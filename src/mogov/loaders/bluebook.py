@@ -11,9 +11,11 @@ import re
 
 import pdfplumber
 
-from mogov import db
+from mogov import db, obs
 from mogov.http import fetch
 from mogov.loaders import loader
+
+log = obs.get_logger(__name__)
 
 BASE = "https://www.sos.mo.gov"
 EDITIONS = os.environ.get("MOGOV_BLUEBOOK_EDITIONS", "2025-2026").split(",")
@@ -54,7 +56,7 @@ def load() -> dict[str, int]:
         for chapter, url in _chapter_urls(edition.strip()).items():
             data = fetch(url, max_age=None, delay=0.5)
             if data[:4] != b"%PDF":
-                print(f"[bluebook] {edition} {chapter}: not a PDF at {url}, skipping")
+                log.warning("bluebook.not_pdf", edition=edition, chapter=chapter, url=url)
                 continue
             with pdfplumber.open(io.BytesIO(data)) as pdf:
                 for page_no, page in enumerate(pdf.pages, 1):

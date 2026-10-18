@@ -17,9 +17,11 @@ import time
 import httpx
 from bs4 import BeautifulSoup
 
-from mogov import db
+from mogov import db, obs
 from mogov.config import USER_AGENT
 from mogov.loaders import loader
+
+log = obs.get_logger(__name__)
 
 BASE = "https://efdsearch.senate.gov"
 FIRST_DATE = os.environ.get("MOGOV_SENATE_EFD_FROM", "01/01/2012 00:00:00")
@@ -91,7 +93,7 @@ def _report_tables(html: str) -> list[dict]:
 @loader("senate_efd")
 def load() -> dict[str, int]:
     if os.environ.get("MOGOV_ACCEPT_SENATE_EFD_TERMS") != "1":
-        print("[senate_efd] opt-in required: set MOGOV_ACCEPT_SENATE_EFD_TERMS=1 to accept the eFD use statement")
+        log.warning("senate_efd.skipped", reason="set MOGOV_ACCEPT_SENATE_EFD_TERMS=1 to accept the eFD use statement")
         return {}
     s = _session()
     filings, rows = [], []

@@ -6,11 +6,13 @@ import json
 import os
 import subprocess
 import sys
-import traceback
+import time
 
-from mogov import db
+from mogov import db, obs
 from mogov.config import DB_PATH, DBT_DIR, RAW_DIR, ROOT
 from mogov.loaders import REGISTRY, STAGE, load_all_modules
+
+log = obs.get_logger(__name__)
 
 
 def run_loaders(names: list[str], stage: int | None = None) -> bool:
@@ -20,20 +22,24 @@ def run_loaders(names: list[str], stage: int | None = None) -> bool:
     for name in names:
         if name not in REGISTRY:
             sys.exit(f"unknown source {name!r}; choose from {', '.join(sorted(REGISTRY))}")
-        print(f"[load] {name} ...", flush=True)
+        log.info("loader.start", loader=name)
+        started = time.perf_counter()
         try:
             for table, n in REGISTRY[name]().items():
-                print(f"[load]   raw.{table}: {n} rows", flush=True)
+                log.info("loader.landed", loader=name, table=f"raw.{table}", rows=n)
+                obs.rows_landed.add(n, {"loader": name, "table": table})
         except Exception:  # one broken upstream shouldn't stop the others
             ok = False
-            traceback.print_exc()
-            print(f"[load] {name} FAILED", flush=True)
+            obs.loader_failures.add(1, {"loader": name})
+            log.exception("loader.failed", loader=name)
+        finally:
+            obs.loader_duration.record(time.perf_counter() - started, {"loader": name})
     return ok
 
 
 def run_dbt(args: list[str]) -> int:
     for table in db.ensure_optional_tables():
-        print(f"[dbt] raw.{table} not loaded yet; using an empty placeholder", flush=True)
+        log.warning("dbt.placeholder", table=f"raw.{table}", reason="not loaded yet; using an empty placeholder")
     # Models over opt-in CSV sources (no empty placeholder possible) are switched on when the data exists.
     dbt_vars = {"mec_direct": db.raw_path("mec_cd1_a").exists()}
     cmd = [sys.executable, "-m", "dbt.cli.main", *args, "--project-dir", str(DBT_DIR), "--profiles-dir", str(DBT_DIR)]
@@ -61,10 +67,13 @@ def export(fmt: str) -> None:
             dest = (out / f"{t}.{fmt}").as_posix()
             opts = "(format csv, header true)" if fmt == "csv" else "(format parquet, compression zstd)"
             con.execute(f"copy marts.{t} to '{dest}' {opts}")
-            print(f"[export] {dest}")
+            log.info("export.written", path=dest)
 
 
 def main() -> None:
+    import atexit
+
+    atexit.register(obs.shutdown)
     parser = argparse.ArgumentParser(prog="mogov")
     sub = parser.add_subparsers(dest="cmd", required=True)
     p_load = sub.add_parser("load", help="run loaders (all if none given)")
@@ -98,4 +107,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    finally:
+        obs.shutdown()

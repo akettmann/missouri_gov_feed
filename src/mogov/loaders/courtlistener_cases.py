@@ -21,10 +21,12 @@ import time
 
 import duckdb
 
-from mogov import db
+from mogov import db, obs
 from mogov.config import DB_PATH
 from mogov.http import fetch
 from mogov.loaders import loader
+
+log = obs.get_logger(__name__)
 
 API = "https://www.courtlistener.com/api/rest/v4"
 TOKEN = os.environ.get("COURTLISTENER_TOKEN", "").strip()
@@ -119,10 +121,10 @@ def _details(cluster_id: int) -> dict:
 def load() -> dict[str, int]:
     people = _people()
     if not people:
-        print("[courtlistener_cases] no legal-career officials yet (run `mogov build` first); skipping")
+        log.warning("cases.skipped", reason="no legal-career officials yet; run `mogov build` first")
         return {"cl_cases": db.replace_json("cl_cases", [], source_url=API)}
     if not TOKEN:
-        print(f"[courtlistener_cases] COURTLISTENER_TOKEN not set: search only, <= {MAX_QUERIES} queries, no outcomes")
+        log.warning("cases.no_token", max_queries=MAX_QUERIES, effect="search only, no outcomes")
     rows, n_queries, n_details, started = [], 0, 0, time.time()
     for person in people:
         for role, query, courts in _queries(person):
@@ -132,7 +134,7 @@ def load() -> dict[str, int]:
             try:
                 hits = _search(query, courts)
             except Exception as exc:
-                print(f"[courtlistener_cases] {query}: {exc}")
+                log.warning("cases.search_failed", query=query, error=str(exc))
                 continue
             for hit in hits:
                 rec = {
@@ -166,5 +168,5 @@ def load() -> dict[str, int]:
                     except Exception as exc:
                         rec["detail_error"] = str(exc)
                 rows.append((f"{person['official_id']}/{role}/{hit.get('cluster_id')}", rec))
-    print(f"[courtlistener_cases] {n_queries} searches, {n_details} case details in {time.time() - started:.0f}s")
+    log.info("cases.done", searches=n_queries, details=n_details, seconds=round(time.time() - started))
     return {"cl_cases": db.replace_json("cl_cases", rows, source_url=API)}

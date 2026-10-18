@@ -16,10 +16,12 @@ import json
 import os
 import zipfile
 
-from mogov import db
+from mogov import db, obs
 from mogov.config import CACHE_DIR, FEC_API_KEY
 from mogov.http import fetch, fetch_to_file
 from mogov.loaders import loader
+
+log = obs.get_logger(__name__)
 
 BULK = "https://www.fec.gov/files/bulk-downloads"
 API = "https://api.open.fec.gov/v1"
@@ -148,7 +150,12 @@ def _sponsored_committees() -> int:
                 )
             )
         except Exception as exc:  # rate limited: keep what we have, report the gap
-            print(f"[fec] sponsor lookup for {cand} failed ({exc}); leadership PACs may be incomplete")
+            log.warning(
+                "fec.sponsor_lookup_failed",
+                candidate_id=cand,
+                error=str(exc),
+                effect="leadership PACs may be incomplete",
+            )
             continue
         for row in body.get("results", []):
             records.append((f"{cand}/{row['committee_id']}", {"sponsor_candidate_id": cand, **row}))
@@ -164,5 +171,5 @@ def load() -> dict[str, int]:
     if FEC_API_KEY and FEC_API_KEY != "DEMO_KEY":
         counts["fec_receipt_aggregates"] = _api_aggregates()
     else:
-        print("[fec] FEC_API_KEY not set: skipping per-member donor aggregates (bulk data still loaded)")
+        log.warning("fec.no_api_key", effect="skipping donor aggregates; bulk data still loaded")
     return counts

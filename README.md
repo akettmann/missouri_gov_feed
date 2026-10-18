@@ -42,6 +42,8 @@ Name-matched records carry a `match_confidence` column. Read medium-confidence m
 | `COURTLISTENER_TOKEN` | Free courtlistener.com token. Adds case outcomes and lifts the 5 requests/minute limit. |
 | `MOGOV_CL_MAX_QUERIES`, `MOGOV_CL_PAUSE` | Case-search cap and pacing. Without a token the defaults are 60 searches per run, 15 s apart; results are cached for 30 days, so repeated runs make progress. |
 | `MOGOV_MEC_OPT_IN=1`, `MOGOV_MEC_USER_AGENT` | Enables direct MEC campaign-finance and lobbying exports (2023+). MEC's robots.txt disallows these pages and its bot protection rejects non-browser clients; see `src/mogov/loaders/mec.py`. |
+| `MOGOV_LOG_JSON=1`, `MOGOV_LOG_LEVEL` | structlog output as JSON lines / log level (default INFO). |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`, `MOGOV_METRICS_CONSOLE=1` | Export OpenTelemetry metrics (`mogov.loader.rows`, `.duration`, `.failures`, `mogov.http.requests`) over OTLP, or print them. |
 | `MOGOV_FEC_INDIV=1` | Also land FEC individual contributions (~2.3 GB per cycle). |
 | `MOGOV_*_YEARS`, `MOGOV_HOUSE_SESSIONS`, `MOGOV_FEC_CYCLES`, ... | Coverage windows (see each loader's header). |
 

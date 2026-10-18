@@ -21,9 +21,11 @@ from datetime import date
 
 import httpx
 
-from mogov import db
+from mogov import db, obs
 from mogov.config import CACHE_DIR, USER_AGENT
 from mogov.loaders import loader
+
+log = obs.get_logger(__name__)
 
 BASE = "https://www.mec.mo.gov/MEC"
 P = "ctl00$ctl00$ContentPlaceHolder$ContentPlaceHolder1$"
@@ -159,8 +161,8 @@ def _lobbyist_expenditures(client: httpx.Client) -> int:
 @loader("mec")
 def load() -> dict[str, int]:
     if os.environ.get("MOGOV_MEC_OPT_IN") != "1":
-        print(
-            "[mec] opt-in required (MOGOV_MEC_OPT_IN=1); see src/mogov/loaders/mec.py for why. Using TAP mirror only."
+        log.warning(
+            "mec.skipped", reason="opt-in required (MOGOV_MEC_OPT_IN=1); see loaders/mec.py", fallback="TAP mirror"
         )
         return {}
     with _client() as client:

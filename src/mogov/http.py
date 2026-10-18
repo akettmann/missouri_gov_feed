@@ -7,6 +7,7 @@ from pathlib import Path
 
 import httpx
 
+from mogov import obs
 from mogov.config import CACHE_DIR, USER_AGENT
 
 _client: httpx.Client | None = None
@@ -42,10 +43,13 @@ def fetch(
     delay: seconds to sleep before a network request (not on cache hits), to stay polite to small state sites.
     """
     path = _cache_path(url, params)
+    host = httpx.URL(url).host
     if path.exists() and (max_age is None or time.time() - path.stat().st_mtime < max_age):
+        obs.http_requests.add(1, {"host": host, "cache_hit": True})
         return path.read_bytes()
     if delay:
         time.sleep(delay)
+    obs.http_requests.add(1, {"host": host, "cache_hit": False})
     for attempt in range(retries):
         resp = client().get(url, params=params, headers=headers)
         if resp.status_code == 429 or resp.status_code >= 500:

@@ -11,10 +11,12 @@ import json
 
 import duckdb
 
-from mogov import db
+from mogov import db, obs
 from mogov.config import CONTACT
 from mogov.http import post
 from mogov.loaders import loader
+
+log = obs.get_logger(__name__)
 
 ENDPOINT = "https://query.wikidata.org/sparql"
 BATCH = 40
@@ -112,7 +114,9 @@ def _sparql(query: str) -> list[dict]:
 def load() -> dict[str, int]:
     if not CONTACT:
         # https://meta.wikimedia.org/wiki/User-Agent_policy -- requests without contact info are refused.
-        print("[wikidata] MOGOV_CONTACT not set (Wikimedia requires contact info in the User-Agent); skipping")
+        log.warning(
+            "wikidata.skipped", reason="MOGOV_CONTACT not set; Wikimedia requires contact info in the User-Agent"
+        )
         return {t: db.replace_json(t, [], source_url=ENDPOINT) for t in [*TEMPLATES, "wikidata_mo_officeholders"]}
     discovered = _sparql(DISCOVER)
     qids = sorted(set(_qids()) | {r["person"].rsplit("/", 1)[-1] for r in discovered})
