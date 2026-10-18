@@ -24,6 +24,7 @@ They will be:
 * Make as few changes to the raw data as possible when writing it to the raw storage
 * emit progress when reasonably knowable (don't add a lot of extra work here. Ask if you are unsure.)
 * be shardable, can spawn workers in parallel that split up the work independently (ensure the split mechanism is idempotent). Ideally use options `--shards` to indicate the max number of shards, and `--shard` to indicate that process's shard. If `--shards` is provided and `--shard` is not provided, the process should run a processpool of `--shards` number of workers
+* Ready to run in the Google Cloud Run Jobs runtime (Refer to the Google cloud container contract cloud_run_container_contract.md)
 ## Documentation
 Diagrams/flowcharts are written in PlantUML
 Maintain step by step documentation of:
