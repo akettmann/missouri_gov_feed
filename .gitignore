@@ -1,0 +1,10 @@
+.venv/
+data/
+__pycache__/
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+.idea/workspace.xml
+dbt/.user.yml
+.env
+.idea
