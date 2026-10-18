@@ -1,0 +1,32 @@
+name: mogov
+version: "0.1.0"
+config-version: 2
+profile: mogov
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  mogov:
+    staging:
+      +schema: staging
+      +materialized: view
+    intermediate:
+      +schema: intermediate
+      +materialized: table
+    marts:
+      +schema: marts
+      +materialized: table
+
+seeds:
+  mogov:
+    +schema: reference
+
+# Let this project override dbt's cross-database macros per adapter (see macros/compat/casts.sql).
+dispatch:
+  - macro_namespace: dbt
+    search_order: ["mogov", "dbt"]

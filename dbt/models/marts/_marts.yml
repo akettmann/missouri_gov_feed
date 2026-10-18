@@ -1,0 +1,101 @@
+version: 2
+
+models:
+  - name: dim_official
+    description: >
+      Every current Missouri public official tracked: 6 statewide executives, the General Assembly
+      (House roster from the House's own XML; Senate from Open States), the congressional delegation,
+      mayors Open States tracks, Missouri state judges (Official Manual) and federal judges seated in Missouri.
+    columns:
+      - name: official_id
+        description: ocd-person id, bioguide:<id>, fjc:<nid>, mojudge:<key>, mohouse:<id> or statewide:<office>.
+        data_tests: [unique, not_null]
+      - name: full_name
+        data_tests: [not_null]
+      - name: level
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['state', 'federal', 'local']
+      - name: office
+        data_tests: [not_null]
+
+  - name: official_profile
+    description: One row per official with record counts per category and a coverage status explaining gaps.
+    columns:
+      - name: official_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+
+  - name: fct_office_history
+    description: Past and present offices (Open States, congress-legislators, FJC, Wikidata, CourtListener, Official Manual).
+    columns:
+      - name: official_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: office_title
+        data_tests: [not_null]
+
+  - name: fct_votes
+    description: Roll-call votes - MO House (PDFs), MO Senate (journals), Congress (Voteview).
+    columns:
+      - name: official_id
+        data_tests: [not_null]
+      - name: vote_cast
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['yea', 'nay', 'present', 'absent', 'absent with leave', 'not voting']
+
+  - name: fct_campaign_finance
+    description: Donations received by and given from officials' committees (FEC; MEC via TAP).
+    columns:
+      - name: direction
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['received', 'given']
+      - name: match_confidence
+        description: "'exact id' (FEC ids), 'high'/'medium' (MEC committee-name match; see int_mec__official_committees)."
+
+  - name: fct_federal_donor_summary
+    description: FEC cycle totals per member, plus top itemized donor employers / size buckets / states.
+
+  - name: fct_lobbyist_gifts
+    description: Lobbyist expenditures on officials reported to MEC (2004-2022 via TAP).
+
+  - name: fct_disclosures
+    description: Mandatory financial disclosures - House Clerk, Senate eFD, federal judges (AO-10).
+
+  - name: fct_voluntary_disclosures
+    description: Hand-curated voluntary disclosures (seeds/voluntary_disclosures.csv).
+
+  - name: fct_bias_indicators
+    description: DW-NOMINATE, Shor-McCarty, ACU ratings and computed party-unity - measured lean, not judgments.
+    columns:
+      - name: indicator
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['dw_nominate_dim1', 'shor_mccarty_np', 'acu_rating', 'party_unity_pct']
+
+  - name: fct_commercial_ties
+    description: Business positions, income/compensation sources and agreements (disclosures, Wikidata).
+
+  - name: fct_family_ties
+    description: Relatives and their leadership roles (Wikidata), spouse/dependent business ties (disclosures).
+
+  - name: fct_legal_careers
+    description: Officials who are or were judges or lawyers, with the evidence.
+
+  - name: fct_case_history
+    description: Cases (CourtListener) for current/former judges and lawyers, with role and outcome.

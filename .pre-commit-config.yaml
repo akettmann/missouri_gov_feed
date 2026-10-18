@@ -1,0 +1,37 @@
+# Hooks run from the repo root via the project venv (`uv sync` first) so sqlfluff's dbt templater
+# compiles models with the same dbt-core / dbt-duckdb the pipeline uses.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --frozen ruff check --fix
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --frozen ruff format
+        language: system
+        types_or: [python, pyi]
+      - id: sqlfluff-fix
+        name: sqlfluff fix
+        entry: uv run --frozen sqlfluff fix --force
+        language: system
+        files: ^dbt/(models|macros|tests)/.*\.sql$
+        require_serial: true
+      - id: sqlfluff-lint
+        name: sqlfluff lint
+        entry: uv run --frozen sqlfluff lint
+        language: system
+        files: ^dbt/(models|macros|tests)/.*\.sql$
+        require_serial: true

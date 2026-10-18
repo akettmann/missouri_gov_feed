@@ -1,0 +1,97 @@
+version: 2
+sources:
+  - name: raw
+    description: >
+      Verbatim landings written by the Python loaders (src/mogov/loaders), one Parquet file per table.
+      JSON payloads are stored as text and read only through the mogov.json_* macros (portable SQL).
+      Tables from opt-in or key-gated loaders (mec, senate_efd, fec aggregates, wikidata, case history)
+      may be absent; models over them are disabled via the `enabled` vars in dbt_project.yml.
+    meta:
+      external_location: "read_parquet('{{ env_var('MOGOV_RAW_DIR', 'data/raw') }}/{name}.parquet')"
+    tables:
+      # rosters / careers
+      - name: openstates_people
+        description: One row per Open States YAML file under data/mo (legislature, retired, executive, municipalities, committees).
+      - name: openstates_current_csv
+        description: Open States flat current roster (has Wikidata QIDs).
+      - name: congress_legislators_current
+        description: unitedstates/congress-legislators current members who have ever served MO.
+      - name: congress_legislators_historical
+      - name: bluebook_lines
+        description: Missouri Official Manual chapter PDFs (executive, legislative, judicial), one row per text line.
+      - name: fjc_judges
+        description: Federal Judicial Center biographical directory of Article III judges (wide CSV).
+      # votes
+      - name: voteview_members
+      - name: voteview_rollcalls
+      - name: voteview_votes
+      - name: mo_house_members
+        description: MO House member XML per session (roster, committees, bio, sponsored bills).
+      - name: mo_house_bills
+      - name: mo_house_lists
+      - name: mo_house_rollcalls
+        description: One row per House roll-call PDF (header fields, printed totals).
+      - name: mo_house_rollcall_votes
+        description: One row per (House roll call, member token) parsed from the PDF grid.
+      - name: mo_senate_journals
+      - name: mo_senate_votes
+        description: One row per (Senate journal vote block, category, senator token).
+      # money
+      - name: fec_candidates
+      - name: fec_committees
+      - name: fec_cand_cmte_links
+      - name: fec_committee_contribs_to_candidates
+        description: FEC pas2 - contributions from committees to candidates (and independent expenditures).
+      - name: fec_candidate_summary
+      - name: fec_sponsored_committees
+        description: Committees (leadership PACs) sponsored by MO members, from the FEC API.
+      - name: fec_receipt_aggregates
+        description: FEC API itemized-receipt aggregates by employer/size/state (needs FEC_API_KEY).
+      - name: tap_mec_contributions
+        description: MEC itemized contributions received, via the Accountability Project mirror (2011-2022).
+      - name: tap_mec_expenditures
+      - name: mec_cd1_a
+        description: MEC direct - itemized contributions received (opt-in `mec` loader; enable var mec_direct).
+      - name: mec_cd3_b
+        description: MEC direct - itemized expenditures over $100.
+      - name: mec_cd3_c
+        description: MEC direct - contributions made by a committee to other committees/candidates.
+      - name: mec_summary
+      - name: mec_candidate_committees
+        description: MEC CF12 election search export - MECID <-> candidate name and office sought.
+      - name: mec_lobbyist_expenditures
+        description: MEC direct - lobbyist expenditures on public officials, 2019+.
+      - name: tap_mec_lobbyist_expenditures
+        description: MEC lobbyist expenditures (gifts) to public officials, via TAP (2004-2022).
+      # disclosures
+      - name: house_fd_index
+      - name: house_fd_pdf_lines
+      - name: senate_efd_filings
+      - name: senate_efd_rows
+        description: Senate eFD web-report table rows (opt-in loader).
+      - name: cl_courts
+      - name: cl_people
+      - name: cl_positions
+      - name: cl_political_affiliations
+      - name: cl_educations
+      - name: cl_schools
+      - name: cl_retention_events
+      - name: cl_financial_disclosures
+      - name: cl_fd_investments
+      - name: cl_fd_gifts
+      - name: cl_fd_debts
+      - name: cl_fd_positions
+      - name: cl_fd_agreements
+      - name: cl_fd_non_investment_income
+      - name: cl_fd_spousal_income
+      # ideology / ratings
+      - name: shor_mccarty
+      - name: acu_ratings
+      # knowledge graph
+      - name: wikidata_positions
+      - name: wikidata_attributes
+      - name: wikidata_relatives
+      - name: wikidata_own_leadership
+      - name: wikidata_mo_officeholders
+      - name: cl_cases
+        description: CourtListener opinion search hits per official judge/lawyer (stage-2 loader).

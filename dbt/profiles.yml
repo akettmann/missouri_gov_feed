@@ -1,0 +1,7 @@
+mogov:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: "{{ env_var('MOGOV_DB', 'data/mogov.duckdb') }}"
+      threads: 4

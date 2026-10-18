@@ -1,0 +1,18 @@
+version: 2
+seeds:
+  - name: statewide_officials
+    description: >
+      Missouri's six statewide elected executive officers. Curated by hand because the Open States
+      executive folder is incomplete. Matched to Open States people by name to pick up prior
+      legislative careers. Review after each election / appointment.
+    config:
+      column_types: {term_start: date, term_end: date}
+    columns:
+      - name: office
+        data_tests: [unique, not_null]
+  - name: house_speakers
+    description: Speaker of the Missouri House per year; roll-call PDFs list the Speaker as "MR SPEAKER".
+  - name: voluntary_disclosures
+    description: Hand-curated voluntary disclosures (no machine-readable source exists). Add rows with a source_url.
+    config:
+      column_types: {disclosure_date: date, official_name: varchar, office: varchar, kind: varchar, description: varchar, source_url: varchar}
