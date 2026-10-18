@@ -14,3 +14,4 @@ DBT Core
 DuckDB backend
 Use compatible constructs from DBT to make switching backends possible
 linting: SqlFluff
+if useful, add dbt-utils and dbt-expectations to the DBT project
