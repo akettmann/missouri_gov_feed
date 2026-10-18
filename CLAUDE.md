@@ -15,3 +15,18 @@ DuckDB backend
 Use compatible constructs from DBT to make switching backends possible
 linting: SqlFluff
 if useful, add dbt-utils and dbt-expectations to the DBT project
+## Loader processes
+Loaders are processes that fetch raw data and write it to our raw storage.
+They will be:
+* Python
+* Idempotent
+* Streaming
+* Make as few changes to the raw data as possible when writing it to the raw storage
+* emit progress when reasonably knowable (don't add a lot of extra work here. Ask if you are unsure.)
+* be shardable, can spawn workers in parallel that split up the work independently (ensure the split mechanism is idempotent). Ideally use options `--shards` to indicate the max number of shards, and `--shard` to indicate that process's shard. If `--shards` is provided and `--shard` is not provided, the process should run a processpool of `--shards` number of workers
+## Documentation
+Diagrams/flowcharts are written in PlantUML
+Maintain step by step documentation of:
+* How to build an environment from scratch
+* How to keep an environment's data in sync
+* a Per source section that describes the source in brief. Also it will include details of any quirks identified for that source
