@@ -55,7 +55,7 @@ def _headers() -> dict:
 def _people() -> list[dict]:
     if not DB_PATH.exists():
         return []
-    with duckdb.connect(str(DB_PATH), read_only=True) as con:
+    with db.connect(str(DB_PATH), read_only=True) as con:
         try:
             rows = con.execute("""
                 select o.official_id, o.full_name, o.given_name, o.family_name, o.office,
