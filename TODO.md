@@ -10,12 +10,18 @@
 - [x] Add diagrams using PlantUML that describe the data model (docs/diagrams/data_model.puml, lineage.puml, pipeline.puml)
 - [x] Add diagrams using PlantUML that describe each source and loader's uniqueness (docs/diagrams/sources/)
 - [x] Build case history from CourtListener's quarterly bulk files (`courtlistener_case_bulk` + int_courtlistener__bulk_case_matches); the API loader stays for top-ups
-- [ ] Decide whether the House/Senate vote-token parsing (regex in Python today) should move to dbt, landing only the extracted PDF text, per "make as few changes to the raw data as possible". The House token regex uses a lookbehind, which RE2/DuckDB can't do
-- [ ] Ask MEC (helpdesk@mec.mo.gov) whether a lower pause or parallel shards are acceptable; the pause is now `MOGOV_MEC_PAUSE`
-- [ ] Deploy the Cloud Run jobs described in docs/environment.md and confirm the GCS FUSE layout end to end
+- [x] House/Senate vote-token parsing stays in the Python loaders: turning the PDF into rows of data is an acceptable transformation
+- [x] Update DBT with detailed definitions/contexts: every mart column documented (_marts.yml, shared doc blocks in models/_docs.md), staging/intermediate model descriptions generated from their SQL headers (scripts/gen_model_docs.py), every raw source described; mart docs persist as table/column comments in DuckDB
+- [ ] Ask MEC (helpdesk@mec.mo.gov) whether a lower pause or parallel shards are acceptable; the pause is `MOGOV_MEC_PAUSE` (a cold run is ~10-11 min at 3 s, ~4-5 min at 1 s)
+- [ ] Normalize `party` ("Democratic" and "Democrat" both occur in dim_official)
+- [ ] Decode FEC committee-type codes in fct_campaign_finance.counterparty_type (raw N/Q/X/Y/H/S/V/W today)
+- [ ] fct_case_history.outcome is mostly CourtListener's verbatim disposition; map it to a fixed vocabulary (affirmed / reversed / remanded / dismissed / mixed ...)
 
 ## Low priority
 - [x] Add metrics for the loaders (rows, duration, failures, progress gauge by loader/shard; HTTP requests, bytes, latency by host)
 - [x] Build GitHub workflow to run tests, lint, etc (.github/workflows/ci.yml)
-- [ ] `playwright` is a dependency but nothing imports it; drop it to slim the image?
-- [ ] mec_cd3_b and mec_summary are landed but no dbt model reads them
+- [x] Drop the unused `playwright` dependency
+- [ ] Frontend candidates, landed but not modeled: `mec_cd3_b` (itemized committee spending over $100: payee, purpose, amount - "how did their committee spend its money") and `mec_summary` (per-report cover totals: raised, spent, money on hand, debt - "raised $X, spent $Y, $Z in the bank")
+
+## Future
+- [ ] Deploy the Cloud Run jobs described in docs/environment.md and confirm the GCS FUSE layout end to end (for now the pipeline runs and writes locally)
