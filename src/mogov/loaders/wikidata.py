@@ -3,7 +3,8 @@ employers, and relatives -- plus any organizations those relatives lead (CEO, di
 member, chairperson, founder, owner) for the "family members in company leadership" view.
 
 People are identified by Wikidata QID, taken from the landed Open States roster and
-congress-legislators files (run those loaders first). Officials without a QID are matched in dbt
+congress-legislators files. Those are stage-1 loaders, so this one is stage 2: as a stage-1 loader its
+shards raced them and failed on a missing openstates_current_csv. Officials without a QID are matched in dbt
 by name against the label search below, so coverage is best for well-documented officials.
 """
 
@@ -110,7 +111,7 @@ def _sparql(query: str) -> list[dict]:
     return [{k: v["value"] for k, v in b.items()} for b in bindings]
 
 
-@loader("wikidata")
+@loader("wikidata", stage=2, service="query.wikidata.org")
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: people (by QID). Every shard runs the (cached) discovery query to list them; shard 0 lands it."""
     tables = [*TEMPLATES, "wikidata_mo_officeholders"]

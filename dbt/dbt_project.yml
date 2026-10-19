@@ -30,6 +30,16 @@ models:
       +persist_docs:
         relation: true
         columns: true
+    # Shaped for the frontend's pages (one model per view), built only from marts and intermediate models.
+    # Same contract rules as the marts.
+    reporting:
+      +schema: reporting
+      +materialized: table
+      +contract:
+        enforced: true
+      +persist_docs:
+        relation: true
+        columns: true
 
 seeds:
   mogov:

@@ -99,7 +99,7 @@ def _filter(stem: str, snap: str, column: str, keep: set[str], prefilter=None) -
     return out, ids
 
 
-@loader("courtlistener_case_bulk")
+@loader("courtlistener_case_bulk", service="courtlistener-s3", slow=True)
 def load(shard: db.Shard) -> dict[str, int]:
     """One unit: the snapshot."""
     if not shard.owns("courtlistener_case_bulk"):

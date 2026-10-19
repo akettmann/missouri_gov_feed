@@ -142,7 +142,7 @@ def _details(cluster_id: int, *, cache_only: bool = False) -> dict:
     return {"disposition": cluster.get("disposition"), "opinion_tail": tail}
 
 
-@loader("courtlistener_cases", stage=2)
+@loader("courtlistener_cases", stage=2, service="www.courtlistener.com")
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: officials (by official_id). MOGOV_CL_MAX_* caps apply per shard."""
     people = _people()

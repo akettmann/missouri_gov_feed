@@ -169,7 +169,10 @@ class _Exports:
             form.set("ddElectionYear", str(year), postback=True)
             dates = re.findall(r'<option[^>]*value="(\d{1,2}/\d{1,2}/\d{4})"', form.page.text)
             if not dates:
+                # Seen for 2016 and 2018. Not cached: an empty answer would otherwise stick for 30 days.
                 log.warning("mec.crosswalk_no_elections", year=year)
+                self.progress.tick()
+                return []
             records = []
             for election_date in dates:
                 form.set("ddElectionDate", election_date, postback=True)
@@ -219,7 +222,7 @@ class _Exports:
         return dest
 
 
-@loader("mec")
+@loader("mec", service="www.mec.mo.gov", slow=True)
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: (report type, year) exports, crosswalk election years, and the lobbyist export."""
     if os.environ.get("MOGOV_MEC_OPT_IN") != "1":

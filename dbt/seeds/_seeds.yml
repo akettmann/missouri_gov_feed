@@ -35,3 +35,11 @@ seeds:
         data_tests: [unique, not_null]
       - name: office
         data_tests: [not_null]
+  - name: mo_payroll_office_titles
+    description: >
+      The position titles on Missouri's state payroll (mo_employee_pay) that are elected or judicial offices,
+      not staff, with the group of offices they belong to (legislature, statewide, judiciary). fct_salaries
+      only reads these rows. Titles found 2017-2025; add new ones if the payroll renames a position.
+    columns:
+      - name: position_title
+        data_tests: [unique, not_null]

@@ -1,5 +1,5 @@
 @startuml lineage
-title Source -> loader -> raw -> marts lineage (from dbt/target/manifest.json, grouped)
+title Source -> loader -> raw -> marts -> reporting lineage (from dbt/target/manifest.json, grouped)
 left to right direction
 skinparam packageStyle rectangle
 skinparam nodesep 12
@@ -27,9 +27,12 @@ package "Money" {
 package "Disclosures" {
   [house_fd] as L_hfd
   [senate_efd\n(opt-in)] as L_efd
+  [mo_employee_pay] as L_pay
+}
+package "Boundaries" {
+  [census_tiger] as L_tiger
 }
 package "Ratings" {
-  [acu_ratings] as L_acu
   [shor_mccarty] as L_sm
 }
 package "Stage 2" {
@@ -42,7 +45,9 @@ package "seeds" {
 package "intermediate (identity resolution)" {
   [int_officials__current\nint_officials__name_keys\nint_officials__bios\nint_officials__wikidata] as I_off
   [int_mo_legislators__seats\nint_mo_house__member_identity] as I_seats
+  [int_bluebook__county_circuits] as I_circ
   [int_mo_house__votes\nint_mo_senate__votes] as I_votes
+  [int_votes__member_votes\nint_votes__party_positions] as I_party
   [int_judges__current\nint_judges__federal\nint_judges__state_index\nint_bluebook__bios\nint_bluebook__judge_bios] as I_judges
   [int_mec__official_committees] as I_mec
   [int_house_fd__schedule_lines\nint_courtlistener__judge_disclosure_items] as I_fd
@@ -52,6 +57,9 @@ package "intermediate (identity resolution)" {
 
 package "marts" {
   [dim_official] as dim
+  [fct_salaries] as F_sal
+  [fct_bills\nfct_bill_subjects\nfct_bill_sponsors\nfct_vote_bills] as F_bills
+  [dim_district\nfct_official_districts] as D_dist
   [fct_votes\nfct_federal_votes] as F_votes
   [fct_campaign_finance\nfct_federal_donor_summary\nfct_campaign_spending\nfct_campaign_reports] as F_money
   [fct_lobbyist_gifts] as F_gifts
@@ -63,6 +71,14 @@ package "marts" {
   [fct_case_history] as F_cases
   [official_profile] as profile
 }
+
+package "reporting (frontend views)" {
+  [rpt_indicator_peers] as R_peers
+  [rpt_party_breaks\nrpt_attendance] as R_votes
+  [rpt_donor_rollup] as R_money
+  [rpt_gift_rollup] as R_gifts
+}
+[voter_frontend\n(dbt exposure)] as EXP
 
 L_os --> I_seats
 L_os --> I_off
@@ -85,6 +101,9 @@ I_seats --> I_votes
 I_votes --> F_votes
 L_vv --> F_votes
 L_vv --> F_bias
+I_votes --> I_party
+L_vv --> I_party
+I_party --> F_bias
 
 L_fec --> F_money
 L_tap --> I_mec
@@ -101,7 +120,6 @@ L_efd --> F_disc
 I_fd --> F_disc
 SEEDS --> F_disc
 
-L_acu --> F_bias
 L_sm --> F_bias
 F_votes --> F_bias
 
@@ -128,4 +146,30 @@ F_office --> profile
 F_ties --> profile
 F_legal --> profile
 F_cases --> profile
+
+L_tiger --> D_dist
+L_pay --> F_sal
+I_seats --> F_sal
+I_off --> F_sal
+F_sal --> EXP
+L_moh --> F_bills
+I_votes --> F_bills
+I_seats --> F_bills
+F_bills --> EXP
+L_bb --> I_circ
+I_circ --> D_dist
+dim --> D_dist
+D_dist --> EXP
+
+F_bias --> R_peers
+dim --> R_peers
+F_votes --> R_votes
+I_party --> R_votes
+F_money --> R_money
+F_gifts --> R_gifts
+R_peers --> EXP
+R_votes --> EXP
+R_money --> EXP
+R_gifts --> EXP
+profile --> EXP
 @enduml

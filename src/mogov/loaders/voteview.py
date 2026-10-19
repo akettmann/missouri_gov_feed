@@ -12,7 +12,7 @@ BASE = "https://voteview.com/static/data/out"
 CONGRESSES = [int(c) for c in os.environ.get("MOGOV_VOTEVIEW_CONGRESSES", "117,118,119").split(",")]
 
 
-@loader("voteview")
+@loader("voteview", service="voteview.com")
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: one CSV per (kind, congress)."""
     counts = {}

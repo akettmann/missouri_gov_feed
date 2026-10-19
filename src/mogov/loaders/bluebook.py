@@ -49,7 +49,7 @@ def _page_columns(page) -> list[str]:
     return [page.extract_text() or ""]
 
 
-@loader("bluebook")
+@loader("bluebook", service="www.sos.mo.gov")
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: chapter PDFs (edition/chapter)."""
     with db.JsonSink(shard, source_url=BASE, tables=["bluebook_lines"]) as sink:

@@ -1,0 +1,13 @@
+@startuml mo_employee_pay
+title mo_employee_pay: Missouri state payroll (data.mo.gov)
+start
+:Socrata catalog: "<year> State Employee Pay" dataset ids;
+:for each year in MOGOV_LOOKBACK_YEARS (one shard unit each):
+<dataset>.csv where agency_name in (Legislature, Judiciary,
+six statewide offices);
+note right: rows verbatim, staff included
+:mo_employee_pay;
+:dbt: officeholder titles (seed mo_payroll_office_titles)
+matched by seat (legislators) or name -> fct_salaries;
+stop
+@enduml

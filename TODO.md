@@ -1,26 +1,40 @@
 # TODO List
 
+# High Priority
+- [x] review full_run.log: every loader started and finished on all 4 shards. Found and fixed: `mo_house` shards 1-2 failed (Windows cache-rename race between shards fetching the same session zip; downloads are now single-flight with a retried rename), `wikidata` shards 1-2 failed (ran before `openstates_people` landed its CSV; now stage 2), MEC cached an empty crosswalk for 2016/2018 for 30 days (no longer cached). Expected: `courtlistener_cases` quota exhausted (0 rows; resumes next day), `dbt.placeholder` for `cl_cases` in the first build
+- [x] review second_run.log: no failures. `mo_house`/`mo_senate`/`house_fd` spent 3-10 min per shard re-parsing cached PDFs; PDF text is now cached by content (`data/cache/pdftext/`)
+- [ ] Re-run `uv run mogov run --shards 4` twice (full + quick re-run) to confirm the fixes and the new concurrent scheduling in a real run; check the second run's loader times
+
 ## Frontend support (see FRONTEND_TODO.md)
 ### dbt
-- [ ] Add a `dbt/models/reporting/` layer (`rpt_*`, portable SQL, enforced contracts like the marts) shaped for the frontend pages
-- [ ] `rpt_indicator_peers`: each bias indicator per official alongside chamber colleagues' values and party medians
-- [ ] `rpt_party_breaks`: party-line votes where the official voted against their party's majority (reuse the party-unity logic in `fct_bias_indicators`; consider extracting it to an intermediate model)
-- [ ] `rpt_donor_rollup`: donations received per official by counterparty organization, counterparty type (PAC vs individual), cycle/year; keep `match_confidence` so the UI can flag/hide medium matches
-- [ ] `rpt_gift_rollup`: lobbyist gifts per official by principal, category and year (with `match_confidence`)
-- [ ] dbt `exposure` for the frontend so its mart/reporting dependencies show in lineage (docs/dbt_best_practices.md)
-- [ ] Decide how ACU is presented: add a progressive-leaning scorecard source for balance, or keep ACU out of headline indicators
+- [x] Add a `dbt/models/reporting/` layer (`rpt_*`, portable SQL, enforced contracts like the marts) shaped for the frontend pages
+- [x] `rpt_indicator_peers`: each bias indicator per official alongside chamber colleagues' values and party medians
+- [x] `rpt_party_breaks`: party-line votes where the official voted against their party's majority (party majorities extracted to `int_votes__party_positions`, now counted over every member who voted)
+- [x] `rpt_donor_rollup`: donations received per official by donor organization, donor class (PAC vs individual), year/cycle; keeps `match_confidence`
+- [x] `rpt_gift_rollup`: lobbyist gifts per official by principal, category and year (with `match_confidence`)
+- [x] dbt `exposure` for the frontend (`voter_frontend` in `models/reporting/_reporting.yml`)
+- [x] Decide how ACU is presented: ACU dropped (see Low priority)
 
 ### Loaders
-- [ ] `census_tiger`: Missouri state legislative (SLDU/SLDL) and congressional district boundaries, plus county boundaries (judicial circuits) and places (mayors); dbt model joining districts to `dim_official`
-- [ ] Bill subjects/sponsors loader (Open States bills API or MO House bill pages) so votes can be grouped by topic
-- [ ] Balancing ideology scorecard loader (if chosen above)
+- [x] `census_tiger`: district, county and place boundaries -> `dim_district`, `fct_official_districts` (legislators, U.S. House, circuit judges via the Official Manual's county->circuit table, mayors)
+- [ ] `fct_official_districts`: map Courts of Appeals districts and federal district courts (E.D./W.D. Mo.) to counties; 7 state judges have no circuit in `dim_official`
+- [x] Bill subjects/sponsors: from the MO House bill XML already landed -> `fct_bills`, `fct_bill_subjects`, `fct_bill_sponsors`, `fct_vote_bills` (House votes linked exactly; Senate votes on House bills via the journal's measure)
+- [ ] Bill subjects before the 2024 sessions and Senate bills (SB/SJR): the House XML has neither. Candidate source: Open States bills API (needs a key) or senate.mo.gov bill pages
+- [x] ~~Balancing ideology scorecard loader~~ (not needed: ACU dropped)
 
 ### Later (interest vs. vote overlap)
-- [ ] Seed mapping donor organizations / lobbyist principals to industries or subjects
+- [ ] Seed mapping donor organizations / lobbyist principals to industries or subjects (can target the House subject index terms in `fct_bill_subjects`)
 - [ ] `rpt_interest_vote_overlap`: votes on bills whose subject matches an industry that funded or gifted the official (co-occurrence, not causation)
 
 ## Low priority
-- [ ] Document "wipe and rebuild from scratch" in docs/environment.md: what to delete (data/raw, mogov.duckdb, exports; optionally data/cache), `mogov run --shards 4`, verification (`mogov build`, `mogov freshness`), and expected time with vs. without the cache; Docker variant
+- [x] Fetch salaries for the officials: `mo_employee_pay` loader (data.mo.gov state payroll) -> `fct_salaries` (state officials, 2017+)
+- [ ] Salaries for federal officials (Congress, federal judges): fixed by statute; a seed of yearly pay tables would cover them
+- [x] when running `uv run mogov run` execute sources that are across different services concurrently (`--workers`; loaders grouped by service)
+- [ ] Listing of companies that operate in the official's jurisdiction, highlight which ones have donated. Needs a decision on the source: the MO Secretary of State business search has no bulk export; Census County Business Patterns has counts but no names
+- [x] Document "wipe and rebuild from scratch" in docs/environment.md
+- [x] Drop ACU source
+- [x] add computed attendance %: `rpt_attendance` per official, chamber and session, with the chamber-wide rate
 
 ## Future
 - [ ] Deploy the Cloud Run jobs described in docs/environment.md and confirm the GCS FUSE layout end to end (for now the pipeline runs and writes locally)
+- [ ] Sunshine Law (RSMo 610) requests for Missouri personal financial disclosures (PFDs), which are not published online: officials' and candidates' from MEC (helpdesk@mec.mo.gov, 800-392-8660), judges' from the Clerk of the Missouri Supreme Court. Once copies arrive, add them through a seed or a local-folder loader

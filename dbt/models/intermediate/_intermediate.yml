@@ -6,6 +6,12 @@ models:
   description: 'Official Manual biographies split per person. Legislative chapter entries start with "District 12—FIRST
     LAST" and run until the next entry; lines are joined in reading order. Grain: one biography per (edition, person)
     in the legislative/executive chapters.'
+- name: int_bluebook__county_circuits
+  description: 'Missouri judicial circuit of every county, from the Official Manual''s "Circuit courts by county"
+    table ("Adair......... Circuit No. 2"; St. Louis appears as "St. Louis Co." and "St. Louis City"). Lines can
+    carry a stray character from the neighbouring column, so the name is taken from its first capital letter. county_key
+    matches stg_census_tiger__features names through name_key(), minus "county"/"co". Grain: one row per county
+    (and St. Louis City) in the latest edition.'
 - name: int_bluebook__judge_bios
   description: 'Official Manual judicial-chapter biographies split per judge. Circuit and associate circuit entries
     are "<NAME IN CAPS>" followed by "Office address: ..."; appellate entries open with "<NAME IN CAPS> was born
@@ -95,3 +101,14 @@ models:
 - name: int_officials__wikidata
   description: 'Wikidata QID per official: from roster cross-references when present, else a unique exact name match
     against living Missouri officeholders on Wikidata. Grain: one row per official with a Wikidata QID.'
+- name: int_votes__member_votes
+  description: 'Every recorded vote by every member, tracked official or not: MO House roll calls and MO Senate
+    journals (member_key is the attributed person, else the printed token) and Congress from the loaded Voteview
+    files (member_key is the ICPSR id). Chamber-wide figures (party majorities, chamber attendance) count from here,
+    so they don''t depend on who holds office today. vote_id, chamber and session_code match fct_votes. Grain: one
+    row per (chamber, vote, member) for every member, tracked or not.'
+- name: int_votes__party_positions
+  description: 'Each party''s majority position on every recorded vote, counted over every member who voted (int_votes__member_votes),
+    not only the officials tracked today. A party''s position is the side most of its yea/nay voters took; a tie
+    has no position. A party-line vote is one where the Republican and Democratic majorities took opposite sides.
+    vote_id and chamber match fct_votes. Grain: one row per (chamber, vote) with any Republican or Democratic yea/nay.'

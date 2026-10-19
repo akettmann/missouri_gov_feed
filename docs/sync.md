@@ -27,9 +27,10 @@ uv run mogov run --shards 4
 | openstates_people | as edited | daily | weekly |
 | congress_legislators | as edited | daily | weekly |
 | fjc_judges | as appointed | 30 days | monthly |
-| wikidata | continuously | 7 days | weekly |
-| acu_ratings | yearly | 30 days | monthly |
+| wikidata (stage 2) | continuously | 7 days | weekly |
 | shor_mccarty | yearly release | 90 days | quarterly |
+| mo_employee_pay | yearly (each January) | current and previous year 7 days, older 30 days | monthly |
+| census_tiger | yearly vintage (each autumn); redistricting | listings 7 days; shapefiles forever | monthly |
 
 Run a subset with `mogov load <loader ...>` followed by `mogov build`. For example, daily during
 session:

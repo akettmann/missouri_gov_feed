@@ -7,13 +7,10 @@ vote ("SB 974 was read the 3rd time and passed by the following vote:") kept as 
 surnames, "(16)"-style district suffixes when two senators share one; dbt matches them to people.
 """
 
-import io
 import re
 from datetime import date
 
-import pdfplumber
-
-from mogov import db, obs
+from mogov import db, obs, pdftext
 from mogov.config import window_years
 from mogov.http import fetch
 from mogov.loaders import loader
@@ -79,7 +76,7 @@ def _journal_urls(year: int) -> list[str]:
     return sorted({BASE + link.decode() for link in links})
 
 
-@loader("mo_senate")
+@loader("mo_senate", service="www.senate.mo.gov", slow=True)
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: journal PDFs (by URL)."""
     journals = shard.take(((url, year) for year in window_years() for url in _journal_urls(year)), key=lambda j: j[0])
@@ -92,8 +89,7 @@ def load(shard: db.Shard) -> dict[str, int]:
             except Exception as exc:
                 sink.add("mo_senate_journals", url, {"year": year, "url": url, "error": str(exc)})
                 continue
-            with pdfplumber.open(io.BytesIO(data)) as pdf:
-                text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+            text = "\n".join(pdftext.page_texts(data))
             rows = parse_journal(text)
             sink.add("mo_senate_journals", url, {"year": year, "url": url, "n_vote_rows": len(rows)})
             sink.extend(

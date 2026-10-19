@@ -13,6 +13,7 @@ import yaml
 GRAIN = {
     "int_bluebook__bios": "one biography per (edition, person) in the legislative/executive chapters",
     "int_bluebook__judge_bios": "one biography per judge in the judicial chapter",
+    "int_bluebook__county_circuits": "one row per county (and St. Louis City) in the latest edition",
     "int_courtlistener__bulk_case_matches": "one row per (official, role, cluster); matched_by says how",
     "int_courtlistener__judge_disclosure_items": "one disclosed item per federal judge report",
     "int_courtlistener__mo_cases": "one row per opinion cluster (decided case) in a tracked court",
@@ -31,6 +32,8 @@ GRAIN = {
     "int_officials__current": "one row per (person, current office)",
     "int_officials__name_keys": "one row per (official, normalized name variant)",
     "int_officials__wikidata": "one row per official with a Wikidata QID",
+    "int_votes__member_votes": "one row per (chamber, vote, member) for every member, tracked or not",
+    "int_votes__party_positions": "one row per (chamber, vote) with any Republican or Democratic yea/nay",
 }
 
 

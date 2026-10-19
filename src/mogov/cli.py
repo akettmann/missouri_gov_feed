@@ -1,9 +1,13 @@
 """`mogov load [source ...]` lands raw data; `mogov build` runs dbt; `mogov run` does everything:
 stage-1 loaders -> dbt build -> stage-2 loaders -> dbt build.
 
-Sharding (load and run): `--shards N --shard i` runs shard i of N in this process; `--shards N` alone runs
-all N shards in a process pool. As a Cloud Run job, CLOUD_RUN_TASK_COUNT / CLOUD_RUN_TASK_INDEX supply
-the defaults, so `--tasks N` on the job shards the work with no extra flags.
+Sharding (load and run): `--shards N --shard i` runs shard i of N; `--shards N` alone runs all N shards.
+As a Cloud Run job, CLOUD_RUN_TASK_COUNT / CLOUD_RUN_TASK_INDEX supply the defaults, so `--tasks N` on the
+job shards the work with no extra flags.
+
+Scheduling: the work is split into jobs of (loaders of one upstream service, shard), run by a process pool
+of `--workers` processes. Loaders of different services run at the same time; loaders of one service run
+one after another within a shard, so a service sees at most one request stream per shard.
 """
 
 import argparse
@@ -20,7 +24,7 @@ import structlog
 
 from mogov import db, obs
 from mogov.config import DB_PATH, DBT_DIR, RAW_DIR, ROOT
-from mogov.loaders import REGISTRY, STAGE, load_all_modules
+from mogov.loaders import REGISTRY, SERVICE, SLOW, STAGE, load_all_modules
 
 log = obs.get_logger(__name__)
 
@@ -58,16 +62,40 @@ def _run_shard(names: list[str], shard: db.Shard) -> bool:
     return ok
 
 
-def run_loaders(names: list[str], stage: int | None = None, *, shards: int = 1, shard: int | None = None) -> bool:
+def _jobs(names: list[str], shards: int, indexes) -> list[tuple[list[str], db.Shard]]:
+    """(loaders of one service, shard) jobs in start order: every shard's slow services first, so none of
+    them is left as the tail of the run; within a tier shard-major, so the first wave spreads over services
+    instead of putting every shard on one service."""
+    groups: dict[str, list[str]] = {}
+    for name in names:
+        groups.setdefault(SERVICE[name], []).append(name)
+    jobs = [(group, db.Shard(i, shards)) for i in indexes for group in groups.values()]
+    return sorted(jobs, key=lambda job: not SLOW.intersection(job[0]))  # stable: keeps shard-major order
+
+
+def default_workers(shards: int) -> int:
+    return max(shards, min(os.cpu_count() or 1, 8))
+
+
+def run_loaders(
+    names: list[str],
+    stage: int | None = None,
+    *,
+    shards: int = 1,
+    shard: int | None = None,
+    workers: int | None = None,
+) -> bool:
     names = _resolve(names, stage)
     db.migrate_legacy_layout()
-    if shard is not None or shards == 1:
-        return _run_shard(names, db.Shard(shard or 0, shards))
-    log.info("loader.pool", shards=shards)
+    jobs = _jobs(names, shards, [shard] if shard is not None else range(shards))
+    workers = min(len(jobs), workers or default_workers(shards))
+    if workers <= 1:
+        return all([_run_shard(group, s) for group, s in jobs])
+    log.info("loader.pool", shards=shards, workers=workers, jobs=len(jobs))
     # spawn, not fork: workers must not inherit the parent's HTTP client or DuckDB handles
-    with ProcessPoolExecutor(shards, mp_context=multiprocessing.get_context("spawn")) as pool:
-        futures = [pool.submit(_run_shard, names, db.Shard(i, shards)) for i in range(shards)]
-        return all(f.result() for f in futures)
+    with ProcessPoolExecutor(workers, mp_context=multiprocessing.get_context("spawn")) as pool:
+        futures = [pool.submit(_run_shard, group, s) for group, s in jobs]
+        return all([f.result() for f in futures])
 
 
 def _shard_args(parser: argparse.ArgumentParser) -> None:
@@ -82,7 +110,13 @@ def _shard_args(parser: argparse.ArgumentParser) -> None:
         "--shard",
         type=int,
         default=int(env_index) if env_index is not None else None,
-        help="run only this shard (0-based; default: $CLOUD_RUN_TASK_INDEX). Omit to run every shard in a pool.",
+        help="run only this shard (0-based; default: $CLOUD_RUN_TASK_INDEX). Omit to run every shard.",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=int(os.environ["MOGOV_WORKERS"]) if os.environ.get("MOGOV_WORKERS") else None,
+        help="processes running loader jobs at once (default: $MOGOV_WORKERS, else max(shards, min(CPUs, 8)))",
     )
 
 
@@ -108,22 +142,20 @@ def run_dbt(args: list[str]) -> int:
 
 
 def export(fmt: str) -> None:
-    """Copy every marts table to data/exports/<table>.<fmt> (csv or parquet)."""
+    """Copy every marts and reporting table to data/exports/<table>.<fmt> (csv or parquet)."""
     import duckdb
 
     out = DB_PATH.parent / "exports"
     out.mkdir(parents=True, exist_ok=True)
     with duckdb.connect(str(DB_PATH), read_only=True) as con:
-        tables = [
-            r[0]
-            for r in con.execute(
-                "select table_name from information_schema.tables where table_schema = 'marts' order by 1"
-            ).fetchall()
-        ]
-        for t in tables:
+        tables = con.execute(
+            "select table_schema, table_name from information_schema.tables "
+            "where table_schema in ('marts', 'reporting') order by 2"
+        ).fetchall()
+        for schema, t in tables:
             dest = (out / f"{t}.{fmt}").as_posix()
             opts = "(format csv, header true)" if fmt == "csv" else "(format parquet, compression zstd)"
-            con.execute(f"copy marts.{t} to '{dest}' {opts}")
+            con.execute(f"copy {schema}.{t} to '{dest}' {opts}")
             log.info("export.written", path=dest)
 
 
@@ -140,7 +172,7 @@ def main() -> None:
     sub.add_parser("list", help="list loaders")
     sub.add_parser("build", help="dbt build; extra arguments pass through to dbt (e.g. -s +fct_votes)")
     sub.add_parser("freshness", help="how long since each always-on loader last landed data (dbt source freshness)")
-    p_export = sub.add_parser("export", help="write marts tables to data/exports/")
+    p_export = sub.add_parser("export", help="write marts and reporting tables to data/exports/")
     p_export.add_argument("--format", choices=["csv", "parquet"], default="csv")
     p_run = sub.add_parser("run", help="load everything, then dbt build")
     p_run.add_argument("sources", nargs="*")
@@ -151,9 +183,9 @@ def main() -> None:
 
     if args.cmd == "list":
         load_all_modules()
-        print("\n".join(f"{n}  (stage {STAGE[n]})" for n in sorted(REGISTRY)))
+        print("\n".join(f"{n}  (stage {STAGE[n]}, service {SERVICE[n]})" for n in sorted(REGISTRY)))
     elif args.cmd == "load":
-        sys.exit(0 if run_loaders(args.sources, shards=args.shards, shard=args.shard) else 1)
+        sys.exit(0 if run_loaders(args.sources, shards=args.shards, shard=args.shard, workers=args.workers) else 1)
     elif args.cmd == "export":
         export(args.format)
     elif args.cmd == "build":
@@ -161,7 +193,7 @@ def main() -> None:
     elif args.cmd == "freshness":
         sys.exit(run_dbt(["source", "freshness"]))
     elif args.cmd == "run":
-        shards = {"shards": args.shards, "shard": args.shard}
+        shards = {"shards": args.shards, "shard": args.shard, "workers": args.workers}
         loaded = run_loaders(args.sources, stage=1, **shards)
         rc = run_dbt(["build"])
         if not args.sources:

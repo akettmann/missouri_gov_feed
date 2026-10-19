@@ -13,7 +13,7 @@ from mogov.loaders import loader
 URL = "https://dataverse.harvard.edu/api/access/datafile/10853698"
 
 
-@loader("shor_mccarty")
+@loader("shor_mccarty", service="dataverse.harvard.edu")
 def load(shard: db.Shard) -> dict[str, int]:
     """One unit: the dataset file."""
     dest = CACHE_DIR / "shor_mccarty" / "shor_mccarty.tab"

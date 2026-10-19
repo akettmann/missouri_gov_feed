@@ -14,9 +14,7 @@ import re
 import zipfile
 from datetime import date
 
-import pdfplumber
-
-from mogov import db, obs, xmljson
+from mogov import db, obs, pdftext, xmljson
 from mogov.config import window_years
 from mogov.http import fetch
 from mogov.loaders import loader
@@ -75,8 +73,7 @@ def _session_files(code: str, year: int) -> dict[str, bytes]:
 
 
 def _parse_rollcall_pdf(data: bytes) -> tuple[dict, list[tuple[str, str]]]:
-    with pdfplumber.open(io.BytesIO(data)) as pdf:
-        text = "\n".join(page.extract_text(layout=True) or "" for page in pdf.pages)
+    text = "\n".join(pdftext.page_texts(data, layout=True))
     header = {k: (m.group(1) if (m := rx.search(text)) else None) for k, rx in HEADER_FIELDS.items()}
     header["text"] = text.split("Total Yes")[0][:1500] if "Total Yes" in text else text[:1500]
     totals = dict(re.findall(r"Total (Yes|No|Present|Absent)\s*:\s*(\d+)", text))
@@ -87,7 +84,7 @@ def _parse_rollcall_pdf(data: bytes) -> tuple[dict, list[tuple[str, str]]]:
     return header, votes
 
 
-@loader("mo_house")
+@loader("mo_house", service="documents.house.mo.gov", slow=True)
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: each session's XML documents (by session code) and each roll-call PDF (by URL). Every shard
     reads every session's XML (cached) to list the roll calls."""

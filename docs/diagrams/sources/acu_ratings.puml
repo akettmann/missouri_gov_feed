@@ -1,9 +1,0 @@
-@startuml acu_ratings
-title acu_ratings: ACU (CPAC) legislative ratings
-start
-:one GraphQL query (undocumented API, http only):
-all MO people + yearly ratings + chamber history;
-note right: one interest group's scorecard, not a neutral measure
-:acu_ratings;
-stop
-@enduml

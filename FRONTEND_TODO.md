@@ -40,5 +40,4 @@ Show evidence, not verdicts. Data-side tasks (dbt reporting models, loaders) liv
 ## Phase 3
 - [ ] Votes grouped by bill subject (needs bill subjects loader)
 - [ ] Interest-vote overlap view (`rpt_interest_vote_overlap`)
-- [ ] Balancing scorecard shown next to ACU, if added
 - [ ] Deploy static build to a GCS bucket + CDN
