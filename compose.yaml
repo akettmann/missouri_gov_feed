@@ -1,0 +1,40 @@
+# Run the pipeline in containers on this machine. Data stays on the host in ./data (override with
+# MOGOV_HOST_DATA), in the same layout as running with uv, so the two can be mixed.
+#
+#   docker compose up                                  full refresh: mogov run --shards $MOGOV_SHARDS
+#   docker compose run --rm mogov load mo_house --shards 4
+#   docker compose run --rm mogov build -s +fct_votes
+#   docker compose run --rm mogov export --format parquet
+#   docker compose run --rm mogov freshness
+#   docker compose --profile docs up docs               dbt docs (model/column definitions) on :8080
+#
+# Keys and opt-ins come from .env (see README), passed into the container.
+
+x-mogov: &mogov
+  build: .
+  image: mogov:local
+  env_file:
+    - path: .env
+      required: false
+  volumes:
+    - ${MOGOV_HOST_DATA:-./data}:/data
+
+services:
+  mogov:
+    <<: *mogov
+    command: ["run", "--shards", "${MOGOV_SHARDS:-4}"]
+
+  docs:
+    <<: *mogov
+    profiles: [docs]
+    environment:
+      MOGOV_DB: /data/mogov.duckdb
+      MOGOV_RAW_DIR: /data/raw
+    entrypoint: ["sh", "-c"]
+    # generate reads the warehouse for column types, so run `mogov build` first
+    command:
+      - >-
+        dbt docs generate --project-dir dbt --profiles-dir dbt &&
+        dbt docs serve --project-dir dbt --profiles-dir dbt --host 0.0.0.0 --port 8080 --no-browser
+    ports:
+      - "8080:8080"

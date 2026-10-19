@@ -10,7 +10,9 @@ uv run mogov run          # stage-1 loaders -> dbt build -> stage-2 loaders -> d
 uv run mogov export       # marts -> data/exports/*.csv   (--format parquet also works)
 ```
 
-Other commands: `mogov list` (loaders), `mogov load <loader> ...`, `mogov build [dbt args]` (for example `-s +fct_votes`).
+Or with Docker only: `docker compose up` (see [docs/environment.md](docs/environment.md#local-in-docker-compose)).
+
+Other commands: `mogov list` (loaders), `mogov freshness`, `mogov load <loader> ...`, `mogov build [dbt args]` (for example `-s +fct_votes`).
 `load` and `run` take `--shards N` (a process pool) or `--shards N --shard i` (one shard, as in a Cloud Run task).
 
 Docs: [building an environment](docs/environment.md) (local and Cloud Run), [keeping it in sync](docs/sync.md),

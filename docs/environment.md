@@ -44,6 +44,22 @@ Layout under `data/` (override the root with `MOGOV_DATA_DIR`):
 A `data/raw/<table>.parquet` file from before sharding existed is moved into
 `<table>/part-000-of-001.parquet` the next time any loader runs.
 
+## Local, in Docker (Compose)
+
+Needs only Docker. Data stays in `./data` on the host, in the same layout as the uv setup, so you can mix
+the two. Keys come from the same `.env`.
+
+```
+docker compose up                                   # full refresh: mogov run --shards 4 (MOGOV_SHARDS)
+docker compose run --rm mogov load mo_house --shards 4
+docker compose run --rm mogov build
+docker compose run --rm mogov export --format parquet
+docker compose --profile docs up docs               # dbt docs (every model/column definition) at http://localhost:8080
+```
+
+Set `MOGOV_HOST_DATA` to use a data folder other than `./data`. On Linux, files the container writes are
+owned by root.
+
 ## Sharding
 
 Every loader splits its work into units (PDFs, files, people, report years...). A shard owns the units
