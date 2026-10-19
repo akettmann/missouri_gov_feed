@@ -23,7 +23,7 @@ history as (
         p.acu_id,
         {{ dbt.safe_cast(mogov.json_str('h.value', '$.year'), dbt.type_int()) }} as year,
         {{ mogov.json_str('h.value', '$.chamber') }} as chamber,
-        {{ mogov.json_str('h.value', '$.party') }} as party,
+        {{ mogov.normalize_party(mogov.json_str('h.value', '$.party')) }} as party,
         {{ dbt.safe_cast(mogov.json_str('h.value', '$.district'), dbt.type_int()) }} as district
     from people as p
     cross join lateral {{ mogov.json_elements('p.payload', '$.history') }} as h

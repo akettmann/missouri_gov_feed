@@ -5,7 +5,7 @@ select
     {{ mogov.json_str('t.value', '$.type') }} as term_type,   -- rep | sen
     {{ mogov.json_str('t.value', '$.state') }} as state,
     {{ mogov.json_str('t.value', '$.district') }} as district,
-    {{ mogov.json_str('t.value', '$.party') }} as party,
+    {{ mogov.normalize_party(mogov.json_str('t.value', '$.party')) }} as party,
     {{ dbt.safe_cast(mogov.json_str('t.value', '$.start'), 'date') }} as start_date,
     {{ dbt.safe_cast(mogov.json_str('t.value', '$.end'), 'date') }} as end_date
 from {{ ref('stg_congress__legislators') }} as l

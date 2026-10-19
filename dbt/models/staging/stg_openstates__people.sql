@@ -10,7 +10,7 @@ with src as (
 parties as (
     select
         {{ mogov.json_str('s.doc', '$.id') }} as openstates_id,
-        {{ mogov.json_str('pt.value', '$.name') }} as party,
+        {{ mogov.normalize_party(mogov.json_str('pt.value', '$.name')) }} as party,
         row_number() over (partition by {{ mogov.json_str('s.doc', '$.id') }} order by pt.idx desc) as rn
     from src as s
     cross join lateral {{ mogov.json_elements('s.doc', '$.party') }} as pt

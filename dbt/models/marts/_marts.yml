@@ -24,8 +24,12 @@ models:
         description: Surname; used for name matching against sources that only carry names.
       - name: party
         description: >
-          Party as the roster records it ("Republican", "Democratic"/"Democrat", ...). Null for judges and
-          non-partisan offices. Not normalized yet: both Democratic spellings occur.
+          Current party, normalized across sources (mogov.normalize_party): Republican, Democratic,
+          Independent or Libertarian. Null for judges and non-partisan offices.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Republican', 'Democratic', 'Independent', 'Libertarian']
       - name: level
         description: "{{ doc('level') }}"
         data_tests:
@@ -194,7 +198,11 @@ models:
               arguments:
                 values: ['yea', 'nay', 'present', 'absent', 'absent with leave', 'not voting']
       - name: party_at_vote
-        description: Party of the official when the vote was cast (state) or current party (federal).
+        description: Party of the official when the vote was cast (state) or current party (federal), normalized as in dim_official.party.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Republican', 'Democratic', 'Independent', 'Libertarian']
       - name: source_url
         description: "{{ doc('source_url') }}"
 

@@ -1,7 +1,6 @@
 # TODO List
 
 ## Medium priority
-- [ ] Normalize `party` ("Democratic" and "Democrat" both occur in dim_official)
 - [ ] Decode FEC committee-type codes in fct_campaign_finance.counterparty_type (raw N/Q/X/Y/H/S/V/W today)
 - [ ] fct_case_history.outcome is mostly CourtListener's verbatim disposition; map it to a fixed vocabulary (affirmed / reversed / remanded / dismissed / mixed ...)
 

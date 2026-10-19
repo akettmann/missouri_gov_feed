@@ -13,7 +13,7 @@ select
     {{ dbt.safe_cast(mogov.json_str('info', '$.DistrictNum[0]'), dbt.type_int()) }} as district_number,
     {{ mogov.json_str('info', '$.LastName[0]') }} as last_name,
     {{ mogov.json_str('info', '$.FirstName[0]') }} as first_name,
-    {{ mogov.json_str('info', '$.Party[0]') }} as party,
+    {{ mogov.normalize_party(mogov.json_str('info', '$.Party[0]')) }} as party,
     {{ dbt.safe_cast(mogov.json_str('info', '$.YearElected[0]'), dbt.type_int()) }} as year_elected,
     {{ mogov.json_str('info', '$.Hometown[0]') }} as hometown,
     {{ mogov.json_str('info', '$.Biography[0]') }} as biography,

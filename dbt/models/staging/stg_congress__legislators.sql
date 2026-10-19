@@ -37,7 +37,7 @@ select
     {{ mogov.json_str('s.p', '$.id.lis') }} as senate_lis_id,
     {{ mogov.json_str('s.p', '$.id.wikipedia') }} as wikipedia_title,
     {{ mogov.json_str('s.p', '$.id.ballotpedia') }} as ballotpedia_title,
-    {{ mogov.json_str('lt.term', '$.party') }} as party,
+    {{ mogov.normalize_party(mogov.json_str('lt.term', '$.party')) }} as party,
     {{ mogov.json_str('lt.term', '$.type') }} as latest_term_type,
     {{ mogov.json_str('lt.term', '$.state') }} as latest_term_state,
     {{ mogov.json_str('lt.term', '$.district') }} as latest_term_district,
