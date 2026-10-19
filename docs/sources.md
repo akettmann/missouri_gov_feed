@@ -104,8 +104,13 @@ Quirks:
   `quote` and `escape` explicitly.
 - Elections with no candidates return the search page instead of a table. These are logged as
   `mec.crosswalk_empty`.
-- In October 2026 the election-year dropdown listed no election dates for 2016 and 2018
-  (`mec.crosswalk_no_elections`). Such a year is no longer cached, so it is retried on every run.
+- The election search only goes back to 2020: in October 2026 its year dropdown offered 2020–2034.
+  Asking for 2016 or 2018 returned no election dates (`mec.crosswalk_no_elections` on every run).
+  The default `MOGOV_MEC_CROSSWALK_YEARS` now starts at 2020. Years the dropdown doesn't offer are
+  skipped and logged as `mec.crosswalk_year_not_offered`. Those years never returned rows, so nothing
+  was lost, but committees first registered for a pre-2020 election are only linked to an official if
+  they also filed for a later one. An offered year with no dates is still logged as
+  `mec.crosswalk_no_elections` and not cached.
 - MEC answers in under a second (the lobbyist search takes about 13 s). The fixed `MOGOV_MEC_PAUSE`
   (3 s) between requests is most of the runtime. A cold run is about 4 requests per export year and
   3 per election date.

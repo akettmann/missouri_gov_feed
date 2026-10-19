@@ -3,7 +3,8 @@
 # High Priority
 - [x] review full_run.log: every loader started and finished on all 4 shards. Found and fixed: `mo_house` shards 1-2 failed (Windows cache-rename race between shards fetching the same session zip; downloads are now single-flight with a retried rename), `wikidata` shards 1-2 failed (ran before `openstates_people` landed its CSV; now stage 2), MEC cached an empty crosswalk for 2016/2018 for 30 days (no longer cached). Expected: `courtlistener_cases` quota exhausted (0 rows; resumes next day), `dbt.placeholder` for `cl_cases` in the first build
 - [x] review second_run.log: no failures. `mo_house`/`mo_senate`/`house_fd` spent 3-10 min per shard re-parsing cached PDFs; PDF text is now cached by content (`data/cache/pdftext/`)
-- [] Re-run `uv run mogov run --shards 4` twice (full + quick re-run) to confirm the fixes and the new concurrent scheduling in a real run; check the second run's loader times (logs in full_run2.log and second_run2.log) REVIEW
+- [x] review full_run2.log / second_run2.log: full run 1h00m, quick re-run 9.4 min (was 20.7 min; PDF-text cache works, slowest loader is now `mo_house` shard 3 redoing its failed work). Found and fixed: `mo_house` shard 3 failed with `PermissionError` creating a single-flight lock file (Windows reports a pending delete that way; now treated as "lock held"), DuckDB's terminal progress bar interleaved with the logs (disabled per connection via `db.connect`), MEC's election search only offers 2020+ so 2016/2018 warned every run (default years now 2020+, unoffered years skipped). Expected: `courtlistener_cases` quota, `dbt.placeholder` for stage-2 tables in the first build, `census_tiger.not_a_zip` for the unpublished TIGER2026 SLDL
+- [ ] Re-run `uv run mogov run --shards 4` once more to confirm the lock fix (no `loader.failed`) and that no progress bars appear in the log
 
 ## Frontend support (see FRONTEND_TODO.md)
 ### dbt
