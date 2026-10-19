@@ -1,7 +1,7 @@
 # TODO List
 
 ## Low priority
-- [ ] review DBT's best practices against our project
+- [ ] dbt best-practice decisions (see docs/dbt_best_practices.md): split the single `raw` source into one source per system? enforce model contracts on the marts? add dbt unit tests for the name-matching models? add exposures once the frontend exists?
 - [] build a Docker Compose file
 
 ## Future
