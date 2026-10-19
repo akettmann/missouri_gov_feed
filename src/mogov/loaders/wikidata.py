@@ -88,11 +88,11 @@ TEMPLATES = {
 def _qids() -> list[str]:
     with duckdb.connect() as con:
         rows = con.execute(f"""
-            select distinct wikidata from read_parquet('{db.raw_path("openstates_current_csv").as_posix()}')
+            select distinct wikidata from read_parquet('{db.raw_glob("openstates_current_csv")}', union_by_name = true)
             where wikidata like 'Q%'
             union
             select distinct json_extract_string(payload, '$.id.wikidata')
-            from read_parquet('{db.raw_path("congress_legislators_current").as_posix()}')
+            from read_parquet('{db.raw_glob("congress_legislators_current")}')
             where json_extract_string(payload, '$.id.wikidata') like 'Q%'
         """).fetchall()
     return sorted(r[0] for r in rows if r[0])
@@ -111,20 +111,27 @@ def _sparql(query: str) -> list[dict]:
 
 
 @loader("wikidata")
-def load() -> dict[str, int]:
+def load(shard: db.Shard) -> dict[str, int]:
+    """Units: people (by QID). Every shard runs the (cached) discovery query to list them; shard 0 lands it."""
+    tables = [*TEMPLATES, "wikidata_mo_officeholders"]
     if not CONTACT:
         # https://meta.wikimedia.org/wiki/User-Agent_policy -- requests without contact info are refused.
         log.warning(
             "wikidata.skipped", reason="MOGOV_CONTACT not set; Wikimedia requires contact info in the User-Agent"
         )
-        return {t: db.replace_json(t, [], source_url=ENDPOINT) for t in [*TEMPLATES, "wikidata_mo_officeholders"]}
+        return {t: db.replace_json(t, [], source_url=ENDPOINT, shard=shard) for t in tables}
     discovered = _sparql(DISCOVER)
-    qids = sorted(set(_qids()) | {r["person"].rsplit("/", 1)[-1] for r in discovered})
-    out: dict[str, list] = {table: [] for table in TEMPLATES}
-    out["wikidata_mo_officeholders"] = [(str(i), r) for i, r in enumerate(discovered)]
-    for i in range(0, len(qids), BATCH):
-        values = " ".join(f"wd:{q}" for q in qids[i : i + BATCH])
-        for table, template in TEMPLATES.items():
-            for j, row in enumerate(_sparql(template % values)):
-                out[table].append((f"{i}/{j}", row))
-    return {table: db.replace_json(table, rows, source_url=ENDPOINT) for table, rows in out.items()}
+    qids = shard.take(sorted(set(_qids()) | {r["person"].rsplit("/", 1)[-1] for r in discovered}))
+    with db.JsonSink(shard, source_url=ENDPOINT, tables=tables) as sink:
+        if shard.index == 0:
+            sink.extend("wikidata_mo_officeholders", ((str(i), r) for i, r in enumerate(discovered)))
+        progress = obs.Progress("people", len(qids), log)
+        for i in range(0, len(qids), BATCH):
+            batch = qids[i : i + BATCH]
+            values = " ".join(f"wd:{q}" for q in batch)
+            for table, template in TEMPLATES.items():
+                for j, row in enumerate(_sparql(template % values)):
+                    sink.add(table, f"{batch[0]}/{j}", row)
+            progress.tick(len(batch))
+        progress.finish()
+    return sink.counts

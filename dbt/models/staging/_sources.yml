@@ -2,12 +2,13 @@ version: 2
 sources:
   - name: raw
     description: >
-      Verbatim landings written by the Python loaders (src/mogov/loaders), one Parquet file per table.
+      Verbatim landings written by the Python loaders (src/mogov/loaders): one directory per table holding
+      one Parquet part per loader shard (part-<shard>-of-<shards>.parquet), read together.
       JSON payloads are stored as text and read only through the mogov.json_* macros (portable SQL).
       Tables from opt-in or key-gated loaders (mec, senate_efd, fec aggregates, wikidata, case history)
       may be absent; models over them are disabled via the `enabled` vars in dbt_project.yml.
     meta:
-      external_location: "read_parquet('{{ env_var('MOGOV_RAW_DIR', 'data/raw') }}/{name}.parquet')"
+      external_location: "read_parquet('{{ env_var('MOGOV_RAW_DIR', 'data/raw') }}/{name}/*.parquet', union_by_name = true)"
     tables:
       # rosters / careers
       - name: openstates_people
@@ -95,3 +96,9 @@ sources:
       - name: wikidata_mo_officeholders
       - name: cl_cases
         description: CourtListener opinion search hits per official judge/lawyer (stage-2 loader).
+      - name: cl_mo_dockets
+        description: CourtListener bulk dockets in Missouri state/federal courts (courtlistener_case_bulk; enable var cl_case_bulk).
+      - name: cl_mo_opinion_clusters
+        description: CourtListener bulk opinion clusters (judges, attorneys, disposition) on those dockets.
+      - name: cl_mo_cluster_panel
+        description: CourtListener bulk opinion-cluster panel (cluster -> judge person id).

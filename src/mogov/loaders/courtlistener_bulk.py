@@ -46,10 +46,14 @@ def _latest_snapshot() -> str:
 
 
 @loader("courtlistener_bulk")
-def load() -> dict[str, int]:
+def load(shard: db.Shard) -> dict[str, int]:
+    """Units: one export file per table."""
     snap = _latest_snapshot()
     counts = {}
     for stem, table in TABLES.items():
+        if not shard.owns(table):
+            counts[table] = db.replace_csv(table, [], shard=shard)
+            continue
         name = f"{stem}-{snap}.csv"
         bz_path = fetch_to_file(
             f"{BUCKET}/bulk-data/{name}.bz2", CACHE_DIR / "courtlistener" / f"{name}.bz2", max_age=None
@@ -58,5 +62,5 @@ def load() -> dict[str, int]:
         if not csv_path.exists():
             with bz2.open(bz_path, "rb") as src, csv_path.open("wb") as dst:
                 shutil.copyfileobj(src, dst, 1 << 20)
-        counts[table] = db.replace_csv(table, csv_path, strict_mode=False, parallel=False)
+        counts[table] = db.replace_csv(table, csv_path, strict_mode=False, parallel=False, shard=shard)
     return counts

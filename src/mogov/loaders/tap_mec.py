@@ -19,9 +19,10 @@ FILES = {
 
 
 @loader("tap_mec")
-def load() -> dict[str, int]:
+def load(shard: db.Shard) -> dict[str, int]:
+    """Units: the mirror's CSV files."""
     counts = {}
     for table, names in FILES.items():
-        paths = [fetch_to_file(f"{BUCKET}/{n}", CACHE_DIR / "tap" / n, max_age=30 * 86400) for n in names]
-        counts[table] = db.replace_csv(table, paths, ignore_errors=True, strict_mode=False)
+        paths = [fetch_to_file(f"{BUCKET}/{n}", CACHE_DIR / "tap" / n, max_age=30 * 86400) for n in shard.take(names)]
+        counts[table] = db.replace_csv(table, paths, ignore_errors=True, strict_mode=False, shard=shard)
     return counts

@@ -1,12 +1,22 @@
 """`mogov load [source ...]` lands raw data; `mogov build` runs dbt; `mogov run` does everything:
-stage-1 loaders -> dbt build -> stage-2 loaders -> dbt build."""
+stage-1 loaders -> dbt build -> stage-2 loaders -> dbt build.
+
+Sharding (load and run): `--shards N --shard i` runs shard i of N in this process; `--shards N` alone runs
+all N shards in a process pool. As a Cloud Run job, CLOUD_RUN_TASK_COUNT / CLOUD_RUN_TASK_INDEX supply
+the defaults, so `--tasks N` on the job shards the work with no extra flags.
+"""
 
 import argparse
 import json
+import multiprocessing
 import os
+import signal
 import subprocess
 import sys
 import time
+from concurrent.futures import ProcessPoolExecutor
+
+import structlog
 
 from mogov import db, obs
 from mogov.config import DB_PATH, DBT_DIR, RAW_DIR, ROOT
@@ -15,33 +25,78 @@ from mogov.loaders import REGISTRY, STAGE, load_all_modules
 log = obs.get_logger(__name__)
 
 
-def run_loaders(names: list[str], stage: int | None = None) -> bool:
+def _resolve(names: list[str], stage: int | None) -> list[str]:
     load_all_modules()
-    names = names or sorted(n for n in REGISTRY if stage is None or STAGE[n] == stage)
-    ok = True
     for name in names:
         if name not in REGISTRY:
             sys.exit(f"unknown source {name!r}; choose from {', '.join(sorted(REGISTRY))}")
-        log.info("loader.start", loader=name)
+    return names or sorted(n for n in REGISTRY if stage is None or STAGE[n] == stage)
+
+
+def _run_shard(names: list[str], shard: db.Shard) -> bool:
+    load_all_modules()
+    ok = True
+    for name in names:
+        attrs = {"loader": name, "shard": f"{shard.index}/{shard.count}"}
+        structlog.contextvars.bind_contextvars(**attrs)
+        log.info("loader.start")
         started = time.perf_counter()
         try:
-            for table, n in REGISTRY[name]().items():
-                log.info("loader.landed", loader=name, table=f"raw.{table}", rows=n)
-                obs.rows_landed.add(n, {"loader": name, "table": table})
+            for table, n in REGISTRY[name](shard).items():
+                log.info("loader.landed", table=f"raw.{table}", rows=n)
+                obs.rows_landed.add(n, {**attrs, "table": table})
         except Exception:  # one broken upstream shouldn't stop the others
             ok = False
-            obs.loader_failures.add(1, {"loader": name})
-            log.exception("loader.failed", loader=name)
+            obs.loader_failures.add(1, attrs)
+            log.exception("loader.failed")
         finally:
-            obs.loader_duration.record(time.perf_counter() - started, {"loader": name})
+            elapsed = time.perf_counter() - started
+            obs.loader_duration.record(elapsed, attrs)
+            log.info("loader.finished", seconds=round(elapsed, 1))
+            structlog.contextvars.unbind_contextvars(*attrs)
+    obs.flush()
     return ok
+
+
+def run_loaders(names: list[str], stage: int | None = None, *, shards: int = 1, shard: int | None = None) -> bool:
+    names = _resolve(names, stage)
+    db.migrate_legacy_layout()
+    if shard is not None or shards == 1:
+        return _run_shard(names, db.Shard(shard or 0, shards))
+    log.info("loader.pool", shards=shards)
+    # spawn, not fork: workers must not inherit the parent's HTTP client or DuckDB handles
+    with ProcessPoolExecutor(shards, mp_context=multiprocessing.get_context("spawn")) as pool:
+        futures = [pool.submit(_run_shard, names, db.Shard(i, shards)) for i in range(shards)]
+        return all(f.result() for f in futures)
+
+
+def _shard_args(parser: argparse.ArgumentParser) -> None:
+    env_count, env_index = os.environ.get("CLOUD_RUN_TASK_COUNT"), os.environ.get("CLOUD_RUN_TASK_INDEX")
+    parser.add_argument(
+        "--shards",
+        type=int,
+        default=int(env_count or 1),
+        help="split each loader's work into this many shards (default: $CLOUD_RUN_TASK_COUNT or 1)",
+    )
+    parser.add_argument(
+        "--shard",
+        type=int,
+        default=int(env_index) if env_index is not None else None,
+        help="run only this shard (0-based; default: $CLOUD_RUN_TASK_INDEX). Omit to run every shard in a pool.",
+    )
+
+
+def _on_sigterm(signum, _frame):
+    # Cloud Run stops tasks with SIGTERM; exit through Python so finally blocks drop temp files and metrics flush.
+    log.warning("process.terminated", signal=signum)
+    sys.exit(128 + signum)
 
 
 def run_dbt(args: list[str]) -> int:
     for table in db.ensure_optional_tables():
         log.warning("dbt.placeholder", table=f"raw.{table}", reason="not loaded yet; using an empty placeholder")
     # Models over opt-in CSV sources (no empty placeholder possible) are switched on when the data exists.
-    dbt_vars = {"mec_direct": db.raw_path("mec_cd1_a").exists()}
+    dbt_vars = {"mec_direct": db.raw_exists("mec_cd1_a"), "cl_case_bulk": db.raw_exists("cl_mo_opinion_clusters")}
     cmd = [sys.executable, "-m", "dbt.cli.main", *args, "--project-dir", str(DBT_DIR), "--profiles-dir", str(DBT_DIR)]
     if args and args[0] in ("build", "run", "test", "compile", "seed"):
         cmd += ["--vars", json.dumps(dbt_vars)]
@@ -74,16 +129,19 @@ def main() -> None:
     import atexit
 
     atexit.register(obs.shutdown)
+    signal.signal(signal.SIGTERM, _on_sigterm)
     parser = argparse.ArgumentParser(prog="mogov")
     sub = parser.add_subparsers(dest="cmd", required=True)
     p_load = sub.add_parser("load", help="run loaders (all if none given)")
     p_load.add_argument("sources", nargs="*")
+    _shard_args(p_load)
     sub.add_parser("list", help="list loaders")
     sub.add_parser("build", help="dbt build; extra arguments pass through to dbt (e.g. -s +fct_votes)")
     p_export = sub.add_parser("export", help="write marts tables to data/exports/")
     p_export.add_argument("--format", choices=["csv", "parquet"], default="csv")
     p_run = sub.add_parser("run", help="load everything, then dbt build")
     p_run.add_argument("sources", nargs="*")
+    _shard_args(p_run)
     args, extra = parser.parse_known_args()
     if extra and args.cmd != "build":
         parser.error(f"unrecognized arguments: {' '.join(extra)}")
@@ -92,16 +150,17 @@ def main() -> None:
         load_all_modules()
         print("\n".join(f"{n}  (stage {STAGE[n]})" for n in sorted(REGISTRY)))
     elif args.cmd == "load":
-        sys.exit(0 if run_loaders(args.sources) else 1)
+        sys.exit(0 if run_loaders(args.sources, shards=args.shards, shard=args.shard) else 1)
     elif args.cmd == "export":
         export(args.format)
     elif args.cmd == "build":
         sys.exit(run_dbt(["build", *extra]))
     elif args.cmd == "run":
-        loaded = run_loaders(args.sources, stage=1)
+        shards = {"shards": args.shards, "shard": args.shard}
+        loaded = run_loaders(args.sources, stage=1, **shards)
         rc = run_dbt(["build"])
         if not args.sources:
-            loaded = run_loaders([], stage=2) and loaded
+            loaded = run_loaders([], stage=2, **shards) and loaded
             rc = run_dbt(["build"]) or rc
         sys.exit(rc or (0 if loaded else 1))
 

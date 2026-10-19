@@ -50,23 +50,28 @@ def _page_columns(page) -> list[str]:
 
 
 @loader("bluebook")
-def load() -> dict[str, int]:
-    lines = []
-    for edition in EDITIONS:
-        for chapter, url in _chapter_urls(edition.strip()).items():
-            data = fetch(url, max_age=None, delay=0.5)
-            if data[:4] != b"%PDF":
-                log.warning("bluebook.not_pdf", edition=edition, chapter=chapter, url=url)
-                continue
-            with pdfplumber.open(io.BytesIO(data)) as pdf:
-                for page_no, page in enumerate(pdf.pages, 1):
-                    line_no = 0
-                    for column, text in enumerate(_page_columns(page), 1):
-                        for line in text.splitlines():
-                            if line.strip():
-                                line_no += 1
-                                lines.append(
-                                    (
+def load(shard: db.Shard) -> dict[str, int]:
+    """Units: chapter PDFs (edition/chapter)."""
+    with db.JsonSink(shard, source_url=BASE, tables=["bluebook_lines"]) as sink:
+        for edition in (e.strip() for e in EDITIONS):
+            for chapter, url in _chapter_urls(edition).items():
+                if not shard.owns(f"{edition}/{chapter}"):
+                    continue
+                data = fetch(url, max_age=None, delay=0.5)
+                if data[:4] != b"%PDF":
+                    log.warning("bluebook.not_pdf", edition=edition, chapter=chapter, url=url)
+                    continue
+                with pdfplumber.open(io.BytesIO(data)) as pdf:
+                    progress = obs.Progress(f"{edition} {chapter} pages", len(pdf.pages), log)
+                    for page_no, page in enumerate(pdf.pages, 1):
+                        progress.tick()
+                        line_no = 0
+                        for column, text in enumerate(_page_columns(page), 1):
+                            for line in text.splitlines():
+                                if line.strip():
+                                    line_no += 1
+                                    sink.add(
+                                        "bluebook_lines",
                                         f"{edition}/{chapter}/{page_no}/{line_no}",
                                         {
                                             "edition": edition,
@@ -78,5 +83,5 @@ def load() -> dict[str, int]:
                                             "url": url,
                                         },
                                     )
-                                )
-    return {"bluebook_lines": db.replace_json("bluebook_lines", lines, source_url=BASE)}
+                    progress.finish()
+    return sink.counts

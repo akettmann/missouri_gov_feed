@@ -92,14 +92,18 @@ def _extract(stem: str, cycle: int):
     return [out_dir / m for m in members]
 
 
-def _land_bulk(stem: str, table: str, header_name: str | None) -> int:
+def _land_bulk(stem: str, table: str, header_name: str | None, shard: db.Shard) -> int:
+    cycles = [c for c in CYCLES if shard.owns(f"{stem}{c}")]
+    if not cycles:
+        return db.replace_csv(table, [], shard=shard)
     columns = _header(header_name) if header_name else WEBALL_COLUMNS
     paths = []
-    for cycle in CYCLES:
+    for cycle in cycles:
         paths.extend(_extract(stem, cycle))
     return db.replace_csv(
         table,
         paths,
+        shard=shard,
         delim="|",
         header=False,
         quote="",
@@ -111,10 +115,12 @@ def _land_bulk(stem: str, table: str, header_name: str | None) -> int:
     )
 
 
-def _api_aggregates() -> int:
+def _api_aggregates(shard: db.Shard):
     """Itemized individual receipts per principal campaign committee, by employer / size / state."""
-    records = []
-    for cand in _mo_candidate_ids():
+    cands = shard.take(_mo_candidate_ids())
+    progress = obs.Progress("FEC receipt aggregates (candidates)", len(cands), log)
+    for cand in cands:
+        progress.tick()
         info = json.loads(fetch(f"{API}/candidate/{cand}/committees/", {"api_key": FEC_API_KEY, "designation": "P"}))
         for cmte in info.get("results", []):
             for cycle in CYCLES:
@@ -128,13 +134,11 @@ def _api_aggregates() -> int:
                     }
                     body = json.loads(fetch(f"{API}/schedules/schedule_a/{agg}/", params))
                     for i, row in enumerate(body.get("results", [])):
-                        records.append(
-                            (
-                                f"{cand}/{cmte['committee_id']}/{cycle}/{agg}/{i}",
-                                {"candidate_id": cand, "aggregate": agg, **row},
-                            )
+                        yield (
+                            f"{cand}/{cmte['committee_id']}/{cycle}/{agg}/{i}",
+                            {"candidate_id": cand, "aggregate": agg, **row},
                         )
-    return db.replace_json("fec_receipt_aggregates", records, source_url=API)
+    progress.finish()
 
 
 def _mo_candidate_ids() -> list[str]:
@@ -142,11 +146,10 @@ def _mo_candidate_ids() -> list[str]:
     return sorted({fid for p in legs if p["terms"][-1]["state"] == "MO" for fid in p["id"].get("fec", [])})
 
 
-def _sponsored_committees() -> int:
+def _sponsored_committees(shard: db.Shard):
     """Leadership PACs etc. each member sponsors (not in the bulk files). One call per candidate ID,
     cached for 30 days, so it fits even DEMO_KEY's ~10 calls/hour once the cache is warm."""
-    records = []
-    for cand in _mo_candidate_ids():
+    for cand in shard.take(_mo_candidate_ids()):
         try:
             body = json.loads(
                 fetch(
@@ -164,18 +167,22 @@ def _sponsored_committees() -> int:
             )
             continue
         for row in body.get("results", []):
-            records.append((f"{cand}/{row['committee_id']}", {"sponsor_candidate_id": cand, **row}))
-    return db.replace_json("fec_sponsored_committees", records, source_url=f"{API}/committees/")
+            yield f"{cand}/{row['committee_id']}", {"sponsor_candidate_id": cand, **row}
 
 
 @loader("fec")
-def load() -> dict[str, int]:
-    counts = {table: _land_bulk(stem, table, hdr) for stem, table, hdr in FILES}
-    counts["fec_sponsored_committees"] = _sponsored_committees()
+def load(shard: db.Shard) -> dict[str, int]:
+    """Units: bulk files (stem + cycle) and, for API lookups, candidate IDs."""
+    counts = {table: _land_bulk(stem, table, hdr, shard) for stem, table, hdr in FILES}
+    counts["fec_sponsored_committees"] = db.replace_json(
+        "fec_sponsored_committees", _sponsored_committees(shard), source_url=f"{API}/committees/", shard=shard
+    )
     if os.environ.get("MOGOV_FEC_INDIV") == "1":
-        counts["fec_individual_contribs"] = _land_bulk("indiv", "fec_individual_contribs", "indiv")
+        counts["fec_individual_contribs"] = _land_bulk("indiv", "fec_individual_contribs", "indiv", shard)
     if FEC_API_KEY and FEC_API_KEY != "DEMO_KEY":
-        counts["fec_receipt_aggregates"] = _api_aggregates()
+        counts["fec_receipt_aggregates"] = db.replace_json(
+            "fec_receipt_aggregates", _api_aggregates(shard), source_url=API, shard=shard
+        )
     else:
         log.warning("fec.no_api_key", effect="skipping donor aggregates; bulk data still loaded")
     return counts

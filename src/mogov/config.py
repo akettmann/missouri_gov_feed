@@ -1,4 +1,5 @@
 import os
+from datetime import date
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -22,3 +23,12 @@ USER_AGENT = os.environ.get(
     else "missouri-gov-feed/0.1 (public-records research)",
 )
 FEC_API_KEY = os.environ.get("FEC_API_KEY", "DEMO_KEY")
+
+# Coverage window for year-windowed state sources (MO House roll calls, MO Senate journals): this many
+# calendar years ending with the current one. House roll-call PDFs go back to 2014.
+LOOKBACK_YEARS = int(os.environ.get("MOGOV_LOOKBACK_YEARS", "10"))
+
+
+def window_years() -> list[int]:
+    this_year = date.today().year
+    return list(range(this_year - LOOKBACK_YEARS + 1, this_year + 1))

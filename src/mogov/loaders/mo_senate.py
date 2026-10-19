@@ -8,18 +8,19 @@ surnames, "(16)"-style district suffixes when two senators share one; dbt matche
 """
 
 import io
-import os
 import re
 from datetime import date
 
 import pdfplumber
 
-from mogov import db
+from mogov import db, obs
+from mogov.config import window_years
 from mogov.http import fetch
 from mogov.loaders import loader
 
+log = obs.get_logger(__name__)
+
 BASE = "https://www.senate.mo.gov"
-YEARS = [int(y) for y in os.environ.get("MOGOV_SENATE_YEARS", "2023,2024,2025,2026").split(",")]
 
 DASH = "[—–-]"
 CATEGORIES = ["YEAS", "NAYS", "Absent with leave", "Absent", "Vacancies"]
@@ -71,27 +72,32 @@ def parse_journal(text: str) -> list[dict]:
 
 
 def _journal_urls(year: int) -> list[str]:
-    html = fetch(f"{BASE}/journallist/", {"SelectedYear": year}, max_age=86400 if year >= date.today().year else None)
+    # past years monthly, not never: a listing cached mid-session would otherwise miss that session's later journals
+    max_age = 86400 if year >= date.today().year else 30 * 86400
+    html = fetch(f"{BASE}/journallist/", {"SelectedYear": year}, max_age=max_age)
     links = re.findall(rb'href="(/\d{2}info/Journals/[^"]+\.pdf)"', html, flags=re.I)
     return sorted({BASE + link.decode() for link in links})
 
 
 @loader("mo_senate")
-def load() -> dict[str, int]:
-    votes, journals = [], []
-    for year in YEARS:
-        for url in _journal_urls(year):
+def load(shard: db.Shard) -> dict[str, int]:
+    """Units: journal PDFs (by URL)."""
+    journals = shard.take(((url, year) for year in window_years() for url in _journal_urls(year)), key=lambda j: j[0])
+    with db.JsonSink(shard, source_url=BASE, tables=["mo_senate_journals", "mo_senate_votes"]) as sink:
+        progress = obs.Progress("journal PDFs", len(journals), log)
+        for url, year in journals:
+            progress.tick()
             try:
                 data = fetch(url, max_age=None, delay=0.5)
             except Exception as exc:
-                journals.append((url, {"year": year, "url": url, "error": str(exc)}))
+                sink.add("mo_senate_journals", url, {"year": year, "url": url, "error": str(exc)})
                 continue
             with pdfplumber.open(io.BytesIO(data)) as pdf:
                 text = "\n".join(page.extract_text() or "" for page in pdf.pages)
             rows = parse_journal(text)
-            journals.append((url, {"year": year, "url": url, "n_vote_rows": len(rows)}))
-            votes.extend((f"{url}#{j}", {"year": year, "url": url, **r}) for j, r in enumerate(rows))
-    return {
-        "mo_senate_journals": db.replace_json("mo_senate_journals", journals, source_url=BASE),
-        "mo_senate_votes": db.replace_json("mo_senate_votes", votes, source_url=BASE),
-    }
+            sink.add("mo_senate_journals", url, {"year": year, "url": url, "n_vote_rows": len(rows)})
+            sink.extend(
+                "mo_senate_votes", ((f"{url}#{j}", {"year": year, "url": url, **r}) for j, r in enumerate(rows))
+            )
+        progress.finish()
+    return sink.counts

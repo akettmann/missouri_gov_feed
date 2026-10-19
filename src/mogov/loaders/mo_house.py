@@ -10,19 +10,23 @@ The site asks that automated clients poll its XML no more than every 30 minutes;
 """
 
 import io
-import os
 import re
 import zipfile
+from datetime import date
 
 import pdfplumber
 
-from mogov import db, xmljson
+from mogov import db, obs, xmljson
+from mogov.config import window_years
 from mogov.http import fetch
 from mogov.loaders import loader
 
+log = obs.get_logger(__name__)
+
 BASE = "https://documents.house.mo.gov"
-# Session codes: two-digit year + type (1 = regular, 3/4 = 1st/2nd extraordinary).
-SESSIONS = os.environ.get("MOGOV_HOUSE_SESSIONS", "231,241,251,253,254,261").split(",")
+# Session codes: two-digit year + type (1 = regular, 2-4 = extraordinary sessions). Which extraordinary
+# sessions exist is discovered: the site answers unknown codes with an HTML page, not a 404.
+SESSION_TYPES = "1234"
 POLITE_DELAY = 0.3
 
 VOTE_TOKEN = re.compile(r"(?<![A-Z])([YNP@]) +- +([A-Z][A-Z'.\- ]*?[A-Z.](?: \d{1,3})?)(?=\s{2,}|\s+[YNP@] +- |\s*$)")
@@ -31,11 +35,17 @@ HEADER_FIELDS = {
     "vote_date": re.compile(r"Date\s*:\s*(\d{1,2}/\d{1,2}/\d{4})"),
     "rollcall_number": re.compile(r"Roll Call\s*:\s*(\d+)"),
 }
+TABLES = ["mo_house_members", "mo_house_bills", "mo_house_lists", "mo_house_rollcalls", "mo_house_rollcall_votes"]
 
 
-def _session_files(code: str) -> dict[str, bytes]:
-    """All XML files for a House session, keyed by upper-cased file name."""
-    data = fetch(f"{BASE}/xml/{code}.zip", max_age=7 * 86400, delay=POLITE_DELAY)
+def _is_xml(data: bytes) -> bool:
+    return data.lstrip()[:1] == b"<" and not data.lstrip()[:15].lower().startswith(b"<!doctype html")
+
+
+def _session_files(code: str, year: int) -> dict[str, bytes]:
+    """All XML files for a House session, keyed by upper-cased file name ({} if the session doesn't exist)."""
+    past = year < date.today().year
+    data = fetch(f"{BASE}/xml/{code}.zip", max_age=(30 if past else 7) * 86400, delay=POLITE_DELAY)
     if data[:2] == b"PK":
         with zipfile.ZipFile(io.BytesIO(data)) as zf:
             return {
@@ -43,13 +53,17 @@ def _session_files(code: str) -> dict[str, bytes]:
                 for name in zf.namelist()
                 if name.lower().endswith(".xml")
             }
-    # Open session: no zip yet, walk the list files.
+    if past or not code.endswith("1"):
+        return {}  # no such session
+    # Open regular session: no zip yet, walk the list files.
     files: dict[str, bytes] = {}
     for kind in ("MemberList", "BillList", "SenateActList"):
         try:
-            files[f"{code}-{kind}.XML".upper()] = fetch(f"{BASE}/xml/{code}-{kind}.XML", delay=POLITE_DELAY)
+            listing = fetch(f"{BASE}/xml/{code}-{kind}.XML", delay=POLITE_DELAY)
         except Exception:
             continue
+        if _is_xml(listing):
+            files[f"{code}-{kind}.XML".upper()] = listing
     for kind, link_tag in (("MemberList", "RepresentativeXMLLink"), ("BillList", "BillXMLLink")):
         listing = files.get(f"{code}-{kind}.XML".upper())
         if not listing:
@@ -74,44 +88,55 @@ def _parse_rollcall_pdf(data: bytes) -> tuple[dict, list[tuple[str, str]]]:
 
 
 @loader("mo_house")
-def load() -> dict[str, int]:
-    members, bills, lists, rollcall_urls = [], [], [], {}
-    for code in SESSIONS:
-        code = code.strip()
-        for name, xml in _session_files(code).items():
-            stem = name.removesuffix(".XML")
-            sess, _, item = stem.partition("-")
-            obj = xmljson.parse(xml)
-            if item.isdigit():
-                members.append((f"{sess}-{item}", {"session_code": sess, "district": item, "doc": obj}))
-            elif item.endswith("LIST"):
-                lists.append((stem, {"session_code": sess, "list": item, "doc": obj}))
-            elif re.match(r"^H[A-Z]*\d+$", item):
-                bills.append((stem, {"session_code": sess, "bill": item, "doc": obj}))
-            for url in re.findall(rb"<RollCallPDF>([^<]+)</RollCallPDF>", xml):
-                rollcall_urls.setdefault(url.decode().strip(), sess)
+def load(shard: db.Shard) -> dict[str, int]:
+    """Units: each session's XML documents (by session code) and each roll-call PDF (by URL). Every shard
+    reads every session's XML (cached) to list the roll calls."""
+    with db.JsonSink(shard, source_url=BASE, tables=TABLES) as sink:
+        rollcall_urls: dict[str, str] = {}
+        codes = [f"{year % 100:02d}{t}" for year in window_years() for t in SESSION_TYPES]
+        progress = obs.Progress("sessions", len(codes), log)
+        for code in codes:
+            files = _session_files(code, 2000 + int(code[:2]))
+            progress.tick()
+            owned = shard.owns(code)
+            for name, xml in files.items():
+                for url in re.findall(rb"<RollCallPDF>([^<]+)</RollCallPDF>", xml):
+                    rollcall_urls.setdefault(url.decode().strip(), code)
+                if not owned:
+                    continue
+                stem = name.removesuffix(".XML")
+                sess, _, item = stem.partition("-")
+                if item.isdigit():
+                    table, key, extra = "mo_house_members", f"{sess}-{item}", {"district": item}
+                elif item.endswith("LIST"):
+                    table, key, extra = "mo_house_lists", stem, {"list": item}
+                elif re.match(r"^H[A-Z]*\d+$", item):
+                    table, key, extra = "mo_house_bills", stem, {"bill": item}
+                else:
+                    continue
+                sink.add(table, key, {"session_code": sess, **extra, "doc": xmljson.parse(xml)})
+        progress.finish()
 
-    rollcalls, votes = [], []
-    for url, sess in sorted(rollcall_urls.items()):
-        try:
-            data = fetch(url, max_age=None, delay=POLITE_DELAY)  # roll calls never change once posted
-        except Exception as exc:
-            rollcalls.append((url, {"session_code": sess, "url": url, "error": str(exc)}))
-            continue
-        if data[:4] != b"%PDF":
-            rollcalls.append((url, {"session_code": sess, "url": url, "error": "not a pdf"}))
-            continue
-        header, cast = _parse_rollcall_pdf(data)
-        rollcalls.append((url, {"session_code": sess, "url": url, **header, "n_tokens": len(cast)}))
-        votes.extend(
-            (f"{url}#{i}", {"session_code": sess, "url": url, "vote_code": c, "member_token": n})
-            for i, (c, n) in enumerate(cast)
-        )
-
-    return {
-        "mo_house_members": db.replace_json("mo_house_members", members, source_url=BASE),
-        "mo_house_bills": db.replace_json("mo_house_bills", bills, source_url=BASE),
-        "mo_house_lists": db.replace_json("mo_house_lists", lists, source_url=BASE),
-        "mo_house_rollcalls": db.replace_json("mo_house_rollcalls", rollcalls, source_url=BASE),
-        "mo_house_rollcall_votes": db.replace_json("mo_house_rollcall_votes", votes, source_url=BASE),
-    }
+        mine = shard.take(sorted(rollcall_urls))
+        progress = obs.Progress("roll-call PDFs", len(mine), log)
+        for url in mine:
+            sess = rollcall_urls[url]
+            progress.tick()
+            try:
+                data = fetch(url, max_age=None, delay=POLITE_DELAY)  # roll calls never change once posted
+            except Exception as exc:
+                sink.add("mo_house_rollcalls", url, {"session_code": sess, "url": url, "error": str(exc)})
+                continue
+            if data[:4] != b"%PDF":
+                sink.add("mo_house_rollcalls", url, {"session_code": sess, "url": url, "error": "not a pdf"})
+                continue
+            header, cast = _parse_rollcall_pdf(data)
+            sink.add("mo_house_rollcalls", url, {"session_code": sess, "url": url, **header, "n_tokens": len(cast)})
+            for i, (c, n) in enumerate(cast):
+                sink.add(
+                    "mo_house_rollcall_votes",
+                    f"{url}#{i}",
+                    {"session_code": sess, "url": url, "vote_code": c, "member_token": n},
+                )
+        progress.finish()
+    return sink.counts

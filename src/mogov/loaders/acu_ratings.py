@@ -24,9 +24,14 @@ query MoRatings {
 
 
 @loader("acu_ratings")
-def load() -> dict[str, int]:
+def load(shard: db.Shard) -> dict[str, int]:
+    """One unit: the single GraphQL query."""
+    if not shard.owns("acu_ratings"):
+        return {"acu_ratings": db.replace_json("acu_ratings", [], source_url=URL, shard=shard)}
     body = json.loads(post(URL, json_body={"query": QUERY}, max_age=30 * 86400))
     if "errors" in body:
         raise RuntimeError(f"ACU GraphQL error: {body['errors']}")
     people = body["data"]["ratings_people"]
-    return {"acu_ratings": db.replace_json("acu_ratings", ((str(p["id"]), p) for p in people), source_url=URL)}
+    return {
+        "acu_ratings": db.replace_json("acu_ratings", ((str(p["id"]), p) for p in people), source_url=URL, shard=shard)
+    }

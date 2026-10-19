@@ -1,0 +1,10 @@
+.venv
+.git
+.idea
+.env
+data
+tests
+dbt/target
+dbt/logs
+dbt/dbt_packages
+**/__pycache__

@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 import time
 from pathlib import Path
 
@@ -27,6 +28,19 @@ def client() -> httpx.Client:
 def _cache_path(url: str, params: dict | None) -> Path:
     key = url + "?" + "&".join(f"{k}={v}" for k, v in sorted((params or {}).items()) if k != "api_key")
     return CACHE_DIR / hashlib.sha256(key.encode()).hexdigest()
+
+
+def _write_atomic(path: Path, content: bytes) -> None:
+    """Shards share the cache; never let another process read a half-written entry."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.part")
+    tmp.write_bytes(content)
+    tmp.replace(path)
+
+
+def _record(host: str, resp: httpx.Response, started: float) -> None:
+    obs.http_duration.record(time.perf_counter() - started, {"host": host, "status": resp.status_code})
+    obs.http_bytes.add(len(resp.content), {"host": host})
 
 
 class RateLimited(httpx.HTTPError):
@@ -74,7 +88,9 @@ def fetch(
         time.sleep(delay)
     obs.http_requests.add(1, {"host": host, "cache_hit": False})
     for attempt in range(retries):
+        started = time.perf_counter()
         resp = client().get(url, params=params, headers=headers)
+        _record(host, resp, started)
         if resp.status_code == 429:
             wait = _retry_after(resp)
             if wait is not None and wait > 120:  # a quota (e.g. N/day), not a burst limit: don't sit and retry
@@ -85,8 +101,7 @@ def fetch(
             time.sleep(min(60, 2**attempt * 5))
             continue
         resp.raise_for_status()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(resp.content)
+        _write_atomic(path, resp.content)
         return resp.content
     resp.raise_for_status()
     raise httpx.HTTPError(f"gave up on {url} after {retries} attempts (last status {resp.status_code})")
@@ -104,14 +119,18 @@ def post(
     """Cached POST (GraphQL / SPARQL / search forms). The cache key includes the request body."""
     body_key = json.dumps({"data": data, "json": json_body}, sort_keys=True, default=str)
     path = _cache_path(url, {"__post__": hashlib.sha256(body_key.encode()).hexdigest()})
+    host = httpx.URL(url).host
     if path.exists() and (max_age is None or time.time() - path.stat().st_mtime < max_age):
+        obs.http_requests.add(1, {"host": host, "cache_hit": True})
         return path.read_bytes()
     if delay:
         time.sleep(delay)
+    obs.http_requests.add(1, {"host": host, "cache_hit": False})
+    started = time.perf_counter()
     resp = client().post(url, data=data, json=json_body, headers=headers)
+    _record(host, resp, started)
     resp.raise_for_status()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(resp.content)
+    _write_atomic(path, resp.content)
     return resp.content
 
 
@@ -120,11 +139,22 @@ def fetch_to_file(url: str, dest: Path, *, max_age: float | None = 86400) -> Pat
     if dest.exists() and (max_age is None or time.time() - dest.stat().st_mtime < max_age):
         return dest
     dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_suffix(dest.suffix + ".part")
-    with client().stream("GET", url) as resp:
-        resp.raise_for_status()
-        with tmp.open("wb") as fh:
-            for chunk in resp.iter_bytes(1 << 20):
-                fh.write(chunk)
-    tmp.replace(dest)
+    tmp = dest.with_name(f".{dest.name}.{os.getpid()}.part")
+    obs.http_requests.add(1, {"host": httpx.URL(url).host, "cache_hit": False})
+    try:
+        with client().stream("GET", url) as resp:
+            resp.raise_for_status()
+            size = int(resp.headers.get("content-length") or 0)
+            progress = obs.Progress(f"download {dest.name} (MiB)", size >> 20) if size > 64 << 20 else None
+            with tmp.open("wb") as fh:
+                for chunk in resp.iter_bytes(1 << 20):
+                    fh.write(chunk)
+                    obs.http_bytes.add(len(chunk), {"host": resp.url.host})
+                    if progress:
+                        progress.tick(len(chunk) / (1 << 20))
+            if progress:
+                progress.finish()
+        tmp.replace(dest)
+    finally:
+        tmp.unlink(missing_ok=True)
     return dest

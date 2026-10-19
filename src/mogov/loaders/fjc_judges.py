@@ -10,6 +10,7 @@ URL = "https://www.fjc.gov/sites/default/files/history/judges.csv"
 
 
 @loader("fjc_judges")
-def load() -> dict[str, int]:
-    path = fetch_to_file(URL, CACHE_DIR / "fjc" / "judges.csv", max_age=30 * 86400)
-    return {"fjc_judges": db.replace_csv("fjc_judges", path, normalize_names=False)}
+def load(shard: db.Shard) -> dict[str, int]:
+    """One unit: the directory CSV."""
+    paths = [fetch_to_file(URL, CACHE_DIR / "fjc" / "judges.csv", max_age=30 * 86400)] if shard.owns("fjc") else []
+    return {"fjc_judges": db.replace_csv("fjc_judges", paths, normalize_names=False, shard=shard)}

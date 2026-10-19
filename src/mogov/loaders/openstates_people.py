@@ -18,10 +18,8 @@ TARBALL = "https://codeload.github.com/openstates/people/tar.gz/refs/heads/main"
 CURRENT_CSV = "https://data.openstates.org/people/current/mo.csv"
 
 
-@loader("openstates_people")
-def load() -> dict[str, int]:
+def _yaml_records():
     path = fetch_to_file(TARBALL, CACHE_DIR / "openstates_people.tar.gz")
-    records = []
     with tarfile.open(path, "r:gz") as tar:
         for member in tar:
             parts = member.name.split("/")
@@ -32,11 +30,16 @@ def load() -> dict[str, int]:
                 continue
             doc = yaml.safe_load(io.TextIOWrapper(tar.extractfile(member), encoding="utf-8"))
             folder = "/".join(parts[3:-1])
-            key = f"{folder}/{parts[-1]}"
-            records.append((key, {"folder": folder, "file": parts[-1], "doc": doc}))
-    csv_path = fetch_to_file(CURRENT_CSV, CACHE_DIR / "openstates_mo_current.csv")
+            yield f"{folder}/{parts[-1]}", {"folder": folder, "file": parts[-1], "doc": doc}
+
+
+@loader("openstates_people")
+def load(shard: db.Shard) -> dict[str, int]:
+    """Units: the people tarball and the current-roster CSV."""
+    records = _yaml_records() if shard.owns("people") else []
+    csv_paths = [fetch_to_file(CURRENT_CSV, CACHE_DIR / "openstates_mo_current.csv")] if shard.owns("current") else []
     return {
-        "openstates_people": db.replace_json("openstates_people", records, source_url=TARBALL),
+        "openstates_people": db.replace_json("openstates_people", records, source_url=TARBALL, shard=shard),
         # flat current roster; carries Wikidata QIDs, which the YAML often lacks
-        "openstates_current_csv": db.replace_csv("openstates_current_csv", csv_path),
+        "openstates_current_csv": db.replace_csv("openstates_current_csv", csv_paths, shard=shard),
     }

@@ -1,5 +1,9 @@
 """Case history for officials who are or were judges or lawyers, from CourtListener (Free Law Project).
 
+Top-up source: the bulk loader (courtlistener_case_bulk) covers everything up to the last quarterly
+snapshot without touching the API's ~125 requests/day token quota. This loader adds what is newer, and
+the lead opinion's closing text (outcome) when a token is set; dbt prefers these rows where both exist.
+
 Stage 2: reads the people to look up from the dbt mart `marts.fct_legal_careers` (+ dim_official).
 For each person it searches CourtListener's opinion index:
   judges   judge:"<surname>" in the courts they sit on (Missouri appellate + federal courts in Missouri)
@@ -139,18 +143,29 @@ def _details(cluster_id: int, *, cache_only: bool = False) -> dict:
 
 
 @loader("courtlistener_cases", stage=2)
-def load() -> dict[str, int]:
+def load(shard: db.Shard) -> dict[str, int]:
+    """Units: officials (by official_id). MOGOV_CL_MAX_* caps apply per shard."""
     people = _people()
     if not people:
         log.warning("cases.skipped", reason="no legal-career officials yet; run `mogov build` first")
-        return {"cl_cases": db.replace_json("cl_cases", [], source_url=API)}
+        return {"cl_cases": db.replace_json("cl_cases", [], source_url=API, shard=shard)}
     if not TOKEN:
         log.warning("cases.no_token", max_queries=MAX_QUERIES, effect="search only, no outcomes")
-    rows, n_queries, n_details, started = [], 0, 0, time.time()
+    people = shard.take(people, key=lambda p: p["official_id"])
+    with db.JsonSink(shard, source_url=API, tables=["cl_cases"]) as sink:
+        stats = _search_people(people, sink)
+    log.info("cases.done", **stats)
+    return sink.counts
+
+
+def _search_people(people: list[dict], sink: db.JsonSink) -> dict:
+    n_queries, n_details, started = 0, 0, time.time()
+    progress = obs.Progress("officials searched", len(people), log)
     # Once CourtListener's quota runs out (e.g. 125 searches/day on some tokens), keep going from cache only:
     # everything already fetched still lands, and the next run resumes where this one stopped.
     quota_hit: RateLimited | None = None
     for person in people:
+        progress.tick()
         for role, query, courts in _queries(person):
             if n_queries >= MAX_QUERIES:
                 break
@@ -201,13 +216,12 @@ def load() -> dict[str, int]:
                         pass
                     except Exception as exc:
                         rec["detail_error"] = str(exc)
-                rows.append((f"{person['official_id']}/{role}/{hit.get('cluster_id')}", rec))
-    log.info(
-        "cases.done",
-        searches=n_queries,
-        details=n_details,
-        seconds=round(time.time() - started),
-        quota_exhausted=quota_hit is not None,
-        resume_after_s=round(quota_hit.retry_after) if quota_hit else None,
-    )
-    return {"cl_cases": db.replace_json("cl_cases", rows, source_url=API)}
+                sink.add("cl_cases", f"{person['official_id']}/{role}/{hit.get('cluster_id')}", rec)
+    progress.finish()
+    return {
+        "searches": n_queries,
+        "details": n_details,
+        "seconds": round(time.time() - started),
+        "quota_exhausted": quota_hit is not None,
+        "resume_after_s": round(quota_hit.retry_after) if quota_hit else None,
+    }

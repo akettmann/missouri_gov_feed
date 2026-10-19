@@ -91,32 +91,36 @@ def _report_tables(html: str) -> list[dict]:
 
 
 @loader("senate_efd")
-def load() -> dict[str, int]:
+def load(shard: db.Shard) -> dict[str, int]:
+    """Units: filings (by report URL). Every shard runs the search to list them."""
     if os.environ.get("MOGOV_ACCEPT_SENATE_EFD_TERMS") != "1":
         log.warning("senate_efd.skipped", reason="set MOGOV_ACCEPT_SENATE_EFD_TERMS=1 to accept the eFD use statement")
         return {}
     s = _session()
-    filings, rows = [], []
-    for first, last, filer, link_html, submitted in _search(s):
-        href = re.search(r'href="([^"]+)"', link_html).group(1)
-        title = re.sub(r"<[^>]+>", "", link_html).strip()
-        rec = {
-            "first_name": first,
-            "last_name": last,
-            "filer_type": filer,
-            "title": title,
-            "submitted": submitted,
-            "url": BASE + href,
-            "is_paper": "/paper/" in href,
-        }
-        filings.append((href, rec))
-        if rec["is_paper"]:
-            continue
-        time.sleep(1.0)
-        page = s.get(BASE + href)
-        for i, r in enumerate(_report_tables(page.text)):
-            rows.append(
-                (
+    results = [r for r in _search(s) if shard.owns(re.search(r'href="([^"]+)"', r[3]).group(1))]
+    with db.JsonSink(shard, source_url=BASE, tables=["senate_efd_filings", "senate_efd_rows"]) as sink:
+        progress = obs.Progress("filings", len(results), log)
+        for first, last, filer, link_html, submitted in results:
+            progress.tick()
+            href = re.search(r'href="([^"]+)"', link_html).group(1)
+            title = re.sub(r"<[^>]+>", "", link_html).strip()
+            rec = {
+                "first_name": first,
+                "last_name": last,
+                "filer_type": filer,
+                "title": title,
+                "submitted": submitted,
+                "url": BASE + href,
+                "is_paper": "/paper/" in href,
+            }
+            sink.add("senate_efd_filings", href, rec)
+            if rec["is_paper"]:
+                continue
+            time.sleep(1.0)
+            page = s.get(BASE + href)
+            for i, r in enumerate(_report_tables(page.text)):
+                sink.add(
+                    "senate_efd_rows",
                     f"{href}#{i}",
                     {
                         "url": BASE + href,
@@ -127,8 +131,5 @@ def load() -> dict[str, int]:
                         **r,
                     },
                 )
-            )
-    return {
-        "senate_efd_filings": db.replace_json("senate_efd_filings", filings, source_url=BASE),
-        "senate_efd_rows": db.replace_json("senate_efd_rows", rows, source_url=BASE),
-    }
+        progress.finish()
+    return sink.counts

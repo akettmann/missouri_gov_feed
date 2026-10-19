@@ -14,6 +14,8 @@ URL = "https://dataverse.harvard.edu/api/access/datafile/10853698"
 
 
 @loader("shor_mccarty")
-def load() -> dict[str, int]:
-    path = fetch_to_file(URL, CACHE_DIR / "shor_mccarty" / "shor_mccarty.tab", max_age=90 * 86400)
-    return {"shor_mccarty": db.replace_csv("shor_mccarty", path, delim="\t")}
+def load(shard: db.Shard) -> dict[str, int]:
+    """One unit: the dataset file."""
+    dest = CACHE_DIR / "shor_mccarty" / "shor_mccarty.tab"
+    paths = [fetch_to_file(URL, dest, max_age=90 * 86400)] if shard.owns("shor_mccarty") else []
+    return {"shor_mccarty": db.replace_csv("shor_mccarty", paths, delim="\t", shard=shard)}

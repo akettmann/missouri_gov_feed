@@ -13,13 +13,15 @@ CONGRESSES = [int(c) for c in os.environ.get("MOGOV_VOTEVIEW_CONGRESSES", "117,1
 
 
 @loader("voteview")
-def load() -> dict[str, int]:
+def load(shard: db.Shard) -> dict[str, int]:
+    """Units: one CSV per (kind, congress)."""
     counts = {}
     for kind in ("members", "rollcalls", "votes"):
         paths = []
         for congress in CONGRESSES:
-            # Full-chamber files (HS = both chambers). Votes are filtered to MO members in dbt.
-            url = f"{BASE}/{kind}/HS{congress}_{kind}.csv"
-            paths.append(fetch_to_file(url, CACHE_DIR / "voteview" / f"HS{congress}_{kind}.csv"))
-        counts[f"voteview_{kind}"] = db.replace_csv(f"voteview_{kind}", paths)
+            name = f"HS{congress}_{kind}.csv"
+            if shard.owns(name):
+                # Full-chamber files (HS = both chambers). Votes are filtered to MO members in dbt.
+                paths.append(fetch_to_file(f"{BASE}/{kind}/{name}", CACHE_DIR / "voteview" / name))
+        counts[f"voteview_{kind}"] = db.replace_csv(f"voteview_{kind}", paths, shard=shard)
     return counts
