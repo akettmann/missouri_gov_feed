@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      MOGOV_DB: ${{ github.workspace }}/ci.duckdb
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.6.17"
+          enable-cache: true
+
+      - name: Install
+        run: uv sync --frozen
+
+      - uses: actions/setup-java@v4  # for the plantuml-render hook
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Lint, format, diagrams (pre-commit hooks; fails on stale SVGs)
+        run: uv run --frozen pre-commit run --all-files --show-diff-on-failure
+
+      - name: Tests
+        run: uv run --frozen pytest -q
+
+      - name: dbt parse
+        run: uv run --frozen dbt parse --project-dir dbt --profiles-dir dbt
