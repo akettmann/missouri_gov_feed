@@ -97,12 +97,14 @@ def run_dbt(args: list[str]) -> int:
         log.warning("dbt.placeholder", table=f"raw.{table}", reason="not loaded yet; using an empty placeholder")
     # Models over opt-in CSV sources (no empty placeholder possible) are switched on when the data exists.
     dbt_vars = {"mec_direct": db.raw_exists("mec_cd1_a"), "cl_case_bulk": db.raw_exists("cl_mo_opinion_clusters")}
-    cmd = [sys.executable, "-m", "dbt.cli.main", *args, "--project-dir", str(DBT_DIR), "--profiles-dir", str(DBT_DIR)]
+    dirs = ["--project-dir", str(DBT_DIR), "--profiles-dir", str(DBT_DIR)]
+    env = {**os.environ, "MOGOV_DB": str(DB_PATH), "MOGOV_RAW_DIR": RAW_DIR.as_posix()}
+    if not (DBT_DIR / "dbt_packages" / "dbt_utils").exists():  # packages.yml (pinned by package-lock.yml)
+        subprocess.check_call([sys.executable, "-m", "dbt.cli.main", "deps", *dirs], cwd=ROOT, env=env)
+    cmd = [sys.executable, "-m", "dbt.cli.main", *args, *dirs]
     if args and args[0] in ("build", "run", "test", "compile", "seed"):
         cmd += ["--vars", json.dumps(dbt_vars)]
-    return subprocess.call(
-        cmd, cwd=ROOT, env={**os.environ, "MOGOV_DB": str(DB_PATH), "MOGOV_RAW_DIR": RAW_DIR.as_posix()}
-    )
+    return subprocess.call(cmd, cwd=ROOT, env=env)
 
 
 def export(fmt: str) -> None:
@@ -137,6 +139,7 @@ def main() -> None:
     _shard_args(p_load)
     sub.add_parser("list", help="list loaders")
     sub.add_parser("build", help="dbt build; extra arguments pass through to dbt (e.g. -s +fct_votes)")
+    sub.add_parser("freshness", help="how long since each always-on loader last landed data (dbt source freshness)")
     p_export = sub.add_parser("export", help="write marts tables to data/exports/")
     p_export.add_argument("--format", choices=["csv", "parquet"], default="csv")
     p_run = sub.add_parser("run", help="load everything, then dbt build")
@@ -155,6 +158,8 @@ def main() -> None:
         export(args.format)
     elif args.cmd == "build":
         sys.exit(run_dbt(["build", *extra]))
+    elif args.cmd == "freshness":
+        sys.exit(run_dbt(["source", "freshness"]))
     elif args.cmd == "run":
         shards = {"shards": args.shards, "shard": args.shard}
         loaded = run_loaders(args.sources, stage=1, **shards)

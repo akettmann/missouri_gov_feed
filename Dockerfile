@@ -16,7 +16,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY src ./src
 COPY dbt ./dbt
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev && dbt deps --project-dir dbt --profiles-dir dbt
 
 ENTRYPOINT ["mogov"]
 CMD ["--help"]

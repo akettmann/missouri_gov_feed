@@ -142,6 +142,10 @@ models:
       Grain: one row per (official, office_title, start_date); when several sources report the same term,
       the most authoritative is kept (seed and FJC > congress-legislators > Open States > Wikidata >
       CourtListener > Official Manual sentences).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, office_title, start_date]
     columns:
       - name: official_id
         description: "{{ doc('official_id') }}"
@@ -173,6 +177,10 @@ models:
       House votes). Missouri House from roll-call PDFs, Missouri Senate from daily journals (both for the
       last MOGOV_LOOKBACK_YEARS), Congress from Voteview. Grain: (official, vote_id). Votes whose printed
       name couldn't be tied to exactly one person are left out rather than guessed.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, chamber, vote_id]
     columns:
       - name: official_id
         description: "{{ doc('official_id') }}"
@@ -211,6 +219,10 @@ models:
       Every roll-call vote cast by a current member of Missouri's congressional delegation in the loaded
       congresses (MOGOV_VOTEVIEW_CONGRESSES), with Voteview's question and result. Grain: (official,
       congress, chamber, rollnumber). Its rows are also unioned into fct_votes.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, congress, chamber, rollnumber]
     columns:
       - name: official_id
         description: "{{ doc('official_id') }}"
@@ -285,7 +297,12 @@ models:
       Federal fundraising per member per cycle. `cycle total` rows come from FEC's candidate summary
       (receipts, individual/PAC/party money, self-funding, disbursements, cash on hand). `by_employer`,
       `by_size` and `by_state` rows are the FEC API's aggregates of itemized individual donors (only when
-      FEC_API_KEY is set). Grain: (official, cycle, aggregate_kind, bucket).
+      FEC_API_KEY is set). Grain: (official, cycle, aggregate_kind, bucket). A member with several FEC
+      candidate ids that FEC reports against one committee is counted once; separate campaigns are summed.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, cycle, aggregate_kind, bucket]
     columns:
       - name: official_id
         description: "{{ doc('official_id') }}"
@@ -380,12 +397,16 @@ models:
 
   - name: fct_bias_indicators
     description: >
-      Measured lean, not judgments. One row per (official, indicator, period):
+      Measured lean, not judgments. One row per (official, indicator, period, detail):
       `dw_nominate_dim1` Voteview, Congress, -1 liberal .. +1 conservative (economic dimension);
       `shor_mccarty_np` state legislators 1993-2022, negative liberal / positive conservative, comparable
       across states; `acu_rating` American Conservative Union yearly score 0-100 (one advocacy group's
       view); `party_unity_pct` share of party-line votes (majorities of R and D opposed) where the official
-      voted with their own party's majority, computed from fct_votes.
+      voted with their own party's majority, computed from fct_votes, one row per chamber (detail names it).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, indicator, period, detail]
     columns:
       - name: official_id
         description: "{{ doc('official_id') }}"
@@ -455,6 +476,10 @@ models:
       Officials who are or were judges or lawyers, with the evidence for each claim: sitting on a judicial
       roster, a biography sentence (attorney, J.D., practiced law, prosecutor, admitted to the bar...), or a
       Wikidata occupation/position. Drives the case-history searches. Grain: (official, legal_role, evidence).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, legal_role, evidence]
     columns:
       - name: official_id
         description: "{{ doc('official_id') }}"
@@ -473,6 +498,10 @@ models:
       (circuit) cases are not in CourtListener. Grain: (official, role, case). Caveats: judges-text matches
       are by surname within the judge's own courts and tenure; attorney text names an Attorney General on
       every brief their office filed (role `attorney` = office of record).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, role, source_url]
     columns:
       - name: official_id
         description: "{{ doc('official_id') }}"
@@ -561,6 +590,10 @@ models:
       "this election" totals accumulate across the election's reports (total = previous + this period,
       which holds for 99.98% of full reports). Grain: one filed report. Amended reports are separate rows
       (report_name starts "AMENDED"); "Limited Activity" reports carry no amounts.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, report_id]
     columns:
       - name: official_id
         description: "{{ doc('official_id') }}"

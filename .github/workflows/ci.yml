@@ -29,6 +29,9 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - name: dbt packages (sqlfluff's dbt templater needs them)
+        run: uv run --frozen dbt deps --project-dir dbt --profiles-dir dbt
+
       - name: Lint, format, diagrams (pre-commit hooks; fails on stale SVGs)
         run: uv run --frozen pre-commit run --all-files --show-diff-on-failure
 
