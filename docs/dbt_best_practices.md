@@ -20,7 +20,7 @@ projects", and the testing and documentation best practices.
 
 - Layered `staging` → `intermediate` → `marts`, with schemas and materializations set per folder in
   `dbt_project.yml`.
-- Naming: `stg_<source>__<entity>`, `int_<entity>__<verb/what>`, `fct_` / `dim_`.
+- Naming: `stg_<source>__<entity>`, `int_<entity>__<verb/what>`, `fct_` / `dim_`; dbt Core 1.12 / dbt-duckdb 1.11 (latest releases).
 - `ref()` / `source()` everywhere; no hardcoded relation names.
 - Portable SQL through `adapter.dispatch` macros (`macros/compat`), so the backend can change.
 - sqlfluff with the dbt templater in pre-commit and CI.
@@ -39,15 +39,16 @@ projects", and the testing and documentation best practices.
 - **The Python loaders keep their own copy of the court list** (they run before dbt and can't read seeds).
   The seed's description points at them.
 
-## Open questions (in TODO.md)
+## Decided and done (follow-up)
 
-1. **One source per system.** Everything is one `raw` source today (`source('raw', 'fec_candidates')`).
-   dbt recommends one source per system (`source('fec', 'candidates')`), which gives clearer lineage and
-   lets freshness and descriptions be set per system. The cost is about 60 renamed references.
-2. **Model contracts on the marts.** `contract: {enforced: true}` with column `data_type`s would make the
-   marts a stable interface for the frontend: a build fails if a column's name or type changes. It
-   needs a type declared for all ~200 mart columns.
-3. **Unit tests for the matching logic.** dbt unit tests (`unit_tests:` with fixture rows) suit the
-   fragile name matching: House vote tokens in `int_mo_house__votes` and committee attribution in
-   `int_mec__official_committees`.
-4. **Exposures**, once the frontend exists, so its dependencies on marts show in lineage.
+| Practice | Now |
+|---|---|
+| One source per system | 16 sources (`source('fec', 'candidates')`), each in `models/staging/<system>/` with its `_<system>__sources.yml`; `identifier` keeps the raw directory names, so loaders are unchanged. Staging models are named after their source (`stg_tap_mec__*` for the TAP mirror, `stg_mec__*` for MEC direct). |
+| Model contracts on the marts | `contract: {enforced: true}` for the marts folder; all 195 columns declare a `data_type`. A renamed, dropped, added or retyped column fails the build. Types are DuckDB's. |
+| Unit tests for fragile logic | dbt unit tests on the name matching: House vote tokens, Senate vote tokens, MEC committee attribution, CourtListener case matches, lobbyist-gift recipients (`_intermediate__unit_tests.yml`, `_marts__unit_tests.yml`). They run before their model in every `mogov build`. A failing one skips the model. |
+
+## Still open
+
+- **Exposures**, once the frontend exists, so its dependencies on marts show in lineage.
+- **CI runs `dbt parse`, not the unit tests.** dbt unit tests read their inputs' column types from the
+  warehouse, and CI has no landed data.
