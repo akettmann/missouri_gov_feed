@@ -7,17 +7,24 @@ OPT-IN (MOGOV_MEC_OPT_IN=1). Read before enabling:
     crawler policy. Consider asking MEC (helpdesk@mec.mo.gov) first.
   * The site sits behind Imperva/Incapsula, which rejects non-browser User-Agents. This loader sends the
     pipeline's honest User-Agent unless you set MOGOV_MEC_USER_AGENT yourself.
-Requests are serial with multi-second pauses; exports are cached for a week.
+Requests are serial with PAUSE-second gaps. Every export is cached (current year weekly, past years
+monthly), so a re-run only goes back to MEC for what has gone stale. Each shard keeps its own pace, so
+N shards make N times the request rate: keep --shards small for this loader.
+
+The pages are ASP.NET WebForms: every postback must carry the __VIEWSTATE of the page it came from.
+An export answers with a file, not a page, so the form keeps the last real page to post back from.
 
 Personal financial disclosure statements (PFDs) are NOT online: MEC releases them only on written
 Sunshine Law (RSMo 610) request, so they're not loaded here.
 """
 
 import html
+import json
 import os
 import re
 import time
 from datetime import date
+from pathlib import Path
 
 import httpx
 
@@ -30,14 +37,16 @@ log = obs.get_logger(__name__)
 BASE = "https://www.mec.mo.gov/MEC"
 P = "ctl00$ctl00$ContentPlaceHolder$ContentPlaceHolder1$"
 YEARS = [int(y) for y in os.environ.get("MOGOV_MEC_YEARS", "2023,2024,2025,2026").split(",")]
-# report types: itemized contributions received, contributions made, itemized expenditures, report summaries
 # Elections whose candidate<->committee lists to pull. Wider than YEARS: officials elected years ago still
 # raise money through the committee they registered then.
 CROSSWALK_YEARS = [
     int(y) for y in os.environ.get("MOGOV_MEC_CROSSWALK_YEARS", "2016,2018,2020,2022,2024,2026").split(",")
 ]
+# report types: itemized contributions received, contributions made, itemized expenditures, report summaries
 REPORT_TYPES = os.environ.get("MOGOV_MEC_REPORT_TYPES", "CD1_A,CD3_C,CD3_B,summary").split(",")
-PAUSE = 3.0
+LOBBYING_FROM = "01/01/2019"
+PAUSE = float(os.environ.get("MOGOV_MEC_PAUSE", "3.0"))
+CACHE = CACHE_DIR / "mec"
 
 
 class _Form:
@@ -47,13 +56,23 @@ class _Form:
 
     def _send(self, data: dict | None) -> httpx.Response:
         time.sleep(PAUSE)
+        started = time.perf_counter()
         if data is None:
             resp = self.client.get(self.url)
         else:
             resp = self.client.post(self.url, data=data, headers={"Referer": self.url})
         resp.raise_for_status()
+        log.debug(
+            "mec.request",
+            page=self.url.rsplit("/", 1)[-1],
+            target=(data or {}).get("__EVENTTARGET", "").removeprefix(P) or None,
+            seconds=round(time.perf_counter() - started, 2),
+            bytes=len(resp.content),
+        )
         if "Incapsula" in resp.text[:2000]:
             raise RuntimeError(f"MEC bot protection rejected the request for {self.url}")
+        if "__VIEWSTATE" in resp.text[:200_000]:
+            self.page = resp  # a postable page; exports (CSV / Excel-HTML) aren't
         return resp
 
     def fields(self) -> dict[str, str]:
@@ -77,16 +96,14 @@ class _Form:
         f[P + name] = value
         if postback:
             f["__EVENTTARGET"] = P + name
-            self.page = self._send(f)
+            self._send(f)
 
     def submit(self, button: str, label: str, extra: dict | None = None) -> httpx.Response:
         f = self.fields()
         f.update({P + k: v for k, v in (extra or {}).items()})
         f["__EVENTTARGET"] = ""
         f[P + button] = label
-        resp = self._send(f)
-        self.page = resp
-        return resp
+        return self._send(f)
 
 
 def _client() -> httpx.Client:
@@ -94,81 +111,144 @@ def _client() -> httpx.Client:
     return httpx.Client(headers={"User-Agent": ua}, follow_redirects=True, timeout=httpx.Timeout(600, connect=30))
 
 
-def _contributions(client: httpx.Client) -> dict[str, int]:
-    counts = {}
-    for rtype in REPORT_TYPES:
-        paths = []
-        for year in YEARS:
-            dest = CACHE_DIR / "mec" / f"{rtype}_{year}.csv"
-            # current year: weekly; past years: monthly, so amendments filed after year-end still arrive
-            max_age = 7 * 86400 if year >= date.today().year else 30 * 86400
-            fresh = dest.exists() and time.time() - dest.stat().st_mtime < max_age
-            if not fresh:
-                form = _Form(client, f"{BASE}/Campaign_Finance/CF_ContrCSV.aspx")
-                form.set("ddReportType", rtype, postback=True)
+def _fresh(path: Path, year: int) -> bool:
+    # current year: weekly; past years: monthly, so amendments filed after year-end still arrive
+    max_age = 7 * 86400 if year >= date.today().year else 30 * 86400
+    return path.exists() and time.time() - path.stat().st_mtime < max_age
+
+
+def _write(path: Path, content: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.part")
+    tmp.write_bytes(content)
+    tmp.replace(path)
+
+
+class _Exports:
+    """Lazily opened MEC session; most runs find everything cached and never connect."""
+
+    def __init__(self):
+        self._client: httpx.Client | None = None
+        self.progress: obs.Progress | None = None
+
+    @property
+    def client(self) -> httpx.Client:
+        if self._client is None:
+            self._client = _client()
+        return self._client
+
+    def close(self) -> None:
+        if self._client is not None:
+            self._client.close()
+
+    def contributions(self, rtype: str, years: list[int]) -> list[Path]:
+        """One CSV per year. One form session per report type: after the first export only the year
+        changes, saving a page load and a postback per year."""
+        paths, form = [], None
+        for year in years:
+            dest = CACHE / f"{rtype}_{year}.csv"
+            if not _fresh(dest, year):
+                if form is None:
+                    form = _Form(self.client, f"{BASE}/Campaign_Finance/CF_ContrCSV.aspx")
+                    form.set("ddReportType", rtype, postback=True)
                 form.set("ddReportYear", str(year), postback=True)
                 resp = form.submit("btnExport", "Export to CSV")
                 if "text/html" in resp.headers.get("content-type", ""):
                     raise RuntimeError(f"MEC export {rtype} {year} returned HTML, not CSV")
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                dest.write_bytes(resp.content)
+                _write(dest, resp.content)
             paths.append(dest)
-        counts[f"mec_{rtype.lower()}"] = db.replace_csv(
-            f"mec_{rtype.lower()}", paths, ignore_errors=True, strict_mode=False, normalize_names=True
-        )
-    return counts
+            self.progress.tick()
+        return paths
 
+    def crosswalk(self, year: int) -> list[tuple[str, dict]]:
+        """MECID <-> candidate name / office sought for each election in `year` (the 'Excel' export is an
+        HTML table). Cached per year as JSON."""
+        dest = CACHE / f"crosswalk_{year}.json"
+        if not _fresh(dest, year):
+            form = _Form(self.client, f"{BASE}/Campaign_Finance/CF12_SearchElection.aspx")
+            form.set("ddElectionYear", str(year), postback=True)
+            dates = re.findall(r'<option[^>]*value="(\d{1,2}/\d{1,2}/\d{4})"', form.page.text)
+            if not dates:
+                log.warning("mec.crosswalk_no_elections", year=year)
+            records = []
+            for election_date in dates:
+                form.set("ddElectionDate", election_date, postback=True)
+                form.submit("btnSearch", "Search")
+                resp = form.submit("btnExport", "Excel Export")
+                rows = re.findall(r"<tr[^>]*>(.*?)</tr>", resp.text, re.S)
+                if "__VIEWSTATE" in resp.text[:200_000] or not rows:
+                    # no candidates filed for this election: the search page comes back instead of a table
+                    log.info("mec.crosswalk_empty", election_date=election_date)
+                    continue
+                for i, tr in enumerate(rows):
+                    cells = [
+                        html.unescape(re.sub(r"<[^>]+>", "", td)).strip()
+                        for td in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", tr, re.S)
+                    ]
+                    if cells and cells[0] != "MECID":
+                        records.append((f"{election_date}/{i}", {"election_date": election_date, "cells": cells}))
+            _write(dest, json.dumps(records).encode())
+        self.progress.tick()
+        return [tuple(r) for r in json.loads(dest.read_bytes())]
 
-def _candidate_crosswalk(client: httpx.Client) -> int:
-    """MECID <-> candidate name / office sought, per election date (the 'Excel' export is an HTML table)."""
-    records = []
-    for year in CROSSWALK_YEARS:
-        form = _Form(client, f"{BASE}/Campaign_Finance/CF12_SearchElection.aspx")
-        form.set("ddElectionYear", str(year), postback=True)
-        dates = re.findall(r'<option[^>]*value="(\d{1,2}/\d{1,2}/\d{4})"', form.page.text)
-        for election_date in dates:
-            form.set("ddElectionDate", election_date, postback=True)
-            form.submit("btnSearch", "Search")
-            resp = form.submit("btnExport", "Excel Export")
-            for i, tr in enumerate(re.findall(r"<tr[^>]*>(.*?)</tr>", resp.text, re.S)):
-                cells = [
-                    html.unescape(re.sub(r"<[^>]+>", "", td)).strip()
-                    for td in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", tr, re.S)
-                ]
-                if cells and cells[0] != "MECID":
-                    records.append((f"{election_date}/{i}", {"election_date": election_date, "cells": cells}))
-    return db.replace_json(
-        "mec_candidate_committees", records, source_url=f"{BASE}/Campaign_Finance/CF12_SearchElection.aspx"
-    )
-
-
-def _lobbyist_expenditures(client: httpx.Client) -> int:
-    form = _Form(client, f"{BASE}/Lobbying/LobExpSearch.aspx")
-    boxes = {
-        k: "on"
-        for k in ("chkInd", "chkGroup", "chkSol", "chkRep", "chkSenator", "chkSWO", "chkELGO", "chkJud", "chkOther")
-    }
-    form.submit(
-        "btnSearch", "Search", {"txtDateFrom": "01/01/2019", "txtDateTo": date.today().strftime("%m/%d/%Y"), **boxes}
-    )
-    resp = form.submit("btnExport", "Export to CSV", boxes)
-    dest = CACHE_DIR / "mec" / "lobbyist_expenditures.csv"
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_bytes(resp.content)
-    return db.replace_csv(
-        "mec_lobbyist_expenditures", dest, ignore_errors=True, strict_mode=False, normalize_names=True
-    )
+    def lobbyist_expenditures(self) -> Path:
+        dest = CACHE / "lobbyist_expenditures.csv"
+        if not _fresh(dest, date.today().year):
+            form = _Form(self.client, f"{BASE}/Lobbying/LobExpSearch.aspx")
+            boxes = {
+                k: "on"
+                for k in (
+                    "chkInd",
+                    "chkGroup",
+                    "chkSol",
+                    "chkRep",
+                    "chkSenator",
+                    "chkSWO",
+                    "chkELGO",
+                    "chkJud",
+                    "chkOther",
+                )
+            }
+            criteria = {"txtDateFrom": LOBBYING_FROM, "txtDateTo": date.today().strftime("%m/%d/%Y"), **boxes}
+            form.submit("btnSearch", "Search", criteria)
+            resp = form.submit("btnExport", "Export to CSV", boxes)
+            if "__VIEWSTATE" in resp.text[:200_000]:
+                raise RuntimeError("MEC lobbyist expenditure export returned the search page, not CSV")
+            _write(dest, resp.content)
+        self.progress.tick()
+        return dest
 
 
 @loader("mec")
-def load() -> dict[str, int]:
+def load(shard: db.Shard) -> dict[str, int]:
+    """Units: (report type, year) exports, crosswalk election years, and the lobbyist export."""
     if os.environ.get("MOGOV_MEC_OPT_IN") != "1":
         log.warning(
             "mec.skipped", reason="opt-in required (MOGOV_MEC_OPT_IN=1); see loaders/mec.py", fallback="TAP mirror"
         )
         return {}
-    with _client() as client:
-        counts = _contributions(client)
-        counts["mec_candidate_committees"] = _candidate_crosswalk(client)
-        counts["mec_lobbyist_expenditures"] = _lobbyist_expenditures(client)
+    contrib_units = {rtype: [y for y in YEARS if shard.owns(f"{rtype}/{y}")] for rtype in REPORT_TYPES}
+    crosswalk_years = [y for y in CROSSWALK_YEARS if shard.owns(f"crosswalk/{y}")]
+    lobbying = shard.owns("lobbyist_expenditures")
+    exports = _Exports()
+    total = sum(map(len, contrib_units.values())) + len(crosswalk_years) + lobbying
+    exports.progress = obs.Progress("MEC exports", total, log)
+    csv_opts = {"ignore_errors": True, "strict_mode": False, "normalize_names": True, "shard": shard}
+    counts = {}
+    try:
+        for rtype, years in contrib_units.items():
+            table = f"mec_{rtype.lower()}"
+            counts[table] = db.replace_csv(table, exports.contributions(rtype, years), **csv_opts)
+        records = [r for year in crosswalk_years for r in exports.crosswalk(year)]
+        counts["mec_candidate_committees"] = db.replace_json(
+            "mec_candidate_committees",
+            records,
+            source_url=f"{BASE}/Campaign_Finance/CF12_SearchElection.aspx",
+            shard=shard,
+        )
+        paths = [exports.lobbyist_expenditures()] if lobbying else []
+        counts["mec_lobbyist_expenditures"] = db.replace_csv("mec_lobbyist_expenditures", paths, **csv_opts)
+    finally:
+        exports.close()
+    exports.progress.finish()
     return counts
