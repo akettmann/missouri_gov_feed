@@ -11,22 +11,9 @@
 -- names an Attorney General on every brief their office filed (role 'attorney' = office of record).
 with api as (
     select
-        {{ mogov.json_str('payload', '$.official_id') }} as official_id,
-        {{ mogov.json_str('payload', '$.role_searched') }} as role,
-        {{ mogov.json_str('payload', '$.cluster_id') }} as cluster_id,
-        {{ mogov.json_str('payload', '$.caseName') }} as case_name,
-        {{ mogov.json_str('payload', '$.court') }} as court,
-        {{ mogov.json_str('payload', '$.court_id') }} as court_id,
-        {{ mogov.json_str('payload', '$.docketNumber') }} as docket_number,
-        {{ dbt.safe_cast(mogov.json_str('payload', '$.dateFiled'), 'date') }} as date_filed,
-        {{ mogov.json_str('payload', '$.judge') }} as judges_text,
-        {{ mogov.json_str('payload', '$.attorney') }} as attorneys_text,
-        {{ mogov.json_str('payload', '$.status') }} as publication_status,
-        {{ mogov.json_str('payload', '$.disposition') }} as disposition,
-        upper({{ mogov.json_str('payload', '$.opinion_tail') }}) as opinion_tail,
-        'https://www.courtlistener.com' || {{ mogov.json_str('payload', '$.absolute_url') }} as source_url,
+        *,
         'api' as input
-    from {{ source('raw', 'cl_cases') }}
+    from {{ ref('stg_courtlistener__api_cases') }}
 ),
 
 cases as (
@@ -50,7 +37,7 @@ cases as (
         c.source_url,
         'bulk' as input
     from {{ ref('int_courtlistener__bulk_case_matches') }} as m
-    inner join {{ ref('stg_courtlistener__mo_cases') }} as c on m.cluster_id = c.cluster_id
+    inner join {{ ref('int_courtlistener__mo_cases') }} as c on m.cluster_id = c.cluster_id
     {% endif %}
 ),
 

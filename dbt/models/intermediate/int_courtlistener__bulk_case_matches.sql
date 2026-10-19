@@ -41,14 +41,10 @@ judicial_start as (
 ),
 
 judge_courts as (
-    select 'mo_supreme_court' as office, 'mo' as court_id
-    union all select 'mo_court_of_appeals', 'moctapp'
-    union all select 'mo_court_of_appeals', 'moctapped'
-    union all select 'mo_court_of_appeals', 'moctappwd'
-    union all select 'mo_court_of_appeals', 'moctappsd'
-    union all select 'us_district_court', 'moed'
-    union all select 'us_district_court', 'mowd'
-    union all select 'us_court_of_appeals', 'ca8'
+    select
+        office,
+        court_id
+    from {{ ref('mo_courts') }}
 ),
 
 cases as (
@@ -58,15 +54,15 @@ cases as (
         date_filed,
         ' ' || {{ mogov.name_key('judges_text') }} || ' ' as judges_key,
         ' ' || {{ mogov.name_key('attorneys_text') }} || ' ' as attorneys_key
-    from {{ ref('stg_courtlistener__mo_cases') }}
+    from {{ ref('int_courtlistener__mo_cases') }}
 ),
 
 on_panel as (
     select
         p.official_id,
-        pn.opinioncluster_id as cluster_id
-    from {{ source('raw', 'cl_mo_cluster_panel') }} as pn
-    inner join {{ ref('int_courtlistener__official_people') }} as p on pn.person_id = p.cl_person_id
+        pn.cluster_id
+    from {{ ref('stg_courtlistener__mo_cluster_panel') }} as pn
+    inner join {{ ref('int_courtlistener__official_people') }} as p on pn.cl_person_id = p.cl_person_id
     inner join searched as s on p.official_id = s.official_id
 ),
 

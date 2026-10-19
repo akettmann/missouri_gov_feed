@@ -1,14 +1,7 @@
 -- House disclosure PDF text, each line tagged with the schedule it falls under (the nearest preceding
 -- "Schedule X:" header in the same document). Column-header rows, "None disclosed." and boilerplate drop out.
 with lines as (
-    select
-        {{ mogov.json_str('payload', '$.doc_id') }} as doc_id,
-        {{ mogov.json_str('payload', '$.url') }} as document_url,
-        {{ mogov.json_str('payload', '$.has_text') }} = 'true' as has_text,
-        {{ dbt.safe_cast(mogov.json_str('payload', '$.page'), dbt.type_int()) }} as page,
-        {{ dbt.safe_cast(mogov.json_str('payload', '$.line_no'), dbt.type_int()) }} as line_no,
-        {{ mogov.json_str('payload', '$.text') }} as line_text
-    from {{ source('raw', 'house_fd_pdf_lines') }}
+    select * from {{ ref('stg_house_fd__pdf_lines') }}
 ),
 
 sequenced as (

@@ -24,3 +24,14 @@ seeds:
     columns:
       - name: code
         data_tests: [unique, not_null]
+  - name: mo_courts
+    description: >
+      CourtListener ids of the courts whose judges we track, with the dim_official office that sits on
+      each: Missouri Supreme Court, the three Court of Appeals districts, E.D./W.D. Mo., and the Eighth
+      Circuit. Shared by the CourtListener matching models. The Python loaders keep the same list
+      (courtlistener_case_bulk.MO_COURTS, courtlistener_cases.JUDGE_COURTS); change them together.
+    columns:
+      - name: court_id
+        data_tests: [unique, not_null]
+      - name: office
+        data_tests: [not_null]

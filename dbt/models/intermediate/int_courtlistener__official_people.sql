@@ -1,18 +1,18 @@
 -- Officials matched to people in CourtListener's judge database: federal judges by FJC id, state judges by
--- exact first+last name among people who held a Missouri court seat (only when the name is unambiguous).
+-- exact first+last name among people who held a seat on a tracked court (only when the name is unambiguous).
 with mo_people as (
-    select distinct person_id
-    from {{ source('raw', 'cl_positions') }}
-    where court_id in ('mo', 'moctapp', 'moctapped', 'moctappwd', 'moctappsd', 'moed', 'mowd', 'ca8')
+    select distinct pos.cl_person_id
+    from {{ ref('stg_courtlistener__positions') }} as pos
+    inner join {{ ref('mo_courts') }} as c on pos.court_id = c.court_id
 ),
 
 people as (
     select
-        p.id as cl_person_id,
+        p.cl_person_id,
         p.fjc_id,
         {{ mogov.name_key("p.name_first || ' ' || p.name_last") }} as name_key
-    from {{ source('raw', 'cl_people') }} as p
-    inner join mo_people as m on p.id = m.person_id
+    from {{ ref('stg_courtlistener__people') }} as p
+    inner join mo_people as m on p.cl_person_id = m.cl_person_id
 ),
 
 by_fjc as (

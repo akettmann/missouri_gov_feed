@@ -47,7 +47,7 @@ package "intermediate (identity resolution)" {
   [int_mec__official_committees] as I_mec
   [int_house_fd__schedule_lines\nint_courtlistener__judge_disclosure_items] as I_fd
   [int_courtlistener__official_people\nint_courtlistener__official_positions] as I_clpos
-  [int_courtlistener__bulk_case_matches] as I_cases
+  [int_courtlistener__mo_cases\nint_courtlistener__bulk_case_matches] as I_cases
 }
 
 package "marts" {

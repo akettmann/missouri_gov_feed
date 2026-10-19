@@ -23,11 +23,14 @@ models:
     without one, panel matches only. Attorney matches start at var case_history_min_year (default 1975): earlier
     namesakes aren''t them. Grain: one row per (official, role, cluster); matched_by says how.'
 - name: int_courtlistener__judge_disclosure_items
-  description: 'Line items from federal judges'' disclosures, one shape for all parts of the report. Grain: one
-    disclosed item per federal judge report.'
+  description: 'Federal judges'' disclosure line items with the report they come from and the judge''s FJC id. Grain:
+    one disclosed item per federal judge report.'
+- name: int_courtlistener__mo_cases
+  description: 'One row per opinion cluster in a tracked Missouri state or federal court (CourtListener bulk export),
+    with its docket and court. Grain: one row per opinion cluster (decided case) in a tracked court.'
 - name: int_courtlistener__official_people
   description: 'Officials matched to people in CourtListener''s judge database: federal judges by FJC id, state
-    judges by exact first+last name among people who held a Missouri court seat (only when the name is unambiguous).
+    judges by exact first+last name among people who held a seat on a tracked court (only when the name is unambiguous).
     Grain: one row per (official, CourtListener person).'
 - name: int_courtlistener__official_positions
   description: 'Career positions from CourtListener''s judge database for officials it covers (matching in int_courtlistener__official_people).

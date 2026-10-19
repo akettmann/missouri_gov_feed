@@ -14,6 +14,7 @@ GRAIN = {
     "int_bluebook__judge_bios": "one biography per judge in the judicial chapter",
     "int_courtlistener__bulk_case_matches": "one row per (official, role, cluster); matched_by says how",
     "int_courtlistener__judge_disclosure_items": "one disclosed item per federal judge report",
+    "int_courtlistener__mo_cases": "one row per opinion cluster (decided case) in a tracked court",
     "int_courtlistener__official_people": "one row per (official, CourtListener person)",
     "int_courtlistener__official_positions": "one row per CourtListener position of a matched official",
     "int_house_fd__schedule_lines": "one text line per House disclosure PDF, tagged with its schedule",
