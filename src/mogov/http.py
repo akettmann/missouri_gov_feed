@@ -29,6 +29,25 @@ def _cache_path(url: str, params: dict | None) -> Path:
     return CACHE_DIR / hashlib.sha256(key.encode()).hexdigest()
 
 
+class RateLimited(httpx.HTTPError):
+    """The server's quota is exhausted for longer than is worth waiting (Retry-After > 2 minutes)."""
+
+    def __init__(self, host: str, retry_after: float):
+        super().__init__(f"{host} rate limit exhausted; retry after {retry_after:.0f}s")
+        self.host, self.retry_after = host, retry_after
+
+
+class CacheMiss(LookupError):
+    """cache_only fetch with nothing cached."""
+
+
+def _retry_after(resp: httpx.Response) -> float | None:
+    try:
+        return float(resp.headers["retry-after"])
+    except (KeyError, ValueError):
+        return None
+
+
 def fetch(
     url: str,
     params: dict | None = None,
@@ -37,22 +56,32 @@ def fetch(
     retries: int = 4,
     headers: dict | None = None,
     delay: float = 0.0,
+    cache_only: bool = False,
 ) -> bytes:
     """GET url, returning bytes. Responses younger than max_age seconds come from cache (None = always cache).
 
     delay: seconds to sleep before a network request (not on cache hits), to stay polite to small state sites.
+    cache_only: never touch the network; return any cached copy regardless of age, else raise CacheMiss.
     """
     path = _cache_path(url, params)
     host = httpx.URL(url).host
-    if path.exists() and (max_age is None or time.time() - path.stat().st_mtime < max_age):
+    if path.exists() and (cache_only or max_age is None or time.time() - path.stat().st_mtime < max_age):
         obs.http_requests.add(1, {"host": host, "cache_hit": True})
         return path.read_bytes()
+    if cache_only:
+        raise CacheMiss(url)
     if delay:
         time.sleep(delay)
     obs.http_requests.add(1, {"host": host, "cache_hit": False})
     for attempt in range(retries):
         resp = client().get(url, params=params, headers=headers)
-        if resp.status_code == 429 or resp.status_code >= 500:
+        if resp.status_code == 429:
+            wait = _retry_after(resp)
+            if wait is not None and wait > 120:  # a quota (e.g. N/day), not a burst limit: don't sit and retry
+                raise RateLimited(host, wait)
+            time.sleep(wait if wait is not None else min(60, 2**attempt * 5))
+            continue
+        if resp.status_code >= 500:
             time.sleep(min(60, 2**attempt * 5))
             continue
         resp.raise_for_status()

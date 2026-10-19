@@ -81,8 +81,14 @@ def _extract(stem: str, cycle: int):
     out_dir = CACHE_DIR / "fec" / f"{stem}{yy}"
     with zipfile.ZipFile(zpath) as zf:
         members = [m for m in zf.namelist() if m.lower().endswith(".txt")]
-        if not out_dir.exists() or any(not (out_dir / m).exists() for m in members):
-            zf.extractall(out_dir, members)
+        # re-extract whenever the zip is newer than what's on disk (the zip is re-downloaded daily)
+        stale = [
+            m for m in members if not (out_dir / m).exists() or (out_dir / m).stat().st_mtime < zpath.stat().st_mtime
+        ]
+        if stale:
+            zf.extractall(out_dir, stale)
+            for m in stale:  # extractall keeps the archive's timestamps; mark as freshly extracted
+                (out_dir / m).touch()
     return [out_dir / m for m in members]
 
 

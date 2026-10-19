@@ -100,7 +100,9 @@ def _contributions(client: httpx.Client) -> dict[str, int]:
         paths = []
         for year in YEARS:
             dest = CACHE_DIR / "mec" / f"{rtype}_{year}.csv"
-            fresh = dest.exists() and (year < date.today().year or time.time() - dest.stat().st_mtime < 7 * 86400)
+            # current year: weekly; past years: monthly, so amendments filed after year-end still arrive
+            max_age = 7 * 86400 if year >= date.today().year else 30 * 86400
+            fresh = dest.exists() and time.time() - dest.stat().st_mtime < max_age
             if not fresh:
                 form = _Form(client, f"{BASE}/Campaign_Finance/CF_ContrCSV.aspx")
                 form.set("ddReportType", rtype, postback=True)

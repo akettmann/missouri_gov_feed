@@ -23,7 +23,7 @@ import duckdb
 
 from mogov import db, obs
 from mogov.config import DB_PATH
-from mogov.http import fetch
+from mogov.http import CacheMiss, RateLimited, fetch
 from mogov.loaders import loader
 
 log = obs.get_logger(__name__)
@@ -82,14 +82,27 @@ def _queries(person: dict) -> list[tuple[str, str, str]]:
     return out
 
 
-def _search(query: str, courts: str) -> list[dict]:
+def _search(query: str, courts: str, *, cache_only: bool = False) -> list[dict]:
+    """Up to MAX_PAGES pages of hits. If the quota runs out mid-pagination, the pages already fetched are
+    returned and RateLimited is re-raised on the next call by the caller's quota flag."""
     results, url, params = (
         [],
         f"{API}/search/",
         {"type": "o", "q": query, "court": courts, "order_by": "dateFiled desc"},
     )
     for _ in range(MAX_PAGES):
-        body = json.loads(fetch(url, params, headers=_headers(), max_age=30 * 86400, delay=PAUSE))
+        try:
+            raw = fetch(
+                url,
+                params,
+                headers=_headers(),
+                max_age=30 * 86400,
+                delay=0 if cache_only else PAUSE,
+                cache_only=cache_only,
+            )
+        except CacheMiss:
+            break
+        body = json.loads(raw)
         results.extend(body.get("results", []))
         url, params = body.get("next"), None
         if not url:
@@ -97,20 +110,28 @@ def _search(query: str, courts: str) -> list[dict]:
     return results
 
 
-def _details(cluster_id: int) -> dict:
+def _details(cluster_id: int, *, cache_only: bool = False) -> dict:
     cluster = json.loads(
         fetch(
             f"{API}/clusters/{cluster_id}/",
             {"fields": "disposition,sub_opinions,syllabus"},
             headers=_headers(),
             max_age=None,
+            cache_only=cache_only,
             delay=PAUSE,
         )
     )
     tail = None
     if cluster.get("sub_opinions"):
         op = json.loads(
-            fetch(cluster["sub_opinions"][0], {"fields": "plain_text"}, headers=_headers(), max_age=None, delay=PAUSE)
+            fetch(
+                cluster["sub_opinions"][0],
+                {"fields": "plain_text"},
+                headers=_headers(),
+                max_age=None,
+                delay=PAUSE,
+                cache_only=cache_only,
+            )
         )
         text = (op.get("plain_text") or "").strip()
         tail = text[-1500:] if text else None
@@ -126,13 +147,22 @@ def load() -> dict[str, int]:
     if not TOKEN:
         log.warning("cases.no_token", max_queries=MAX_QUERIES, effect="search only, no outcomes")
     rows, n_queries, n_details, started = [], 0, 0, time.time()
+    # Once CourtListener's quota runs out (e.g. 125 searches/day on some tokens), keep going from cache only:
+    # everything already fetched still lands, and the next run resumes where this one stopped.
+    quota_hit: RateLimited | None = None
     for person in people:
         for role, query, courts in _queries(person):
             if n_queries >= MAX_QUERIES:
                 break
             n_queries += 1
             try:
-                hits = _search(query, courts)
+                hits = _search(query, courts, cache_only=quota_hit is not None)
+            except RateLimited as exc:
+                quota_hit = exc
+                log.warning(
+                    "cases.quota_exhausted", retry_after_s=round(exc.retry_after), effect="continuing from cache"
+                )
+                hits = _search(query, courts, cache_only=True)
             except Exception as exc:
                 log.warning("cases.search_failed", query=query, error=str(exc))
                 continue
@@ -163,10 +193,21 @@ def load() -> dict[str, int]:
                 }
                 if TOKEN and n_details < MAX_DETAILS and hit.get("cluster_id"):
                     try:
-                        rec.update(_details(hit["cluster_id"]))
+                        rec.update(_details(hit["cluster_id"], cache_only=quota_hit is not None))
                         n_details += 1
+                    except RateLimited as exc:
+                        quota_hit = exc
+                    except CacheMiss:
+                        pass
                     except Exception as exc:
                         rec["detail_error"] = str(exc)
                 rows.append((f"{person['official_id']}/{role}/{hit.get('cluster_id')}", rec))
-    log.info("cases.done", searches=n_queries, details=n_details, seconds=round(time.time() - started))
+    log.info(
+        "cases.done",
+        searches=n_queries,
+        details=n_details,
+        seconds=round(time.time() - started),
+        quota_exhausted=quota_hit is not None,
+        resume_after_s=round(quota_hit.retry_after) if quota_hit else None,
+    )
     return {"cl_cases": db.replace_json("cl_cases", rows, source_url=API)}
