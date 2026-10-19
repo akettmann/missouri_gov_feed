@@ -156,6 +156,12 @@ Quirks:
 - Clusters have no court column; they're kept by `docket_id`.
 - Panels (judge person ids) are sparse for state courts. dbt therefore also matches the judge's surname
   as a whole word in the `judges` text, but only in courts the judge sits on.
+- Surnames repeat on the same court across generations: a 1910 Judge Smith on the 8th Circuit, fathers
+  and sons on the Court of Appeals. Judges-text matches therefore count only from the judge's first
+  known judicial start date; with no start date, only panel matches count. Attorney matches start at
+  dbt var `case_history_min_year` (default 1975).
+- In the 2026-09 snapshot, 8th Circuit (ca8) opinions stop in August 2019. The API loader covers later
+  ones.
 - The filtered CSVs are cached per snapshot (`data/cache/courtlistener/mo-*.csv`), so re-runs within
   a quarter are quick. Cases can be up to three months stale; `courtlistener_cases` tops up.
 
