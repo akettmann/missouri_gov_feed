@@ -1,3 +1,4 @@
+-- Voteview roll calls (both chambers, loaded congresses): date, bill, question, result and vote totals.
 select
     {{ dbt.safe_cast('congress', dbt.type_int()) }} as congress,
     chamber,

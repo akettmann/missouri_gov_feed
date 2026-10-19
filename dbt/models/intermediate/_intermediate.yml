@@ -1,0 +1,94 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: int_bluebook__bios
+  description: 'Official Manual biographies split per person. Legislative chapter entries start with "District 12—FIRST
+    LAST" and run until the next entry; lines are joined in reading order. Grain: one biography per (edition, person)
+    in the legislative/executive chapters.'
+- name: int_bluebook__judge_bios
+  description: 'Official Manual judicial-chapter biographies split per judge. Circuit and associate circuit entries
+    are "<NAME IN CAPS>" followed by "Office address: ..."; appellate entries open with "<NAME IN CAPS> was born
+    / received / served ...". The bio runs until the next entry; words hyphenated across lines are rejoined. Grain:
+    one biography per judge in the judicial chapter.'
+- name: int_courtlistener__bulk_case_matches
+  description: 'Officials matched to Missouri cases in the CourtListener bulk export. Mirrors the API loader''s
+    searches (src/mogov/loaders/courtlistener_cases.py) over the same people (fct_legal_careers): judge     on the
+    opinion''s panel (CourtListener person id), or their surname as a whole word in the judges text of a case in
+    a court they sit on (panels are sparse for state courts) attorney  "<first> <last>" as whole words in the attorneys
+    text, for lawyers and for judges whose own court CourtListener doesn''t cover (trial courts) Names are compared
+    as name_key()s padded with spaces, so "Hall" doesn''t match "Marshall". Surnames repeat across generations on
+    the same court (a 1910 Judge Smith on the 8th Circuit, fathers and sons on the Court of Appeals), so judges-text
+    matches only count from the judge''s first known judicial start date (fct_office_history, else dim_official.current_term_start);
+    without one, panel matches only. Attorney matches start at var case_history_min_year (default 1975): earlier
+    namesakes aren''t them. Grain: one row per (official, role, cluster); matched_by says how.'
+- name: int_courtlistener__judge_disclosure_items
+  description: 'Line items from federal judges'' disclosures, one shape for all parts of the report. Grain: one
+    disclosed item per federal judge report.'
+- name: int_courtlistener__official_people
+  description: 'Officials matched to people in CourtListener''s judge database: federal judges by FJC id, state
+    judges by exact first+last name among people who held a Missouri court seat (only when the name is unambiguous).
+    Grain: one row per (official, CourtListener person).'
+- name: int_courtlistener__official_positions
+  description: 'Career positions from CourtListener''s judge database for officials it covers (matching in int_courtlistener__official_people).
+    Grain: one row per CourtListener position of a matched official.'
+- name: int_house_fd__schedule_lines
+  description: 'House disclosure PDF text, each line tagged with the schedule it falls under (the nearest preceding
+    "Schedule X:" header in the same document). Column-header rows, "None disclosed." and boilerplate drop out.
+    Grain: one text line per House disclosure PDF, tagged with its schedule.'
+- name: int_judges__current
+  description: 'All sitting judges we track: Missouri state judges (Official Manual, latest edition) and federal
+    judges seated in Missouri (FJC). Grain: one row per sitting judge (state and federal).'
+- name: int_judges__federal
+  description: 'Sitting federal judges in Missouri: E.D./W.D. Mo. district judges, plus Eighth Circuit judges whose
+    FJC career record mentions Missouri (the FJC has no duty-station field, so this is labeled, not assumed). Grain:
+    one row per sitting federal judge in Missouri.'
+- name: int_judges__state_index
+  description: 'Missouri state judges from the Official Manual''s alphabetical judge index: "Crane, Sue M. ........
+    Associate ....... 13th   Harrell, Kevin D. ....... Circuit ....... 16th" Each index line holds up to two entries.
+    Entries whose name wrapped onto two lines are lost (a handful per edition); compare the count against the manual''s
+    chapter totals when reviewing. Grain: one row per state judge in the Official Manual index.'
+- name: int_mec__official_committees
+  description: 'Missouri Ethics Commission committees attributed to current state/local officials by committee name
+    (e.g. "Nicole Galloway For Missouri", "Friends of Wesley Bell"). TAP''s mirror has no candidate<-> committee
+    crosswalk, so this is a name match, labeled by confidence: high    committee name contains the official''s first
+    and last name medium  named surname-first ("Riggs for Missouri", "Friends of Riggs", "Riggs Committee"), no
+    other current official shares that surname, and it isn''t a local-office committee ("... for Sheriff"). A different
+    first name anywhere in the name ("Committee to Elect Caleb Rowden") never matches. When the MEC loader has run,
+    its CF12 crosswalk (exact MECID<->candidate) should replace this. Grain: one row per (official, MEC committee)
+    with a confidence label.'
+- name: int_mo_house__member_identity
+  description: 'Identity for each MO House member per session (House XML is authoritative for the House roster).
+    person_key = Open States id when the seat (district + date + surname) matches one person, otherwise mohouse:<House
+    member id>, so people missing from Open States still get a stable key. Grain: one row per (House session, member)
+    with a person_key.'
+- name: int_mo_house__votes
+  description: 'MO House roll-call votes attributed to people. A PDF token ("SMITH 46", "FOUNTAIN HENDERS", "MR
+    SPEAKER") is matched against that session''s House member list: same surname (prefix match for names the PDF
+    truncates) and, when the token carries one, same district. The Speaker comes from the house_speakers seed. Members
+    who left mid-session are missing from that session''s (end-of-session) list, so a second pass matches against
+    every session''s members. Keys ignore spaces ("VANSCHOIACK" = "Van Schoiack"). Tokens matching zero or several
+    people stay unattributed rather than guessed. Grain: one row per (House roll call, attributed person).'
+- name: int_mo_legislators__seats
+  description: 'Every Missouri legislative seat-term in Open States (current and retired people), keyed for matching:
+    chamber, district number, surname key, and date range (open-ended where Open States has no date). Grain: one
+    row per Open States legislative seat-term.'
+- name: int_mo_senate__votes
+  description: 'MO Senate journal votes attributed to people: the senator serving on the vote date with a matching
+    surname (and district, when the journal adds one to disambiguate). Ambiguous tokens stay unattributed. Grain:
+    one row per (Senate journal vote, attributed person).'
+- name: int_officials__bios
+  description: 'One biography text per current official where a source has one: Official Manual (legislators), MO
+    House XML (representatives), FJC professional career (federal judges), Open States (others). Grain: one biography
+    text per official per source.'
+- name: int_officials__current
+  description: 'Everyone currently holding a Missouri public office that we track, one row per (person, office).
+    official_id: Open States ocd-person id when one exists, else bioguide:<id>, statewide:<office>, or judge:<key>
+    (see int_judges__current). Grain: one row per (person, current office).'
+- name: int_officials__name_keys
+  description: 'Normalized name variants per current official, for matching sources that only carry names (MEC committees,
+    lobbyist reports, Wikidata labels, ratings). One row per (official, variant). Grain: one row per (official,
+    normalized name variant).'
+- name: int_officials__wikidata
+  description: 'Wikidata QID per official: from roster cross-references when present, else a unique exact name match
+    against living Missouri officeholders on Wikidata. Grain: one row per official with a Wikidata QID.'

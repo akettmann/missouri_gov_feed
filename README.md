@@ -69,6 +69,9 @@ Rules for contributors:
 
 - Python only extracts and lands data; every transformation is dbt.
 - dbt SQL must stay portable. Use `mogov.*` and `dbt.*` macros, not DuckDB-only syntax.
+- Model docs: mart columns are hand-written in `dbt/models/marts/_marts.yml` (shared definitions in
+  `dbt/models/_docs.md`) and land as DuckDB table/column comments. Staging and intermediate descriptions come
+  from each model's SQL header comment, so edit the header and run `uv run python scripts/gen_model_docs.py`.
 - pre-commit runs ruff, sqlfluff and the PlantUML renderer (`uv run pre-commit install`). Edit the `.puml`; the hook writes the `.svg`, so stage it and commit again.
 
 ## Known gaps (data not obtainable online)

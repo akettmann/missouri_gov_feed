@@ -21,6 +21,10 @@ models:
     marts:
       +schema: marts
       +materialized: table
+      # descriptions become table/column comments in the warehouse, so consumers see them without dbt
+      +persist_docs:
+        relation: true
+        columns: true
 
 seeds:
   mogov:
