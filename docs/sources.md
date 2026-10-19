@@ -322,7 +322,9 @@ Quirks:
 
 data.mo.gov's "<year> State Employee Pay" datasets (the Missouri Accountability Portal's employee data):
 calendar-year gross pay per employee, agency and position title. Legislators, statewide officials and
-state judges are on it; `fct_salaries` picks them out.
+state judges are on it; `fct_salaries` picks them out. Federal officials aren't on it. Their pay is fixed by
+statute and not published per person, so `fct_salaries` adds the office's annual salary from the
+`federal_salaries` seed (`pay_basis = 'statutory salary'`). Add that year's rates to the seed each January.
 
 - Lands: `mo_employee_pay`, verbatim CSV (all columns text). Only the agencies that employ officials are
   fetched (Legislature, Judiciary and the six statewide offices), staff included.

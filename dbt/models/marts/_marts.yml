@@ -1091,11 +1091,12 @@ models:
 
   - name: fct_salaries
     description: >
-      Pay received by current state officials as officeholders, per calendar year, from Missouri's state payroll
-      (data.mo.gov "State Employee Pay", 2017+). Gross pay is everything paid in the year, not the base salary; a
-      year with a change of office has one row per position. Name-matched within the official's group of offices.
-      Federal officials are paid by the U.S. and are not covered. Grain: one row per (official, year, agency,
-      position).
+      Officeholder pay per calendar year, 2017+. State officials: gross pay received, from Missouri's state payroll
+      (data.mo.gov "State Employee Pay"; everything paid in the year, not the base salary), name-matched within the
+      official's group of offices. Federal officials (Congress, U.S. district and circuit judges): the statutory
+      annual salary of the office for each year they held it (seed federal_salaries), since federal pay isn't
+      published per person. A year with a change of office has one row per position. Grain: one row per
+      (official, year, agency, position).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -1115,19 +1116,26 @@ models:
         description: Calendar year paid.
       - name: agency_name
         data_type: varchar
-        description: Paying agency (LEGISLATURE, JUDICIARY, OFFICE OF GOVERNOR...).
+        description: Paying agency (LEGISLATURE, JUDICIARY, OFFICE OF GOVERNOR..., U.S. CONGRESS, U.S. COURTS).
       - name: position_title
         data_type: varchar
-        description: Payroll position title (STATE REPRESENTATIVE, SENATOR, CIRCUIT JUDGE, GOVERNOR...).
+        description: Position title (STATE REPRESENTATIVE, SENATOR, CIRCUIT JUDGE, GOVERNOR..., U.S. SENATOR, U.S. DISTRICT JUDGE).
       - name: employee_name
         data_type: varchar
-        description: Name as the payroll prints it ("LAST, FIRST M"), so a reader can check the match.
-      - name: gross_pay
+        description: Name as the payroll prints it ("LAST, FIRST M"), so a reader can check the match; the official's name for federal rows.
+      - name: pay
         data_type: decimal(12,2)
-        description: Gross pay for the year in dollars (all pay received, not base salary).
+        description: Dollars for the year; what it measures depends on pay_basis.
+      - name: pay_basis
+        data_type: varchar
+        description: "'gross pay': all pay received in the year (state payroll). 'statutory salary': the office's annual salary rate (federal), not what was paid."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['gross pay', 'statutory salary']
       - name: match_confidence
         data_type: varchar
-        description: "{{ doc('match_confidence') }}"
+        description: "{{ doc('match_confidence') }} Federal rows are joined by id, so always 'high'."
       - name: source_url
         data_type: varchar
-        description: The Missouri Accountability Portal's employee pay search.
+        description: The Missouri Accountability Portal's employee pay search, or the federal pay table.

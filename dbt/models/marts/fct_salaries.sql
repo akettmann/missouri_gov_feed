@@ -12,7 +12,11 @@
 --                judges, and legislator rows the seat match leaves open (shared surnames, members without
 --                an Open States seat)
 -- match_confidence is 'high' when the first name also matches exactly, else 'medium'. Ambiguous rows are
--- dropped. Federal officials (Congress, federal judges) are paid by the U.S. and are not covered.
+-- dropped.
+-- Federal officials (Congress, federal judges) are paid by the U.S., whose pay isn't published per person;
+-- their rows are the statutory salary of the office (seed federal_salaries) for each year they held it:
+-- Congress from every congress-legislators term, judges from their commission (current court only).
+-- pay_basis tells the two apart.
 with pay as (
     select
         p.*,
@@ -166,6 +170,46 @@ matched as (
             and b.agency_name = s.agency_name
             and b.position_title = s.position_title
     where s.official_id is null
+),
+
+-- federal: statutory salary per year in office ----------------------------------------------------------
+federal_years as (
+    -- a Congress ends at noon on January 3, so its last calendar year is the one before end_date
+    select distinct
+        o.official_id,
+        o.full_name,
+        case t.term_type when 'sen' then 'us_senate' else 'us_house' end as office,
+        extract(year from t.start_date) as first_year,
+        extract(year from {{ dbt.dateadd('day', -4, 't.end_date') }}) as last_year
+    from {{ ref('int_officials__current') }} as o
+    inner join {{ ref('stg_congress__terms') }} as t on o.bioguide_id = t.bioguide_id
+    where t.state = 'MO'
+    union all
+    select
+        official_id,
+        full_name,
+        office,
+        extract(year from current_term_start) as first_year,
+        coalesce(extract(year from current_term_end), extract(year from current_date)) as last_year
+    from {{ ref('dim_official') }}
+    where office in ('us_district_court', 'us_court_of_appeals')
+),
+
+federal as (
+    select distinct
+        y.official_id,
+        s.calendar_year,
+        case when y.office in ('us_house', 'us_senate') then 'U.S. CONGRESS' else 'U.S. COURTS' end as agency_name,
+        s.position_title,
+        y.full_name as employee_name,
+        {{ dbt.safe_cast('s.annual_salary', 'decimal(12, 2)') }} as pay,
+        s.source_url
+    from federal_years as y
+    inner join {{ ref('federal_salaries') }} as s
+        on
+            y.office = s.office
+            and s.calendar_year between y.first_year and y.last_year
+            and s.calendar_year <= extract(year from current_date)
 )
 
 select
@@ -174,7 +218,22 @@ select
     agency_name,
     position_title,
     employee_name,
-    gross_pay,
+    gross_pay as pay,
+    'gross pay' as pay_basis,
     match_confidence,
     'https://mapyourtaxes.mo.gov/MAP/Employees/' as source_url
 from matched
+
+union all
+
+select
+    official_id,
+    calendar_year,
+    agency_name,
+    position_title,
+    employee_name,
+    pay,
+    'statutory salary' as pay_basis,
+    'high' as match_confidence,
+    source_url
+from federal

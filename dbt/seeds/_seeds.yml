@@ -57,6 +57,20 @@ seeds:
           - accepted_values:
               arguments:
                 values: ['moed', 'mowd']
+  - name: federal_salaries
+    description: >
+      Statutory annual salary per calendar year for the federal offices we track: Members of Congress (Senate
+      historical table; rank-and-file rate, the same in both chambers; leadership is paid more, and no Missouri
+      member held a paid leadership post in 2026) and U.S. district and circuit judges (uscourts.gov judicial
+      compensation). Copied October 2026 for 2017-2026, matching the state payroll's coverage. Add a row per
+      office each January.
+    columns:
+      - name: office
+        data_tests: [not_null]
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [calendar_year, office]
   - name: mo_payroll_office_titles
     description: >
       The position titles on Missouri's state payroll (mo_employee_pay) that are elected or judicial offices,

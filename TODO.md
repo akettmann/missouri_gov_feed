@@ -29,7 +29,7 @@
 
 ## Low priority
 - [x] Fetch salaries for the officials: `mo_employee_pay` loader (data.mo.gov state payroll) -> `fct_salaries` (state officials, 2017+)
-- [ ] Salaries for federal officials (Congress, federal judges): fixed by statute; a seed of yearly pay tables would cover them
+- [x] Salaries for federal officials (Congress, federal judges): `federal_salaries` seed (senate.gov, uscourts.gov; 2017-2026) -> `fct_salaries` rows with `pay_basis = 'statutory salary'` (`gross_pay` renamed `pay`). Add each year's rates in January
 - [x] when running `uv run mogov run` execute sources that are across different services concurrently (`--workers`; loaders grouped by service)
 - [ ] Listing of companies that operate in the official's jurisdiction, highlight which ones have donated. Needs a decision on the source: the MO Secretary of State business search has no bulk export; Census County Business Patterns has counts but no names
 - [x] Document "wipe and rebuild from scratch" in docs/environment.md
