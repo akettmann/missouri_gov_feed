@@ -13,8 +13,15 @@ models:
     AM".
 - name: stg_mec_direct__contributions_made
   description: 'MEC contributions made: the reporting committee (mecid) gave to `committee` (a candidate or committee).'
+- name: stg_mec_direct__expenditures
+  description: 'MEC itemized expenditures over $100 (CD3 Part B, direct export, recent report years): what each
+    committee paid, to whom, for what. Contributions to other committees are reported separately (CD3 Part C).'
 - name: stg_mec_direct__lobbyist_gifts
   description: MEC lobbyist expenditures on officials, 2019+ (direct export). recipient is "Last,  First  - Role".
+- name: stg_mec_direct__report_summaries
+  description: 'MEC campaign finance report cover pages (direct export): one row per filed report with its totals.
+    "This election" totals accumulate across an election''s reports; "this period" amounts cover the report alone.
+    Amended reports are separate rows with their own report_id.'
 - name: stg_acu__ratings
   description: American Conservative Union (CPAC) yearly ratings of Missouri legislators (0-100; higher = votes
     more often with ACU's positions), with the chamber/district they held that year.

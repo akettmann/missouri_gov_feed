@@ -23,7 +23,7 @@ Docs: [building an environment](docs/environment.md) (local and Cloud Run), [kee
 | Officials | `dim_official`, `official_profile` | Open States, MO House XML, congress-legislators, statewide seed, Official Manual, FJC |
 | Forced disclosures | `fct_disclosures` | U.S. House Clerk (annual reports and trades), Senate eFD, federal judges' AO-10 reports (CourtListener) |
 | Voluntary disclosures | `fct_voluntary_disclosures` | hand-curated `dbt/seeds/voluntary_disclosures.csv` (no feed exists) |
-| Donations to / from them | `fct_campaign_finance`, `fct_federal_donor_summary`, `fct_lobbyist_gifts` | FEC bulk + API; MEC via the Accountability Project mirror (2011–2022); MEC direct (opt-in) |
+| Donations to / from them | `fct_campaign_finance`, `fct_federal_donor_summary`, `fct_lobbyist_gifts`; committee spending and report totals in `fct_campaign_spending`, `fct_campaign_reports` | FEC bulk + API; MEC via the Accountability Project mirror (2011–2022); MEC direct (opt-in) |
 | Biases | `fct_bias_indicators` | DW-NOMINATE, Shor-McCarty, ACU ratings, party-unity computed from votes |
 | Family in company leadership | `fct_family_ties` | Wikidata relatives and the organizations they lead; spouse/dependent items on disclosures |
 | Voting history | `fct_votes` | MO House roll-call PDFs, MO Senate journals (last 10 years by default), Voteview (Congress) |

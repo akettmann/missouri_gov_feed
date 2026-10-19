@@ -511,3 +511,102 @@ models:
         description: "`Published` or `Unpublished` (precedential status)."
       - name: source_url
         description: "{{ doc('source_url') }}"
+
+  - name: fct_campaign_spending
+    description: >
+      How each official's state campaign committees spent their money: itemized expenditures with payee,
+      purpose and amount. TAP mirror for report years through 2022, MEC's own export (CD3 Part B, items
+      over $100) for 2023+ when the MEC loader has run. Committees are attributed as in
+      fct_campaign_finance. Grain: one itemized expenditure as filed. TAP rows include contributions to
+      other committees, which fct_campaign_finance also lists as `given`.
+    columns:
+      - name: official_id
+        description: "{{ doc('official_id') }}"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: expenditure_date
+        description: Date paid, as reported.
+      - name: amount
+        description: USD. Negative values are refunds/corrections as filed.
+      - name: payee_name
+        description: Who was paid (company, or person's name).
+      - name: payee_city
+        description: Payee city as reported.
+      - name: payee_state
+        description: Payee state as reported.
+      - name: purpose
+        description: Purpose as the committee described it (e.g. "Newspaper Insert for Election", "Postage").
+      - name: expenditure_type
+        description: How it was paid (e.g. "Paid", "Credit" / in-kind), as reported.
+      - name: committee_name
+        description: The official's committee that spent the money.
+      - name: mec_committee_id
+        description: MEC committee id (MECID).
+      - name: match_confidence
+        description: "{{ doc('match_confidence') }}"
+      - name: source
+        description: "`MEC` or `MEC (via Accountability Project)`."
+      - name: source_url
+        description: "{{ doc('source_url') }}"
+
+  - name: fct_campaign_reports
+    description: >
+      Cover-page totals of every campaign finance report filed by an official's state committees (MEC
+      direct export, report years 2023+; needs the MEC loader). The quick "raised $X, spent $Y, $Z in
+      the bank" view without summing itemized rows. "This period" amounts cover the report alone;
+      "this election" totals accumulate across the election's reports (total = previous + this period,
+      which holds for 99.98% of full reports). Grain: one filed report. Amended reports are separate rows
+      (report_name starts "AMENDED"); "Limited Activity" reports carry no amounts.
+    columns:
+      - name: official_id
+        description: "{{ doc('official_id') }}"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: committee_name
+        description: The official's committee that filed the report.
+      - name: mec_committee_id
+        description: MEC committee id (MECID).
+      - name: report_id
+        description: MEC report id; amendments get their own.
+      - name: report_name
+        description: Report as MEC names it (e.g. "October Quarterly Report", "AMENDED April Quarterly Report", "8 Day Before General Election-11/3/2026").
+      - name: report_year
+        description: Year the report belongs to.
+      - name: report_type
+        description: "`Full Disclosure`, `Limited Activity`, `Termination`, ..."
+      - name: contributions_received
+        description: Monetary contributions received this period (USD).
+      - name: loans_received
+        description: Loans received this period (USD).
+      - name: misc_receipts
+        description: Other receipts this period, e.g. interest and refunds (USD).
+      - name: inkind_contributions_received
+        description: In-kind contributions received this period (USD value).
+      - name: total_receipts_this_election
+        description: All receipts for the election to date, including this period (USD).
+      - name: expenditures_this_period
+        description: Expenditures this period (USD).
+      - name: total_expenditures_this_election
+        description: Expenditures for the election to date (USD).
+      - name: contributions_made_this_period
+        description: Contributions the committee made to others this period (USD).
+      - name: total_contributions_made_this_election
+        description: Contributions made to others for the election to date (USD).
+      - name: starting_money_on_hand
+        description: Cash on hand at the start of the period (USD).
+      - name: ending_money_on_hand
+        description: Cash on hand at the end of the period (USD) - "money in the bank".
+      - name: outstanding_indebtedness
+        description: Debt owed at the end of the period (USD).
+      - name: match_confidence
+        description: "{{ doc('match_confidence') }}"
+      - name: source_url
+        description: "{{ doc('source_url') }}"
