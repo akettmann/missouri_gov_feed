@@ -1,0 +1,9 @@
+@startuml voteview
+title voteview: congressional roll calls + DW-NOMINATE
+start
+:HS<congress>_{members,rollcalls,votes}.csv
+for MOGOV_VOTEVIEW_CONGRESSES;
+note right: full-chamber files; MO members picked out in dbt
+:voteview_members, voteview_rollcalls, voteview_votes;
+stop
+@enduml

@@ -1,15 +1,21 @@
 # TODO List
 
 ## High priority
-"State roll calls are loaded for 2023–2026 by default. Widen the window with MOGOV_HOUSE_SESSIONS (House PDFs go back to 2014) and MOGOV_SENATE_YEARS." Unify this control, make the default 10 years
-Add progress logging to the loaders
-Review loaders against the guidelines in CLAUDE.md
-review the MEC loader it is slower than I would like. Review what takes the most time, and consider if there are any optimizations that can be made
+- [x] Unify the state roll-call window and default it to 10 years: `MOGOV_LOOKBACK_YEARS` (default 10) replaces MOGOV_HOUSE_SESSIONS / MOGOV_SENATE_YEARS; House extraordinary sessions are discovered
+- [x] Add progress logging to the loaders (`loader.progress`, every MOGOV_PROGRESS_SECONDS)
+- [x] Review loaders against the guidelines in CLAUDE.md: streaming JsonSink, `--shards`/`--shard` + process pool, Cloud Run task env, JSON logs with severity, SIGTERM handling, Dockerfile
+- [x] Review the MEC loader speed: the crosswalk (~9 of ~13 min) was never cached, and lost the ASP.NET view state after the first export of each year (non-November elections landed site-footer junk). Now cached, view state fixed, form reused across years. The remaining cost is the 3 s pause per request (MEC answers in <1 s)
 
 ## Medium priority
-add diagrams using PlantUML that describe the data model
-add diagrams using PlantUML that describe each source and loader's uniqueness
-Build case history from CourtListener's quarterly bulk files instead of the REST API (the account token is capped at 125 requests/day across all endpoints). Load opinion-clusters, search_opinioncluster_panel and dockets from the public S3 bucket (same as courtlistener_bulk), filtered to Missouri courts (mo, moctapp*, moed, mowd, ca8), and feed fct_case_history with judges/panel, attorneys and disposition. Trade-off: several GB per quarter, cases up to 3 months stale. Keep the API loader for small top-ups.
+- [x] Add diagrams using PlantUML that describe the data model (docs/diagrams/data_model.puml, lineage.puml, pipeline.puml)
+- [x] Add diagrams using PlantUML that describe each source and loader's uniqueness (docs/diagrams/sources/)
+- [x] Build case history from CourtListener's quarterly bulk files (`courtlistener_case_bulk` + int_courtlistener__bulk_case_matches); the API loader stays for top-ups
+- [ ] Decide whether the House/Senate vote-token parsing (regex in Python today) should move to dbt, landing only the extracted PDF text, per "make as few changes to the raw data as possible". The House token regex uses a lookbehind, which RE2/DuckDB can't do
+- [ ] Ask MEC (helpdesk@mec.mo.gov) whether a lower pause or parallel shards are acceptable; the pause is now `MOGOV_MEC_PAUSE`
+- [ ] Deploy the Cloud Run jobs described in docs/environment.md and confirm the GCS FUSE layout end to end
+
 ## Low priority
-add metrics for the loaders
-Build Github workflow to run tests, lint, etc
+- [x] Add metrics for the loaders (rows, duration, failures, progress gauge by loader/shard; HTTP requests, bytes, latency by host)
+- [x] Build GitHub workflow to run tests, lint, etc (.github/workflows/ci.yml)
+- [ ] `playwright` is a dependency but nothing imports it; drop it to slim the image?
+- [ ] mec_cd3_b and mec_summary are landed but no dbt model reads them

@@ -1,0 +1,8 @@
+@startuml shor_mccarty
+title shor_mccarty: state legislator ideology
+start
+:Harvard Dataverse tab file (Jan 2025 release, 1993-2022);
+note right: wide per-year columns; reshaped in dbt
+:shor_mccarty;
+stop
+@enduml

@@ -1,0 +1,20 @@
+@startuml courtlistener_cases
+title courtlistener_cases: case history (stage 2)
+start
+:officials from marts.fct_legal_careers + dim_official
+(needs a first dbt build);
+:judges: judge:"<surname>" in their courts
+lawyers: attorney:"<first> <last>" in MO state + federal courts;
+:CourtListener search API, up to MOGOV_CL_MAX_PAGES pages;
+if (COURTLISTENER_TOKEN?) then (yes)
+  :cluster disposition + last 1,500 chars of the lead opinion;
+else (no)
+  :search only, 5 requests/min, MOGOV_CL_MAX_QUERIES cap;
+endif
+if (429 with Retry-After > 2 min?) then (quota exhausted)
+  :continue from cache only;
+  note right: next run resumes; results cached 30 days
+endif
+:cl_cases;
+stop
+@enduml

@@ -1,0 +1,24 @@
+@startuml fec
+title fec: FEC bulk files + API
+start
+:bulk zips per cycle (cn, cm, ccl, pas2, weball)
+fec.gov/files/bulk-downloads/<cycle>/<stem><yy>.zip;
+note right
+  Pipe-delimited, no header row: headers come from
+  data_dictionaries/<stem>_header_file.csv, except
+  weball (columns hard-coded from the FEC docs).
+  quote/escape disabled: fields contain bare quotes.
+  Landed nationally; filtered to MO in dbt.
+end note
+:fec_candidates, fec_committees, fec_cand_cmte_links,
+fec_committee_contribs_to_candidates, fec_candidate_summary;
+:API: committees sponsored by each MO member's
+FEC candidate ID (leadership PACs);
+if (FEC_API_KEY set (not DEMO_KEY)?) then (yes)
+  :schedule_a aggregates by employer / size / state;
+endif
+if (MOGOV_FEC_INDIV=1?) then (yes)
+  :individual contributions (~2.3 GB per cycle);
+endif
+stop
+@enduml

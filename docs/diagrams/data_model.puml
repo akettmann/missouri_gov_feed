@@ -1,0 +1,149 @@
+@startuml data_model
+title marts schema: one profile per current Missouri official
+hide circle
+skinparam linetype ortho
+
+entity dim_official {
+  * official_id
+  --
+  full_name, given_name, family_name
+  party, level, office, office_title, district
+  current_term_start, current_term_end
+  openstates_id, bioguide_id, icpsr
+  opensecrets_id, votesmart_id
+  wikidata_qid, senate_lis_id
+  email, image_url, hometown
+}
+
+entity official_profile {
+  * official_id
+  --
+  identity columns from dim_official
+  is_judge_or_lawyer
+  n_<category> counts
+  <category>_status:
+    available | none found |
+    not applicable | not public
+}
+
+entity fct_votes {
+  official_id, vote_id
+  --
+  chamber, session_code, vote_date
+  measure, vote_description
+  vote_cast, party_at_vote, source_url
+}
+
+entity fct_federal_votes {
+  official_id, congress, chamber, rollnumber
+  --
+  vote_date, bill_number, vote_question
+  vote_result, vote_cast, source_url
+}
+
+entity fct_campaign_finance {
+  official_id
+  --
+  direction (received | given)
+  level (state | federal)
+  transaction_date, amount
+  counterparty, counterparty_organization
+  counterparty_type, kind, source
+  match_confidence, source_url
+}
+
+entity fct_federal_donor_summary {
+  official_id, cycle, aggregate_kind, bucket
+  --
+  total, contribution_count
+}
+
+entity fct_lobbyist_gifts {
+  official_id
+  --
+  expenditure_date, amount
+  lobbyist_name, lobbyist_principal
+  expenditure_category, description
+  recipient_raw, match_confidence
+}
+
+entity fct_disclosures {
+  official_id
+  --
+  disclosure_type, filing_kind
+  report_year, filing_date
+  section, owner, amount
+  description, document_url
+}
+
+entity fct_voluntary_disclosures {
+  official_id
+  --
+  disclosure_date, kind
+  description, source_url
+}
+
+entity fct_bias_indicators {
+  official_id, indicator, period
+  --
+  value, detail, source_url
+}
+
+entity fct_office_history {
+  official_id
+  --
+  office_title, district, jurisdiction
+  start_date, end_date, source
+}
+
+entity fct_commercial_ties {
+  official_id
+  --
+  tie_kind, whose, detail
+  as_of_year, is_latest_report
+  source, source_url
+}
+
+entity fct_family_ties {
+  official_id
+  --
+  relation, relative_name
+  role, organization
+  source, source_url
+}
+
+entity fct_legal_careers {
+  official_id, legal_role
+  --
+  evidence, source
+}
+
+entity fct_case_history {
+  official_id
+  --
+  role, case_name, court, court_id
+  docket_number, date_filed
+  disposition, outcome
+  judges_text, attorneys_text
+  source_url
+}
+
+dim_official ||--|| official_profile
+dim_official ||--o{ fct_votes
+fct_federal_votes }o--|| dim_official
+fct_federal_votes ..> fct_votes : federal rows\nunioned in
+dim_official ||--o{ fct_campaign_finance
+dim_official ||--o{ fct_federal_donor_summary
+dim_official ||--o{ fct_lobbyist_gifts
+dim_official ||--o{ fct_disclosures
+dim_official ||--o{ fct_voluntary_disclosures
+dim_official ||--o{ fct_bias_indicators
+dim_official ||--o{ fct_office_history
+dim_official ||--o{ fct_commercial_ties
+dim_official ||--o{ fct_family_ties
+dim_official ||--o{ fct_legal_careers
+dim_official ||--o{ fct_case_history
+fct_disclosures ..> fct_commercial_ties : positions,\nincome, agreements
+fct_disclosures ..> fct_family_ties : spouse /\ndependent items
+fct_legal_careers ..> fct_case_history : who is searched\n(stage 2)
+@enduml

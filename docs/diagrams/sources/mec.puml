@@ -1,0 +1,33 @@
+@startuml mec
+title mec: Missouri Ethics Commission exports (OPT-IN)
+start
+if (MOGOV_MEC_OPT_IN=1?) then (no)
+  :skip; TAP mirror covers <= 2022;
+  stop
+endif
+partition "ASP.NET WebForms session" {
+  :GET form page (keeps __VIEWSTATE);
+  :postback per dropdown change (report type, year, election date);
+  :submit export button;
+  note right
+    The export answers with a file, not a page:
+    the form keeps the last real page to post back
+    from. Posting from the export body lost the
+    view state and silently returned the site chrome.
+  end note
+}
+:CF_ContrCSV: one CSV per (report type, year),
+one form session per report type;
+:CF12_SearchElection: per election date
+search + "Excel" export (an HTML table);
+:LobExpSearch: lobbyist expenditures 2019+;
+note right
+  Imperva bot protection; robots.txt disallows.
+  3 s pause per request (MOGOV_MEC_PAUSE);
+  MEC answers in < 1 s, so the pauses dominate.
+  Everything cached: current year weekly, past monthly.
+end note
+:mec_cd1_a, mec_cd3_b, mec_cd3_c, mec_summary,
+mec_candidate_committees, mec_lobbyist_expenditures;
+stop
+@enduml

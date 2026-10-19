@@ -1,0 +1,9 @@
+@startuml congress_legislators
+title congress_legislators: unitedstates/congress-legislators
+start
+:legislators-current.json, legislators-historical.json;
+:keep people with any MO term;
+note right: cross-IDs: bioguide, FEC, ICPSR (Voteview), OpenSecrets, Wikidata
+:congress_legislators_current, congress_legislators_historical;
+stop
+@enduml

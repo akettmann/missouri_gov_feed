@@ -1,0 +1,42 @@
+@startuml pipeline
+title mogov run: how a full refresh flows
+
+|Loaders (stage 1)|
+start
+:mogov load (all stage-1 loaders);
+note right
+  Each loader lists its work units and
+  processes those its shard owns:
+  crc32(unit key) % shards == shard.
+  --shards N        process pool of N
+  --shards N --shard i   one shard
+  Cloud Run: CLOUD_RUN_TASK_COUNT/INDEX
+end note
+fork
+  :fetch (cached HTTP, data/cache);
+fork again
+  :parse PDFs / XML / HTML
+  to text rows (no shaping);
+end fork
+:stream rows to
+data/raw/<table>/part-<i>-of-<N>.parquet;
+
+|dbt|
+:mogov build (dbt build);
+note right
+  sources read <table>/*.parquet;
+  empty placeholders for optional
+  JSON tables that aren't loaded
+end note
+:staging -> intermediate -> marts;
+
+|Loaders (stage 2)|
+:courtlistener_cases
+(needs marts.fct_legal_careers);
+
+|dbt|
+:mogov build;
+:mogov export (optional)
+data/exports/*.csv|parquet;
+stop
+@enduml

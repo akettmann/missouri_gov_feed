@@ -1,0 +1,15 @@
+@startuml wikidata
+title wikidata: positions, occupations, relatives
+start
+if (MOGOV_CONTACT set?) then (no)
+  :land empty tables;
+  note right: Wikimedia refuses requests without contact info
+  stop
+endif
+:DISCOVER: living holders of Missouri positions (shard 0 lands it);
+:QIDs = discovered + Open States CSV + congress-legislators;
+:owned QIDs in batches of 40 x 4 SPARQL templates;
+:wikidata_positions, _attributes, _relatives,
+_own_leadership, _mo_officeholders;
+stop
+@enduml

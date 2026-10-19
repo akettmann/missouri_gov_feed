@@ -1,0 +1,15 @@
+@startuml senate_efd
+title senate_efd: U.S. Senate eFD (OPT-IN)
+start
+if (MOGOV_ACCEPT_SENATE_EFD_TERMS=1?) then (no)
+  :skip;
+  stop
+endif
+:accept the use statement (CSRF form);
+:search API: MO senators + candidates, 100 per page;
+:owned web-filed reports -> every HTML table row
+(section, headers, cells);
+note right: paper filings are page images: is_paper = true, not parsed
+:senate_efd_filings, senate_efd_rows;
+stop
+@enduml

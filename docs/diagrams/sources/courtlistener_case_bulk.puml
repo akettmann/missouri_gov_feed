@@ -1,0 +1,27 @@
+@startuml courtlistener_case_bulk
+title courtlistener_case_bulk: case history from quarterly bulk files
+start
+:newest snapshot date (same as courtlistener_bulk);
+if (filtered CSVs for this snapshot cached?) then (yes)
+else (no)
+  :download dockets (~5 GB bz2), opinion-clusters (~2.5 GB),
+  search_opinioncluster_panel (~5 MB);
+  :stream-decompress; split records by quote parity
+  (newlines inside quoted fields stay in the record);
+  :dockets: keep court_id in mo, moctapp*, moed, mowd, ca8;
+  :opinion-clusters: keep docket_id in kept dockets;
+  :panel: keep opinioncluster_id in kept clusters;
+  note right
+    The only loader that filters before landing:
+    the national files are too big to land whole.
+    Kept records are copied byte for byte.
+  end note
+endif
+:cl_mo_dockets, cl_mo_opinion_clusters, cl_mo_cluster_panel;
+note right
+  dbt: int_courtlistener__bulk_case_matches matches officials
+  by panel person id, surname in judges text (own courts),
+  "first last" in attorneys text
+end note
+stop
+@enduml

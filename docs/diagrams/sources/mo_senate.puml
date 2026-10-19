@@ -1,0 +1,22 @@
+@startuml mo_senate
+title mo_senate: MO Senate daily journals
+start
+:for each year in the lookback window:
+GET senate.mo.gov/journallist/?SelectedYear=YYYY
+(current year daily, past years monthly);
+:owned journal PDFs -> pdfplumber text;
+:strip running page headers
+("Journal of the Senate 118", day lines);
+:find each "YEAS—Senators ... Vacancies—" block
+(bounded to 2,500 chars so a block missing "Vacancies"
+can't swallow the rest of the journal);
+:one row per (vote block, category, senator token)
++ the sentence that introduced the vote;
+note right
+  Duplicate surnames carry a district:
+  "Brown (16)" (2025+) or "Brown (16th Dist.)" (older),
+  both normalised to "Brown (16)".
+end note
+:mo_senate_journals, mo_senate_votes;
+stop
+@enduml

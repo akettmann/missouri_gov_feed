@@ -1,0 +1,17 @@
+@startuml courtlistener_bulk
+title courtlistener_bulk: judges + federal judges' disclosures
+start
+:list the public S3 bucket; pick the newest
+people-db-people-<date>.csv.bz2 snapshot;
+:download each table's .csv.bz2 (cached forever per snapshot)
+and decompress to the cache;
+note right
+  Postgres CSV exports. financial-disclosures-reimbursements
+  is skipped: the 2026-09 export has an unbalanced quote that
+  swallows the rest of the file.
+  Filtering to Missouri courts happens in dbt.
+end note
+:cl_people, cl_positions, cl_courts, ...,
+cl_financial_disclosures, cl_fd_*;
+stop
+@enduml

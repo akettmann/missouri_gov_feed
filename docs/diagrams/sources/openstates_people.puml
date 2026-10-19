@@ -1,0 +1,10 @@
+@startuml openstates_people
+title openstates_people: Open States people repo
+start
+:GitHub tarball of openstates/people (main);
+:every data/mo/**/*.yml -> one row (YAML parsed to JSON);
+:current-roster CSV (data.openstates.org);
+note right: the CSV carries Wikidata QIDs the YAML often lacks
+:openstates_people, openstates_current_csv;
+stop
+@enduml

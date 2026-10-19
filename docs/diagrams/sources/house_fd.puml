@@ -1,0 +1,17 @@
+@startuml house_fd
+title house_fd: U.S. House Clerk financial disclosures
+start
+:yearly index zips <year>FD.zip (national, tab-delimited)
+from MOGOV_HOUSE_FD_FIRST_YEAR;
+:house_fd_index (owned years);
+:Missouri filings of types O, A, P, C, T;
+:PDF -> text lines (pdfplumber);
+if (text layer?) then (yes)
+  :one row per line;
+else (scanned paper filing, DocID 8xxxxxxx/9xxxxxxx)
+  :has_text = false row (gap stays visible);
+endif
+:house_fd_pdf_lines;
+note right: dbt classifies lines into assets, income, transactions
+stop
+@enduml

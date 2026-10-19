@@ -1,0 +1,27 @@
+@startuml mo_house
+title mo_house: MO House XML + roll-call PDFs
+start
+:for each year in the lookback window (MOGOV_LOOKBACK_YEARS)
+and session type 1-4: GET documents.house.mo.gov/xml/<YY><t>.zip;
+if (body is a zip?) then (yes)
+  :read every *.xml in the archive;
+elseif (regular session of the current year?) then (yes)
+  :open session (no zip yet):
+  walk MemberList / BillList / SenateActList
+  and fetch each linked per-member / per-bill XML;
+else (HTML page)
+  :skip: no such session
+  (site answers unknown codes with 200 + HTML);
+endif
+:owned sessions -> xmljson -> mo_house_members / _bills / _lists;
+:collect <RollCallPDF> URLs from all sessions (every shard);
+:owned roll-call PDFs -> pdfplumber layout text
+-> header fields + one row per (roll call, member token);
+note right
+  Tokens are printed surnames ("SMITH 46", "MR SPEAKER"),
+  matched to members in dbt (int_mo_house__member_identity).
+  PDFs are cached forever: roll calls never change.
+end note
+:mo_house_rollcalls, mo_house_rollcall_votes;
+stop
+@enduml

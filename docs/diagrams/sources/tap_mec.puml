@@ -1,0 +1,13 @@
+@startuml tap_mec
+title tap_mec: MEC via The Accountability Project mirror
+start
+:3 cleaned CSVs from s3://publicaccountability/csv;
+note right
+  Coverage ends in 2022. Re-cleaned by TAP, so column
+  names differ from MEC's own exports.
+  Some rows are malformed: ignore_errors, strict_mode off.
+end note
+:tap_mec_contributions, tap_mec_expenditures,
+tap_mec_lobbyist_expenditures;
+stop
+@enduml

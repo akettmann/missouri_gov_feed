@@ -1,0 +1,131 @@
+@startuml lineage
+title Source -> loader -> raw -> marts lineage (from dbt/target/manifest.json, grouped)
+left to right direction
+skinparam packageStyle rectangle
+skinparam nodesep 12
+skinparam ranksep 60
+
+package "Rosters & careers" {
+  [openstates_people] as L_os
+  [congress_legislators] as L_cl
+  [bluebook] as L_bb
+  [fjc_judges] as L_fjc
+  [courtlistener_bulk] as L_clb
+  [courtlistener_case_bulk] as L_ccb
+  [wikidata] as L_wd
+}
+package "Votes" {
+  [mo_house] as L_moh
+  [mo_senate] as L_mos
+  [voteview] as L_vv
+}
+package "Money" {
+  [fec] as L_fec
+  [tap_mec] as L_tap
+  [mec\n(opt-in)] as L_mec
+}
+package "Disclosures" {
+  [house_fd] as L_hfd
+  [senate_efd\n(opt-in)] as L_efd
+}
+package "Ratings" {
+  [acu_ratings] as L_acu
+  [shor_mccarty] as L_sm
+}
+package "Stage 2" {
+  [courtlistener_cases] as L_cc
+}
+package "seeds" {
+  [statewide_officials\nhouse_speakers\nvoluntary_disclosures] as SEEDS
+}
+
+package "intermediate (identity resolution)" {
+  [int_officials__current\nint_officials__name_keys\nint_officials__bios\nint_officials__wikidata] as I_off
+  [int_mo_legislators__seats\nint_mo_house__member_identity] as I_seats
+  [int_mo_house__votes\nint_mo_senate__votes] as I_votes
+  [int_judges__current\nint_judges__federal\nint_judges__state_index\nint_bluebook__bios\nint_bluebook__judge_bios] as I_judges
+  [int_mec__official_committees] as I_mec
+  [int_house_fd__schedule_lines\nint_courtlistener__judge_disclosure_items] as I_fd
+  [int_courtlistener__official_people\nint_courtlistener__official_positions] as I_clpos
+  [int_courtlistener__bulk_case_matches] as I_cases
+}
+
+package "marts" {
+  [dim_official] as dim
+  [fct_votes\nfct_federal_votes] as F_votes
+  [fct_campaign_finance\nfct_federal_donor_summary] as F_money
+  [fct_lobbyist_gifts] as F_gifts
+  [fct_disclosures\nfct_voluntary_disclosures] as F_disc
+  [fct_bias_indicators] as F_bias
+  [fct_office_history] as F_office
+  [fct_commercial_ties\nfct_family_ties] as F_ties
+  [fct_legal_careers] as F_legal
+  [fct_case_history] as F_cases
+  [official_profile] as profile
+}
+
+L_os --> I_seats
+L_os --> I_off
+L_cl --> I_off
+L_cl --> dim
+L_bb --> I_judges
+L_fjc --> I_judges
+L_clb --> I_fd
+L_clb --> I_clpos
+L_wd --> I_off
+SEEDS --> I_off
+I_judges --> I_off
+I_seats --> I_off
+I_off --> dim
+
+L_moh --> I_seats
+L_moh --> I_votes
+L_mos --> I_votes
+I_seats --> I_votes
+I_votes --> F_votes
+L_vv --> F_votes
+L_vv --> F_bias
+
+L_fec --> F_money
+L_tap --> I_mec
+L_tap --> F_money
+L_tap --> F_gifts
+L_mec --> I_mec
+L_mec --> F_money
+L_mec --> F_gifts
+I_mec --> F_money
+I_off --> F_gifts
+
+L_hfd --> I_fd
+L_efd --> F_disc
+I_fd --> F_disc
+SEEDS --> F_disc
+
+L_acu --> F_bias
+L_sm --> F_bias
+F_votes --> F_bias
+
+I_off --> F_office
+I_clpos --> F_office
+L_wd --> F_ties
+F_disc --> F_ties
+I_off --> F_legal
+
+F_legal ..> L_cc : officials to search
+F_legal --> I_cases
+I_clpos --> I_cases
+L_ccb --> I_cases
+I_cases --> F_cases
+L_cc --> F_cases
+
+dim --> profile
+F_votes --> profile
+F_money --> profile
+F_gifts --> profile
+F_disc --> profile
+F_bias --> profile
+F_office --> profile
+F_ties --> profile
+F_legal --> profile
+F_cases --> profile
+@enduml

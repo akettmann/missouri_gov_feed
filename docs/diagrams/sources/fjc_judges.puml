@@ -1,0 +1,7 @@
+@startuml fjc_judges
+title fjc_judges: Federal Judicial Center directory
+start
+:judges.csv (every Article III judge since 1789, wide format);
+:fjc_judges (column names kept as published);
+stop
+@enduml

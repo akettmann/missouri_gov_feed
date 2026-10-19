@@ -1,0 +1,14 @@
+@startuml bluebook
+title bluebook: Missouri Official Manual
+start
+:edition index page -> chapter PDF links
+(file names differ between editions,
+falls back to the 2019+ naming scheme);
+:executive, legislative, judicial chapters;
+:per page: two-column if (almost) no words
+straddle the midline, else one column;
+:one row per text line (edition, chapter, page, column);
+note right: dbt splits lines into per-person biographies
+:bluebook_lines;
+stop
+@enduml
