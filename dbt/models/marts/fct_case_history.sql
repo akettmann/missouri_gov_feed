@@ -4,8 +4,9 @@
 --   bulk  quarterly bulk export matched in int_courtlistener__bulk_case_matches (var cl_case_bulk)
 --   api   REST search hits (courtlistener_cases loader): newer than the last snapshot, and with the
 --         lead opinion's closing text when COURTLISTENER_TOKEN is set
--- outcome: CourtListener's disposition field when present, else the decree word found at the end of the
--- lead opinion (AFFIRMED / REVERSED / REMANDED / DISMISSED ...; API rows only), else null.
+-- outcome: a fixed vocabulary (mogov.classify_outcome) read from CourtListener's disposition when present,
+-- else from decree phrases at the end of the lead opinion (API rows only), else null. disposition stays
+-- verbatim beside it.
 -- Caveats: surname-only judge matches can catch a same-named judge on the same court; attorney text
 -- names an Attorney General on every brief their office filed (role 'attorney' = office of record).
 with api as (
@@ -85,8 +86,10 @@ select
     docket_number,
     date_filed,
     nullif(trim(coalesce(disposition, '')), '') as disposition,
+    -- the disposition, classified; else decree phrases at the end of the opinion (strict phrases: it's prose);
+    -- else 'other' for a disposition that fits no class (e.g. "SUSPENDED", "ELECTION RESULTS VALID")
     coalesce(
-        nullif(trim(coalesce(disposition, '')), ''),
+        nullif({{ mogov.classify_outcome('disposition') }}, 'other'),
         case
             when
                 opinion_tail like '%AFFIRMED IN PART%' or opinion_tail like '%REVERSED IN PART%'
@@ -101,7 +104,8 @@ select
             when opinion_tail like '%DISMISSED%' then 'dismissed'
             when opinion_tail like '%PERMANENT WRIT%' or opinion_tail like '%WRIT IS MADE ABSOLUTE%' then 'writ granted'
             when opinion_tail like '%WRIT%DENIED%' or opinion_tail like '%QUASHED%' then 'writ denied'
-        end
+        end,
+        {{ mogov.classify_outcome('disposition') }}
     ) as outcome,
     judges_text,
     attorneys_text,

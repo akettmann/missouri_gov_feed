@@ -1,8 +1,5 @@
 # TODO List
 
-## Medium priority
-- [ ] fct_case_history.outcome is mostly CourtListener's verbatim disposition; map it to a fixed vocabulary (affirmed / reversed / remanded / dismissed / mixed ...)
-
 ## Low priority
 - [ ] Model `mec_cd3_b` (itemized committee spending over $100: payee, purpose, amount) and `mec_summary` (per-report cover totals: raised, spent, money on hand, debt) for the frontend
 - [ ] review DBT's best practices against our project

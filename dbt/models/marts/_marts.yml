@@ -492,9 +492,17 @@ models:
         description: CourtListener's disposition field, verbatim (free text, e.g. "AFFIRMED IN PART; REVERSED IN PART AND REMANDED").
       - name: outcome
         description: >
-          The disposition when present (verbatim, so wording varies); otherwise, for API rows with opinion text,
-          a normalized decree word read from the end of the lead opinion (affirmed, reversed, reversed and
-          remanded, vacated, dismissed, writ granted/denied...). Null when neither is available.
+          The decision in a fixed vocabulary (mogov.classify_outcome): affirmed, reversed, reversed and
+          remanded, affirmed in part, reversed in part, vacated, remanded, dismissed, writ granted, writ
+          denied, transferred, or other (a disposition that fits no class, e.g. "SUSPENDED"). Read from the
+          disposition when present, else from decree phrases at the end of the opinion (API rows with
+          COURTLISTENER_TOKEN). Null when neither exists - most bulk rows, since CourtListener records few
+          dispositions for Missouri cases.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['affirmed', 'reversed', 'reversed and remanded', 'affirmed in part, reversed in part',
+                         'vacated', 'remanded', 'dismissed', 'writ granted', 'writ denied', 'transferred', 'other']
       - name: judges_text
         description: Judges as printed in the opinion.
       - name: attorneys_text
