@@ -7,6 +7,7 @@
     ('cl_fd_spousal_income', 'spousal income', "source_type", "''", "date_raw"),
     ('cl_fd_gifts', 'gift', "source || ': ' || description", "value", "''"),
     ('cl_fd_debts', 'liability', "creditor_name || ' - ' || description", "value_code", "''"),
+    ('cl_fd_reimbursements', 'reimbursement', "source || ': ' || coalesce(purpose, '') || ' (' || coalesce(location, '') || ')'", "''", "items_paid_or_provided"),
 ] %}
 with items as (
     {% for table, kind, descr, amount, extra in parts %}

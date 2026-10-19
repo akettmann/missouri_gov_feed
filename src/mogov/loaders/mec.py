@@ -233,7 +233,16 @@ def load(shard: db.Shard) -> dict[str, int]:
     exports = _Exports()
     total = sum(map(len, contrib_units.values())) + len(crosswalk_years) + lobbying
     exports.progress = obs.Progress("MEC exports", total, log)
-    csv_opts = {"ignore_errors": True, "strict_mode": False, "normalize_names": True, "shard": shard}
+    # The quote/escape must be explicit: with non-strict sniffing DuckDB mis-read quoted names such as
+    # "'Together With Schaper'" and silently merged the following rows (~2,800 rows lost across 2023-26).
+    csv_opts = {
+        "quote": '"',
+        "escape": '"',
+        "ignore_errors": True,
+        "strict_mode": False,
+        "normalize_names": True,
+        "shard": shard,
+    }
     counts = {}
     try:
         for rtype, years in contrib_units.items():

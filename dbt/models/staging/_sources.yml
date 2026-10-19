@@ -114,6 +114,8 @@ sources:
         description: "AO-10 report part: agreements."
       - name: cl_fd_non_investment_income
         description: "AO-10 report part: non-investment income."
+      - name: cl_fd_reimbursements
+        description: "AO-10 report part: reimbursements (travel, lodging, meals paid by others)."
       - name: cl_fd_spousal_income
         description: "AO-10 report part: spouse's non-investment income."
       # ideology / ratings

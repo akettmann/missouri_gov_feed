@@ -24,5 +24,8 @@ def load(shard: db.Shard) -> dict[str, int]:
     counts = {}
     for table, names in FILES.items():
         paths = [fetch_to_file(f"{BUCKET}/{n}", CACHE_DIR / "tap" / n, max_age=30 * 86400) for n in shard.take(names)]
-        counts[table] = db.replace_csv(table, paths, ignore_errors=True, strict_mode=False, shard=shard)
+        # explicit quote/escape: non-strict sniffing silently merged rows (~900 lost across the files)
+        counts[table] = db.replace_csv(
+            table, paths, quote='"', escape='"', ignore_errors=True, strict_mode=False, shard=shard
+        )
     return counts

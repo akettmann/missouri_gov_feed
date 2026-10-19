@@ -1,9 +1,10 @@
-"""CourtListener (Free Law Project) quarterly bulk exports: judges, their positions, and federal judges'
+r"""CourtListener (Free Law Project) quarterly bulk exports: judges, their positions, and federal judges'
 financial disclosures (AO-10 reports, parsed into investments, gifts, debts, outside positions...).
 
-Public S3 bucket, no auth. Files are bz2-compressed Postgres CSV exports; they're decompressed
-to the cache and landed verbatim. Filtering to Missouri courts (mo, moctapp*, moed, mowd, ca8...)
-happens in dbt.
+Public S3 bucket, no auth. Files are bz2-compressed Postgres CSV exports with ESCAPE '\': quotes inside
+fields are backslash-escaped, not doubled, so the dialect is set explicitly (left to sniffing, DuckDB lost
+rows and choked on the reimbursements file). They're decompressed to the cache and landed verbatim.
+Filtering to Missouri courts (mo, moctapp*, moed, mowd, ca8...) happens in dbt.
 """
 
 import bz2
@@ -32,8 +33,7 @@ TABLES = {
     "financial-disclosures-agreements": "cl_fd_agreements",
     "financial-disclosures-non-investment-income": "cl_fd_non_investment_income",
     "financial-disclosures-spousal-income": "cl_fd_spousal_income",
-    # financial-disclosures-reimbursements omitted: the 2026-09 export has an unbalanced quote that
-    # swallows the rest of the file (DuckDB OOMs on the runaway field).
+    "financial-disclosures-reimbursements": "cl_fd_reimbursements",
 }
 
 
@@ -62,5 +62,7 @@ def load(shard: db.Shard) -> dict[str, int]:
         if not csv_path.exists():
             with bz2.open(bz_path, "rb") as src, csv_path.open("wb") as dst:
                 shutil.copyfileobj(src, dst, 1 << 20)
-        counts[table] = db.replace_csv(table, csv_path, strict_mode=False, parallel=False, shard=shard)
+        counts[table] = db.replace_csv(
+            table, csv_path, quote='"', escape="\\", strict_mode=False, parallel=False, shard=shard
+        )
     return counts

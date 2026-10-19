@@ -59,6 +59,10 @@ Quirks:
   answers with a file, not a page. Posting from the export body used to lose the view state, so MEC
   silently returned its generic page. Every election after the first in a year then landed the site
   footer (14 junk rows) instead of candidates. Fixed in October 2026: the form keeps the last real page.
+- The exports quote every field, and names can contain apostrophes (`"'Together With Schaper'"`).
+  DuckDB's non-strict sniffing mis-read such fields and silently merged the following rows, losing about
+  2,800 rows across 2023–26 (contributions, expenditures, report summaries). The loader now sets
+  `quote` and `escape` explicitly.
 - Elections with no candidates return the search page instead of a table. These are logged as
   `mec.crosswalk_empty`.
 - MEC answers in under a second (the lobbyist search takes about 13 s). The fixed `MOGOV_MEC_PAUSE`
@@ -75,7 +79,9 @@ Cleaned MEC contributions, expenditures and lobbyist expenditures from TAP's pub
 Quirks:
 - Coverage ends in 2022.
 - Column names are TAP's, not MEC's.
-- Some rows are malformed, so they're read with `ignore_errors` and without strict mode.
+- Some rows are malformed, so they're read with `ignore_errors` and without strict mode. The quote and
+  escape characters are set explicitly: with non-strict sniffing, DuckDB mis-read some quoted fields
+  and silently merged the rows after them (about 900 rows lost before October 2026).
 
 ## fec: Federal Election Commission
 
@@ -134,8 +140,9 @@ schools, and federal judges' financial disclosures.
 - Lands: `cl_*` tables.
 
 Quirks:
-- `financial-disclosures-reimbursements` is skipped. The 2026-09 export has an unbalanced quote that
-  swallows the rest of the file, and DuckDB runs out of memory.
+- The exports are Postgres CSV with backslash-escaped quotes (`\"`), not doubled ones, so the reader is
+  told `escape='\'`. Left to sniffing, DuckDB dropped rows, and the reimbursements file looked like an
+  unbalanced quote and ran out of memory. With the explicit dialect it lands all 33,472 rows.
 - Missouri filtering (mo, moctapp*, moed, mowd, ca8) happens in dbt.
 
 ## courtlistener_case_bulk: case history from bulk files

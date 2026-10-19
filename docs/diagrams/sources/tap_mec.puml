@@ -5,7 +5,8 @@ start
 note right
   Coverage ends in 2022. Re-cleaned by TAP, so column
   names differ from MEC's own exports.
-  Some rows are malformed: ignore_errors, strict_mode off.
+  Some rows are malformed: ignore_errors, strict_mode off,
+  with quote/escape set explicitly (sniffing merged rows).
 end note
 :tap_mec_contributions, tap_mec_expenditures,
 tap_mec_lobbyist_expenditures;
