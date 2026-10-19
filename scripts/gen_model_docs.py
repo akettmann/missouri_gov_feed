@@ -11,6 +11,7 @@ from pathlib import Path
 import yaml
 
 GRAIN = {
+    "int_bills__subjects": "one row per (session, bill, subject) from one chamber's index",
     "int_bluebook__bios": "one biography per (edition, person) in the legislative/executive chapters",
     "int_bluebook__judge_bios": "one biography per judge in the judicial chapter",
     "int_bluebook__county_circuits": "one row per county (and St. Louis City) in the latest edition",

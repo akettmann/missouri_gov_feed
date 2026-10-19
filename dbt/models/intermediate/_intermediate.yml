@@ -2,6 +2,12 @@
 # not this file, then regenerate.
 version: 2
 models:
+- name: int_bills__subjects
+  description: 'Subject index terms per bill from both chambers'' indexes. A House bill keeps the House XML''s own
+    terms (2024 sessions on); the Senate topical index fills in House bills without them (earlier sessions, when
+    the bill reached the Senate) and covers Senate bills. The two indexes tag the same House bill a little differently,
+    so they''re not mixed for one bill. subject_source says which index a row comes from. Grain: one row per (session,
+    bill, subject) from one chamber''s index.'
 - name: int_bluebook__bios
   description: 'Official Manual biographies split per person. Legislative chapter entries start with "District 12—FIRST
     LAST" and run until the next entry; lines are joined in reading order. Grain: one biography per (edition, person)

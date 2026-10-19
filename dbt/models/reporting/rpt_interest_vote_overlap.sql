@@ -1,8 +1,8 @@
 -- Roll-call votes on bills whose subject touches an industry or interest that gave the official money in or
 -- before the vote's year: the official's vote, the bill, the subjects that tie it to the industry
--- (industry_subjects seed over the House subject index) and the money (int_interests__industry_money).
+-- (industry_subjects seed over the legislature's subject index) and the money (int_interests__industry_money).
 -- Co-occurrence, not causation: it shows that money and a vote meet, not that one caused the other.
--- Only Missouri legislators: subjects come from the House bill index, which links to state votes.
+-- Only Missouri legislators: bill subjects (fct_bill_subjects) link to state votes only.
 with votes as (
     select
         v.official_id,

@@ -94,7 +94,7 @@ seeds:
                 field: industry
   - name: industry_subjects
     description: >
-      The MO House bill subject index terms (fct_bill_subjects.subject_name, verbatim) that each interest_keywords
+      The legislature's bill subject index terms (fct_bill_subjects.subject_name, verbatim) that each interest_keywords
       industry has a stake in. Feeds rpt_interest_vote_overlap. tests/assert_industry_subjects_known.sql warns if
       a term stops appearing in the bill data.
     data_tests:

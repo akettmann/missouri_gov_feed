@@ -1,9 +1,10 @@
--- The House subject index terms of each House bill, one row per term, for grouping votes by topic
--- (join fct_vote_bills). The House export carries them from the 2024 sessions on.
-select distinct
+-- The subject index terms of each bill, one row per term, for grouping votes by topic (join fct_vote_bills).
+-- House bills carry the House XML's terms from the 2024 sessions on; earlier House bills that reached the
+-- Senate, and Senate bills, carry the Senate topical index's (int_bills__subjects).
+select
     session_code,
     bill,
     subject_id,
-    subject_name
-from {{ ref('stg_mo_house__bill_subjects') }}
-where subject_name is not null
+    subject_name,
+    subject_source
+from {{ ref('int_bills__subjects') }}

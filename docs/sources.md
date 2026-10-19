@@ -9,6 +9,7 @@ flow diagram in [diagrams/sources](diagrams/sources). Raw tables land under `dat
 |---|---|---|---|---|
 | `mo_house` | Missouri House (documents.house.mo.gov) | members, bills, per-member roll-call votes | `MOGOV_LOOKBACK_YEARS` (default 10; PDFs from 2014) | |
 | `mo_senate` | Missouri Senate journals (senate.mo.gov) | per-senator roll-call votes | `MOGOV_LOOKBACK_YEARS` | |
+| `mo_senate_topics` | Missouri Senate topical index (senate.mo.gov) | Senate bills, subject terms for Senate bills and House bills that reached the Senate | `MOGOV_LOOKBACK_YEARS` (regular sessions) | |
 | `mec` | Missouri Ethics Commission | state campaign contributions and spending, candidate↔committee links, lobbyist gifts | 2023+ | opt-in |
 | `tap_mec` | MEC via The Accountability Project | state campaign finance and lobbyist gifts | 2011–2022 (gifts from 2004) | |
 | `fec` | Federal Election Commission | federal candidates, committees, PAC contributions, donor aggregates | `MOGOV_FEC_CYCLES` | API key for aggregates |
@@ -81,6 +82,33 @@ Quirks:
   swallow the rest of the journal.
 - PDF parsing (about 3 s per journal) dominates a cold run, so it shards well. The extracted text is
   cached by PDF content, so re-runs skip it.
+
+## mo_senate_topics: Missouri Senate topical index
+
+senate.mo.gov's "Topical Index" (`/BillTracking/bills/keywords?year=YYYY&session=R`) lists every bill of a
+regular session under each subject keyword. It covers all Senate bills and resolutions, plus the House bills
+that reached the Senate. The keywords are the legislature's shared subject index. The House XML only carries
+subjects from 2024, so this fills in earlier sessions. It also adds Senate bills to `fct_bills`, which lets
+`fct_vote_bills` link Senate votes on Senate bills.
+
+- Lands: `mo_senate_bill_topics`, one row per (session, keyword, bill card): keyword, bill label, link,
+  description and sponsors, as the page prints them.
+- Window: `MOGOV_LOOKBACK_YEARS`. Shard units: session years (one page each, 3–6 MB).
+
+Quirks:
+- The page title "TOPICAL INDEX" uses the same heading markup as the keywords. It has no bill cards, so it
+  lands nothing.
+- Extraordinary sessions (`session=E`) have no index; the page comes back empty.
+- Two terms are spelled differently from the House index: "Elementary and Secondary Education, Department
+  of" (House: "…, DEPT. OF") and "Workers' Compensation" (House: no apostrophe). Staging maps them to the
+  House spelling.
+- The Senate indexes House bills a little differently from the House: for the 486 House bills in both
+  (2024–26), 1,576 of the Senate's 2,807 terms match the House's 2,092. A House bill keeps the House's own
+  terms where it has them (`fct_bill_subjects.subject_source`).
+- A House bill that never reached the Senate has no Senate entry, so House bills before 2024 that died in
+  the House still have no subjects.
+- The House export doesn't name its roll calls on Senate bills, so House votes on Senate bills aren't
+  linked to a bill.
 
 ## mec: Missouri Ethics Commission (opt-in)
 

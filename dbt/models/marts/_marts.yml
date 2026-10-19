@@ -966,9 +966,10 @@ models:
 
   - name: fct_bills
     description: >
-      Missouri House bills and resolutions per session (House XML export): titles, current version, last
-      action, and the House subject index terms (`subjects`, "; "-separated; from the 2024 sessions on).
-      Senate bills are not covered yet. Grain: one row per (session, bill).
+      Missouri bills and resolutions per session. House bills from the House XML export (titles, current version,
+      last action); Senate bills from the Senate topical index (its one-line description as short_title; the other
+      House-only columns are null). `subjects` holds the subject index terms, "; "-separated (fct_bill_subjects).
+      Grain: one row per (session, bill).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -982,7 +983,7 @@ models:
         description: Calendar year of the session.
       - name: bill
         data_type: varchar
-        description: Bill number without spaces (HB2, HJR1, HCR3, HR10).
+        description: Bill number without spaces (HB2, HJR1, HCR3, HR10, SB974, SJR3).
       - name: current_bill_string
         data_type: varchar
         description: The current version's full designation, e.g. "CCS SS SCS HCS HB 2".
@@ -994,7 +995,7 @@ models:
         description: Long title (what the bill does, in one sentence).
       - name: subjects
         data_type: varchar
-        description: House subject index terms, "; "-separated (null before the 2024 sessions).
+        description: Subject index terms, "; "-separated (null when neither chamber's index has the bill).
       - name: last_action
         data_type: varchar
         description: Last recorded action, with its date.
@@ -1007,8 +1008,9 @@ models:
 
   - name: fct_bill_subjects
     description: >
-      House subject index terms per House bill, one row per term (from the 2024 sessions on). Join to
-      fct_vote_bills to group votes by topic. Grain: one row per (session, bill, subject).
+      Subject index terms per bill, one row per term. House bills keep the House XML's terms (2024 sessions on);
+      earlier House bills that reached the Senate, and Senate bills, get the Senate topical index's (same
+      vocabulary). Join to fct_vote_bills to group votes by topic. Grain: one row per (session, bill, subject).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -1022,10 +1024,17 @@ models:
         description: Bill number (fct_bills).
       - name: subject_id
         data_type: varchar
-        description: House subject index id.
+        description: House subject index id (null for Senate index rows).
       - name: subject_name
         data_type: varchar
         description: Subject term, e.g. "APPROPRIATIONS", "ELEMENTARY AND SECONDARY EDUCATION, DEPT. OF".
+      - name: subject_source
+        data_type: varchar
+        description: Which index the term comes from (house or senate).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['house', 'senate']
 
   - name: fct_bill_sponsors
     description: >
@@ -1061,9 +1070,9 @@ models:
 
   - name: fct_vote_bills
     description: >
-      Which House bill a state vote was on. House roll calls are linked exactly (the bill XML names the
-      roll-call PDF, which is the vote_id); Senate journal votes through the measure in the journal text
-      ("HB 2") and the year's regular session. Senate bills aren't covered yet. Grain: one row per (chamber,
+      Which bill a state vote was on. House roll calls are linked exactly (the bill XML names the roll-call PDF,
+      which is the vote_id), for House bills only; Senate journal votes through the measure in the journal text
+      ("HB 2", "SB 974") and the year's regular session, for House and Senate bills. Grain: one row per (chamber,
       vote, bill, bill version).
     data_tests:
       - dbt_utils.unique_combination_of_columns:

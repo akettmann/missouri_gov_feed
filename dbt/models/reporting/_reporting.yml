@@ -308,12 +308,12 @@ models:
 
   - name: rpt_interest_vote_overlap
     description: >
-      Missouri legislators' roll-call votes on bills whose House subject index terms touch an industry or
+      Missouri legislators' roll-call votes on bills whose subject index terms touch an industry or
       interest that gave the official money (organization/PAC contributions or lobbyist gifts) in or before the
       vote's year. Industries come from donor and principal names (interest_keywords seed) and are tied to bill
       subjects by the industry_subjects seed. Co-occurrence, not causation: a row says money and a vote meet, not
-      that one caused the other. Only bills with House subject data (2024+ House bills and the Senate votes on
-      them). Grain: one row per (official, chamber, vote, industry).
+      that one caused the other. Only votes linked to a bill with subject terms (fct_vote_bills, fct_bill_subjects).
+      Grain: one row per (official, chamber, vote, industry).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:

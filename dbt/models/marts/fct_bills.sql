@@ -1,13 +1,55 @@
--- Missouri House bills and resolutions per session (House XML export), with their subject index terms
--- folded into one text column for display; fct_bill_subjects has one row per term for grouping.
--- Senate bills are not in the House export and are not covered yet.
+-- Missouri bills and resolutions per session, with their subject index terms folded into one text column
+-- for display; fct_bill_subjects has one row per term for grouping.
+--   House bills  the House XML export: titles, current version, last action
+--   Senate bills the Senate topical index (regular sessions): its one-line description as the short
+--                title; Senate bills filed under no keyword aren't listed there and are missing
 with subjects as (
     select
         session_code,
         bill,
         {{ dbt.listagg('subject_name', "'; '", "order by subject_name") }} as subjects
-    from {{ ref('stg_mo_house__bill_subjects') }}
+    from {{ ref('int_bills__subjects') }}
     group by session_code, bill
+),
+
+senate_bills as (
+    select
+        session_code,
+        max(session_year) as session_year,
+        bill,
+        max(description) as short_title,
+        max(bill_url) as source_url
+    from {{ ref('stg_mo_senate__bill_topics') }}
+    where bill like 'S%'
+    group by session_code, bill
+),
+
+bills as (
+    select
+        session_code,
+        session_year,
+        bill,
+        current_bill_string,
+        short_title,
+        long_title,
+        last_action,
+        proposed_effective_date,
+        source_url
+    from {{ ref('stg_mo_house__bills') }}
+
+    union all
+
+    select
+        session_code,
+        session_year,
+        bill,
+        cast(null as {{ dbt.type_string() }}) as current_bill_string,
+        short_title,
+        cast(null as {{ dbt.type_string() }}) as long_title,
+        cast(null as {{ dbt.type_string() }}) as last_action,
+        cast(null as date) as proposed_effective_date,
+        source_url
+    from senate_bills
 )
 
 select
@@ -21,5 +63,5 @@ select
     b.last_action,
     b.proposed_effective_date,
     b.source_url
-from {{ ref('stg_mo_house__bills') }} as b
+from bills as b
 left join subjects as s on b.session_code = s.session_code and b.bill = s.bill
