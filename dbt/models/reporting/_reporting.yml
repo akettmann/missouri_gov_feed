@@ -306,6 +306,78 @@ models:
         data_type: double
         description: The same rate over every member of the chamber in the session.
 
+  - name: rpt_interest_vote_overlap
+    description: >
+      Missouri legislators' roll-call votes on bills whose House subject index terms touch an industry or
+      interest that gave the official money (organization/PAC contributions or lobbyist gifts) in or before the
+      vote's year. Industries come from donor and principal names (interest_keywords seed) and are tied to bill
+      subjects by the industry_subjects seed. Co-occurrence, not causation: a row says money and a vote meet, not
+      that one caused the other. Only bills with House subject data (2024+ House bills and the Senate votes on
+      them). Grain: one row per (official, chamber, vote, industry).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, chamber, vote_id, industry]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: chamber
+        data_type: varchar
+        description: state_house or state_senate.
+      - name: session_code
+        data_type: varchar
+        description: MO House session code of the bill.
+      - name: vote_id
+        data_type: varchar
+        description: Vote identifier, as in fct_votes.
+      - name: vote_date
+        data_type: date
+        description: Date of the vote.
+      - name: bill
+        data_type: varchar
+        description: The bill voted on (fct_vote_bills).
+      - name: short_title
+        data_type: varchar
+        description: The bill's short title (fct_bills).
+      - name: vote_cast
+        data_type: varchar
+        description: The official's vote, as in fct_votes.
+      - name: industry
+        data_type: varchar
+        description: Industry or interest (interest_keywords / industry_subjects seeds).
+        data_tests: [not_null]
+      - name: matched_subjects
+        data_type: varchar
+        description: The bill's subject index terms that tie it to the industry, '; '-separated.
+      - name: contributions_amount
+        data_type: decimal(38,6)
+        description: Contributions from the industry's organizations and PACs to the official in or before the vote's year.
+      - name: gifts_amount
+        data_type: decimal(38,6)
+        description: Lobbyist gifts from the industry's principals to the official in or before the vote's year.
+      - name: first_money_year
+        data_type: integer
+        description: First year the official received money from the industry.
+      - name: last_money_year
+        data_type: integer
+        description: Last year (up to the vote's year) the official received money from the industry.
+      - name: match_confidence
+        data_type: varchar
+        description: "{{ doc('match_confidence') }} The weakest among the money rows counted."
+      - name: vote_source_url
+        data_type: varchar
+        description: The roll call or journal the vote comes from.
+      - name: bill_source_url
+        data_type: varchar
+        description: The bill's page.
+
 exposures:
   - name: voter_frontend
     label: Missouri officials frontend
@@ -341,3 +413,4 @@ exposures:
       - ref('rpt_donor_rollup')
       - ref('rpt_gift_rollup')
       - ref('rpt_attendance')
+      - ref('rpt_interest_vote_overlap')

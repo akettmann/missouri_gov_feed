@@ -24,8 +24,9 @@
 - [x] ~~Balancing ideology scorecard loader~~ (not needed: ACU dropped)
 
 ### Later (interest vs. vote overlap)
-- [ ] Seed mapping donor organizations / lobbyist principals to industries or subjects (can target the House subject index terms in `fct_bill_subjects`)
-- [ ] `rpt_interest_vote_overlap`: votes on bills whose subject matches an industry that funded or gifted the official (co-occurrence, not causation)
+- [x] Seed mapping donor organizations / lobbyist principals to industries or subjects: `interest_keywords` (236 whole-word keywords -> 18 industries) and `industry_subjects` (industry -> House subject index terms), via `int_interests__industry_money`
+- [x] `rpt_interest_vote_overlap`: votes on bills whose subject matches an industry that funded or gifted the official (co-occurrence, not causation)
+- [ ] Widen `interest_keywords` coverage: classified names cover ~37% of organization money; most of the rest is opaque PAC acronyms (AMECPAC, MEDA PAC, CN-MO PAC...) that need a person to look up whom they represent
 
 ## Low priority
 - [x] Fetch salaries for the officials: `mo_employee_pay` loader (data.mo.gov state payroll) -> `fct_salaries` (state officials, 2017+)

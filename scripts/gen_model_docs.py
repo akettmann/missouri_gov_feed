@@ -20,6 +20,7 @@ GRAIN = {
     "int_courtlistener__official_people": "one row per (official, CourtListener person)",
     "int_courtlistener__official_positions": "one row per CourtListener position of a matched official",
     "int_house_fd__schedule_lines": "one text line per House disclosure PDF, tagged with its schedule",
+    "int_interests__industry_money": "one row per (official, industry, money kind, year)",
     "int_judges__current": "one row per sitting judge (state and federal)",
     "int_judges__federal": "one row per sitting federal judge in Missouri",
     "int_judges__state_index": "one row per state judge in the Official Manual index",

@@ -71,6 +71,36 @@ seeds:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [calendar_year, office]
+  - name: interest_keywords
+    description: >
+      Whole-word keywords that put a donor organization or lobbyist principal in an industry or interest, in
+      name_key form (lowercase, punctuation as spaces: "at t" for AT&T). Only words that name the industry
+      outright ("hospital", "realtors", "credit union") or well-known companies ("ameren", "centene"); opaque
+      PAC acronyms are left unclassified rather than guessed. A keyword may sit in several industries (a health
+      insurer is health_care and insurance). Checked against the October 2026 names: generic words that
+      misfired were dropped ("farm" hit State Farm, "title" hit Title Max, "sports" hit sports bars). The
+      classified names cover about 37% of organization money and gifts to state officials.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [keyword, industry]
+    columns:
+      - name: industry
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('industry_subjects')
+                field: industry
+  - name: industry_subjects
+    description: >
+      The MO House bill subject index terms (fct_bill_subjects.subject_name, verbatim) that each interest_keywords
+      industry has a stake in. Feeds rpt_interest_vote_overlap. tests/assert_industry_subjects_known.sql warns if
+      a term stops appearing in the bill data.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [industry, subject_name]
   - name: mo_payroll_office_titles
     description: >
       The position titles on Missouri's state payroll (mo_employee_pay) that are elected or judicial offices,
