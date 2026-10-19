@@ -268,9 +268,9 @@ models:
       - name: counterparty_type
         description: >
           Kind of counterparty. MEC: Individual / Committee / Organization / Corporation; given rows:
-          "committee or candidate", "candidate committee" or "charity". FEC received rows carry FEC's raw
-          committee-type code (e.g. Q PAC qualified, N PAC non-qualified, X/Y party, H/S House/Senate
-          campaign, V/W hybrid PAC) - not yet decoded.
+          "committee or candidate", "candidate committee" or "charity". FEC received rows carry the giving
+          committee's type as FEC names it (seed fec_committee_types), e.g. "PAC - qualified", "Party -
+          qualified", "House", "Hybrid PAC (with Non-Contribution Account) - Qualified".
       - name: kind
         description: Free-text description of the transaction (e.g. "monetary to Friends of X", "direct contribution").
       - name: source

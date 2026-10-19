@@ -29,7 +29,7 @@ fec_received as (
         c.amount,
         g.committee_name as counterparty,
         g.connected_organization as counterparty_organization,
-        coalesce(g.committee_type, 'committee') as counterparty_type,
+        coalesce(t.committee_type, g.committee_type, 'committee') as counterparty_type,
         c.transaction_kind as kind,
         'FEC' as source,
         'exact id' as match_confidence,
@@ -37,6 +37,7 @@ fec_received as (
     from {{ ref('stg_fec__committee_contributions') }} as c
     inner join fec_ids as i on c.candidate_id = i.fec_candidate_id
     left join {{ ref('stg_fec__committees') }} as g on c.giving_committee_id = g.committee_id
+    left join {{ ref('fec_committee_types') }} as t on g.committee_type = t.code
     where c.transaction_kind = 'direct contribution'
 ),
 

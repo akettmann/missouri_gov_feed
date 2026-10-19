@@ -16,3 +16,11 @@ seeds:
     description: Hand-curated voluntary disclosures (no machine-readable source exists). Add rows with a source_url.
     config:
       column_types: {disclosure_date: date, official_name: varchar, office: varchar, kind: varchar, description: varchar, source_url: varchar}
+  - name: fec_committee_types
+    description: >
+      FEC committee type codes (CMTE_TP in the committee master) and their names, verbatim from
+      https://www.fec.gov/campaign-finance-data/committee-type-code-descriptions/. Decodes
+      fct_campaign_finance.counterparty_type; tests/assert_fec_committee_types_known.sql warns on new codes.
+    columns:
+      - name: code
+        data_tests: [unique, not_null]
