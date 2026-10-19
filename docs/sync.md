@@ -56,6 +56,8 @@ parts never need deleting by hand.
 
 ## Checking a sync
 
+- `uv run mogov freshness` reports how long ago each always-on loader last landed its tables. It warns
+  after 8 days and errors after 32.
 - `loader.landed` log lines give row counts per table and shard; `loader.failed` means the process
   exits non-zero.
 - `mogov build` runs the dbt tests. `official_profile.*_status` columns show which categories have
