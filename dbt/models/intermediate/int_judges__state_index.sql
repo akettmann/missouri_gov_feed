@@ -2,7 +2,9 @@
 --   "Crane, Sue M. ........ Associate ....... 13th   Harrell, Kevin D. ....... Circuit ....... 16th"
 -- Each index line holds up to two entries. Entries whose name wrapped onto two lines are lost
 -- (a handful per edition); compare the count against the manual's chapter totals when reviewing.
-{% set entry = "([A-Z][A-Za-z'.-]+(?: [A-Za-z'.-]+)*, [A-Za-z'. -]+?) [.]{3,} (Associate|Circuit|Supreme Court|Appellate Eastern|Appellate Western|Appellate Southern)(?: [.]{3,} ([0-9]+)(?:st|nd|rd|th))?" %}  -- noqa: LT05
+-- The dot leader sometimes runs straight into the circuit ("Associate ..............35th"), so the space before
+-- it is optional; without that, 7 judges in the 2025-2026 edition lost their circuit.
+{% set entry = "([A-Z][A-Za-z'.-]+(?: [A-Za-z'.-]+)*, [A-Za-z'. -]+?) [.]{3,} (Associate|Circuit|Supreme Court|Appellate Eastern|Appellate Western|Appellate Southern)(?: [.]{3,} ?([0-9]+)(?:st|nd|rd|th))?" %}  -- noqa: LT05
 
 with index_lines as (
     select

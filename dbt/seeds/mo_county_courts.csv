@@ -1,0 +1,116 @@
+county_geoid,county_name,appeals_district,federal_district,federal_division
+29001,Adair County,western,moed,Northern
+29003,Andrew County,western,mowd,St. Joseph
+29005,Atchison County,western,mowd,St. Joseph
+29007,Audrain County,eastern,moed,Northern
+29009,Barry County,southern,mowd,Southwestern
+29011,Barton County,southern,mowd,Southwestern
+29013,Bates County,western,mowd,Western
+29015,Benton County,western,mowd,Central
+29017,Bollinger County,southern,moed,Southeastern
+29019,Boone County,western,mowd,Central
+29021,Buchanan County,western,mowd,St. Joseph
+29023,Butler County,southern,moed,Southeastern
+29025,Caldwell County,western,mowd,St. Joseph
+29027,Callaway County,western,mowd,Central
+29029,Camden County,southern,mowd,Central
+29031,Cape Girardeau County,eastern,moed,Southeastern
+29033,Carroll County,western,mowd,Western
+29035,Carter County,southern,moed,Southeastern
+29037,Cass County,western,mowd,Western
+29039,Cedar County,southern,mowd,Southern
+29041,Chariton County,western,moed,Northern
+29043,Christian County,southern,mowd,Southern
+29045,Clark County,eastern,moed,Northern
+29047,Clay County,western,mowd,Western
+29049,Clinton County,western,mowd,St. Joseph
+29051,Cole County,western,mowd,Central
+29053,Cooper County,western,mowd,Central
+29055,Crawford County,southern,moed,Eastern
+29057,Dade County,southern,mowd,Southern
+29059,Dallas County,southern,mowd,Southern
+29061,Daviess County,western,mowd,St. Joseph
+29063,DeKalb County,western,mowd,St. Joseph
+29065,Dent County,southern,moed,Eastern
+29067,Douglas County,southern,mowd,Southern
+29069,Dunklin County,southern,moed,Southeastern
+29071,Franklin County,eastern,moed,Eastern
+29073,Gasconade County,eastern,moed,Eastern
+29075,Gentry County,western,mowd,St. Joseph
+29077,Greene County,southern,mowd,Southern
+29079,Grundy County,western,mowd,St. Joseph
+29081,Harrison County,western,mowd,St. Joseph
+29083,Henry County,western,mowd,Western
+29085,Hickory County,southern,mowd,Central
+29087,Holt County,western,mowd,St. Joseph
+29089,Howard County,western,mowd,Central
+29091,Howell County,southern,mowd,Southern
+29093,Iron County,southern,moed,Southeastern
+29095,Jackson County,western,mowd,Western
+29097,Jasper County,southern,mowd,Southwestern
+29099,Jefferson County,eastern,moed,Eastern
+29101,Johnson County,western,mowd,Western
+29103,Knox County,eastern,moed,Northern
+29105,Laclede County,southern,mowd,Southern
+29107,Lafayette County,western,mowd,Western
+29109,Lawrence County,southern,mowd,Southwestern
+29111,Lewis County,eastern,moed,Northern
+29113,Lincoln County,eastern,moed,Eastern
+29115,Linn County,western,moed,Northern
+29117,Livingston County,western,mowd,St. Joseph
+29119,McDonald County,southern,mowd,Southwestern
+29121,Macon County,western,moed,Northern
+29123,Madison County,eastern,moed,Southeastern
+29125,Maries County,southern,moed,Eastern
+29127,Marion County,eastern,moed,Northern
+29129,Mercer County,western,mowd,St. Joseph
+29131,Miller County,western,mowd,Central
+29133,Mississippi County,southern,moed,Southeastern
+29135,Moniteau County,western,mowd,Central
+29137,Monroe County,eastern,moed,Northern
+29139,Montgomery County,eastern,moed,Northern
+29141,Morgan County,western,mowd,Central
+29143,New Madrid County,southern,moed,Southeastern
+29145,Newton County,southern,mowd,Southwestern
+29147,Nodaway County,western,mowd,St. Joseph
+29149,Oregon County,southern,mowd,Southern
+29151,Osage County,eastern,mowd,Central
+29153,Ozark County,southern,mowd,Southern
+29155,Pemiscot County,southern,moed,Southeastern
+29157,Perry County,eastern,moed,Southeastern
+29159,Pettis County,western,mowd,Central
+29161,Phelps County,southern,moed,Eastern
+29163,Pike County,eastern,moed,Northern
+29165,Platte County,western,mowd,St. Joseph
+29167,Polk County,southern,mowd,Southern
+29169,Pulaski County,southern,mowd,Southern
+29171,Putnam County,western,mowd,St. Joseph
+29173,Ralls County,eastern,moed,Northern
+29175,Randolph County,western,moed,Northern
+29177,Ray County,western,mowd,Western
+29179,Reynolds County,southern,moed,Southeastern
+29181,Ripley County,southern,moed,Southeastern
+29183,St. Charles County,eastern,moed,Eastern
+29185,St. Clair County,southern,mowd,Western
+29186,Ste. Genevieve County,eastern,moed,Southeastern
+29187,St. Francois County,eastern,moed,Eastern
+29189,St. Louis County,eastern,moed,Eastern
+29195,Saline County,western,mowd,Western
+29197,Schuyler County,western,moed,Northern
+29199,Scotland County,eastern,moed,Northern
+29201,Scott County,southern,moed,Southeastern
+29203,Shannon County,southern,moed,Southeastern
+29205,Shelby County,eastern,moed,Northern
+29207,Stoddard County,southern,moed,Southeastern
+29209,Stone County,southern,mowd,Southwestern
+29211,Sullivan County,western,mowd,St. Joseph
+29213,Taney County,southern,mowd,Southern
+29215,Texas County,southern,mowd,Southern
+29217,Vernon County,western,mowd,Southwestern
+29219,Warren County,eastern,moed,Eastern
+29221,Washington County,eastern,moed,Eastern
+29223,Wayne County,southern,moed,Southeastern
+29225,Webster County,southern,mowd,Southern
+29227,Worth County,western,mowd,St. Joseph
+29229,Wright County,southern,mowd,Southern
+29510,St. Louis city,eastern,moed,Eastern

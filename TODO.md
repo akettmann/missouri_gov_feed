@@ -18,7 +18,7 @@
 
 ### Loaders
 - [x] `census_tiger`: district, county and place boundaries -> `dim_district`, `fct_official_districts` (legislators, U.S. House, circuit judges via the Official Manual's county->circuit table, mayors)
-- [ ] `fct_official_districts`: map Courts of Appeals districts and federal district courts (E.D./W.D. Mo.) to counties; 7 state judges have no circuit in `dim_official`
+- [x] `fct_official_districts`: Courts of Appeals districts and federal district courts (E.D./W.D. Mo.) mapped to counties via the `mo_county_courts` seed (RSMo 477.050-.070, 28 U.S.C. 105; also on `dim_district`). The 7 judges without a circuit were an Official Manual index parsing bug (dot leader running into the circuit); fixing it also recovered 6 judges that had been dropped
 - [x] Bill subjects/sponsors: from the MO House bill XML already landed -> `fct_bills`, `fct_bill_subjects`, `fct_bill_sponsors`, `fct_vote_bills` (House votes linked exactly; Senate votes on House bills via the journal's measure)
 - [ ] Bill subjects before the 2024 sessions and Senate bills (SB/SJR): the House XML has neither. Candidate source: Open States bills API (needs a key) or senate.mo.gov bill pages
 - [x] ~~Balancing ideology scorecard loader~~ (not needed: ACU dropped)

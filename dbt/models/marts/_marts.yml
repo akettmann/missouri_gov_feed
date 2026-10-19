@@ -890,6 +890,20 @@ models:
       - name: judicial_circuit
         data_type: integer
         description: Missouri judicial circuit number, for counties (Official Manual "Circuit courts by county").
+      - name: appeals_district
+        data_type: varchar
+        description: Missouri Court of Appeals district (eastern, southern, western) for counties (RSMo 477.050-.070).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['eastern', 'southern', 'western']
+      - name: federal_district
+        data_type: varchar
+        description: Federal judicial district (moed, mowd) for counties (28 U.S.C. 105).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['moed', 'mowd']
       - name: land_area_m2
         data_type: bigint
         description: Land area in square meters (Census ALAND).
@@ -913,8 +927,9 @@ models:
     description: >
       Which areas (dim_district) each official serves: legislators and U.S. representatives the district they
       were elected from (the Congress in session for the U.S. House), circuit and associate circuit judges every
-      county of their circuit, mayors their city. Statewide offices serve every area and have no rows; courts of
-      appeals and federal district courts are not mapped yet. Grain: one row per (official, area).
+      county of their circuit, Court of Appeals judges every county of their appellate district, U.S. district
+      judges every county of E.D. and/or W.D. Mo., mayors their city. Statewide offices and the Eighth Circuit
+      serve every area and have no rows. Grain: one row per (official, area).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -943,11 +958,11 @@ models:
         description: "{{ doc('office') }}"
       - name: relation
         data_type: varchar
-        description: elected from, judicial circuit, or mayor of.
+        description: elected from, judicial circuit, appellate district, federal district, or mayor of.
         data_tests:
           - accepted_values:
               arguments:
-                values: ['elected from', 'judicial circuit', 'mayor of']
+                values: ['elected from', 'judicial circuit', 'appellate district', 'federal district', 'mayor of']
 
   - name: fct_bills
     description: >

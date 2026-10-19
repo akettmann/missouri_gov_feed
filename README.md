@@ -28,7 +28,7 @@ Docs: [building an environment](docs/environment.md) (local and Cloud Run), [kee
 | Donations to / from them | `fct_campaign_finance`, `fct_federal_donor_summary`, `fct_lobbyist_gifts`; committee spending and report totals in `fct_campaign_spending`, `fct_campaign_reports` | FEC bulk + API; MEC via the Accountability Project mirror (2011–2022); MEC direct (opt-in) |
 | Biases | `fct_bias_indicators` | DW-NOMINATE, Shor-McCarty, party-unity computed from votes |
 | Family in company leadership | `fct_family_ties` | Wikidata relatives and the organizations they lead; spouse/dependent items on disclosures |
-| Districts (find my officials) | `dim_district`, `fct_official_districts` | Census TIGER/Line boundaries; Official Manual county→circuit table |
+| Districts (find my officials) | `dim_district`, `fct_official_districts` | Census TIGER/Line boundaries; Official Manual county→circuit table; `mo_county_courts` seed (appellate and federal districts) |
 | Salaries (state officials) | `fct_salaries` | Missouri state payroll (data.mo.gov), 2017+ |
 | Bills and their subjects | `fct_bills`, `fct_bill_subjects`, `fct_bill_sponsors`, `fct_vote_bills` | MO House bill XML (subjects from 2024); Senate votes linked through the journal's measure |
 | Voting history | `fct_votes` | MO House roll-call PDFs, MO Senate journals (last 10 years by default), Voteview (Congress) |

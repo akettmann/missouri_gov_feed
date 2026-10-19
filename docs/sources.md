@@ -294,7 +294,9 @@ Quirks:
 Census Bureau TIGER/Line shapefiles: state senate (SLDU) and house (SLDL) districts, congressional
 districts, counties and places. They feed `dim_district` and `fct_official_districts`, the "find my
 officials" lookup. Judicial circuits are groups of counties; the county→circuit table comes from the
-Official Manual (`int_bluebook__county_circuits`).
+Official Manual (`int_bluebook__county_circuits`). Court of Appeals districts (RSMo 477.050–.070) and
+federal judicial districts (28 U.S.C. 105) are also groups of counties, fixed by statute, so they come from
+the `mo_county_courts` seed.
 
 - Lands: `census_tiger_features`, one row per feature: the attribute table verbatim (`properties`), the
   geometry as GeoJSON (lon/lat, NAD83) and the layer, vintage and file.
@@ -311,7 +313,10 @@ Quirks:
   landed.
 - TIGER names St. Louis city and St. Louis County both "St. Louis"; `NAMELSAD` ("St. Louis city", "St.
   Louis County") tells them apart, and the circuit match uses it.
-- Seven state judges have no circuit in `dim_official` (October 2026), so they have no district rows.
+- In October 2026, seven state judges had no circuit in `dim_official`, so they had no district rows. The
+  cause was in the Official Manual's judge index, not TIGER: the dot leader can run straight into the circuit
+  ("Associate ..............35th"). `int_judges__state_index` now accepts that, which also recovered six
+  judges whose index line had failed to parse at all.
 
 ## mo_employee_pay: Missouri state payroll
 

@@ -35,6 +35,28 @@ seeds:
         data_tests: [unique, not_null]
       - name: office
         data_tests: [not_null]
+  - name: mo_county_courts
+    description: >
+      Each Missouri county (and the city of St. Louis) with its Court of Appeals district (RSMo 477.050 eastern,
+      477.060 southern, 477.070 western: every other county) and its federal judicial district and division
+      (28 U.S.C. 105). Built from the statute text in October 2026; review if either statute is amended.
+    config:
+      column_types: {county_geoid: varchar, county_name: varchar, appeals_district: varchar, federal_district: varchar, federal_division: varchar}
+    columns:
+      - name: county_geoid
+        data_tests: [unique, not_null]
+      - name: appeals_district
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['eastern', 'southern', 'western']
+      - name: federal_district
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['moed', 'mowd']
   - name: mo_payroll_office_titles
     description: >
       The position titles on Missouri's state payroll (mo_employee_pay) that are elected or judicial offices,

@@ -17,7 +17,8 @@ note right: counties: national file, Missouri (STATEFP 29) only
 :census_tiger_features
 (properties verbatim + GeoJSON geometry);
 :dbt: stg_census_tiger__features -> dim_district
-(+ county judicial circuits from the Official Manual)
+(+ county judicial circuits from the Official Manual,
+appellate and federal districts from the mo_county_courts seed)
 -> fct_official_districts;
 stop
 @enduml
