@@ -17,7 +17,7 @@ with tap as (
         m.mec_committee_id,
         m.confidence as match_confidence,
         'MEC (via Accountability Project)' as source
-    from {{ ref('stg_mec__expenditures') }} as e
+    from {{ ref('stg_tap_mec__expenditures') }} as e
     inner join {{ ref('int_mec__official_committees') }} as m on e.mec_committee_id = m.mec_committee_id
 ){% if var('mec_direct', false) %},
 
@@ -35,7 +35,7 @@ direct as (
         m.mec_committee_id,
         m.confidence as match_confidence,
         'MEC' as source
-    from {{ ref('stg_mec_direct__expenditures') }} as e
+    from {{ ref('stg_mec__expenditures') }} as e
     inner join {{ ref('int_mec__official_committees') }} as m on e.mec_committee_id = m.mec_committee_id
 )
 {% endif %}

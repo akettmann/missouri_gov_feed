@@ -1,0 +1,7 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_acu__ratings
+  description: American Conservative Union (CPAC) yearly ratings of Missouri legislators (0-100; higher = votes
+    more often with ACU's positions), with the chamber/district they held that year.

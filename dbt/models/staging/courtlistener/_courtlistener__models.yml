@@ -1,0 +1,25 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_courtlistener__api_cases
+  description: CourtListener REST search hits per official judge/lawyer (stage-2 courtlistener_cases loader), with
+    the cluster's disposition and the lead opinion's last ~1,500 characters when COURTLISTENER_TOKEN was set.
+- name: stg_courtlistener__courts
+  description: 'CourtListener courts: id and full name.'
+- name: stg_courtlistener__judge_disclosure_items
+  description: Line items from federal judges' AO-10 reports, one shape for every part of the report (investments,
+    positions, agreements, income, gifts, liabilities, reimbursements).
+- name: stg_courtlistener__judge_disclosures
+  description: Federal judges' financial disclosure reports (AO-10) as indexed by CourtListener, one row per report.
+- name: stg_courtlistener__mo_cluster_panel
+  description: 'CourtListener bulk opinion panels: which judges (person ids) sat on each cluster.'
+- name: stg_courtlistener__mo_clusters
+  description: CourtListener bulk opinion clusters (one per decided case) on those dockets. judges / attorneys are
+    CourtListener's free-text fields as printed in the opinion.
+- name: stg_courtlistener__mo_dockets
+  description: CourtListener bulk dockets in tracked Missouri state and federal courts (filtered by the loader).
+- name: stg_courtlistener__people
+  description: 'CourtListener judge database: one row per person (national; bulk export).'
+- name: stg_courtlistener__positions
+  description: 'CourtListener judge database: one row per position a person held (judgeships and prior careers).'

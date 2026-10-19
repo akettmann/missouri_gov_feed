@@ -1,0 +1,67 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: mo_house
+  description: Missouri House XML exports and roll-call PDFs.
+  tables:
+  - name: members
+    identifier: mo_house_members
+    description: MO House member XML per session (roster, committees, bio, sponsored bills).
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: bills
+    identifier: mo_house_bills
+    description: MO House bill XML per session (sponsors, actions, roll-call totals and RollCallPDF links), as JSON.
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: lists
+    identifier: mo_house_lists
+    description: MO House list XML per session (MemberList, BillList, SenateActList, hearing lists...), as JSON.
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: rollcalls
+    identifier: mo_house_rollcalls
+    description: One row per House roll-call PDF (header fields, printed totals).
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: rollcall_votes
+    identifier: mo_house_rollcall_votes
+    description: One row per (House roll call, member token) parsed from the PDF grid.
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day

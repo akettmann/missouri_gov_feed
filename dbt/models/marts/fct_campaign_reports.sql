@@ -25,5 +25,5 @@ select
     r.outstanding_indebtedness,
     m.confidence as match_confidence,
     'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || r.mec_committee_id as source_url
-from {{ ref('stg_mec_direct__report_summaries') }} as r
+from {{ ref('stg_mec__report_summaries') }} as r
 inner join {{ ref('int_mec__official_committees') }} as m on r.mec_committee_id = m.mec_committee_id

@@ -1,0 +1,12 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_mo_house__members
+  description: MO House members per session (end-of-session snapshot from the House XML export).
+- name: stg_mo_house__rollcall_votes
+  description: 'One row per (MO House roll call, member token). Tokens: "SMITH 46" (district when surnames collide),
+    "FOUNTAIN HENDERS" (truncated to ~16 chars), "MR SPEAKER".'
+- name: stg_mo_house__rollcalls
+  description: 'One row per MO House roll call (parsed PDF header). The line after "Roll Call : N" names the measure
+    (e.g. "HCS HB 10"); the next lines carry the sponsor and a description.'

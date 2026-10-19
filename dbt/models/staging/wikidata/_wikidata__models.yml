@@ -1,0 +1,10 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_wikidata__facts
+  description: Wikidata facts about Missouri officials, normalized to (qid, fact_kind, value, value_qid, dates).
+- name: stg_wikidata__officeholders
+  description: Living people Wikidata records as holding a Missouri office; used to find QIDs for officials by name.
+- name: stg_wikidata__relatives
+  description: Officials' relatives on Wikidata, with any organization the relative leads and offices they hold.

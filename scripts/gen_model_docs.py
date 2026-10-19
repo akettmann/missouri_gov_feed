@@ -3,7 +3,8 @@ plus a hand-written grain line. Run from the repo root:
 
     uv run python scripts/gen_model_docs.py
 
-Re-run after adding a model or editing a header. Mart docs are hand-written in models/marts/_marts.yml."""
+Re-run after adding a model or editing a header. Mart docs are hand-written in models/marts/_marts.yml;
+unit tests live in their own files so regenerating never touches them."""
 
 from pathlib import Path
 
@@ -44,14 +45,13 @@ def header(path: Path) -> str:
     return " ".join(lines)
 
 
-def write(layer: str, folder: Path) -> None:
+def write(folder: Path, out: Path) -> None:
     models = []
-    for path in sorted(folder.rglob("*.sql")):
+    for path in sorted(folder.glob("*.sql")):
         text = header(path)
         if path.stem in GRAIN:
             text += f" Grain: {GRAIN[path.stem]}."
         models.append({"name": path.stem, "description": text.strip()})
-    out = folder / f"_{layer}.yml"
     body = yaml.safe_dump({"version": 2, "models": models}, sort_keys=False, width=110, allow_unicode=True)
     out.write_text(
         f"# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,\n"
@@ -62,5 +62,7 @@ def write(layer: str, folder: Path) -> None:
     print(out, len(models))
 
 
-write("staging", Path("dbt/models/staging"))
-write("intermediate", Path("dbt/models/intermediate"))
+# staging: one folder per source system, docs beside its _<system>__sources.yml
+for system in sorted(p for p in Path("dbt/models/staging").iterdir() if p.is_dir()):
+    write(system, system / f"_{system.name}__models.yml")
+write(Path("dbt/models/intermediate"), Path("dbt/models/intermediate/_intermediate.yml"))

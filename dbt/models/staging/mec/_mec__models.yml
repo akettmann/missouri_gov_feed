@@ -1,0 +1,21 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_mec__candidate_committees
+  description: 'MEC''s own candidate <-> committee crosswalk (CF12 election search export), one row per candidacy.
+    cells: [MECID, committee name, candidate name, party, office sought, status]'
+- name: stg_mec__contributions
+  description: MEC itemized contributions received (direct export, recent report years). Dates "M/D/YYYY 12:00:00
+    AM".
+- name: stg_mec__contributions_made
+  description: 'MEC contributions made: the reporting committee (mecid) gave to `committee` (a candidate or committee).'
+- name: stg_mec__expenditures
+  description: 'MEC itemized expenditures over $100 (CD3 Part B, direct export, recent report years): what each
+    committee paid, to whom, for what. Contributions to other committees are reported separately (CD3 Part C).'
+- name: stg_mec__lobbyist_gifts
+  description: MEC lobbyist expenditures on officials, 2019+ (direct export). recipient is "Last,  First  - Role".
+- name: stg_mec__report_summaries
+  description: 'MEC campaign finance report cover pages (direct export): one row per filed report with its totals.
+    "This election" totals accumulate across an election''s reports; "this period" amounts cover the report alone.
+    Amended reports are separate rows with their own report_id.'

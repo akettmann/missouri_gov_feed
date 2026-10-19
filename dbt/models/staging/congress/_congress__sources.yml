@@ -1,0 +1,32 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: congress
+  description: 'unitedstates/congress-legislators: members of Congress who ever served Missouri, with cross-system
+    ids.'
+  tables:
+  - name: legislators_current
+    identifier: congress_legislators_current
+    description: unitedstates/congress-legislators current members who have ever served MO.
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: legislators_historical
+    identifier: congress_legislators_historical
+    description: unitedstates/congress-legislators former members who ever served MO, with term history and cross-ids.
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day

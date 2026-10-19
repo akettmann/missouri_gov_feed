@@ -1,0 +1,31 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: mo_senate
+  description: Missouri Senate daily journal PDFs, parsed into per-senator vote rows.
+  tables:
+  - name: journals
+    identifier: mo_senate_journals
+    description: 'One row per MO Senate journal PDF read: URL, year, number of vote rows parsed (or the fetch error).'
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: votes
+    identifier: mo_senate_votes
+    description: One row per (Senate journal vote block, category, senator token).
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day

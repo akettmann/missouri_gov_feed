@@ -1,0 +1,26 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: mec
+  description: Missouri Ethics Commission direct exports (opt-in `mec` loader; models gated by var mec_direct).
+  tables:
+  - name: cd1_a
+    identifier: mec_cd1_a
+    description: MEC direct - itemized contributions received (opt-in `mec` loader; enable var mec_direct).
+  - name: cd3_b
+    identifier: mec_cd3_b
+    description: MEC direct - itemized expenditures over $100.
+  - name: cd3_c
+    identifier: mec_cd3_c
+    description: MEC direct - contributions made by a committee to other committees/candidates.
+  - name: summary
+    identifier: mec_summary
+    description: MEC direct - one row per filed campaign finance report with cover-page totals (receipts, expenditures,
+      money on hand, debt). Landed, not yet modeled.
+  - name: candidate_committees
+    identifier: mec_candidate_committees
+    description: MEC CF12 election search export - MECID <-> candidate name and office sought.
+  - name: lobbyist_expenditures
+    identifier: mec_lobbyist_expenditures
+    description: MEC direct - lobbyist expenditures on public officials, 2019+.

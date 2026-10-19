@@ -1,0 +1,6 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_bluebook__lines
+  description: Missouri Official Manual text, one row per extracted line, in reading order per chapter.

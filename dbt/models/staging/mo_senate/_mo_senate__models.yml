@@ -1,0 +1,7 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_mo_senate__votes
+  description: 'One row per (MO Senate journal vote, senator token). Tokens: surname, or "Brown (16)" when two senators
+    share one. The context is the journal sentence introducing the vote.'

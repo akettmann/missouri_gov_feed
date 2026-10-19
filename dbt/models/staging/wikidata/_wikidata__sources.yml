@@ -1,0 +1,22 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: wikidata
+  description: Wikidata facts about tracked officials (SPARQL).
+  tables:
+  - name: positions
+    identifier: wikidata_positions
+    description: Wikidata P39 positions held by tracked officials (with start/end/district qualifiers).
+  - name: attributes
+    identifier: wikidata_attributes
+    description: Wikidata occupation, employer, party, education and memberships of tracked officials.
+  - name: relatives
+    identifier: wikidata_relatives
+    description: Wikidata relatives of tracked officials, with organizations they lead and offices they hold.
+  - name: own_leadership
+    identifier: wikidata_own_leadership
+    description: Organizations tracked officials lead, founded or own per Wikidata.
+  - name: mo_officeholders
+    identifier: wikidata_mo_officeholders
+    description: Living people Wikidata lists as holding a Missouri position (QID discovery).

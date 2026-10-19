@@ -61,7 +61,7 @@ Name-matched records carry a `match_confidence` column. Read medium-confidence m
 ```
 src/mogov/loaders/   one module per source; lands raw data only (data/raw/<table>/part-<shard>-of-<shards>.parquet)
 src/mogov/http.py    cached, polite HTTP (data/cache/)
-dbt/models/staging   one model per raw table: typing and renaming
+dbt/models/staging/<system>/  one source per system (_<system>__sources.yml); one model per raw table: typing and renaming
 dbt/models/intermediate  identity resolution (vote tokens -> people, committees -> officials, ...)
 dbt/models/marts     the per-official facts above
 dbt/macros/compat    adapter.dispatch macros (JSON, regex, dates, casts) so models are backend-portable

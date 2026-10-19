@@ -1,0 +1,10 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_house_fd__filings
+  description: 'U.S. House Clerk financial disclosure index (all members/candidates nationally). FilingType: O annual,
+    A amendment, P periodic transaction report, C candidate, T termination, X extension.'
+- name: stg_house_fd__pdf_lines
+  description: U.S. House disclosure PDF text, one row per extracted line (Missouri filers); scanned filings appear
+    once with has_text = false.

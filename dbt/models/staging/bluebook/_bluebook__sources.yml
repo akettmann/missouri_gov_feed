@@ -1,0 +1,19 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: bluebook
+  description: Missouri Official Manual (Secretary of State) chapter PDFs, one row per text line.
+  tables:
+  - name: lines
+    identifier: bluebook_lines
+    description: Missouri Official Manual chapter PDFs (executive, legislative, judicial), one row per text line.
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day

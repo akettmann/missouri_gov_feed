@@ -1,0 +1,18 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_fec__candidate_committees
+  description: 'Candidate -> committee links: authorized committees from the FEC linkage file, plus sponsored committees
+    (leadership PACs) from the FEC API.'
+- name: stg_fec__candidate_summary
+  description: 'FEC all-candidates summary: per candidate per cycle totals.'
+- name: stg_fec__committee_contributions
+  description: 'FEC pas2: contributions from committees (PACs, party committees, leadership PACs) to candidates,
+    plus independent expenditures for/against candidates. Amounts in USD; dates MMDDYYYY in the file.'
+- name: stg_fec__committees
+  description: 'FEC committee master, latest cycle''s record per committee. CMTE_DSGN: P principal campaign, A authorized,
+    D leadership PAC, J joint fundraiser, U unauthorized, B lobbyist PAC.'
+- name: stg_fec__receipt_aggregates
+  description: 'FEC API: itemized individual receipts per principal committee, aggregated by employer / size / state.
+    Empty when FEC_API_KEY isn''t configured.'

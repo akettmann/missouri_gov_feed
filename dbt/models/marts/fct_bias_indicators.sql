@@ -27,7 +27,7 @@ shor as (
         'Shor-McCarty career ideal point; served ' || {{ dbt.safe_cast('s.first_year', dbt.type_string()) }}
         || '-' || {{ dbt.safe_cast('s.last_year', dbt.type_string()) }} as detail,
         'https://doi.org/10.7910/DVN/SGOQ7G' as source_url
-    from {{ ref('stg_shor_mccarty') }} as s
+    from {{ ref('stg_shor_mccarty__scores') }} as s
     inner join {{ ref('int_mo_legislators__seats') }} as seat
         on
             s.last_chamber = seat.chamber

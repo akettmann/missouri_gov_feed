@@ -1,0 +1,10 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: fjc
+  description: Federal Judicial Center biographical directory of Article III judges.
+  tables:
+  - name: judges
+    identifier: fjc_judges
+    description: Federal Judicial Center biographical directory of Article III judges (wide CSV).

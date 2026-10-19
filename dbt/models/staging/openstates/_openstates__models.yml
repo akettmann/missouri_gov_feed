@@ -1,0 +1,12 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_openstates__current_roster
+  description: 'Open States flat current roster: adds Wikidata QIDs, which the YAML usually lacks.'
+- name: stg_openstates__other_names
+  description: Alternate spellings Open States has seen for each person; used to match people in other sources.
+- name: stg_openstates__people
+  description: One row per Missouri person in Open States (excludes the committees folder).
+- name: stg_openstates__roles
+  description: 'Every role (office) each Open States person has held: the state-level past-offices history.'

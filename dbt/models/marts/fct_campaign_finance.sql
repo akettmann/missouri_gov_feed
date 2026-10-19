@@ -76,7 +76,7 @@ mec_received as (
         'MEC (via Accountability Project)' as source,
         m.confidence as match_confidence,
         'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url
-    from {{ ref('stg_mec__contributions') }} as c
+    from {{ ref('stg_tap_mec__contributions') }} as c
     inner join {{ ref('int_mec__official_committees') }} as m on c.mec_committee_id = m.mec_committee_id
 ),
 
@@ -95,7 +95,7 @@ mec_given as (
         'MEC (via Accountability Project)' as source,
         m.confidence as match_confidence,
         'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url
-    from {{ ref('stg_mec__expenditures') }} as e
+    from {{ ref('stg_tap_mec__expenditures') }} as e
     inner join {{ ref('int_mec__official_committees') }} as m on e.mec_committee_id = m.mec_committee_id
     where
         lower(e.purpose) like '%contribution%'
@@ -119,7 +119,7 @@ mec_direct_received as (
         'MEC' as source,
         m.confidence as match_confidence,
         'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url
-    from {{ ref('stg_mec_direct__contributions') }} as c
+    from {{ ref('stg_mec__contributions') }} as c
     inner join {{ ref('int_mec__official_committees') }} as m on c.mec_committee_id = m.mec_committee_id
 ),
 
@@ -137,7 +137,7 @@ mec_direct_given as (
         'MEC' as source,
         m.confidence as match_confidence,
         'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url
-    from {{ ref('stg_mec_direct__contributions_made') }} as c
+    from {{ ref('stg_mec__contributions_made') }} as c
     inner join {{ ref('int_mec__official_committees') }} as m on c.mec_committee_id = m.mec_committee_id
 )
 {% endif %}

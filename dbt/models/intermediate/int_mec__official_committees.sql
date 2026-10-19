@@ -11,7 +11,7 @@ with committees as (
         mec_committee_id,
         committee_name,
         ' ' || {{ mogov.name_key('committee_name') }} || ' ' as committee_key
-    from {{ ref('stg_mec__contributions') }}
+    from {{ ref('stg_tap_mec__contributions') }}
     where mec_committee_id is not null
 ),
 
@@ -68,7 +68,7 @@ crosswalk_names as (
         candidate_key,
         count(distinct mec_committee_id) as n_committees,
         count(distinct office_sought) as n_offices
-    from {{ ref('stg_mec_direct__candidate_committees') }}
+    from {{ ref('stg_mec__candidate_committees') }}
     group by 1
 ),
 
@@ -78,7 +78,7 @@ crosswalk as (
         x.mec_committee_id,
         x.committee_name,
         'exact (MEC crosswalk)' as confidence
-    from {{ ref('stg_mec_direct__candidate_committees') }} as x
+    from {{ ref('stg_mec__candidate_committees') }} as x
     inner join {{ ref('int_officials__name_keys') }} as k on x.candidate_key = k.variant_key
     inner join crosswalk_names as n on x.candidate_key = n.candidate_key
     where

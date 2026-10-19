@@ -1,0 +1,10 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_voteview__members
+  description: 'Voteview member-congress rows, with DW-NOMINATE ideal points (dim1: economic left(-)/right(+)).'
+- name: stg_voteview__rollcalls
+  description: 'Voteview roll calls (both chambers, loaded congresses): date, bill, question, result and vote totals.'
+- name: stg_voteview__votes
+  description: 'cast_code per Voteview: 1-3 yea, 4-6 nay, 7-8 present, 9 not voting, 0 not a member.'

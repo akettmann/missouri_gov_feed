@@ -1,0 +1,10 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: shor_mccarty
+  description: Shor-McCarty state legislator ideology scores (Harvard Dataverse).
+  tables:
+  - name: scores
+    identifier: shor_mccarty
+    description: Shor-McCarty state legislator ideology scores, all states, 1993-2022 (wide per-year columns).

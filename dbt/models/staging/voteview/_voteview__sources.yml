@@ -1,0 +1,17 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: voteview
+  description: Voteview congressional members, roll calls and votes (full chambers, loaded congresses).
+  tables:
+  - name: members
+    identifier: voteview_members
+    description: Voteview member-congress rows (both chambers, loaded congresses) with DW-NOMINATE scores; national.
+  - name: rollcalls
+    identifier: voteview_rollcalls
+    description: 'Voteview roll calls (both chambers, loaded congresses): date, bill, question, result.'
+  - name: votes
+    identifier: voteview_votes
+    description: Voteview individual votes, one row per (roll call, member) with a cast code; national, filtered
+      in dbt.

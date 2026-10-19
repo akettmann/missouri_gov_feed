@@ -1,0 +1,37 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: fec
+  description: Federal Election Commission bulk files (national) and API lookups.
+  tables:
+  - name: candidates
+    identifier: fec_candidates
+    description: FEC candidate master (cn), loaded cycles, national.
+  - name: committees
+    identifier: fec_committees
+    description: FEC committee master (cm), loaded cycles, national. CMTE_DSGN D marks leadership PACs.
+  - name: cand_cmte_links
+    identifier: fec_cand_cmte_links
+    description: FEC candidate-committee linkage (ccl), loaded cycles, national.
+  - name: committee_contribs_to_candidates
+    identifier: fec_committee_contribs_to_candidates
+    description: FEC pas2 - contributions from committees to candidates (and independent expenditures).
+  - name: candidate_summary
+    identifier: fec_candidate_summary
+    description: 'FEC all-candidates summary (weball): per-candidate cycle totals, national.'
+  - name: sponsored_committees
+    identifier: fec_sponsored_committees
+    description: Committees (leadership PACs) sponsored by MO members, from the FEC API.
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: receipt_aggregates
+    identifier: fec_receipt_aggregates
+    description: FEC API itemized-receipt aggregates by employer/size/state (needs FEC_API_KEY).

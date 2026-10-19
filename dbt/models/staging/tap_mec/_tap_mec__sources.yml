@@ -1,0 +1,16 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: tap_mec
+  description: Missouri Ethics Commission data via The Accountability Project mirror (2004-2022).
+  tables:
+  - name: contributions
+    identifier: tap_mec_contributions
+    description: MEC itemized contributions received, via the Accountability Project mirror (2011-2022).
+  - name: expenditures
+    identifier: tap_mec_expenditures
+    description: MEC itemized expenditures by Missouri committees, via the Accountability Project mirror (2011-2022).
+  - name: lobbyist_expenditures
+    identifier: tap_mec_lobbyist_expenditures
+    description: MEC lobbyist expenditures (gifts) to public officials, via TAP (2004-2022).

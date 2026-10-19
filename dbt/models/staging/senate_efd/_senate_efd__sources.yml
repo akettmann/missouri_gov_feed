@@ -1,0 +1,13 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: senate_efd
+  description: U.S. Senate eFD financial disclosures for Missouri (opt-in loader).
+  tables:
+  - name: filings
+    identifier: senate_efd_filings
+    description: Senate eFD filings for MO senators/candidates (opt-in loader); paper filings flagged is_paper.
+  - name: rows
+    identifier: senate_efd_rows
+    description: Senate eFD web-report table rows (opt-in loader).

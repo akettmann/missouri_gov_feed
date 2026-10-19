@@ -1,0 +1,11 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_congress__fec_ids
+  description: Every FEC candidate ID a Missouri member of Congress has used (House and Senate runs get separate
+    IDs).
+- name: stg_congress__legislators
+  description: Members of Congress who ever represented Missouri, with cross-system IDs.
+- name: stg_congress__terms
+  description: One row per congressional term served (any state), for MO members' past-office history.

@@ -1,0 +1,8 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_shor_mccarty__scores
+  description: 'Shor-McCarty state legislator ideology (Missouri only). np_score: one career ideal point, negative
+    = liberal, positive = conservative, comparable across states and chambers. The wide per-year chamber/district
+    columns are unpivoted to find each legislator''s last seat.'

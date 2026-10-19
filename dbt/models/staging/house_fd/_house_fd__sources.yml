@@ -1,0 +1,32 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: house_fd
+  description: 'U.S. House Clerk financial disclosures: national index and Missouri filers'' PDF text.'
+  tables:
+  - name: index
+    identifier: house_fd_index
+    description: U.S. House Clerk financial disclosure index, every filer nationally, from MOGOV_HOUSE_FD_FIRST_YEAR.
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: pdf_lines
+    identifier: house_fd_pdf_lines
+    description: Text lines of Missouri members' House disclosure PDFs; scanned filings appear once with has_text
+      = false.
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day

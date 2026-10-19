@@ -30,6 +30,15 @@ seeds:
   mogov:
     +schema: reference
 
+# One source per system (models/staging/<system>/_<system>__sources.yml). Every table is a directory of
+# Parquet parts written by the loaders under MOGOV_RAW_DIR; `identifier` is that directory's name.
+# JSON payloads are text, read only through the mogov.json_* macros (portable SQL). Opt-in / key-gated
+# tables may be absent: their models are gated by vars, or `mogov build` creates empty placeholders.
+sources:
+  mogov:
+    +meta:
+      external_location: "read_parquet('{{ env_var('MOGOV_RAW_DIR', 'data/raw') }}/{identifier}/*.parquet', union_by_name = true)"
+
 # Let this project override dbt's cross-database macros per adapter (see macros/compat/casts.sql).
 dispatch:
   - macro_namespace: dbt

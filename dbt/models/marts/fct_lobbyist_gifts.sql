@@ -17,7 +17,7 @@ with all_gifts as (
         amount,
         expenditure_date,
         'MEC lobbyist reports (via Accountability Project)' as source
-    from {{ ref('stg_mec__lobbyist_gifts') }}
+    from {{ ref('stg_tap_mec__lobbyist_gifts') }}
     {% if var('mec_direct', false) %}
     where expenditure_date < {{ dbt.safe_cast("'2019-01-01'", 'date') }}
     union all
@@ -34,7 +34,7 @@ with all_gifts as (
         amount,
         expenditure_date,
         'MEC lobbyist reports' as source
-    from {{ ref('stg_mec_direct__lobbyist_gifts') }}
+    from {{ ref('stg_mec__lobbyist_gifts') }}
     {% endif %}
 ),
 

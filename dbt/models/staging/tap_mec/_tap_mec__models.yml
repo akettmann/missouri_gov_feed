@@ -1,0 +1,14 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_tap_mec__contributions
+  description: MEC itemized contributions received by Missouri committees (TAP mirror, 2011-2022). The mirror combines
+    two MEC export layouts; coalesce the overlapping columns. dupe_flag marks rows TAP identified as duplicates
+    (amended reports) and they're dropped.
+- name: stg_tap_mec__expenditures
+  description: 'MEC itemized expenditures by Missouri committees (TAP mirror, 2011-2022): includes contributions
+    the committee made to other candidates and committees.'
+- name: stg_tap_mec__lobbyist_gifts
+  description: MEC lobbyist expenditures on public officials (meals, gifts, travel...), TAP mirror 2004-2022. recipient_name
+    is "LAST, FIRST"; group expenditures (e.g. "ENTIRE SENATE") have no individual name.

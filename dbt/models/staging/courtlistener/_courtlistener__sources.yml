@@ -1,0 +1,69 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: courtlistener
+  description: 'CourtListener (Free Law Project): judge database and AO-10 disclosures (bulk), Missouri case bulk
+    files (var cl_case_bulk), API case search (stage 2).'
+  tables:
+  - name: courts
+    identifier: cl_courts
+    description: CourtListener courts (bulk export).
+  - name: people
+    identifier: cl_people
+    description: 'CourtListener judge database: people (bulk export, national).'
+  - name: positions
+    identifier: cl_positions
+    description: 'CourtListener judge database: positions held (judgeships, prior jobs), national.'
+  - name: political_affiliations
+    identifier: cl_political_affiliations
+    description: 'CourtListener judge database: party affiliations.'
+  - name: educations
+    identifier: cl_educations
+    description: 'CourtListener judge database: degrees.'
+  - name: schools
+    identifier: cl_schools
+    description: 'CourtListener judge database: schools.'
+  - name: retention_events
+    identifier: cl_retention_events
+    description: 'CourtListener judge database: retention votes and reappointments.'
+  - name: financial_disclosures
+    identifier: cl_financial_disclosures
+    description: 'CourtListener: federal judges'' AO-10 disclosure reports (one row per report).'
+  - name: fd_investments
+    identifier: cl_fd_investments
+    description: 'AO-10 report part: investments.'
+  - name: fd_gifts
+    identifier: cl_fd_gifts
+    description: 'AO-10 report part: gifts.'
+  - name: fd_debts
+    identifier: cl_fd_debts
+    description: 'AO-10 report part: liabilities.'
+  - name: fd_positions
+    identifier: cl_fd_positions
+    description: 'AO-10 report part: outside positions.'
+  - name: fd_agreements
+    identifier: cl_fd_agreements
+    description: 'AO-10 report part: agreements.'
+  - name: fd_non_investment_income
+    identifier: cl_fd_non_investment_income
+    description: 'AO-10 report part: non-investment income.'
+  - name: fd_spousal_income
+    identifier: cl_fd_spousal_income
+    description: 'AO-10 report part: spouse''s non-investment income.'
+  - name: fd_reimbursements
+    identifier: cl_fd_reimbursements
+    description: 'AO-10 report part: reimbursements (travel, lodging, meals paid by others).'
+  - name: cases
+    identifier: cl_cases
+    description: CourtListener opinion search hits per official judge/lawyer (stage-2 loader).
+  - name: mo_dockets
+    identifier: cl_mo_dockets
+    description: CourtListener bulk dockets in Missouri state/federal courts (courtlistener_case_bulk; enable var
+      cl_case_bulk).
+  - name: mo_opinion_clusters
+    identifier: cl_mo_opinion_clusters
+    description: CourtListener bulk opinion clusters (judges, attorneys, disposition) on those dockets.
+  - name: mo_cluster_panel
+    identifier: cl_mo_cluster_panel
+    description: CourtListener bulk opinion-cluster panel (cluster -> judge person id).
