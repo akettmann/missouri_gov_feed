@@ -53,7 +53,7 @@ package "intermediate (identity resolution)" {
 package "marts" {
   [dim_official] as dim
   [fct_votes\nfct_federal_votes] as F_votes
-  [fct_campaign_finance\nfct_federal_donor_summary] as F_money
+  [fct_campaign_finance\nfct_federal_donor_summary\nfct_campaign_spending\nfct_campaign_reports] as F_money
   [fct_lobbyist_gifts] as F_gifts
   [fct_disclosures\nfct_voluntary_disclosures] as F_disc
   [fct_bias_indicators] as F_bias
