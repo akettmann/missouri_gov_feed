@@ -1,0 +1,47 @@
+---
+// Section C: money in. Federal officials also get FEC aggregates; everyone with donations gets the
+// rpt_donor_rollup views (sample data if that export is missing).
+import type { OfficialBundle } from "../lib/exports/types";
+import { statusKind } from "../lib/format";
+import SampleBanner from "./SampleBanner.astro";
+import Viz from "./Viz.astro";
+
+interface Props {
+  bundle: OfficialBundle;
+}
+const { bundle } = Astro.props;
+const { money } = bundle;
+const hasFederal = money.federal.length > 0;
+const hasRollup = money.cycles.rows.length > 0;
+---
+
+<section class="card" id="money" aria-labelledby="money-h">
+  <h2 id="money-h">Money in</h2>
+  <p class="lede">Who funds this official's campaigns, how much, and in what size gifts.</p>
+  {statusKind(money.status) !== "available" && !hasFederal ? (
+    <p class="muted">No campaign finance records: {money.status}.</p>
+  ) : (
+    <>
+      {hasFederal && (
+        <>
+          <h3>Federal campaign (FEC summaries)</h3>
+          <div class="grid-2">
+            <Viz id="fed-receipts" bundle={bundle} />
+            <Viz id="fed-state" bundle={bundle} />
+          </div>
+          <Viz id="fed-size" bundle={bundle} />
+        </>
+      )}
+      {hasRollup && (
+        <>
+          <h3>Donors</h3>
+          {money.cycles.sample && <SampleBanner model={money.cycles.model} />}
+          <div class="grid-2">
+            <Viz id="donors-by-cycle" bundle={bundle} />
+            <Viz id="top-donors" bundle={bundle} />
+          </div>
+        </>
+      )}
+    </>
+  )}
+</section>

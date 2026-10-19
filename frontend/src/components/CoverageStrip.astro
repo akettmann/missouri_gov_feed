@@ -1,0 +1,69 @@
+---
+// official_profile.*_status as a strip, so gaps are explicit: "not public" is not the same as "none found".
+import type { CoverageItem } from "../lib/exports/types";
+import { count, statusKind } from "../lib/format";
+
+interface Props {
+  items: CoverageItem[];
+}
+const { items } = Astro.props;
+const ICON = { available: "●", none: "○", "not-public": "⊘", na: "–" } as const;
+const SHORT = { available: "available", none: "none found", "not-public": "not public", na: "n/a" } as const;
+---
+
+<ul class="strip" aria-label="What data we have for this official">
+  {items.map((it) => {
+    const kind = statusKind(it.status);
+    return (
+      <li class={`cell ${kind}`} title={it.status}>
+        <span class="label">{it.label}</span>
+        <span class="state">
+          <span aria-hidden="true">{ICON[kind]}</span> {SHORT[kind]}
+          {kind === "available" && it.count > 0 && <span class="muted"> · {count(it.count)}</span>}
+        </span>
+        {kind !== "available" && kind !== "na" && <span class="why small muted">{it.status}</span>}
+      </li>
+    );
+  })}
+</ul>
+
+<style>
+  .strip {
+    list-style: none;
+    padding: 0;
+    margin: 12px 0 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 6px;
+  }
+  .cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 0.8125rem;
+  }
+  .label {
+    font-weight: 600;
+  }
+  .available .state {
+    color: var(--ink);
+  }
+  .none .state,
+  .not-public .state {
+    color: var(--ink-2);
+  }
+  .not-public {
+    background: var(--surface-2);
+  }
+  .na {
+    opacity: 0.6;
+  }
+  .why {
+    font-size: 0.75rem;
+    line-height: 1.3;
+  }
+</style>

@@ -1,0 +1,63 @@
+---
+// A chart with its table twin. The table is server-rendered (readable without JS); the client script
+// (src/scripts/profile.ts) draws the chart from the same spec and redraws both on the medium toggle.
+import type { OfficialBundle } from "../lib/exports/types";
+import { cellText, VIZ } from "../lib/viz";
+import SourceLink from "./SourceLink.astro";
+
+interface Props {
+  id: keyof typeof VIZ;
+  bundle: OfficialBundle;
+}
+const { id, bundle } = Astro.props;
+const spec = VIZ[id];
+const rows = spec.rows(bundle, false);
+---
+
+{rows.length > 0 && (
+  <figure class="viz" data-viz={id}>
+    <figcaption>{spec.title}</figcaption>
+    <div class="chart" aria-hidden="true" />
+    {spec.note && <p class="small muted">{spec.note}</p>}
+    <details>
+      <summary class="small">Table view</summary>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              {spec.columns.map((c) => (
+                <th class:list={{ num: c.money || c.num }}>{c.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr data-confidence={r.confidence || undefined}>
+                {spec.columns.map((c, i) => (
+                  <td class:list={{ num: c.money || c.num }}>
+                    {c.link ? <SourceLink url={String(r[c.key])} /> : cellText(c, r)}
+                    {i === 0 && r.confidence === "medium" && <span class="badge medium">possible match</span>}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </figure>
+)}
+
+<style>
+  .viz {
+    margin: 0 0 20px;
+  }
+  figcaption {
+    font-weight: 600;
+    font-size: 0.9375rem;
+    margin-bottom: 6px;
+  }
+  .badge {
+    margin-left: 6px;
+  }
+</style>

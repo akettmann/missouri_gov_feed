@@ -1,0 +1,26 @@
+---
+// Shown on any block drawn from a fixture rather than a real dbt export.
+interface Props {
+  model: string;
+}
+const { model } = Astro.props;
+---
+
+<p class="sample" role="note">
+  <strong>Sample data.</strong> The <code>{model}</code> model isn't built yet, so this block shows made-up
+  placeholder values to preview the layout. They say nothing about this official.
+</p>
+
+<style>
+  .sample {
+    background: var(--sample-bg);
+    color: var(--sample-ink);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.875rem;
+    margin: 0 0 12px;
+  }
+  code {
+    font-size: 0.8125rem;
+  }
+</style>

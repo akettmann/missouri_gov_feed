@@ -1,0 +1,140 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { freshness } from "../lib/exports/load";
+import { INDICATORS } from "../lib/indicators";
+
+const tables = freshness();
+---
+
+<Layout title="Methodology">
+  <h1>Methodology</h1>
+  <p class="lede">
+    This site shows evidence about Missouri officials, not verdicts. It has no composite "bias score" and no
+    rankings, and every official gets the same layout whatever their party. Each figure links to the public
+    record it came from.
+  </p>
+
+  <section class="card" id="indicators">
+    <h2>Ideology indicators</h2>
+    <p class="lede">
+      Each indicator is shown on its own scale. Scales use a neutral violet-to-orange palette; party is shown
+      only as a text label.
+    </p>
+    {Object.entries(INDICATORS).map(([key, m]) => (
+      <div class="ind">
+        <h3>
+          {m.label} <code class="small muted">{key}</code>
+        </h3>
+        <p>{m.meaning}</p>
+        <p>
+          <strong>Scale:</strong>{" "}
+          {m.low === "%"
+            ? `${m.domain[0]}% to ${m.domain[1]}%`
+            : `${m.domain[0]} (${m.low}) to ${m.domain[1]} (${m.high})`}
+          . <strong>Limits:</strong> {m.limits}
+        </p>
+        <p class="small muted">Source: {m.source}</p>
+      </div>
+    ))}
+  </section>
+
+  <section class="card" id="matching">
+    <h2>How records are matched to officials</h2>
+    <p>
+      Many sources (campaign finance, lobbyist reports) identify people by name only. Each matched record
+      keeps a<code>match_confidence</code>:
+    </p>
+    <ul>
+      <li>
+        <strong>exact id</strong>: joined on a shared identifier (FEC candidate id, bioguide id).
+      </li>
+      <li>
+        <strong>exact (MEC crosswalk)</strong>: the Missouri Ethics Commission's own candidate-committee list
+        names the committee.
+      </li>
+      <li>
+        <strong>high</strong>: first and last name both match.
+      </li>
+      <li>
+        <strong>medium</strong>: surname matches but the first-name signal is weaker (only the first three
+        letters, or a surname-first committee name with no other official sharing the surname). These carry a
+        <span class="badge medium">possible match</span> badge, and "Hide possible matches" on any profile
+        removes them from every table and chart.
+      </li>
+    </ul>
+  </section>
+
+  <section class="card" id="coverage">
+    <h2>Coverage and gaps</h2>
+    <p>Each profile opens with a coverage strip. The states mean different things:</p>
+    <ul>
+      <li>
+        <strong>● available</strong>: records were found and are shown.
+      </li>
+      <li>
+        <strong>○ none found</strong>: we looked in a source that covers this office and found nothing.
+      </li>
+      <li>
+        <strong>⊘ not public</strong>: the records exist but aren't published online (for example, Missouri
+        personal financial disclosures need a Sunshine Law request). Absence here says nothing about the
+        official.
+      </li>
+      <li>
+        <strong>– n/a</strong>: the measure doesn't apply to this office (for example, judges don't cast
+        roll-call votes).
+      </li>
+    </ul>
+  </section>
+
+  <section class="card" id="interest-votes">
+    <h2>Interests and votes</h2>
+    <p>
+      Where the site shows money or gifts from an interest next to votes on related bills, that is
+      <strong>co-occurrence, not causation</strong>. A donation alongside a vote doesn't show the vote was
+      bought, and officials often get money from groups that already agree with them.
+    </p>
+  </section>
+
+  <section class="card" id="freshness">
+    <h2>Sources and data freshness</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Dataset</th>
+            <th>Exported</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tables.map((t) => (
+            <tr>
+              <td>
+                <code>{t.table}</code>
+              </td>
+              <td>{t.exported_at?.slice(0, 10) ?? "—"}</td>
+              <td>
+                {t.sample ? <span class="badge medium">sample data (model not built yet)</span> : "real"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <p class="small muted">
+      Sources include the Missouri Ethics Commission, Missouri House and Senate journals, Open States, the
+      FEC, Voteview, Shor-McCarty, the American Conservative Union, U.S. House and Senate financial
+      disclosures, CourtListener and the Federal Judicial Center. The repository's docs/sources.md has the
+      per-source details and known quirks.
+    </p>
+  </section>
+</Layout>
+
+<style>
+  h1 {
+    margin-top: 24px;
+  }
+  .ind + .ind {
+    border-top: 1px solid var(--hairline);
+  }
+</style>

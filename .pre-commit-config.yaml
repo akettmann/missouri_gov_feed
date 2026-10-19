@@ -9,6 +9,7 @@ repos:
       - id: end-of-file-fixer
         exclude: \.svg$
       - id: check-yaml
+        exclude: ^frontend/pnpm-lock\.yaml$  # generated; pnpm writes it as multiple YAML documents
       - id: check-toml
       - id: check-added-large-files
         args: ["--maxkb=1024"]
@@ -44,3 +45,22 @@ repos:
         language: system
         files: ^docs/diagrams/.*\.puml$
         require_serial: true
+      # frontend/: needs Node 24 + pnpm (`cd frontend && pnpm install` first). Hooks get repo-root paths,
+      # so the wrappers strip the frontend/ prefix and run inside frontend/.
+      - id: prettier
+        name: prettier (frontend)
+        entry: bash -c 'cd frontend && pnpm exec prettier --write --ignore-unknown "${@#frontend/}"' --
+        language: system
+        files: ^frontend/
+        exclude: ^frontend/pnpm-lock\.yaml$
+      - id: eslint
+        name: eslint (frontend)
+        entry: bash -c 'cd frontend && pnpm exec eslint --fix --no-warn-ignored "${@#frontend/}"' --
+        language: system
+        files: ^frontend/.*\.(js|mjs|ts|astro)$
+      - id: astro-check
+        name: astro check (frontend)
+        entry: pnpm --dir frontend check
+        language: system
+        files: ^frontend/
+        pass_filenames: false

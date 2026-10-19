@@ -1,0 +1,35 @@
+---
+// "Hide possible matches": toggles html.hide-medium (CSS hides flagged rows; charts redraw). The choice
+// is remembered per browser; the inline script in Layout applies it before paint.
+---
+
+<label class="toggle">
+  <input type="checkbox" data-hide-medium />
+  Hide possible matches <span class="badge medium">possible match</span>
+</label>
+
+<script>
+  const boxes = document.querySelectorAll<HTMLInputElement>("input[data-hide-medium]");
+  const root = document.documentElement;
+  for (const box of boxes) {
+    box.checked = root.classList.contains("hide-medium");
+    box.addEventListener("change", () => {
+      root.classList.toggle("hide-medium", box.checked);
+      try {
+        localStorage.setItem("hide-medium", box.checked ? "1" : "0");
+      } catch {
+        /* storage unavailable: preference lasts for this page only */
+      }
+      document.dispatchEvent(new CustomEvent("hide-medium-change", { detail: box.checked }));
+    });
+  }
+</script>
+
+<style>
+  .toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+</style>

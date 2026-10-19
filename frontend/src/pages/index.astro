@@ -1,0 +1,160 @@
+---
+// Browse/search: the full list is server-rendered (usable without JS); the script just hides rows.
+import Layout from "../layouts/Layout.astro";
+import { officialIndex } from "../lib/exports/load";
+import { LEVELS, officeLine } from "../lib/format";
+import { href } from "../lib/site";
+
+const officials = await officialIndex();
+const offices = [...new Map(officials.map((o) => [o.office, o.office_title ?? o.office])).entries()].sort(
+  (a, b) => a[1].localeCompare(b[1]),
+);
+---
+
+<Layout title="Find an official">
+  <h1>Missouri officials</h1>
+  <p class="lede">
+    {officials.length} current state, federal and local officials. Each profile shows published ideology
+    measures, campaign money, lobbyist gifts and disclosed business ties, with links to the original records.
+    No scores, no rankings.
+  </p>
+
+  <form class="filters card" role="search" onsubmit="return false">
+    <label>
+      Name
+      <input type="search" name="q" placeholder="e.g. Hough" autocomplete="off" />
+    </label>
+    <label>
+      Level
+      <select name="level">
+        <option value="">All</option>
+        {Object.entries(LEVELS).map(([v, l]) => (
+          <option value={v}>{l}</option>
+        ))}
+      </select>
+    </label>
+    <label>
+      Office
+      <select name="office">
+        <option value="">All</option>
+        {offices.map(([v, l]) => (
+          <option value={v}>{l}</option>
+        ))}
+      </select>
+    </label>
+    <label>
+      District
+      <input type="text" name="district" inputmode="numeric" placeholder="e.g. 53" autocomplete="off" />
+    </label>
+  </form>
+
+  <p class="small muted" aria-live="polite" id="result-count">
+    {officials.length} officials
+  </p>
+  <div class="table-scroll card list">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Office</th>
+          <th>Party</th>
+          <th>Level</th>
+        </tr>
+      </thead>
+      <tbody>
+        {officials.map((o) => (
+          <tr
+            data-name={o.full_name.toLowerCase()}
+            data-level={o.level}
+            data-office={o.office}
+            data-district={(o.district ?? "").toLowerCase()}
+          >
+            <td>
+              <a href={href(`/officials/${o.slug}/`)}>{o.full_name}</a>
+            </td>
+            <td>{officeLine(o)}</td>
+            <td>{o.party ?? <span class="muted">none listed</span>}</td>
+            <td>{LEVELS[o.level] ?? o.level}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</Layout>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>("form.filters")!;
+  const rows = [...document.querySelectorAll<HTMLTableRowElement>(".list tbody tr")];
+  const counter = document.getElementById("result-count")!;
+  const fold = (s: string) => s.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+
+  function apply() {
+    const f = new FormData(form);
+    const q = fold(String(f.get("q") ?? ""));
+    const level = String(f.get("level") ?? "");
+    const office = String(f.get("office") ?? "");
+    const district = fold(String(f.get("district") ?? ""));
+    let shown = 0;
+    for (const r of rows) {
+      const d = r.dataset;
+      const ok =
+        (!q || fold(d.name!).includes(q)) &&
+        (!level || d.level === level) &&
+        (!office || d.office === office) &&
+        (!district || d.district === district);
+      r.hidden = !ok;
+      if (ok) shown++;
+    }
+    counter.textContent = `${shown} of ${rows.length} officials`;
+    const params = new URLSearchParams([...f].filter(([, v]) => v !== "") as [string, string][]);
+    history.replaceState(null, "", params.size ? `?${params}` : location.pathname);
+  }
+
+  // restore filters from the URL so searches are shareable
+  for (const [k, v] of new URLSearchParams(location.search)) {
+    const el = form.elements.namedItem(k);
+    if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) el.value = v;
+  }
+  form.addEventListener("input", apply);
+  apply();
+</script>
+
+<style>
+  h1 {
+    margin-top: 24px;
+  }
+  .filters {
+    display: grid;
+    grid-template-columns: 2fr 1fr 2fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 720px) {
+    .filters {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink-2);
+    min-width: 0;
+  }
+  input,
+  select {
+    font: inherit;
+    font-weight: 400;
+    font-size: 1rem;
+    padding: 6px 8px;
+    border: 1px solid var(--axis);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+    min-width: 0;
+  }
+  .list {
+    padding: 4px 8px;
+  }
+</style>

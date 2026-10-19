@@ -1,0 +1,13 @@
+---
+// Only medium matches are flagged; exact/high matches are the unremarkable default.
+interface Props {
+  confidence: string | null | undefined;
+}
+const { confidence } = Astro.props;
+---
+
+{confidence === "medium" && (
+  <span class="badge medium" title="Matched to this official by name only; it may be someone else">
+    possible match
+  </span>
+)}

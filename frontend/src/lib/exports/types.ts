@@ -1,0 +1,145 @@
+// Shapes of the per-official bundle the build emits (one prerendered page + one JSON per official).
+// Column names follow the dbt marts / planned rpt_* contracts so a real export can replace a fixture as-is.
+
+export type Confidence = string; // 'exact id' | 'exact (MEC crosswalk)' | 'high' | 'medium' | ...
+
+export interface Official {
+  official_id: string;
+  slug: string;
+  full_name: string;
+  party: string | null;
+  level: string;
+  office: string;
+  office_title: string | null;
+  district: string | null;
+  current_term_start: string | null;
+  current_term_end: string | null;
+  image_url: string | null;
+  hometown: string | null;
+  email: string | null;
+  is_judge_or_lawyer: boolean | null;
+}
+
+export interface CoverageItem {
+  key: string;
+  label: string;
+  status: string;
+  count: number;
+}
+
+export interface Indicator {
+  indicator: string;
+  value: number | null;
+  period: number | null;
+  detail: string | null;
+  source_url: string | null;
+}
+
+/** rpt_donor_rollup summed per election cycle x donor group (medium matches kept apart for the toggle). */
+export interface DonorCycleRow {
+  cycle: number;
+  donor_group: string;
+  match_confidence: Confidence;
+  total_amount: number;
+  contribution_count: number;
+}
+
+/** rpt_donor_rollup's biggest non-individual donors over all years (top 25 per official). */
+export interface TopDonorRow {
+  donor_name: string;
+  donor_group: string;
+  match_confidence: Confidence;
+  source: string;
+  source_url: string | null;
+  total_amount: number;
+  contribution_count: number;
+  first_year: number;
+  last_year: number;
+}
+
+/** rpt_gift_rollup rows: official x year x principal x category x confidence x source. */
+export interface GiftRollupRow {
+  year: number;
+  lobbyist_principal: string;
+  expenditure_category: string;
+  match_confidence: Confidence;
+  source: string;
+  source_url: string | null;
+  total_amount: number;
+  gift_count: number;
+  lobbyist_count: number;
+}
+
+/** `fct_federal_donor_summary` rows (FEC aggregates; real data). */
+export interface FederalDonorRow {
+  cycle: number;
+  aggregate_kind: string;
+  bucket: string;
+  total: number;
+  contribution_count: number | null;
+}
+
+export interface CommercialTie {
+  tie_kind: string;
+  whose: string;
+  detail: string;
+  as_of_year: number | null;
+  source: string;
+  source_url: string | null;
+}
+
+export interface FamilyTie {
+  relation: string;
+  relative_name: string | null;
+  role: string | null;
+  organization: string | null;
+  source: string;
+  source_url: string | null;
+}
+
+export interface DisclosureFiling {
+  disclosure_type: string;
+  filing_kind: string | null;
+  report_year: number | null;
+  filing_date: string | null;
+  document_url: string | null;
+  n_items: number;
+}
+
+/** A dataset is either real (from an export) or a labelled stand-in until the dbt model exists. */
+export interface Dataset<T> {
+  sample: boolean;
+  model: string;
+  rows: T[];
+}
+
+export interface OfficialBundle {
+  official: Official;
+  coverage: CoverageItem[];
+  indicators: Indicator[];
+  money: {
+    status: string;
+    federal: FederalDonorRow[];
+    cycles: Dataset<DonorCycleRow>;
+    top_donors: Dataset<TopDonorRow>;
+  };
+  gifts: Dataset<GiftRollupRow>;
+  interests: {
+    commercial_ties: CommercialTie[];
+    family_ties: FamilyTie[];
+    filings: DisclosureFiling[];
+    commercial_ties_status: string;
+    family_ties_status: string;
+    disclosures_status: string;
+  };
+}
+
+export interface IndexEntry {
+  slug: string;
+  full_name: string;
+  party: string | null;
+  level: string;
+  office: string;
+  office_title: string | null;
+  district: string | null;
+}

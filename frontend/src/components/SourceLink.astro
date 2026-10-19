@@ -1,0 +1,18 @@
+---
+// Every fact links to where it came from; when a source has no per-row URL, say so instead of hiding it.
+interface Props {
+  url: string | null | undefined;
+  label?: string;
+  missing?: string;
+}
+const { url, label = "source", missing = "no link" } = Astro.props;
+---
+
+{url ? (
+  <a href={url} rel="noopener noreferrer" target="_blank">
+    {label}
+    <span aria-hidden="true">↗</span>
+  </a>
+) : (
+  <span class="muted">{missing}</span>
+)}

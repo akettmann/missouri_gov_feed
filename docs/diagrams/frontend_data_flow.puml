@@ -1,0 +1,44 @@
+@startuml frontend_data_flow
+title Frontend data flow: parquet exports -> static site
+skinparam componentStyle rectangle
+
+database "data/mogov.duckdb" as wh {
+  [marts.*] as marts
+  [reporting.rpt_*] as rpt
+}
+
+folder "data/exports" as exports {
+  [<table>.parquet] as pq
+}
+
+package "frontend/ (pnpm build, Node + @duckdb/node-api)" {
+  [lib/exports/load.ts\nselect rows per official] as load
+  [lib/exports/fixtures.ts\nSAMPLE rpt_* fallback] as fixtures
+  [lib/viz.ts\nchart + table specs] as viz
+}
+
+folder "frontend/dist (static)" as dist {
+  [index.html\nbrowse / search] as idx
+  [officials/<slug>/index.html\nprofile + tables] as page
+  [officials/<slug>.json\nper-official bundle] as json
+  [methodology/index.html] as meth
+}
+
+actor Voter as voter
+
+marts --> pq : uv run mogov export\n--format parquet
+rpt --> pq : uv run mogov export
+pq --> load : read_parquet
+fixtures ..> load : only when an\nrpt_* export is missing
+load --> idx
+load --> page
+load --> json
+load --> meth : export timestamps
+viz --> page : server-rendered tables
+voter --> page : open profile
+page --> json : fetch (charts,\nmedium-match toggle)
+note right of json
+  Observable Plot draws charts in the browser
+  from the same viz.ts specs as the tables
+end note
+@enduml

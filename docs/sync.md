@@ -54,6 +54,19 @@ Delete the relevant entries under `data/cache/` (named files for large downloads
 `data/cache/mec/`, `data/cache/fec/`; hashed names for everything else), or the whole cache. Raw
 parts never need deleting by hand.
 
+## Refreshing the frontend
+
+The site is a static snapshot of the exports. After a sync:
+
+```
+uv run mogov export --format parquet
+cd frontend && pnpm build && pnpm sizes
+```
+
+`pnpm build` reads the new parquet files and regenerates every page and per-official JSON; the
+methodology page's "data freshness" table shows each export's timestamp. Run `pnpm sizes` after
+each refresh: a new source can push one official's JSON over the per-page budget.
+
 ## Checking a sync
 
 - `uv run mogov freshness` reports how long ago each always-on loader last landed its tables. It warns

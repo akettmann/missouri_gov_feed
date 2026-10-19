@@ -1,0 +1,255 @@
+// Assembles one OfficialBundle per official from the exports. Row selection and display shaping only
+// (filter to one official, distinct filings, Missouri vs out-of-state, trimming rpt_donor_rollup to what
+// a page draws); the real aggregation lives in dbt (rpt_*), with a fixture standing in when one is missing.
+import { createHash } from "node:crypto";
+import { DONOR_GROUP_SQL } from "../rollups";
+import { exportedAt, hasExport, query } from "./db";
+import { sampleDonorCycles, sampleGiftRollup, sampleTopDonors } from "./fixtures";
+import type {
+  CommercialTie,
+  CoverageItem,
+  Dataset,
+  DisclosureFiling,
+  DonorCycleRow,
+  FamilyTie,
+  FederalDonorRow,
+  GiftRollupRow,
+  IndexEntry,
+  Indicator,
+  Official,
+  OfficialBundle,
+  TopDonorRow,
+} from "./types";
+
+type ProfileRow = Omit<Official, "slug"> & Record<string, string | number | boolean | null>;
+
+export const COVERAGE: { key: string; label: string }[] = [
+  { key: "votes", label: "Votes" },
+  { key: "bias", label: "Ideology indicators" },
+  { key: "donations", label: "Donations" },
+  { key: "disclosures", label: "Financial disclosures" },
+  { key: "commercial_ties", label: "Commercial ties" },
+  { key: "family_ties", label: "Family ties" },
+  { key: "cases", label: "Court cases" },
+  { key: "voluntary_disclosures", label: "Voluntary disclosures" },
+];
+const COUNT_COLUMN: Record<string, string> = { bias: "n_bias_indicators" }; // the rest are n_<key>
+
+export function slugFor(fullName: string, officialId: string): string {
+  const name = fullName
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `${name}-${createHash("sha1").update(officialId).digest("hex").slice(0, 6)}`;
+}
+
+function groupBy<T extends { official_id: string }>(rows: T[]): Map<string, Omit<T, "official_id">[]> {
+  const out = new Map<string, Omit<T, "official_id">[]>();
+  for (const { official_id, ...rest } of rows) {
+    const list = out.get(official_id);
+    if (list) list.push(rest);
+    else out.set(official_id, [rest]);
+  }
+  return out;
+}
+
+const SORT_LEVEL: Record<string, number> = { state: 0, federal: 1, local: 2 };
+
+async function loadAll(): Promise<OfficialBundle[]> {
+  const profiles = await query<ProfileRow>(`
+    select d.official_id, d.full_name, d.party, d.level, d.office, d.office_title, d.district,
+           cast(d.current_term_start as varchar) as current_term_start,
+           cast(d.current_term_end as varchar) as current_term_end,
+           d.image_url, d.hometown, d.email, p.is_judge_or_lawyer,
+           p.* exclude (official_id, full_name, party, level, office, office_title, district, is_judge_or_lawyer)
+    from {dim_official} d join {official_profile} p using (official_id)
+    order by d.level, d.office, try_cast(d.district as integer), d.district, d.full_name`);
+
+  const indicators = groupBy(
+    await query<Indicator & { official_id: string }>(`
+      select official_id, indicator, value, period, detail, source_url
+      from {fct_bias_indicators} order by indicator, period`),
+  );
+
+  // by_employer is ~2.8k rows of individual donors' employers; not used by the MVP pages
+  const federal = groupBy(
+    await query<FederalDonorRow & { official_id: string }>(`
+      select official_id, cycle, aggregate_kind,
+             case when aggregate_kind = 'by_state' then
+               case when bucket = 'Missouri' then 'Missouri' else 'Out of state' end else bucket end as bucket,
+             cast(sum(total) as double) as total, cast(sum(contribution_count) as integer) as contribution_count
+      from {fct_federal_donor_summary}
+      where aggregate_kind <> 'by_employer'
+      group by all order by cycle, aggregate_kind, bucket`),
+  );
+
+  const ties = groupBy(
+    await query<CommercialTie & { official_id: string }>(`
+      select official_id, tie_kind, whose, detail, as_of_year, source, source_url
+      from {fct_commercial_ties} where is_latest_report order by tie_kind, whose, detail`),
+  );
+
+  const family = groupBy(
+    await query<FamilyTie & { official_id: string }>(`
+      select official_id, relation, relative_name, role, organization, source, source_url
+      from {fct_family_ties} order by relation, organization`),
+  );
+
+  const filings = groupBy(
+    await query<DisclosureFiling & { official_id: string }>(`
+      select official_id, disclosure_type, filing_kind, report_year,
+             cast(filing_date as varchar) as filing_date, document_url, cast(count(*) as integer) as n_items
+      from {fct_disclosures} group by all order by report_year desc nulls last, filing_date desc nulls last`),
+  );
+
+  // rpt_donor_rollup is up to ~7k rows per official (one per donor-year), too big for a page; ship the
+  // two views the page draws. Medium matches stay separate so "hide possible matches" can drop them.
+  const hasDonors = hasExport("rpt_donor_rollup");
+  const realCycles = hasDonors
+    ? groupBy(
+        await query<DonorCycleRow & { official_id: string }>(`
+          select official_id, election_cycle as cycle, ${DONOR_GROUP_SQL} as donor_group,
+                 case when match_confidence = 'medium' then 'medium' else 'matched' end as match_confidence,
+                 cast(sum(total_amount) as double) as total_amount,
+                 cast(sum(contribution_count) as integer) as contribution_count
+          from {rpt_donor_rollup}
+          group by all order by cycle`),
+      )
+    : null;
+  // individuals are excluded: their donor_name is an employer, and values like 'none' / 'retired' would
+  // rank as if they were organizations
+  const realTop = hasDonors
+    ? groupBy(
+        await query<TopDonorRow & { official_id: string }>(`
+          select official_id, donor_name, donor_group, match_confidence, source, source_url,
+                 total_amount, contribution_count, first_year, last_year
+          from (
+            select official_id, donor_name, ${DONOR_GROUP_SQL} as donor_group, match_confidence,
+                   min(source) as source, min(source_url) as source_url,
+                   cast(sum(total_amount) as double) as total_amount,
+                   cast(sum(contribution_count) as integer) as contribution_count,
+                   cast(min(transaction_year) as integer) as first_year,
+                   cast(max(transaction_year) as integer) as last_year,
+                   row_number() over (partition by official_id order by sum(total_amount) desc) as rank
+            from {rpt_donor_rollup}
+            where donor_class <> 'individual'
+            group by official_id, donor_name, donor_class, match_confidence
+          ) ranked
+          where rank <= 25 order by official_id, rank`),
+      )
+    : null;
+  const realGifts = hasExport("rpt_gift_rollup")
+    ? groupBy(
+        await query<GiftRollupRow & { official_id: string }>(`
+          select official_id, cast(expenditure_year as integer) as year, lobbyist_principal,
+                 expenditure_category, match_confidence, source, source_url,
+                 cast(total_amount as double) as total_amount, cast(gift_count as integer) as gift_count,
+                 cast(lobbyist_count as integer) as lobbyist_count
+          from {rpt_gift_rollup} order by year`),
+      )
+    : null;
+
+  return profiles
+    .sort((a, b) => (SORT_LEVEL[a.level] ?? 9) - (SORT_LEVEL[b.level] ?? 9))
+    .map((p): OfficialBundle => {
+      const id = p.official_id;
+      const status = (k: string) => String(p[`${k}_status`]);
+      const coverage: CoverageItem[] = COVERAGE.map(({ key, label }) => ({
+        key,
+        label,
+        status: status(key),
+        count: Number(p[COUNT_COLUMN[key] ?? `n_${key}`] ?? 0),
+      }));
+      const donates = Number(p.n_donations) > 0;
+      const cycles: Dataset<DonorCycleRow> = realCycles
+        ? { sample: false, model: "rpt_donor_rollup", rows: (realCycles.get(id) ?? []) as DonorCycleRow[] }
+        : { sample: true, model: "rpt_donor_rollup", rows: donates ? sampleDonorCycles(id) : [] };
+      const topDonors: Dataset<TopDonorRow> = realTop
+        ? { sample: false, model: "rpt_donor_rollup", rows: (realTop.get(id) ?? []) as TopDonorRow[] }
+        : { sample: true, model: "rpt_donor_rollup", rows: donates ? sampleTopDonors(id) : [] };
+      const gifts: Dataset<GiftRollupRow> = realGifts
+        ? { sample: false, model: "rpt_gift_rollup", rows: (realGifts.get(id) ?? []) as GiftRollupRow[] }
+        : {
+            sample: true,
+            model: "rpt_gift_rollup",
+            rows: Number(p.n_lobbyist_gifts) > 0 ? sampleGiftRollup(id) : [],
+          };
+      return {
+        official: {
+          official_id: id,
+          slug: slugFor(p.full_name, id),
+          full_name: p.full_name,
+          party: p.party,
+          level: p.level,
+          office: p.office,
+          office_title: p.office_title,
+          district: p.district,
+          current_term_start: p.current_term_start,
+          current_term_end: p.current_term_end,
+          image_url: p.image_url,
+          hometown: p.hometown,
+          email: p.email,
+          is_judge_or_lawyer: p.is_judge_or_lawyer,
+        },
+        coverage,
+        indicators: (indicators.get(id) ?? []) as Indicator[],
+        money: {
+          status: status("donations"),
+          federal: (federal.get(id) ?? []) as FederalDonorRow[],
+          cycles,
+          top_donors: topDonors,
+        },
+        gifts,
+        interests: {
+          commercial_ties: (ties.get(id) ?? []) as CommercialTie[],
+          family_ties: (family.get(id) ?? []) as FamilyTie[],
+          filings: (filings.get(id) ?? []) as DisclosureFiling[],
+          commercial_ties_status: status("commercial_ties"),
+          family_ties_status: status("family_ties"),
+          disclosures_status: status("disclosures"),
+        },
+      };
+    });
+}
+
+let cache: Promise<OfficialBundle[]> | undefined;
+
+/** Every official's bundle; computed once per build and shared by pages and JSON endpoints. */
+export function allOfficials(): Promise<OfficialBundle[]> {
+  cache ??= loadAll();
+  return cache;
+}
+
+export async function officialIndex(): Promise<IndexEntry[]> {
+  return (await allOfficials()).map(({ official: o }) => ({
+    slug: o.slug,
+    full_name: o.full_name,
+    party: o.party,
+    level: o.level,
+    office: o.office,
+    office_title: o.office_title,
+    district: o.district,
+  }));
+}
+
+/** Export timestamps shown on the methodology page as data freshness. */
+export function freshness(): { table: string; exported_at: string | null; sample: boolean }[] {
+  const tables = [
+    "dim_official",
+    "official_profile",
+    "fct_bias_indicators",
+    "fct_federal_donor_summary",
+    "fct_commercial_ties",
+    "fct_family_ties",
+    "fct_disclosures",
+    "rpt_donor_rollup",
+    "rpt_gift_rollup",
+  ];
+  return tables.map((t) => ({
+    table: t,
+    exported_at: exportedAt(t)?.toISOString() ?? null,
+    sample: t.startsWith("rpt_") && !hasExport(t),
+  }));
+}

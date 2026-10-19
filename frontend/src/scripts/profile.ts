@@ -1,0 +1,155 @@
+// Draws the profile charts from the per-official JSON and keeps charts + table twins in step with the
+// "hide possible matches" toggle. Tables are already server-rendered, so this only enhances.
+import * as Plot from "@observablehq/plot";
+import type { OfficialBundle } from "../lib/exports/types";
+import { money } from "../lib/format";
+import { cellText, VIZ, type Row, type VizSpec } from "../lib/viz";
+
+const compactUsd = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+// long names (lobbyist principals) are clipped on the axis; tooltip and table keep them whole
+const MAX_LABEL = 32;
+const clip = (s: string) => (s.length > MAX_LABEL ? `${s.slice(0, MAX_LABEL - 1)}…` : s);
+
+const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const seriesColors = () => [1, 2, 3, 4, 5].map((i) => css(`--series-${i}`));
+const hideMedium = () => document.documentElement.classList.contains("hide-medium");
+
+function chart(spec: VizSpec, rows: Row[], width: number): SVGSVGElement | HTMLElement {
+  const style = { background: "transparent", color: css("--ink-2"), fontSize: "12px" };
+  if (spec.kind === "hbar") {
+    const longest = Math.min(MAX_LABEL, Math.max(...rows.map((r) => String(r[spec.y]).length)));
+    return Plot.plot({
+      width,
+      style,
+      marginLeft: 16 + longest * 6.5,
+      height: 28 * rows.length + 40,
+      x: { grid: true, label: null, tickFormat: (d: number) => compactUsd.format(d) },
+      y: { label: null, domain: rows.map((r) => String(r[spec.y])), tickFormat: clip },
+      marks: [
+        Plot.barX(rows, {
+          x: spec.x,
+          y: spec.y,
+          fill: css("--series-1"),
+          insetTop: 3,
+          insetBottom: 3,
+          rx: 2,
+          tip: { format: { x: (d: number) => money(d) } },
+        }),
+        Plot.ruleX([0], { stroke: css("--axis") }),
+      ],
+    });
+  }
+  // stacked columns; color follows the series' fixed slot, so hiding one never repaints the others
+  const order = spec.seriesOrder ?? [];
+  const colors = seriesColors();
+  const present = order.filter((s) => rows.some((r) => r[spec.series!] === s));
+  return Plot.plot({
+    width,
+    style,
+    height: 240,
+    marginLeft: 56,
+    x: { label: null, type: "band" },
+    y: { grid: true, label: null, tickFormat: (d: number) => compactUsd.format(d) },
+    color: {
+      domain: present,
+      range: present.map((s) => colors[order.indexOf(s) % colors.length]),
+      legend: present.length > 1,
+    },
+    marks: [
+      Plot.barY(rows, {
+        x: spec.x,
+        y: spec.y,
+        fill: spec.series,
+        order: present,
+        insetLeft: 2,
+        insetRight: 2,
+        tip: { format: { y: (d: number) => money(d) } },
+      }),
+      Plot.ruleY([0], { stroke: css("--axis") }),
+    ],
+  });
+}
+
+/** Only reachable by hiding possible matches: every record behind this chart was a medium match. */
+function emptyNote(): HTMLElement {
+  const p = document.createElement("p");
+  p.className = "small muted";
+  p.textContent =
+    'All records here are possible matches, which are hidden. Untick "Hide possible matches" to see them.';
+  return p;
+}
+
+function fillTable(fig: Element, spec: VizSpec, rows: Row[]) {
+  const tbody = fig.querySelector("tbody");
+  if (!tbody) return;
+  tbody.replaceChildren(
+    ...rows.map((r) => {
+      const tr = document.createElement("tr");
+      spec.columns.forEach((c, i) => {
+        const td = document.createElement("td");
+        if (c.link) {
+          const url = String(r[c.key]);
+          if (url) {
+            const a = Object.assign(document.createElement("a"), {
+              href: url,
+              target: "_blank",
+              rel: "noopener noreferrer",
+            });
+            a.textContent = "source ↗";
+            td.append(a);
+          } else {
+            td.innerHTML = '<span class="muted">no link</span>';
+          }
+        } else {
+          td.textContent = cellText(c, r);
+        }
+        if (c.money || c.num) td.className = "num";
+        if (i === 0 && r.confidence === "medium") {
+          const b = document.createElement("span");
+          b.className = "badge medium";
+          b.textContent = "possible match";
+          td.append(" ", b);
+        }
+        tr.append(td);
+      });
+      return tr;
+    }),
+  );
+}
+
+function render(bundle: OfficialBundle, tablesToo: boolean) {
+  for (const fig of document.querySelectorAll<HTMLElement>("figure[data-viz]")) {
+    const spec = VIZ[fig.dataset.viz!];
+    const target = fig.querySelector<HTMLElement>(".chart");
+    if (!spec || !target) continue;
+    const rows = spec.rows(bundle, hideMedium());
+    if (tablesToo && spec.usesConfidence) fillTable(fig, spec, rows);
+    target.replaceChildren(rows.length ? chart(spec, rows, Math.max(280, target.clientWidth)) : emptyNote());
+  }
+}
+
+async function main() {
+  const article = document.querySelector<HTMLElement>("article[data-bundle-url]");
+  if (!article || !document.querySelector("figure[data-viz]")) return;
+  const res = await fetch(article.dataset.bundleUrl!);
+  if (!res.ok) return; // tables still show everything
+  const bundle = (await res.json()) as OfficialBundle;
+  // the server tables include medium rows; redraw them if the reader already hides those
+  render(bundle, hideMedium());
+  document.addEventListener("hide-medium-change", () => render(bundle, true));
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => render(bundle, false));
+  let lastWidth = window.innerWidth;
+  window.addEventListener("resize", () => {
+    if (Math.abs(window.innerWidth - lastWidth) < 40) return;
+    lastWidth = window.innerWidth;
+    render(bundle, false);
+  });
+}
+
+main();

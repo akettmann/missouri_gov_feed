@@ -44,6 +44,38 @@ Layout under `data/` (override the root with `MOGOV_DATA_DIR`):
 A `data/raw/<table>.parquet` file from before sharding existed is moved into
 `<table>/part-000-of-001.parquet` the next time any loader runs.
 
+## Frontend (static site)
+
+The voter-facing site lives in `frontend/`: Astro (static build), Observable Plot, pnpm. It is built
+entirely from the parquet exports; there is no server. Data flow:
+[frontend_data_flow](diagrams/frontend_data_flow.puml).
+
+1. Install Node.js 24 LTS (`frontend/.node-version` pins the version; `>=24.22.0`) and enable pnpm
+   with `corepack enable` (the version comes from `packageManager` in `frontend/package.json`).
+2. Export the marts as parquet (the build reads `data/exports/*.parquet`; `MOGOV_EXPORTS` points it
+   elsewhere):
+   ```
+   uv run mogov export --format parquet
+   ```
+3. Install, build and preview:
+   ```
+   cd frontend
+   pnpm install
+   pnpm build          # dist/: one page + one JSON per official, browse page, methodology
+   pnpm preview        # http://localhost:4321
+   pnpm sizes          # per-official payload sizes; exits 1 if any JSON is over budget (100 KB gzipped)
+   ```
+4. Checks (also run by pre-commit on `frontend/` changes): `pnpm check` (astro check / TypeScript),
+   `pnpm lint` (ESLint), `pnpm format:check` (Prettier).
+
+The money and gift sections read `rpt_donor_rollup` and `rpt_gift_rollup` (dbt `reporting` schema,
+exported by `mogov export`). If either export is missing, for example when the reporting models haven't
+been built yet, the build falls back to deterministic **sample data** behind a visible "Sample data"
+banner instead of failing (`frontend/src/lib/exports/fixtures.ts`).
+
+Optional build-time environment: `PUBLIC_SITE_URL` (canonical site URL), `PUBLIC_REPORT_ERROR_URL`
+(where "Report an error" goes; default: a prefilled GitHub issue on this repo).
+
 ## Local, in Docker (Compose)
 
 Needs only Docker. Data stays in `./data` on the host, in the same layout as the uv setup, so you can mix

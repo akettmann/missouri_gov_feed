@@ -1,0 +1,31 @@
+---
+// Section D: lobbyist gifts reported to MEC, by principal, category and year.
+import type { OfficialBundle } from "../lib/exports/types";
+import SampleBanner from "./SampleBanner.astro";
+import Viz from "./Viz.astro";
+
+interface Props {
+  bundle: OfficialBundle;
+}
+const { bundle } = Astro.props;
+const { gifts } = bundle;
+---
+
+<section class="card" id="gifts" aria-labelledby="gifts-h">
+  <h2 id="gifts-h">Lobbyist gifts</h2>
+  <p class="lede">
+    Meals, tickets, travel and other expenditures lobbyists reported spending on this official, grouped by the
+    principal (client) the lobbyist represents.
+  </p>
+  {gifts.rows.length === 0 ? (
+    <p class="muted">No lobbyist gifts reported to the Missouri Ethics Commission for this official.</p>
+  ) : (
+    <>
+      {gifts.sample && <SampleBanner model={gifts.model} />}
+      <div class="grid-2">
+        <Viz id="gifts-by-principal" bundle={bundle} />
+        <Viz id="gifts-by-year" bundle={bundle} />
+      </div>
+    </>
+  )}
+</section>

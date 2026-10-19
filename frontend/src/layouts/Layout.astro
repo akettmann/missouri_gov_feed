@@ -1,0 +1,77 @@
+---
+import "../styles/global.css";
+import { href } from "../lib/site";
+
+interface Props {
+  title: string;
+  description?: string;
+}
+const { title, description = "Measured lean and potential conflicts of interest for Missouri officials." } =
+  Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <title>{title} · Missouri Officials</title>
+    <script is:inline>
+      // apply the medium-match preference before paint so hidden rows never flash
+      try {
+        if (localStorage.getItem("hide-medium") === "1")
+          document.documentElement.classList.add("hide-medium");
+      } catch {
+        /* storage unavailable: show everything */
+      }
+    </script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap bar">
+        <a class="brand" href={href("/")}>
+          Missouri Officials
+        </a>
+        <nav>
+          <a href={href("/")}>Officials</a>
+          <a href={href("/methodology/")}>Methodology</a>
+        </nav>
+      </div>
+    </header>
+    <main class="wrap">
+      <slot />
+    </main>
+    <footer class="wrap site-footer muted small">
+      Evidence, not verdicts. Every figure links to its public source; see{" "}
+      <a href={href("/methodology/")}>methodology</a> for what each measure can and can't tell you.
+    </footer>
+  </body>
+</html>
+
+<style>
+  .site-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 56px;
+    flex-wrap: wrap;
+  }
+  .brand {
+    font-weight: 700;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  nav {
+    display: flex;
+    gap: 16px;
+  }
+  .site-footer {
+    padding: 32px 16px 48px;
+  }
+</style>

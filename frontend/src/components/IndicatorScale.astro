@@ -1,0 +1,74 @@
+---
+// One value on its indicator's own scale. Diverging scales: violet <-> gray <-> orange (never red/blue).
+import { indicatorMeta } from "../lib/indicators";
+
+interface Props {
+  indicator: string;
+  value: number;
+}
+const { indicator, value } = Astro.props;
+const meta = indicatorMeta(indicator);
+const [lo, hi] = meta.domain;
+const pct = Math.max(0, Math.min(1, (value - lo) / (hi - lo))) * 100;
+---
+
+<div
+  class="scale"
+  role="img"
+  aria-label={`${value} on a scale from ${lo} (${meta.low}) to ${hi} (${meta.high})`}
+>
+  <div class:list={["track", { diverging: meta.diverging }]}>
+    {meta.diverging && <span class="mid" />}
+    <span class="mark" style={`left:${pct}%`}></span>
+  </div>
+  <div class="ends small muted">
+    <span>
+      {lo}
+      {meta.low === "%" ? "%" : ` ${meta.low}`}
+    </span>
+    <span>
+      {hi}
+      {meta.high === "%" ? "%" : ` ${meta.high}`}
+    </span>
+  </div>
+</div>
+
+<style>
+  .scale {
+    min-width: 200px;
+  }
+  .track {
+    position: relative;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--hairline);
+    margin: 10px 0 4px;
+  }
+  .track.diverging {
+    background: linear-gradient(to right, var(--div-low), var(--div-mid) 50%, var(--div-high));
+  }
+  .mid {
+    position: absolute;
+    left: 50%;
+    top: -3px;
+    bottom: -3px;
+    width: 1px;
+    background: var(--axis);
+  }
+  .mark {
+    position: absolute;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--ink);
+    border: 2px solid var(--surface);
+    transform: translate(-50%, -50%);
+  }
+  .ends {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 0.75rem;
+  }
+</style>

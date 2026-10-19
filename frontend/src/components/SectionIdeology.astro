@@ -1,0 +1,106 @@
+---
+// Section A: each indicator on its own scale with period, detail and source. No composite score.
+import type { Indicator } from "../lib/exports/types";
+import { indicatorMeta } from "../lib/indicators";
+import { href } from "../lib/site";
+import IndicatorScale from "./IndicatorScale.astro";
+import SourceLink from "./SourceLink.astro";
+
+interface Props {
+  indicators: Indicator[];
+  status: string;
+}
+const { indicators, status } = Astro.props;
+
+const groups = new Map<string, Indicator[]>();
+for (const i of indicators) groups.set(i.indicator, [...(groups.get(i.indicator) ?? []), i]);
+// latest period first; party unity has no period
+for (const rows of groups.values()) rows.sort((a, b) => (b.period ?? 0) - (a.period ?? 0));
+// a null value is a period the source didn't score (e.g. ACU years without enough rated votes)
+const fmt = (key: string, v: number | null) =>
+  v === null
+    ? "no score"
+    : key === "party_unity_pct"
+      ? `${v.toFixed(1)}%`
+      : v.toFixed(key === "acu_rating" ? 0 : 2);
+---
+
+<section class="card" id="ideology" aria-labelledby="ideology-h">
+  <h2 id="ideology-h">Ideology indicators</h2>
+  <p class="lede">
+    Published measures of how this official votes, each on its own scale. They are separate lenses, not a
+    single score. <a href={href("/methodology/#indicators")}>What each one means</a>.
+  </p>
+  {groups.size === 0 ? (
+    <p class="muted">No indicators: {status}.</p>
+  ) : (
+    [...groups].map(([key, rows]) => {
+      const meta = indicatorMeta(key);
+      const latest = rows.find((r) => r.value !== null) ?? rows[0];
+      return (
+        <div class="indicator">
+          <div class="head">
+            <h3>{meta.label}</h3>
+            <span class="value">{fmt(key, latest.value)}</span>
+            {latest.period && <span class="muted small">({latest.period})</span>}
+          </div>
+          {latest.value !== null && <IndicatorScale indicator={key} value={latest.value} />}
+          <p class="small muted">
+            {latest.detail} ·{" "}
+            <SourceLink url={latest.source_url} missing="computed from votes in this dataset" />
+          </p>
+          {rows.length > 1 && (
+            <details>
+              <summary class="small">All {rows.length} values</summary>
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Period</th>
+                      <th class="num">Value</th>
+                      <th>Detail</th>
+                      <th>Source</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr>
+                        <td>{r.period ?? "all loaded votes"}</td>
+                        <td class="num">{fmt(key, r.value)}</td>
+                        <td>{r.detail}</td>
+                        <td>
+                          <SourceLink url={r.source_url} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          )}
+        </div>
+      );
+    })
+  )}
+</section>
+
+<style>
+  .indicator + .indicator {
+    border-top: 1px solid var(--hairline);
+    margin-top: 16px;
+    padding-top: 4px;
+  }
+  .head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .head h3 {
+    margin-bottom: 0;
+  }
+  .value {
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+</style>
