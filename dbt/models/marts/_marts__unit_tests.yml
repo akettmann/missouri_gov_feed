@@ -1,0 +1,30 @@
+# Unit tests for name matching inside marts (dbt unit tests: fixed input rows -> exact expected rows).
+version: 2
+
+unit_tests:
+  - name: lobbyist_gifts_match_recipient_name_and_title
+    model: fct_lobbyist_gifts
+    description: >
+      Recipient "LAST, FIRST" matches an official on surname plus the first three letters of the first
+      name: exact first name -> high, shortened form (Dan/Daniel) -> medium. A gift whose recipient fits
+      two officials is dropped rather than guessed, and a recipient title naming another kind of office
+      doesn't match.
+    overrides:
+      vars:
+        mec_direct: false
+    given:
+      - input: ref('stg_tap_mec__lobbyist_gifts')
+        rows:
+          - {lobbyist_id: L1, lobbyist_name: A Lobbyist, recipient_raw: 'JONES, DANIEL', recipient_title: REPRESENTATIVE, recipient_last: JONES, recipient_first: DANIEL, amount: 40, expenditure_date: '2017-02-01', description: dinner}
+          - {lobbyist_id: L1, lobbyist_name: A Lobbyist, recipient_raw: 'JONES, DAN', recipient_title: REPRESENTATIVE, recipient_last: JONES, recipient_first: DAN, amount: 25, expenditure_date: '2017-03-01', description: lunch}
+          - {lobbyist_id: L1, lobbyist_name: A Lobbyist, recipient_raw: 'LEE, ANN', recipient_title: SENATOR, recipient_last: LEE, recipient_first: ANN, amount: 30, expenditure_date: '2017-04-01', description: tickets}
+          - {lobbyist_id: L1, lobbyist_name: A Lobbyist, recipient_raw: 'JONES, DAN', recipient_title: COUNTY CLERK, recipient_last: JONES, recipient_first: DAN, amount: 15, expenditure_date: '2017-05-01', description: coffee}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: o_dan_jones, office: state_house, family_key: jones, given_key: dan, level: state}
+          - {official_id: o_ann_lee, office: state_senate, family_key: lee, given_key: ann, level: state}
+          - {official_id: o_anne_lee, office: state_house, family_key: lee, given_key: anne, level: state}
+    expect:
+      rows:
+        - {official_id: o_dan_jones, recipient_raw: 'JONES, DANIEL', match_confidence: medium}
+        - {official_id: o_dan_jones, recipient_raw: 'JONES, DAN', match_confidence: high}

@@ -1,0 +1,153 @@
+# Unit tests for the name-matching models (dbt unit tests: fixed input rows -> exact expected rows).
+# Kept apart from the generated _intermediate.yml so regenerating docs never touches them.
+version: 2
+
+unit_tests:
+  - name: house_vote_tokens_attribute_to_one_member_or_none
+    model: int_mo_house__votes
+    description: >
+      A roll-call PDF token resolves to exactly one House member or stays unattributed: district suffix
+      disambiguates, a bare shared surname is ambiguous, truncated names prefix-match (13+ chars), spaces
+      are ignored, MR SPEAKER comes from the house_speakers seed, a member missing from this session's
+      end-of-session list matches another session's list, and unknown tokens stay null.
+    given:
+      - input: ref('stg_mo_house__rollcall_votes')
+        rows:
+          - {rollcall_url: r1, session_code: '251', member_token: SMITH 46, token_name: SMITH, token_district: 46, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '251', member_token: SMITH, token_name: SMITH, token_district: null, vote_cast: nay}
+          - {rollcall_url: r1, session_code: '251', member_token: FOUNTAIN HENDERS, token_name: FOUNTAIN HENDERS, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '251', member_token: VANSCHOIACK, token_name: VANSCHOIACK, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '251', member_token: MR SPEAKER, token_name: MR SPEAKER, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '251', member_token: BROWN, token_name: BROWN, token_district: null, vote_cast: nay}
+          - {rollcall_url: r1, session_code: '251', member_token: NOBODY, token_name: NOBODY, token_district: null, vote_cast: yea}
+      - input: ref('stg_mo_house__rollcalls')
+        rows:
+          - {rollcall_url: r1, session_code: '251', vote_date: '2025-04-03', measure: HB 10}
+      - input: ref('house_speakers')
+        rows:
+          - {session_year: 2025, district_number: 89, name: Dean Plocher}
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '251', district_number: 46, surname_key: smith, person_key: p_smith46, party: Republican}
+          - {session_code: '251', district_number: 120, surname_key: smith, person_key: p_smith120, party: Democratic}
+          - {session_code: '251', district_number: 79, surname_key: fountain henderson, person_key: p_fountain, party: Democratic}
+          - {session_code: '251', district_number: 4, surname_key: van schoiack, person_key: p_vanschoiack, party: Republican}
+          - {session_code: '251', district_number: 89, surname_key: plocher, person_key: p_plocher, party: Republican}
+          - {session_code: '241', district_number: 12, surname_key: brown, person_key: p_brown, party: Democratic}
+    expect:
+      rows:
+        - {member_token: SMITH 46, person_key: p_smith46}
+        - {member_token: SMITH, person_key: null}
+        - {member_token: FOUNTAIN HENDERS, person_key: p_fountain}
+        - {member_token: VANSCHOIACK, person_key: p_vanschoiack}
+        - {member_token: MR SPEAKER, person_key: p_plocher}
+        - {member_token: BROWN, person_key: p_brown}
+        - {member_token: NOBODY, person_key: null}
+
+  - name: senate_vote_tokens_match_senator_serving_on_the_date
+    model: int_mo_senate__votes
+    description: >
+      A journal token resolves to the one senator with that surname serving on the vote date: "(16)"
+      disambiguates shared surnames, a bare shared surname is ambiguous, and a senator whose term ended
+      doesn't match.
+    given:
+      - input: ref('stg_mo_senate__votes')
+        rows:
+          - {vote_id: v1, journal_url: j1, session_year: 2025, vote_date: '2025-03-10', senator_token: Brown (16), token_name: Brown, token_district: 16, vote_cast: yea}
+          - {vote_id: v1, journal_url: j1, session_year: 2025, vote_date: '2025-03-10', senator_token: Brown, token_name: Brown, token_district: null, vote_cast: yea}
+          - {vote_id: v1, journal_url: j1, session_year: 2025, vote_date: '2025-03-10', senator_token: Eigel, token_name: Eigel, token_district: null, vote_cast: nay}
+          - {vote_id: v1, journal_url: j1, session_year: 2025, vote_date: '2025-03-10', senator_token: Schupp, token_name: Schupp, token_district: null, vote_cast: nay}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {openstates_id: p_brown16, chamber: upper, district_number: 16, surname_key: brown, party: Republican, start_date: '2023-01-04', end_date: '2026-12-31'}
+          - {openstates_id: p_brown26, chamber: upper, district_number: 26, surname_key: brown, party: Republican, start_date: '2023-01-04', end_date: '2026-12-31'}
+          - {openstates_id: p_eigel, chamber: upper, district_number: 23, surname_key: eigel, party: Republican, start_date: '2017-01-04', end_date: '2026-12-31'}
+          - {openstates_id: p_schupp, chamber: upper, district_number: 24, surname_key: schupp, party: Democratic, start_date: '2015-01-07', end_date: '2023-01-03'}
+    expect:
+      rows:
+        - {member_token: Brown (16), person_key: p_brown16}
+        - {member_token: Brown, person_key: null}
+        - {member_token: Eigel, person_key: p_eigel}
+        - {member_token: Schupp, person_key: null}
+
+  - name: mec_committees_attributed_by_name_with_confidence
+    model: int_mec__official_committees
+    description: >
+      Name heuristics (without MEC's crosswalk): full name -> high; surname-first naming -> medium, but only
+      for a surname no other official shares and never for local-office committees; a committee naming a
+      different first name never matches.
+    overrides:
+      vars:
+        mec_direct: false
+    given:
+      - input: ref('stg_tap_mec__contributions')
+        rows:
+          - {mec_committee_id: C1, committee_name: Nicole Galloway For Missouri}
+          - {mec_committee_id: C2, committee_name: Riggs for Missouri}
+          - {mec_committee_id: C3, committee_name: Smith for Missouri}
+          - {mec_committee_id: C4, committee_name: Ann Smith for State Representative}
+          - {mec_committee_id: C5, committee_name: Riggs for Sheriff}
+          - {mec_committee_id: C6, committee_name: Committee to Elect Caleb Rowden}
+          - {mec_committee_id: C7, committee_name: Friends of Riggs}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: o_galloway, family_key: galloway, given_key: nicole, level: state}
+          - {official_id: o_riggs, family_key: riggs, given_key: tim, level: state}
+          - {official_id: o_ann_smith, family_key: smith, given_key: ann, level: state}
+          - {official_id: o_bob_smith, family_key: smith, given_key: bob, level: state}
+          - {official_id: o_rowden, family_key: rowden, given_key: jane, level: state}
+    expect:
+      rows:
+        - {official_id: o_galloway, mec_committee_id: C1, confidence: high}
+        - {official_id: o_riggs, mec_committee_id: C2, confidence: medium}
+        - {official_id: o_ann_smith, mec_committee_id: C4, confidence: high}
+        - {official_id: o_riggs, mec_committee_id: C7, confidence: medium}
+
+  - name: bulk_case_matches_respect_courts_tenure_and_whole_words
+    model: int_courtlistener__bulk_case_matches
+    description: >
+      Judges match by panel person id, or by surname as a whole word in the judges text of their own
+      courts on/after their judicial start ("Hall" not in "Marshall", not before 2010); a judge with no
+      known start gets panel matches only; lawyers match "first last" in the attorneys text from 1975.
+    overrides:
+      vars:
+        cl_case_bulk: true
+        case_history_min_year: 1975
+    given:
+      - input: ref('fct_legal_careers')
+        rows:
+          - {official_id: j_hall, legal_role: judge}
+          - {official_id: j_smith, legal_role: judge}
+          - {official_id: l_doe, legal_role: lawyer}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: j_hall, given_name: Pat, family_name: Hall, office: mo_court_of_appeals, current_term_start: null}
+          - {official_id: j_smith, given_name: Justin, family_name: Smith, office: us_court_of_appeals, current_term_start: null}
+          - {official_id: l_doe, given_name: Jane, family_name: Doe, office: state_house, current_term_start: null}
+      - input: ref('fct_office_history')
+        rows:
+          - {official_id: j_hall, office_title: 'Judge, Missouri Court of Appeals', start_date: '2010-01-01'}
+      - input: ref('mo_courts')
+        rows:
+          - {court_id: mo, office: mo_supreme_court}
+          - {court_id: moctappwd, office: mo_court_of_appeals}
+          - {court_id: ca8, office: us_court_of_appeals}
+      - input: ref('int_courtlistener__mo_cases')
+        rows:
+          - {cluster_id: c1, court_id: moctappwd, date_filed: '2015-06-01', judges_text: 'Hall, P.J., and Ahuja, J.', attorneys_text: null}
+          - {cluster_id: c2, court_id: moctappwd, date_filed: '2005-06-01', judges_text: Hall, attorneys_text: null}
+          - {cluster_id: c3, court_id: moctappwd, date_filed: '2016-06-01', judges_text: Marshall, attorneys_text: null}
+          - {cluster_id: c4, court_id: ca8, date_filed: '2018-06-01', judges_text: 'Smith, Circuit Judge', attorneys_text: null}
+          - {cluster_id: c5, court_id: mo, date_filed: '2000-06-01', judges_text: null, attorneys_text: 'Jane Doe, for appellant.'}
+          - {cluster_id: c6, court_id: mo, date_filed: '1970-06-01', judges_text: null, attorneys_text: Jane Doe}
+      - input: ref('stg_courtlistener__mo_cluster_panel')
+        rows:
+          - {cluster_id: c4, cl_person_id: '99'}
+      - input: ref('int_courtlistener__official_people')
+        rows:
+          - {official_id: j_smith, cl_person_id: '99'}
+    expect:
+      rows:
+        - {official_id: j_hall, role: judge, cluster_id: c1, matched_by: judges text}
+        - {official_id: j_smith, role: judge, cluster_id: c4, matched_by: panel}
+        - {official_id: l_doe, role: attorney, cluster_id: c5, matched_by: attorneys text}

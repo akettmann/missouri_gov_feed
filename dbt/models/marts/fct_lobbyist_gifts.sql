@@ -1,7 +1,8 @@
 -- Lobbyist expenditures on current officials (meals, tickets, travel, gifts), from MEC lobbyist reports
 -- (TAP mirror, 2004-2022). Missouri's Amendment 1 (Dec 2018) banned most gifts over $5, so volumes drop
 -- sharply after 2018. Matched on recipient "LAST, FIRST" + office title; confidence 'high' when the first
--- name matches exactly, 'medium' when only its first three letters do (nicknames: Mike/Michael).
+-- name matches exactly, 'medium' when only its first three letters do (Dan/Daniel, Rob/Robert; not
+-- Mike/Michael, whose first three letters differ).
 -- With the opt-in MEC loader, 2019+ comes from MEC directly and the mirror supplies earlier years.
 with all_gifts as (
     select
