@@ -13,16 +13,21 @@ models:
       Missouri (FJC). Grain: official. Identity and cross-system ids live here; every fact joins to it.
     columns:
       - name: official_id
+        data_type: varchar
         description: "{{ doc('official_id') }}"
         data_tests: [unique, not_null]
       - name: full_name
+        data_type: varchar
         description: Display name as the authoritative roster prints it (may include suffixes, e.g. "Jr.", "II").
         data_tests: [not_null]
       - name: given_name
+        data_type: varchar
         description: First name (sometimes with middle name); used for name matching.
       - name: family_name
+        data_type: varchar
         description: Surname; used for name matching against sources that only carry names.
       - name: party
+        data_type: varchar
         description: >
           Current party, normalized across sources (mogov.normalize_party): Republican, Democratic,
           Independent or Libertarian. Null for judges and non-partisan offices.
@@ -31,41 +36,57 @@ models:
               arguments:
                 values: ['Republican', 'Democratic', 'Independent', 'Libertarian']
       - name: level
+        data_type: varchar
         description: "{{ doc('level') }}"
         data_tests:
           - accepted_values:
               arguments:
                 values: ['state', 'federal', 'local']
       - name: office
+        data_type: varchar
         description: "{{ doc('office') }}"
         data_tests: [not_null]
       - name: office_title
+        data_type: varchar
         description: Human-readable office, e.g. "State Representative", "Circuit Judge, 22 Judicial Circuit".
       - name: district
+        data_type: varchar
         description: Legislative/congressional district, judicial circuit or court district; null for statewide offices.
       - name: current_term_start
+        data_type: date
         description: Start of the current term where the roster records it (often null for state judges).
       - name: current_term_end
+        data_type: date
         description: Scheduled end of the current term where known.
       - name: openstates_id
+        data_type: varchar
         description: Open States person id (ocd-person/...), when the person is in Open States.
       - name: bioguide_id
+        data_type: varchar
         description: Congressional Biographical Directory id (members of Congress).
       - name: icpsr
+        data_type: integer
         description: ICPSR id, Voteview's member key (members of Congress).
       - name: opensecrets_id
+        data_type: varchar
         description: OpenSecrets (CRP) candidate id (members of Congress).
       - name: votesmart_id
+        data_type: varchar
         description: Vote Smart candidate id (members of Congress).
       - name: wikidata_qid
+        data_type: varchar
         description: Wikidata item id (Q...), from congress-legislators or the Open States roster.
       - name: senate_lis_id
+        data_type: varchar
         description: U.S. Senate LIS member id (senators).
       - name: email
+        data_type: varchar
         description: Public office email from Open States.
       - name: image_url
+        data_type: varchar
         description: Official portrait URL from Open States.
       - name: hometown
+        data_type: varchar
         description: Hometown as Open States records it.
 
   - name: official_profile
@@ -75,6 +96,7 @@ models:
       for a profile page.
     columns:
       - name: official_id
+        data_type: varchar
         description: "{{ doc('official_id') }}"
         data_tests:
           - unique
@@ -84,54 +106,79 @@ models:
                 to: ref('dim_official')
                 field: official_id
       - name: full_name
+        data_type: varchar
         description: As in dim_official.
       - name: party
+        data_type: varchar
         description: As in dim_official.
       - name: level
+        data_type: varchar
         description: "{{ doc('level') }}"
       - name: office
+        data_type: varchar
         description: "{{ doc('office') }}"
       - name: office_title
+        data_type: varchar
         description: As in dim_official.
       - name: district
+        data_type: varchar
         description: As in dim_official.
       - name: is_judge_or_lawyer
+        data_type: boolean
         description: True when fct_legal_careers has any row for the official (drives case-history coverage).
       - name: n_votes
+        data_type: bigint
         description: Rows in fct_votes.
       - name: n_donations
+        data_type: bigint
         description: Rows in fct_campaign_finance.
       - name: n_lobbyist_gifts
+        data_type: bigint
         description: Rows in fct_lobbyist_gifts.
       - name: n_disclosures
+        data_type: bigint
         description: Rows in fct_disclosures.
       - name: n_bias_indicators
+        data_type: bigint
         description: Rows in fct_bias_indicators.
       - name: n_past_offices
+        data_type: bigint
         description: Rows in fct_office_history.
       - name: n_commercial_ties
+        data_type: bigint
         description: Rows in fct_commercial_ties.
       - name: n_family_ties
+        data_type: bigint
         description: Rows in fct_family_ties.
       - name: n_cases
+        data_type: bigint
         description: Rows in fct_case_history.
       - name: n_voluntary_disclosures
+        data_type: bigint
         description: Rows in fct_voluntary_disclosures.
       - name: votes_status
+        data_type: varchar
         description: "{{ doc('coverage_status') }}"
       - name: donations_status
+        data_type: varchar
         description: "{{ doc('coverage_status') }}"
       - name: disclosures_status
+        data_type: varchar
         description: "{{ doc('coverage_status') }}"
       - name: voluntary_disclosures_status
+        data_type: varchar
         description: "{{ doc('coverage_status') }}"
       - name: bias_status
+        data_type: varchar
         description: "{{ doc('coverage_status') }}"
       - name: commercial_ties_status
+        data_type: varchar
         description: "{{ doc('coverage_status') }}"
       - name: family_ties_status
+        data_type: varchar
         description: "{{ doc('coverage_status') }}"
       - name: cases_status
+        data_type: varchar
         description: "{{ doc('coverage_status') }}"
 
   - name: fct_office_history
@@ -148,6 +195,7 @@ models:
             combination_of_columns: [official_id, office_title, start_date]
     columns:
       - name: official_id
+        data_type: varchar
         description: "{{ doc('official_id') }}"
         data_tests:
           - not_null
@@ -156,19 +204,25 @@ models:
                 to: ref('dim_official')
                 field: official_id
       - name: office_title
+        data_type: varchar
         description: >
           Office as the source names it. Official Manual rows hold the whole sentence, e.g. "Appointed to the
           Court of Appeals by Governor Parson in 2021".
         data_tests: [not_null]
       - name: district
+        data_type: varchar
         description: District or seat qualifier where the source has one.
       - name: jurisdiction
+        data_type: varchar
         description: Open States / OCD jurisdiction id, or the source name where there is none (fjc, wikidata...).
       - name: start_date
+        data_type: date
         description: Term start. Official Manual rows only know the year (stored as January 1).
       - name: end_date
+        data_type: date
         description: Term end; null when ongoing or unknown.
       - name: source
+        data_type: varchar
         description: Which source this row came from (openstates, congress-legislators, fjc, wikidata, courtlistener, statewide_officials seed, Missouri Official Manual <edition>).
 
   - name: fct_votes
@@ -183,35 +237,46 @@ models:
             combination_of_columns: [official_id, chamber, vote_id]
     columns:
       - name: official_id
+        data_type: varchar
         description: "{{ doc('official_id') }}"
         data_tests: [not_null]
       - name: full_name
+        data_type: varchar
         description: As in dim_official.
       - name: chamber
+        data_type: varchar
         description: "`state_house`, `state_senate`, `us_house` or `us_senate`."
       - name: session_code
+        data_type: varchar
         description: MO House session code (YY + type, e.g. 251), Senate journal year, or Congress number.
       - name: vote_id
+        data_type: varchar
         description: Identifier of the roll call within the chamber (unique per chamber).
       - name: vote_date
+        data_type: date
         description: Date of the vote.
       - name: measure
+        data_type: varchar
         description: Bill or resolution voted on (e.g. "HCS HB 10"), where the record names one.
       - name: vote_description
+        data_type: varchar
         description: What was voted on - the House calendar item, the Senate journal sentence introducing the vote, or Voteview's description.
       - name: vote_cast
+        data_type: varchar
         description: "{{ doc('vote_cast') }}"
         data_tests:
           - accepted_values:
               arguments:
                 values: ['yea', 'nay', 'present', 'absent', 'absent with leave', 'not voting']
       - name: party_at_vote
+        data_type: varchar
         description: Party of the official when the vote was cast (state) or current party (federal), normalized as in dim_official.party.
         data_tests:
           - accepted_values:
               arguments:
                 values: ['Republican', 'Democratic', 'Independent', 'Libertarian']
       - name: source_url
+        data_type: varchar
         description: "{{ doc('source_url') }}"
 
   - name: fct_federal_votes
@@ -225,30 +290,43 @@ models:
             combination_of_columns: [official_id, congress, chamber, rollnumber]
     columns:
       - name: official_id
+        data_type: varchar
         description: "{{ doc('official_id') }}"
       - name: full_name
+        data_type: varchar
         description: As in dim_official.
       - name: congress
+        data_type: integer
         description: Congress number (119 = 2025-2027).
       - name: chamber
+        data_type: varchar
         description: "`House` or `Senate` (Voteview spelling)."
       - name: rollnumber
+        data_type: integer
         description: Roll-call number within the congress and chamber.
       - name: vote_date
+        data_type: date
         description: Date of the vote.
       - name: bill_number
+        data_type: varchar
         description: Bill number, when the vote was on a bill.
       - name: vote_question
+        data_type: varchar
         description: Question put to the chamber (e.g. "On Passage").
       - name: vote_desc
+        data_type: varchar
         description: Voteview's short description of the measure.
       - name: dtl_desc
+        data_type: varchar
         description: Voteview's detailed description, where present.
       - name: vote_result
+        data_type: varchar
         description: Outcome of the roll call (e.g. "Passed").
       - name: vote_cast
+        data_type: varchar
         description: "{{ doc('vote_cast') }}"
       - name: source_url
+        data_type: varchar
         description: "{{ doc('source_url') }}"
 
   - name: fct_campaign_finance
@@ -260,36 +338,48 @@ models:
       summarized in fct_federal_donor_summary instead of listed. Grain: one itemized transaction.
     columns:
       - name: official_id
+        data_type: varchar
         description: "{{ doc('official_id') }}"
       - name: direction
+        data_type: varchar
         description: "`received` = money given to the official's committee; `given` = contributions made by the official's committee or leadership PAC."
         data_tests:
           - accepted_values:
               arguments:
                 values: ['received', 'given']
       - name: level
+        data_type: varchar
         description: "`federal` (FEC) or `state` (MEC)."
       - name: transaction_date
+        data_type: date
         description: Date of the contribution as reported.
       - name: amount
+        data_type: decimal(28,6)
         description: Amount in USD. Negative values are refunds/corrections as filed.
       - name: counterparty
+        data_type: varchar
         description: The other party - the donor for `received`, the recipient for `given`.
       - name: counterparty_organization
+        data_type: varchar
         description: Donor's employer/company, or the connected organization of a giving PAC.
       - name: counterparty_type
+        data_type: varchar
         description: >
           Kind of counterparty. MEC: Individual / Committee / Organization / Corporation; given rows:
           "committee or candidate", "candidate committee" or "charity". FEC received rows carry the giving
           committee's type as FEC names it (seed fec_committee_types), e.g. "PAC - qualified", "Party -
           qualified", "House", "Hybrid PAC (with Non-Contribution Account) - Qualified".
       - name: kind
+        data_type: varchar
         description: Free-text description of the transaction (e.g. "monetary to Friends of X", "direct contribution").
       - name: source
+        data_type: varchar
         description: "`FEC`, `MEC`, or `MEC (via Accountability Project)`."
       - name: match_confidence
+        data_type: varchar
         description: "{{ doc('match_confidence') }}"
       - name: source_url
+        data_type: varchar
         description: "{{ doc('source_url') }}"
 
   - name: fct_federal_donor_summary
@@ -305,16 +395,22 @@ models:
             combination_of_columns: [official_id, cycle, aggregate_kind, bucket]
     columns:
       - name: official_id
+        data_type: varchar
         description: "{{ doc('official_id') }}"
       - name: cycle
+        data_type: integer
         description: Two-year election cycle (e.g. 2026).
       - name: aggregate_kind
+        data_type: varchar
         description: "`cycle total`, `by_employer`, `by_size` or `by_state`."
       - name: bucket
+        data_type: varchar
         description: The metric (for cycle totals, e.g. "total receipts") or the group (an employer, a size band, a state).
       - name: total
+        data_type: decimal(28,6)
         description: USD.
       - name: contribution_count
+        data_type: bigint
         description: Number of contributions in the bucket (aggregates only).
 
   - name: fct_lobbyist_gifts
@@ -325,28 +421,40 @@ models:
       reported expenditure; rows whose recipient name fits more than one official are dropped.
     columns:
       - name: official_id
+        data_type: varchar
         description: "{{ doc('official_id') }}"
       - name: expenditure_date
+        data_type: date
         description: Date of the expenditure.
       - name: expenditure_year
+        data_type: bigint
         description: Year of expenditure_date.
       - name: amount
+        data_type: decimal(28,6)
         description: USD.
       - name: lobbyist_name
+        data_type: varchar
         description: Reporting lobbyist.
       - name: lobbyist_principal
+        data_type: varchar
         description: The organization the lobbyist was paid to represent.
       - name: expenditure_category
+        data_type: varchar
         description: Category as filed (Meals, Food & Beverage / Travel / Gift / Entertainment / ...); capitalization differs between the two sources.
       - name: description
+        data_type: varchar
         description: Lobbyist's description of the expenditure.
       - name: recipient_title
+        data_type: varchar
         description: Recipient's role as reported (REPRESENTATIVE, SENATOR, SPOUSE OR CHILD, ...).
       - name: recipient_raw
+        data_type: varchar
         description: Recipient as written on the report ("LAST, FIRST").
       - name: match_confidence
+        data_type: varchar
         description: "{{ doc('match_confidence') }}"
       - name: source
+        data_type: varchar
         description: "`MEC lobbyist reports` or `MEC lobbyist reports (via Accountability Project)`."
 
   - name: fct_disclosures
@@ -358,24 +466,34 @@ models:
       disclosed item; scanned filings appear once with section "document (not text-extractable...)".
     columns:
       - name: official_id
+        data_type: varchar
         description: "{{ doc('official_id') }}"
       - name: disclosure_type
+        data_type: varchar
         description: "`U.S. House financial disclosure`, `U.S. Senate financial disclosure` or `Federal judicial financial disclosure (AO-10)`."
       - name: filing_kind
+        data_type: varchar
         description: Report kind - annual report, periodic transaction report, amendment, candidate report, extension request...
       - name: report_year
+        data_type: integer
         description: Calendar year the report covers.
       - name: filing_date
+        data_type: date
         description: Date filed (null for AO-10 rows).
       - name: section
+        data_type: varchar
         description: "Report part the item sits in (e.g. \"A: assets\", \"Part 8. Positions\", \"investment\")."
       - name: owner
+        data_type: varchar
         description: Whose item it is, as the form codes it - SP/Spouse, DC/Child, JT/Joint, Self; blank on forms without an owner column.
       - name: amount
+        data_type: varchar
         description: Value as disclosed - usually a range band ("$15,001 - $50,000") or an AO-10 letter code, not a number.
       - name: description
+        data_type: varchar
         description: The item text (asset, income source, position, transaction...).
       - name: document_url
+        data_type: varchar
         description: Link to the filed report.
 
   - name: fct_voluntary_disclosures
@@ -385,14 +503,19 @@ models:
       seeds/voluntary_disclosures.csv and matched by name. Grain: one disclosure.
     columns:
       - name: official_id
+        data_type: varchar
         description: "{{ doc('official_id') }}"
       - name: disclosure_date
+        data_type: date
         description: Date published.
       - name: kind
+        data_type: varchar
         description: Kind of disclosure as curated.
       - name: description
+        data_type: varchar
         description: What was disclosed.
       - name: source_url
+        data_type: varchar
         description: "{{ doc('source_url') }}"
 
   - name: fct_bias_indicators
@@ -409,20 +532,26 @@ models:
             combination_of_columns: [official_id, indicator, period, detail]
     columns:
       - name: official_id
+        data_type: varchar
         description: "{{ doc('official_id') }}"
       - name: indicator
+        data_type: varchar
         description: Which measure (see the model description).
         data_tests:
           - accepted_values:
               arguments:
                 values: ['dw_nominate_dim1', 'shor_mccarty_np', 'acu_rating', 'party_unity_pct']
       - name: value
+        data_type: double
         description: The score, on the indicator's own scale.
       - name: period
+        data_type: integer
         description: Congress number (DW-NOMINATE), last year served (Shor-McCarty), rating year (ACU); null for party unity (computed over all loaded votes).
       - name: detail
+        data_type: varchar
         description: Context for the value (chamber, years served, number of party-line votes).
       - name: source_url
+        data_type: varchar
         description: "{{ doc('source_url') }}"
 
   - name: fct_commercial_ties
@@ -433,20 +562,28 @@ models:
       per Wikidata. Personal holdings (stocks, funds) stay in fct_disclosures. Grain: one tie as disclosed.
     columns:
       - name: official_id
+        data_type: varchar
         description: "{{ doc('official_id') }}"
       - name: tie_kind
+        data_type: varchar
         description: "`position held`, `income source`, `compensation source`, `agreement`, or a Wikidata relation (`employer`, `chief executive of`, `board member of`, `founder of`, ...)."
       - name: whose
+        data_type: varchar
         description: "`self`, `spouse` or `dependent` (from the disclosure's owner code)."
       - name: detail
+        data_type: varchar
         description: The organization / description as disclosed.
       - name: as_of_year
+        data_type: integer
         description: Report year of the disclosure (null for Wikidata).
       - name: is_latest_report
+        data_type: boolean
         description: True when the row comes from the official's most recent disclosure year (always true for Wikidata) - filter on it for "current" ties.
       - name: source
+        data_type: varchar
         description: Disclosure type or `Wikidata`.
       - name: source_url
+        data_type: varchar
         description: "{{ doc('source_url') }}"
 
   - name: fct_family_ties
@@ -457,18 +594,25 @@ models:
       extend this but is not machine-accessible. Grain: one (relative, role) as reported.
     columns:
       - name: official_id
+        data_type: varchar
         description: "{{ doc('official_id') }}"
       - name: relation
+        data_type: varchar
         description: Relationship to the official (spouse, child, sibling, father, mother, relative, partner, dependent).
       - name: relative_name
+        data_type: varchar
         description: Relative's name (Wikidata only; disclosures don't name the spouse).
       - name: role
+        data_type: varchar
         description: The relative's role - a leadership role, `public office`, or the disclosure tie kind (e.g. `income source`).
       - name: organization
+        data_type: varchar
         description: The organization led / office held / income source disclosed.
       - name: source
+        data_type: varchar
         description: "`Wikidata` or the disclosure type."
       - name: source_url
+        data_type: varchar
         description: "{{ doc('source_url') }}"
 
   - name: fct_legal_careers
@@ -482,12 +626,16 @@ models:
             combination_of_columns: [official_id, legal_role, evidence]
     columns:
       - name: official_id
+        data_type: varchar
         description: "{{ doc('official_id') }}"
       - name: legal_role
+        data_type: varchar
         description: "`judge` or `lawyer`."
       - name: evidence
+        data_type: varchar
         description: The roster office title, biography sentence or Wikidata fact that supports the role.
       - name: source
+        data_type: varchar
         description: Where the evidence came from (judicial roster, Missouri Official Manual <edition>, MO House member page <session>, FJC Biographical Directory, Wikidata).
 
   - name: fct_case_history
@@ -504,22 +652,31 @@ models:
             combination_of_columns: [official_id, role, source_url]
     columns:
       - name: official_id
+        data_type: varchar
         description: "{{ doc('official_id') }}"
       - name: role
+        data_type: varchar
         description: "`judge` (authored or sat on the panel) or `attorney` (named as counsel in the opinion)."
       - name: case_name
+        data_type: varchar
         description: Case caption.
       - name: court
+        data_type: varchar
         description: Court name.
       - name: court_id
+        data_type: varchar
         description: CourtListener court id (mo, moctapp, moctapped, moctappwd, moctappsd, moed, mowd, ca8).
       - name: docket_number
+        data_type: varchar
         description: Court's docket number.
       - name: date_filed
+        data_type: date
         description: Date the opinion was filed.
       - name: disposition
+        data_type: varchar
         description: CourtListener's disposition field, verbatim (free text, e.g. "AFFIRMED IN PART; REVERSED IN PART AND REMANDED").
       - name: outcome
+        data_type: varchar
         description: >
           The decision in a fixed vocabulary (mogov.classify_outcome): affirmed, reversed, reversed and
           remanded, affirmed in part, reversed in part, vacated, remanded, dismissed, writ granted, writ
@@ -533,12 +690,16 @@ models:
                 values: ['affirmed', 'reversed', 'reversed and remanded', 'affirmed in part, reversed in part',
                          'vacated', 'remanded', 'dismissed', 'writ granted', 'writ denied', 'transferred', 'other']
       - name: judges_text
+        data_type: varchar
         description: Judges as printed in the opinion.
       - name: attorneys_text
+        data_type: varchar
         description: Counsel as printed in the opinion.
       - name: publication_status
+        data_type: varchar
         description: "`Published` or `Unpublished` (precedential status)."
       - name: source_url
+        data_type: varchar
         description: "{{ doc('source_url') }}"
 
   - name: fct_campaign_spending
@@ -550,6 +711,7 @@ models:
       other committees, which fct_campaign_finance also lists as `given`.
     columns:
       - name: official_id
+        data_type: varchar
         description: "{{ doc('official_id') }}"
         data_tests:
           - not_null
@@ -558,28 +720,40 @@ models:
                 to: ref('dim_official')
                 field: official_id
       - name: expenditure_date
+        data_type: date
         description: Date paid, as reported.
       - name: amount
+        data_type: decimal(28,6)
         description: USD. Negative values are refunds/corrections as filed.
       - name: payee_name
+        data_type: varchar
         description: Who was paid (company, or person's name).
       - name: payee_city
+        data_type: varchar
         description: Payee city as reported.
       - name: payee_state
+        data_type: varchar
         description: Payee state as reported.
       - name: purpose
+        data_type: varchar
         description: Purpose as the committee described it (e.g. "Newspaper Insert for Election", "Postage").
       - name: expenditure_type
+        data_type: varchar
         description: How it was paid (e.g. "Paid", "Credit" / in-kind), as reported.
       - name: committee_name
+        data_type: varchar
         description: The official's committee that spent the money.
       - name: mec_committee_id
+        data_type: varchar
         description: MEC committee id (MECID).
       - name: match_confidence
+        data_type: varchar
         description: "{{ doc('match_confidence') }}"
       - name: source
+        data_type: varchar
         description: "`MEC` or `MEC (via Accountability Project)`."
       - name: source_url
+        data_type: varchar
         description: "{{ doc('source_url') }}"
 
   - name: fct_campaign_reports
@@ -596,6 +770,7 @@ models:
             combination_of_columns: [official_id, report_id]
     columns:
       - name: official_id
+        data_type: varchar
         description: "{{ doc('official_id') }}"
         data_tests:
           - not_null
@@ -604,42 +779,62 @@ models:
                 to: ref('dim_official')
                 field: official_id
       - name: committee_name
+        data_type: varchar
         description: The official's committee that filed the report.
       - name: mec_committee_id
+        data_type: varchar
         description: MEC committee id (MECID).
       - name: report_id
+        data_type: varchar
         description: MEC report id; amendments get their own.
       - name: report_name
+        data_type: varchar
         description: Report as MEC names it (e.g. "October Quarterly Report", "AMENDED April Quarterly Report", "8 Day Before General Election-11/3/2026").
       - name: report_year
+        data_type: integer
         description: Year the report belongs to.
       - name: report_type
+        data_type: varchar
         description: "`Full Disclosure`, `Limited Activity`, `Termination`, ..."
       - name: contributions_received
+        data_type: decimal(28,6)
         description: Monetary contributions received this period (USD).
       - name: loans_received
+        data_type: decimal(28,6)
         description: Loans received this period (USD).
       - name: misc_receipts
+        data_type: decimal(28,6)
         description: Other receipts this period, e.g. interest and refunds (USD).
       - name: inkind_contributions_received
+        data_type: decimal(28,6)
         description: In-kind contributions received this period (USD value).
       - name: total_receipts_this_election
+        data_type: decimal(28,6)
         description: All receipts for the election to date, including this period (USD).
       - name: expenditures_this_period
+        data_type: decimal(28,6)
         description: Expenditures this period (USD).
       - name: total_expenditures_this_election
+        data_type: decimal(28,6)
         description: Expenditures for the election to date (USD).
       - name: contributions_made_this_period
+        data_type: decimal(28,6)
         description: Contributions the committee made to others this period (USD).
       - name: total_contributions_made_this_election
+        data_type: decimal(28,6)
         description: Contributions made to others for the election to date (USD).
       - name: starting_money_on_hand
+        data_type: decimal(28,6)
         description: Cash on hand at the start of the period (USD).
       - name: ending_money_on_hand
+        data_type: decimal(28,6)
         description: Cash on hand at the end of the period (USD) - "money in the bank".
       - name: outstanding_indebtedness
+        data_type: decimal(28,6)
         description: Debt owed at the end of the period (USD).
       - name: match_confidence
+        data_type: varchar
         description: "{{ doc('match_confidence') }}"
       - name: source_url
+        data_type: varchar
         description: "{{ doc('source_url') }}"

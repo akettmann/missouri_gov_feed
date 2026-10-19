@@ -64,8 +64,8 @@ select
     cycle,
     aggregate_kind,
     bucket,
-    sum(total) as total,
-    sum(contribution_count) as contribution_count
+    cast(sum(total) as {{ dbt.type_numeric() }}) as total,
+    cast(sum(contribution_count) as {{ dbt.type_bigint() }}) as contribution_count
 from (
     select
         official_id,

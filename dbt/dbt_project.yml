@@ -21,6 +21,11 @@ models:
     marts:
       +schema: marts
       +materialized: table
+      # The marts are the interface for consumers (the frontend): their column names and types are a
+      # contract (data_type per column in marts/_marts.yml), and a build that changes them fails.
+      # Types are DuckDB's; a new backend means re-declaring them.
+      +contract:
+        enforced: true
       # descriptions become table/column comments in the warehouse, so consumers see them without dbt
       +persist_docs:
         relation: true
