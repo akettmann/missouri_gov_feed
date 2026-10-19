@@ -15,6 +15,7 @@ DuckDB backend
 Use compatible constructs from DBT to make switching backends possible
 linting: SqlFluff
 if useful, add dbt-utils and dbt-expectations to the DBT project
+Follow DBT's best practices https://docs.getdbt.com/best-practices?version=2
 ## Loader processes
 Loaders are processes that fetch raw data and write it to our raw storage.
 They will be:
