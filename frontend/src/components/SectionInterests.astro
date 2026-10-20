@@ -1,8 +1,9 @@
 ---
-// Section E: personal interests. Current commercial ties (latest report only), family ties, and the list of
-// disclosure filings so a reader can open the original documents.
+// Section E: personal interests. Family ties, and, where a financial disclosure exists (federal officials),
+// current commercial ties (latest report only) and the filings themselves. Commercial ties and filings are
+// left out entirely when there are none, rather than shown as "not public" (format.ts HIDE_UNLESS_AVAILABLE).
 import type { OfficialBundle } from "../lib/exports/types";
-import { count, statusKind } from "../lib/format";
+import { count } from "../lib/format";
 import SourceLink from "./SourceLink.astro";
 
 interface Props {
@@ -10,48 +11,47 @@ interface Props {
 }
 const { interests: x } = Astro.props.bundle;
 const FILINGS_SHOWN = 25;
+const disclosed = x.commercial_ties.length > 0 || x.filings.length > 0;
 ---
 
 <section class="card" id="interests" aria-labelledby="interests-h">
   <h2 id="interests-h">Personal interests</h2>
   <p class="lede">
-    Business positions, income sources and agreements from the most recent disclosure, plus family ties.
+    {disclosed
+      ? "Business positions, income sources and agreements from the most recent financial disclosure, plus family ties."
+      : "Family ties found in public records."}
   </p>
 
-  <h3>Commercial ties (latest report)</h3>
-  {x.commercial_ties.length === 0 ? (
-    <p class="muted small">
-      {statusKind(x.commercial_ties_status) === "available"
-        ? "None in the latest report."
-        : x.commercial_ties_status}
-    </p>
-  ) : (
-    <div class="table-scroll">
-      <table>
-        <thead>
-          <tr>
-            <th>Kind</th>
-            <th>Whose</th>
-            <th>Detail</th>
-            <th>Year</th>
-            <th>Source</th>
-          </tr>
-        </thead>
-        <tbody>
-          {x.commercial_ties.map((t) => (
+  {x.commercial_ties.length > 0 && (
+    <>
+      <h3>Commercial ties (latest report)</h3>
+      <div class="table-scroll">
+        <table>
+          <thead>
             <tr>
-              <td>{t.tie_kind}</td>
-              <td>{t.whose}</td>
-              <td class="detail">{t.detail}</td>
-              <td>{t.as_of_year}</td>
-              <td>
-                <SourceLink url={t.source_url} label={t.source} />
-              </td>
+              <th>Kind</th>
+              <th>Whose</th>
+              <th>Detail</th>
+              <th>Year</th>
+              <th>Source</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {x.commercial_ties.map((t) => (
+              <tr>
+                <td>{t.tie_kind}</td>
+                <td>{t.whose}</td>
+                <td class="detail">{t.detail}</td>
+                <td>{t.as_of_year}</td>
+                <td>
+                  <SourceLink url={t.source_url} label={t.source} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   )}
 
   <h3>Family ties</h3>
@@ -70,47 +70,47 @@ const FILINGS_SHOWN = 25;
     </ul>
   )}
 
-  <h3>Disclosure filings</h3>
-  {x.filings.length === 0 ? (
-    <p class="muted small">{x.disclosures_status}</p>
-  ) : (
-    <details open={x.filings.length <= 6}>
-      <summary class="small">{count(x.filings.length)} filings</summary>
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Year</th>
-              <th>Filing</th>
-              <th>Filed</th>
-              <th class="num">Items</th>
-              <th>Document</th>
-            </tr>
-          </thead>
-          <tbody>
-            {x.filings.slice(0, FILINGS_SHOWN).map((f) => (
+  {x.filings.length > 0 && (
+    <>
+      <h3>Disclosure filings</h3>
+      <details open={x.filings.length <= 6}>
+        <summary class="small">{count(x.filings.length)} filings</summary>
+        <div class="table-scroll">
+          <table>
+            <thead>
               <tr>
-                <td>{f.report_year}</td>
-                <td>
-                  {f.disclosure_type}
-                  {f.filing_kind && <span class="muted">, {f.filing_kind}</span>}
-                </td>
-                <td>{f.filing_date}</td>
-                <td class="num">{count(f.n_items)}</td>
-                <td>
-                  <SourceLink url={f.document_url} label="open" />
-                </td>
+                <th>Year</th>
+                <th>Filing</th>
+                <th>Filed</th>
+                <th class="num">Items</th>
+                <th>Document</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {x.filings.length > FILINGS_SHOWN && (
-        <p class="small muted">
-          Showing the {FILINGS_SHOWN} most recent; all are in this official's JSON download.
-        </p>
-      )}
-    </details>
+            </thead>
+            <tbody>
+              {x.filings.slice(0, FILINGS_SHOWN).map((f) => (
+                <tr>
+                  <td>{f.report_year}</td>
+                  <td>
+                    {f.disclosure_type}
+                    {f.filing_kind && <span class="muted">, {f.filing_kind}</span>}
+                  </td>
+                  <td>{f.filing_date}</td>
+                  <td class="num">{count(f.n_items)}</td>
+                  <td>
+                    <SourceLink url={f.document_url} label="open" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {x.filings.length > FILINGS_SHOWN && (
+          <p class="small muted">
+            Showing the {FILINGS_SHOWN} most recent; all are in this official's JSON download.
+          </p>
+        )}
+      </details>
+    </>
   )}
 </section>
 

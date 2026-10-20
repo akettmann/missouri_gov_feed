@@ -1,7 +1,7 @@
 // Side-by-side rows for the compare page, computed from two per-official bundles. Pure (runs in the browser).
 // Every row is one measured or published number; nothing is combined into a score.
 import type { OfficialBundle } from "./exports/types";
-import { count, money, pct, statusKind } from "./format";
+import { count, HIDE_UNLESS_AVAILABLE, money, pct, statusKind } from "./format";
 import { indicatorMeta } from "./indicators";
 import { withoutMedium } from "./rollups";
 
@@ -105,25 +105,30 @@ export function compareRows(bundles: OfficialBundle[], hideMedium: boolean): Com
   rows.push({ section: "Lobbyist gifts", label: "Total", values: g.map((x) => x[0]) });
   rows.push({ section: "Lobbyist gifts", label: "Largest principal", values: g.map((x) => x[1]) });
 
-  rows.push({
-    section: "Personal interests",
-    label: "Commercial ties (latest report)",
-    values: each((b) =>
-      statusKind(b.interests.commercial_ties_status) === "available"
-        ? count(b.interests.commercial_ties.length)
-        : b.interests.commercial_ties_status,
-    ),
-  });
+  // disclosures and commercial ties exist for federal officials only: show a row only if one side has data
+  const anyAvailable = (key: string) =>
+    bundles.some((b) => statusKind(b.coverage.find((x) => x.key === key)?.status ?? "") === "available");
+  if (anyAvailable("commercial_ties"))
+    rows.push({
+      section: "Personal interests",
+      label: "Commercial ties (latest report)",
+      values: each((b) =>
+        statusKind(b.interests.commercial_ties_status) === "available"
+          ? count(b.interests.commercial_ties.length)
+          : NA,
+      ),
+    });
   rows.push({
     section: "Personal interests",
     label: "Family ties",
     values: each((b) => count(b.interests.family_ties.length)),
   });
   for (const c of bundles[0]?.coverage ?? [])
-    rows.push({
-      section: "Coverage",
-      label: c.label,
-      values: each((b) => b.coverage.find((x) => x.key === c.key)?.status ?? NA),
-    });
+    if (!HIDE_UNLESS_AVAILABLE.includes(c.key) || anyAvailable(c.key))
+      rows.push({
+        section: "Coverage",
+        label: c.label,
+        values: each((b) => b.coverage.find((x) => x.key === c.key)?.status ?? NA),
+      });
   return rows;
 }

@@ -30,6 +30,14 @@ export function sessionLabel(chamber: string, code: string): string {
 
 export const pct = (n: number | null | undefined, digits = 1) => (n == null ? "—" : `${n.toFixed(digits)}%`);
 
+/**
+ * Coverage categories shown only where an official actually has data. Disclosures and business ties exist for
+ * federal officials only; for everyone else they'd be a row of "not public", so they're hidden instead.
+ */
+export const HIDE_UNLESS_AVAILABLE = ["disclosures", "commercial_ties"];
+export const visibleCoverage = <T extends { key: string; status: string }>(items: T[]) =>
+  items.filter((c) => !HIDE_UNLESS_AVAILABLE.includes(c.key) || statusKind(c.status) === "available");
+
 export const isMedium = (confidence: string | null | undefined) => confidence === "medium";
 
 export const LEVELS: Record<string, string> = { state: "State", federal: "Federal", local: "Local" };
