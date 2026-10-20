@@ -20,6 +20,3 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
 ## Medium priority
 
 ## Low priority
-- [ ] When going public (the site will be public; development stays local for now): create the bucket
-  (docs/environment.md "Publishing to Google Cloud Storage") and run `MOGOV_SITE_BUCKET=... pnpm deploy:gcs`;
-  the script and docs are ready
