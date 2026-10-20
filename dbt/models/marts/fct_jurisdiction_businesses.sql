@@ -26,7 +26,12 @@ donors as (
         {{ mogov.company_key("coalesce(nullif(trim(counterparty_organization), ''), counterparty)") }} as donor_key,
         min(coalesce(nullif(trim(counterparty_organization), ''), counterparty)) as donor_name,
         sum(amount) as amount,
-        count(*) as n_contributions
+        count(*) as n_contributions,
+        min(extract(year from transaction_date)) as first_year,
+        max(extract(year from transaction_date)) as last_year,
+        min(source_url) as source_url,
+        -- 1 when any of the money was tied to the official by a medium (name-only) match
+        max(case when match_confidence = 'medium' then 1 else 0 end) as is_medium
     from {{ ref('fct_campaign_finance') }}
     where
         direction = 'received'
@@ -93,7 +98,11 @@ matches as (
         max(m.by_name) as by_name,
         min(d.donor_name) as donor_name,
         min(d.amount) as amount,
-        min(d.n_contributions) as n_contributions
+        min(d.n_contributions) as n_contributions,
+        min(d.first_year) as first_year,
+        min(d.last_year) as last_year,
+        min(d.source_url) as source_url,
+        min(d.is_medium) as is_medium
     from matched_donors as m
     inner join donors as d on m.official_id = d.official_id and m.donor_key = d.donor_key
     group by m.official_id, m.registry_id, m.donor_key
@@ -106,7 +115,11 @@ per_facility as (
         case when max(by_name) = 1 then 'same name' else 'same company' end as matched_by,
         {{ dbt.listagg('donor_name', "'; '", 'order by donor_name') }} as donor_names,
         sum(amount) as donated_amount,
-        sum(n_contributions) as n_contributions
+        sum(n_contributions) as n_contributions,
+        min(first_year) as first_year,
+        max(last_year) as last_year,
+        min(source_url) as source_url,
+        case when max(is_medium) = 1 then 'medium' else 'high' end as match_confidence
     from matches
     group by official_id, registry_id
 )
@@ -128,6 +141,10 @@ select
     m.donor_names,
     m.donated_amount,
     m.n_contributions,
+    cast(m.first_year as {{ dbt.type_int() }}) as first_year,
+    cast(m.last_year as {{ dbt.type_int() }}) as last_year,
+    m.match_confidence,
+    m.source_url as contributions_url,
     f.frs_url
 from areas as a
 inner join {{ ref('fct_district_facilities') }} as f

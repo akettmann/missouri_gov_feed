@@ -203,6 +203,36 @@ export interface InterestOverlap {
   }[];
 }
 
+/** A company that gave to the official and has EPA-regulated sites in their area (fct_jurisdiction_businesses). */
+export interface DistrictDonor {
+  /** the matched contributors as filed, "; "-separated */
+  donor_names: string;
+  /** the official's total from those contributors (all years loaded), not per site */
+  donated_amount: number;
+  n_contributions: number;
+  first_year: number | null;
+  last_year: number | null;
+  /** about who received the money (medium = tied to the official by name only), not the site match */
+  match_confidence: string;
+  contributions_url: string | null;
+  sites: {
+    facility_name: string | null;
+    city: string | null;
+    naics_description: string | null;
+    /** "same name" or "same company" (a brand from the company_brands seed) */
+    matched_by: string;
+    frs_url: string | null;
+  }[];
+}
+
+/** EPA-regulated sites in the official's area per NAICS sector (rpt_district_business_industries). */
+export interface DistrictIndustry {
+  sector_code: string | null;
+  sector_name: string;
+  n_sites: number;
+  n_donor_sites: number;
+}
+
 /** A dataset is either real (from an export) or a labelled stand-in until the dbt model exists. */
 export interface Dataset<T> {
   sample: boolean;
@@ -254,6 +284,11 @@ export interface OfficialBundle {
     top_donors: Dataset<TopDonorRow>;
   };
   gifts: Dataset<GiftRollupRow>;
+  /**
+   * Businesses in the official's district or city; null when either export is missing. Officials elected
+   * statewide (and judges) have no area, so both lists are empty.
+   */
+  businesses: { donors: DistrictDonor[]; industries: DistrictIndustry[] } | null;
   interests: {
     commercial_ties: CommercialTie[];
     family_ties: FamilyTie[];

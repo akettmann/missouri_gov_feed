@@ -25,4 +25,10 @@
   top contributors (one hop back, from `mec_cd1_a` / TAP contributions where the contributor is itself a committee),
   so the frontend can show who funds pass-through PACs (FRONTEND_TODO, `/pacs/` follow-up). Mark nonprofits that
   don't disclose donors as the end of the trail
+- [ ] EPA FRS sites mostly have no NAICS code (149k of 218k official-site rows in `fct_jurisdiction_businesses`,
+  October 2026), so `rpt_district_business_industries` puts most sites under "No industry code". FRS program
+  records also carry SIC codes (the state zip's `MO_SIC_FILE.CSV`, not landed yet); landing it and mapping SIC to a
+  NAICS sector would classify more sites
+- [ ] `docs/diagrams/lineage.puml` doesn't show the EPA FRS chain (`fct_district_facilities`,
+  `fct_jurisdiction_businesses`, `rpt_district_business_industries`); add it
 - [ ] PlantUML in Github doesn't seem to have dot installed. Can we use the new Javascript transpile of plantuml?

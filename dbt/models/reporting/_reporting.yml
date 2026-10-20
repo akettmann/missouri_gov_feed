@@ -558,6 +558,52 @@ models:
         data_type: varchar
         description: "{{ doc('source_url') }}"
 
+  - name: rpt_district_business_industries
+    description: >
+      EPA-regulated business sites (fct_jurisdiction_businesses) in each district-elected official's area,
+      counted by NAICS sector (naics_sectors seed, from the site's primary NAICS code), with how many are tied to
+      a donor. The donor sites themselves are listed in fct_jurisdiction_businesses (is_donor). EPA FRS covers
+      regulated sites only (factories, fuel stations, shops with permits), and most sites carry no NAICS code;
+      those are counted under sector_name "No industry code" with a null sector_code. Grain: one row per
+      (official, sector).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, sector_name]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "n_donor_sites <= n_sites"
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: sector_code
+        data_type: varchar
+        description: NAICS sector code (`31-33` for manufacturing); null for sites with no NAICS code.
+      - name: sector_name
+        data_type: varchar
+        description: NAICS sector title, or "No industry code".
+        data_tests: [not_null]
+      - name: n_sites
+        data_type: bigint
+        description: Sites in the official's area in this sector.
+        data_tests:
+          # sanity: the most sites in any area was 11,089 (a U.S. House district) in October 2026
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 40000
+      - name: n_donor_sites
+        data_type: bigint
+        description: Of those, sites whose name, owner or parent company matches a donor to the official.
+        data_tests: [not_null]
+
 exposures:
   - name: voter_frontend
     label: Missouri officials frontend
@@ -598,3 +644,5 @@ exposures:
       - ref('rpt_donor_size')
       - ref('rpt_donor_employers')
       - ref('rpt_interest_vote_overlap')
+      - ref('fct_jurisdiction_businesses')
+      - ref('rpt_district_business_industries')

@@ -448,6 +448,12 @@ offices, shops and most service businesses are missing.
     sites are filed under legal or subsidiary names ("UNION ELECTRIC CO", "LACLEDE GAS", "SOUTHWESTERN BELL
     TELEPHONE", "KANSAS CITY POWER & LIGHT"). The seed covers the largest corporate donors with Missouri sites.
   - In October 2026: 502 (official, facility) pairs by name and 1,541 more by brand, for 122 officials.
+- Each matched site also carries the matched donors' first and last contribution year, the receiving
+  committee's filing page (`contributions_url`) and `match_confidence` (`medium` when any of that money was tied
+  to the official by name only).
+- `rpt_district_business_industries` counts each official's sites by NAICS sector (`naics_sectors` seed, from
+  the primary NAICS code's first two digits). The profile page ships only the donor sites plus these counts: a
+  U.S. House district holds up to ~10,500 sites, too many for the per-official JSON budget.
 
 Quirks:
 - A few rows fuse two records onto one line (a closing quote is missing: `...,"O"110015893693",...`). DuckDB's
@@ -456,6 +462,8 @@ Quirks:
   under `_fields` and drop out in staging.
 - About a third of the sites (36k of 112k in October 2026) have no coordinates and so no district. 54 have
   coordinates outside Missouri.
+- Most sites carry no NAICS code (149k of 218k (official, site) rows in October 2026), so the largest
+  per-sector group is usually "No industry code".
 - Organization types are mostly `UNKNOWN`, so government sites are also recognized by name ("City of ...",
   "... County", "... School District", "Public Works") as well as by a government org type or federal agency.
 - One owner per facility is kept: owner/operator, then owner, operator, permittee, preferring a known org

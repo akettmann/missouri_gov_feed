@@ -1,0 +1,177 @@
+---
+// Businesses in their area (fct_jurisdiction_businesses + rpt_district_business_industries): EPA-regulated
+// sites in the official's district or city, the companies among them that gave to the official first, then
+// site counts by industry. A company giving to the official for the area it operates in is co-occurrence,
+// not influence, and the source's limits (EPA sites only, exact-name or listed-brand matches) are stated here.
+import ConfidenceBadge from "./ConfidenceBadge.astro";
+import SourceLink from "./SourceLink.astro";
+import type { OfficialBundle } from "../lib/exports/types";
+import { count, money } from "../lib/format";
+import { href } from "../lib/site";
+
+interface Props {
+  bundle: OfficialBundle;
+}
+const { businesses } = Astro.props.bundle;
+const industries = businesses?.industries ?? [];
+const totalSites = industries.reduce((n, i) => n + i.n_sites, 0);
+// bars compare the coded sectors; the uncoded group is usually most of the sites and would flatten them
+const maxSites = Math.max(1, ...industries.filter((i) => i.sector_code).map((i) => i.n_sites));
+const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : `${a}–${b}`);
+---
+
+<section class="card" id="businesses" aria-labelledby="businesses-h">
+  <h2 id="businesses-h">Businesses in their area</h2>
+  <p class="lede">
+    Sites that EPA or a state environmental program regulates in the district or city this official
+    represents, with the companies among them that gave this official campaign money listed first.{" "}
+    <strong>This shows co-occurrence, not influence:</strong> companies often give to the officials who
+    represent the places they operate.{" "}
+    <a href={href("/methodology/#district-businesses")}>How it's matched</a>.
+  </p>
+  {businesses === null ? (
+    <p class="muted small">
+      Not available yet (the fct_jurisdiction_businesses or rpt_district_business_industries export is
+      missing).
+    </p>
+  ) : industries.length === 0 ? (
+    <p class="muted small">
+      Not applicable: this covers officials elected from a district or a city (state legislators, U.S.
+      representatives and mayors). Statewide offices and U.S. senators serve the whole state, and judges are
+      left out (a circuit holds thousands of sites, and judges take almost no money from companies).
+    </p>
+  ) : (
+    <>
+      <p class="small muted limits">
+        Limits: only EPA-regulated sites are listed (factories, fuel stations, utilities, repair shops, farms
+        with permits), so offices, stores and most service businesses are missing. A site counts as a donor's
+        only when the donor's name is the same as the site's, its owner's or its parent company's, or both
+        names carry a brand from a short hand-checked list of large companies (a "Spire PAC" and a "LACLEDE
+        GAS" site). Donors that give under another name are missed.
+      </p>
+      <h3>Companies here that gave to this official</h3>
+      {businesses.donors.length === 0 ? (
+        <p class="muted small">
+          None of the {count(totalSites)} sites matched a donor to this official by name or listed brand.
+        </p>
+      ) : (
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Donor (as filed)</th>
+                <th class="num">Gave this official</th>
+                <th>Years</th>
+                <th>Their sites here</th>
+                <th>Contributions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {businesses.donors.map((d) => (
+                <tr data-confidence={d.match_confidence === "medium" ? "medium" : undefined}>
+                  <td>
+                    {d.donor_names} <ConfidenceBadge confidence={d.match_confidence} />
+                  </td>
+                  <td class="num">
+                    {money(d.donated_amount)}
+                    <span class="muted small">
+                      {" "}
+                      ({count(d.n_contributions)} {d.n_contributions === 1 ? "contribution" : "contributions"}
+                      )
+                    </span>
+                  </td>
+                  <td class="nowrap">{years(d.first_year, d.last_year)}</td>
+                  <td>
+                    <details>
+                      <summary class="small">
+                        {d.sites.length} {d.sites.length === 1 ? "site" : "sites"}
+                      </summary>
+                      <ul class="sites small">
+                        {d.sites.map((s) => (
+                          <li>
+                            {s.facility_name ?? "unnamed site"}
+                            {s.city && <span class="muted">, {s.city}</span>}
+                            {s.naics_description && <span class="muted"> · {s.naics_description}</span>}
+                            {s.matched_by === "same company" && (
+                              <span
+                                class="badge"
+                                title="Tied by a shared brand (company_brands list), not an identical name"
+                              >
+                                same brand
+                              </span>
+                            )}{" "}
+                            · <SourceLink url={s.frs_url} label="EPA record" />
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </td>
+                  <td>
+                    <SourceLink url={d.contributions_url} label="reports" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <h3>All {count(totalSites)} sites by industry</h3>
+      <p class="small muted">
+        NAICS sector of each site's main industry code. Most FRS sites carry no code, so the largest group is
+        often "No industry code".
+      </p>
+      <div class="table-scroll">
+        <table class="industries">
+          <thead>
+            <tr>
+              <th>Industry (NAICS sector)</th>
+              <th class="num">Sites</th>
+              <th class="num">Tied to a donor</th>
+              <th class="bar-col" aria-hidden="true"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {industries.map((i) => (
+              <tr>
+                <td>
+                  {i.sector_name}
+                  {i.sector_code && <span class="muted small"> {i.sector_code}</span>}
+                </td>
+                <td class="num">{count(i.n_sites)}</td>
+                <td class="num">{i.n_donor_sites > 0 ? count(i.n_donor_sites) : "—"}</td>
+                <td class="bar-col" aria-hidden="true">
+                  {i.sector_code && <span class="bar" style={`width: ${(100 * i.n_sites) / maxSites}%`} />}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )}
+</section>
+
+<style>
+  .nowrap {
+    white-space: nowrap;
+  }
+  .limits {
+    max-width: 72ch;
+  }
+  .sites {
+    padding-left: 1rem;
+    margin: 4px 0;
+    max-width: 60ch;
+  }
+  .bar-col {
+    width: 30%;
+    min-width: 80px;
+  }
+  .bar {
+    display: block;
+    height: 10px;
+    margin-top: 6px;
+    border-radius: 2px;
+    background: var(--axis);
+  }
+</style>
