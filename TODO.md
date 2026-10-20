@@ -17,5 +17,5 @@
 ## Low priority
 - [ ] Widen `fct_jurisdiction_businesses` beyond EPA-regulated sites (the `epa_frs` loader, October 2026). Offices, shops and most service businesses are missing. Options:
   - Secretary of State business entity registry: no bulk export. Request an extract under the Sunshine Law (template in docs/sunshine_requests.md). Needs the user to send it
-  - OSHA establishment data (inspections, injury reports): named, addressed sites, mostly the same regulated industries
+  - OSHA injury-tracking (ITA Form 300A) summary data, yearly zips from osha.gov/Establishment-Specific-Injury-and-Illness-Data: 7,913 Missouri establishments in the 2024 file (establishment and company name, street address, ZIP, NAICS, average employees; establishments with 20+ employees in listed industries and all with 250+), so retail, warehouses and health care that FRS lacks. Blocked on a user decision: osha.gov returns 403 to our honest User-Agent (`missouri-gov-feed/0.1 ...`) and serves only browser-like ones; ask OSHA (or use DOL's keyed API) rather than spoof. It has no coordinates, so it also needs geocoding (Census Geocoder batch API, free, 10,000 addresses per request) before the district join
   - Ruled out: the Missouri Accountability Portal's vendor payments have no vendor address; Census County Business Patterns has no company names
