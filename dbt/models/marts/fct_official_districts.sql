@@ -3,13 +3,22 @@
 --                     of the Congress in session)
 --   judicial circuit  circuit and associate circuit judges: every county of their circuit
 --   mayor of          mayors: the place whose name matches their title ("Mayor Of Saint Louis" -> St. Louis)
--- Statewide offices (executives, U.S. senators, Supreme Court) serve every area and have no rows. Courts of
--- appeals and federal district courts are not mapped yet.
+--   appellate district  Court of Appeals judges: every county of the district in their title
+--   federal district  U.S. district judges: every county of E.D. and/or W.D. Mo. (district 'moed', 'mowd',
+--                     'moed+mowd')
+-- Statewide offices (executives, U.S. senators, Supreme Court) and the Eighth Circuit serve every area and have
+-- no rows.
 with officials as (
     select
         official_id,
         office,
+        district,
         {{ dbt.safe_cast('district', dbt.type_int()) }} as district_number,
+        case
+            when lower(office_title) like '%eastern district%' then 'eastern'
+            when lower(office_title) like '%southern district%' then 'southern'
+            when lower(office_title) like '%western district%' then 'western'
+        end as appeals_district,
         {{ mogov.regex_replace_all(
             mogov.regex_replace_all(mogov.name_key('office_title'), '^mayor of ', ''), '^saint ', 'st '
         ) }} as mayor_place_key
@@ -63,3 +72,31 @@ inner join districts as d
         d.district_type = 'place'
         and o.mayor_place_key = d.place_key
 where o.office = 'mayor'
+
+union all
+
+select
+    o.official_id,
+    d.district_id,
+    o.office,
+    'appellate district' as relation
+from officials as o
+inner join districts as d
+    on
+        d.district_type = 'county'
+        and o.appeals_district = d.appeals_district
+where o.office = 'mo_court_of_appeals'
+
+union all
+
+select
+    o.official_id,
+    d.district_id,
+    o.office,
+    'federal district' as relation
+from officials as o
+inner join districts as d
+    on
+        d.district_type = 'county'
+        and {{ dbt.position('d.federal_district', 'o.district') }} > 0
+where o.office = 'us_district_court'

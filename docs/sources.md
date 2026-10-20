@@ -9,6 +9,7 @@ flow diagram in [diagrams/sources](diagrams/sources). Raw tables land under `dat
 |---|---|---|---|---|
 | `mo_house` | Missouri House (documents.house.mo.gov) | members, bills, per-member roll-call votes | `MOGOV_LOOKBACK_YEARS` (default 10; PDFs from 2014) | |
 | `mo_senate` | Missouri Senate journals (senate.mo.gov) | per-senator roll-call votes | `MOGOV_LOOKBACK_YEARS` | |
+| `mo_senate_topics` | Missouri Senate topical index (senate.mo.gov) | Senate bills, subject terms for Senate bills and House bills that reached the Senate | `MOGOV_LOOKBACK_YEARS` (regular sessions) | |
 | `mec` | Missouri Ethics Commission | state campaign contributions and spending, candidate↔committee links, lobbyist gifts | 2023+ | opt-in |
 | `tap_mec` | MEC via The Accountability Project | state campaign finance and lobbyist gifts | 2011–2022 (gifts from 2004) | |
 | `fec` | Federal Election Commission | federal candidates, committees, PAC contributions, donor aggregates | `MOGOV_FEC_CYCLES` | API key for aggregates |
@@ -60,6 +61,12 @@ Quirks:
   `fct_vote_bills` links House votes to bills exactly. About 80% of roll calls belong to a bill; the
   rest are motions and resolutions.
 - Bill sponsors list senators (conferees, handlers) with district 200 + their senate district.
+- Roll-call PDFs are found only through the bill XML, so the loader misses every roll call the XML doesn't
+  nest under a House bill. That includes House votes on Senate bills (third reading, conference reports)
+  and procedural votes ("APPROVE JOURNAL", "PQ"). Only 108 of the 3,873 roll calls landed by October 2026
+  name a Senate measure. The PDFs are numbered per session day (`billsYYS/rollcalls/{day}.{nnn}.pdf`).
+  On day 71 of 2025 the site had roll calls 1–4 and we held only #2. Non-existent numbers answer with an
+  HTML error page, like unknown session codes.
 - PDF text extraction is cached by PDF content (`data/cache/pdftext/`). Before that, a re-run spent
   3–10 minutes per shard re-parsing PDFs that were already downloaded.
 
@@ -81,6 +88,33 @@ Quirks:
   swallow the rest of the journal.
 - PDF parsing (about 3 s per journal) dominates a cold run, so it shards well. The extracted text is
   cached by PDF content, so re-runs skip it.
+
+## mo_senate_topics: Missouri Senate topical index
+
+senate.mo.gov's "Topical Index" (`/BillTracking/bills/keywords?year=YYYY&session=R`) lists every bill of a
+regular session under each subject keyword. It covers all Senate bills and resolutions, plus the House bills
+that reached the Senate. The keywords are the legislature's shared subject index. The House XML only carries
+subjects from 2024, so this fills in earlier sessions. It also adds Senate bills to `fct_bills`, which lets
+`fct_vote_bills` link Senate votes on Senate bills.
+
+- Lands: `mo_senate_bill_topics`, one row per (session, keyword, bill card): keyword, bill label, link,
+  description and sponsors, as the page prints them.
+- Window: `MOGOV_LOOKBACK_YEARS`. Shard units: session years (one page each, 3–6 MB).
+
+Quirks:
+- The page title "TOPICAL INDEX" uses the same heading markup as the keywords. It has no bill cards, so it
+  lands nothing.
+- Extraordinary sessions (`session=E`) have no index; the page comes back empty.
+- Two terms are spelled differently from the House index: "Elementary and Secondary Education, Department
+  of" (House: "…, DEPT. OF") and "Workers' Compensation" (House: no apostrophe). Staging maps them to the
+  House spelling.
+- The Senate indexes House bills a little differently from the House: for the 486 House bills in both
+  (2024–26), 1,576 of the Senate's 2,807 terms match the House's 2,092. A House bill keeps the House's own
+  terms where it has them (`fct_bill_subjects.subject_source`).
+- A House bill that never reached the Senate has no Senate entry, so House bills before 2024 that died in
+  the House still have no subjects.
+- The House export doesn't name its roll calls on Senate bills, so House votes on Senate bills aren't
+  linked to a bill.
 
 ## mec: Missouri Ethics Commission (opt-in)
 
@@ -104,8 +138,13 @@ Quirks:
   `quote` and `escape` explicitly.
 - Elections with no candidates return the search page instead of a table. These are logged as
   `mec.crosswalk_empty`.
-- In October 2026 the election-year dropdown listed no election dates for 2016 and 2018
-  (`mec.crosswalk_no_elections`). Such a year is no longer cached, so it is retried on every run.
+- The election search only goes back to 2020: in October 2026 its year dropdown offered 2020–2034.
+  Asking for 2016 or 2018 returned no election dates (`mec.crosswalk_no_elections` on every run).
+  The default `MOGOV_MEC_CROSSWALK_YEARS` now starts at 2020. Years the dropdown doesn't offer are
+  skipped and logged as `mec.crosswalk_year_not_offered`. Those years never returned rows, so nothing
+  was lost, but committees first registered for a pre-2020 election are only linked to an official if
+  they also filed for a later one. An offered year with no dates is still logged as
+  `mec.crosswalk_no_elections` and not cached.
 - MEC answers in under a second (the lobbyist search takes about 13 s). The fixed `MOGOV_MEC_PAUSE`
   (3 s) between requests is most of the runtime. A cold run is about 4 requests per export year and
   3 per election date.
@@ -289,7 +328,9 @@ Quirks:
 Census Bureau TIGER/Line shapefiles: state senate (SLDU) and house (SLDL) districts, congressional
 districts, counties and places. They feed `dim_district` and `fct_official_districts`, the "find my
 officials" lookup. Judicial circuits are groups of counties; the county→circuit table comes from the
-Official Manual (`int_bluebook__county_circuits`).
+Official Manual (`int_bluebook__county_circuits`). Court of Appeals districts (RSMo 477.050–.070) and
+federal judicial districts (28 U.S.C. 105) are also groups of counties, fixed by statute, so they come from
+the `mo_county_courts` seed.
 
 - Lands: `census_tiger_features`, one row per feature: the attribute table verbatim (`properties`), the
   geometry as GeoJSON (lon/lat, NAD83) and the layer, vintage and file.
@@ -306,13 +347,18 @@ Quirks:
   landed.
 - TIGER names St. Louis city and St. Louis County both "St. Louis"; `NAMELSAD` ("St. Louis city", "St.
   Louis County") tells them apart, and the circuit match uses it.
-- Seven state judges have no circuit in `dim_official` (October 2026), so they have no district rows.
+- In October 2026, seven state judges had no circuit in `dim_official`, so they had no district rows. The
+  cause was in the Official Manual's judge index, not TIGER: the dot leader can run straight into the circuit
+  ("Associate ..............35th"). `int_judges__state_index` now accepts that, which also recovered six
+  judges whose index line had failed to parse at all.
 
 ## mo_employee_pay: Missouri state payroll
 
 data.mo.gov's "<year> State Employee Pay" datasets (the Missouri Accountability Portal's employee data):
 calendar-year gross pay per employee, agency and position title. Legislators, statewide officials and
-state judges are on it; `fct_salaries` picks them out.
+state judges are on it; `fct_salaries` picks them out. Federal officials aren't on it. Their pay is fixed by
+statute and not published per person, so `fct_salaries` adds the office's annual salary from the
+`federal_salaries` seed (`pay_basis = 'statutory salary'`). Add that year's rates to the seed each January.
 
 - Lands: `mo_employee_pay`, verbatim CSV (all columns text). Only the agencies that employ officials are
   fetched (Legislature, Judiciary and the six statewide offices), staff included.

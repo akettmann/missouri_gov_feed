@@ -1,0 +1,237 @@
+keyword,industry
+agribusiness,agriculture
+agricultural,agriculture
+bayer,agriculture
+cattle,agriculture
+cattlemen,agriculture
+corn growers,agriculture
+dairy,agriculture
+deere,agriculture
+farm bureau,agriculture
+farm service,agriculture
+farms,agriculture
+forest products,agriculture
+grain,agriculture
+pork,agriculture
+poultry,agriculture
+smithfield,agriculture
+soybean,agriculture
+sugar,agriculture
+veterinary,agriculture
+anheuser,alcohol
+beer,alcohol
+brewery,alcohol
+brewing,alcohol
+distillers,alcohol
+liquor,alcohol
+spirits,alcohol
+wine,alcohol
+bancorp,banking_finance
+bancshares,banking_finance
+bank,banking_finance
+bankers,banking_finance
+banking,banking_finance
+banks,banking_finance
+blackrock,banking_finance
+capital one,banking_finance
+citigroup,banking_finance
+credit union,banking_finance
+credit unions,banking_finance
+finance,banking_finance
+financial,banking_finance
+h r block,banking_finance
+jpmorgan,banking_finance
+lenders,banking_finance
+lending,banking_finance
+morgan stanley,banking_finance
+mortgage,banking_finance
+savings,banking_finance
+securities,banking_finance
+wells fargo,banking_finance
+associated industries,business
+chamber,business
+chamber of commerce,business
+convenience stores,business
+grocers,business
+home depot,business
+hy vee,business
+manufacturers,business
+retail,business
+retailers,business
+walmart,business
+aggregates,construction
+architects,construction
+asphalt,construction
+builders,construction
+burns mcdonnell,construction
+carpenters,construction
+concrete,construction
+construction,construction
+contractors,construction
+engineering,construction
+je dunn,construction
+laborers,construction
+operating engineers,construction
+college,education
+colleges,education
+education,education
+educators,education
+nea,education
+school,education
+schools,education
+teachers,education
+university,education
+ameren,energy_utilities
+amerenmo,energy_utilities
+amerenue,energy_utilities
+chevron,energy_utilities
+electric,energy_utilities
+energy,energy_utilities
+evergy,energy_utilities
+oil,energy_utilities
+petroleum,energy_utilities
+pipeline,energy_utilities
+power,energy_utilities
+propane,energy_utilities
+spire,energy_utilities
+utilities,energy_utilities
+valero,energy_utilities
+water,energy_utilities
+firearms,firearms
+gun,firearms
+rifle,firearms
+shooting sports,firearms
+ameristar,gaming
+casino,gaming
+casinos,gaming
+gaming,gaming
+lottery,gaming
+aetna,health_care
+anesthesiologists,health_care
+anesthetists,health_care
+biotechnology,health_care
+blue cross,health_care
+bluecross,health_care
+bristol myers,health_care
+centene,health_care
+chiropractic,health_care
+cigna,health_care
+dental,health_care
+dentists,health_care
+elevance,health_care
+express scripts,health_care
+health,health_care
+healthcare,health_care
+hospital,health_care
+hospitals,health_care
+lilly,health_care
+medical,health_care
+nurse,health_care
+nurses,health_care
+nursing,health_care
+optometric,health_care
+pfizer,health_care
+pharmaceutical,health_care
+pharmacists,health_care
+pharmacy,health_care
+physician,health_care
+physicians,health_care
+residential care,health_care
+ssm,health_care
+unitedhealth,health_care
+aetna,insurance
+aflac,insurance
+blue cross,insurance
+bluecross,insurance
+centene,insurance
+cigna,insurance
+elevance,insurance
+health plan,insurance
+insurance,insurance
+insurers,insurance
+lockton,insurance
+prudential,insurance
+state farm,insurance
+thrivent,insurance
+unitedhealth,insurance
+afl cio,labor
+carpenters,labor
+electrical workers,labor
+laborers,labor
+letter carriers,labor
+operating engineers,labor
+seiu,labor
+teamsters,labor
+union local,labor
+workers,labor
+armstrong teasdale,legal
+attorneys,legal
+husch blackwell,legal
+lathrop gage,legal
+lawyers,legal
+llp,legal
+missouri bar,legal
+thompson coburn,legal
+trial attorneys,legal
+fire fighters,public_safety
+fire protection,public_safety
+firefighters,public_safety
+law enforcement,public_safety
+police,public_safety
+sheriffs,public_safety
+troopers,public_safety
+apartment,real_estate
+home builders,real_estate
+land title,real_estate
+multifamily,real_estate
+real estate,real_estate
+realtor,real_estate
+realtors,real_estate
+cardinals,sports_tourism
+chiefs,sports_tourism
+hotel,sports_tourism
+hotels,sports_tourism
+lodging,sports_tourism
+resort,sports_tourism
+royals,sports_tourism
+silver dollar city,sports_tourism
+sports commission,sports_tourism
+sports complex,sports_tourism
+tourism,sports_tourism
+at t,telecom
+broadband,telecom
+cable,telecom
+centurylink,telecom
+centurytel,telecom
+charter communications,telecom
+comcast,telecom
+embarq,telecom
+sprint,telecom
+t mobile,telecom
+telecommunications,telecom
+telephone,telecom
+time warner,telecom
+verizon,telecom
+wireless,telecom
+altria,tobacco
+rai services,tobacco
+tobacco,tobacco
+vapor,tobacco
+airlines,transportation
+auto dealers,transportation
+automobile dealers,transportation
+bnsf,transportation
+csx,transportation
+enterprise holdings,transportation
+fedex,transportation
+ford motor,transportation
+general motors,transportation
+motor carriers,transportation
+norfolk southern,transportation
+railroad,transportation
+railway,transportation
+toyota,transportation
+truck,transportation
+trucking,transportation
+union pacific,transportation
+united parcel service,transportation

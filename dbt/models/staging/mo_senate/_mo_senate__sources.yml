@@ -3,7 +3,7 @@
 version: 2
 sources:
 - name: mo_senate
-  description: Missouri Senate daily journal PDFs, parsed into per-senator vote rows.
+  description: Missouri Senate daily journal PDFs, parsed into per-senator vote rows, and the Senate topical index (subject keywords per bill).
   tables:
   - name: journals
     identifier: mo_senate_journals
@@ -20,6 +20,18 @@ sources:
   - name: votes
     identifier: mo_senate_votes
     description: One row per (Senate journal vote block, category, senator token).
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: bill_topics
+    identifier: mo_senate_bill_topics
+    description: One row per (regular session, topical index keyword, bill card) from the Senate's topical index.
     config:
       loaded_at_field: loaded_at
       freshness:

@@ -1,7 +1,7 @@
 -- Areas Missouri officials are elected or appointed for, with their boundaries (Census TIGER/Line, GeoJSON)
 -- for "find my officials" lookups: state senate and house districts, congressional districts (every loaded
--- Congress; is_current marks the Congress in session), counties (with their judicial circuit) and places
--- (cities, for mayors).
+-- Congress; is_current marks the Congress in session), counties (with their judicial circuit, Court of
+-- Appeals district and federal district) and places (cities, for mayors).
 with features as (
     select
         *,
@@ -43,6 +43,8 @@ select
     f.name_with_type,
     f.geoid,
     c.circuit_number as judicial_circuit,
+    courts.appeals_district,
+    courts.federal_district,
     f.land_area_m2,
     f.interior_lat,
     f.interior_lon,
@@ -54,3 +56,7 @@ left join circuits as c
     on
         f.district_type = 'county'
         and {{ mogov.regex_replace_all(mogov.name_key('f.name_with_type'), ' county$', '') }} = c.county_key
+left join {{ ref('mo_county_courts') }} as courts
+    on
+        f.district_type = 'county'
+        and f.geoid = courts.county_geoid

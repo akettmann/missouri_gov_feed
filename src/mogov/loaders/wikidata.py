@@ -10,8 +10,6 @@ by name against the label search below, so coverage is best for well-documented 
 
 import json
 
-import duckdb
-
 from mogov import db, obs
 from mogov.config import CONTACT
 from mogov.http import post
@@ -87,7 +85,7 @@ TEMPLATES = {
 
 
 def _qids() -> list[str]:
-    with duckdb.connect() as con:
+    with db.connect() as con:
         rows = con.execute(f"""
             select distinct wikidata from read_parquet('{db.raw_glob("openstates_current_csv")}', union_by_name = true)
             where wikidata like 'Q%'

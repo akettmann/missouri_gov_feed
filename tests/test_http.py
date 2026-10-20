@@ -34,6 +34,22 @@ def test_stale_lock_is_taken_over(tmp_path, monkeypatch):
     assert not lock.exists()
 
 
+def test_lock_create_permission_error_means_held(tmp_path, monkeypatch):
+    # Windows: creating a lock file whose delete is still pending raises PermissionError, not FileExistsError
+    real_open, failures = http.os.open, [PermissionError(13, "Permission denied")]
+
+    def flaky_open(path, flags, *args):
+        if failures:
+            raise failures.pop()
+        return real_open(path, flags, *args)
+
+    monkeypatch.setattr(http.os, "open", flaky_open)
+    monkeypatch.setattr(http.time, "sleep", lambda s: None)
+    with http._single_flight(tmp_path / "x") as held:
+        assert held.exists()
+    assert not failures
+
+
 def test_replace_file_retries_permission_errors(tmp_path, monkeypatch):
     src, dest = tmp_path / "a", tmp_path / "b"
     src.write_bytes(b"new")

@@ -2,6 +2,11 @@
 # not this file, then regenerate.
 version: 2
 models:
+- name: stg_mo_senate__bill_topics
+  description: 'Subject keywords per bill from the MO Senate topical index (regular sessions): Senate bills and
+    the House bills that reached the Senate. subject_name is the keyword upper-cased into the House index''s spelling;
+    the two indexes share their terms except "..., DEPARTMENT OF" (House "DEPT. OF") and "WORKERS'' COMPENSATION"
+    (House drops the apostrophe). session_code follows the House codes (two-digit year + 1).'
 - name: stg_mo_senate__votes
   description: 'One row per (MO Senate journal vote, senator token). Tokens: surname, or "Brown (16)" when two senators
     share one. The context is the journal sentence introducing the vote.'

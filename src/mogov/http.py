@@ -74,8 +74,10 @@ def _single_flight(path: Path) -> Iterator[Path]:
         try:
             os.close(os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
             break
-        except FileExistsError:
-            with contextlib.suppress(FileNotFoundError):
+        # Windows raises PermissionError instead of FileExistsError while another shard's unlink of the lock is
+        # still pending (a peer has it open for stat); either way the lock is taken, so wait.
+        except (FileExistsError, PermissionError):
+            with contextlib.suppress(FileNotFoundError, PermissionError):
                 if time.time() - lock.stat().st_mtime > LOCK_STALE_S:
                     lock.unlink(missing_ok=True)
             time.sleep(0.5)

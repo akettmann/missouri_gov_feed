@@ -143,11 +143,10 @@ def run_dbt(args: list[str]) -> int:
 
 def export(fmt: str) -> None:
     """Copy every marts and reporting table to data/exports/<table>.<fmt> (csv or parquet)."""
-    import duckdb
 
     out = DB_PATH.parent / "exports"
     out.mkdir(parents=True, exist_ok=True)
-    with duckdb.connect(str(DB_PATH), read_only=True) as con:
+    with db.connect(str(DB_PATH), read_only=True) as con:
         tables = con.execute(
             "select table_schema, table_name from information_schema.tables "
             "where table_schema in ('marts', 'reporting') order by 2"

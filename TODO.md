@@ -1,40 +1,25 @@
 # TODO List
 
-# High Priority
-- [x] review full_run.log: every loader started and finished on all 4 shards. Found and fixed: `mo_house` shards 1-2 failed (Windows cache-rename race between shards fetching the same session zip; downloads are now single-flight with a retried rename), `wikidata` shards 1-2 failed (ran before `openstates_people` landed its CSV; now stage 2), MEC cached an empty crosswalk for 2016/2018 for 30 days (no longer cached). Expected: `courtlistener_cases` quota exhausted (0 rows; resumes next day), `dbt.placeholder` for `cl_cases` in the first build
-- [x] review second_run.log: no failures. `mo_house`/`mo_senate`/`house_fd` spent 3-10 min per shard re-parsing cached PDFs; PDF text is now cached by content (`data/cache/pdftext/`)
-- [ ] Re-run `uv run mogov run --shards 4` twice (full + quick re-run) to confirm the fixes and the new concurrent scheduling in a real run; check the second run's loader times
+## High priority
+- [ ] Re-run `uv run mogov run --shards 4` once more to confirm the lock fix (no `loader.failed`) and that no progress bars appear in the log. Expected warnings: `courtlistener_cases` quota, `dbt.placeholder` for stage-2 tables in the first build, `census_tiger.not_a_zip` for the unpublished TIGER2026 SLDL
+- [ ] `mo_house`: discover roll-call PDFs by enumerating `billsYYS/rollcalls/{day}.{nnn}.pdf` per session day, not only through the bill XML. The XML misses House votes on Senate bills and procedural votes (see the `mo_house` quirks in docs/sources.md). Link the new ones to bills with the PDF's `measure` header (`SS SCS SBs 49 & 118`). Check `rpt_attendance` afterwards: it currently counts only the roll calls we found
+- [ ] `fct_vote_bills`: 833 House roll calls that name a House bill (`HCS HB 2`, `HB 1973`...) aren't linked to it, because the bill XML doesn't nest them. Fall back to matching the PDF `measure` to the bill number
 
-## Frontend support (see FRONTEND_TODO.md)
-### dbt
-- [x] Add a `dbt/models/reporting/` layer (`rpt_*`, portable SQL, enforced contracts like the marts) shaped for the frontend pages
-- [x] `rpt_indicator_peers`: each bias indicator per official alongside chamber colleagues' values and party medians
-- [x] `rpt_party_breaks`: party-line votes where the official voted against their party's majority (party majorities extracted to `int_votes__party_positions`, now counted over every member who voted)
-- [x] `rpt_donor_rollup`: donations received per official by donor organization, donor class (PAC vs individual), year/cycle; keeps `match_confidence`
-- [x] `rpt_gift_rollup`: lobbyist gifts per official by principal, category and year (with `match_confidence`)
-- [x] dbt `exposure` for the frontend (`voter_frontend` in `models/reporting/_reporting.yml`)
-- [x] Decide how ACU is presented: ACU dropped (see Low priority)
-
-### Loaders
-- [x] `census_tiger`: district, county and place boundaries -> `dim_district`, `fct_official_districts` (legislators, U.S. House, circuit judges via the Official Manual's county->circuit table, mayors)
-- [ ] `fct_official_districts`: map Courts of Appeals districts and federal district courts (E.D./W.D. Mo.) to counties; 7 state judges have no circuit in `dim_official`
-- [x] Bill subjects/sponsors: from the MO House bill XML already landed -> `fct_bills`, `fct_bill_subjects`, `fct_bill_sponsors`, `fct_vote_bills` (House votes linked exactly; Senate votes on House bills via the journal's measure)
-- [ ] Bill subjects before the 2024 sessions and Senate bills (SB/SJR): the House XML has neither. Candidate source: Open States bills API (needs a key) or senate.mo.gov bill pages
-- [x] ~~Balancing ideology scorecard loader~~ (not needed: ACU dropped)
-
-### Later (interest vs. vote overlap)
-- [ ] Seed mapping donor organizations / lobbyist principals to industries or subjects (can target the House subject index terms in `fct_bill_subjects`)
-- [ ] `rpt_interest_vote_overlap`: votes on bills whose subject matches an industry that funded or gifted the official (co-occurrence, not causation)
+## Medium priority
+- [ ] Send the Sunshine Law requests for personal financial disclosures (templates and requirements in docs/sunshine_requests.md): MEC for legislators, statewide officials and candidates; the Clerk of the Supreme Court for judges. Fill in the project description and contact, build the filer lists from `dim_official`, then log the dates sent. Once copies arrive, add them through a seed or a local-folder loader
+- [ ] Bill subjects for pre-2024 House bills that never reached the Senate (the House XML has no `SubjectIndex` before 2024, and the House site's subject index keeps only a few years: 2017-2024 return nothing, the static `sbjndx` archive stops at 2011). Candidates:
+  - LegiScan: free API key (30,000 queries/month), weekly per-state datasets (JSON/CSV) with bills, subjects, sponsors and roll calls. Check the license terms and Missouri's coverage years before building a loader
+  - Open States bulk session CSVs: Missouri 2017-2026, free account login required; check whether they carry subjects
+- [ ] Widen `interest_keywords` coverage: classified names cover ~37% of organization money; most of the rest is opaque PAC acronyms (AMECPAC, MEDA PAC, CN-MO PAC...). Sources to look up whom they represent:
+  - MEC's Statement of Committee Organization has a "Connected Organization's Name" field for continuing committees (PACs), on scanned filings (`mec.mo.gov/Scanned/PDF/...`); check whether the committee search pages show it as text
+  - FEC committee data (`connected_organization_name`) for PACs that are also federally registered; the `fec` loader already talks to that API
+  - FollowTheMoney (now part of OpenSecrets) codes state contributors by industry; check whether its API or downloads are still offered and on what terms
 
 ## Low priority
-- [x] Fetch salaries for the officials: `mo_employee_pay` loader (data.mo.gov state payroll) -> `fct_salaries` (state officials, 2017+)
-- [ ] Salaries for federal officials (Congress, federal judges): fixed by statute; a seed of yearly pay tables would cover them
-- [x] when running `uv run mogov run` execute sources that are across different services concurrently (`--workers`; loaders grouped by service)
-- [ ] Listing of companies that operate in the official's jurisdiction, highlight which ones have donated. Needs a decision on the source: the MO Secretary of State business search has no bulk export; Census County Business Patterns has counts but no names
-- [x] Document "wipe and rebuild from scratch" in docs/environment.md
-- [x] Drop ACU source
-- [x] add computed attendance %: `rpt_attendance` per official, chamber and session, with the chamber-wide rate
-
-## Future
-- [ ] Deploy the Cloud Run jobs described in docs/environment.md and confirm the GCS FUSE layout end to end (for now the pipeline runs and writes locally)
-- [ ] Sunshine Law (RSMo 610) requests for Missouri personal financial disclosures (PFDs), which are not published online: officials' and candidates' from MEC (helpdesk@mec.mo.gov, 800-392-8660), judges' from the Clerk of the Missouri Supreme Court. Once copies arrive, add them through a seed or a local-folder loader
+- [ ] Listing of companies that operate in the official's jurisdiction, highlight which ones have donated. Source options:
+  - Secretary of State business entity registry: no bulk export (only UCC bulk data, by agreement). Request an extract under the Sunshine Law (template in docs/sunshine_requests.md)
+  - Missouri Accountability Portal (mapyourtaxes.mo.gov) data downloads: state expenditures by vendor per fiscal year, pipe-delimited. Covers companies paid by the state, with vendor names
+  - EPA Facility Registry Service or OSHA establishment data: named, geocoded sites for regulated industries only
+  - Census County Business Patterns: counts by industry, no company names
+- [ ] Save a copy of the literal Sunshine Law (RSMo Chapter 610, sections 610.010-610.035, from revisor.mo.gov) in the repo, along with the other sections docs/sunshine_requests.md cites (105.483-105.492, Court Operating Rule 2), noting the date each was retrieved
+- [ ] Each January: add the year's rates to the `federal_salaries` seed (senate.gov, uscourts.gov)

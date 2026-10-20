@@ -35,6 +35,72 @@ seeds:
         data_tests: [unique, not_null]
       - name: office
         data_tests: [not_null]
+  - name: mo_county_courts
+    description: >
+      Each Missouri county (and the city of St. Louis) with its Court of Appeals district (RSMo 477.050 eastern,
+      477.060 southern, 477.070 western: every other county) and its federal judicial district and division
+      (28 U.S.C. 105). Built from the statute text in October 2026; review if either statute is amended.
+    config:
+      column_types: {county_geoid: varchar, county_name: varchar, appeals_district: varchar, federal_district: varchar, federal_division: varchar}
+    columns:
+      - name: county_geoid
+        data_tests: [unique, not_null]
+      - name: appeals_district
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['eastern', 'southern', 'western']
+      - name: federal_district
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['moed', 'mowd']
+  - name: federal_salaries
+    description: >
+      Statutory annual salary per calendar year for the federal offices we track: Members of Congress (Senate
+      historical table; rank-and-file rate, the same in both chambers; leadership is paid more, and no Missouri
+      member held a paid leadership post in 2026) and U.S. district and circuit judges (uscourts.gov judicial
+      compensation). Copied October 2026 for 2017-2026, matching the state payroll's coverage. Add a row per
+      office each January.
+    columns:
+      - name: office
+        data_tests: [not_null]
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [calendar_year, office]
+  - name: interest_keywords
+    description: >
+      Whole-word keywords that put a donor organization or lobbyist principal in an industry or interest, in
+      name_key form (lowercase, punctuation as spaces: "at t" for AT&T). Only words that name the industry
+      outright ("hospital", "realtors", "credit union") or well-known companies ("ameren", "centene"); opaque
+      PAC acronyms are left unclassified rather than guessed. A keyword may sit in several industries (a health
+      insurer is health_care and insurance). Checked against the October 2026 names: generic words that
+      misfired were dropped ("farm" hit State Farm, "title" hit Title Max, "sports" hit sports bars). The
+      classified names cover about 37% of organization money and gifts to state officials.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [keyword, industry]
+    columns:
+      - name: industry
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('industry_subjects')
+                field: industry
+  - name: industry_subjects
+    description: >
+      The legislature's bill subject index terms (fct_bill_subjects.subject_name, verbatim) that each interest_keywords
+      industry has a stake in. Feeds rpt_interest_vote_overlap. tests/assert_industry_subjects_known.sql warns if
+      a term stops appearing in the bill data.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [industry, subject_name]
   - name: mo_payroll_office_titles
     description: >
       The position titles on Missouri's state payroll (mo_employee_pay) that are elected or judicial offices,

@@ -14,6 +14,7 @@ uv run mogov run --shards 4
 |---|---|---|---|
 | mo_house | daily in session (Jan–May), rarely otherwise | session zips weekly (current year), monthly (past); roll-call PDFs forever | daily in session, weekly otherwise |
 | mo_senate | daily in session | current-year listing daily, past monthly; journal PDFs forever | daily in session, weekly otherwise |
+| mo_senate_topics | daily in session (new bills indexed) | current year daily, past years monthly | daily in session, weekly otherwise |
 | mec (opt-in) | continuously | exports: current year weekly, past years monthly | weekly |
 | tap_mec | frozen (ends 2022) | 30 days | monthly |
 | fec | weekly bulk refresh | bulk zips daily; sponsor lookups 30 days | weekly |

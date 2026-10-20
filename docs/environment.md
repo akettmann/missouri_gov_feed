@@ -174,7 +174,7 @@ non-zero. SIGTERM exits cleanly: temp files are removed and metrics are flushed.
      --add-volume-mount volume=data,mount-path=/data \
      --set-env-vars MOGOV_DUCKDB_MEMORY=2GB \
      --set-secrets COURTLISTENER_TOKEN=courtlistener-token:latest \
-     --args load,mo_house,mo_senate,house_fd
+     --args load,mo_house,mo_senate,mo_senate_topics,house_fd
    ```
    Retrying a task is safe: it re-runs the same shard and replaces the same part.
 5. Create the build job. DuckDB does random writes, which Cloud Storage FUSE handles badly, so build in
