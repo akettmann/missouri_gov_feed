@@ -50,6 +50,15 @@ uv run mogov build
   `MOGOV_HOUSE_FD_FIRST_YEAR`: per-source windows (see each loader's docstring). Roll them forward each
   January / cycle.
 
+## Yearly hand-maintained seeds
+
+Each January:
+- `federal_salaries`: add the new year's pay rates for Congress (senate.gov) and federal judges
+  (uscourts.gov), with their sources. Until then `fct_salaries` has no federal rows for the new year.
+- `legislator_seat_corrections`: check `int_mo_senate__votes` for tokens with no `person_key`. A new
+  unmatched surname usually means Open States is missing or cutting short someone's term. Add the
+  corrected term with its source.
+
 ## Forcing a refresh
 
 Delete the relevant entries under `data/cache/` (named files for large downloads, such as
