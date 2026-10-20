@@ -20,3 +20,4 @@
   - EPA Facility Registry Service or OSHA establishment data: named, geocoded sites for regulated industries only
   - Census County Business Patterns: counts by industry, no company names
 - [ ] Each January: add the year's rates to the `federal_salaries` seed (senate.gov, uscourts.gov)
+- [] write a simplified summary of the missouri sunshine act
