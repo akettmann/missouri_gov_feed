@@ -202,6 +202,16 @@ async function loadAll(): Promise<OfficialBundle[]> {
       )
     : null;
 
+  type SizeRow = OfficialBundle["money"]["size"] & object;
+  const sizes = hasExport("rpt_donor_size")
+    ? groupBy(
+        await query<SizeRow[number] & { official_id: string }>(`
+          select official_id, election_cycle as cycle, band_floor, match_confidence,
+                 cast(total_amount as double) as total_amount
+          from {rpt_donor_size} order by cycle, band_floor`),
+      )
+    : null;
+
   // up to ~700 subjects per legislator; the page lists the 20 with the most roll calls
   const subjects = hasExport("rpt_votes_by_subject")
     ? groupBy(
@@ -356,6 +366,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
           status: status("donations"),
           federal: (federal.get(id) ?? []) as FederalDonorRow[],
           cycles,
+          size: sizes ? ((sizes.get(id) ?? []) as SizeRow) : null,
           top_donors: topDonors,
         },
         gifts,

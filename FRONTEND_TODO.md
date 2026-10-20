@@ -24,8 +24,6 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
   of our own; or ship a ZIP-code centroid table (coarse: a ZIP can span several districts)
 
 ## Medium priority
-- [ ] State size bands: `rpt_donor_rollup` has no per-contribution size, so only federal officials get a size view;
-  add a size-band column or a small `rpt_donor_size` model
 - [ ] `rpt_donor_rollup.donor_name` is an employer for individuals ("none", "retired", ...); the frontend leaves
   individuals out of "Top donor organizations". A "top employers of individual donors" view needs those values
   cleaned or excluded in dbt first

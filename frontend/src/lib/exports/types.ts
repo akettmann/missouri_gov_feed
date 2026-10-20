@@ -237,6 +237,8 @@ export interface OfficialBundle {
     status: string;
     federal: FederalDonorRow[];
     cycles: Dataset<DonorCycleRow>;
+    /** state officials' individual contributions by size (rpt_donor_size); null when the export is missing */
+    size: { cycle: number; band_floor: number; match_confidence: string; total_amount: number }[] | null;
     top_donors: Dataset<TopDonorRow>;
   };
   gifts: Dataset<GiftRollupRow>;

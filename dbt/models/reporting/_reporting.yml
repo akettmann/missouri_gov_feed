@@ -484,6 +484,41 @@ models:
         data_type: bigint
         description: How many officials in the office qualified for this award and period.
 
+  - name: rpt_donor_size
+    description: >
+      State officials' contributions from individuals by contribution size and election cycle, in the FEC's
+      bands (0, 200, 500, 1000, 2000 dollars and up) so they compare with fct_federal_donor_summary by_size.
+      MEC itemizes only contributions over $100, so the smallest band undercounts small donors. Grain: one row
+      per (official, election cycle, band, match confidence).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, election_cycle, band_floor, match_confidence]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests: [not_null]
+      - name: election_cycle
+        data_type: integer
+        description: Two-year cycle, named by its even (election) year.
+      - name: band_floor
+        data_type: integer
+        description: The band's lower bound in dollars (0, 200, 500, 1000, 2000).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 200, 500, 1000, 2000]
+      - name: match_confidence
+        data_type: varchar
+        description: "{{ doc('match_confidence') }}"
+      - name: total_amount
+        data_type: decimal(28,6)
+        description: Dollars contributed in the band.
+      - name: contribution_count
+        data_type: bigint
+        description: Contributions in the band.
+
 exposures:
   - name: voter_frontend
     label: Missouri officials frontend
@@ -521,4 +556,5 @@ exposures:
       - ref('rpt_attendance')
       - ref('rpt_votes_by_subject')
       - ref('rpt_awards')
+      - ref('rpt_donor_size')
       - ref('rpt_interest_vote_overlap')

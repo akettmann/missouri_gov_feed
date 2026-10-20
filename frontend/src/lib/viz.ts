@@ -154,6 +154,35 @@ export const VIZ: Record<string, VizSpec> = {
             cmp(a, b, "cycle") || FED_RECEIPT_KINDS.indexOf(a.source) - FED_RECEIPT_KINDS.indexOf(b.source),
         ),
   },
+  "state-size": {
+    title: "Contributions from individuals by size and cycle (MEC)",
+    kind: "stack",
+    x: "cycle",
+    y: "total",
+    series: "band",
+    seriesOrder: Object.values(FED_SIZE_LABEL),
+    usesConfidence: true,
+    note: "Same bands as the federal chart. MEC itemizes only contributions over $100, so small donors are undercounted.",
+    columns: [
+      { key: "cycle", label: "Cycle" },
+      { key: "band", label: "Size" },
+      { key: "total", label: "Total", money: true },
+    ],
+    rows: (b, hide) => {
+      const rows = withoutMedium(b.money.size ?? [], hide);
+      const key = (r: (typeof rows)[number]) => `${r.cycle}|${r.band_floor}`;
+      return sumBy(rows, key, (r) => r.total_amount)
+        .map(({ key: k, total }) => {
+          const [cycle, floor] = String(k).split("|");
+          return { cycle, band: FED_SIZE_LABEL[floor], total };
+        })
+        .sort(
+          (a, b) =>
+            cmp(a, b, "cycle") ||
+            Object.values(FED_SIZE_LABEL).indexOf(a.band) - Object.values(FED_SIZE_LABEL).indexOf(b.band),
+        );
+    },
+  },
   "fed-size": {
     title: "Individual contributions by size and cycle (FEC)",
     kind: "stack",
