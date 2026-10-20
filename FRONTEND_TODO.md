@@ -2,6 +2,7 @@
 
 Goal: help a voter see measurable lean and potential conflicts of interest for their Missouri officials.
 Show evidence, not verdicts. Data-side tasks (dbt reporting models, loaders) live in TODO.md.
+The Phase 1 MVP is built in `frontend/`; build and refresh steps are in docs/environment.md and docs/sync.md.
 
 ## Principles (apply to every task)
 - No composite "bias score" and no rankings; identical layout for every official regardless of party
@@ -10,37 +11,29 @@ Show evidence, not verdicts. Data-side tasks (dbt reporting models, loaders) liv
 - Neutral diverging palette for score scales (no red/blue); party shown as a label
 - "Report an error" link on every profile
 - Interest-vote views are labeled co-occurrence, not causation
+- Keep each official's JSON under the 100 KB gzipped budget (`pnpm sizes` after every data refresh)
 
-## Phase 0: spikes
-- [x] Build the DB and measure export sizes per official (sets per-page JSON budget)
-  - `pnpm sizes`: largest per-official JSON 120 KB raw / 7.7 KB gzipped, p95 HTML page 32 KB. Budget set at
-    100 KB gzipped per JSON (the script exits 1 above it). `rpt_donor_rollup` reaches ~7k rows per official,
-    so the build ships per-cycle totals plus the top 25 donors rather than raw rows
-- [ ] Check whether the Census Geocoder can be called from the browser (CORS); otherwise use map click / geolocation with client-side point-in-polygon
-- [x] Confirm stack: Astro (static build) + Observable Plot, pnpm; build reads `data/exports/*.parquet` with `@duckdb/node-api`
-  - Astro 7.4, Node 24.22 LTS, TypeScript 6.0 (TS 7 is too new for @astrojs/check and typescript-eslint)
-- [ ] Decide audience/hosting (public?) and whether judges are in the MVP (judges currently get profiles; their
-  ideology/votes sections show "not applicable")
+## Open decisions
+- [ ] Audience/hosting (public?) and whether judges stay in (they get profiles today; ideology/votes show "not applicable")
+- [ ] ACU: it no longer appeared in the latest export. If it's dropped for good, remove it from
+  `frontend/src/lib/indicators.ts` (methodology page) and drop the Phase 3 balancing-scorecard item
 
-## Phase 1: MVP
-- [x] Scaffold `frontend/` (Astro, pnpm); add eslint, prettier and `astro check` to pre-commit
-- [x] Build-time data layer: read exported parquet, emit one prerendered page plus a small JSON per official
-- [x] Browse/search page: by name, office, district, level
-- [x] Profile header and coverage strip (`official_profile`, `dim_official`)
-- [x] Section A, ideology: indicator values with period, detail and source
-- [x] Section C, money in: top donor organizations, PAC vs individual, size bands, in/out of state (federal), trend by cycle
-  - Size bands are federal only (FEC `by_size`): `rpt_donor_rollup` has no per-contribution size, so state
-    officials have no size view yet
-- [x] Section D, lobbyist gifts: by principal, category and year
-- [x] Section E, personal interests: current commercial ties (`is_latest_report`), family ties, disclosure filings
-- [x] Methodology page: indicator meanings and limits, match-confidence rules, sources, data freshness
-- [x] Confidence badges, medium-match toggle, "report an error" link
-- [x] Docs: PlantUML diagram of the frontend data flow; build steps in docs/environment.md; refresh steps in docs/sync.md
+## Follow-ups from the MVP
+- [ ] FEC size bands: confirm whether `fct_federal_donor_summary` `by_size` bucket 0 includes unitemized money
+  (the dbt docs say itemized only, but Hawley's under-$200 band is $8M+); fix the docs or the chart note
+- [ ] State size bands: `rpt_donor_rollup` has no per-contribution size, so only federal officials get a size view;
+  add a size-band column or a small `rpt_donor_size` model
+- [ ] `rpt_donor_rollup.donor_name` is an employer for individuals ("none", "retired", ...); the frontend leaves
+  individuals out of "Top donor organizations" for now
 
 ## Phase 2
-- [ ] Find my officials: address / map click / geolocation to districts (needs `census_tiger` loader); lookup runs client-side so addresses never leave the browser
-- [ ] Peer strip charts for each indicator, chamber colleagues and party medians (`rpt_indicator_peers`)
-- [ ] Section B, party loyalty: unity % and "votes where they broke with their party" list (`rpt_party_breaks`)
+- [ ] Census Geocoder spike: can it be called from the browser (CORS)? Otherwise map click / geolocation with
+  client-side point-in-polygon
+- [ ] Find my officials: address / map click / geolocation to districts (needs `census_tiger` loader); lookup runs
+  client-side so addresses never leave the browser
+- [ ] Peer strip charts for each indicator, chamber colleagues and party medians (`rpt_indicator_peers`, built)
+- [ ] Section B, party loyalty: unity % and "votes where they broke with their party" list (`rpt_party_breaks`, built)
+- [ ] Attendance per session vs chamber (`rpt_attendance`, built)
 - [ ] Compare view: two officials side by side, or official vs chamber/party median
 - [ ] Judges' profiles: disclosures, ties, case history (no outcome statistics without a reviewed methodology)
 
