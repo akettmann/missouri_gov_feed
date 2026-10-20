@@ -7,6 +7,7 @@ import { exportedAt, hasExport, query } from "./db";
 import { sampleDonorCycles, sampleGiftRollup, sampleTopDonors } from "./fixtures";
 import type {
   AttendanceRow,
+  CaseRow,
   CommercialTie,
   CoverageItem,
   Dataset,
@@ -199,6 +200,39 @@ async function loadAll(): Promise<OfficialBundle[]> {
       )
     : null;
 
+  // a federal appellate judge has ~6k cases: ship yearly counts plus the most recent ones
+  const RECENT_CASES = 50;
+  const hasCases = hasExport("fct_case_history");
+  const caseYears = hasCases
+    ? groupBy(
+        await query<{ official_id: string; year: number; role: string; cases: number }>(`
+          select official_id, cast(extract(year from date_filed) as integer) as year, role,
+                 cast(count(*) as integer) as cases
+          from {fct_case_history} where date_filed is not null
+          group by all order by year`),
+      )
+    : null;
+  const caseTotals = hasCases
+    ? new Map(
+        (
+          await query<{ official_id: string; n: number }>(`
+            select official_id, cast(count(*) as integer) as n from {fct_case_history} group by 1`)
+        ).map((r) => [r.official_id, r.n]),
+      )
+    : new Map<string, number>();
+  const recentCases = hasCases
+    ? groupBy(
+        await query<CaseRow & { official_id: string }>(`
+          select official_id, role, case_name, court, docket_number, cast(date_filed as varchar) as date_filed,
+                 disposition, publication_status, source_url
+          from (
+            select *, row_number() over (partition by official_id order by date_filed desc nulls last) as rank
+            from {fct_case_history}
+          ) ranked
+          where rank <= ${RECENT_CASES} order by official_id, rank`),
+      )
+    : null;
+
   return profiles
     .sort((a, b) => (SORT_LEVEL[a.level] ?? 9) - (SORT_LEVEL[b.level] ?? 9))
     .map((p): OfficialBundle => {
@@ -248,6 +282,14 @@ async function loadAll(): Promise<OfficialBundle[]> {
           status: status("votes"),
           party_breaks: breaks ? ((breaks.get(id) ?? []) as PartyBreak[]) : null,
           attendance: attendance ? ((attendance.get(id) ?? []) as AttendanceRow[]) : null,
+        },
+        courts: {
+          status: status("cases"),
+          by_year: caseYears
+            ? ((caseYears.get(id) ?? []) as { year: number; role: string; cases: number }[])
+            : null,
+          total: caseTotals.get(id) ?? 0,
+          recent: (recentCases?.get(id) ?? []) as CaseRow[],
         },
         money: {
           status: status("donations"),

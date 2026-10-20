@@ -4,6 +4,7 @@
 import type { GetStaticPaths } from "astro";
 import ConfidenceToggle from "../../components/ConfidenceToggle.astro";
 import CoverageStrip from "../../components/CoverageStrip.astro";
+import SectionCourts from "../../components/SectionCourts.astro";
 import SectionGifts from "../../components/SectionGifts.astro";
 import SectionIdeology from "../../components/SectionIdeology.astro";
 import SectionInterests from "../../components/SectionInterests.astro";
@@ -74,6 +75,7 @@ const term = [o.current_term_start, o.current_term_end].filter(Boolean).join(" t
     <SectionMoney bundle={bundle} />
     <SectionGifts bundle={bundle} />
     <SectionInterests bundle={bundle} />
+    <SectionCourts bundle={bundle} />
   </article>
 </Layout>
 

@@ -34,6 +34,8 @@ export interface VizSpec {
   /** does hiding medium matches change this spec? */
   usesConfidence: boolean;
   note?: string;
+  /** y is a count, not dollars (axis and tooltip formatting) */
+  count?: boolean;
 }
 
 const FED_RECEIPT_KINDS = [
@@ -261,6 +263,28 @@ export const VIZ: Record<string, VizSpec> = {
         .sort((a, b) => b.total - a.total)
         .slice(0, 10);
     },
+  },
+  "cases-by-year": {
+    title: "Cases per year",
+    kind: "stack",
+    x: "year",
+    y: "cases",
+    series: "role",
+    seriesOrder: ["As judge", "As attorney"],
+    count: true,
+    usesConfidence: false,
+    note: "Counts of cases only. Outcomes aren't summarized: that needs a reviewed method.",
+    columns: [
+      { key: "year", label: "Year filed" },
+      { key: "role", label: "Role" },
+      { key: "cases", label: "Cases", num: true },
+    ],
+    rows: (b) =>
+      (b.courts.by_year ?? []).map((r) => ({
+        year: String(r.year),
+        role: r.role === "judge" ? "As judge" : "As attorney",
+        cases: r.cases,
+      })),
   },
   attendance: {
     title: "Votes attended per session, against the whole chamber",

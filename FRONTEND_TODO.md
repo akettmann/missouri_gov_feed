@@ -29,7 +29,6 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
 - [ ] `rpt_donor_rollup.donor_name` is an employer for individuals ("none", "retired", ...); the frontend leaves
   individuals out of "Top donor organizations". A "top employers of individual donors" view needs those values
   cleaned or excluded in dbt first
-- [ ] Judges' profiles: disclosures, ties, case history (no outcome statistics without a reviewed methodology)
 
 ## Low priority
 - [ ] Votes grouped by bill subject (bill subjects from `mo_senate_topics`)

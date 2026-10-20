@@ -2,7 +2,7 @@
 // "hide possible matches" toggle. Tables are already server-rendered, so this only enhances.
 import * as Plot from "@observablehq/plot";
 import type { OfficialBundle } from "../lib/exports/types";
-import { money } from "../lib/format";
+import { count, money } from "../lib/format";
 import { cellText, VIZ, type Row, type VizSpec } from "../lib/viz";
 
 const compactUsd = new Intl.NumberFormat("en-US", {
@@ -15,6 +15,12 @@ const compactUsd = new Intl.NumberFormat("en-US", {
 // long names (lobbyist principals) are clipped on the axis; tooltip and table keep them whole
 const MAX_LABEL = 32;
 const clip = (s: string) => (s.length > MAX_LABEL ? `${s.slice(0, MAX_LABEL - 1)}…` : s);
+
+function thinTicks(values: string[], width: number): string[] {
+  const unique = [...new Set(values)];
+  const every = Math.max(1, Math.ceil(unique.length / Math.max(1, Math.floor(width / 50))));
+  return unique.filter((_, i) => i % every === 0);
+}
 
 const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const seriesColors = () => [1, 2, 3, 4, 5].map((i) => css(`--series-${i}`));
@@ -88,8 +94,16 @@ function chart(spec: VizSpec, rows: Row[], width: number): SVGSVGElement | HTMLE
     style,
     height: 240,
     marginLeft: 56,
-    x: { label: null, type: "band" },
-    y: { grid: true, label: null, tickFormat: (d: number) => compactUsd.format(d) },
+    // long year ranges (a judge's 40 years of cases) would overlap: label about one band per 50px
+    x: {
+      label: null,
+      type: "band",
+      ticks: thinTicks(
+        rows.map((r) => String(r[spec.x])),
+        width,
+      ),
+    },
+    y: { grid: true, label: null, tickFormat: (d: number) => (spec.count ? count(d) : compactUsd.format(d)) },
     color: {
       domain: present,
       range: present.map((s) => colors[order.indexOf(s) % colors.length]),
@@ -103,7 +117,7 @@ function chart(spec: VizSpec, rows: Row[], width: number): SVGSVGElement | HTMLE
         order: present,
         insetLeft: 2,
         insetRight: 2,
-        tip: { format: { y: (d: number) => money(d) } },
+        tip: { format: { y: (d: number) => (spec.count ? count(d) : money(d)) } },
       }),
       Plot.ruleY([0], { stroke: css("--axis") }),
     ],

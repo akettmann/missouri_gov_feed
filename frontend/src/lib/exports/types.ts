@@ -154,6 +154,18 @@ export interface AttendanceRow {
   chamber_attendance_pct: number;
 }
 
+/** fct_case_history: a case the official sat on (judge) or argued (attorney). */
+export interface CaseRow {
+  role: string;
+  case_name: string;
+  court: string | null;
+  docket_number: string | null;
+  date_filed: string | null;
+  disposition: string | null;
+  publication_status: string | null;
+  source_url: string | null;
+}
+
 /** A dataset is either real (from an export) or a labelled stand-in until the dbt model exists. */
 export interface Dataset<T> {
   sample: boolean;
@@ -171,6 +183,14 @@ export interface OfficialBundle {
     /** null when the rpt_* export is missing (section says so instead of showing nothing) */
     party_breaks: PartyBreak[] | null;
     attendance: AttendanceRow[] | null;
+  };
+  courts: {
+    status: string;
+    /** cases per filing year and role; null when the export is missing */
+    by_year: { year: number; role: string; cases: number }[] | null;
+    total: number;
+    /** the most recent cases (all of them are in the CourtListener links) */
+    recent: CaseRow[];
   };
   money: {
     status: string;
