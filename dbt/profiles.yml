@@ -4,4 +4,6 @@ mogov:
     local:
       type: duckdb
       path: "{{ env_var('MOGOV_DB', 'data/mogov.duckdb') }}"
+      # point-in-polygon for facilities in districts (macros/compat/spatial.sql)
+      extensions: [spatial]
       threads: 4

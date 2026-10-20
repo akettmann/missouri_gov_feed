@@ -1178,3 +1178,145 @@ models:
       - name: source_url
         data_type: varchar
         description: The Missouri Accountability Portal's employee pay search, or the federal pay table.
+
+  - name: fct_district_facilities
+    description: >
+      EPA-regulated facilities (EPA Facility Registry Service) inside each current area of dim_district: state
+      house and senate districts, the U.S. House districts of the Congress in session, counties and places
+      (cities). Placed by the facility's coordinates; the third of FRS sites with no coordinates, and the few
+      whose coordinates fall outside Missouri, have no rows. FRS covers sites an EPA or state program regulates
+      (factories, fuel stations, quarries, auto shops, dry cleaners, utilities...), not every business.
+      Grain: one row per (area, facility).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [district_id, registry_id]
+    columns:
+      - name: district_id
+        data_type: varchar
+        description: The area (dim_district).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_district')
+                field: district_id
+      - name: registry_id
+        data_type: varchar
+        description: EPA FRS registry id of the facility.
+        data_tests: [not_null]
+      - name: facility_name
+        data_type: varchar
+        description: The facility's name in FRS.
+      - name: address
+        data_type: varchar
+        description: Street address.
+      - name: city
+        data_type: varchar
+        description: City in the facility's address.
+      - name: postal_code
+        data_type: varchar
+        description: ZIP code.
+      - name: owner_name
+        data_type: varchar
+        description: >
+          The facility's owner or operator: the first owner-role organization any EPA program lists (owner/operator,
+          owner, operator, permittee). Null when no program names one.
+      - name: owner_type
+        data_type: varchar
+        description: The owner's FRS org_type (PRIVATE, MUNICIPAL, STATE...; mostly UNKNOWN).
+      - name: parent_company_name
+        data_type: varchar
+        description: A parent company a program lists, when any does.
+      - name: naics_code
+        data_type: varchar
+        description: The primary NAICS industry code most of the facility's programs give.
+      - name: naics_description
+        data_type: varchar
+        description: The NAICS code's title, as FRS writes it.
+      - name: is_government
+        data_type: boolean
+        description: A federal site, or an owner or operator is a government body (municipal, county, state, federal, district, tribal).
+        data_tests: [not_null]
+      - name: latitude
+        data_type: float
+        description: Latitude (NAD83).
+      - name: longitude
+        data_type: float
+        description: Longitude (NAD83).
+      - name: frs_url
+        data_type: varchar
+        description: The facility's EPA FRS detail report.
+
+  - name: fct_jurisdiction_businesses
+    description: >
+      Businesses operating in a district-elected official's area: the non-government EPA-regulated facilities
+      (fct_district_facilities) in the district a state legislator or U.S. representative is elected from, or in
+      a mayor's city, flagged when the official received campaign contributions from them. Judges are left out
+      (a circuit or federal district holds thousands of sites, and judges take almost no organization money). A contribution counts when the donor organization's name equals
+      the facility's, its owner's or its parent company's after normalizing case, punctuation, a leading "the"
+      and legal-form words (Inc, LLC, Co, Corp...). Exact names only, so a donor that files under another name
+      is missed. Statewide officials have no rows (they serve every area). Grain: one row per (official,
+      facility); district_id is the area that puts the facility in the official's jurisdiction.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, registry_id]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: registry_id
+        data_type: varchar
+        description: EPA FRS registry id of the facility.
+        data_tests: [not_null]
+      - name: district_id
+        data_type: varchar
+        description: The official's area (dim_district) the facility is in.
+        data_tests: [not_null]
+      - name: facility_name
+        data_type: varchar
+        description: The facility's name in FRS.
+      - name: address
+        data_type: varchar
+        description: Street address.
+      - name: city
+        data_type: varchar
+        description: City in the facility's address.
+      - name: postal_code
+        data_type: varchar
+        description: ZIP code.
+      - name: owner_name
+        data_type: varchar
+        description: The facility's owner or operator (see fct_district_facilities).
+      - name: parent_company_name
+        data_type: varchar
+        description: A parent company a program lists, when any does.
+      - name: naics_code
+        data_type: varchar
+        description: Primary NAICS industry code.
+      - name: naics_description
+        data_type: varchar
+        description: The NAICS code's title.
+      - name: is_donor
+        data_type: boolean
+        description: The official received campaign contributions from this facility, its owner or its parent company.
+        data_tests: [not_null]
+      - name: donor_name
+        data_type: varchar
+        description: The contributor name as filed, when is_donor.
+      - name: donated_amount
+        data_type: decimal(38,6)
+        description: Total contributions the official received from that donor (all years loaded), when is_donor.
+      - name: n_contributions
+        data_type: hugeint
+        description: Number of those contributions.
+      - name: frs_url
+        data_type: varchar
+        description: The facility's EPA FRS detail report.

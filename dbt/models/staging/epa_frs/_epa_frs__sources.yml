@@ -1,0 +1,28 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: epa_frs
+  description: >
+    EPA Facility Registry Service, Missouri state file: regulated sites with their address, coordinates,
+    NAICS codes and owner/operator organizations. One row per CSV row; payload is the row as a JSON object
+    keyed by the CSV header (a malformed row has only `_fields`, the list of values).
+  tables:
+  - name: facilities
+    identifier: epa_frs_facilities
+    description: One row per facility (MO_FACILITY_FILE.CSV), keyed by REGISTRY_ID.
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 45
+          period: day
+        error_after:
+          count: 120
+          period: day
+  - name: organizations
+    identifier: epa_frs_organizations
+    description: One row per (facility, program record, affiliated organization) (MO_ORGANIZATION_FILE.CSV).
+  - name: naics
+    identifier: epa_frs_naics
+    description: One row per (facility, program record, NAICS code) (MO_NAICS_FILE.CSV).

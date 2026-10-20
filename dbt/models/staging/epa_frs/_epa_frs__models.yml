@@ -1,0 +1,16 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_epa_frs__facilities
+  description: 'One row per EPA FRS facility in Missouri: name, street address, county, coordinates (NAD83; missing
+    for about a third of the sites) and the federal agency for federal sites. Malformed CSV rows (no REGISTRY_ID)
+    are left out.'
+- name: stg_epa_frs__naics
+  description: One row per NAICS code an EPA FRS program record gives a facility. is_primary marks the program's
+    primary code (PRIMARY_INDICATOR); a facility can have several programs and so several primary codes. Malformed
+    CSV rows (no REGISTRY_ID) are left out.
+- name: stg_epa_frs__organizations
+  description: 'One row per organization affiliated with an EPA FRS facility through one program record: owner,
+    operator, parent company, contacts... org_type is mostly UNKNOWN; PRIVATE, MUNICIPAL, STATE, FEDERAL, DISTRICT
+    and COUNTY are the common known values. Malformed CSV rows (no REGISTRY_ID) are left out.'

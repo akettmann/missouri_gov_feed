@@ -74,6 +74,17 @@
 {%- endmacro %}
 
 
+{# name_key of a company name without a leading "the" and trailing legal-form words, so "The Doe Company, Inc."
+   and "DOE CO" both give "doe". #}
+{% macro company_key(expr) -%}
+    {{ mogov.regex_replace_all(
+        mogov.regex_replace_all(mogov.name_key(expr), '^the ', ''),
+        '( (inc|incorporated|llc|l l c|co|corp|corporation|company|companies|ltd|limited|lp|llp|pc|pllc))+$',
+        ''
+    ) }}
+{%- endmacro %}
+
+
 {# Left-pad with zeros to width n (lpad isn't universal). #}
 {% macro zero_pad(expr, n) -%}
     {{ dbt.right(dbt.concat(["'" ~ ('0' * n) ~ "'", dbt.safe_cast(expr, dbt.type_string())]), n) }}

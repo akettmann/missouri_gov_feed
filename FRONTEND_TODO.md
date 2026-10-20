@@ -25,6 +25,11 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
 - [ ] Section B, party loyalty: unity % and "votes where they broke with their party" list (`rpt_party_breaks`)
 - [ ] Peer strip charts for each indicator, chamber colleagues and party medians (`rpt_indicator_peers`)
 - [ ] Attendance per session vs chamber (`rpt_attendance`)
+- [ ] Businesses in their district (`fct_jurisdiction_businesses`): the regulated sites in a legislator's, U.S.
+  representative's or mayor's area, with the ones that gave to them first (donor name, amount, link to the
+  contributions). A house district can hold 1,400 sites, so ship the donor rows plus counts by industry (NAICS),
+  not the full list, to stay under the JSON budget. Label the source's limit: EPA-regulated sites only, exact
+  name matches only
 - [ ] Find my officials: address / map click / geolocation to districts (`census_tiger`); lookup runs client-side
   so addresses never leave the browser. First check whether the Census Geocoder allows browser calls (CORS);
   otherwise map click / geolocation with client-side point-in-polygon
