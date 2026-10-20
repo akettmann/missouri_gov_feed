@@ -42,3 +42,4 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
 - [ ] Deploy static build to a GCS bucket + CDN
 - [ ] Add "Awards" such as "Worst Attendance", "Most Money from PACs", "Always Votes with the Party", each award can be by year and lifetime, implement the opposite positive version as well.
 - [ ] Ensure the page looks correct on a wide screen
+- [ ] Build a reference that explains what PACs are used for, to hide the sources of money being donated to politicians
