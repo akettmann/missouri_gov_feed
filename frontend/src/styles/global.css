@@ -119,7 +119,9 @@ h3 {
 }
 
 .wrap {
-  max-width: 1040px;
+  /* wide enough that dense pages (profile chart pairs, tables) use a big screen, while prose and single
+     charts keep their own caps below so nothing stretches edge to edge */
+  max-width: 1280px;
   margin: 0 auto;
   padding: 0 16px;
 }
@@ -135,6 +137,11 @@ h3 {
   border-radius: 10px;
   padding: 20px;
   margin: 16px 0;
+}
+/* readable line length for running text, however wide the column */
+main p,
+main li {
+  max-width: 75ch;
 }
 .lede {
   color: var(--ink-2);
@@ -195,6 +202,12 @@ details > summary {
 }
 .chart {
   min-height: 40px;
+}
+/* a lone chart or indicator scale stops growing at about the old column width; extra room goes to columns */
+.viz,
+.scale,
+.peer {
+  max-width: 960px;
 }
 .chart svg {
   max-width: 100%;

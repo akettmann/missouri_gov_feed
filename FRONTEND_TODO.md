@@ -31,5 +31,6 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
   name or listed-brand matches only
 
 ## Low priority
-- [ ] Ensure the page looks correct on a wide screen
+- [ ] Find my officials on a wide screen: before a lookup the results column (right two fifths) is empty
+  beside the map; a short "your officials will appear here" placeholder would balance it
 - [ ] Build a reference that explains what PACs are used for, to hide the sources of money being donated to politicians

@@ -181,6 +181,11 @@ const tables = freshness();
   h1 {
     margin-top: 24px;
   }
+  /* all prose: keep each card as wide as its text (75ch plus padding) so wide screens don't leave an empty
+     right half inside every card */
+  .card {
+    max-width: calc(75ch + 42px);
+  }
   .ind + .ind {
     border-top: 1px solid var(--hairline);
   }
