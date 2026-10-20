@@ -21,4 +21,8 @@
   - Secretary of State business entity registry: no bulk export. Request an extract under the Sunshine Law (template in docs/sunshine_requests.md). Needs the user to send it
   - OSHA injury-tracking (ITA Form 300A) summary data, yearly zips from osha.gov/Establishment-Specific-Injury-and-Illness-Data: 7,913 Missouri establishments in the 2024 file (establishment and company name, street address, ZIP, NAICS, average employees; establishments with 20+ employees in listed industries and all with 250+), so retail, warehouses and health care that FRS lacks. Blocked on a user decision: osha.gov returns 403 to our honest User-Agent (`missouri-gov-feed/0.1 ...`) and serves only browser-like ones; ask OSHA (or use DOL's keyed API) rather than spoof. It has no coordinates, so it also needs geocoding (Census Geocoder batch API, free, 10,000 addresses per request) before the district join
   - Ruled out: the Missouri Accountability Portal's vendor payments have no vendor address; Census County Business Patterns has no company names
+- [ ] Committee-to-committee money rollup: for each Missouri committee (MEC ID) that gives to an official, its own
+  top contributors (one hop back, from `mec_cd1_a` / TAP contributions where the contributor is itself a committee),
+  so the frontend can show who funds pass-through PACs (FRONTEND_TODO, `/pacs/` follow-up). Mark nonprofits that
+  don't disclose donors as the end of the trail
 - [ ] PlantUML in Github doesn't seem to have dot installed. Can we use the new Javascript transpile of plantuml?

@@ -1,0 +1,636 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { href } from "../lib/site";
+
+// Every factual claim on this page cites one of these. Numbers are the order they appear in the list.
+const SOURCES = [
+  {
+    id: "mec-a2",
+    title: "Missouri Ethics Commission, Constitutional Article VIII, Section 23 (summary and FAQ, Oct. 2018)",
+    url: "https://www.mec.mo.gov/WebDocs/PDF/CampaignFinance/MEC_Article_VIII_Section_23.pdf",
+  },
+  {
+    id: "const-viii",
+    title: "Missouri Constitution, Article VIII, Section 23 (campaign contributions)",
+    url: "https://revisor.mo.gov/main/OneSection.aspx?section=VIII%20%20%2023&constit=y",
+  },
+  {
+    id: "const-iii",
+    title: "Missouri Constitution, Article III, Section 2 (legislative contribution limits)",
+    url: "https://revisor.mo.gov/main/OneSection.aspx?section=III%20%20%20%202&constit=y",
+  },
+  {
+    id: "csr",
+    title:
+      "Missouri Secretary of State, proposed amendment to 15 CSR 30-14.010, Campaign Contribution Limits (filed July 9, 2026)",
+    url: "https://www.sos.mo.gov/CMSImages/GeneralCounsel/Amended15c30-14.010v2.pdf",
+  },
+  {
+    id: "ffef",
+    title: "Free & Fair Election Fund v. Missouri Ethics Commission, 903 F.3d 759 (8th Cir. Sept. 10, 2018)",
+    url: "https://www.leagle.com/decision/infco20180910107",
+  },
+  {
+    id: "cert",
+    title:
+      "U.S. Supreme Court docket No. 18-896, Missouri Ethics Commission v. Free and Fair Election Fund (certiorari denied 2019)",
+    url: "https://www.supremecourt.gov/docket/docketfiles/html/public/18-896.html",
+  },
+  {
+    id: "rsmo-031",
+    title: "RSMo 130.031 (cash, anonymous and fictitious-name contributions)",
+    url: "https://revisor.mo.gov/main/OneSection.aspx?section=130.031",
+  },
+  {
+    id: "rsmo-044",
+    title: "RSMo 130.044 (48-hour reports of contributions over $5,000)",
+    url: "https://revisor.mo.gov/main/OneSection.aspx?section=130.044",
+  },
+  {
+    id: "rsmo-046",
+    title: "RSMo 130.046 (disclosure report deadlines)",
+    url: "https://revisor.mo.gov/main/OneSection.aspx?section=130.046",
+  },
+  {
+    id: "fec-limits",
+    title: "FEC, Contribution limits (2025–2026)",
+    url: "https://www.fec.gov/help-candidates-and-committees/candidate-taking-receipts/contribution-limits/",
+  },
+  {
+    id: "fec-pacs",
+    title: "FEC, Understanding nonconnected PACs",
+    url: "https://www.fec.gov/help-candidates-and-committees/registering-pac/understanding-nonconnected-pacs/",
+  },
+  {
+    id: "fec-types",
+    title: "FEC, Types of nonconnected PACs",
+    url: "https://www.fec.gov/help-candidates-and-committees/registering-pac/types-nonconnected-pacs/",
+  },
+  {
+    id: "fr-leadership",
+    title: "FEC, Final rules on leadership PACs, 68 Fed. Reg. 67013 (Dec. 1, 2003)",
+    url: "https://www.govinfo.gov/link/fr/68/67013",
+  },
+  {
+    id: "fec-cu",
+    title: "FEC, Citizens United v. FEC (Supreme Court, Jan. 21, 2010)",
+    url: "https://www.fec.gov/legal-resources/court-cases/citizens-united-v-fec/",
+  },
+  {
+    id: "fec-speechnow",
+    title: "FEC, SpeechNow.org v. FEC (D.C. Circuit, Mar. 26, 2010)",
+    url: "https://www.fec.gov/legal-resources/court-cases/speechnoworg-v-fec/",
+  },
+  {
+    id: "fec-48",
+    title: "FEC, 48-hour notices",
+    url: "https://www.fec.gov/help-candidates-and-committees/filing-reports/48-hour-notices/",
+  },
+  {
+    id: "usc-30122",
+    title: "52 U.S.C. § 30122, Contributions in name of another prohibited",
+    url: "https://www.law.cornell.edu/uscode/text/52/30122",
+  },
+  {
+    id: "irs",
+    title:
+      "IRS, Public disclosure of exempt organization returns: contributors' identities not subject to disclosure",
+    url: "https://www.irs.gov/charities-non-profits/public-disclosure-and-availability-of-exempt-organizations-returns-and-applications-contributors-identities-not-subject-to-disclosure",
+  },
+  {
+    id: "mi-goofy",
+    title:
+      "Rudi Keller, “‘A little goofy’: Loopholes allow millions to flow around Missouri campaign donation limits,” Missouri Independent, Nov. 15, 2024",
+    url: "https://missouriindependent.com/2024/11/15/a-little-goofy-loopholes-allow-millions-to-flow-around-missouri-campaign-donation-limits/",
+  },
+  {
+    id: "mi-a3",
+    title:
+      "Anna Spoerre, “Missouri abortion-rights campaign doubles its fundraising total since qualifying for ballot,” Missouri Independent, Sept. 13, 2024",
+    url: "https://missouriindependent.com/2024/09/13/missouri-abortion-rights-campaign-doubles-fundraising-fairness-project/",
+  },
+  {
+    id: "pp-concord",
+    title: "ProPublica Nonprofit Explorer, The Concord Fund (501(c)(4))",
+    url: "https://projects.propublica.org/nonprofits/organizations/202303252",
+  },
+  {
+    id: "pp-1630",
+    title: "ProPublica Nonprofit Explorer, Sixteen Thirty Fund (501(c)(4))",
+    url: "https://projects.propublica.org/nonprofits/organizations/264486735",
+  },
+  {
+    id: "mec-search",
+    title: "Missouri Ethics Commission, campaign finance searches",
+    url: "https://mec.mo.gov/MEC/Campaign_Finance/Searches.aspx",
+  },
+  {
+    id: "fec-data",
+    title: "FEC, Campaign finance data",
+    url: "https://www.fec.gov/data/",
+  },
+  {
+    id: "ftm",
+    title: "OpenSecrets / FollowTheMoney.org (state campaign finance across years)",
+    url: "https://www.followthemoney.org/",
+  },
+] as const;
+
+type SourceId = (typeof SOURCES)[number]["id"];
+const num = Object.fromEntries(SOURCES.map((s, i) => [s.id, i + 1])) as Record<SourceId, number>;
+const url = Object.fromEntries(SOURCES.map((s) => [s.id, s.url])) as Record<SourceId, string>;
+---
+
+<Layout
+  title="How PACs move money"
+  description="What political action committees are, what they're for, and how money can pass through them so the original donor is hard to see."
+>
+  <h1>How PACs move money</h1>
+  <p class="lede">
+    Political action committees (PACs) pool money and spend it on elections. Most of that is ordinary and
+    fully reported. But because a PAC can give to another PAC, and because some groups that give to PACs don't
+    have to name their own donors, money can pass through several hands before it reaches a candidate, and the
+    report the public sees names only the last one. This page explains how that works in Missouri and federal
+    races and how to follow the money yourself. The practices described here are used by groups across the
+    political spectrum; examples are drawn from reporting on both parties.
+  </p>
+
+  <nav class="card toc" aria-label="On this page">
+    <ol>
+      <li>
+        <a href="#what">What a PAC is</a>
+      </li>
+      <li>
+        <a href="#uses">What PACs are for</a>
+      </li>
+      <li>
+        <a href="#limits">Limits and disclosure</a>
+      </li>
+      <li>
+        <a href="#layering">How money can be layered</a>
+      </li>
+      <li>
+        <a href="#trace">Trace it yourself</a>
+      </li>
+      <li>
+        <a href="#this-site">How this site shows it</a>
+      </li>
+      <li>
+        <a href="#sources">Sources</a>
+      </li>
+    </ol>
+  </nav>
+
+  <section class="card" id="what">
+    <h2>What a PAC is</h2>
+    <h3>In Missouri races</h3>
+    <p>
+      Missouri law sorts political money into committees, each registered with the Missouri Ethics Commission
+      (MEC):
+    </p>
+    <ul>
+      <li>
+        <strong>Candidate committees</strong> raise and spend for one candidate. They can't give to other
+        candidate committees (including federal ones) or to PACs.
+        <sup>
+          <a href={`#src-${num["mec-a2"]}`}>{num["mec-a2"]}</a>
+        </sup>
+      </li>
+      <li>
+        <strong>Continuing committees</strong>, also called political action committees: the constitution uses
+        both names, and the MEC has said they're the same thing.
+        <sup>
+          <a href={`#src-${num["mec-a2"]}`}>{num["mec-a2"]}</a>
+        </sup>{" "}
+        A PAC can give to candidates (within the limits below), to parties and to other PACs.
+      </li>
+      <li>
+        <strong>Political party committees</strong>: state, county and district committees of a party, with
+        their own limits.
+        <sup>
+          <a href={`#src-${num["mec-a2"]}`}>{num["mec-a2"]}</a>
+        </sup>
+      </li>
+    </ul>
+    <p>
+      Corporations and labor unions can't give to candidate committees or parties directly, but they can set
+      up a PAC funded by their members, officers, employees or shareholders, and PACs may take money from
+      corporations, associations and partnerships.
+      <sup>
+        <a href={`#src-${num["mec-a2"]}`}>{num["mec-a2"]}</a>
+      </sup>
+    </p>
+
+    <h3>In federal races</h3>
+    <p>The Federal Election Commission (FEC) recognizes several kinds of PAC:</p>
+    <ul>
+      <li>
+        <strong>Separate segregated fund (SSF)</strong>: a corporate or union PAC with a sponsoring
+        organization. It may ask only certain people tied to that organization (members, stockholders, certain
+        employees and their families) for money.
+        <sup>
+          <a href={`#src-${num["fec-pacs"]}`}>{num["fec-pacs"]}</a>
+        </sup>
+      </li>
+      <li>
+        <strong>Nonconnected PAC</strong>: no sponsoring corporation or union; it can ask the general public
+        for money.
+        <sup>
+          <a href={`#src-${num["fec-pacs"]}`}>{num["fec-pacs"]}</a>
+        </sup>
+      </li>
+      <li>
+        <strong>Leadership PAC</strong>: a committee "directly or indirectly established, financed, maintained
+        or controlled by a candidate" that is not the candidate's own campaign committee.
+        <sup>
+          <a href={`#src-${num["fec-types"]}`}>{num["fec-types"]}</a>
+        </sup>
+      </li>
+      <li>
+        <strong>Super PAC</strong> (independent expenditure-only committee): may take unlimited amounts from
+        individuals, corporations, unions and other PACs, but may not give to candidates or coordinate with
+        them.
+        <sup>
+          <a href={`#src-${num["fec-types"]}`}>{num["fec-types"]}</a>
+        </sup>{" "}
+        Super PACs follow from two 2010 rulings: <em>Citizens United v. FEC</em> held that corporations can't
+        be barred from independent spending,
+        <sup>
+          <a href={`#src-${num["fec-cu"]}`}>{num["fec-cu"]}</a>
+        </sup>{" "}
+        and <em>SpeechNow.org v. FEC</em> then struck down limits on contributions to groups that only make
+        independent expenditures.
+        <sup>
+          <a href={`#src-${num["fec-speechnow"]}`}>{num["fec-speechnow"]}</a>
+        </sup>
+      </li>
+      <li>
+        <strong>Hybrid PAC</strong>: keeps a limited account for giving to candidates and a separate unlimited
+        account for independent spending.
+        <sup>
+          <a href={`#src-${num["fec-types"]}`}>{num["fec-types"]}</a>
+        </sup>
+      </li>
+    </ul>
+  </section>
+
+  <section class="card" id="uses">
+    <h2>What PACs are for</h2>
+    <p>Most PAC activity is what the law intends:</p>
+    <ul>
+      <li>
+        <strong>Pooling small gifts.</strong> Members of a union, trade group or company can each give a
+        little and have it spent together.
+      </li>
+      <li>
+        <strong>A lawful channel for organizations.</strong> Corporations and unions that can't give to
+        candidates directly can take part through a PAC their people fund.
+        <sup>
+          <a href={`#src-${num["mec-a2"]}`}>{num["mec-a2"]}</a>
+        </sup>
+      </li>
+      <li>
+        <strong>Supporting allies.</strong> In the FEC's description, leadership PAC money is "given to other
+        Federal candidates," pays for the officeholder's travel when campaigning for them, or goes to party
+        committees and state and local candidates.
+        <sup>
+          <a href={`#src-${num["fr-leadership"]}`}>{num["fr-leadership"]}</a>
+        </sup>
+      </li>
+      <li>
+        <strong>Independent advocacy.</strong> Groups spend on ads for or against candidates and ballot
+        measures without coordinating with a campaign.
+      </li>
+    </ul>
+    <p>
+      Every PAC reports the donors who give to it. The problem this page is about is narrower: when a donor is
+      itself a PAC or a nonprofit, the trail continues somewhere else, and sometimes it ends.
+    </p>
+  </section>
+
+  <section class="card" id="limits">
+    <h2>Limits and disclosure</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Rule</th>
+            <th scope="col">Missouri state races</th>
+            <th scope="col">Federal races</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">One donor to one candidate, per election</th>
+            <td>
+              Governor and other statewide offices: $2,825 since Jan. 1, 2023; a proposed rule filed July 9,
+              2026 would raise it to $3,225.
+              <sup>
+                <a href={`#src-${num["csr"]}`}>{num["csr"]}</a>
+              </sup>{" "}
+              State senator: $2,400. State representative: $2,000.
+              <sup>
+                <a href={`#src-${num["const-iii"]}`}>{num["const-iii"]}</a>
+              </sup>{" "}
+              No state limit for local candidates.
+              <sup>
+                <a href={`#src-${num["mec-a2"]}`}>{num["mec-a2"]}</a>
+              </sup>
+            </td>
+            <td>
+              Individual: $3,500. Multicandidate PAC: $5,000.
+              <sup>
+                <a href={`#src-${num["fec-limits"]}`}>{num["fec-limits"]}</a>
+              </sup>
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Giving to a PAC</th>
+            <td>
+              The constitution limits gifts to candidates and parties, not to PACs,
+              <sup>
+                <a href={`#src-${num["mec-a2"]}`}>{num["mec-a2"]}</a>
+              </sup>{" "}
+              and "each PAC is allowed to donate the maximum, even if it has only a single donor."
+              <sup>
+                <a href={`#src-${num["mi-goofy"]}`}>{num["mi-goofy"]}</a>
+              </sup>
+            </td>
+            <td>
+              Individual to a PAC: $5,000 a year.
+              <sup>
+                <a href={`#src-${num["fec-limits"]}`}>{num["fec-limits"]}</a>
+              </sup>{" "}
+              Super PACs and hybrid PACs' non-contribution accounts: unlimited.
+              <sup>
+                <a href={`#src-${num["fec-types"]}`}>{num["fec-types"]}</a>
+              </sup>
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">PAC to PAC</th>
+            <td>
+              Amendment 2 (2016) banned it, but federal courts struck the ban down in 2017–2018 and the
+              Supreme Court declined to hear the state's appeal in 2019.
+              <sup>
+                <a href={`#src-${num["ffef"]}`}>{num["ffef"]}</a>,
+                <a href={`#src-${num["cert"]}`}>{num["cert"]}</a>
+              </sup>
+            </td>
+            <td>
+              Allowed, within the limits above.
+              <sup>
+                <a href={`#src-${num["fec-limits"]}`}>{num["fec-limits"]}</a>
+              </sup>
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Giving in someone else's name</th>
+            <td>
+              Banned, as are anonymous gifts over $25 and cash gifts over $100.
+              <sup>
+                <a href={`#src-${num["rsmo-031"]}`}>{num["rsmo-031"]}</a>
+              </sup>
+            </td>
+            <td>
+              Banned ("straw donors").
+              <sup>
+                <a href={`#src-${num["usc-30122"]}`}>{num["usc-30122"]}</a>
+              </sup>
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Fast reporting of big gifts</th>
+            <td>
+              Any single contribution over $5,000 must be reported to the MEC within 48 hours.
+              <sup>
+                <a href={`#src-${num["rsmo-044"]}`}>{num["rsmo-044"]}</a>
+              </sup>
+            </td>
+            <td>
+              Campaigns report gifts of $1,000 or more received in the last 20 days before an election within
+              48 hours.
+              <sup>
+                <a href={`#src-${num["fec-48"]}`}>{num["fec-48"]}</a>
+              </sup>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="small muted">
+      Missouri's statewide limit is adjusted for inflation by rule; check the MEC for the figure in force on a
+      given date.
+    </p>
+  </section>
+
+  <section class="card" id="layering">
+    <h2>How money can be layered</h2>
+    <p>
+      None of the patterns below is illegal on its own, and each has ordinary uses. Together they can make it
+      hard or impossible for a voter to see where money started.
+      <sup>
+        <a href={`#src-${num["mi-goofy"]}`}>{num["mi-goofy"]}</a>
+      </sup>{" "}
+      What the law does forbid is disguising the true donor: giving in another person's name.
+      <sup>
+        <a href={`#src-${num["rsmo-031"]}`}>{num["rsmo-031"]}</a>,
+        <a href={`#src-${num["usc-30122"]}`}>{num["usc-30122"]}</a>
+      </sup>
+    </p>
+
+    <h3>One source, many PACs</h3>
+    <p>
+      Missouri's limits apply per donor, and a PAC is a donor. A group that funds several PACs can have each
+      one give the maximum to the same candidate. The Missouri Independent reported in 2024 that the Missouri
+      Health Care Association stopped funding its own PAC in 2017 and began giving to two new ones, DSV PAC
+      and RQC PAC, which share a treasurer; recipients include Senate Minority Leader Doug Beck (D). Six PACs
+      run by Strategic Capitol Consulting each gave $2,400 to Brad Hudson (R) on the same day, $14,400 in all;
+      and the Missouri Bankers Association runs a statewide PAC plus seven regional ones.
+      <sup>
+        <a href={`#src-${num["mi-goofy"]}`}>{num["mi-goofy"]}</a>
+      </sup>{" "}
+      The candidates report each check as coming from the PAC that wrote it.
+    </p>
+
+    <h3>PAC-to-PAC chains</h3>
+    <p>
+      Since the courts struck down Missouri's PAC-to-PAC ban,
+      <sup>
+        <a href={`#src-${num["ffef"]}`}>{num["ffef"]}</a>
+      </sup>{" "}
+      money can move through a chain of committees. Each committee reports only who gave to it, so a
+      candidate's report shows the last PAC in the chain. Finding the original donors means opening that PAC's
+      own reports, then the reports of each committee that funded it, and so on.
+    </p>
+
+    <h3>Nonprofits that don't name their donors</h3>
+    <p>
+      Tax-exempt nonprofits such as 501(c)(4) "social welfare" groups and 501(c)(6) trade associations are
+      generally not required to disclose their contributors publicly.
+      <sup>
+        <a href={`#src-${num["irs"]}`}>{num["irs"]}</a>
+      </sup>{" "}
+      When such a group gives to a PAC or ballot committee, the PAC reports the nonprofit as the donor and the
+      trail stops there. This is often called "dark money." Two Missouri examples from 2024, one on each side:
+      the Concord Fund, a 501(c)(4),
+      <sup>
+        <a href={`#src-${num["pp-concord"]}`}>{num["pp-concord"]}</a>
+      </sup>{" "}
+      was the largest donor to candidate PACs, giving $6 million in the effort to nominate Will Scharf (R) for
+      attorney general;
+      <sup>
+        <a href={`#src-${num["mi-goofy"]}`}>{num["mi-goofy"]}</a>
+      </sup>{" "}
+      and the Sixteen Thirty Fund, also a 501(c)(4),
+      <sup>
+        <a href={`#src-${num["pp-1630"]}`}>{num["pp-1630"]}</a>
+      </sup>{" "}
+      gave $4.5 million to the campaign for the abortion-rights amendment, whose largest donors were "four
+      out-of-state progressive nonprofits that are not required to disclose their donors."
+      <sup>
+        <a href={`#src-${num["mi-a3"]}`}>{num["mi-a3"]}</a>
+      </sup>
+    </p>
+
+    <h3>Names that don't say who's behind them</h3>
+    <p>
+      A PAC's name doesn't have to identify its funders. In the 2024 reporting, money from J&amp;J Ventures
+      reached candidates through PACs named Another Viceroy PAC, Paladin PAC and Rowdy PAC, and eight
+      candidates got amounts that would have exceeded the limit from a single PAC.
+      <sup>
+        <a href={`#src-${num["mi-goofy"]}`}>{num["mi-goofy"]}</a>
+      </sup>{" "}
+      Names like these also defeat keyword matching, including this site's (see below).
+    </p>
+
+    <h3>Timing</h3>
+    <p>
+      Missouri's last report before an election is due eight days before it and covers money through the
+      twelfth day before; the next one is due 30 days after.
+      <sup>
+        <a href={`#src-${num["rsmo-046"]}`}>{num["rsmo-046"]}</a>
+      </sup>{" "}
+      Gifts made in that gap appear only after the vote, unless a single contribution exceeds $5,000 and
+      triggers a 48-hour report.
+      <sup>
+        <a href={`#src-${num["rsmo-044"]}`}>{num["rsmo-044"]}</a>
+      </sup>{" "}
+      Federal campaigns have a similar 48-hour rule for gifts of $1,000 or more late in a race.
+      <sup>
+        <a href={`#src-${num["fec-48"]}`}>{num["fec-48"]}</a>
+      </sup>
+    </p>
+  </section>
+
+  <section class="card" id="trace">
+    <h2>Trace it yourself</h2>
+    <ol class="steps">
+      <li>
+        Start from a candidate's donors (on this site, the <strong>Money in</strong> section of any official's
+        profile) and note donors that are committees, PACs or organizations rather than people.
+      </li>
+      <li>
+        Look the committee up in the MEC's campaign finance search by name or MEC ID, and open its disclosure
+        reports to see who gave to it. The MEC also has a search for single contributions over $5,000.
+        <sup>
+          <a href={`#src-${num["mec-search"]}`}>{num["mec-search"]}</a>
+        </sup>
+      </li>
+      <li>Repeat for each committee among that PAC's donors until you reach people or companies.</li>
+      <li>
+        For federal races, the FEC's data pages list each committee's receipts by contributor, including
+        transfers from other committees.
+        <sup>
+          <a href={`#src-${num["fec-data"]}`}>{num["fec-data"]}</a>
+        </sup>
+      </li>
+      <li>
+        If the trail reaches a nonprofit, public records usually stop: its tax return shows amounts but not,
+        in general, donor names.
+        <sup>
+          <a href={`#src-${num["irs"]}`}>{num["irs"]}</a>
+        </sup>
+      </li>
+      <li>
+        FollowTheMoney.org collects state campaign finance across years and states, which helps with donors
+        who give in many places.
+        <sup>
+          <a href={`#src-${num["ftm"]}`}>{num["ftm"]}</a>
+        </sup>
+      </li>
+    </ol>
+  </section>
+
+  <section class="card" id="this-site">
+    <h2>How this site shows it</h2>
+    <ul>
+      <li>
+        Each profile's <strong>Money in</strong> section lists donors as the official's committee reported
+        them: totals by cycle, top donors, top employers and gift sizes. A PAC shows up under its own name;
+        the site does not yet follow PAC-to-PAC chains back to the original donors.
+      </li>
+      <li>
+        The <a href={href("/awards/")}>awards</a> rank money from PACs, committees and parties, counted
+        together because the MEC files PACs as committees (
+        <a href={href("/methodology/#awards")}>methodology</a>).
+      </li>
+      <li>
+        Interest-and-votes views assign donors to industries by keywords in their names. Opaque PAC names,
+        leadership PACs and pass-through PACs usually match no industry, so those views undercount (
+        <a href={href("/methodology/#interest-votes")}>methodology</a>).
+      </li>
+    </ul>
+    <p class="small muted">
+      As everywhere on this site, a donation shown next to a vote is co-occurrence, not evidence the vote was
+      bought.
+    </p>
+  </section>
+
+  <section class="card" id="sources">
+    <h2>Sources</h2>
+    <ol class="sources small">
+      {SOURCES.map((s, i) => (
+        <li id={`src-${i + 1}`}>
+          <a href={url[s.id]} rel="noopener">
+            {s.title}
+          </a>
+        </li>
+      ))}
+    </ol>
+  </section>
+</Layout>
+
+<style>
+  h1 {
+    margin-top: 24px;
+  }
+  .toc ol {
+    margin: 0;
+    padding-left: 1.25rem;
+    columns: 2 14rem;
+  }
+  .steps li + li,
+  .sources li + li {
+    margin-top: 0.4rem;
+  }
+  .sources a {
+    overflow-wrap: anywhere;
+  }
+  sup {
+    line-height: 0;
+  }
+  sup a {
+    text-decoration: none;
+  }
+  tbody th {
+    font-weight: 600;
+    min-width: 9rem;
+  }
+  :target {
+    scroll-margin-top: 16px;
+  }
+  li:target {
+    background: var(--surface-2);
+  }
+</style>
