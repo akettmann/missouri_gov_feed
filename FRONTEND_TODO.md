@@ -16,7 +16,7 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
 - Keep each official's JSON under the 100 KB gzipped budget (`pnpm sizes` after every data refresh)
 
 ## High priority
-- [ ] Decide audience/hosting (public?) and whether judges stay in (they get profiles today; ideology/votes show
+- [ ] Decide whether judges stay in (they get profiles, find, compare and awards today; ideology/votes show
   "not applicable")
 - [ ] Decide on address search for /find/ (today: device location or a map click only). The Census Geocoder
   sends no CORS header, so a browser can reach it only by JSONP: that runs Census-hosted script on our page and
@@ -26,4 +26,6 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
 ## Medium priority
 
 ## Low priority
-- [ ] Deploy static build to a GCS bucket + CDN
+- [ ] When going public (the site will be public; development stays local for now): create the bucket
+  (docs/environment.md "Publishing to Google Cloud Storage") and run `MOGOV_SITE_BUCKET=... pnpm deploy:gcs`;
+  the script and docs are ready
