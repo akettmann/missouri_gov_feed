@@ -22,3 +22,11 @@ models:
 - name: stg_mo_house__rollcalls
   description: 'One row per MO House roll call (parsed PDF header). The line after "Roll Call : N" names the measure
     (e.g. "HCS HB 10"); the next lines carry the sponsor and a description.'
+  columns:
+  - name: session_day
+    description: Legislative day of the session (highest seen through 2026 is 79).
+    data_tests:
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 1
+          max_value: 120

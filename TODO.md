@@ -1,14 +1,7 @@
 # TODO List
 
 ## High priority
-- [ ] Add "sanity check" dbt tests (CLAUDE.md guideline): bounds no real data has come near, so a parsing or loading bug fails loudly. Only `dbt_utils` is installed; its `accepted_range` and `expression_is_true` cover these, or add dbt-expectations. Observed October 2026 values, for setting the bounds:
-  - House roll calls per session day: max 95 (fail above 200)
-  - Members recorded on one roll call: House max 162 Yes+No (163 seats); Senate 34 seats
-  - Session day numbers: max 79 (fail above 120)
-  - Single campaign contribution: max $880,000 (fail at $10M); negatives down to -$11,600 are refunds
-  - Single lobbyist gift: max $3,045 (fail at $100,000)
-  - `fct_salaries.pay`: $388 (partial year) to $264,900 (fail above $1M)
-  - Percentages (`attendance_pct` and others): between 0 and 100
+- [ ] Senate votes that match no senator (`int_mo_senate__votes.person_key` null): Wallingford (1,106 tokens, 2017-2020) and Kehoe (663, 2017-2018) never match, and no senator matches on the January 4-10, 2017 votes. Their seats seem to be missing from `int_mo_legislators__seats` (former senators, or terms starting after the first day of session). Find the gap in the Open States people data and fill it (seed or another source)
 
 ## Medium priority
 - [ ] `fct_vote_bills`: House roll calls on combined bills (`HCS HBs 267 & 347`, `SS SCS SBs 49 & 118`) link only the lead bill. Link every bill number in the measure if bill-level reports need the others

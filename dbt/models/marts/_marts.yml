@@ -355,7 +355,15 @@ models:
         description: Date of the contribution as reported.
       - name: amount
         data_type: decimal(28,6)
-        description: Amount in USD. Negative values are refunds/corrections as filed.
+        description: >
+          Amount in USD. Negative values are refunds/corrections as filed. Sanity bound: fails at $10M either way
+          (largest through 2026: $880,000; refunds down to -$11,600).
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -10000000
+                max_value: 10000000
+                inclusive: false
       - name: counterparty
         data_type: varchar
         description: The other party - the donor for `received`, the recipient for `given`.
@@ -431,7 +439,14 @@ models:
         description: Year of expenditure_date.
       - name: amount
         data_type: decimal(28,6)
-        description: USD.
+        description: >
+          USD; negative values are corrections as filed. Sanity bound: the largest gift through 2026 was $3,045.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -100000
+                max_value: 100000
+                inclusive: false
       - name: lobbyist_name
         data_type: varchar
         description: Reporting lobbyist.
@@ -555,6 +570,13 @@ models:
       - name: value
         data_type: double
         description: The score, on the indicator's own scale.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+              config:
+                where: "indicator = 'party_unity_pct'"
       - name: period
         data_type: integer
         description: Congress number (DW-NOMINATE), last year served (Shor-McCarty); null for party unity (computed over all loaded votes).
@@ -1135,7 +1157,14 @@ models:
         description: Name as the payroll prints it ("LAST, FIRST M"), so a reader can check the match; the official's name for federal rows.
       - name: pay
         data_type: decimal(12,2)
-        description: Dollars for the year; what it measures depends on pay_basis.
+        description: >
+          Dollars for the year; what it measures depends on pay_basis. Through 2026: $388 (a partial year) to
+          $264,900.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1000000
       - name: pay_basis
         data_type: varchar
         description: "'gross pay': all pay received in the year (state payroll). 'statutory salary': the office's annual salary rate (federal), not what was paid."

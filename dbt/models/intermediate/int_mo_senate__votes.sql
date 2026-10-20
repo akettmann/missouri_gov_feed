@@ -1,5 +1,6 @@
 -- MO Senate journal votes attributed to people: the senator serving on the vote date with a matching
 -- surname (and district, when the journal adds one to disambiguate). Ambiguous tokens stay unattributed.
+-- A two-word token ("Thompson Rehder") also matches a senator whose recorded surname is its last word.
 with votes as (
     select
         *,
@@ -18,7 +19,7 @@ candidates as (
         on
             seat.chamber = 'upper'
             and v.vote_date between seat.start_date and seat.end_date
-            and v.token_key = seat.surname_key
+            and (v.token_key = seat.surname_key or v.token_key like '% ' || seat.surname_key)
             and (v.token_district is null or v.token_district = seat.district_number)
 ),
 

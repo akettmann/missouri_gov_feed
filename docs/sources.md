@@ -92,6 +92,16 @@ Quirks:
 - Running page headers ("Journal of the Senate 118", day lines) appear mid-block and are stripped.
 - The block regex is bounded at 2,500 characters, so a block missing its "Vacancies" line can't
   swallow the rest of the journal.
+- Some votes have an "Excused from voting—Senator Hegeman—1" line (recorded as `not voting`).
+- Some journals print a section's total before its names ("Absent with leave—Senators—2 Eigel
+  Gannon"). A section's names therefore also end at the next section heading. Before October 2026 they
+  ran on into it, picking up "Vacancies", "NAYS" or "Absent" as senators and filing the next section's
+  senators under the wrong vote.
+- Names are space-separated, so a two-word surname looks like two senators. Known ones are listed in
+  `COMPOUND_SURNAMES` (Holly Thompson Rehder, printed "Thompson Rehder"); dbt matches a two-word token on
+  its last word. The PDF text sometimes cuts "Senator" short ("Senato"); such words are skipped.
+- The `assert_votes_within_seats` dbt test fails if a vote lists more than 34 senators. It caught all of
+  the above: 443 votes listed 35 or 36 names before the fixes.
 - PDF parsing (about 3 s per journal) dominates a cold run, so it shards well. The extracted text is
   cached by PDF content, so re-runs skip it.
 

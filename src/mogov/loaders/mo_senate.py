@@ -1,7 +1,8 @@
 """Missouri Senate journals: the only per-senator roll-call record.
 
 Daily journal PDFs are listed at senate.mo.gov/journallist/?SelectedYear=YYYY. Each recorded vote
-reads "YEAS—Senators <names>—N  NAYS—Senators ... Absent—... Absent with leave—... Vacancies—...".
+reads "YEAS—Senators <names>—N  NAYS—Senators ... Absent—... Absent with leave—... [Excused from voting—...]
+Vacancies—...".
 Every block becomes one raw row per (vote, senator token), with the sentence that introduced the
 vote ("SB 974 was read the 3rd time and passed by the following vote:") kept as context. Tokens are
 surnames, "(16)"-style district suffixes when two senators share one; dbt matches them to people.
@@ -20,16 +21,21 @@ log = obs.get_logger(__name__)
 BASE = "https://www.senate.mo.gov"
 
 DASH = "[—–-]"
-CATEGORIES = ["YEAS", "NAYS", "Absent with leave", "Absent", "Vacancies"]
+CATEGORIES = ["YEAS", "NAYS", "Absent with leave", "Absent", "Excused from voting", "Vacancies"]
+CATEGORY = "|".join(CATEGORIES)
 # bounded so a block missing its "Vacancies" line can't swallow the rest of the journal
 BLOCK = re.compile(rf"YEAS{DASH}Senators?.{{0,2500}}?Vacancies{DASH}[^\n]*", re.S)
+# A section's names end at its "—N" total, "None", or the next section. Some journals print the total
+# before the names ("Absent with leave—Senators—2 Eigel Gannon"); that leading number is the total.
 SECTION = re.compile(
-    rf"(YEAS|NAYS|Absent with leave|Absent|Vacancies){DASH}(?:Senators?{DASH}?)?\s*"
-    rf"(.*?)(?={DASH}\d+\b|{DASH}?None\b|$)",
+    rf"({CATEGORY}){DASH}(?:Senators?{DASH}?)?\s*"
+    rf"(.*?)(?={DASH}\d+\b|{DASH}?None\b|\s(?:{CATEGORY}){DASH}|$)",
     re.S,
 )
+# Surnames of two words, which a space-separated list can't tell apart from two senators.
+COMPOUND_SURNAMES = ["Thompson Rehder"]
 # "Brown (16)" (2025+) or "Brown (16th Dist.)" (earlier); normalized to "Brown (16)"
-NAME = re.compile(r"([A-Z][A-Za-z'’\-]+)(?: \((\d+)(?:st|nd|rd|th)?(?: ?Dist\.?)?\))?")
+NAME = re.compile(rf"({'|'.join(COMPOUND_SURNAMES)}|[A-Z][A-Za-z'’\-]+)(?: \((\d+)(?:st|nd|rd|th)?(?: ?Dist\.?)?\))?")
 # running page headers: "Journal of the Senate 118", "Sixty-Sixth Day—Thursday, April 24, 2025"
 PAGE_FURNITURE = re.compile(
     r"^(?:Journal of the Senate \d+|\d+ Journal of the Senate|.*\bDAY\s*[—–-]\s*[A-Z]+DAY,.*)$", re.M | re.I
@@ -50,8 +56,11 @@ def parse_journal(text: str) -> list[dict]:
             if category == "Vacancies":
                 continue
             count = re.search(rf"{re.escape(names)}{DASH}(\d+)", block.replace("\n", " "))
+            if leading := re.match(r"(\d+)\s+", names):
+                count, names = leading, names[leading.end() :]
             for surname, district in NAME.findall(names):
-                if surname in {"Senator", "Senators", "None", "Dist"}:
+                # "Senato" and the like: the heading word cut off by the PDF text
+                if surname in {"None", "Dist"} or (len(surname) >= 5 and "Senators".startswith(surname)):
                     continue
                 name = f"{surname} ({district})" if district else surname
                 rows.append(

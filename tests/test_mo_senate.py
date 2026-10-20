@@ -14,6 +14,59 @@ def _text() -> str:
         return "\n".join(p.extract_text() or "" for p in pdf.pages)
 
 
+# Two blocks from the 2022 journal RDay6005052296-2344.pdf, as pdfplumber extracts them
+BLOCKS_2022 = """On motion of Senator O'Laughlin, HB 2485 was read the 3rd time and passed by the following vote:
+YEAS—Senators
+Bean Beck Bernskoetter Brattin Brown Burlison Cierpiot
+Crawford Eslinger Gannon Hoskins Hough Koenig Luetkemeyer
+May O'Laughlin Onder Razer Riddle Rizzo Roberts
+Rowden Schatz Thompson Rehder Washington White Wieland Williams—28
+NAYS—Senators
+Arthur Moon Mosley Schupp—4
+Absent—Senators—None
+Absent with leave—Senator Eigel—1
+Journal of the Senate 2308
+Excused from voting—Senator Hegeman—1
+Vacancies—None
+The emergency clause was adopted by the following vote:
+YEAS—Senators
+Bean Bernskoetter Brattin Brown Burlison Cierpiot Crawford
+Eslinger Hegeman Hoskins Hough Koenig Luetkemeyer O'Laughlin
+Onder Riddle Rowden Schatz Thompson Rehder White Wieland—21
+NAYS—Senators
+Arthur Beck May Moon Mosley Razer Rizzo
+Roberts Schupp Washington Williams—11
+Journal of the Senate 2310
+Absent—Senators—None
+Absent with leave—Senators—2
+Eigel Gannon
+Vacancies—None
+"""
+
+
+def test_every_seat_is_accounted_for_once():
+    rows = parse_journal(BLOCKS_2022)
+    for block in (0, 1):
+        names = [r["name"] for r in rows if r["block_index"] == block]
+        assert len(names) == len(set(names)) == 34, block
+    assert "Thompson Rehder" in {r["name"] for r in rows}
+    assert not {"Thompson", "Rehder", "Vacancies"} & {r["name"] for r in rows}
+
+
+def test_excused_and_leading_totals():
+    rows = parse_journal(BLOCKS_2022)
+    excused = [r for r in rows if r["category"] == "Excused from voting"]
+    assert [(r["block_index"], r["name"], r["declared_count"]) for r in excused] == [(0, "Hegeman", 1)]
+    leave = [r for r in rows if r["block_index"] == 1 and r["category"] == "Absent with leave"]
+    assert [(r["name"], r["declared_count"]) for r in leave] == [("Eigel", 2), ("Gannon", 2)]
+
+
+def test_cut_off_heading_word_is_not_a_senator():
+    text = BLOCKS_2022.replace("Absent with leave—Senator Eigel—1", "Absent with leave—Senato Eigel—1")
+    names = {r["name"] for r in parse_journal(text) if r["block_index"] == 0}
+    assert "Senato" not in names and "Eigel" in names
+
+
 def test_vote_blocks_parse_and_counts_match_declared_totals():
     rows = parse_journal(_text())
     assert rows, "expected at least one recorded vote"
