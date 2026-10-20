@@ -40,10 +40,12 @@ bill_industry_subjects as (
 ),
 
 money_by_vote as (
+    -- per bill, so money isn't summed once per bill when a vote covers several bills of one industry
     select
         v.official_id,
         v.chamber,
         v.vote_id,
+        v.bill,
         b.industry,
         sum(case when m.money_kind = 'contribution' then m.total_amount else 0 end) as contributions_amount,
         sum(case when m.money_kind = 'lobbyist gift' then m.total_amount else 0 end) as gifts_amount,
@@ -59,7 +61,7 @@ money_by_vote as (
             v.official_id = m.official_id
             and b.industry = m.industry
             and v.vote_year >= m.money_year
-    group by v.official_id, v.chamber, v.vote_id, b.industry
+    group by v.official_id, v.chamber, v.vote_id, v.bill, b.industry
 )
 
 select
@@ -82,7 +84,7 @@ select
     bl.source_url as bill_source_url
 from money_by_vote as m
 inner join votes as v
-    on m.official_id = v.official_id and m.chamber = v.chamber and m.vote_id = v.vote_id
+    on m.official_id = v.official_id and m.chamber = v.chamber and m.vote_id = v.vote_id and m.bill = v.bill
 inner join bill_industry_subjects as b
     on v.session_code = b.session_code and v.bill = b.bill and m.industry = b.industry
 left join {{ ref('fct_bills') }} as bl
