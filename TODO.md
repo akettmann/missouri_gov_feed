@@ -23,3 +23,4 @@
   - Census County Business Patterns: counts by industry, no company names
 - [ ] Save a copy of the literal Sunshine Law (RSMo Chapter 610, sections 610.010-610.035, from revisor.mo.gov) in the repo, along with the other sections docs/sunshine_requests.md cites (105.483-105.492, Court Operating Rule 2), noting the date each was retrieved
 - [ ] Each January: add the year's rates to the `federal_salaries` seed (senate.gov, uscourts.gov)
+- [] write a simplified summary of the missouri sunshine act
