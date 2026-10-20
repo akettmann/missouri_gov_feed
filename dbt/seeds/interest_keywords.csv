@@ -1,4 +1,10 @@
 keyword,industry
+accountants,accounting
+cpas,accounting
+deloitte,accounting
+ernst young,accounting
+kpmg,accounting
+pricewaterhousecoopers,accounting
 agribusiness,agriculture
 agricultural,agriculture
 bayer,agriculture
@@ -24,6 +30,7 @@ brewery,alcohol
 brewing,alcohol
 distillers,alcohol
 liquor,alcohol
+mbwa,alcohol
 spirits,alcohol
 wine,alcohol
 bancorp,banking_finance
@@ -40,13 +47,16 @@ credit unions,banking_finance
 finance,banking_finance
 financial,banking_finance
 h r block,banking_finance
+investment company institute,banking_finance
 jpmorgan,banking_finance
 lenders,banking_finance
 lending,banking_finance
+mba,banking_finance
 morgan stanley,banking_finance
 mortgage,banking_finance
 savings,banking_finance
 securities,banking_finance
+ubs,banking_finance
 wells fargo,banking_finance
 associated industries,business
 chamber,business
@@ -59,6 +69,7 @@ manufacturers,business
 retail,business
 retailers,business
 walmart,business
+acec,construction
 agc,construction
 aggregates,construction
 architects,construction
@@ -73,6 +84,17 @@ engineering,construction
 je dunn,construction
 laborers,construction
 operating engineers,construction
+bae systems,defense
+boeing,defense
+general dynamics,defense
+honeywell,defense
+huntington ingalls,defense
+l3harris,defense
+leidos,defense
+lockheed martin,defense
+northrop grumman,defense
+raytheon,defense
+rtx,defense
 college,education
 colleges,education
 education,education
@@ -131,6 +153,7 @@ hospital,health_care
 hospitals,health_care
 lilly,health_care
 medical,health_care
+mha,health_care
 nurse,health_care
 nurses,health_care
 nursing,health_care
@@ -141,6 +164,7 @@ pharmacists,health_care
 pharmacy,health_care
 physician,health_care
 physicians,health_care
+pt pac,health_care
 residential care,health_care
 ssm,health_care
 unitedhealth,health_care
@@ -210,6 +234,7 @@ broadband,telecom
 cable,telecom
 centurylink,telecom
 centurytel,telecom
+charter communication,telecom
 charter communications,telecom
 comcast,telecom
 embarq,telecom
@@ -230,6 +255,7 @@ auto dealers,transportation
 automobile dealers,transportation
 bnsf,transportation
 csx,transportation
+dealers interested in government,transportation
 enterprise holdings,transportation
 fedex,transportation
 ford motor,transportation

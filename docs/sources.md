@@ -29,6 +29,7 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `shor_mccarty` | Harvard Dataverse | state legislator ideology scores | 1993–2022 | |
 | `mo_employee_pay` | data.mo.gov State Employee Pay | yearly gross pay of legislators, statewide officials and state judges | `MOGOV_LOOKBACK_YEARS` (published from 2007) | |
 | `census_tiger` | Census Bureau TIGER/Line | legislative and congressional district, county and city boundaries | newest vintage | |
+| `epa_frs` | EPA Facility Registry Service | regulated facilities (name, address, coordinates, NAICS, owner) placed in districts; businesses in each official's district that donated to them | current state file (refreshed every few months) | |
 | `census_zcta` | Census Bureau Gazetteer | ZIP code area centers and land areas (find-by-ZIP) | newest vintage | |
 
 ## mo_house: Missouri House of Representatives
@@ -415,3 +416,52 @@ Quirks:
   representatives and 32 of 33 senators; the rest share a surname with a colleague and use a nickname.
 - The current year's dataset appears in January of the following year.
 - Federal officials (Congress, federal judges) are paid by the U.S. and are not in this source.
+
+## epa_frs: EPA Facility Registry Service
+
+EPA's Facility Registry Service (FRS) lists every site an EPA or state environmental program regulates:
+factories, fuel stations, quarries, auto body shops, dry cleaners, utilities, farms with permits, landfills.
+Each site has a name, street address, coordinates, NAICS industry codes and the organizations that own or
+operate it. dbt places each site in the districts, counties and cities that contain it
+(`fct_district_facilities`), then lists the businesses in each district-elected official's area and flags
+those that gave to the official (`fct_jurisdiction_businesses`).
+
+It is the only free, named and geocoded list of businesses found for Missouri. The Secretary of State's
+business registry has no bulk export, the Missouri Accountability Portal's vendor payments have no address
+(see Quirks), and Census County Business Patterns has counts but no names. FRS covers regulated sites only, so
+offices, shops and most service businesses are missing.
+
+- Lands: `epa_frs_facilities`, `epa_frs_organizations`, `epa_frs_naics`, one row per CSV row of
+  `MO_FACILITY_FILE.CSV`, `MO_ORGANIZATION_FILE.CSV` and `MO_NAICS_FILE.CSV` from the Missouri state file
+  (`https://ordsext.epa.gov/FLA/www3/state_files/state_combined_mo.zip`, about 35 MB). The payload is the row
+  as a JSON object keyed by the CSV header.
+- Shard units: the three CSV files. The zip is downloaded once and shared.
+- Districts: point-in-polygon of the facility's coordinates against the current `dim_district` boundaries.
+  The geometry functions are dispatched per backend (`macros/compat/spatial.sql`); on DuckDB they need the
+  `spatial` extension, which `dbt/profiles.yml` loads (downloaded on first use).
+- Donor match, two ways (`matched_by`):
+  - `same name`: the donor organization's name equals the facility's, owner's or parent company's after
+    normalizing case and punctuation and dropping a leading "the" and legal-form words (Inc, LLC, Co,
+    Corp...).
+  - `same company`: both names carry one brand from the `company_brands` seed. Corporate money mostly comes
+    from PACs named after the brand ("Ameren Missouri PAC", "Spire PAC", "AT&T Missouri Employee PAC"), while
+    sites are filed under legal or subsidiary names ("UNION ELECTRIC CO", "LACLEDE GAS", "SOUTHWESTERN BELL
+    TELEPHONE", "KANSAS CITY POWER & LIGHT"). The seed covers the largest corporate donors with Missouri sites.
+  - In October 2026: 502 (official, facility) pairs by name and 1,541 more by brand, for 122 officials.
+
+Quirks:
+- A few rows fuse two records onto one line (a closing quote is missing: `...,"O"110015893693",...`). DuckDB's
+  CSV reader, even with `ignore_errors`, dropped 35 good organization rows after each such line, so the
+  loader reads the files with Python's csv module. The two malformed rows per file land with their values
+  under `_fields` and drop out in staging.
+- About a third of the sites (36k of 112k in October 2026) have no coordinates and so no district. 54 have
+  coordinates outside Missouri.
+- Organization types are mostly `UNKNOWN`, so government sites are also recognized by name ("City of ...",
+  "... County", "... School District", "Public Works") as well as by a government org type or federal agency.
+- One owner per facility is kept: owner/operator, then owner, operator, permittee, preferring a known org
+  type.
+- Branded fuel stations carry the brand in their name but are mostly independently owned ("BILL S PHILLIPS
+  66"), so oil brands are not in `company_brands`.
+- Missouri Accountability Portal (mapyourtaxes.mo.gov, also the "State Expenditures" datasets on data.mo.gov)
+  was checked for the same purpose and not used: its files have agency, category, vendor name (cut at 30
+  characters) and amount per fiscal year, with no vendor address, and include employees' reimbursements.

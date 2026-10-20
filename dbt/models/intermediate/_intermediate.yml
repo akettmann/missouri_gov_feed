@@ -47,6 +47,14 @@ models:
 - name: int_courtlistener__official_positions
   description: 'Career positions from CourtListener''s judge database for officials it covers (matching in int_courtlistener__official_people).
     Grain: one row per CourtListener position of a matched official.'
+- name: int_epa_frs__facilities
+  description: 'EPA FRS facilities in Missouri that have coordinates, with one owner, one parent company and one
+    primary NAICS code each. The owner is the first owner-role organization (owner/operator, owner, operator, permittee;
+    a known org_type before UNKNOWN); the NAICS code is the primary code most of the facility''s programs give.
+    is_government: a federal site, any owner-role organization typed as a government body (municipal, county, state,
+    federal, district, tribal), or a facility or owner named like one ("City of ...", "... County", "... School
+    District"; most organizations are typed UNKNOWN). The *_key columns are company_key names for matching donors.
+    Grain: one row per geocoded EPA FRS facility.'
 - name: int_house_fd__schedule_lines
   description: 'House disclosure PDF text, each line tagged with the schedule it falls under (the nearest preceding
     "Schedule X:" header in the same document). Column-header rows, "None disclosed." and boilerplate drop out.
@@ -96,12 +104,16 @@ models:
     people stay unattributed rather than guessed. Grain: one row per (House roll call, attributed person).'
 - name: int_mo_legislators__seats
   description: 'Every Missouri legislative seat-term in Open States (current and retired people), keyed for matching:
-    chamber, district number, surname key, and date range (open-ended where Open States has no date). Grain: one
-    row per Open States legislative seat-term.'
+    chamber, district number, surname key, and date range (open-ended where Open States has no date). Two corrections
+    to Open States: * a term starting in January counts from January 1. Open States starts the 2017 class on January
+    11, but the session (and their votes) began January 4. * seed legislator_seat_corrections adds terms Open States
+    lacks or cuts short (senators who left mid-term for statewide office), each with its source. Grain: one row
+    per Open States legislative seat-term.'
 - name: int_mo_senate__votes
   description: 'MO Senate journal votes attributed to people: the senator serving on the vote date with a matching
-    surname (and district, when the journal adds one to disambiguate). Ambiguous tokens stay unattributed. Grain:
-    one row per (Senate journal vote, attributed person).'
+    surname (and district, when the journal adds one to disambiguate). Ambiguous tokens stay unattributed. A two-word
+    token ("Thompson Rehder") also matches a senator whose recorded surname is its last word. Grain: one row per
+    (Senate journal vote, attributed person).'
 - name: int_officials__bios
   description: 'One biography text per current official where a source has one: Official Manual (legislators), MO
     House XML (representatives), FJC professional career (federal judges), Open States (others). Grain: one biography

@@ -61,6 +61,18 @@ def test_excused_and_leading_totals():
     assert [(r["name"], r["declared_count"]) for r in leave] == [("Eigel", 2), ("Gannon", 2)]
 
 
+def test_veto_session_journal_date():
+    header = "Journal of the Senate\nFIRST REGULAR SESSION\nVETO SESSION\nWEDNESDAY, SEPTEMBER 15, 2021\n"
+    rows = parse_journal(header + BLOCKS_2022)
+    assert {(r["journal_day"], r["journal_date"]) for r in rows} == {("VETO SESSION", "SEPTEMBER 15, 2021")}
+
+
+def test_run_together_names_are_split():
+    text = BLOCKS_2022.replace("Rowden Schatz", "RowdenSchatz").replace("May O'Laughlin", "May McCreery O'Laughlin")
+    names = {r["name"] for r in parse_journal(text) if r["block_index"] == 0}
+    assert {"Rowden", "Schatz", "McCreery"} <= names and "RowdenSchatz" not in names
+
+
 def test_cut_off_heading_word_is_not_a_senator():
     text = BLOCKS_2022.replace("Absent with leave—Senator Eigel—1", "Absent with leave—Senato Eigel—1")
     names = {r["name"] for r in parse_journal(text) if r["block_index"] == 0}

@@ -133,9 +133,12 @@ def run_dbt(args: list[str]) -> int:
     dbt_vars = {"mec_direct": db.raw_exists("mec_cd1_a"), "cl_case_bulk": db.raw_exists("cl_mo_opinion_clusters")}
     dirs = ["--project-dir", str(DBT_DIR), "--profiles-dir", str(DBT_DIR)]
     env = {**os.environ, "MOGOV_DB": str(DB_PATH), "MOGOV_RAW_DIR": RAW_DIR.as_posix()}
+    # dbt's console-script entry point. Not `-m dbt.cli.main`: the dbt.cli package imports that module first, so
+    # runpy warns it "found in sys.modules ... prior to execution".
+    dbt = [sys.executable, "-c", "from dbt.cli.main import cli; cli()"]
     if not (DBT_DIR / "dbt_packages" / "dbt_utils").exists():  # packages.yml (pinned by package-lock.yml)
-        subprocess.check_call([sys.executable, "-m", "dbt.cli.main", "deps", *dirs], cwd=ROOT, env=env)
-    cmd = [sys.executable, "-m", "dbt.cli.main", *args, *dirs]
+        subprocess.check_call([*dbt, "deps", *dirs], cwd=ROOT, env=env)
+    cmd = [*dbt, *args, *dirs]
     if args and args[0] in ("build", "run", "test", "compile", "seed"):
         cmd += ["--vars", json.dumps(dbt_vars)]
     return subprocess.call(cmd, cwd=ROOT, env=env)

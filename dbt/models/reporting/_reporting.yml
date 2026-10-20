@@ -323,11 +323,12 @@ models:
       vote's year. Industries come from donor and principal names (interest_keywords seed) and are tied to bill
       subjects by the industry_subjects seed. Co-occurrence, not causation: a row says money and a vote meet, not
       that one caused the other. Only votes linked to a bill with subject terms (fct_vote_bills, fct_bill_subjects).
-      Grain: one row per (official, chamber, vote, industry).
+      A vote on combined bills ("SBs 49 & 118") is a vote on each of them, so it gets a row per bill.
+      Grain: one row per (official, chamber, vote, bill, industry).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
-            combination_of_columns: [official_id, chamber, vote_id, industry]
+            combination_of_columns: [official_id, chamber, vote_id, bill, industry]
     columns:
       - name: official_id
         data_type: varchar

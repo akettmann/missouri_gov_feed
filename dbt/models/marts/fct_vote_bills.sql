@@ -1,7 +1,7 @@
 -- Which bill each state vote was on, so votes can be grouped by bill subject (fct_bill_subjects).
 --   House roll calls: the bill XML names the roll-call PDF, which is the vote_id (exact). Roll calls the XML
 --   doesn't name (all votes on Senate bills, some on House bills) fall back to the measure printed on the PDF
---   ("HCS HB 2", "SS SCS SBs 49 & 118"): its lead bill, matched to that session's bills.
+--   ("HCS HB 2", "SS SCS SBs 49 & 118"): every bill number it names, matched to that session's bills.
 --   Senate journal votes: the vote's measure ("HB 2", "SB 974") read from the journal text, matched to that
 --   year's regular-session bill (House bills from the House export, Senate bills from the topical index).
 with bills as (
@@ -17,13 +17,25 @@ with bills as (
     where bill like 'S%'
 ),
 
+bill_keys as (
+    select
+        session_code,
+        bill,
+        {{ mogov.regex_extract('bill', '^([A-Z]+)') }} as bill_type,
+        {{ mogov.regex_extract('bill', '([0-9]+)$') }} as bill_number
+    from bills
+),
+
+{% set measure_bills = '(^|[ ,])(HJR|HCR|HCB|HB|HR|SJR|SCR|SB)S? +([0-9]+( *(&|,|AND) *[0-9]+)*)' %}
 house_measures as (
+    -- the measure's bill type and its numbers, space-padded: "SS SCS SBs 49 & 118" -> SB, " 49 118 "
     select
         rollcall_url,
         session_code,
-        {{ mogov.regex_extract('upper(measure)', '(^|[ ,])(HJR|HCR|HCB|HB|HR|SJR|SCR|SB)S? +([0-9]+)', 2) }}
-        || {{ mogov.regex_extract('upper(measure)', '(^|[ ,])(HJR|HCR|HCB|HB|HR|SJR|SCR|SB)S? +([0-9]+)', 3) }}
-            as bill
+        {{ mogov.regex_extract('upper(measure)', measure_bills, 2) }} as bill_type,
+        ' '
+        || trim({{ mogov.regex_replace_all(mogov.regex_extract('upper(measure)', measure_bills, 3), '[^0-9]+', ' ') }})
+        || ' ' as bill_numbers
     from {{ ref('stg_mo_house__rollcalls') }}
     where rollcall_url not in (
         select l.rollcall_url
@@ -52,10 +64,11 @@ select distinct
     cast(null as {{ dbt.type_string() }}) as bill_version,
     'measure text' as matched_by
 from house_measures as m
-inner join bills as b
+inner join bill_keys as b
     on
-        m.bill = b.bill
-        and m.session_code = b.session_code
+        m.session_code = b.session_code
+        and m.bill_type = b.bill_type
+        and m.bill_numbers like '% ' || b.bill_number || ' %'
 
 union all
 

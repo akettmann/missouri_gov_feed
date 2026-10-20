@@ -32,6 +32,7 @@ uv run mogov run --shards 4
 | shor_mccarty | yearly release | 90 days | quarterly |
 | mo_employee_pay | yearly (each January) | current and previous year 7 days, older 30 days | monthly |
 | census_tiger | yearly vintage (each autumn); redistricting | listings 7 days; shapefiles forever | monthly |
+| epa_frs | state file refreshed every few months | 30 days | monthly |
 | census_zcta | yearly vintage | forever per vintage | monthly (picks up a new vintage) |
 
 Run a subset with `mogov load <loader ...>` followed by `mogov build`. For example, daily during
@@ -50,6 +51,15 @@ uv run mogov build
 - `MOGOV_MEC_YEARS`, `MOGOV_MEC_CROSSWALK_YEARS`, `MOGOV_FEC_CYCLES`, `MOGOV_VOTEVIEW_CONGRESSES`,
   `MOGOV_HOUSE_FD_FIRST_YEAR`: per-source windows (see each loader's docstring). Roll them forward each
   January / cycle.
+
+## Yearly hand-maintained seeds
+
+Each January:
+- `federal_salaries`: add the new year's pay rates for Congress (senate.gov) and federal judges
+  (uscourts.gov), with their sources. Until then `fct_salaries` has no federal rows for the new year.
+- `legislator_seat_corrections`: check `int_mo_senate__votes` for tokens with no `person_key`. A new
+  unmatched surname usually means Open States is missing or cutting short someone's term. Add the
+  corrected term with its source.
 
 ## Forcing a refresh
 

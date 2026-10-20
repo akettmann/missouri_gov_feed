@@ -24,6 +24,11 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
 - [ ] Officials list: replace the Level and Office dropdowns with picture tiles to pick from (for example the
   Capitol for the legislature, a gavel for courts, the U.S. Capitol for Congress, a city hall for mayors),
   each labeled in text so the choice doesn't rely on the image
+- [ ] Businesses in their district (`fct_jurisdiction_businesses`): the regulated sites in a legislator's, U.S.
+  representative's or mayor's area, with the ones that gave to them first (donor name, amount, link to the
+  contributions). A house district can hold 1,400 sites, so ship the donor rows plus counts by industry (NAICS),
+  not the full list, to stay under the JSON budget. Label the source's limit: EPA-regulated sites only, exact
+  name or listed-brand matches only
 
 ## Low priority
 - [ ] Ensure the page looks correct on a wide screen

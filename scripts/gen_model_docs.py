@@ -20,6 +20,7 @@ GRAIN = {
     "int_courtlistener__mo_cases": "one row per opinion cluster (decided case) in a tracked court",
     "int_courtlistener__official_people": "one row per (official, CourtListener person)",
     "int_courtlistener__official_positions": "one row per CourtListener position of a matched official",
+    "int_epa_frs__facilities": "one row per geocoded EPA FRS facility",
     "int_house_fd__schedule_lines": "one text line per House disclosure PDF, tagged with its schedule",
     "int_interests__industry_money": "one row per (official, industry, money kind, year)",
     "int_judges__current": "one row per sitting judge (state and federal)",
@@ -51,12 +52,17 @@ def header(path: Path) -> str:
 
 
 def write(folder: Path, out: Path) -> None:
+    # hand-written keys (columns with tests, data_tests...) survive regeneration; only descriptions are rewritten
+    kept = {}
+    if out.exists():
+        kept = {m["name"]: m for m in (yaml.safe_load(out.read_text(encoding="utf-8")) or {}).get("models", [])}
     models = []
     for path in sorted(folder.glob("*.sql")):
         text = header(path)
         if path.stem in GRAIN:
             text += f" Grain: {GRAIN[path.stem]}."
-        models.append({"name": path.stem, "description": text.strip()})
+        extra = {k: v for k, v in kept.get(path.stem, {}).items() if k not in ("name", "description")}
+        models.append({"name": path.stem, "description": text.strip(), **extra})
     body = yaml.safe_dump({"version": 2, "models": models}, sort_keys=False, width=110, allow_unicode=True)
     out.write_text(
         f"# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,\n"

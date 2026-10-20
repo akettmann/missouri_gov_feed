@@ -36,16 +36,30 @@ SECTION = re.compile(
 COMPOUND_SURNAMES = ["Thompson Rehder"]
 # "Brown (16)" (2025+) or "Brown (16th Dist.)" (earlier); normalized to "Brown (16)"
 NAME = re.compile(rf"({'|'.join(COMPOUND_SURNAMES)}|[A-Z][A-Za-z'’\-]+)(?: \((\d+)(?:st|nd|rd|th)?(?: ?Dist\.?)?\))?")
+# Two surnames with the space lost: a capitalized word of 3+ letters running into another ("SaterSchatz"), but not
+# "Mac"/"Mc" names (McCreery has one lowercase letter before the second capital; MacDonald is excluded by name).
+RUN_TOGETHER = re.compile(r"\b(?!Mac)([A-Z][a-z]{2,})([A-Z][a-z]{2,})\b")
 # running page headers: "Journal of the Senate 118", "Sixty-Sixth Day—Thursday, April 24, 2025"
 PAGE_FURNITURE = re.compile(
     r"^(?:Journal of the Senate \d+|\d+ Journal of the Senate|.*\bDAY\s*[—–-]\s*[A-Z]+DAY,.*)$", re.M | re.I
 )
 DAY_HEADER = re.compile(r"([A-Z\-]+ DAY)\s*[—–-]\s*[A-Z]+DAY,\s*([A-Z]+ \d{1,2}, \d{4})")
+# veto session journals have no "...DAY—": "VETO SESSION" then "WEDNESDAY, SEPTEMBER 15, 2021"
+DATE_LINE = re.compile(r"^[A-Z]+DAY,\s*([A-Z]+ \d{1,2}, \d{4})$", re.M)
+
+
+def _journal_day(text: str) -> tuple[str | None, str | None]:
+    """(day name, date) from the journal's first header, e.g. ("FIFTH DAY", "JANUARY 15, 2025")."""
+    if day := DAY_HEADER.search(text):
+        return day.group(1), day.group(2)
+    if date_line := DATE_LINE.search(text[:2000]):
+        return ("VETO SESSION" if "VETO SESSION" in text[: date_line.start()] else None), date_line.group(1)
+    return None, None
 
 
 def parse_journal(text: str) -> list[dict]:
     """All recorded votes in a journal's text -> [{context, category, name, declared_count, block_index}]."""
-    day = DAY_HEADER.search(text)
+    journal_day, journal_date = _journal_day(text)
     rows = []
     for i, m in enumerate(BLOCK.finditer(text)):
         block = PAGE_FURNITURE.sub("", m.group(0))
@@ -58,6 +72,8 @@ def parse_journal(text: str) -> list[dict]:
             count = re.search(rf"{re.escape(names)}{DASH}(\d+)", block.replace("\n", " "))
             if leading := re.match(r"(\d+)\s+", names):
                 count, names = leading, names[leading.end() :]
+            # the PDF text sometimes drops the space between two names ("SaterSchatz")
+            names = RUN_TOGETHER.sub(r"\1 \2", names)
             for surname, district in NAME.findall(names):
                 # "Senato" and the like: the heading word cut off by the PDF text
                 if surname in {"None", "Dist"} or (len(surname) >= 5 and "Senators".startswith(surname)):
@@ -66,8 +82,8 @@ def parse_journal(text: str) -> list[dict]:
                 rows.append(
                     {
                         "block_index": i,
-                        "journal_day": day.group(1) if day else None,
-                        "journal_date": day.group(2) if day else None,
+                        "journal_day": journal_day,
+                        "journal_date": journal_date,
                         "context": context[-400:],
                         "category": category,
                         "name": name,
