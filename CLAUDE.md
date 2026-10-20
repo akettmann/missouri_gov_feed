@@ -34,3 +34,8 @@ Maintain step by step documentation of:
 * How to keep an environment's data in sync
 * a Per source section that describes the source in brief. Also it will include details of any quirks identified for that source
 * a summary of our sources and what types of data they provide
+## Issue Tracking
+Frontend issues go in `FRONTEND_TODO.md`
+all other issues go to `TODO.md`
+If you find a problem while working, if it is not blocking your progress, offload it to the proper todo file.
+Put them in sections of low/medium/high priority
