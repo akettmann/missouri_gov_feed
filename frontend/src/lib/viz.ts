@@ -154,6 +154,32 @@ export const VIZ: Record<string, VizSpec> = {
             cmp(a, b, "cycle") || FED_RECEIPT_KINDS.indexOf(a.source) - FED_RECEIPT_KINDS.indexOf(b.source),
         ),
   },
+  "top-employers": {
+    title: "Top employers of individual donors, all years",
+    kind: "hbar",
+    x: "total",
+    y: "label",
+    usesConfidence: true,
+    note: "From the employer each individual donor reported. Retired, self-employed and similar answers are left out.",
+    columns: [
+      { key: "label", label: "Employer" },
+      { key: "donors", label: "Donors", num: true },
+      { key: "years", label: "Years" },
+      { key: "total", label: "Total", money: true },
+      { key: "source_url", label: "Source", link: true },
+    ],
+    rows: (b, hide) =>
+      withoutMedium(b.money.employers ?? [], hide)
+        .slice(0, 10)
+        .map((r) => ({
+          label: r.match_confidence === "medium" ? `${r.employer}${MEDIUM_SUFFIX}` : r.employer,
+          donors: r.donor_count,
+          years: r.first_year === r.last_year ? String(r.first_year) : `${r.first_year}–${r.last_year}`,
+          total: r.total_amount,
+          source_url: r.source_url ?? "",
+          confidence: r.match_confidence,
+        })),
+  },
   "state-size": {
     title: "Contributions from individuals by size and cycle (MEC)",
     kind: "stack",

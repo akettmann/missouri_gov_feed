@@ -519,6 +519,44 @@ models:
         data_type: bigint
         description: Contributions in the band.
 
+  - name: rpt_donor_employers
+    description: >
+      Employers of the individuals who gave to each official, from the employer field on individual
+      contributions (fct_campaign_finance.counterparty_organization). Contributions with no employer, or with a
+      placeholder answer (donor_employer_placeholders seed: retired, none, self-employed, bare occupations), are
+      left out. Spelling variants are not merged. State money only. Grain: one row per (official, lower-cased
+      employer, match confidence).
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests: [not_null]
+      - name: employer
+        data_type: varchar
+        description: The employer as filed (one spelling per lower-cased name).
+        data_tests: [not_null]
+      - name: match_confidence
+        data_type: varchar
+        description: "{{ doc('match_confidence') }}"
+      - name: donor_count
+        data_type: bigint
+        description: Distinct contributors (by lower-cased name) giving that employer.
+      - name: contribution_count
+        data_type: bigint
+        description: Contributions summed.
+      - name: total_amount
+        data_type: decimal(28,6)
+        description: Dollars given by that employer's employees.
+      - name: first_year
+        data_type: integer
+        description: Earliest contribution year.
+      - name: last_year
+        data_type: integer
+        description: Latest contribution year.
+      - name: source_url
+        data_type: varchar
+        description: "{{ doc('source_url') }}"
+
 exposures:
   - name: voter_frontend
     label: Missouri officials frontend
@@ -557,4 +595,5 @@ exposures:
       - ref('rpt_votes_by_subject')
       - ref('rpt_awards')
       - ref('rpt_donor_size')
+      - ref('rpt_donor_employers')
       - ref('rpt_interest_vote_overlap')

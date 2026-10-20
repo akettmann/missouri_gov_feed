@@ -237,6 +237,18 @@ export interface OfficialBundle {
     status: string;
     federal: FederalDonorRow[];
     cycles: Dataset<DonorCycleRow>;
+    /** employers of individual donors (rpt_donor_employers, top 20); null when the export is missing */
+    employers:
+      | {
+          employer: string;
+          match_confidence: string;
+          donor_count: number;
+          total_amount: number;
+          first_year: number;
+          last_year: number;
+          source_url: string | null;
+        }[]
+      | null;
     /** state officials' individual contributions by size (rpt_donor_size); null when the export is missing */
     size: { cycle: number; band_floor: number; match_confidence: string; total_amount: number }[] | null;
     top_donors: Dataset<TopDonorRow>;

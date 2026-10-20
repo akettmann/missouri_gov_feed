@@ -24,9 +24,6 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
   of our own; or ship a ZIP-code centroid table (coarse: a ZIP can span several districts)
 
 ## Medium priority
-- [ ] `rpt_donor_rollup.donor_name` is an employer for individuals ("none", "retired", ...); the frontend leaves
-  individuals out of "Top donor organizations". A "top employers of individual donors" view needs those values
-  cleaned or excluded in dbt first
 
 ## Low priority
 - [ ] Deploy static build to a GCS bucket + CDN

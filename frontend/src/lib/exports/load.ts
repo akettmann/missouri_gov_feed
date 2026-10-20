@@ -202,6 +202,20 @@ async function loadAll(): Promise<OfficialBundle[]> {
       )
     : null;
 
+  type EmployerRow = OfficialBundle["money"]["employers"] & object;
+  const employers = hasExport("rpt_donor_employers")
+    ? groupBy(
+        await query<EmployerRow[number] & { official_id: string }>(`
+          select official_id, employer, match_confidence, cast(donor_count as integer) as donor_count,
+                 cast(total_amount as double) as total_amount, first_year, last_year, source_url
+          from (
+            select *, row_number() over (partition by official_id order by total_amount desc, employer) as rank
+            from {rpt_donor_employers}
+          ) ranked
+          where rank <= 20 order by official_id, rank`),
+      )
+    : null;
+
   type SizeRow = OfficialBundle["money"]["size"] & object;
   const sizes = hasExport("rpt_donor_size")
     ? groupBy(
@@ -367,6 +381,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
           federal: (federal.get(id) ?? []) as FederalDonorRow[],
           cycles,
           size: sizes ? ((sizes.get(id) ?? []) as SizeRow) : null,
+          employers: employers ? ((employers.get(id) ?? []) as EmployerRow) : null,
           top_donors: topDonors,
         },
         gifts,
