@@ -61,6 +61,12 @@ Quirks:
   `fct_vote_bills` links House votes to bills exactly. About 80% of roll calls belong to a bill; the
   rest are motions and resolutions.
 - Bill sponsors list senators (conferees, handlers) with district 200 + their senate district.
+- Roll-call PDFs are found only through the bill XML, so the loader misses every roll call the XML doesn't
+  nest under a House bill. That includes House votes on Senate bills (third reading, conference reports)
+  and procedural votes ("APPROVE JOURNAL", "PQ"). Only 108 of the 3,873 roll calls landed by October 2026
+  name a Senate measure. The PDFs are numbered per session day (`billsYYS/rollcalls/{day}.{nnn}.pdf`).
+  On day 71 of 2025 the site had roll calls 1–4 and we held only #2. Non-existent numbers answer with an
+  HTML error page, like unknown session codes.
 - PDF text extraction is cached by PDF content (`data/cache/pdftext/`). Before that, a re-run spent
   3–10 minutes per shard re-parsing PDFs that were already downloaded.
 
