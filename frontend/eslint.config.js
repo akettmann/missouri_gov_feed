@@ -11,5 +11,9 @@ export default defineConfig(
   astro.configs.recommended,
   {
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
+    rules: {
+      // `const { drop: _drop, ...keep } = obj` is how we omit a field
+      "@typescript-eslint/no-unused-vars": ["error", { varsIgnorePattern: "^_", ignoreRestSiblings: true }],
+    },
   },
 );

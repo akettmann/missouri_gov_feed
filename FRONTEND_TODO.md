@@ -18,11 +18,12 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
 ## High priority
 - [ ] Decide audience/hosting (public?) and whether judges stay in (they get profiles today; ideology/votes show
   "not applicable")
+- [ ] Decide on address search for /find/ (today: device location or a map click only). The Census Geocoder
+  sends no CORS header, so a browser can reach it only by JSONP: that runs Census-hosted script on our page and
+  sends the typed address to the Census Bureau. Options: accept that with a notice; geocode through a small proxy
+  of our own; or ship a ZIP-code centroid table (coarse: a ZIP can span several districts)
 
 ## Medium priority
-- [ ] Find my officials: address / map click / geolocation to districts (`census_tiger`); lookup runs client-side
-  so addresses never leave the browser. First check whether the Census Geocoder allows browser calls (CORS);
-  otherwise map click / geolocation with client-side point-in-polygon
 - [ ] State size bands: `rpt_donor_rollup` has no per-contribution size, so only federal officials get a size view;
   add a size-band column or a small `rpt_donor_size` model
 - [ ] `rpt_donor_rollup.donor_name` is an employer for individuals ("none", "retired", ...); the frontend leaves

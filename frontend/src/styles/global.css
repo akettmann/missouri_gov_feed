@@ -201,6 +201,16 @@ details > summary {
   height: auto;
   overflow: visible;
 }
+/* officials listed by the find-my-officials lookup */
+.people {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+}
+.people li {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--hairline);
+}
 .grid-2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));

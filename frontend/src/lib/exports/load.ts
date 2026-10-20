@@ -171,14 +171,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
   }
   const peers = groupBy(
     // the row's own party only feeds peerValues; a strip carries party solely inside its peers list
-    peerRows.map((r) => {
-      const strip: PeerStrip & { official_id: string; party?: string | null } = {
-        ...r,
-        peers: peerValues.get(r.peer_group) ?? [],
-      };
-      delete strip.party;
-      return strip;
-    }),
+    peerRows.map(({ party: _party, ...r }) => ({ ...r, peers: peerValues.get(r.peer_group) ?? [] })),
   );
 
   const breaks = hasExport("rpt_party_breaks")
