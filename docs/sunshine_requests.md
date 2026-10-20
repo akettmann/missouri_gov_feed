@@ -272,6 +272,11 @@ bodies.
 
 ## Sources
 
+Copies of the full texts, retrieved October 19, 2026, are in `docs/reference/`:
+[RSMo Chapter 610](reference/rsmo_chapter_610_sunshine_law.md),
+[RSMo 105.483–105.492](reference/rsmo_105_483_to_105_492_financial_interest.md) and
+[Court Operating Rule 2](reference/court_operating_rule_2.md). The online versions below are authoritative.
+
 - RSMo [§ 610.010](https://revisor.mo.gov/main/OneSection.aspx?section=610.010),
   [§ 610.023](https://revisor.mo.gov/main/OneSection.aspx?section=610.023),
   [§ 610.026](https://revisor.mo.gov/main/OneSection.aspx?section=610.026),
