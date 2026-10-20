@@ -36,3 +36,4 @@
   - Census County Business Patterns: counts by industry, no company names
 - [ ] Write a simplified summary of the Missouri Sunshine Law (full text in docs/reference/rsmo_chapter_610_sunshine_law.md): what's open, what can be closed, how to request records, deadlines, fees and remedies
 - [ ] Each January: add the year's rates to the `federal_salaries` seed (senate.gov, uscourts.gov)
+- [ ] PlantUML in Github doesn't seem to have dot installed. Can we use the new Javascript transpile of plantuml?
