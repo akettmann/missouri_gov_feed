@@ -1,58 +1,128 @@
 ---
-// Browse/search: the full list is server-rendered (usable without JS); the script just hides rows.
+// Browse/search. Today's officials are server-rendered (usable without JS); the script hides rows, and swaps
+// in a past year's list (lookup/officeholders/<year>.json) when the year control asks for one.
 import Layout from "../layouts/Layout.astro";
-import { officialIndex } from "../lib/exports/load";
-import { LEVELS, officeLine } from "../lib/format";
+import OfficeIcon from "../components/OfficeIcon.astro";
+import { exportedAt } from "../lib/exports/db";
+import { officialIndex, pastOfficeholders } from "../lib/exports/load";
+import { LEVELS, OFFICE_GROUPS, officeGroup, officeLine } from "../lib/format";
 import { href } from "../lib/site";
 
 const officials = await officialIndex();
-const offices = [...new Map(officials.map((o) => [o.office, o.office_title ?? o.office])).entries()].sort(
-  (a, b) => a[1].localeCompare(b[1]),
+const past = await pastOfficeholders();
+const currentYear = past?.currentYear ?? (exportedAt("dim_official") ?? new Date()).getFullYear();
+const pastYears = [...(past?.years.keys() ?? [])].sort((a, b) => b - a);
+
+// tiles and their office chips cover every office in any year; labels fall back to the data's office title
+const titles = new Map<string, string>();
+for (const o of [...officials, ...[...(past?.years.values() ?? [])].flat()]) {
+  if (!titles.has(o.office)) titles.set(o.office, o.office_title ?? o.office.replaceAll("_", " "));
+}
+const groups = [
+  ...OFFICE_GROUPS,
+  { key: "other", label: "Other offices", offices: {} as Record<string, string> },
+].flatMap((g) => {
+  const offices = [...titles.keys()]
+    .filter((o) => officeGroup(o) === g.key)
+    .sort((a, b) => {
+      const order = Object.keys(g.offices);
+      return order.indexOf(a) - order.indexOf(b) || a.localeCompare(b);
+    })
+    .map((o) => [o, g.offices[o] ?? titles.get(o)!] as const);
+  return offices.length ? [{ key: g.key, label: g.label, offices }] : [];
+});
+const currentOffices = Object.fromEntries(
+  groups.flatMap((g) => g.offices.filter(([o]) => officials.some((x) => x.office === o))),
+);
+const groupInfo = Object.fromEntries(
+  groups.map((g) => [g.key, { label: g.label, offices: g.offices.map(([o]) => o) }]),
 );
 ---
 
 <Layout title="Find an official">
   <h1>Missouri officials</h1>
   <p class="lede">
-    {officials.length} current state, federal and local officials. Each profile shows published ideology
+    {officials.length} state, federal and local officials serving now. Each profile shows published ideology
     measures, campaign money, lobbyist gifts and disclosed business ties, with links to the original records.
     No composite scores: every number is a published or directly measured figure.
   </p>
 
   <form class="filters card" role="search" onsubmit="return false">
-    <label>
-      Name
-      <input type="search" name="q" placeholder="e.g. Hough" autocomplete="off" />
-    </label>
-    <label>
-      Level
-      <select name="level">
-        <option value="">All</option>
-        {Object.entries(LEVELS).map(([v, l]) => (
-          <option value={v}>{l}</option>
+    <fieldset class="tiles">
+      <legend>Office</legend>
+      <div class="tile-row">
+        <label class="tile">
+          <input type="radio" name="group" value="" checked />
+          <span class="tile-face">
+            <OfficeIcon name="all" />
+            <span>All offices</span>
+          </span>
+        </label>
+        {groups.map((g) => (
+          <label class="tile">
+            <input type="radio" name="group" value={g.key} />
+            <span class="tile-face">
+              <OfficeIcon name={g.key} />
+              <span>{g.label}</span>
+            </span>
+          </label>
         ))}
-      </select>
-    </label>
-    <label>
-      Office
-      <select name="office">
-        <option value="">All</option>
-        {offices.map(([v, l]) => (
-          <option value={v}>{l}</option>
-        ))}
-      </select>
-    </label>
-    <label>
-      District
-      <input type="text" name="district" inputmode="numeric" placeholder="e.g. 53" autocomplete="off" />
-    </label>
+      </div>
+    </fieldset>
+    {groups
+      .filter((g) => g.offices.length > 1)
+      .map((g) => (
+        <fieldset class="chips" data-group={g.key} hidden>
+          <legend>{g.label}</legend>
+          <label class="chip">
+            <input type="radio" name="office" value="" />
+            <span>All</span>
+          </label>
+          {g.offices.map(([o, label]) => (
+            <label class="chip">
+              <input type="radio" name="office" value={o} />
+              <span>{label}</span>
+            </label>
+          ))}
+        </fieldset>
+      ))}
+    <div class="fields">
+      <label>
+        Name
+        <input type="search" name="q" placeholder="e.g. Hough" autocomplete="off" />
+      </label>
+      <label>
+        District
+        <input type="text" name="district" inputmode="numeric" placeholder="e.g. 53" autocomplete="off" />
+      </label>
+      {pastYears.length > 0 && (
+        <label>
+          Year
+          <select name="year">
+            <option value="">{currentYear} (serving now)</option>
+            {pastYears.map((y) => (
+              <option value={y}>{y}</option>
+            ))}
+          </select>
+        </label>
+      )}
+    </div>
   </form>
 
+  <h2 id="list-heading">Serving in {currentYear}</h2>
+  <p class="small muted" id="list-note">
+    People holding office now.{pastYears.length > 0 && ` Pick a year to see who held these offices before.`}
+  </p>
   <p class="small muted" aria-live="polite" id="result-count">
     {officials.length} officials
   </p>
-  <div class="table-scroll card list">
-    <table>
+  <div
+    class="table-scroll card list"
+    data-year={currentYear}
+    data-offices={JSON.stringify(currentOffices)}
+    data-groups={JSON.stringify(groupInfo)}
+  >
+    <table aria-labelledby="list-heading">
       <thead>
         <tr>
           <th>Name</th>
@@ -65,7 +135,7 @@ const offices = [...new Map(officials.map((o) => [o.office, o.office_title ?? o.
         {officials.map((o) => (
           <tr
             data-name={o.full_name.toLowerCase()}
-            data-level={o.level}
+            data-group={officeGroup(o.office)}
             data-office={o.office}
             data-district={(o.district ?? "").toLowerCase()}
           >
@@ -79,33 +149,131 @@ const offices = [...new Map(officials.map((o) => [o.office, o.office_title ?? o.
         ))}
       </tbody>
     </table>
+    <p class="empty muted" hidden>
+      No officials match these filters.
+    </p>
   </div>
 </Layout>
 
 <script>
+  type PastRow = [string, string | null, string, string, string, string | null, string | null, string];
+
   const form = document.querySelector<HTMLFormElement>("form.filters")!;
-  const rows = [...document.querySelectorAll<HTMLTableRowElement>(".list tbody tr")];
+  const list = document.querySelector<HTMLElement>(".list")!;
+  const tbody = list.querySelector("tbody")!;
+  const empty = list.querySelector<HTMLElement>(".empty")!;
+  const heading = document.getElementById("list-heading")!;
+  const note = document.getElementById("list-note")!;
   const counter = document.getElementById("result-count")!;
+  const chipSets = [...form.querySelectorAll<HTMLFieldSetElement>("fieldset.chips")];
+  const officeRadios = [...form.querySelectorAll<HTMLInputElement>('input[name="office"]')];
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const currentYear = list.dataset.year!;
+  const currentOffices: Record<string, string> = JSON.parse(list.dataset.offices!);
+  const groups: Record<string, { label: string; offices: string[] }> = JSON.parse(list.dataset.groups!);
+  const currentRows = [...tbody.rows];
+  const defaultNote = note.textContent;
   const fold = (s: string) => s.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
-  function apply() {
+  function rowFor([name, slug, office, group, line, district, party, level]: PastRow) {
+    const tr = document.createElement("tr");
+    Object.assign(tr.dataset, {
+      name: name.toLowerCase(),
+      group,
+      office,
+      district: (district ?? "").toLowerCase(),
+    });
+    const cell = (content: string | Node) => tr.insertCell().append(content);
+    if (slug) {
+      const a = document.createElement("a");
+      a.href = `${base}/officials/${slug}/`;
+      a.textContent = name;
+      cell(a);
+    } else cell(name);
+    cell(line);
+    if (party) cell(party);
+    else {
+      const none = document.createElement("span");
+      none.className = "muted";
+      none.textContent = "none listed";
+      cell(none);
+    }
+    cell(level);
+    return tr;
+  }
+
+  const years = new Map<string, Promise<HTMLTableRowElement[]>>();
+  function rowsFor(year: string): Promise<HTMLTableRowElement[]> {
+    if (!year) return Promise.resolve(currentRows);
+    let rows = years.get(year);
+    if (!rows) {
+      rows = fetch(`${base}/lookup/officeholders/${year}.json`)
+        .then((r) => (r.ok ? (r.json() as Promise<PastRow[]>) : Promise.reject(new Error(r.statusText))))
+        .then((data) => data.map(rowFor));
+      rows.catch(() => years.delete(year));
+      years.set(year, rows);
+    }
+    return rows;
+  }
+
+  // a past year lists only the offices with dated rosters: name the ones it has no records for
+  function pastNote(year: string, rows: HTMLTableRowElement[]) {
+    const held = new Set(rows.map((r) => r.dataset.office));
+    const missing = Object.values(groups).flatMap(({ label, offices }) => {
+      const gone = offices.filter((o) => o in currentOffices && !held.has(o));
+      if (!gone.length) return [];
+      return gone.length === offices.filter((o) => o in currentOffices).length
+        ? [label]
+        : gone.map((o) => currentOffices[o]);
+    });
+    return (
+      `Everyone recorded as holding these offices at some point in ${year}. Names link to a profile only for ` +
+      `people serving now.` +
+      (missing.length
+        ? ` No ${year} records for: ${missing.join(", ")}; those are listed for ${currentYear} only.`
+        : "")
+    );
+  }
+
+  let shownYear = "";
+  let pending = 0;
+  async function apply() {
     const f = new FormData(form);
+    const year = String(f.get("year") ?? "");
+    const ticket = ++pending;
+    let rows: HTMLTableRowElement[];
+    try {
+      rows = await rowsFor(year);
+    } catch {
+      note.textContent = `Couldn't load the ${year} list. Check your connection and pick the year again.`;
+      return;
+    }
+    if (ticket !== pending) return; // a newer change is already on its way
+    if (year !== shownYear) {
+      tbody.replaceChildren(...rows);
+      shownYear = year;
+      heading.textContent = year ? `Served in ${year}` : `Serving in ${currentYear}`;
+      note.textContent = year ? pastNote(year, rows) : defaultNote;
+    }
+
     const q = fold(String(f.get("q") ?? ""));
-    const level = String(f.get("level") ?? "");
+    const group = String(f.get("group") ?? "");
     const office = String(f.get("office") ?? "");
     const district = fold(String(f.get("district") ?? ""));
+    for (const set of chipSets) set.hidden = set.dataset.group !== group;
     let shown = 0;
     for (const r of rows) {
       const d = r.dataset;
       const ok =
         (!q || fold(d.name!).includes(q)) &&
-        (!level || d.level === level) &&
+        (!group || d.group === group) &&
         (!office || d.office === office) &&
         (!district || d.district === district);
       r.hidden = !ok;
       if (ok) shown++;
     }
-    counter.textContent = `${shown} of ${rows.length} officials`;
+    counter.textContent = `${shown} of ${rows.length} ${year ? `officeholders in ${year}` : "officials serving now"}`;
+    empty.hidden = shown > 0;
     const params = new URLSearchParams([...f].filter(([, v]) => v !== "") as [string, string][]);
     history.replaceState(null, "", params.size ? `?${params}` : location.pathname);
   }
@@ -113,10 +281,21 @@ const offices = [...new Map(officials.map((o) => [o.office, o.office_title ?? o.
   // restore filters from the URL so searches are shareable
   for (const [k, v] of new URLSearchParams(location.search)) {
     const el = form.elements.namedItem(k);
-    if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) el.value = v;
+    if (el instanceof RadioNodeList || el instanceof HTMLInputElement || el instanceof HTMLSelectElement) {
+      el.value = v;
+    }
   }
-  form.addEventListener("input", apply);
-  apply();
+  form.addEventListener("input", (e) => {
+    // a new office tile starts from all of its offices
+    const t = e.target;
+    if (t instanceof HTMLInputElement && t.name === "group") {
+      for (const r of officeRadios) r.checked = false;
+      const all = chipSets.find((s) => s.dataset.group === t.value)?.querySelector("input");
+      if (all) all.checked = true;
+    }
+    void apply();
+  });
+  void apply();
 </script>
 
 <style>
@@ -125,15 +304,126 @@ const offices = [...new Map(officials.map((o) => [o.office, o.office_title ?? o.
   }
   .filters {
     display: grid;
-    grid-template-columns: 2fr 1fr 2fr 1fr;
+    gap: 12px;
+  }
+  fieldset {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+  }
+  legend {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink-2);
+    padding: 0;
+    margin-bottom: 4px;
+  }
+  .tile-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+    gap: 8px;
+  }
+  @media (max-width: 480px) {
+    .tile-row {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .tile,
+  .chip {
+    position: relative;
+    cursor: pointer;
+  }
+  /* the radio stays focusable and announced; the face next to it draws the state */
+  .tile input,
+  .chip input {
+    position: absolute;
+    opacity: 0;
+    inset: 0;
+    margin: 0;
+    cursor: pointer;
+  }
+  .tile-face {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 4px;
+    height: 100%;
+    padding: 10px 6px 8px;
+    border: 1px solid var(--axis);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink-2);
+    font-size: 0.8125rem;
+    line-height: 1.25;
+    text-align: center;
+  }
+  .tile:hover .tile-face,
+  .chip:hover span {
+    border-color: var(--ink-2);
+  }
+  .tile input:checked + .tile-face {
+    border-color: var(--focus);
+    box-shadow: inset 0 0 0 1px var(--focus);
+    background: var(--surface-2);
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .tile input:checked + .tile-face::after {
+    content: "✓";
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    font-size: 0.8125rem;
+    color: var(--focus);
+  }
+  .tile input:focus-visible + .tile-face,
+  .chip input:focus-visible + span {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chips[hidden] {
+    display: none;
+  }
+  .chips legend {
+    width: 100%;
+  }
+  .chip span {
+    display: inline-block;
+    padding: 2px 10px;
+    border: 1px solid var(--axis);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink-2);
+    font-size: 0.875rem;
+  }
+  .chip input:checked + span {
+    border-color: var(--focus);
+    box-shadow: inset 0 0 0 1px var(--focus);
+    background: var(--surface-2);
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .fields {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
     gap: 12px;
   }
   @media (max-width: 720px) {
-    .filters {
+    .fields {
       grid-template-columns: 1fr 1fr;
     }
+    .fields label:first-child {
+      grid-column: 1 / -1;
+    }
   }
-  label {
+  .fields label {
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -142,7 +432,8 @@ const offices = [...new Map(officials.map((o) => [o.office, o.office_title ?? o.
     color: var(--ink-2);
     min-width: 0;
   }
-  input,
+  input[type="search"],
+  input[type="text"],
   select {
     font: inherit;
     font-weight: 400;
@@ -154,7 +445,18 @@ const offices = [...new Map(officials.map((o) => [o.office, o.office_title ?? o.
     color: var(--ink);
     min-width: 0;
   }
+  #list-heading {
+    margin-top: 24px;
+  }
+  #list-note {
+    margin: 0 0 4px;
+    max-width: 70ch;
+  }
   .list {
     padding: 4px 8px;
+  }
+  .empty {
+    padding: 8px;
+    margin: 0;
   }
 </style>

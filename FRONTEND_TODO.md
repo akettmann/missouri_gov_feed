@@ -18,12 +18,8 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
 ## High priority
 
 ## Medium priority
-- [ ] Officials list: by default, show only the people holding office in the current year (not past
-  officeholders), with a way to look back at other years. Note: `dim_official` holds only sitting officials
-  today, so other years need past officeholders (`fct_office_history`) brought into the list
-- [ ] Officials list: replace the Level and Office dropdowns with picture tiles to pick from (for example the
-  Capitol for the legislature, a gavel for courts, the U.S. Capitol for Congress, a city hall for mayors),
-  each labeled in text so the choice doesn't rely on the image
+- [ ] Site header at phone width (390px): the nav links don't wrap, so "Methodology" runs off the right edge
+  and the page scrolls sideways (`layouts/Layout.astro`, every page)
 - [ ] Businesses in their district (`fct_jurisdiction_businesses`): the regulated sites in a legislator's, U.S.
   representative's or mayor's area, with the ones that gave to them first (donor name, amount, link to the
   contributions). A house district can hold 1,400 sites, so ship the donor rows plus counts by industry (NAICS),
@@ -31,5 +27,9 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
   name or listed-brand matches only
 
 ## Low priority
+- [ ] Officials list, past years: people who no longer serve are listed without a link because they have no
+  profile. A small page per past officeholder (offices held, years, source links) would let the list link them
+- [ ] Officials list: the year control needs JavaScript (it fetches `lookup/officeholders/<year>.json`); without
+  it only the current year shows. Static per-year pages would make look-back work without JS
 - [ ] Ensure the page looks correct on a wide screen
 - [ ] Build a reference that explains what PACs are used for, to hide the sources of money being donated to politicians

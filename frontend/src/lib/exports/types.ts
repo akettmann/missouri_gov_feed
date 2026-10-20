@@ -273,3 +273,8 @@ export interface IndexEntry {
   office_title: string | null;
   district: string | null;
 }
+
+/** One past-year row of the browse list (rpt_officeholders_by_year); slug only for people serving now. */
+export interface PastOfficeholder extends Omit<IndexEntry, "slug"> {
+  slug: string | null;
+}

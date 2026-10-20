@@ -84,6 +84,7 @@ package "reporting (frontend views)" {
   [rpt_donor_rollup] as R_money
   [rpt_gift_rollup] as R_gifts
   [rpt_interest_vote_overlap] as R_overlap
+  [rpt_officeholders_by_year] as R_years
 }
 [voter_frontend\n(dbt exposure)] as EXP
 
@@ -192,5 +193,11 @@ F_bills --> R_overlap
 F_votes --> R_overlap
 S_interest --> R_overlap
 R_overlap --> EXP
+I_seats --> I_years
+L_cl --> I_years
+L_fjc --> I_years
+I_years --> R_years
+dim --> R_years
+R_years --> EXP
 profile --> EXP
 @enduml

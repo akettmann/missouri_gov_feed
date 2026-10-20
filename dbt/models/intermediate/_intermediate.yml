@@ -114,6 +114,19 @@ models:
     surname (and district, when the journal adds one to disambiguate). Ambiguous tokens stay unattributed. A two-word
     token ("Thompson Rehder") also matches a senator whose recorded surname is its last word. Grain: one row per
     (Senate journal vote, attributed person).'
+- name: int_officeholders__years
+  description: 'Who held each tracked office in each year, for the offices whose past holders have dated records:
+    state_house    the House''s own roster for each session year (int_mo_house__member_identity). Members who left
+    mid-session are missing from that session''s end-of-session list. state_senate   Open States seat-terms with
+    a start date (int_mo_legislators__seats). A year is kept only when all 34 districts have a dated holder, so
+    a partial year doesn''t pass as the full Senate. us_house, us_senate                 congress-legislators terms
+    for Missouri us_district_court, us_court_of_appeals   FJC commissions on the E.D./W.D. Mo. district courts,
+    and Eighth Circuit judges whose FJC career mentions Missouri (as int_judges__federal) A term counts for a year
+    when it runs past January 15 of it, so a hand-over in the first days of January (Congress turns over on January
+    3) doesn''t list both the outgoing and the incoming holder. Years are those with a House roster. Statewide officers,
+    mayors and state judges have no dated past rosters here. person keys match dim_official.official_id, so a past
+    holder who serves today links to their profile. Grain: one row per (year, person, office) for offices with dated
+    past rosters.'
 - name: int_officials__bios
   description: 'One biography text per current official where a source has one: Official Manual (legislators), MO
     House XML (representatives), FJC professional career (federal judges), Open States (others). Grain: one biography

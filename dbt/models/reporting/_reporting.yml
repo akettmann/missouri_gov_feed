@@ -558,6 +558,71 @@ models:
         data_type: varchar
         description: "{{ doc('source_url') }}"
 
+  - name: rpt_officeholders_by_year
+    description: >
+      Who held each tracked office in each year, for the browse page's year control. The current calendar
+      year is everyone serving now (dim_official, every office). Earlier years list the past holders of the
+      offices with dated rosters only (int_officeholders__years: MO House from its session rosters, MO Senate
+      in years where Open States dates all 34 seats, Congress, federal judges); statewide officers, mayors and
+      state judges have no rows before the current year. A term counts for a year when it runs past January 15.
+      Grain: one row per (year, office, person).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [year, office, official_id]
+    columns:
+      - name: year
+        data_type: integer
+        description: Calendar year. The latest year is the build year and lists those serving now.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1990
+                max_value: 2100
+      - name: official_id
+        data_type: varchar
+        description: >
+          Person key: dim_official.official_id for anyone serving now; otherwise the same kind of key the
+          source gives (Open States id, mohouse:<House member id>, bioguide:<id>, fjc:<nid>).
+        data_tests: [not_null]
+      - name: full_name
+        data_type: varchar
+        description: Display name.
+        data_tests: [not_null]
+      - name: party
+        data_type: varchar
+        description: >
+          Party as the source records it for that year (House roster, congress-legislators term); Open States'
+          current party for past senators; none for judges. A label, not a color.
+      - name: level
+        data_type: varchar
+        description: state, federal or local.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [state, federal, local]
+      - name: office
+        data_type: varchar
+        description: Office key, as in dim_official.office.
+        data_tests: [not_null]
+      - name: office_title
+        data_type: varchar
+        description: Office as displayed.
+      - name: district
+        data_type: varchar
+        description: District number, or court key for federal judges (moed, mowd, ca8, moed+mowd).
+      - name: has_profile
+        data_type: boolean
+        description: True when the person serves now (in any office) and so has a profile page.
+        data_tests: [not_null]
+      - name: source
+        data_type: varchar
+        description: >
+          Where the row comes from - dim_official (current year), mo_house roster, openstates,
+          congress-legislators or fjc.
+
 exposures:
   - name: voter_frontend
     label: Missouri officials frontend
@@ -598,3 +663,4 @@ exposures:
       - ref('rpt_donor_size')
       - ref('rpt_donor_employers')
       - ref('rpt_interest_vote_overlap')
+      - ref('rpt_officeholders_by_year')
