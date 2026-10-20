@@ -18,6 +18,12 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
 ## High priority
 
 ## Medium priority
+- [ ] Officials list: by default, show only the people holding office in the current year (not past
+  officeholders), with a way to look back at other years. Note: `dim_official` holds only sitting officials
+  today, so other years need past officeholders (`fct_office_history`) brought into the list
+- [ ] Officials list: replace the Level and Office dropdowns with picture tiles to pick from (for example the
+  Capitol for the legislature, a gavel for courts, the U.S. Capitol for Congress, a city hall for mayors),
+  each labeled in text so the choice doesn't rely on the image
 
 ## Low priority
 - [ ] Ensure the page looks correct on a wide screen
