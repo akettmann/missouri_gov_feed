@@ -59,6 +59,7 @@ manufacturers,business
 retail,business
 retailers,business
 walmart,business
+agc,construction
 aggregates,construction
 architects,construction
 asphalt,construction
@@ -81,6 +82,8 @@ school,education
 schools,education
 teachers,education
 university,education
+amec,energy_utilities
+amecpac,energy_utilities
 ameren,energy_utilities
 amerenmo,energy_utilities
 amerenue,energy_utilities
@@ -88,6 +91,7 @@ chevron,energy_utilities
 electric,energy_utilities
 energy,energy_utilities
 evergy,energy_utilities
+meda,energy_utilities
 oil,energy_utilities
 petroleum,energy_utilities
 pipeline,energy_utilities
@@ -122,6 +126,7 @@ elevance,health_care
 express scripts,health_care
 health,health_care
 healthcare,health_care
+healthpac,health_care
 hospital,health_care
 hospitals,health_care
 lilly,health_care
@@ -150,12 +155,14 @@ health plan,insurance
 insurance,insurance
 insurers,insurance
 lockton,insurance
+mosfa,insurance
 prudential,insurance
 state farm,insurance
 thrivent,insurance
 unitedhealth,insurance
 afl cio,labor
 carpenters,labor
+chipp,labor
 electrical workers,labor
 laborers,labor
 letter carriers,labor
@@ -214,6 +221,7 @@ time warner,telecom
 verizon,telecom
 wireless,telecom
 altria,tobacco
+cheyenne international,tobacco
 rai services,tobacco
 tobacco,tobacco
 vapor,tobacco
