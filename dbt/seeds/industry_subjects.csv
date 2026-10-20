@@ -1,4 +1,8 @@
 industry,subject_name
+accounting,ACCOUNTANTS
+accounting,"AUDITOR, STATE"
+accounting,TAXATION AND REVENUE - GENERAL
+accounting,TAXATION AND REVENUE - INCOME
 agriculture,AGRICULTURE
 agriculture,"AGRICULTURE, DEPARTMENT OF"
 agriculture,ANIMALS
@@ -21,6 +25,7 @@ business,TAX INCENTIVES
 construction,CAPITAL IMPROVEMENTS
 construction,CONSTRUCTION AND BUILDING CODES
 construction,CONTRACTS AND CONTRACTORS
+construction,ENGINEERS
 construction,EXCAVATION
 construction,PUBLIC BUILDINGS
 construction,ROADS AND HIGHWAYS
@@ -57,6 +62,7 @@ health_care,NURSES
 health_care,NURSING HOMES AND LONG-TERM CARE FACILITIES
 health_care,OPTOMETRY
 health_care,PHARMACY
+health_care,PHYSICAL THERAPISTS
 health_care,PHYSICIANS
 insurance,INSURANCE - AUTOMOBILE
 insurance,INSURANCE - GENERAL

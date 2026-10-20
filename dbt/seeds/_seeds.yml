@@ -100,11 +100,19 @@ seeds:
       are added only once their sponsor is confirmed (October 2026: agc = AGC of Missouri, amec/amecpac =
       Association of Missouri Electric Cooperatives, meda = Missouri Energy Development Association,
       healthpac = Missouri Hospital Association, mosfa = Missouri State Farm Agents, chipp = Carpenters'
-      council, "cheyenne international" = the Decade cigarette maker); the rest are left unclassified rather
-      than guessed. A keyword may sit in several industries (a health
+      council, "cheyenne international" = the Decade cigarette maker; mba = the Missouri Bankers Association's
+      regional PACs, from its treasurer's phone on MEC; mbwa = MEC committee C000684, MO Beer Wholesalers
+      Association; "dealers interested in government" = MEC C000708, MADA (auto dealers); mha = Missouri
+      Hospital Association, sharing its PO Box 60 with HEALTHPAC; acec = ACEC Missouri, MEC's connected
+      organization for C222134; "pt pac" = PT-PAC of Missouri, the physical therapists' PAC); the rest are left
+      unclassified rather than guessed. Confirmed to have no single industry, so deliberately unclassified:
+      lobbying-firm PACs (ATGS PAC = Armstrong Teasdale's AT Government Strategies; HBS MO State PAC = Husch
+      Blackwell Strategies; A Better Missouri, Living Well PAC and Missouri First at Bardgett & Associates) and
+      one-treasurer families of PACs (Missouri AG, C, Senior, Growth PAC and MO Majority PAC in Perryville; MO
+      DSV and RQC PAC in New Bloomfield). A keyword may sit in several industries (a health
       insurer is health_care and insurance). Checked against the October 2026 names: generic words that
       misfired were dropped ("farm" hit State Farm, "title" hit Title Max, "sports" hit sports bars). The
-      classified names cover 44% of organization contributions and lobbyist gifts by amount (October 2026).
+      classified names cover 49% of organization contributions and lobbyist gifts by amount (October 2026).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
