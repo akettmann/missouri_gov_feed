@@ -64,25 +64,25 @@ revisor.mo.gov before relying on a detail.
 
 ## Building the request lists
 
-PFD requests name the filers. Generate the lists from `dim_official` rather than typing them, and attach
-them to the letter as a CSV. `dim_official` holds current officeholders only (October 2026: 188 legislators
-and 7 statewide officers for MEC, 346 judges for the Clerk). People who left office during the requested
-years have to be added by hand.
+PFD requests name the filers. Generate the lists rather than typing them, and attach them to the letter as
+CSVs:
 
-```sql
--- MEC: legislators and statewide officers
-select full_name, office_title, district, party
-from marts.dim_official
-where level = 'state'
-    and office not in ('mo_supreme_court', 'mo_court_of_appeals', 'mo_circuit_judge', 'mo_associate_circuit_judge')
-order by office, district;
-
--- Clerk of the Supreme Court: state judges
-select full_name, office_title, district
-from marts.dim_official
-where office in ('mo_supreme_court', 'mo_court_of_appeals', 'mo_circuit_judge', 'mo_associate_circuit_judge')
-order by office, district, full_name;
 ```
+uv run python scripts/sunshine_filer_lists.py          # writes data/sunshine/mec_filers.csv, clerk_filers.csv
+```
+
+The lists cover the last five full calendar years, the statements MEC and the Clerk still keep (run in 2026:
+filing years 2021-2025).
+
+- `mec_filers.csv`: legislators and statewide officers, current and former, with their terms and a
+  `status` column. Legislators come from Open States' seat-terms, so members who left are included (October
+  2026: 194 current, 164 former). The statewide list has current officers only: add the statewide officers
+  who left during those years by hand. For 2021-2025 that is Mike Parson (Governor), Jay Ashcroft (Secretary
+  of State), Eric Schmitt and Andrew Bailey (Attorney General) and Nicole Galloway (State Auditor); check
+  against the Official Manual before sending. A statement is filed per person per year, so officers who
+  changed office (Mike Kehoe, Scott Fitzpatrick) are already covered by their current row.
+- `clerk_filers.csv`: current state judges (October 2026: 352). Judges who left the bench in those years are
+  not in the data and have to be added by hand.
 
 ## Template: Missouri Ethics Commission (officials' and candidates' PFDs)
 
