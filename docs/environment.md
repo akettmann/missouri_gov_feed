@@ -130,6 +130,11 @@ the page data without it. The build simplifies the TIGER boundaries to about 50 
 point itself, so a visitor's location never leaves the page. Without those exports the page says the boundaries
 aren't loaded.
 
+The officials list (`/`) shows the people serving now; its year control loads earlier years from
+`dist/lookup/officeholders/<year>.json`, built from `rpt_officeholders_by_year`. Without that export the page
+lists today's officials only and hides the year control. Past years cover only offices with dated rosters (MO
+House, MO Senate where every seat is dated, Congress, federal courts); the page names the offices a year lacks.
+
 Optional build-time environment: `PUBLIC_SITE_URL` (canonical site URL), `PUBLIC_REPORT_ERROR_URL`
 (where "Report an error" goes; default: a prefilled GitHub issue on this repo).
 

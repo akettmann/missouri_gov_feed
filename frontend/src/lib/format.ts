@@ -41,3 +41,49 @@ export const visibleCoverage = <T extends { key: string; status: string }>(items
 export const isMedium = (confidence: string | null | undefined) => confidence === "medium";
 
 export const LEVELS: Record<string, string> = { state: "State", federal: "Federal", local: "Local" };
+
+/**
+ * Office tiles on the browse page. Each groups related offices (office key -> label); an office missing here
+ * falls into "other", so a newly tracked office still shows up.
+ */
+export const OFFICE_GROUPS: { key: string; label: string; offices: Record<string, string> }[] = [
+  {
+    key: "legislature",
+    label: "Missouri legislature",
+    offices: { state_house: "Missouri House", state_senate: "Missouri Senate" },
+  },
+  {
+    key: "statewide",
+    label: "Statewide offices",
+    offices: {
+      governor: "Governor",
+      lt_governor: "Lieutenant Governor",
+      attorney_general: "Attorney General",
+      secretary_of_state: "Secretary of State",
+      state_auditor: "State Auditor",
+      state_treasurer: "State Treasurer",
+    },
+  },
+  {
+    key: "state_courts",
+    label: "Missouri courts",
+    offices: {
+      mo_supreme_court: "Supreme Court of Missouri",
+      mo_court_of_appeals: "Missouri Court of Appeals",
+      mo_circuit_judge: "Circuit judges",
+      mo_associate_circuit_judge: "Associate circuit judges",
+    },
+  },
+  { key: "congress", label: "Congress", offices: { us_senate: "U.S. Senate", us_house: "U.S. House" } },
+  {
+    key: "federal_courts",
+    label: "Federal courts",
+    offices: {
+      us_court_of_appeals: "U.S. Court of Appeals, 8th Circuit",
+      us_district_court: "U.S. District Courts",
+    },
+  },
+  { key: "mayors", label: "Mayors", offices: { mayor: "Mayors" } },
+];
+
+export const officeGroup = (office: string) => OFFICE_GROUPS.find((g) => office in g.offices)?.key ?? "other";

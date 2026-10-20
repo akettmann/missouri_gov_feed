@@ -24,6 +24,7 @@ import type {
   Official,
   OfficialBundle,
   PartyBreak,
+  PastOfficeholder,
   PeerStrip,
   SubjectVotes,
   TopDonorRow,
@@ -461,6 +462,32 @@ export async function officialIndex(): Promise<IndexEntry[]> {
   }));
 }
 
+/**
+ * The browse list's look-back: past years of rpt_officeholders_by_year (its latest year is the one serving now,
+ * which the page takes from dim_official), newest first. Null without the export, so the page lists today only.
+ */
+export async function pastOfficeholders(): Promise<{
+  currentYear: number;
+  years: Map<number, PastOfficeholder[]>;
+} | null> {
+  if (!hasExport("rpt_officeholders_by_year")) return null;
+  const slugs = new Map((await allOfficials()).map(({ official: o }) => [o.official_id, o.slug]));
+  const rows = await query<PastOfficeholder & { year: number; official_id: string; has_profile: boolean }>(`
+    select year, official_id, has_profile, full_name, party, level, office, office_title, district
+    from {rpt_officeholders_by_year}
+    order by year desc, level, office, try_cast(district as integer), district, full_name`);
+  const currentYear = Math.max(...rows.map((r) => r.year));
+  const years = new Map<number, PastOfficeholder[]>();
+  for (const { year, official_id, has_profile, ...r } of rows) {
+    if (year === currentYear) continue;
+    const entry = { ...r, slug: has_profile ? (slugs.get(official_id) ?? null) : null };
+    const list = years.get(year);
+    if (list) list.push(entry);
+    else years.set(year, [entry]);
+  }
+  return { currentYear, years };
+}
+
 /** Export timestamps shown on the methodology page as data freshness. */
 export function freshness(): { table: string; exported_at: string | null; sample: boolean }[] {
   const tables = [
@@ -480,6 +507,7 @@ export function freshness(): { table: string; exported_at: string | null; sample
     "rpt_interest_vote_overlap",
     "fct_jurisdiction_businesses",
     "rpt_district_business_industries",
+    "rpt_officeholders_by_year",
   ];
   return tables.map((t) => ({
     table: t,

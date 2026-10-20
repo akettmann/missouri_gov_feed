@@ -18,12 +18,6 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
 ## High priority
 
 ## Medium priority
-- [ ] Officials list: by default, show only the people holding office in the current year (not past
-  officeholders), with a way to look back at other years. Note: `dim_official` holds only sitting officials
-  today, so other years need past officeholders (`fct_office_history`) brought into the list
-- [ ] Officials list: replace the Level and Office dropdowns with picture tiles to pick from (for example the
-  Capitol for the legislature, a gavel for courts, the U.S. Capitol for Congress, a city hall for mayors),
-  each labeled in text so the choice doesn't rely on the image
 
 ## Low priority
 - [ ] Find my officials on a wide screen: before a lookup the results column (right two fifths) is empty
@@ -37,3 +31,7 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
 - [ ] Businesses in their area: offer the full site list per district (all ~1,400 in a house district) as a
   separate per-district download or page, outside the per-official JSON budget
 - [ ] Compare page: add a businesses-in-their-area row (donor companies with sites in the area, total sites)
+- [ ] Officials list, past years: people who no longer serve are listed without a link because they have no
+  profile. A small page per past officeholder (offices held, years, source links) would let the list link them
+- [ ] Officials list: the year control needs JavaScript (it fetches `lookup/officeholders/<year>.json`); without
+  it only the current year shows. Static per-year pages would make look-back work without JS

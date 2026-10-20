@@ -31,6 +31,7 @@ GRAIN = {
     "int_mo_house__votes": "one row per (House roll call, attributed person)",
     "int_mo_legislators__seats": "one row per Open States legislative seat-term",
     "int_mo_senate__votes": "one row per (Senate journal vote, attributed person)",
+    "int_officeholders__years": "one row per (year, person, office) for offices with dated past rosters",
     "int_officials__bios": "one biography text per official per source",
     "int_officials__current": "one row per (person, current office)",
     "int_officials__name_keys": "one row per (official, normalized name variant)",
