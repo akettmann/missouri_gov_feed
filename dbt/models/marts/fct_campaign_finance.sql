@@ -69,7 +69,9 @@ mec_received as (
         c.contribution_date as transaction_date,
         c.amount,
         c.contributor_name as counterparty,
-        coalesce(c.contributor_company, c.contributor_employer) as counterparty_organization,
+        coalesce(
+            {{ null_if_placeholder('c.contributor_company') }}, {{ null_if_placeholder('c.contributor_employer') }}
+        ) as counterparty_organization,
         c.contributor_type as counterparty_type,
         case c.contribution_kind when 'I' then 'in-kind' when 'In-Kind' then 'in-kind' else 'monetary' end
         || ' to ' || m.committee_name as kind,
@@ -113,7 +115,7 @@ mec_direct_received as (
         c.contribution_date as transaction_date,
         c.amount,
         c.contributor_name as counterparty,
-        c.contributor_company as counterparty_organization,
+        {{ null_if_placeholder('c.contributor_company') }} as counterparty_organization,
         c.contributor_type as counterparty_type,
         lower(c.contribution_kind) || ' to ' || m.committee_name as kind,
         'MEC' as source,

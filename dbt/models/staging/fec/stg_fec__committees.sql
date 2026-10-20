@@ -6,7 +6,8 @@ select
     cmte_dsgn as designation,
     cmte_tp as committee_type,
     cmte_pty_affiliation as party,
-    connected_org_nm as connected_organization,
+    -- "NONE" is the FEC's placeholder for no connected organization (about 8,900 committees)
+    {{ null_if_placeholder('connected_org_nm') }} as connected_organization,
     cand_id as candidate_id,
     cmte_city as city,
     cmte_st as state
