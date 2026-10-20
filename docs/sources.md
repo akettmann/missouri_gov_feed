@@ -417,10 +417,15 @@ offices, shops and most service businesses are missing.
 - Districts: point-in-polygon of the facility's coordinates against the current `dim_district` boundaries.
   The geometry functions are dispatched per backend (`macros/compat/spatial.sql`); on DuckDB they need the
   `spatial` extension, which `dbt/profiles.yml` loads (downloaded on first use).
-- Donor match: the donor organization's name and the facility's, owner's or parent company's name are
-  compared after normalizing case and punctuation and dropping a leading "the" and legal-form words (Inc,
-  LLC, Co, Corp...). Only exact matches count. In October 2026: 502 (official, facility) pairs for 49
-  officials, from 145 donors (AT&T, UPS, Ameren, BNSF, Tyson, ADM, Boeing...).
+- Donor match, two ways (`matched_by`):
+  - `same name`: the donor organization's name equals the facility's, owner's or parent company's after
+    normalizing case and punctuation and dropping a leading "the" and legal-form words (Inc, LLC, Co,
+    Corp...).
+  - `same company`: both names carry one brand from the `company_brands` seed. Corporate money mostly comes
+    from PACs named after the brand ("Ameren Missouri PAC", "Spire PAC", "AT&T Missouri Employee PAC"), while
+    sites are filed under legal or subsidiary names ("UNION ELECTRIC CO", "LACLEDE GAS", "SOUTHWESTERN BELL
+    TELEPHONE", "KANSAS CITY POWER & LIGHT"). The seed covers the largest corporate donors with Missouri sites.
+  - In October 2026: 502 (official, facility) pairs by name and 1,541 more by brand, for 122 officials.
 
 Quirks:
 - A few rows fuse two records onto one line (a closing quote is missing: `...,"O"110015893693",...`). DuckDB's
@@ -432,9 +437,9 @@ Quirks:
 - Organization types are mostly `UNKNOWN`, so government sites are also recognized by name ("City of ...",
   "... County", "... School District", "Public Works") as well as by a government org type or federal agency.
 - One owner per facility is kept: owner/operator, then owner, operator, permittee, preferring a known org
-  type. Owners are often a utility's legal name ("UNION ELECTRIC CO") while the donor is the parent
-  ("Ameren Corporation"); the facility's own name ("AMERENUE ...") or the parent company field catches some
-  of these, not all.
+  type.
+- Branded fuel stations carry the brand in their name but are mostly independently owned ("BILL S PHILLIPS
+  66"), so oil brands are not in `company_brands`.
 - Missouri Accountability Portal (mapyourtaxes.mo.gov, also the "State Expenditures" datasets on data.mo.gov)
   was checked for the same purpose and not used: its files have agency, category, vendor name (cut at 30
   characters) and amount per fiscal year, with no vendor address, and include employees' reimbursements.

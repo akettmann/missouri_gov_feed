@@ -1253,9 +1253,11 @@ models:
       Businesses operating in a district-elected official's area: the non-government EPA-regulated facilities
       (fct_district_facilities) in the district a state legislator or U.S. representative is elected from, or in
       a mayor's city, flagged when the official received campaign contributions from them. Judges are left out
-      (a circuit or federal district holds thousands of sites, and judges take almost no organization money). A contribution counts when the donor organization's name equals
-      the facility's, its owner's or its parent company's after normalizing case, punctuation, a leading "the"
-      and legal-form words (Inc, LLC, Co, Corp...). Exact names only, so a donor that files under another name
+      (a circuit or federal district holds thousands of sites, and judges take almost no organization money).
+      A contribution counts when the donor organization's name equals the facility's, its owner's or its parent
+      company's after normalizing case, punctuation, a leading "the" and legal-form words (Inc, LLC, Co,
+      Corp...), or when both names carry the same brand from the company_brands seed (corporate PACs and
+      subsidiaries: "Spire PAC" and "LACLEDE GAS CO"). A company not in the seed that gives under another name
       is missed. Statewide officials have no rows (they serve every area). Grain: one row per (official,
       facility); district_id is the area that puts the facility in the official's jurisdiction.
     data_tests:
@@ -1308,12 +1310,24 @@ models:
         data_type: boolean
         description: The official received campaign contributions from this facility, its owner or its parent company.
         data_tests: [not_null]
-      - name: donor_name
+      - name: matched_by
         data_type: varchar
-        description: The contributor name as filed, when is_donor.
+        description: >
+          How the donor was tied to the facility, when is_donor: `same name` (the donor's normalized name equals
+          the facility's, owner's or parent company's) or `same company` (both names carry one brand from the
+          company_brands seed, e.g. "Ameren Missouri PAC" and a "UNION ELECTRIC CO" substation).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['same name', 'same company']
+      - name: donor_names
+        data_type: varchar
+        description: The matched contributors as filed, separated by "; ", when is_donor.
       - name: donated_amount
         data_type: decimal(38,6)
-        description: Total contributions the official received from that donor (all years loaded), when is_donor.
+        description: >
+          Total contributions the official received from the matched donors (all years loaded), when is_donor.
+          The same total repeats on every facility of that company in the official's area.
       - name: n_contributions
         data_type: hugeint
         description: Number of those contributions.

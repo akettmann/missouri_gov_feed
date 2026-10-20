@@ -18,4 +18,3 @@
   - Secretary of State business entity registry: no bulk export. Request an extract under the Sunshine Law (template in docs/sunshine_requests.md). Needs the user to send it
   - OSHA establishment data (inspections, injury reports): named, addressed sites, mostly the same regulated industries
   - Ruled out: the Missouri Accountability Portal's vendor payments have no vendor address; Census County Business Patterns has no company names
-- [ ] Donor matching in `fct_jurisdiction_businesses` is exact on normalized names, so a site owned under a subsidiary's legal name ("UNION ELECTRIC CO") misses the parent's PAC ("Ameren Corporation") unless the site's own name or FRS's parent-company field carries it. A small seed of legal name -> parent (the large utilities, railroads and telecoms) would catch most of the money

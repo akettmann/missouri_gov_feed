@@ -116,6 +116,24 @@ seeds:
               arguments:
                 to: ref('industry_subjects')
                 field: industry
+  - name: company_brands
+    description: >
+      Whole-word keywords (name_key form, "at t" for AT&T) that tie a company's PACs, subsidiaries and
+      legal names to one brand, so fct_jurisdiction_businesses can match "Ameren Missouri PAC" to a "UNION
+      ELECTRIC CO" substation or "Spire PAC" to "LACLEDE GAS CO". For the largest corporate donors that have
+      Missouri EPA FRS sites (October 2026). Every name each keyword hits, on the donor side and the facility side,
+      was checked. Left out because they hit independently owned stations under the brand: "phillips 66",
+      "valero"; "tyson" alone hit a place name, so Tyson's divisions are listed instead. Known strays: the
+      Anheuser-Busch employees' credit union and Murphy USA fuel stations at Walmart stores.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [keyword, brand]
+    columns:
+      - name: keyword
+        data_tests: [not_null, unique]
+      - name: brand
+        data_tests: [not_null]
   - name: industry_subjects
     description: >
       The legislature's bill subject index terms (fct_bill_subjects.subject_name, verbatim) that each interest_keywords
