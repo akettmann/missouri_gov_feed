@@ -1,4 +1,4 @@
-// Client side of "find my officials": point-in-polygon against /data/districts.json, then the officials
+// Client side of "find my officials": point-in-polygon against /lookup/districts.json, then the officials
 // for each district, grouped by level. Runs entirely in the browser.
 import type { DistrictShape } from "../lib/exports/districts";
 

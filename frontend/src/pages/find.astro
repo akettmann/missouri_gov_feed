@@ -90,7 +90,7 @@ const path = (polygons: Ring[][]) =>
   const pin = document.getElementById("pin");
   let data: Promise<Lookup> | undefined;
   const load = () =>
-    (data ??= fetch(`${import.meta.env.BASE_URL.replace(/\/$/, "")}/data/districts.json`).then((r) =>
+    (data ??= fetch(`${import.meta.env.BASE_URL.replace(/\/$/, "")}/lookup/districts.json`).then((r) =>
       r.json(),
     ));
 

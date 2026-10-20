@@ -125,7 +125,7 @@ banner instead of failing (`frontend/src/lib/exports/fixtures.ts`).
 
 "Find my officials" (`/find/`) needs the `dim_district` and `fct_official_districts` exports (the
 `census_tiger` loader). The build simplifies the TIGER boundaries to about 50 m and writes
-`dist/data/districts.json` (about 300 KB gzipped); the browser downloads it on the first lookup and matches the
+`dist/lookup/districts.json` (about 300 KB gzipped); the browser downloads it on the first lookup and matches the
 point itself, so a visitor's location never leaves the page. Without those exports the page says the boundaries
 aren't loaded.
 

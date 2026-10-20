@@ -1,5 +1,6 @@
 .venv/
-data/
+# the repo-root data dir only: a bare `data/` also hid source folders like frontend/src/**/data
+/data/
 __pycache__/
 dbt/target/
 dbt/logs/
