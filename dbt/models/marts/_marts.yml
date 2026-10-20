@@ -1070,10 +1070,11 @@ models:
 
   - name: fct_vote_bills
     description: >
-      Which bill a state vote was on. House roll calls are linked exactly (the bill XML names the roll-call PDF,
-      which is the vote_id), for House bills only; Senate journal votes through the measure in the journal text
-      ("HB 2", "SB 974") and the year's regular session, for House and Senate bills. Grain: one row per (chamber,
-      vote, bill, bill version).
+      Which bill a state vote was on. House roll calls are linked exactly where the bill XML names the roll-call
+      PDF (the vote_id); the rest (votes on Senate bills, some on House bills) through the lead bill of the
+      measure printed on the PDF ("HCS HB 2", "SS SCS SBs 49 & 118") in the same session. Senate journal votes
+      through the measure in the journal text ("HB 2", "SB 974") and the year's regular session. Grain: one row
+      per (chamber, vote, bill, bill version).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -1096,7 +1097,7 @@ models:
         description: Version of the bill text voted on (House roll calls only), e.g. "Perfected", "Truly Agreed".
       - name: matched_by
         data_type: varchar
-        description: roll-call link (exact) or measure text (read from the Senate journal).
+        description: roll-call link (exact) or measure text (read from the House roll-call PDF or the Senate journal).
 
   - name: fct_salaries
     description: >

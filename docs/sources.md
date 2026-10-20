@@ -36,7 +36,7 @@ the only per-member House vote record.
 - Lands: `mo_house_members`, `mo_house_bills`, `mo_house_lists`, `mo_house_rollcalls`,
   `mo_house_rollcall_votes`.
 - Window: `MOGOV_LOOKBACK_YEARS` (default 10). Roll-call PDFs go back to 2014.
-- Shard units: session codes (XML) and roll-call PDF URLs.
+- Shard units: session codes (XML) and session days (roll-call PDFs).
 
 Quirks:
 - Session codes are two-digit year plus type: `1` regular, `2`–`4` extraordinary. Unknown codes return
@@ -58,15 +58,21 @@ Quirks:
   bills API needs a key).
 - Each bill's roll calls are nested under the bill text version voted on
   (`BillText[].RollCalls[].RollCall[].RollCallPDF`). The PDF URL is the House `vote_id`, so
-  `fct_vote_bills` links House votes to bills exactly. About 80% of roll calls belong to a bill; the
-  rest are motions and resolutions.
+  `fct_vote_bills` links House votes to bills exactly. Roll calls the XML doesn't nest (all House votes on
+  Senate bills, some on House bills) are linked by the lead bill of the measure printed on the PDF
+  (`matched_by = 'measure text'`). In October 2026 5,274 of 6,449 roll calls were linked; most of the rest
+  are procedural (approve journal, quorum calls, rules, previous question).
 - Bill sponsors list senators (conferees, handlers) with district 200 + their senate district.
-- Roll-call PDFs are found only through the bill XML, so the loader misses every roll call the XML doesn't
-  nest under a House bill. That includes House votes on Senate bills (third reading, conference reports)
-  and procedural votes ("APPROVE JOURNAL", "PQ"). Only 108 of the 3,873 roll calls landed by October 2026
-  name a Senate measure. The PDFs are numbered per session day (`billsYYS/rollcalls/{day}.{nnn}.pdf`).
-  On day 71 of 2025 the site had roll calls 1–4 and we held only #2. Non-existent numbers answer with an
-  HTML error page, like unknown session codes.
+- The bill XML only links roll calls nested under a House bill. It misses House votes on Senate bills
+  (third reading, conference reports) and procedural votes ("APPROVE JOURNAL", "QUORUM", "PQ"). Until
+  October 2026 the loader found PDFs only through the XML: 3,873 roll calls, 108 of them on Senate
+  measures. There is no index of the PDFs, but they are numbered per session day
+  (`billsYYS/rollcalls/{day}.{nnn}.pdf`), and a missing number answers with the site's HTML error page,
+  like unknown session codes. The loader now probes each day from roll call 1 until the first miss past
+  the highest number the XML links, for days 1 to the last linked day + 3 (10 days for a session the XML
+  links none in). That found 6,449 roll calls, 1,526 on Senate measures. Misses are cached for good once
+  the session's year is over and re-checked daily before that. The first probe took about 8 minutes per
+  shard with 4 shards.
 - PDF text extraction is cached by PDF content (`data/cache/pdftext/`). Before that, a re-run spent
   3–10 minutes per shard re-parsing PDFs that were already downloaded.
 
