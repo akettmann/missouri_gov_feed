@@ -1,0 +1,12 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: census_zcta
+  description: U.S. Census Bureau Gazetteer files for ZIP Code Tabulation Areas (www2.census.gov/geo/docs/maps-data/data/gazetteer).
+  tables:
+  - name: gazetteer
+    identifier: census_zcta_gazetteer
+    description: >
+      The national ZCTA Gazetteer file verbatim (all columns as text, names lower-cased): GEOID, land and water
+      area, and each ZCTA's internal point (INTPTLAT / INTPTLONG); `filename` names the vintage's file.

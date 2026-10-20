@@ -7,6 +7,8 @@ export interface Lookup {
   shapes: DistrictShape[];
   officials: Record<string, string[]>;
   statewide: string[];
+  /** ZIP -> [lon, lat, equal-area radius in meters] */
+  zips: Record<string, [number, number, number]>;
   /** slug -> [full name, office line, party, office] */
   directory: Record<string, [string, string, string | null, string]>;
 }
@@ -57,8 +59,8 @@ const GROUPS: { title: string; offices: string[]; collapsed?: boolean }[] = [
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}) =>
   Object.assign(document.createElement(tag), props);
 
-export function lookup(data: Lookup, lon: number, lat: number, out: HTMLElement, status: HTMLElement) {
-  const hits = data.shapes.filter(
+const hitsAt = (data: Lookup, lon: number, lat: number) =>
+  data.shapes.filter(
     (s) =>
       lon >= s.bbox[0] &&
       lon <= s.bbox[2] &&
@@ -66,6 +68,79 @@ export function lookup(data: Lookup, lon: number, lat: number, out: HTMLElement,
       lat <= s.bbox[3] &&
       inside(s.polygons, lon, lat),
   );
+
+/** Districts a ZIP may also reach: sample a circle of the ZIP's land area around its internal point. */
+const ALSO_TYPES = ["us_house", "state_senate", "state_house"];
+function alsoReached(data: Lookup, lon: number, lat: number, radiusM: number, primary: Set<string>) {
+  const found = new Map<string, Lookup["shapes"][number]>();
+  const dLat = radiusM / 111_320;
+  const dLon = radiusM / (111_320 * Math.cos((lat * Math.PI) / 180));
+  for (const f of [0.5, 0.9])
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * 2 * Math.PI;
+      for (const h of hitsAt(data, lon + f * dLon * Math.cos(a), lat + f * dLat * Math.sin(a)))
+        if (ALSO_TYPES.includes(h.district_type) && !primary.has(h.district_id)) found.set(h.district_id, h);
+    }
+  return [...found.values()].sort(
+    (a, b) => ALSO_TYPES.indexOf(a.district_type) - ALSO_TYPES.indexOf(b.district_type),
+  );
+}
+
+/** Look up a typed ZIP: officials at the ZIP's internal point, then other districts the ZIP may reach. */
+export function lookupZip(
+  data: Lookup,
+  zip: string,
+  out: HTMLElement,
+  status: HTMLElement,
+): [number, number] | null {
+  const z = data.zips?.[zip];
+  if (!z) {
+    out.replaceChildren(
+      el("p", {
+        className: "muted",
+        textContent: `${zip} isn't a Missouri ZIP code in the Census ZIP areas (PO-box-only ZIPs have none). Try your location or the map.`,
+      }),
+    );
+    status.textContent = "ZIP not found.";
+    return null;
+  }
+  const [lon, lat, radius] = z;
+  lookup(data, lon, lat, out, status);
+  const primary = new Set(hitsAt(data, lon, lat).map((h) => h.district_id));
+  const also = alsoReached(data, lon, lat, radius, primary);
+  status.textContent = `ZIP ${zip}, at its center: ${status.textContent}`;
+  if (also.length) {
+    const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+    const box = el("div", { className: "also" });
+    box.append(
+      el("h3", { textContent: "This ZIP may also reach" }),
+      el("p", {
+        className: "small muted",
+        textContent:
+          "A ZIP code can cross district lines. If you live near the edge of this ZIP, one of these may be yours; use your location or the map for an exact answer.",
+      }),
+    );
+    const list = el("ul", { className: "people" });
+    for (const d of also) {
+      const li = el("li");
+      li.append(el("strong", { textContent: d.name }));
+      const members = data.officials[d.district_id] ?? [];
+      if (!members.length)
+        li.append(el("span", { className: "muted", textContent: " · no current member in our data" }));
+      for (const s of members) {
+        li.append(" · ");
+        li.append(el("a", { href: `${base}/officials/${s}/`, textContent: data.directory[s][0] }));
+      }
+      list.append(li);
+    }
+    box.append(list);
+    out.append(box);
+  }
+  return [lon, lat];
+}
+
+export function lookup(data: Lookup, lon: number, lat: number, out: HTMLElement, status: HTMLElement) {
+  const hits = hitsAt(data, lon, lat);
   out.replaceChildren();
   if (!hits.some((h) => h.district_type === "county")) {
     status.textContent = "That point isn't in Missouri. Try another spot.";

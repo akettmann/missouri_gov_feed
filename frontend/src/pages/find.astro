@@ -31,8 +31,8 @@ const path = (polygons: Ring[][]) =>
 <Layout title="Find my officials" description="Find the Missouri officials who represent a location.">
   <h1>Find my officials</h1>
   <p class="lede">
-    Use your device's location or click where you live on the map. Your location is matched to districts
-    inside this page and is never sent anywhere.
+    Enter your ZIP code, use your device's location, or click where you live on the map. Whatever you enter is
+    matched to districts inside this page and is never sent anywhere.
   </p>
 
   {!data ? (
@@ -40,9 +40,22 @@ const path = (polygons: Ring[][]) =>
   ) : (
     <div class="find">
       <div class="card map-card">
-        <button type="button" id="locate">
-          Use my location
-        </button>
+        <form id="zip-form" class="zip" onsubmit="return false">
+          <label for="zip">ZIP code</label>
+          <input
+            id="zip"
+            name="zip"
+            inputmode="numeric"
+            pattern="[0-9]{5}"
+            maxlength="5"
+            autocomplete="postal-code"
+          />
+          <button type="submit">Find</button>
+          <span class="muted small">or</span>
+          <button type="button" id="locate">
+            Use my location
+          </button>
+        </form>
         <p class="small muted" id="status" aria-live="polite">
           Or click the map. Zoom with your browser if you need more detail.
         </p>
@@ -83,7 +96,7 @@ const path = (polygons: Ring[][]) =>
 </Layout>
 
 <script>
-  import { lookup, type Lookup } from "../scripts/find";
+  import { lookup, lookupZip, type Lookup } from "../scripts/find";
 
   const map = document.querySelector<SVGSVGElement>("#map");
   const status = document.getElementById("status")!;
@@ -94,18 +107,36 @@ const path = (polygons: Ring[][]) =>
       r.json(),
     ));
 
-  async function choose(lon: number, lat: number) {
-    if (map && pin) {
-      const d = map.dataset;
-      pin.setAttribute("cx", String((lon - Number(d.minLon)) * Number(d.cos) * Number(d.k)));
-      pin.setAttribute("cy", String((Number(d.maxLat) - lat) * Number(d.k)));
-    }
-    status.textContent = "Looking up districts…";
-    lookup(await load(), lon, lat, document.getElementById("groups")!, status);
+  function placePin(lon: number, lat: number) {
+    if (!map || !pin) return;
+    const d = map.dataset;
+    pin.setAttribute("cx", String((lon - Number(d.minLon)) * Number(d.cos) * Number(d.k)));
+    pin.setAttribute("cy", String((Number(d.maxLat) - lat) * Number(d.k)));
+  }
+  function showResults() {
     const results = document.getElementById("results")!;
     results.hidden = false;
     results.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+
+  async function choose(lon: number, lat: number) {
+    placePin(lon, lat);
+    status.textContent = "Looking up districts…";
+    lookup(await load(), lon, lat, document.getElementById("groups")!, status);
+    showResults();
+  }
+
+  document.getElementById("zip-form")?.addEventListener("submit", async () => {
+    const zip = (document.getElementById("zip") as HTMLInputElement).value.trim();
+    if (!/^\d{5}$/.test(zip)) {
+      status.textContent = "Enter a five-digit ZIP code.";
+      return;
+    }
+    status.textContent = "Looking up districts…";
+    const point = lookupZip(await load(), zip, document.getElementById("groups")!, status);
+    if (point) placePin(...point);
+    showResults();
+  });
 
   map?.addEventListener("click", (e) => {
     const pt = map.createSVGPoint();
@@ -164,6 +195,30 @@ const path = (polygons: Ring[][]) =>
     fill: var(--ink);
     stroke: var(--surface);
     stroke-width: 2;
+  }
+  .zip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .zip label {
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+  .zip input {
+    font: inherit;
+    width: 7ch;
+    padding: 7px 8px;
+    border: 1px solid var(--axis);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .results :global(.also) {
+    margin-top: 16px;
+    padding-top: 8px;
+    border-top: 1px solid var(--hairline);
   }
   button {
     font: inherit;

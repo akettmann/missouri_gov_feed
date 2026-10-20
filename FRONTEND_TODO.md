@@ -16,12 +16,6 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
 - Keep each official's JSON under the 100 KB gzipped budget (`pnpm sizes` after every data refresh)
 
 ## High priority
-- [ ] Decide whether judges stay in (they get profiles, find, compare and awards today; ideology/votes show
-  "not applicable")
-- [ ] Decide on address search for /find/ (today: device location or a map click only). The Census Geocoder
-  sends no CORS header, so a browser can reach it only by JSONP: that runs Census-hosted script on our page and
-  sends the typed address to the Census Bureau. Options: accept that with a notice; geocode through a small proxy
-  of our own; or ship a ZIP-code centroid table (coarse: a ZIP can span several districts)
 
 ## Medium priority
 

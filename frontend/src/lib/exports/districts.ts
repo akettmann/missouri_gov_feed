@@ -23,6 +23,8 @@ export interface DistrictData {
   statewide: string[];
   /** county outlines for the clickable map, simplified harder */
   map: { district_id: string; name: string; polygons: Ring[][] }[];
+  /** ZIP (ZCTA) -> [internal point lon, lat, radius in meters of a circle with the same land area] */
+  zips: Record<string, [number, number, number]>;
 }
 
 type Pt = [number, number];
@@ -142,7 +144,20 @@ async function load(): Promise<DistrictData | null> {
       map.push({ district_id: r.district_id, name: r.name, polygons: shrink(geometry, 0.01) });
   }
 
+  // ZIP lookup: the area's internal point, and how far the area reaches (equal-area circle) so the page can say
+  // which other districts a ZIP may also cover
+  const zips: DistrictData["zips"] = {};
+  if (hasExport("dim_zcta")) {
+    for (const z of await query<{ zcta: string; lon: number; lat: number; land: number }>(`
+      select zcta, cast(interior_lon as double) as lon, cast(interior_lat as double) as lat,
+             cast(coalesce(land_area_m2, 0) as double) as land
+      from {dim_zcta}`)) {
+      zips[z.zcta] = [round(z.lon), round(z.lat), Math.round(Math.sqrt(z.land / Math.PI))];
+    }
+  }
+
   return {
+    zips,
     vintage: rows.find((r) => r.vintage != null)?.vintage ?? null,
     shapes,
     officials,
