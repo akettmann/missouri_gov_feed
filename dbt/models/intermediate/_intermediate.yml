@@ -96,8 +96,9 @@ models:
     people stay unattributed rather than guessed. Grain: one row per (House roll call, attributed person).'
 - name: int_mo_legislators__seats
   description: 'Every Missouri legislative seat-term in Open States (current and retired people), keyed for matching:
-    chamber, district number, surname key, and date range (open-ended where Open States has no date). Grain: one
-    row per Open States legislative seat-term.'
+    chamber, district number, surname key, and date range (open-ended where Open States has no date). January
+    starts count from January 1 (Open States starts the 2017 class a week after session opened), and the
+    legislator_seat_corrections seed adds terms Open States lacks. Grain: one row per legislative seat-term.'
 - name: int_mo_senate__votes
   description: 'MO Senate journal votes attributed to people: the senator serving on the vote date with a matching
     surname (and district, when the journal adds one to disambiguate). Ambiguous tokens stay unattributed. Grain:

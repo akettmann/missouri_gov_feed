@@ -12,6 +12,27 @@ seeds:
         data_tests: [unique, not_null]
   - name: house_speakers
     description: Speaker of the Missouri House per year; roll-call PDFs list the Speaker as "MR SPEAKER".
+  - name: legislator_seat_corrections
+    description: >
+      Legislative seat-terms Open States lacks or cuts short, added to int_mo_legislators__seats so journal votes
+      and other records match. Found through Senate journal tokens that matched nobody (October 2026): Wallingford's
+      whole Senate term was missing; Kehoe's and Parson's ended on 2016-12-31 although both served until they became
+      lieutenant governor. Every row cites its source.
+    config:
+      column_types: {openstates_id: varchar, chamber: varchar, district: integer, start_date: date, end_date: date, source: varchar}
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [openstates_id, chamber, start_date]
+    columns:
+      - name: chamber
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['upper', 'lower']
+      - name: source
+        data_tests:
+          - not_null
   - name: voluntary_disclosures
     description: Hand-curated voluntary disclosures (no machine-readable source exists). Add rows with a source_url.
     config:
