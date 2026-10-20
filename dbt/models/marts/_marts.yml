@@ -355,7 +355,15 @@ models:
         description: Date of the contribution as reported.
       - name: amount
         data_type: decimal(28,6)
-        description: Amount in USD. Negative values are refunds/corrections as filed.
+        description: >
+          Amount in USD. Negative values are refunds/corrections as filed. Sanity bound: fails at $10M either way
+          (largest through 2026: $880,000; refunds down to -$11,600).
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -10000000
+                max_value: 10000000
+                inclusive: false
       - name: counterparty
         data_type: varchar
         description: The other party - the donor for `received`, the recipient for `given`.
@@ -431,7 +439,14 @@ models:
         description: Year of expenditure_date.
       - name: amount
         data_type: decimal(28,6)
-        description: USD.
+        description: >
+          USD; negative values are corrections as filed. Sanity bound: the largest gift through 2026 was $3,045.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -100000
+                max_value: 100000
+                inclusive: false
       - name: lobbyist_name
         data_type: varchar
         description: Reporting lobbyist.
@@ -523,9 +538,9 @@ models:
       Measured lean, not judgments. One row per (official, indicator, period, detail):
       `dw_nominate_dim1` Voteview, Congress, -1 liberal .. +1 conservative (economic dimension);
       `shor_mccarty_np` state legislators 1993-2022, negative liberal / positive conservative, comparable
-      across states; `acu_rating` American Conservative Union yearly score 0-100 (one advocacy group's
-      view); `party_unity_pct` share of party-line votes (majorities of R and D opposed) where the official
-      voted with their own party's majority, computed from fct_votes, one row per chamber (detail names it).
+      across states; `party_unity_pct` share of party-line votes (majorities of R and D opposed) where the official
+      voted with their own party's majority, one row per chamber. The majorities count every member who
+      voted (int_votes__party_positions), not only the officials tracked today.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -540,13 +555,31 @@ models:
         data_tests:
           - accepted_values:
               arguments:
-                values: ['dw_nominate_dim1', 'shor_mccarty_np', 'acu_rating', 'party_unity_pct']
+                values: ['dw_nominate_dim1', 'shor_mccarty_np', 'party_unity_pct']
+      - name: chamber
+        data_type: varchar
+        description: >
+          Chamber the value was measured in: the Congress chamber (DW-NOMINATE), the last legislative chamber
+          served in (Shor-McCarty), or the chamber whose votes were counted (party unity). May differ from
+          the official's current office.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['state_house', 'state_senate', 'us_house', 'us_senate']
       - name: value
         data_type: double
         description: The score, on the indicator's own scale.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+              config:
+                where: "indicator = 'party_unity_pct'"
       - name: period
         data_type: integer
-        description: Congress number (DW-NOMINATE), last year served (Shor-McCarty), rating year (ACU); null for party unity (computed over all loaded votes).
+        description: Congress number (DW-NOMINATE), last year served (Shor-McCarty); null for party unity (computed over all loaded votes).
       - name: detail
         data_type: varchar
         description: Context for the value (chamber, years served, number of party-line votes).
@@ -838,3 +871,310 @@ models:
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"
+
+  - name: dim_district
+    description: >
+      Areas Missouri officials are elected or appointed for, with boundaries from Census TIGER/Line as
+      GeoJSON (lon/lat, NAD83): state senate and house districts, congressional districts for every loaded
+      Congress (is_current marks the one in session; Missouri's 2025 map applies from the 120th), counties
+      with their judicial circuit (Official Manual), and places (cities). Grain: one row per area.
+    columns:
+      - name: district_id
+        data_type: varchar
+        description: >
+          `state_senate:<n>`, `state_house:<n>`, `us_house:<congress>:<n>`, `county:<GEOID>`, `place:<GEOID>`.
+        data_tests: [unique, not_null]
+      - name: district_type
+        data_type: varchar
+        description: state_senate, state_house, us_house, county or place.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['state_senate', 'state_house', 'us_house', 'county', 'place']
+      - name: district_number
+        data_type: integer
+        description: District number (legislative and congressional districts); null for counties and places.
+      - name: congress
+        data_type: integer
+        description: Congress the congressional district map is for; null otherwise.
+      - name: is_current
+        data_type: boolean
+        description: False only for congressional districts of a Congress not in session.
+      - name: name
+        data_type: varchar
+        description: Census name (place and county name; "State Senate District 1"-style for districts).
+      - name: name_with_type
+        data_type: varchar
+        description: Census NAMELSAD, e.g. "St. Louis city", "Boone County", "Congressional District 1".
+      - name: geoid
+        data_type: varchar
+        description: Census GEOID (state code 29 + district / county / place code).
+      - name: judicial_circuit
+        data_type: integer
+        description: Missouri judicial circuit number, for counties (Official Manual "Circuit courts by county").
+      - name: appeals_district
+        data_type: varchar
+        description: Missouri Court of Appeals district (eastern, southern, western) for counties (RSMo 477.050-.070).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['eastern', 'southern', 'western']
+      - name: federal_district
+        data_type: varchar
+        description: Federal judicial district (moed, mowd) for counties (28 U.S.C. 105).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['moed', 'mowd']
+      - name: land_area_m2
+        data_type: bigint
+        description: Land area in square meters (Census ALAND).
+      - name: interior_lat
+        data_type: float
+        description: Latitude of the Census internal point (inside the area; good for a map label).
+      - name: interior_lon
+        data_type: float
+        description: Longitude of the Census internal point.
+      - name: vintage
+        data_type: integer
+        description: TIGER/Line year the boundary comes from.
+      - name: geometry_geojson
+        data_type: varchar
+        description: GeoJSON geometry (Polygon or MultiPolygon), lon/lat, as published by the Census Bureau.
+      - name: source_url
+        data_type: varchar
+        description: "{{ doc('source_url') }}"
+
+  - name: fct_official_districts
+    description: >
+      Which areas (dim_district) each official serves: legislators and U.S. representatives the district they
+      were elected from (the Congress in session for the U.S. House), circuit and associate circuit judges every
+      county of their circuit, Court of Appeals judges every county of their appellate district, U.S. district
+      judges every county of E.D. and/or W.D. Mo., mayors their city. Statewide offices and the Eighth Circuit
+      serve every area and have no rows. Grain: one row per (official, area).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, district_id]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: district_id
+        data_type: varchar
+        description: The area (dim_district).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_district')
+                field: district_id
+      - name: office
+        data_type: varchar
+        description: "{{ doc('office') }}"
+      - name: relation
+        data_type: varchar
+        description: elected from, judicial circuit, appellate district, federal district, or mayor of.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['elected from', 'judicial circuit', 'appellate district', 'federal district', 'mayor of']
+
+  - name: fct_bills
+    description: >
+      Missouri bills and resolutions per session. House bills from the House XML export (titles, current version,
+      last action); Senate bills from the Senate topical index (its one-line description as short_title; the other
+      House-only columns are null). `subjects` holds the subject index terms, "; "-separated (fct_bill_subjects).
+      Grain: one row per (session, bill).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [session_code, bill]
+    columns:
+      - name: session_code
+        data_type: varchar
+        description: House session code (two-digit year + type; 1 regular, 2-4 extraordinary).
+      - name: session_year
+        data_type: integer
+        description: Calendar year of the session.
+      - name: bill
+        data_type: varchar
+        description: Bill number without spaces (HB2, HJR1, HCR3, HR10, SB974, SJR3).
+      - name: current_bill_string
+        data_type: varchar
+        description: The current version's full designation, e.g. "CCS SS SCS HCS HB 2".
+      - name: short_title
+        data_type: varchar
+        description: Short title.
+      - name: long_title
+        data_type: varchar
+        description: Long title (what the bill does, in one sentence).
+      - name: subjects
+        data_type: varchar
+        description: Subject index terms, "; "-separated (null when neither chamber's index has the bill).
+      - name: last_action
+        data_type: varchar
+        description: Last recorded action, with its date.
+      - name: proposed_effective_date
+        data_type: date
+        description: Proposed effective date.
+      - name: source_url
+        data_type: varchar
+        description: "{{ doc('source_url') }}"
+
+  - name: fct_bill_subjects
+    description: >
+      Subject index terms per bill, one row per term. House bills keep the House XML's terms (2024 sessions on);
+      earlier House bills that reached the Senate, and Senate bills, get the Senate topical index's (same
+      vocabulary). Join to fct_vote_bills to group votes by topic. Grain: one row per (session, bill, subject).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [session_code, bill, subject_id, subject_name]
+    columns:
+      - name: session_code
+        data_type: varchar
+        description: House session code.
+      - name: bill
+        data_type: varchar
+        description: Bill number (fct_bills).
+      - name: subject_id
+        data_type: varchar
+        description: House subject index id (null for Senate index rows).
+      - name: subject_name
+        data_type: varchar
+        description: Subject term, e.g. "APPROPRIATIONS", "ELEMENTARY AND SECONDARY EDUCATION, DEPT. OF".
+      - name: subject_source
+        data_type: varchar
+        description: Which index the term comes from (house or senate).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['house', 'senate']
+
+  - name: fct_bill_sponsors
+    description: >
+      Sponsors, co-sponsors, handlers and House/Senate conferees of each House bill, as the House lists them,
+      matched to officials where the district and surname agree. Grain: one row per (session, bill, sponsor
+      type, sponsor name).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [session_code, bill, sponsor_type, sponsor_name]
+    columns:
+      - name: session_code
+        data_type: varchar
+        description: House session code.
+      - name: bill
+        data_type: varchar
+        description: Bill number (fct_bills).
+      - name: sponsor_type
+        data_type: varchar
+        description: Sponsor, Co-Sponsor, Handler, HouseConferee or SenateConferee.
+      - name: sponsor_name
+        data_type: varchar
+        description: Name as the House lists it.
+      - name: sponsor_chamber
+        data_type: varchar
+        description: state_house or state_senate (the House numbers senators 200 + senate district).
+      - name: sponsor_district
+        data_type: integer
+        description: District in the sponsor's own chamber.
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }} Null when the sponsor isn't a current official or didn't match."
+
+  - name: fct_vote_bills
+    description: >
+      Which bill a state vote was on. House roll calls are linked exactly where the bill XML names the roll-call
+      PDF (the vote_id); the rest (votes on Senate bills, some on House bills) through the lead bill of the
+      measure printed on the PDF ("HCS HB 2", "SS SCS SBs 49 & 118") in the same session. Senate journal votes
+      through the measure in the journal text ("HB 2", "SB 974") and the year's regular session. Grain: one row
+      per (chamber, vote, bill, bill version).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [chamber, vote_id, session_code, bill, bill_version]
+    columns:
+      - name: chamber
+        data_type: varchar
+        description: state_house or state_senate.
+      - name: vote_id
+        data_type: varchar
+        description: Vote identifier (fct_votes.vote_id).
+      - name: session_code
+        data_type: varchar
+        description: House session code of the bill.
+      - name: bill
+        data_type: varchar
+        description: Bill number (fct_bills).
+      - name: bill_version
+        data_type: varchar
+        description: Version of the bill text voted on (House roll calls only), e.g. "Perfected", "Truly Agreed".
+      - name: matched_by
+        data_type: varchar
+        description: roll-call link (exact) or measure text (read from the House roll-call PDF or the Senate journal).
+
+  - name: fct_salaries
+    description: >
+      Officeholder pay per calendar year, 2017+. State officials: gross pay received, from Missouri's state payroll
+      (data.mo.gov "State Employee Pay"; everything paid in the year, not the base salary), name-matched within the
+      official's group of offices. Federal officials (Congress, U.S. district and circuit judges): the statutory
+      annual salary of the office for each year they held it (seed federal_salaries), since federal pay isn't
+      published per person. A year with a change of office has one row per position. Grain: one row per
+      (official, year, agency, position).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, calendar_year, agency_name, position_title]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: calendar_year
+        data_type: integer
+        description: Calendar year paid.
+      - name: agency_name
+        data_type: varchar
+        description: Paying agency (LEGISLATURE, JUDICIARY, OFFICE OF GOVERNOR..., U.S. CONGRESS, U.S. COURTS).
+      - name: position_title
+        data_type: varchar
+        description: Position title (STATE REPRESENTATIVE, SENATOR, CIRCUIT JUDGE, GOVERNOR..., U.S. SENATOR, U.S. DISTRICT JUDGE).
+      - name: employee_name
+        data_type: varchar
+        description: Name as the payroll prints it ("LAST, FIRST M"), so a reader can check the match; the official's name for federal rows.
+      - name: pay
+        data_type: decimal(12,2)
+        description: >
+          Dollars for the year; what it measures depends on pay_basis. Through 2026: $388 (a partial year) to
+          $264,900.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1000000
+      - name: pay_basis
+        data_type: varchar
+        description: "'gross pay': all pay received in the year (state payroll). 'statutory salary': the office's annual salary rate (federal), not what was paid."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['gross pay', 'statutory salary']
+      - name: match_confidence
+        data_type: varchar
+        description: "{{ doc('match_confidence') }} Federal rows are joined by id, so always 'high'."
+      - name: source_url
+        data_type: varchar
+        description: The Missouri Accountability Portal's employee pay search, or the federal pay table.

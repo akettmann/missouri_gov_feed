@@ -1,13 +1,16 @@
 -- "Bias" indicators: measurable lean, not judgments. Each row is one indicator for one official:
 --   dw_nominate_dim1   Voteview, Congress. -1 liberal .. +1 conservative (economic dimension).
 --   shor_mccarty_np    State legislators, 1993-2022. Negative liberal, positive conservative.
---   acu_rating         American Conservative Union yearly score, 0-100 (one advocacy group's view).
 --   party_unity_pct    Share of party-line votes (majority of R vs majority of D) where the official
---                      voted with their own party's majority. Computed from the vote records here.
+--                      voted with their own party's majority. Computed from the vote records here; the
+--                      majorities count every member who voted, not just today's officials.
+-- chamber is where the indicator was measured (the Congress chamber, the last legislative chamber served
+-- in, or the chamber whose votes were counted), which can differ from the official's current office.
 with nominate as (
     select
         o.official_id,
         'dw_nominate_dim1' as indicator,
+        case m.chamber when 'House' then 'us_house' else 'us_senate' end as chamber,
         m.nominate_dim1 as value,
         m.congress as period,
         'Voteview DW-NOMINATE, ' || m.chamber || ' ' || {{ dbt.safe_cast('m.congress', dbt.type_string()) }}
@@ -22,6 +25,7 @@ shor as (
     select
         o.official_id,
         'shor_mccarty_np' as indicator,
+        case s.last_chamber when 'upper' then 'state_senate' else 'state_house' end as chamber,
         s.np_score as value,
         s.last_year as period,
         'Shor-McCarty career ideal point; served ' || {{ dbt.safe_cast('s.first_year', dbt.type_string()) }}
@@ -38,84 +42,36 @@ shor as (
     inner join {{ ref('dim_official') }} as o on seat.openstates_id = o.official_id
 ),
 
-acu as (
-    select
-        o.official_id,
-        'acu_rating' as indicator,
-        a.rating as value,
-        a.year as period,
-        'ACU ' || a.chamber || ' district ' || {{ dbt.safe_cast('a.district', dbt.type_string()) }} as detail,
-        'http://ratings.conservative.org/people/' || a.acu_id as source_url
-    from {{ ref('stg_acu__ratings') }} as a
-    inner join {{ ref('int_mo_legislators__seats') }} as seat
-        on
-            seat.chamber = case a.chamber when 'senate' then 'upper' else 'lower' end
-            and a.district = seat.district_number
-            and seat.surname_key = {{ mogov.name_key('a.family_name') }}
-            and extract(year from seat.start_date) <= a.year
-            and extract(year from seat.end_date) >= a.year
-    inner join {{ ref('dim_official') }} as o on seat.openstates_id = o.official_id
-),
-
--- party unity ----------------------------------------------------------------------------------------
-votes as (
-    select
-        official_id,
-        chamber,
-        vote_id,
-        vote_cast,
-        case
-            when party_at_vote like 'Republican%' then 'R'
-            when party_at_vote like 'Democrat%' then 'D'
-        end as party
-    from {{ ref('fct_votes') }}
-    where vote_cast in ('yea', 'nay')
-),
-
-party_positions as (
-    select
-        chamber,
-        vote_id,
-        party,
-        case when sum(case when vote_cast = 'yea' then 1 else 0 end) * 2 > count(*) then 'yea' else 'nay' end
-            as majority_position
-    from votes
-    where party is not null
-    group by chamber, vote_id, party
-),
-
-party_line_votes as (
-    select
-        r.chamber,
-        r.vote_id,
-        r.majority_position as r_position,
-        d.majority_position as d_position
-    from party_positions as r
-    inner join party_positions as d on r.chamber = d.chamber and r.vote_id = d.vote_id and d.party = 'D'
-    where r.party = 'R' and r.majority_position <> d.majority_position
-),
-
+-- party unity: party majorities come from every member who voted (int_votes__party_positions) ----------
 unity as (
     select
         v.official_id,
         'party_unity_pct' as indicator,
+        v.chamber,
         round(100.0 * sum(
-            case when v.vote_cast = case v.party when 'R' then p.r_position else p.d_position end then 1 else 0 end
+            case
+                when
+                    v.vote_cast
+                    = case v.party_at_vote when 'Republican' then p.republican_position else p.democratic_position end
+                    then 1
+                else 0
+            end
         ) / count(*), 1) as value,
         cast(null as {{ dbt.type_int() }}) as period,
         v.chamber || ': ' || {{ dbt.safe_cast('count(*)', dbt.type_string()) }} || ' party-line votes' as detail,
         cast(null as {{ dbt.type_string() }}) as source_url
-    from votes as v
-    inner join party_line_votes as p on v.chamber = p.chamber and v.vote_id = p.vote_id
-    where v.party is not null
+    from {{ ref('fct_votes') }} as v
+    inner join {{ ref('int_votes__party_positions') }} as p on v.chamber = p.chamber and v.vote_id = p.vote_id
+    where
+        p.is_party_line
+        and v.vote_cast in ('yea', 'nay')
+        and v.party_at_vote in ('Republican', 'Democratic')
     group by v.official_id, v.chamber
 )
 
-{% set cols = 'official_id, indicator, value, period, detail, source_url' %}
+{% set cols = 'official_id, indicator, chamber, value, period, detail, source_url' %}
 select {{ cols }} from nominate
 union all
 select {{ cols }} from shor
-union all
-select {{ cols }} from acu
 union all
 select {{ cols }} from unity

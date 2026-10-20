@@ -2,7 +2,7 @@
 
 Goal: help a voter see measurable lean and potential conflicts of interest for their Missouri officials.
 Show evidence, not verdicts. Data-side tasks (dbt reporting models, loaders) live in TODO.md.
-The Phase 1 MVP is built in `frontend/`; build and refresh steps are in docs/environment.md and docs/sync.md.
+The MVP is built in `frontend/`; build and refresh steps are in docs/environment.md and docs/sync.md.
 
 ## Principles (apply to every task)
 - No composite "bias score" and no rankings; identical layout for every official regardless of party
@@ -13,32 +13,29 @@ The Phase 1 MVP is built in `frontend/`; build and refresh steps are in docs/env
 - Interest-vote views are labeled co-occurrence, not causation
 - Keep each official's JSON under the 100 KB gzipped budget (`pnpm sizes` after every data refresh)
 
-## Open decisions
-- [ ] Audience/hosting (public?) and whether judges stay in (they get profiles today; ideology/votes show "not applicable")
-- [ ] ACU: it no longer appeared in the latest export. If it's dropped for good, remove it from
-  `frontend/src/lib/indicators.ts` (methodology page) and drop the Phase 3 balancing-scorecard item
-
-## Follow-ups from the MVP
+## High priority
 - [ ] FEC size bands: confirm whether `fct_federal_donor_summary` `by_size` bucket 0 includes unitemized money
   (the dbt docs say itemized only, but Hawley's under-$200 band is $8M+); fix the docs or the chart note
+- [ ] Decide audience/hosting (public?) and whether judges stay in (they get profiles today; ideology/votes show
+  "not applicable")
+
+## Medium priority
+- [ ] Section B, party loyalty: unity % and "votes where they broke with their party" list (`rpt_party_breaks`)
+- [ ] Peer strip charts for each indicator, chamber colleagues and party medians (`rpt_indicator_peers`)
+- [ ] Attendance per session vs chamber (`rpt_attendance`)
+- [ ] Find my officials: address / map click / geolocation to districts (`census_tiger`); lookup runs client-side
+  so addresses never leave the browser. First check whether the Census Geocoder allows browser calls (CORS);
+  otherwise map click / geolocation with client-side point-in-polygon
 - [ ] State size bands: `rpt_donor_rollup` has no per-contribution size, so only federal officials get a size view;
   add a size-band column or a small `rpt_donor_size` model
 - [ ] `rpt_donor_rollup.donor_name` is an employer for individuals ("none", "retired", ...); the frontend leaves
-  individuals out of "Top donor organizations" for now
-
-## Phase 2
-- [ ] Census Geocoder spike: can it be called from the browser (CORS)? Otherwise map click / geolocation with
-  client-side point-in-polygon
-- [ ] Find my officials: address / map click / geolocation to districts (needs `census_tiger` loader); lookup runs
-  client-side so addresses never leave the browser
-- [ ] Peer strip charts for each indicator, chamber colleagues and party medians (`rpt_indicator_peers`, built)
-- [ ] Section B, party loyalty: unity % and "votes where they broke with their party" list (`rpt_party_breaks`, built)
-- [ ] Attendance per session vs chamber (`rpt_attendance`, built)
+  individuals out of "Top donor organizations". A "top employers of individual donors" view needs those values
+  cleaned or excluded in dbt first
 - [ ] Compare view: two officials side by side, or official vs chamber/party median
 - [ ] Judges' profiles: disclosures, ties, case history (no outcome statistics without a reviewed methodology)
 
-## Phase 3
-- [ ] Votes grouped by bill subject (needs bill subjects loader)
+## Low priority
+- [ ] Votes grouped by bill subject (bill subjects from `mo_senate_topics`)
 - [ ] Interest-vote overlap view (`rpt_interest_vote_overlap`)
-- [ ] Balancing scorecard shown next to ACU, if added
 - [ ] Deploy static build to a GCS bucket + CDN
+- [ ] Add "Awards" such as "Worst Attendance", "Most Money from PACs", "Always Votes with the Party", each award can be by year and lifetime, implement the opposite positive version as well.

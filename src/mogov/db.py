@@ -50,9 +50,17 @@ class Shard:
 UNSHARDED = Shard()
 
 
+def connect(database: str = ":memory:", **kwargs) -> duckdb.DuckDBPyConnection:
+    """duckdb.connect without the terminal progress bar DuckDB draws for queries over ~2s, which lands in the
+    middle of the structured logs. It's a session setting, so it can't go in connect()'s config."""
+    con = duckdb.connect(database, **kwargs)
+    con.execute("set enable_progress_bar = false")
+    return con
+
+
 def _connect() -> duckdb.DuckDBPyConnection:
     # Streaming copy: don't hold whole files in memory to preserve row order.
-    return duckdb.connect(
+    return connect(
         config={
             "preserve_insertion_order": False,
             "memory_limit": os.environ.get("MOGOV_DUCKDB_MEMORY", "3GB"),

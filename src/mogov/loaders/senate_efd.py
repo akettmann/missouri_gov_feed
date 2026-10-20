@@ -90,7 +90,7 @@ def _report_tables(html: str) -> list[dict]:
     return out
 
 
-@loader("senate_efd")
+@loader("senate_efd", service="efdsearch.senate.gov")
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: filings (by report URL). Every shard runs the search to list them."""
     if os.environ.get("MOGOV_ACCEPT_SENATE_EFD_TERMS") != "1":

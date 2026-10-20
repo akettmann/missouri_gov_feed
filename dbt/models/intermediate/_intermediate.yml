@@ -2,10 +2,22 @@
 # not this file, then regenerate.
 version: 2
 models:
+- name: int_bills__subjects
+  description: 'Subject index terms per bill from both chambers'' indexes. A House bill keeps the House XML''s own
+    terms (2024 sessions on); the Senate topical index fills in House bills without them (earlier sessions, when
+    the bill reached the Senate) and covers Senate bills. The two indexes tag the same House bill a little differently,
+    so they''re not mixed for one bill. subject_source says which index a row comes from. Grain: one row per (session,
+    bill, subject) from one chamber''s index.'
 - name: int_bluebook__bios
   description: 'Official Manual biographies split per person. Legislative chapter entries start with "District 12—FIRST
     LAST" and run until the next entry; lines are joined in reading order. Grain: one biography per (edition, person)
     in the legislative/executive chapters.'
+- name: int_bluebook__county_circuits
+  description: 'Missouri judicial circuit of every county, from the Official Manual''s "Circuit courts by county"
+    table ("Adair......... Circuit No. 2"; St. Louis appears as "St. Louis Co." and "St. Louis City"). Lines can
+    carry a stray character from the neighbouring column, so the name is taken from its first capital letter. county_key
+    matches stg_census_tiger__features names through name_key(), minus "county"/"co". Grain: one row per county
+    (and St. Louis City) in the latest edition.'
 - name: int_bluebook__judge_bios
   description: 'Official Manual judicial-chapter biographies split per judge. Circuit and associate circuit entries
     are "<NAME IN CAPS>" followed by "Office address: ..."; appellate entries open with "<NAME IN CAPS> was born
@@ -39,6 +51,14 @@ models:
   description: 'House disclosure PDF text, each line tagged with the schedule it falls under (the nearest preceding
     "Schedule X:" header in the same document). Column-header rows, "None disclosed." and boilerplate drop out.
     Grain: one text line per House disclosure PDF, tagged with its schedule.'
+- name: int_interests__industry_money
+  description: 'Money each official received from an industry or interest, per year: campaign contributions from
+    organizations, PACs and committees (individuals are left out: their employer is not their money) and lobbyist
+    gifts by the lobbyist''s principal. The donor or principal name is classified by the whole-word keywords in
+    the interest_keywords seed ("Missouri Hospital Association PAC" -> health_care). A name can match several industries
+    ("Missouri Association of Insurance and Financial Advisors" -> insurance and banking_finance) and then counts
+    for each. Names with no keyword (opaque PAC acronyms) are left out. match_confidence is the weakest official
+    match among the rows rolled up. Grain: one row per (official, industry, money kind, year).'
 - name: int_judges__current
   description: 'All sitting judges we track: Missouri state judges (Official Manual, latest edition) and federal
     judges seated in Missouri (FJC). Grain: one row per sitting judge (state and federal).'
@@ -50,7 +70,9 @@ models:
   description: 'Missouri state judges from the Official Manual''s alphabetical judge index: "Crane, Sue M. ........
     Associate ....... 13th   Harrell, Kevin D. ....... Circuit ....... 16th" Each index line holds up to two entries.
     Entries whose name wrapped onto two lines are lost (a handful per edition); compare the count against the manual''s
-    chapter totals when reviewing. Grain: one row per state judge in the Official Manual index.'
+    chapter totals when reviewing. The dot leader sometimes runs straight into the circuit ("Associate ..............35th"),
+    so the space before it is optional; without that, 7 judges in the 2025-2026 edition lost their circuit. Grain:
+    one row per state judge in the Official Manual index.'
 - name: int_mec__official_committees
   description: 'Missouri Ethics Commission committees attributed to current state/local officials by committee name
     (e.g. "Nicole Galloway For Missouri", "Friends of Wesley Bell"). TAP''s mirror has no candidate<-> committee
@@ -95,3 +117,14 @@ models:
 - name: int_officials__wikidata
   description: 'Wikidata QID per official: from roster cross-references when present, else a unique exact name match
     against living Missouri officeholders on Wikidata. Grain: one row per official with a Wikidata QID.'
+- name: int_votes__member_votes
+  description: 'Every recorded vote by every member, tracked official or not: MO House roll calls and MO Senate
+    journals (member_key is the attributed person, else the printed token) and Congress from the loaded Voteview
+    files (member_key is the ICPSR id). Chamber-wide figures (party majorities, chamber attendance) count from here,
+    so they don''t depend on who holds office today. vote_id, chamber and session_code match fct_votes. Grain: one
+    row per (chamber, vote, member) for every member, tracked or not.'
+- name: int_votes__party_positions
+  description: 'Each party''s majority position on every recorded vote, counted over every member who voted (int_votes__member_votes),
+    not only the officials tracked today. A party''s position is the side most of its yea/nay voters took; a tie
+    has no position. A party-line vote is one where the Republican and Democratic majorities took opposite sides.
+    vote_id and chamber match fct_votes. Grain: one row per (chamber, vote) with any Republican or Democratic yea/nay.'

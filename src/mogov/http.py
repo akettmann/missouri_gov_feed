@@ -1,9 +1,11 @@
 """HTTP client with an on-disk cache so re-runs don't re-hit public servers."""
 
+import contextlib
 import hashlib
 import json
 import os
 import time
+from collections.abc import Iterator
 from pathlib import Path
 
 import httpx
@@ -30,12 +32,59 @@ def _cache_path(url: str, params: dict | None) -> Path:
     return CACHE_DIR / hashlib.sha256(key.encode()).hexdigest()
 
 
-def _write_atomic(path: Path, content: bytes) -> None:
+def _fresh(path: Path, max_age: float | None) -> bool:
+    return path.exists() and (max_age is None or time.time() - path.stat().st_mtime < max_age)
+
+
+def replace_file(tmp: Path, dest: Path, attempts: int = 10) -> None:
+    """tmp.replace(dest), retried: Windows refuses to replace a file that another process has open (a shard
+    reading the cached copy) or is replacing at the same moment ("[WinError 5] Access is denied")."""
+    for attempt in range(attempts):
+        try:
+            tmp.replace(dest)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.1 * (attempt + 1))
+
+
+def write_atomic(path: Path, content: bytes) -> None:
     """Shards share the cache; never let another process read a half-written entry."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f".{path.name}.{os.getpid()}.part")
-    tmp.write_bytes(content)
-    tmp.replace(path)
+    try:
+        tmp.write_bytes(content)
+        replace_file(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+# A lock file untouched for this long belongs to a process that died; downloads refresh it as they stream.
+LOCK_STALE_S = 300
+
+
+@contextlib.contextmanager
+def _single_flight(path: Path) -> Iterator[Path]:
+    """Shards that need the same URL download it once: the first takes a lock file next to the cache entry,
+    the others wait for it to go away and then find the fresh copy in the cache. Yields the lock path."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock = path.with_name(f".{path.name}.lock")
+    while True:
+        try:
+            os.close(os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            break
+        # Windows raises PermissionError instead of FileExistsError while another shard's unlink of the lock is
+        # still pending (a peer has it open for stat); either way the lock is taken, so wait.
+        except (FileExistsError, PermissionError):
+            with contextlib.suppress(FileNotFoundError, PermissionError):
+                if time.time() - lock.stat().st_mtime > LOCK_STALE_S:
+                    lock.unlink(missing_ok=True)
+            time.sleep(0.5)
+    try:
+        yield lock
+    finally:
+        lock.unlink(missing_ok=True)
 
 
 def _record(host: str, resp: httpx.Response, started: float) -> None:
@@ -79,11 +128,19 @@ def fetch(
     """
     path = _cache_path(url, params)
     host = httpx.URL(url).host
-    if path.exists() and (cache_only or max_age is None or time.time() - path.stat().st_mtime < max_age):
+    if _fresh(path, None if cache_only else max_age):
         obs.http_requests.add(1, {"host": host, "cache_hit": True})
         return path.read_bytes()
     if cache_only:
         raise CacheMiss(url)
+    with _single_flight(path):
+        if _fresh(path, max_age):  # another shard fetched it while we waited
+            obs.http_requests.add(1, {"host": host, "cache_hit": True})
+            return path.read_bytes()
+        return _get(url, params, path, host, retries=retries, headers=headers, delay=delay)
+
+
+def _get(url: str, params: dict | None, path: Path, host: str, *, retries: int, headers: dict | None, delay: float):
     if delay:
         time.sleep(delay)
     obs.http_requests.add(1, {"host": host, "cache_hit": False})
@@ -101,7 +158,7 @@ def fetch(
             time.sleep(min(60, 2**attempt * 5))
             continue
         resp.raise_for_status()
-        _write_atomic(path, resp.content)
+        write_atomic(path, resp.content)
         return resp.content
     resp.raise_for_status()
     raise httpx.HTTPError(f"gave up on {url} after {retries} attempts (last status {resp.status_code})")
@@ -120,26 +177,36 @@ def post(
     body_key = json.dumps({"data": data, "json": json_body}, sort_keys=True, default=str)
     path = _cache_path(url, {"__post__": hashlib.sha256(body_key.encode()).hexdigest()})
     host = httpx.URL(url).host
-    if path.exists() and (max_age is None or time.time() - path.stat().st_mtime < max_age):
-        obs.http_requests.add(1, {"host": host, "cache_hit": True})
-        return path.read_bytes()
-    if delay:
-        time.sleep(delay)
-    obs.http_requests.add(1, {"host": host, "cache_hit": False})
-    started = time.perf_counter()
-    resp = client().post(url, data=data, json=json_body, headers=headers)
-    _record(host, resp, started)
-    resp.raise_for_status()
-    _write_atomic(path, resp.content)
-    return resp.content
+    if not _fresh(path, max_age):
+        with _single_flight(path):
+            if not _fresh(path, max_age):
+                if delay:
+                    time.sleep(delay)
+                obs.http_requests.add(1, {"host": host, "cache_hit": False})
+                started = time.perf_counter()
+                resp = client().post(url, data=data, json=json_body, headers=headers)
+                _record(host, resp, started)
+                resp.raise_for_status()
+                write_atomic(path, resp.content)
+                return resp.content
+    obs.http_requests.add(1, {"host": host, "cache_hit": True})
+    return path.read_bytes()
 
 
 def fetch_to_file(url: str, dest: Path, *, max_age: float | None = 86400) -> Path:
-    """Stream a large download to dest, skipping it if a fresh copy exists."""
-    if dest.exists() and (max_age is None or time.time() - dest.stat().st_mtime < max_age):
+    """Stream a large download to dest, skipping it if a fresh copy exists. Concurrent callers (shards)
+    download it once; the rest wait for that copy."""
+    if _fresh(dest, max_age):
         return dest
-    dest.parent.mkdir(parents=True, exist_ok=True)
+    with _single_flight(dest) as lock:
+        if not _fresh(dest, max_age):
+            _stream(url, dest, lock)
+    return dest
+
+
+def _stream(url: str, dest: Path, lock: Path) -> None:
     tmp = dest.with_name(f".{dest.name}.{os.getpid()}.part")
+    touched = time.time()
     obs.http_requests.add(1, {"host": httpx.URL(url).host, "cache_hit": False})
     try:
         with client().stream("GET", url) as resp:
@@ -152,9 +219,11 @@ def fetch_to_file(url: str, dest: Path, *, max_age: float | None = 86400) -> Pat
                     obs.http_bytes.add(len(chunk), {"host": resp.url.host})
                     if progress:
                         progress.tick(len(chunk) / (1 << 20))
+                    if time.time() - touched > 30:  # heartbeat: waiting shards must not think we died
+                        lock.touch()
+                        touched = time.time()
             if progress:
                 progress.finish()
-        tmp.replace(dest)
+        replace_file(tmp, dest)
     finally:
         tmp.unlink(missing_ok=True)
-    return dest

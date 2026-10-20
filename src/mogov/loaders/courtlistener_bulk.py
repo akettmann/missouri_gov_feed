@@ -45,7 +45,7 @@ def _latest_snapshot() -> str:
     return max(dates)
 
 
-@loader("courtlistener_bulk")
+@loader("courtlistener_bulk", service="courtlistener-s3")
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: one export file per table."""
     snap = _latest_snapshot()

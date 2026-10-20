@@ -14,6 +14,7 @@ uv run mogov run --shards 4
 |---|---|---|---|
 | mo_house | daily in session (Jan–May), rarely otherwise | session zips weekly (current year), monthly (past); roll-call PDFs forever | daily in session, weekly otherwise |
 | mo_senate | daily in session | current-year listing daily, past monthly; journal PDFs forever | daily in session, weekly otherwise |
+| mo_senate_topics | daily in session (new bills indexed) | current year daily, past years monthly | daily in session, weekly otherwise |
 | mec (opt-in) | continuously | exports: current year weekly, past years monthly | weekly |
 | tap_mec | frozen (ends 2022) | 30 days | monthly |
 | fec | weekly bulk refresh | bulk zips daily; sponsor lookups 30 days | weekly |
@@ -27,9 +28,10 @@ uv run mogov run --shards 4
 | openstates_people | as edited | daily | weekly |
 | congress_legislators | as edited | daily | weekly |
 | fjc_judges | as appointed | 30 days | monthly |
-| wikidata | continuously | 7 days | weekly |
-| acu_ratings | yearly | 30 days | monthly |
+| wikidata (stage 2) | continuously | 7 days | weekly |
 | shor_mccarty | yearly release | 90 days | quarterly |
+| mo_employee_pay | yearly (each January) | current and previous year 7 days, older 30 days | monthly |
+| census_tiger | yearly vintage (each autumn); redistricting | listings 7 days; shapefiles forever | monthly |
 
 Run a subset with `mogov load <loader ...>` followed by `mogov build`. For example, daily during
 session:

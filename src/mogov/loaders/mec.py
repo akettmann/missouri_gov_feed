@@ -38,10 +38,8 @@ BASE = "https://www.mec.mo.gov/MEC"
 P = "ctl00$ctl00$ContentPlaceHolder$ContentPlaceHolder1$"
 YEARS = [int(y) for y in os.environ.get("MOGOV_MEC_YEARS", "2023,2024,2025,2026").split(",")]
 # Elections whose candidate<->committee lists to pull. Wider than YEARS: officials elected years ago still
-# raise money through the committee they registered then.
-CROSSWALK_YEARS = [
-    int(y) for y in os.environ.get("MOGOV_MEC_CROSSWALK_YEARS", "2016,2018,2020,2022,2024,2026").split(",")
-]
+# raise money through the committee they registered then. The election search only offers 2020 onward.
+CROSSWALK_YEARS = [int(y) for y in os.environ.get("MOGOV_MEC_CROSSWALK_YEARS", "2020,2022,2024,2026").split(",")]
 # report types: itemized contributions received, contributions made, itemized expenditures, report summaries
 REPORT_TYPES = os.environ.get("MOGOV_MEC_REPORT_TYPES", "CD1_A,CD3_C,CD3_B,summary").split(",")
 LOBBYING_FROM = "01/01/2019"
@@ -166,10 +164,17 @@ class _Exports:
         dest = CACHE / f"crosswalk_{year}.json"
         if not _fresh(dest, year):
             form = _Form(self.client, f"{BASE}/Campaign_Finance/CF12_SearchElection.aspx")
+            if f'value="{year}"' not in form.page.text:
+                log.info("mec.crosswalk_year_not_offered", year=year)
+                self.progress.tick()
+                return []
             form.set("ddElectionYear", str(year), postback=True)
             dates = re.findall(r'<option[^>]*value="(\d{1,2}/\d{1,2}/\d{4})"', form.page.text)
             if not dates:
+                # Not cached: an empty answer would otherwise stick for 30 days.
                 log.warning("mec.crosswalk_no_elections", year=year)
+                self.progress.tick()
+                return []
             records = []
             for election_date in dates:
                 form.set("ddElectionDate", election_date, postback=True)
@@ -219,7 +224,7 @@ class _Exports:
         return dest
 
 
-@loader("mec")
+@loader("mec", service="www.mec.mo.gov", slow=True)
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: (report type, year) exports, crosswalk election years, and the lobbyist export."""
     if os.environ.get("MOGOV_MEC_OPT_IN") != "1":

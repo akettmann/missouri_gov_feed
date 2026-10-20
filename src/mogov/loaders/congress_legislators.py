@@ -10,7 +10,7 @@ from mogov.loaders import loader
 BASE = "https://unitedstates.github.io/congress-legislators"
 
 
-@loader("congress_legislators")
+@loader("congress_legislators", service="unitedstates.github.io")
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: the current and historical files."""
     counts = {}

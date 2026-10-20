@@ -1,0 +1,12 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: mo_employee_pay
+  description: Missouri state payroll from data.mo.gov ("<year> State Employee Pay").
+  tables:
+  - name: pay
+    identifier: mo_employee_pay
+    description: >
+      Calendar-year gross pay per employee, agency and position, for the Legislature, the Judiciary and the
+      six statewide offices (staff included), verbatim as CSV text columns.

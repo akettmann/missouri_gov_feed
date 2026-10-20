@@ -24,13 +24,13 @@ Diagrams: [pipeline](diagrams/pipeline.puml), [lineage](diagrams/lineage.puml),
    See the configuration table in the [README](../README.md#configuration-env-gitignored) for the rest.
 4. First full load and build:
    ```
-   uv run mogov run --shards 4      # stage-1 loaders (4 processes) -> dbt build -> stage 2 -> dbt build
+   uv run mogov run --shards 4      # stage-1 loaders (concurrent, 4 shards) -> dbt build -> stage 2 -> dbt build
    ```
    The first run is the slow one: it downloads several GB (FEC, CourtListener bulk) and parses about
    ten years of House roll-call PDFs and Senate journals. Everything fetched is cached under
    `data/cache`, so later runs are much faster.
 5. Check the result: `uv run mogov build` should end with `ERROR=0`. Run `uv run mogov export` to write
-   the marts to `data/exports/`.
+   the marts and reporting tables to `data/exports/`.
 
 Layout under `data/` (override the root with `MOGOV_DATA_DIR`):
 
@@ -43,6 +43,56 @@ Layout under `data/` (override the root with `MOGOV_DATA_DIR`):
 
 A `data/raw/<table>.parquet` file from before sharding existed is moved into
 `<table>/part-000-of-001.parquet` the next time any loader runs.
+
+## Wiping and rebuilding from scratch
+
+Everything under `data/` can be regenerated. What you delete decides how long the rebuild takes:
+
+| Delete | Effect |
+|---|---|
+| `data/mogov.duckdb` | dbt rebuilds every model from the raw parts (under a minute). |
+| `data/raw/` | Every loader lands its tables again, from the cache where it can. |
+| `data/exports/` | Rewritten by the next `mogov export`. |
+| `data/cache/` (optional) | Everything is downloaded and parsed again. About 10 GB as of October 2026. Keep it unless you suspect a bad cached response. |
+
+1. Stop anything using `data/` (a running `mogov`, a DuckDB shell, `dbt docs serve`). On Windows an open
+   file can't be deleted.
+2. Delete the warehouse, raw landings and exports (add `data/cache` for a cold rebuild):
+   ```
+   rm -rf data/raw data/mogov.duckdb data/exports                                   # macOS / Linux / Git Bash
+   Remove-Item -Recurse -Force data/raw, data/mogov.duckdb, data/exports             # PowerShell
+   ```
+3. Rebuild:
+   ```
+   uv run mogov run --shards 4
+   ```
+4. Check it:
+   ```
+   uv run mogov build        # must end with ERROR=0
+   uv run mogov freshness    # every always-on source landed just now
+   uv run mogov export --format parquet
+   ```
+   In the run log, every loader has `loader.finished` once per shard and no `loader.failed`. A
+   `dbt.placeholder` warning is expected for tables of opt-in or key-gated loaders you haven't enabled,
+   and for `cl_cases` in the first dbt build (it is a stage-2 table).
+
+How long it takes (October 2026, one Windows desktop, `--shards 4`):
+- **Warm cache** (only raw and the warehouse deleted): the October 2026 full run took about 75 minutes,
+  most of it filtering the CourtListener bulk files (about 50 minutes, one process) and parsing roll-call
+  PDFs. A re-run 20 minutes later took about 20 minutes, still mostly PDF parsing. PDF text is now cached
+  and loaders of different services run concurrently, so expect less than both.
+- **Cold cache**: add the downloads, several GB (FEC bulk files, the CourtListener bulk files at about
+  8 GB compressed, about ten years of House roll-call PDFs and Senate journals). The small state sites
+  are fetched with pauses between requests, so plan for a few hours.
+
+With Docker the steps are the same, against the host folder the container mounts (`./data`, or
+`MOGOV_HOST_DATA`):
+```
+rm -rf data/raw data/mogov.duckdb data/exports
+docker compose up
+docker compose run --rm mogov build
+docker compose run --rm mogov freshness
+```
 
 ## Frontend (static site)
 
@@ -101,12 +151,26 @@ listing order or on which other shards run.
 | Invocation | Effect |
 |---|---|
 | `mogov load mo_house` | one process, all units (`part-000-of-001`) |
-| `mogov load mo_house --shards 4` | a pool of 4 processes, one per shard |
+| `mogov load mo_house --shards 4` | all 4 shards, in a pool of worker processes |
 | `mogov load mo_house --shards 4 --shard 2` | only shard 2 of 4 (for one container of a job) |
 | Cloud Run job with `--tasks 4` | same as the line above, taken from `CLOUD_RUN_TASK_COUNT` / `CLOUD_RUN_TASK_INDEX` |
 
+Loaders that talk to different services run at the same time. Each loader names its upstream service
+(`mogov list` shows it), and the work is split into jobs of (one service's loaders, one shard). A pool of
+`--workers` processes runs the jobs (default `$MOGOV_WORKERS`, else the larger of the shard count and
+min(CPUs, 8)). Loaders of the same service run one after another within a shard, so a site never sees
+more than one request stream per shard. Slow loaders (`mo_senate`, `mo_house`, `house_fd`, `mec`, `fec`,
+`courtlistener_case_bulk`) start first. Each worker can use up to `MOGOV_DUCKDB_MEMORY` (default 3GB) while
+it lands a table, so lower that or `--workers` on a small machine.
+
 Each shard replaces only its own part. If you change the shard count, run every shard before the next
 `dbt build`. Parts left by the old count are deleted as the new shards write theirs.
+
+Shards on one machine share `data/cache`. When several need the same URL (every `mo_house` shard reads
+every session zip, for example), the first takes a lock file next to the cache entry
+(`.<entry>.lock`) and downloads it; the others wait and read its copy. A lock untouched for 5 minutes
+is treated as left by a crashed process. Cloud Run tasks run on separate machines, so there the lock
+only helps as far as Cloud Storage FUSE honours exclusive creates; expect some duplicate downloads.
 
 Be polite with small state sites. Each shard keeps its own request pace, so N shards make N times the
 request rate. That matters most for `mec` (ask MEC before running it in parallel) and less for the
@@ -142,7 +206,7 @@ non-zero. SIGTERM exits cleanly: temp files are removed and metrics are flushed.
      --add-volume-mount volume=data,mount-path=/data \
      --set-env-vars MOGOV_DUCKDB_MEMORY=2GB \
      --set-secrets COURTLISTENER_TOKEN=courtlistener-token:latest \
-     --args load,mo_house,mo_senate,house_fd
+     --args load,mo_house,mo_senate,mo_senate_topics,house_fd
    ```
    Retrying a task is safe: it re-runs the same shard and replaces the same part.
 5. Create the build job. DuckDB does random writes, which Cloud Storage FUSE handles badly, so build in
@@ -151,8 +215,9 @@ non-zero. SIGTERM exits cleanly: temp files are removed and metrics are flushed.
    gcloud run jobs create mogov-build ... --tasks 1 --memory 8Gi \
      --command sh --args -c,'cp /data/mogov.duckdb /tmp/ 2>/dev/null; MOGOV_DB=/tmp/mogov.duckdb mogov build && cp /tmp/mogov.duckdb /data/mogov.duckdb'
    ```
-6. Chain them in order: stage-1 load jobs, then `mogov-build`, then `mogov load courtlistener_cases`
-   (stage 2), then `mogov-build` again. Use Cloud Workflows, or Cloud Scheduler triggers spaced far
+6. Chain them in order: stage-1 load jobs, then `mogov-build`, then
+   `mogov load courtlistener_cases wikidata` (stage 2; `mogov list` shows each loader's stage), then
+   `mogov-build` again. Use Cloud Workflows, or Cloud Scheduler triggers spaced far
    enough apart. See [sync.md](sync.md) for cadences.
 
 Metrics: set `OTEL_EXPORTER_OTLP_ENDPOINT` to an OTLP/HTTP collector, for example an OpenTelemetry

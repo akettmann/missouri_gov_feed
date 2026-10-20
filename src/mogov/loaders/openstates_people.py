@@ -33,7 +33,7 @@ def _yaml_records():
             yield f"{folder}/{parts[-1]}", {"folder": folder, "file": parts[-1], "doc": doc}
 
 
-@loader("openstates_people")
+@loader("openstates_people", service="openstates")
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: the people tarball and the current-roster CSV."""
     records = _yaml_records() if shard.owns("people") else []

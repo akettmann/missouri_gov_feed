@@ -12,9 +12,7 @@ import os
 import zipfile
 from datetime import date
 
-import pdfplumber
-
-from mogov import db, obs
+from mogov import db, obs, pdftext
 from mogov.http import fetch
 from mogov.loaders import loader
 
@@ -39,7 +37,7 @@ def _index(year: int) -> list[dict]:
     return [{**dict(zip(header, r, strict=False)), "index_year": year} for r in rows]
 
 
-@loader("house_fd")
+@loader("house_fd", service="disclosures-clerk.house.gov", slow=True)
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: index years, and Missouri filings' PDFs (by URL). Every shard reads every index (cached) to
     find the Missouri filings."""
@@ -61,8 +59,7 @@ def load(shard: db.Shard) -> dict[str, int]:
             except Exception as exc:
                 sink.add("house_fd_pdf_lines", url, {"doc_id": rec["DocID"], "url": url, "error": str(exc)})
                 continue
-            with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-                texts = [(i, page.extract_text(layout=False) or "") for i, page in enumerate(pdf.pages, 1)]
+            texts = list(enumerate(pdftext.page_texts(pdf_bytes, layout=False), 1))
             if not any(t.strip() for _, t in texts):
                 sink.add("house_fd_pdf_lines", url, {"doc_id": rec["DocID"], "url": url, "has_text": False})
                 continue

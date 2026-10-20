@@ -18,7 +18,7 @@ FILES = {
 }
 
 
-@loader("tap_mec")
+@loader("tap_mec", service="publicaccountability.s3.amazonaws.com")
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: the mirror's CSV files."""
     counts = {}

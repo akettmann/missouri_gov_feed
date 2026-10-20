@@ -3,6 +3,31 @@
 One section per loader: what the source is, what lands, and the quirks found so far. Each has a
 flow diagram in [diagrams/sources](diagrams/sources). Raw tables land under `data/raw/<table>/`.
 
+## Summary
+
+| Loader | Source | Data it provides | Coverage | Gate |
+|---|---|---|---|---|
+| `mo_house` | Missouri House (documents.house.mo.gov) | members, bills, per-member roll-call votes | `MOGOV_LOOKBACK_YEARS` (default 10; PDFs from 2014) | |
+| `mo_senate` | Missouri Senate journals (senate.mo.gov) | per-senator roll-call votes | `MOGOV_LOOKBACK_YEARS` | |
+| `mo_senate_topics` | Missouri Senate topical index (senate.mo.gov) | Senate bills, subject terms for Senate bills and House bills that reached the Senate | `MOGOV_LOOKBACK_YEARS` (regular sessions) | |
+| `mec` | Missouri Ethics Commission | state campaign contributions and spending, candidate↔committee links, lobbyist gifts | 2023+ | opt-in |
+| `tap_mec` | MEC via The Accountability Project | state campaign finance and lobbyist gifts | 2011–2022 (gifts from 2004) | |
+| `fec` | Federal Election Commission | federal candidates, committees, PAC contributions, donor aggregates | `MOGOV_FEC_CYCLES` | API key for aggregates |
+| `voteview` | Voteview | Congress roll calls, votes, DW-NOMINATE ideology | `MOGOV_VOTEVIEW_CONGRESSES` | |
+| `house_fd` | U.S. House Clerk | House members' financial disclosures and trades | 2015+ | |
+| `senate_efd` | U.S. Senate eFD | senators' financial disclosures | as filed | opt-in |
+| `courtlistener_bulk` | CourtListener bulk files | judges, positions, education, federal judges' disclosures | quarterly snapshot | |
+| `courtlistener_case_bulk` | CourtListener bulk files | Missouri state and federal court dockets and opinions | quarterly snapshot | |
+| `courtlistener_cases` | CourtListener API | recent cases and outcomes for judges and lawyers | ~125 requests/day | token for outcomes |
+| `bluebook` | Missouri Official Manual | biographies, judges, county→judicial circuit table | `MOGOV_BLUEBOOK_EDITIONS` | |
+| `openstates_people` | Open States | state legislators, executives, mayors: roles, party, ids | current + retired | |
+| `congress_legislators` | unitedstates/congress-legislators | Missouri members of Congress, cross-system ids | all Missouri terms | |
+| `fjc_judges` | Federal Judicial Center | Article III judges' careers | since 1789 | |
+| `wikidata` | Wikidata | past offices, occupations, employers, relatives and the organizations they lead | as edited | `MOGOV_CONTACT` |
+| `shor_mccarty` | Harvard Dataverse | state legislator ideology scores | 1993–2022 | |
+| `mo_employee_pay` | data.mo.gov State Employee Pay | yearly gross pay of legislators, statewide officials and state judges | `MOGOV_LOOKBACK_YEARS` (published from 2007) | |
+| `census_tiger` | Census Bureau TIGER/Line | legislative and congressional district, county and city boundaries | newest vintage | |
+
 ## mo_house: Missouri House of Representatives
 
 documents.house.mo.gov XML exports (members, bills, actions) plus one PDF per roll call. The PDFs are
@@ -11,7 +36,7 @@ the only per-member House vote record.
 - Lands: `mo_house_members`, `mo_house_bills`, `mo_house_lists`, `mo_house_rollcalls`,
   `mo_house_rollcall_votes`.
 - Window: `MOGOV_LOOKBACK_YEARS` (default 10). Roll-call PDFs go back to 2014.
-- Shard units: session codes (XML) and roll-call PDF URLs.
+- Shard units: session codes (XML) and session days (roll-call PDFs).
 
 Quirks:
 - Session codes are two-digit year plus type: `1` regular, `2`–`4` extraordinary. Unknown codes return
@@ -24,6 +49,32 @@ Quirks:
   (`int_mo_house__member_identity`, seed `house_speakers`).
 - The site asks clients not to poll its XML more than every 30 minutes. Cached copies keep it well
   under that.
+- Every shard reads every session zip to list the roll calls. In the October 2026 full run, two shards
+  fetched the same zip at once and the second rename of the cache file failed on Windows
+  (`PermissionError: [WinError 5]`), failing both shards. The HTTP cache now lets one process download a
+  URL while the others wait for its copy, and retries the rename.
+- Bill XML carries the House subject index (`SubjectIndex`) only from the 2024 sessions on, so earlier
+  bills have no subjects in `fct_bill_subjects`. Older sessions would need another source (Open States'
+  bills API needs a key).
+- Each bill's roll calls are nested under the bill text version voted on
+  (`BillText[].RollCalls[].RollCall[].RollCallPDF`). The PDF URL is the House `vote_id`, so
+  `fct_vote_bills` links House votes to bills exactly. Roll calls the XML doesn't nest (all House votes on
+  Senate bills, some on House bills) are linked by the lead bill of the measure printed on the PDF
+  (`matched_by = 'measure text'`). In October 2026 5,274 of 6,449 roll calls were linked; most of the rest
+  are procedural (approve journal, quorum calls, rules, previous question).
+- Bill sponsors list senators (conferees, handlers) with district 200 + their senate district.
+- The bill XML only links roll calls nested under a House bill. It misses House votes on Senate bills
+  (third reading, conference reports) and procedural votes ("APPROVE JOURNAL", "QUORUM", "PQ"). Until
+  October 2026 the loader found PDFs only through the XML: 3,873 roll calls, 108 of them on Senate
+  measures. There is no index of the PDFs, but they are numbered per session day
+  (`billsYYS/rollcalls/{day}.{nnn}.pdf`), and a missing number answers with the site's HTML error page,
+  like unknown session codes. The loader now probes each day from roll call 1 until the first miss past
+  the highest number the XML links, for days 1 to the last linked day + 3 (10 days for a session the XML
+  links none in). That found 6,449 roll calls, 1,526 on Senate measures. Misses are cached for good once
+  the session's year is over and re-checked daily before that. The first probe took about 8 minutes per
+  shard with 4 shards.
+- PDF text extraction is cached by PDF content (`data/cache/pdftext/`). Before that, a re-run spent
+  3–10 minutes per shard re-parsing PDFs that were already downloaded.
 
 ## mo_senate: Missouri Senate journals
 
@@ -41,7 +92,45 @@ Quirks:
 - Running page headers ("Journal of the Senate 118", day lines) appear mid-block and are stripped.
 - The block regex is bounded at 2,500 characters, so a block missing its "Vacancies" line can't
   swallow the rest of the journal.
-- PDF parsing (about 3 s per journal) dominates this loader's runtime, so it shards well.
+- Some votes have an "Excused from voting—Senator Hegeman—1" line (recorded as `not voting`).
+- Some journals print a section's total before its names ("Absent with leave—Senators—2 Eigel
+  Gannon"). A section's names therefore also end at the next section heading. Before October 2026 they
+  ran on into it, picking up "Vacancies", "NAYS" or "Absent" as senators and filing the next section's
+  senators under the wrong vote.
+- Names are space-separated, so a two-word surname looks like two senators. Known ones are listed in
+  `COMPOUND_SURNAMES` (Holly Thompson Rehder, printed "Thompson Rehder"); dbt matches a two-word token on
+  its last word. The PDF text sometimes cuts "Senator" short ("Senato"); such words are skipped.
+- The `assert_votes_within_seats` dbt test fails if a vote lists more than 34 senators. It caught all of
+  the above: 443 votes listed 35 or 36 names before the fixes.
+- PDF parsing (about 3 s per journal) dominates a cold run, so it shards well. The extracted text is
+  cached by PDF content, so re-runs skip it.
+
+## mo_senate_topics: Missouri Senate topical index
+
+senate.mo.gov's "Topical Index" (`/BillTracking/bills/keywords?year=YYYY&session=R`) lists every bill of a
+regular session under each subject keyword. It covers all Senate bills and resolutions, plus the House bills
+that reached the Senate. The keywords are the legislature's shared subject index. The House XML only carries
+subjects from 2024, so this fills in earlier sessions. It also adds Senate bills to `fct_bills`, which lets
+`fct_vote_bills` link Senate votes on Senate bills.
+
+- Lands: `mo_senate_bill_topics`, one row per (session, keyword, bill card): keyword, bill label, link,
+  description and sponsors, as the page prints them.
+- Window: `MOGOV_LOOKBACK_YEARS`. Shard units: session years (one page each, 3–6 MB).
+
+Quirks:
+- The page title "TOPICAL INDEX" uses the same heading markup as the keywords. It has no bill cards, so it
+  lands nothing.
+- Extraordinary sessions (`session=E`) have no index; the page comes back empty.
+- Two terms are spelled differently from the House index: "Elementary and Secondary Education, Department
+  of" (House: "…, DEPT. OF") and "Workers' Compensation" (House: no apostrophe). Staging maps them to the
+  House spelling.
+- The Senate indexes House bills a little differently from the House: for the 486 House bills in both
+  (2024–26), 1,576 of the Senate's 2,807 terms match the House's 2,092. A House bill keeps the House's own
+  terms where it has them (`fct_bill_subjects.subject_source`).
+- A House bill that never reached the Senate has no Senate entry, so House bills before 2024 that died in
+  the House still have no subjects.
+- The House export doesn't name its roll calls on Senate bills, so House votes on Senate bills aren't
+  linked to a bill.
 
 ## mec: Missouri Ethics Commission (opt-in)
 
@@ -65,10 +154,20 @@ Quirks:
   `quote` and `escape` explicitly.
 - Elections with no candidates return the search page instead of a table. These are logged as
   `mec.crosswalk_empty`.
+- The election search only goes back to 2020: in October 2026 its year dropdown offered 2020–2034.
+  Asking for 2016 or 2018 returned no election dates (`mec.crosswalk_no_elections` on every run).
+  The default `MOGOV_MEC_CROSSWALK_YEARS` now starts at 2020. Years the dropdown doesn't offer are
+  skipped and logged as `mec.crosswalk_year_not_offered`. Those years never returned rows, so nothing
+  was lost, but committees first registered for a pre-2020 election are only linked to an official if
+  they also filed for a later one. An offered year with no dates is still logged as
+  `mec.crosswalk_no_elections` and not cached.
 - MEC answers in under a second (the lobbyist search takes about 13 s). The fixed `MOGOV_MEC_PAUSE`
   (3 s) between requests is most of the runtime. A cold run is about 4 requests per export year and
   3 per election date.
-- Personal financial disclosures are not online; they're released only on Sunshine Law request.
+- Personal financial disclosures (PFDs) are not online. MEC's 2026 Ethics Guide: "State law requires a
+  request to receive copies of PFDs filed with the Commission. Therefore, PFDs are not available for
+  public viewing on the MEC's website." Anyone can request copies from MEC (legislators, statewide
+  officials, candidates). Judges file theirs with the Missouri Supreme Court instead.
 
 ## tap_mec: MEC via The Accountability Project
 
@@ -183,7 +282,9 @@ Searches CourtListener's opinions for each official who is or was a judge or law
 Quirks:
 - It needs a first dbt build, which is why it's stage 2.
 - Tokens are capped at about 125 requests per day across all endpoints. On a long `Retry-After` the
-  loader continues from cache only, and the next run resumes.
+  loader continues from cache only, and the next run resumes. If the quota is already spent when the run
+  starts and nothing is cached yet, `cl_cases` lands 0 rows (seen in the October 2026 runs:
+  `cases.quota_exhausted` with `retry_after_s` about 16 hours). Run it again the next day.
 - Without a token it can only search (5 requests per minute) and gets no dispositions.
 - CourtListener has no trial-court (circuit) cases, and Case.net forbids automated access.
 - It's now a top-up for `courtlistener_case_bulk`. Where both have a case, an API row with outcome data
@@ -229,14 +330,66 @@ Quirks:
 Quirks:
 - It needs `MOGOV_CONTACT`: Wikimedia refuses User-Agents without contact info.
 - QIDs come from Open States, congress-legislators, and a discovery query for living holders of
-  Missouri positions. Run those loaders first.
+  Missouri positions. It reads those loaders' raw files, so it is a stage-2 loader. As a stage-1 loader
+  its shards raced `openstates_people` and failed on a missing `openstates_current_csv`.
 
-## acu_ratings: American Conservative Union
-
-- Lands: `acu_ratings`. One query to an undocumented GraphQL API (plain http).
-- This is one interest group's scorecard, not a neutral measure.
 
 ## shor_mccarty: state legislator ideology
 
 - Lands: `shor_mccarty`. Harvard Dataverse, January 2025 release covering 1993–2022, with wide per-year
   columns. License CC BY-NC-SA 4.0.
+
+## census_tiger: district and place boundaries
+
+Census Bureau TIGER/Line shapefiles: state senate (SLDU) and house (SLDL) districts, congressional
+districts, counties and places. They feed `dim_district` and `fct_official_districts`, the "find my
+officials" lookup. Judicial circuits are groups of counties; the county→circuit table comes from the
+Official Manual (`int_bluebook__county_circuits`). Court of Appeals districts (RSMo 477.050–.070) and
+federal judicial districts (28 U.S.C. 105) are also groups of counties, fixed by statute, so they come from
+the `mo_county_courts` seed.
+
+- Lands: `census_tiger_features`, one row per feature: the attribute table verbatim (`properties`), the
+  geometry as GeoJSON (lon/lat, NAD83) and the layer, vintage and file.
+- Shard units: file kinds (`29_sldl.zip`, `29_cd119.zip`, `us_county.zip`...).
+
+Quirks:
+- Each layer comes from the newest TIGER year that has it. In October 2026, `TIGER2026/SLDL` listed
+  `tl_2026_29_sldl.zip` but served a short HTML page for it. The loader checks every download is a zip and
+  falls back to the previous vintage (`census_tiger.not_a_zip`).
+- Missouri redrew its congressional map in 2025. TIGER2026 has only the 120th Congress's districts
+  (`cd120`), but today's members represent the 119th's. The loader lands the newest file for every Congress
+  it finds in the last three vintages; `dim_district.is_current` marks the Congress in session.
+- Counties exist only as a national file (about 80 MB). Only its Missouri features (STATEFP 29) are
+  landed.
+- TIGER names St. Louis city and St. Louis County both "St. Louis"; `NAMELSAD` ("St. Louis city", "St.
+  Louis County") tells them apart, and the circuit match uses it.
+- In October 2026, seven state judges had no circuit in `dim_official`, so they had no district rows. The
+  cause was in the Official Manual's judge index, not TIGER: the dot leader can run straight into the circuit
+  ("Associate ..............35th"). `int_judges__state_index` now accepts that, which also recovered six
+  judges whose index line had failed to parse at all.
+
+## mo_employee_pay: Missouri state payroll
+
+data.mo.gov's "<year> State Employee Pay" datasets (the Missouri Accountability Portal's employee data):
+calendar-year gross pay per employee, agency and position title. Legislators, statewide officials and
+state judges are on it; `fct_salaries` picks them out. Federal officials aren't on it. Their pay is fixed by
+statute and not published per person, so `fct_salaries` adds the office's annual salary from the
+`federal_salaries` seed (`pay_basis = 'statutory salary'`). Add that year's rates to the seed each January.
+
+- Lands: `mo_employee_pay`, verbatim CSV (all columns text). Only the agencies that employ officials are
+  fetched (Legislature, Judiciary and the six statewide offices), staff included.
+- Window: `MOGOV_LOOKBACK_YEARS`. Shard units: calendar years (one dataset each; ids from the Socrata
+  catalog).
+
+Quirks:
+- Gross pay is everything paid in the year, not the base salary. Someone who changed office mid-year has
+  one row per position (the 2025 governor also has a Lieutenant Governor row).
+- Officeholder titles (`STATE REPRESENTATIVE`, `SENATOR`, `SENATE FLOOR LEADER`, `CIRCUIT JUDGE`,
+  `GOVERNOR`...) are listed in the seed `mo_payroll_office_titles`. Staff titles such as "SENATORS' STAFF"
+  never count. Add a title to the seed if the payroll renames a position.
+- Names are legal names, "LAST, FIRST M": "LUETKEMEYER, ANTON H" is Tony Luetkemeyer, and "BLACK, JAMES R"
+  is Rusty Black. Legislators are therefore matched by surname, chamber and year against the seat history,
+  when exactly one member fits. Others are matched by name. In October 2026, 2025 pay matched 147 of 155
+  representatives and 32 of 33 senators; the rest share a surname with a colleague and use a nickname.
+- The current year's dataset appears in January of the following year.
+- Federal officials (Congress, federal judges) are paid by the U.S. and are not in this source.

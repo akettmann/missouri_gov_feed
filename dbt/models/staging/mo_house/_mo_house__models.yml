@@ -2,6 +2,18 @@
 # not this file, then regenerate.
 version: 2
 models:
+- name: stg_mo_house__bill_rollcalls
+  description: 'The House roll calls taken on each bill: the XML nests them under the bill text version voted on
+    (BillText[].RollCalls[].RollCall[]). rollcall_url is the roll-call PDF, which is the House vote_id.'
+- name: stg_mo_house__bill_sponsors
+  description: 'Sponsors of each House bill as the XML lists them: sponsor, co-sponsors, handlers and House/Senate
+    conferees. District numbers are the House''s: senators appear as 200 + their senate district.'
+- name: stg_mo_house__bill_subjects
+  description: The House's subject index terms for each bill ("APPROPRIATIONS", "EDUCATION, ELEMENTARY AND SECONDARY").
+    The XML export has them from the 2024 sessions on; earlier sessions have none.
+- name: stg_mo_house__bills
+  description: 'One row per MO House bill per session (House XML export): number, current version, titles, last
+    action. bill_doc keeps the bill''s XML-as-JSON for the subject, sponsor and roll-call models built on this one.'
 - name: stg_mo_house__members
   description: MO House members per session (end-of-session snapshot from the House XML export).
 - name: stg_mo_house__rollcall_votes
@@ -10,3 +22,11 @@ models:
 - name: stg_mo_house__rollcalls
   description: 'One row per MO House roll call (parsed PDF header). The line after "Roll Call : N" names the measure
     (e.g. "HCS HB 10"); the next lines carry the sponsor and a description.'
+  columns:
+  - name: session_day
+    description: Legislative day of the session (highest seen through 2026 is 79).
+    data_tests:
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 1
+          max_value: 120

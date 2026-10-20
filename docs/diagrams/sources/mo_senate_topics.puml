@@ -1,0 +1,21 @@
+@startuml mo_senate_topics
+title mo_senate_topics: MO Senate topical index
+start
+:owned years of the lookback window
+(one unit per regular session);
+:GET senate.mo.gov/BillTracking/bills/keywords?year=YYYY&session=R
+(3-6 MB; current year daily, past years monthly);
+note right
+  Extraordinary sessions have no index
+  (the page comes back empty).
+end note
+:split at each keyword heading;
+:one row per (keyword, bill card):
+bill label, link, description, sponsors;
+:mo_senate_bill_topics;
+:dbt: stg_mo_senate__bill_topics
+(keyword -> House subject spelling)
+-> int_bills__subjects (House terms win for a House bill)
+-> fct_bill_subjects, fct_bills (Senate bills), fct_vote_bills;
+stop
+@enduml

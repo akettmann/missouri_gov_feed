@@ -8,9 +8,14 @@ note right
   Each loader lists its work units and
   processes those its shard owns:
   crc32(unit key) % shards == shard.
-  --shards N        process pool of N
+  --shards N        all N shards
   --shards N --shard i   one shard
   Cloud Run: CLOUD_RUN_TASK_COUNT/INDEX
+  Jobs: (loaders of one service, shard),
+  run by --workers processes: different
+  services concurrently, slow ones first.
+  Shards needing the same URL download
+  it once (lock file in data/cache).
 end note
 fork
   :fetch (cached HTTP, data/cache);
@@ -28,15 +33,19 @@ note right
   empty placeholders for optional
   JSON tables that aren't loaded
 end note
-:staging -> intermediate -> marts;
+:staging -> intermediate -> marts
+-> reporting;
 
 |Loaders (stage 2)|
 :courtlistener_cases
-(needs marts.fct_legal_careers);
+(needs marts.fct_legal_careers)
+wikidata
+(needs QIDs from the landed rosters);
 
 |dbt|
 :mogov build;
 :mogov export (optional)
+marts and reporting to
 data/exports/*.csv|parquet;
 stop
 @enduml

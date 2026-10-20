@@ -45,10 +45,11 @@ projects", and the testing and documentation best practices.
 |---|---|
 | One source per system | 16 sources (`source('fec', 'candidates')`), each in `models/staging/<system>/` with its `_<system>__sources.yml`; `identifier` keeps the raw directory names, so loaders are unchanged. Staging models are named after their source (`stg_tap_mec__*` for the TAP mirror, `stg_mec__*` for MEC direct). |
 | Model contracts on the marts | `contract: {enforced: true}` for the marts folder; all 195 columns declare a `data_type`. A renamed, dropped, added or retyped column fails the build. Types are DuckDB's. |
+| Exposures | `voter_frontend` (`models/reporting/_reporting.yml`) lists the marts and reporting models the planned frontend reads, so they show in lineage before the frontend exists. |
+| Reporting layer | `models/reporting/` (`rpt_*`, schema `reporting`), contracts enforced like the marts. Built only from marts and intermediate models. |
 | Unit tests for fragile logic | dbt unit tests on the name matching: House vote tokens, Senate vote tokens, MEC committee attribution, CourtListener case matches, lobbyist-gift recipients (`_intermediate__unit_tests.yml`, `_marts__unit_tests.yml`). They run before their model in every `mogov build`. A failing one skips the model. |
 
 ## Still open
 
-- **Exposures**, once the frontend exists, so its dependencies on marts show in lineage.
 - **CI runs `dbt parse`, not the unit tests.** dbt unit tests read their inputs' column types from the
   warehouse, and CI has no landed data.

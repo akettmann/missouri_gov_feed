@@ -55,7 +55,7 @@ def _headers() -> dict:
 def _people() -> list[dict]:
     if not DB_PATH.exists():
         return []
-    with duckdb.connect(str(DB_PATH), read_only=True) as con:
+    with db.connect(str(DB_PATH), read_only=True) as con:
         try:
             rows = con.execute("""
                 select o.official_id, o.full_name, o.given_name, o.family_name, o.office,
@@ -142,7 +142,7 @@ def _details(cluster_id: int, *, cache_only: bool = False) -> dict:
     return {"disposition": cluster.get("disposition"), "opinion_tail": tail}
 
 
-@loader("courtlistener_cases", stage=2)
+@loader("courtlistener_cases", stage=2, service="www.courtlistener.com")
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: officials (by official_id). MOGOV_CL_MAX_* caps apply per shard."""
     people = _people()

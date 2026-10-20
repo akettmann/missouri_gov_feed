@@ -1,0 +1,7 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_mo_employee_pay__pay
+  description: 'Missouri state payroll rows: calendar-year gross pay (all pay received, not base salary) per employee,
+    agency and position. Names are printed "LAST, FIRST M"; split here for matching.'

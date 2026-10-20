@@ -9,7 +9,7 @@ from mogov.loaders import loader
 URL = "https://www.fjc.gov/sites/default/files/history/judges.csv"
 
 
-@loader("fjc_judges")
+@loader("fjc_judges", service="www.fjc.gov")
 def load(shard: db.Shard) -> dict[str, int]:
     """One unit: the directory CSV."""
     paths = [fetch_to_file(URL, CACHE_DIR / "fjc" / "judges.csv", max_age=30 * 86400)] if shard.owns("fjc") else []

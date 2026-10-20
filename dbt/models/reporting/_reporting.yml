@@ -1,0 +1,426 @@
+version: 2
+
+# Reporting models are shaped for the frontend's pages (FRONTEND_TODO.md). Like the marts, their columns are
+# a contract (data_type per column) and descriptions persist as warehouse comments. They read only marts and
+# intermediate models. Every row keeps official_id, and source_url / match_confidence wherever the facts
+# behind it have them.
+
+models:
+  - name: rpt_indicator_peers
+    description: >
+      Each bias indicator value (fct_bias_indicators) with the same measure's distribution over the
+      official's peers: every tracked official with that indicator in the same chamber (and Congress, for
+      DW-NOMINATE). peer_group names the group, so a strip chart selects all rows sharing it. Medians, not
+      means; no ranks. Grain: one row per fct_bias_indicators row.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, indicator, period, detail]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: full_name
+        data_type: varchar
+        description: Display name (dim_official).
+      - name: party
+        data_type: varchar
+        description: Current party (dim_official); shown as a label, not a color.
+      - name: indicator
+        data_type: varchar
+        description: Which measure (see fct_bias_indicators).
+      - name: chamber
+        data_type: varchar
+        description: Chamber the value was measured in (see fct_bias_indicators).
+      - name: period
+        data_type: integer
+        description: As in fct_bias_indicators (Congress number, last year served, or null).
+      - name: detail
+        data_type: varchar
+        description: As in fct_bias_indicators.
+      - name: value
+        data_type: double
+        description: The official's value, on the indicator's own scale.
+      - name: peer_group
+        data_type: varchar
+        description: "`<indicator>:<chamber>` plus `:<congress>` for DW-NOMINATE. Rows sharing it are compared."
+        data_tests: [not_null]
+      - name: peer_count
+        data_type: bigint
+        description: Officials in the peer group, including this one.
+      - name: peer_median
+        data_type: double
+        description: Median value over the peer group.
+      - name: peer_min
+        data_type: double
+        description: Lowest value in the peer group.
+      - name: peer_max
+        data_type: double
+        description: Highest value in the peer group.
+      - name: party_peer_count
+        data_type: bigint
+        description: Peers of the official's own party (null without a party).
+      - name: party_median
+        data_type: double
+        description: Median over peers of the official's own party.
+      - name: republican_median
+        data_type: double
+        description: Median over Republican peers (null if none).
+      - name: democratic_median
+        data_type: double
+        description: Median over Democratic peers (null if none).
+      - name: source_url
+        data_type: varchar
+        description: "{{ doc('source_url') }}"
+
+  - name: rpt_party_breaks
+    description: >
+      Party-line votes (Republican and Democratic majorities on opposite sides, counted over every member
+      who voted) where the official voted yea/nay against their own party's majority. These are the votes
+      behind a party_unity_pct below 100. Grain: one row per (official, chamber, vote).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, chamber, vote_id]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests: [not_null]
+      - name: full_name
+        data_type: varchar
+        description: Display name.
+      - name: chamber
+        data_type: varchar
+        description: state_house, state_senate, us_house or us_senate.
+      - name: session_code
+        data_type: varchar
+        description: Legislative session (MO House session code, Senate year) or Congress number.
+      - name: vote_id
+        data_type: varchar
+        description: Vote identifier, as in fct_votes.
+      - name: vote_date
+        data_type: date
+        description: Date of the vote.
+      - name: measure
+        data_type: varchar
+        description: Bill or measure voted on, where the source names one.
+      - name: vote_description
+        data_type: varchar
+        description: What the vote was on (calendar item, journal sentence or Voteview description).
+      - name: party_at_vote
+        data_type: varchar
+        description: The official's party when the vote was cast.
+      - name: vote_cast
+        data_type: varchar
+        description: The official's vote (yea or nay).
+      - name: party_position
+        data_type: varchar
+        description: Majority position of the official's party (the side they broke from).
+      - name: other_party_position
+        data_type: varchar
+        description: Majority position of the other major party (the side they voted with).
+      - name: republican_yea
+        data_type: hugeint
+        description: Republicans voting yea (all members, not only tracked officials).
+      - name: republican_nay
+        data_type: hugeint
+        description: Republicans voting nay.
+      - name: democratic_yea
+        data_type: hugeint
+        description: Democrats voting yea.
+      - name: democratic_nay
+        data_type: hugeint
+        description: Democrats voting nay.
+      - name: source_url
+        data_type: varchar
+        description: "{{ doc('source_url') }}"
+
+  - name: rpt_donor_rollup
+    description: >
+      Money received by each official's campaign committees (fct_campaign_finance, direction 'received'),
+      summed per donor, donor class and year. Individual federal donors are only available summarized
+      (fct_federal_donor_summary). Grain: one row per (official, level, year, donor class, donor, match
+      confidence, source, source_url).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              [official_id, level, transaction_year, donor_class, donor_name, match_confidence, source, source_url]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests: [not_null]
+      - name: level
+        data_type: varchar
+        description: federal (FEC) or state (MEC).
+      - name: transaction_year
+        data_type: integer
+        description: Calendar year of the contributions.
+      - name: election_cycle
+        data_type: integer
+        description: Two-year cycle the year belongs to, named by its even (election) year.
+      - name: donor_class
+        data_type: varchar
+        description: >
+          individual, pac, party, candidate committee, committee (MEC committees of any kind), business or
+          organization, other. Grouped from the sources' counterparty types.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['individual', 'pac', 'party', 'candidate committee', 'committee',
+                  'business or organization', 'other']
+      - name: donor_name
+        data_type: varchar
+        description: >
+          The counterparty's organization where the source names one (an individual's employer or company,
+          a PAC's connected organization), else the counterparty's name.
+      - name: match_confidence
+        data_type: varchar
+        description: "{{ doc('match_confidence') }}"
+      - name: source
+        data_type: varchar
+        description: Where the records come from (FEC, MEC, MEC via the Accountability Project).
+      - name: source_url
+        data_type: varchar
+        description: "{{ doc('source_url') }}"
+      - name: total_amount
+        data_type: decimal(38,6)
+        description: Sum received, in dollars.
+      - name: contribution_count
+        data_type: bigint
+        description: Number of contributions summed.
+      - name: first_date
+        data_type: date
+        description: Earliest contribution date in the row.
+      - name: last_date
+        data_type: date
+        description: Latest contribution date in the row.
+
+  - name: rpt_gift_rollup
+    description: >
+      Lobbyist gifts (fct_lobbyist_gifts) summed per official, principal, category and year. Missouri's
+      Amendment 1 (December 2018) banned most gifts over $5, so totals drop sharply after 2018. Grain: one
+      row per (official, year, principal, category, match confidence, source).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              [official_id, expenditure_year, lobbyist_principal, expenditure_category, match_confidence, source]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests: [not_null]
+      - name: expenditure_year
+        data_type: bigint
+        description: Year of the gifts.
+      - name: lobbyist_principal
+        data_type: varchar
+        description: The client the lobbyist reported the gift for; "(not reported)" if blank.
+      - name: expenditure_category
+        data_type: varchar
+        description: MEC category, upper-cased (MEALS, FOOD, & BEVERAGE; ENTERTAINMENT; GIFT; TRAVEL; ...).
+      - name: match_confidence
+        data_type: varchar
+        description: "{{ doc('match_confidence') }}"
+      - name: source
+        data_type: varchar
+        description: MEC lobbyist reports, direct or via the Accountability Project.
+      - name: total_amount
+        data_type: decimal(38,6)
+        description: Sum of the gifts, in dollars.
+      - name: gift_count
+        data_type: bigint
+        description: Number of gifts summed.
+      - name: lobbyist_count
+        data_type: bigint
+        description: Distinct lobbyists who reported them.
+      - name: first_date
+        data_type: date
+        description: Earliest gift date in the row.
+      - name: last_date
+        data_type: date
+        description: Latest gift date in the row.
+      - name: source_url
+        data_type: varchar
+        description: MEC's lobbyist expenditure search (MEC has no per-report permalink).
+
+  - name: rpt_attendance
+    description: >
+      Attendance for recorded votes per official, chamber and session, with the whole chamber's rate for the
+      same session (every member, tracked or not). Present = yea, nay or present. Grain: one row per
+      (official, chamber, session).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, chamber, session_code]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests: [not_null]
+      - name: full_name
+        data_type: varchar
+        description: Display name.
+      - name: chamber
+        data_type: varchar
+        description: state_house, state_senate, us_house or us_senate.
+      - name: session_code
+        data_type: varchar
+        description: >
+          MO House session code (two-digit year + type: 1 regular, 2-4 extraordinary), MO Senate journal
+          year, or Congress number.
+      - name: first_vote_date
+        data_type: date
+        description: First recorded vote of the official in the session.
+      - name: last_vote_date
+        data_type: date
+        description: Last recorded vote of the official in the session.
+      - name: votes_recorded
+        data_type: bigint
+        description: Votes on which the official was listed (as a member) in the session.
+      - name: votes_present
+        data_type: hugeint
+        description: Of those, votes where they voted yea, nay or present.
+      - name: absent
+        data_type: hugeint
+        description: Listed as absent.
+      - name: absent_with_leave
+        data_type: hugeint
+        description: Listed as absent with leave (excused; MO Senate journals).
+      - name: not_voting
+        data_type: hugeint
+        description: Listed as not voting (Congress) or excused from voting (MO Senate journals).
+      - name: attendance_pct
+        data_type: double
+        description: 100 * votes_present / votes_recorded.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: chamber_attendance_pct
+        data_type: double
+        description: The same rate over every member of the chamber in the session.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+
+  - name: rpt_interest_vote_overlap
+    description: >
+      Missouri legislators' roll-call votes on bills whose subject index terms touch an industry or
+      interest that gave the official money (organization/PAC contributions or lobbyist gifts) in or before the
+      vote's year. Industries come from donor and principal names (interest_keywords seed) and are tied to bill
+      subjects by the industry_subjects seed. Co-occurrence, not causation: a row says money and a vote meet, not
+      that one caused the other. Only votes linked to a bill with subject terms (fct_vote_bills, fct_bill_subjects).
+      Grain: one row per (official, chamber, vote, industry).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, chamber, vote_id, industry]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: chamber
+        data_type: varchar
+        description: state_house or state_senate.
+      - name: session_code
+        data_type: varchar
+        description: MO House session code of the bill.
+      - name: vote_id
+        data_type: varchar
+        description: Vote identifier, as in fct_votes.
+      - name: vote_date
+        data_type: date
+        description: Date of the vote.
+      - name: bill
+        data_type: varchar
+        description: The bill voted on (fct_vote_bills).
+      - name: short_title
+        data_type: varchar
+        description: The bill's short title (fct_bills).
+      - name: vote_cast
+        data_type: varchar
+        description: The official's vote, as in fct_votes.
+      - name: industry
+        data_type: varchar
+        description: Industry or interest (interest_keywords / industry_subjects seeds).
+        data_tests: [not_null]
+      - name: matched_subjects
+        data_type: varchar
+        description: The bill's subject index terms that tie it to the industry, '; '-separated.
+      - name: contributions_amount
+        data_type: decimal(38,6)
+        description: Contributions from the industry's organizations and PACs to the official in or before the vote's year.
+      - name: gifts_amount
+        data_type: decimal(38,6)
+        description: Lobbyist gifts from the industry's principals to the official in or before the vote's year.
+      - name: first_money_year
+        data_type: integer
+        description: First year the official received money from the industry.
+      - name: last_money_year
+        data_type: integer
+        description: Last year (up to the vote's year) the official received money from the industry.
+      - name: match_confidence
+        data_type: varchar
+        description: "{{ doc('match_confidence') }} The weakest among the money rows counted."
+      - name: vote_source_url
+        data_type: varchar
+        description: The roll call or journal the vote comes from.
+      - name: bill_source_url
+        data_type: varchar
+        description: The bill's page.
+
+exposures:
+  - name: voter_frontend
+    label: Missouri officials frontend
+    type: application
+    maturity: low
+    description: >
+      Static site that shows each official's measurable lean and potential conflicts of interest, as
+      evidence rather than verdicts (FRONTEND_TODO.md). Its build reads the exported marts and reporting
+      tables (`mogov export`).
+    owner:
+      name: mriswithe
+    depends_on:
+      - ref('dim_official')
+      - ref('official_profile')
+      - ref('fct_bias_indicators')
+      - ref('fct_votes')
+      - ref('fct_campaign_finance')
+      - ref('fct_federal_donor_summary')
+      - ref('fct_lobbyist_gifts')
+      - ref('fct_commercial_ties')
+      - ref('fct_family_ties')
+      - ref('fct_disclosures')
+      - ref('fct_case_history')
+      - ref('dim_district')
+      - ref('fct_official_districts')
+      - ref('fct_bills')
+      - ref('fct_bill_subjects')
+      - ref('fct_bill_sponsors')
+      - ref('fct_vote_bills')
+      - ref('fct_salaries')
+      - ref('rpt_indicator_peers')
+      - ref('rpt_party_breaks')
+      - ref('rpt_donor_rollup')
+      - ref('rpt_gift_rollup')
+      - ref('rpt_attendance')
+      - ref('rpt_interest_vote_overlap')

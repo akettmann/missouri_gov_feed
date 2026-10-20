@@ -170,7 +170,7 @@ def _sponsored_committees(shard: db.Shard):
             yield f"{cand}/{row['committee_id']}", {"sponsor_candidate_id": cand, **row}
 
 
-@loader("fec")
+@loader("fec", service="fec.gov", slow=True)
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: bulk files (stem + cycle) and, for API lookups, candidate IDs."""
     counts = {table: _land_bulk(stem, table, hdr, shard) for stem, table, hdr in FILES}

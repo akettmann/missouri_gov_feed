@@ -31,5 +31,6 @@ select
         when 'NAYS' then 'nay'
         when 'Absent' then 'absent'
         when 'Absent with leave' then 'absent with leave'
+        when 'Excused from voting' then 'not voting'
     end as vote_cast
 from src

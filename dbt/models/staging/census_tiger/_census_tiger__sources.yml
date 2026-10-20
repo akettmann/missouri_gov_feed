@@ -1,0 +1,22 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: census_tiger
+  description: U.S. Census Bureau TIGER/Line shapefiles for Missouri (www2.census.gov/geo/tiger).
+  tables:
+  - name: features
+    identifier: census_tiger_features
+    description: >
+      One shapefile feature per row: Missouri state senate (sldu) and house (sldl) districts, congressional
+      districts per Congress (cd), counties and places. Payload keeps the attribute table verbatim
+      (`properties`), the geometry as GeoJSON, and the layer, vintage and file it came from.
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day

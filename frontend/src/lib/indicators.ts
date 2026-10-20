@@ -40,20 +40,6 @@ export const INDICATORS: Record<string, IndicatorMeta> = {
     limits: "Covers 1993-2022 only, and one score per career; recent shifts don't show up.",
     source: "Shor & McCarty, Harvard Dataverse",
   },
-  acu_rating: {
-    label: "ACU rating",
-    domain: [0, 100],
-    diverging: true,
-    low: "rarely agreed with ACU",
-    high: "usually agreed with ACU",
-    meaning:
-      "The American Conservative Union's yearly score: the share of votes the ACU selected where the " +
-      "official voted the way the ACU preferred. Period is the rating year.",
-    limits:
-      "One advocacy group's choice of votes and of the 'right' answer. No balancing scorecard from another " +
-      "viewpoint is loaded yet, so read it as that group's view, not a neutral measure.",
-    source: "American Conservative Union",
-  },
   party_unity_pct: {
     label: "Party unity",
     domain: [0, 100],
