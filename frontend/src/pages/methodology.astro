@@ -2,6 +2,7 @@
 import Layout from "../layouts/Layout.astro";
 import { freshness } from "../lib/exports/load";
 import { INDICATORS } from "../lib/indicators";
+import { href } from "../lib/site";
 
 const tables = freshness();
 ---
@@ -139,7 +140,8 @@ const tables = freshness();
       appears when the bill carries one of those terms and the industry gave the official money in or before
       that year. Money shown is the total through the latest such vote. Keyword matching misses donors whose
       names don't say what they do, and many large PACs (leadership or pass-through PACs) belong to no single
-      industry.
+      industry. <a href={href("/pacs/")}>How PACs move money</a> explains how money can pass through PACs and
+      nonprofits before it reaches a candidate.
     </p>
   </section>
 

@@ -33,4 +33,7 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
 ## Low priority
 - [ ] Find my officials on a wide screen: before a lookup the results column (right two fifths) is empty
   beside the map; a short "your officials will appear here" placeholder would balance it
-- [ ] Build a reference that explains what PACs are used for, to hide the sources of money being donated to politicians
+- [ ] PAC reference (`/pacs/`): Missouri's statewide contribution limit is quoted as $2,825 with a proposed
+  $3,225 (rule filed July 9, 2026). Update the figure once the Secretary of State's rule takes effect
+- [ ] Profiles: when a top donor is a Missouri committee, show that committee's own top donors one hop back
+  (needs a committee-to-committee rollup in dbt; see TODO.md), so pass-through PACs aren't a dead end
