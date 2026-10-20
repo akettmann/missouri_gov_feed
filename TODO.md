@@ -14,6 +14,18 @@
   - FollowTheMoney (now part of OpenSecrets) industry codes for state contributors; check whether its API or downloads are still offered
 - [ ] Campaign contributions whose payer is "NONE" ($1.27M, October 2026): find which reports or loaders produce it, and use the real name if the source has one
 - [ ] `fct_vote_bills`: House roll calls on combined bills (`HCS HBs 267 & 347`, `SS SCS SBs 49 & 118`) link only the lead bill. Link every bill number in the measure if bill-level reports need the others
+- [ ] Warning when running DBT via `uv run mogov run --shards 4`
+```shell
+2026-10-20T03:05:37.657895Z [info     ] loader.landed                  loader=mo_house rows=1844 shard=2/4 table=raw.mo_house_rollcalls
+2026-10-20T03:05:37.657994Z [info     ] loader.landed                  loader=mo_house rows=295388 shard=2/4 table=raw.mo_house_rollcall_votes
+2026-10-20T03:05:37.658104Z [info     ] loader.finished                loader=mo_house seconds=504.3 shard=2/4
+<frozen runpy>:128: RuntimeWarning: 'dbt.cli.main' found in sys.modules after import of package 'dbt.cli', but prior to execution of 'dbt.cli.main'; this may result in unpredictable behaviour
+03:05:41  Running with dbt=1.12.6
+03:05:42  Registered adapter: duckdb=1.11.0
+03:05:45  Found 108 models, 102 data tests, 10 seeds, 65 sources, 1 exposure, 655 macros, 5 unit tests
+03:05:45
+03:05:45  Concurrency: 4 threads (target='local')
+```
 
 ## Low priority
 - [ ] Add a defense industry (Boeing, General Dynamics, Northrop Grumman, RTX are large federal donors) to `interest_keywords` and `industry_subjects`
