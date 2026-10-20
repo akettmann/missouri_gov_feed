@@ -272,6 +272,7 @@ bodies.
 
 ## Sources
 
+A plain-language summary of the whole law is in [sunshine_law_summary.md](sunshine_law_summary.md).
 Copies of the full texts, retrieved October 19, 2026, are in `docs/reference/`:
 [RSMo Chapter 610](reference/rsmo_chapter_610_sunshine_law.md),
 [RSMo 105.483–105.492](reference/rsmo_105_483_to_105_492_financial_interest.md) and
