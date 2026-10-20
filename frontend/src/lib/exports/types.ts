@@ -106,6 +106,54 @@ export interface DisclosureFiling {
   n_items: number;
 }
 
+/** One indicator value placed among its peer group (rpt_indicator_peers), with every peer's value. */
+export interface PeerStrip {
+  indicator: string;
+  peer_group: string;
+  detail: string | null;
+  chamber: string;
+  period: number | null;
+  value: number;
+  peer_count: number;
+  peer_median: number | null;
+  republican_median: number | null;
+  democratic_median: number | null;
+  /** every member of the peer group, the official included */
+  peers: { value: number; party: string | null }[];
+}
+
+/** rpt_party_breaks: a party-line vote where the official voted against their party's majority. */
+export interface PartyBreak {
+  chamber: string;
+  session_code: string;
+  vote_date: string;
+  measure: string | null;
+  vote_description: string | null;
+  vote_cast: string;
+  party_position: string;
+  other_party_position: string | null;
+  republican_yea: number | null;
+  republican_nay: number | null;
+  democratic_yea: number | null;
+  democratic_nay: number | null;
+  source_url: string | null;
+}
+
+/** rpt_attendance: one session. */
+export interface AttendanceRow {
+  chamber: string;
+  session_code: string;
+  first_vote_date: string | null;
+  last_vote_date: string | null;
+  votes_recorded: number;
+  votes_present: number;
+  absent: number;
+  absent_with_leave: number;
+  not_voting: number;
+  attendance_pct: number;
+  chamber_attendance_pct: number;
+}
+
 /** A dataset is either real (from an export) or a labelled stand-in until the dbt model exists. */
 export interface Dataset<T> {
   sample: boolean;
@@ -117,6 +165,13 @@ export interface OfficialBundle {
   official: Official;
   coverage: CoverageItem[];
   indicators: Indicator[];
+  peers: PeerStrip[];
+  voting: {
+    status: string;
+    /** null when the rpt_* export is missing (section says so instead of showing nothing) */
+    party_breaks: PartyBreak[] | null;
+    attendance: AttendanceRow[] | null;
+  };
   money: {
     status: string;
     federal: FederalDonorRow[];

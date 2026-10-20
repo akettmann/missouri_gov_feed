@@ -1,21 +1,31 @@
 ---
 // Section A: each indicator on its own scale with period, detail and source. No composite score.
-import type { Indicator } from "../lib/exports/types";
+import type { Indicator, PeerStrip as PeerStripData } from "../lib/exports/types";
 import { indicatorMeta } from "../lib/indicators";
 import { href } from "../lib/site";
 import IndicatorScale from "./IndicatorScale.astro";
+import PeerStrip from "./PeerStrip.astro";
 import SourceLink from "./SourceLink.astro";
 
 interface Props {
   indicators: Indicator[];
   status: string;
+  peers: PeerStripData[];
+  /** dim_official.office, e.g. state_senate: picks the current chamber's row when periods tie */
+  office: string;
 }
-const { indicators, status } = Astro.props;
+const { indicators, status, peers, office } = Astro.props;
+// the strip for exactly the row the scale shows: a member of both chambers has one party-unity row per
+// chamber (same indicator, null period), told apart only by detail ("state_senate: 216 party-line votes")
+const stripFor = (row: Indicator) =>
+  peers.find((p) => p.indicator === row.indicator && p.period === row.period && p.detail === row.detail);
 
 const groups = new Map<string, Indicator[]>();
 for (const i of indicators) groups.set(i.indicator, [...(groups.get(i.indicator) ?? []), i]);
-// latest period first; party unity has no period
-for (const rows of groups.values()) rows.sort((a, b) => (b.period ?? 0) - (a.period ?? 0));
+// latest period first; party unity has no period, so the current chamber's row leads
+const current = (r: Indicator) => (r.detail?.startsWith(`${office}:`) ? 0 : 1);
+for (const rows of groups.values())
+  rows.sort((a, b) => (b.period ?? 0) - (a.period ?? 0) || current(a) - current(b));
 // a null value is a period the source didn't score (e.g. a year without enough rated votes)
 const fmt = (key: string, v: number | null) =>
   v === null ? "no score" : key === "party_unity_pct" ? `${v.toFixed(1)}%` : v.toFixed(2);
@@ -33,6 +43,7 @@ const fmt = (key: string, v: number | null) =>
     [...groups].map(([key, rows]) => {
       const meta = indicatorMeta(key);
       const latest = rows.find((r) => r.value !== null) ?? rows[0];
+      const strip = stripFor(latest);
       return (
         <div class="indicator">
           <div class="head">
@@ -41,6 +52,7 @@ const fmt = (key: string, v: number | null) =>
             {latest.period && <span class="muted small">({latest.period})</span>}
           </div>
           {latest.value !== null && <IndicatorScale indicator={key} value={latest.value} />}
+          {strip && strip.peers.length > 1 && <PeerStrip strip={strip} />}
           <p class="small muted">
             {latest.detail} ·{" "}
             <SourceLink url={latest.source_url} missing="computed from votes in this dataset" />

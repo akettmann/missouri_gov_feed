@@ -6,6 +6,7 @@ import { DONOR_GROUP_SQL } from "../rollups";
 import { exportedAt, hasExport, query } from "./db";
 import { sampleDonorCycles, sampleGiftRollup, sampleTopDonors } from "./fixtures";
 import type {
+  AttendanceRow,
   CommercialTie,
   CoverageItem,
   Dataset,
@@ -18,6 +19,8 @@ import type {
   Indicator,
   Official,
   OfficialBundle,
+  PartyBreak,
+  PeerStrip,
   TopDonorRow,
 } from "./types";
 
@@ -151,6 +154,58 @@ async function loadAll(): Promise<OfficialBundle[]> {
       )
     : null;
 
+  // Voting-record models have no fixture: a missing export renders as "not available yet".
+  type PeerRow = Omit<PeerStrip, "peers"> & { official_id: string; party: string | null };
+  const peerRows = hasExport("rpt_indicator_peers")
+    ? await query<PeerRow>(`
+        select official_id, party, indicator, peer_group, chamber, period, detail, value,
+               cast(peer_count as integer) as peer_count, peer_median, republican_median, democratic_median
+        from {rpt_indicator_peers} where value is not null`)
+    : [];
+  const peerValues = new Map<string, { value: number; party: string | null }[]>();
+  for (const r of peerRows) {
+    peerValues.set(r.peer_group, [
+      ...(peerValues.get(r.peer_group) ?? []),
+      { value: r.value, party: r.party },
+    ]);
+  }
+  const peers = groupBy(
+    // the row's own party only feeds peerValues; a strip carries party solely inside its peers list
+    peerRows.map((r) => {
+      const strip: PeerStrip & { official_id: string; party?: string | null } = {
+        ...r,
+        peers: peerValues.get(r.peer_group) ?? [],
+      };
+      delete strip.party;
+      return strip;
+    }),
+  );
+
+  const breaks = hasExport("rpt_party_breaks")
+    ? groupBy(
+        await query<PartyBreak & { official_id: string }>(`
+          select official_id, chamber, session_code, cast(vote_date as varchar) as vote_date, measure,
+                 vote_description, vote_cast, party_position, other_party_position,
+                 cast(republican_yea as integer) as republican_yea, cast(republican_nay as integer) as republican_nay,
+                 cast(democratic_yea as integer) as democratic_yea, cast(democratic_nay as integer) as democratic_nay,
+                 source_url
+          from {rpt_party_breaks} order by vote_date desc`),
+      )
+    : null;
+
+  const attendance = hasExport("rpt_attendance")
+    ? groupBy(
+        await query<AttendanceRow & { official_id: string }>(`
+          select official_id, chamber, session_code,
+                 cast(first_vote_date as varchar) as first_vote_date,
+                 cast(last_vote_date as varchar) as last_vote_date,
+                 cast(votes_recorded as integer) as votes_recorded, cast(votes_present as integer) as votes_present,
+                 cast(absent as integer) as absent, cast(absent_with_leave as integer) as absent_with_leave,
+                 cast(not_voting as integer) as not_voting, attendance_pct, chamber_attendance_pct
+          from {rpt_attendance} order by first_vote_date`),
+      )
+    : null;
+
   return profiles
     .sort((a, b) => (SORT_LEVEL[a.level] ?? 9) - (SORT_LEVEL[b.level] ?? 9))
     .map((p): OfficialBundle => {
@@ -195,6 +250,12 @@ async function loadAll(): Promise<OfficialBundle[]> {
         },
         coverage,
         indicators: (indicators.get(id) ?? []) as Indicator[],
+        peers: (peers.get(id) ?? []) as PeerStrip[],
+        voting: {
+          status: status("votes"),
+          party_breaks: breaks ? ((breaks.get(id) ?? []) as PartyBreak[]) : null,
+          attendance: attendance ? ((attendance.get(id) ?? []) as AttendanceRow[]) : null,
+        },
         money: {
           status: status("donations"),
           federal: (federal.get(id) ?? []) as FederalDonorRow[],
@@ -246,10 +307,13 @@ export function freshness(): { table: string; exported_at: string | null; sample
     "fct_disclosures",
     "rpt_donor_rollup",
     "rpt_gift_rollup",
+    "rpt_indicator_peers",
+    "rpt_party_breaks",
+    "rpt_attendance",
   ];
   return tables.map((t) => ({
     table: t,
     exported_at: exportedAt(t)?.toISOString() ?? null,
-    sample: t.startsWith("rpt_") && !hasExport(t),
+    sample: (t === "rpt_donor_rollup" || t === "rpt_gift_rollup") && !hasExport(t),
   }));
 }

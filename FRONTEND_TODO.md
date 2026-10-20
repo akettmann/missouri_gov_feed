@@ -20,9 +20,6 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
   "not applicable")
 
 ## Medium priority
-- [ ] Section B, party loyalty: unity % and "votes where they broke with their party" list (`rpt_party_breaks`)
-- [ ] Peer strip charts for each indicator, chamber colleagues and party medians (`rpt_indicator_peers`)
-- [ ] Attendance per session vs chamber (`rpt_attendance`)
 - [ ] Find my officials: address / map click / geolocation to districts (`census_tiger`); lookup runs client-side
   so addresses never leave the browser. First check whether the Census Geocoder allows browser calls (CORS);
   otherwise map click / geolocation with client-side point-in-polygon

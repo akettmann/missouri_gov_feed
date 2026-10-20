@@ -2,7 +2,7 @@
 // table (works without JS) and the client renders the same rows as an Observable Plot chart, re-running
 // the spec when "hide possible matches" changes. Pure TS, safe to bundle for the browser.
 import type { OfficialBundle } from "./exports/types";
-import { count, money } from "./format";
+import { count, money, pct, sessionLabel } from "./format";
 import { DONOR_GROUPS, GIFT_GROUPS, giftGroup, sumBy, withoutMedium } from "./rollups";
 
 type DonorGroup = (typeof DONOR_GROUPS)[number];
@@ -14,14 +14,17 @@ export interface Column {
   label: string;
   money?: boolean;
   num?: boolean;
+  pct?: boolean;
   /** value is a URL rendered as a "source" link */
   link?: boolean;
 }
 
 export interface VizSpec {
   title: string;
-  /** stack: x = category axis, series stacked; hbar: one bar per y category */
-  kind: "stack" | "hbar";
+  /** stack: x = category axis, series stacked; hbar: one bar per y category; dumbbell: per y row, x is the
+   *  official value and `x2` a reference (chamber) value on the same 0-100 scale */
+  kind: "stack" | "hbar" | "dumbbell";
+  x2?: string;
   x: string;
   y: string;
   series?: string;
@@ -54,6 +57,7 @@ export function cellText(c: Column, r: Row): string {
   const v = r[c.key];
   if (c.money) return money(Number(v));
   if (c.num) return count(Number(v));
+  if (c.pct) return pct(Number(v));
   return String(v).replace(MEDIUM_SUFFIX, "");
 }
 
@@ -257,5 +261,31 @@ export const VIZ: Record<string, VizSpec> = {
         .sort((a, b) => b.total - a.total)
         .slice(0, 10);
     },
+  },
+  attendance: {
+    title: "Votes attended per session, against the whole chamber",
+    kind: "dumbbell",
+    x: "official",
+    x2: "chamber",
+    y: "session",
+    usesConfidence: false,
+    note: "● this official · ○ chamber average. Attended = voted yea, nay or present on a recorded vote.",
+    columns: [
+      { key: "session", label: "Session" },
+      { key: "official", label: "Attended", pct: true },
+      { key: "chamber", label: "Chamber", pct: true },
+      { key: "recorded", label: "Votes", num: true },
+      { key: "absent", label: "Absent or not voting", num: true },
+      { key: "excused", label: "Absent with leave", num: true },
+    ],
+    rows: (b) =>
+      (b.voting.attendance ?? []).map((r) => ({
+        session: sessionLabel(r.chamber, r.session_code),
+        official: r.attendance_pct,
+        chamber: r.chamber_attendance_pct,
+        recorded: r.votes_recorded,
+        absent: r.absent + r.not_voting,
+        excused: r.absent_with_leave,
+      })),
   },
 };

@@ -22,6 +22,40 @@ const hideMedium = () => document.documentElement.classList.contains("hide-mediu
 
 function chart(spec: VizSpec, rows: Row[], width: number): SVGSVGElement | HTMLElement {
   const style = { background: "transparent", color: css("--ink-2"), fontSize: "12px" };
+  if (spec.kind === "dumbbell") {
+    const ink = css("--ink");
+    const muted = css("--muted");
+    const longest = Math.max(...rows.map((r) => String(r[spec.y]).length));
+    // dots need no zero baseline; attendance clusters near 100%, so start at the nearest 10 below the data
+    const low = Math.min(...rows.flatMap((r) => [Number(r[spec.x]), Number(r[spec.x2!])]));
+    const from = Math.max(0, Math.floor((low - 2) / 10) * 10);
+    return Plot.plot({
+      width,
+      style,
+      marginLeft: 16 + longest * 6.5,
+      height: 26 * rows.length + 40,
+      x: { domain: [from, 100], grid: true, label: null, tickFormat: (d: number) => `${d}%` },
+      y: { label: null, domain: rows.map((r) => String(r[spec.y])) },
+      marks: [
+        Plot.link(rows, { x1: spec.x2!, x2: spec.x, y1: spec.y, y2: spec.y, stroke: muted, strokeWidth: 2 }),
+        Plot.dot(rows, {
+          x: spec.x2!,
+          y: spec.y,
+          r: 5,
+          stroke: muted,
+          strokeWidth: 2,
+          fill: css("--surface"),
+        }),
+        Plot.dot(rows, {
+          x: spec.x,
+          y: spec.y,
+          r: 5,
+          fill: ink,
+          tip: { format: { x: (d: number) => `${d.toFixed(1)}%` } },
+        }),
+      ],
+    });
+  }
   if (spec.kind === "hbar") {
     const longest = Math.min(MAX_LABEL, Math.max(...rows.map((r) => String(r[spec.y]).length)));
     return Plot.plot({
@@ -109,7 +143,7 @@ function fillTable(fig: Element, spec: VizSpec, rows: Row[]) {
         } else {
           td.textContent = cellText(c, r);
         }
-        if (c.money || c.num) td.className = "num";
+        if (c.money || c.num || c.pct) td.className = "num";
         if (i === 0 && r.confidence === "medium") {
           const b = document.createElement("span");
           b.className = "badge medium";
