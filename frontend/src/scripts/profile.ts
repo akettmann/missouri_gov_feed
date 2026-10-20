@@ -28,6 +28,36 @@ const hideMedium = () => document.documentElement.classList.contains("hide-mediu
 
 function chart(spec: VizSpec, rows: Row[], width: number): SVGSVGElement | HTMLElement {
   const style = { background: "transparent", color: css("--ink-2"), fontSize: "12px" };
+  if (spec.kind === "hstack") {
+    // melt the wide table rows into one segment per stack key; colors follow the key's fixed slot
+    const keys = spec.stackKeys ?? [];
+    const colors = seriesColors();
+    const long = rows.flatMap((r) =>
+      keys.map((k) => ({ y: String(r[spec.y]), part: k.label, n: Number(r[k.key]) })),
+    );
+    const longest = Math.min(MAX_LABEL, Math.max(...rows.map((r) => String(r[spec.y]).length)));
+    return Plot.plot({
+      width,
+      style,
+      marginLeft: 16 + longest * 6.5,
+      height: 24 * rows.length + 60,
+      x: { grid: true, label: null, tickFormat: (d: number) => count(d) },
+      y: { label: null, domain: rows.map((r) => String(r[spec.y])), tickFormat: clip },
+      color: { domain: keys.map((k) => k.label), range: keys.map((_, i) => colors[i]), legend: true },
+      marks: [
+        Plot.barX(long, {
+          x: "n",
+          y: "y",
+          fill: "part",
+          order: keys.map((k) => k.label),
+          insetTop: 3,
+          insetBottom: 3,
+          tip: true,
+        }),
+        Plot.ruleX([0], { stroke: css("--axis") }),
+      ],
+    });
+  }
   if (spec.kind === "dumbbell") {
     const ink = css("--ink");
     const muted = css("--muted");

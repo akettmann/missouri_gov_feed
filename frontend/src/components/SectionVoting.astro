@@ -103,6 +103,13 @@ const tally = (yea: number | null, nay: number | null) => (yea == null ? "—" :
       ) : (
         <Viz id="attendance" bundle={bundle} />
       )}
+
+      {voting.by_subject && voting.by_subject.length > 0 && (
+        <>
+          <h3>By bill subject</h3>
+          <Viz id="votes-by-subject" bundle={bundle} />
+        </>
+      )}
     </>
   )}
 </section>

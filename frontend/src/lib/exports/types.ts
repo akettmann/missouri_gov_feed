@@ -166,6 +166,43 @@ export interface CaseRow {
   source_url: string | null;
 }
 
+/** rpt_votes_by_subject: roll calls on bills with one subject. */
+export interface SubjectVotes {
+  chamber: string;
+  subject_name: string;
+  subject_source: string;
+  roll_calls: number;
+  yea: number;
+  nay: number;
+  other: number;
+  bills: number;
+}
+
+/** rpt_interest_vote_overlap rolled up per industry: money in, and votes on bills touching that industry. */
+export interface InterestOverlap {
+  industry: string;
+  /** cumulative through the latest overlapping vote (the model's amounts are "in or before the vote's year") */
+  contributions_amount: number;
+  gifts_amount: number;
+  first_money_year: number | null;
+  last_money_year: number | null;
+  match_confidence: string;
+  roll_calls: number;
+  yea: number;
+  nay: number;
+  other: number;
+  bills: number;
+  /** the most recent overlapping votes */
+  examples: {
+    vote_date: string;
+    bill: string;
+    short_title: string | null;
+    vote_cast: string;
+    vote_source_url: string | null;
+    bill_source_url: string | null;
+  }[];
+}
+
 /** A dataset is either real (from an export) or a labelled stand-in until the dbt model exists. */
 export interface Dataset<T> {
   sample: boolean;
@@ -183,7 +220,11 @@ export interface OfficialBundle {
     /** null when the rpt_* export is missing (section says so instead of showing nothing) */
     party_breaks: PartyBreak[] | null;
     attendance: AttendanceRow[] | null;
+    /** the subjects with the most roll calls (top 20) */
+    by_subject: SubjectVotes[] | null;
   };
+  /** null when the rpt_interest_vote_overlap export is missing */
+  overlap: InterestOverlap[] | null;
   courts: {
     status: string;
     /** cases per filing year and role; null when the export is missing */

@@ -23,7 +23,9 @@ export interface VizSpec {
   title: string;
   /** stack: x = category axis, series stacked; hbar: one bar per y category; dumbbell: per y row, x is the
    *  official value and `x2` a reference (chamber) value on the same 0-100 scale */
-  kind: "stack" | "hbar" | "dumbbell";
+  kind: "stack" | "hbar" | "dumbbell" | "hstack";
+  /** hstack: wide columns stacked along x, one bar per y row (the table stays wide) */
+  stackKeys?: { key: string; label: string }[];
   x2?: string;
   x: string;
   y: string;
@@ -263,6 +265,35 @@ export const VIZ: Record<string, VizSpec> = {
         .sort((a, b) => b.total - a.total)
         .slice(0, 10);
     },
+  },
+  "votes-by-subject": {
+    title: "Votes on bills by subject (the 20 subjects with the most roll calls)",
+    kind: "hstack",
+    x: "n",
+    y: "subject",
+    stackKeys: [
+      { key: "yea", label: "Yea" },
+      { key: "nay", label: "Nay" },
+      { key: "other", label: "Present / absent" },
+    ],
+    count: true,
+    usesConfidence: false,
+    note: "Counts of roll calls on bills carrying each subject term; one roll call can fall under several subjects.",
+    columns: [
+      { key: "subject", label: "Subject" },
+      { key: "roll_calls", label: "Roll calls", num: true },
+      { key: "yea", label: "Yea", num: true },
+      { key: "nay", label: "Nay", num: true },
+      { key: "other", label: "Present / absent", num: true },
+    ],
+    rows: (b) =>
+      (b.voting.by_subject ?? []).map((r) => ({
+        subject: r.subject_name.charAt(0) + r.subject_name.slice(1).toLowerCase(),
+        roll_calls: r.roll_calls,
+        yea: r.yea,
+        nay: r.nay,
+        other: r.other,
+      })),
   },
   "cases-by-year": {
     title: "Cases per year",

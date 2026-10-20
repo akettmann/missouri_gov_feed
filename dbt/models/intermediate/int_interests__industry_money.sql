@@ -72,7 +72,8 @@ select
     money_year,
     sum(amount) as total_amount,
     count(distinct payer) as payer_count,
-    case when min(match_confidence) = 'high' and max(match_confidence) = 'high' then 'high' else 'medium' end
+    -- only a name-only ('medium') match weakens the group; 'exact id' / 'exact (MEC crosswalk)' beat 'high'
+    case when sum(case when match_confidence = 'medium' then 1 else 0 end) > 0 then 'medium' else 'high' end
         as match_confidence
 from classified
 group by official_id, industry, money_kind, money_year

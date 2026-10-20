@@ -17,11 +17,13 @@ import type {
   FederalDonorRow,
   GiftRollupRow,
   IndexEntry,
+  InterestOverlap,
   Indicator,
   Official,
   OfficialBundle,
   PartyBreak,
   PeerStrip,
+  SubjectVotes,
   TopDonorRow,
 } from "./types";
 
@@ -200,6 +202,63 @@ async function loadAll(): Promise<OfficialBundle[]> {
       )
     : null;
 
+  // up to ~700 subjects per legislator; the page lists the 20 with the most roll calls
+  const subjects = hasExport("rpt_votes_by_subject")
+    ? groupBy(
+        await query<SubjectVotes & { official_id: string }>(`
+          select official_id, chamber, subject_name, subject_source,
+                 cast(roll_calls as integer) as roll_calls, cast(yea as integer) as yea,
+                 cast(nay as integer) as nay, cast(other as integer) as other, cast(bills as integer) as bills
+          from (
+            select *, row_number() over (partition by official_id order by roll_calls desc, subject_name) as rank
+            from {rpt_votes_by_subject}
+          ) ranked
+          where rank <= 20 order by official_id, rank`),
+      )
+    : null;
+
+  // rpt_interest_vote_overlap has one row per (vote, industry), ~2k per legislator: roll up per industry.
+  // Its money is cumulative ("in or before the vote's year"), so the latest row's amount is the total, and
+  // that row's match_confidence is the weakest of all the money counted.
+  const hasOverlap = hasExport("rpt_interest_vote_overlap");
+  type OverlapRow = Omit<InterestOverlap, "examples"> & { official_id: string };
+  const overlapRows = hasOverlap
+    ? await query<OverlapRow>(`
+        select official_id, industry,
+               cast(max(contributions_amount) as double) as contributions_amount,
+               cast(max(gifts_amount) as double) as gifts_amount,
+               min(first_money_year) as first_money_year, max(last_money_year) as last_money_year,
+               arg_max(match_confidence, vote_date) as match_confidence,
+               cast(count(distinct vote_id) as integer) as roll_calls,
+               cast(count(distinct case when vote_cast = 'yea' then vote_id end) as integer) as yea,
+               cast(count(distinct case when vote_cast = 'nay' then vote_id end) as integer) as nay,
+               cast(count(distinct case when vote_cast not in ('yea', 'nay') then vote_id end) as integer) as other,
+               cast(count(distinct bill) as integer) as bills
+        from {rpt_interest_vote_overlap}
+        group by official_id, industry
+        order by official_id, max(contributions_amount) + max(gifts_amount) desc`)
+    : [];
+  const examples = new Map<string, InterestOverlap["examples"]>();
+  if (hasOverlap) {
+    for (const r of await query<
+      InterestOverlap["examples"][number] & { official_id: string; industry: string }
+    >(`
+      select official_id, industry, cast(vote_date as varchar) as vote_date, bill, short_title, vote_cast,
+             vote_source_url, bill_source_url
+      from (
+        select *, row_number() over (partition by official_id, industry order by vote_date desc, bill) as rank
+        from {rpt_interest_vote_overlap}
+      ) ranked
+      where rank <= 5`)) {
+      const { official_id, industry, ...ex } = r;
+      const key = `${official_id}|${industry}`;
+      examples.set(key, [...(examples.get(key) ?? []), ex]);
+    }
+  }
+  const overlap = groupBy(
+    overlapRows.map((r) => ({ ...r, examples: examples.get(`${r.official_id}|${r.industry}`) ?? [] })),
+  );
+
   // a federal appellate judge has ~6k cases: ship yearly counts plus the most recent ones
   const RECENT_CASES = 50;
   const hasCases = hasExport("fct_case_history");
@@ -282,7 +341,9 @@ async function loadAll(): Promise<OfficialBundle[]> {
           status: status("votes"),
           party_breaks: breaks ? ((breaks.get(id) ?? []) as PartyBreak[]) : null,
           attendance: attendance ? ((attendance.get(id) ?? []) as AttendanceRow[]) : null,
+          by_subject: subjects ? ((subjects.get(id) ?? []) as SubjectVotes[]) : null,
         },
+        overlap: hasOverlap ? ((overlap.get(id) ?? []) as InterestOverlap[]) : null,
         courts: {
           status: status("cases"),
           by_year: caseYears
@@ -345,6 +406,8 @@ export function freshness(): { table: string; exported_at: string | null; sample
     "rpt_indicator_peers",
     "rpt_party_breaks",
     "rpt_attendance",
+    "rpt_votes_by_subject",
+    "rpt_interest_vote_overlap",
   ];
   return tables.map((t) => ({
     table: t,

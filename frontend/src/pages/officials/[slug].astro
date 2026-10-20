@@ -9,6 +9,7 @@ import SectionGifts from "../../components/SectionGifts.astro";
 import SectionIdeology from "../../components/SectionIdeology.astro";
 import SectionInterests from "../../components/SectionInterests.astro";
 import SectionMoney from "../../components/SectionMoney.astro";
+import SectionOverlap from "../../components/SectionOverlap.astro";
 import SectionVoting from "../../components/SectionVoting.astro";
 import Layout from "../../layouts/Layout.astro";
 import { allOfficials } from "../../lib/exports/load";
@@ -74,6 +75,7 @@ const term = [o.current_term_start, o.current_term_end].filter(Boolean).join(" t
     <SectionVoting bundle={bundle} />
     <SectionMoney bundle={bundle} />
     <SectionGifts bundle={bundle} />
+    <SectionOverlap bundle={bundle} />
     <SectionInterests bundle={bundle} />
     <SectionCourts bundle={bundle} />
   </article>

@@ -7,7 +7,8 @@ with votes as (
     select
         v.official_id,
         v.chamber,
-        v.session_code,
+        -- the bill's session code: Senate votes carry the journal year ('2026'), bills the House code ('261')
+        vb.session_code,
         v.vote_id,
         v.vote_date,
         v.vote_cast,

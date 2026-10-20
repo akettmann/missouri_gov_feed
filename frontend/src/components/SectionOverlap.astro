@@ -1,0 +1,96 @@
+---
+// Interests and votes (rpt_interest_vote_overlap): industries that gave this official money, next to their
+// votes on bills whose subjects touch those industries. Co-occurrence, not causation: said up front, every time.
+import ConfidenceBadge from "./ConfidenceBadge.astro";
+import SourceLink from "./SourceLink.astro";
+import type { OfficialBundle } from "../lib/exports/types";
+import { count, money } from "../lib/format";
+import { href } from "../lib/site";
+
+interface Props {
+  bundle: OfficialBundle;
+}
+const { overlap } = Astro.props.bundle;
+const industryLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).replaceAll("_", " ");
+---
+
+<section class="card" id="overlap" aria-labelledby="overlap-h">
+  <h2 id="overlap-h">Interests and votes</h2>
+  <p class="lede">
+    Industries that gave this official money, next to how they voted on bills whose subjects touch that
+    industry.
+    <strong>This shows co-occurrence, not cause:</strong> officials often get money from groups that already
+    agree with them, and most bills pass with wide support.{" "}
+    <a href={href("/methodology/#interest-votes")}>How it's matched</a>.
+  </p>
+  {overlap === null ? (
+    <p class="muted small">Not available yet (the rpt_interest_vote_overlap export is missing).</p>
+  ) : overlap.length === 0 ? (
+    <p class="muted small">
+      No votes found on bills touching an industry that gave this official money (only Missouri legislators'
+      votes on bills with subject terms are covered).
+    </p>
+  ) : (
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Industry</th>
+            <th class="num">Money in</th>
+            <th>Years</th>
+            <th class="num">Roll calls</th>
+            <th class="num">Yea</th>
+            <th class="num">Nay</th>
+            <th>Recent votes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {overlap.map((o) => (
+            <tr data-confidence={o.match_confidence === "medium" ? "medium" : undefined}>
+              <td>
+                {industryLabel(o.industry)} <ConfidenceBadge confidence={o.match_confidence} />
+              </td>
+              <td class="num">
+                {money(o.contributions_amount + o.gifts_amount)}
+                {o.gifts_amount > 0 && <span class="muted small"> incl. {money(o.gifts_amount)} gifts</span>}
+              </td>
+              <td class="nowrap">
+                {o.first_money_year === o.last_money_year
+                  ? o.first_money_year
+                  : `${o.first_money_year}–${o.last_money_year}`}
+              </td>
+              <td class="num">{count(o.roll_calls)}</td>
+              <td class="num">{count(o.yea)}</td>
+              <td class="num">{count(o.nay)}</td>
+              <td>
+                <details>
+                  <summary class="small">{o.examples.length} most recent</summary>
+                  <ul class="ex small">
+                    {o.examples.map((e) => (
+                      <li>
+                        {e.vote_date} · <SourceLink url={e.bill_source_url} label={e.bill} />
+                        {e.short_title && <span class="muted"> {e.short_title}</span>} · voted {e.vote_cast} ·{" "}
+                        <SourceLink url={e.vote_source_url} label="roll call" />
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</section>
+
+<style>
+  .nowrap {
+    white-space: nowrap;
+  }
+  .ex {
+    padding-left: 1rem;
+    margin: 4px 0;
+    max-width: 52ch;
+  }
+</style>
