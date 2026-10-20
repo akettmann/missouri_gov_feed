@@ -2,6 +2,8 @@
 
 One section per loader: what the source is, what lands, and the quirks found so far. Each has a
 flow diagram in [diagrams/sources](diagrams/sources). Raw tables land under `data/raw/<table>/`.
+How a bill moves between the two chambers, which the `mo_house` and `mo_senate` records follow, is in
+[diagrams/mo_bill_flow.svg](diagrams/mo_bill_flow.svg).
 
 ## Summary
 
