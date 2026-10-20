@@ -154,7 +154,7 @@ export const VIZ: Record<string, VizSpec> = {
     series: "band",
     seriesOrder: Object.values(FED_SIZE_LABEL),
     usesConfidence: false,
-    note: "Size bands as the FEC API reports them (each band starts at the amount shown).",
+    note: "Bands as FEC reports them; the smallest includes unitemized contributions, so the bands add up to roughly the cycle's individual total.",
     columns: [
       { key: "cycle", label: "Cycle" },
       { key: "band", label: "Size" },

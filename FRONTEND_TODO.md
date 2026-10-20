@@ -16,8 +16,6 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
 - Keep each official's JSON under the 100 KB gzipped budget (`pnpm sizes` after every data refresh)
 
 ## High priority
-- [ ] FEC size bands: confirm whether `fct_federal_donor_summary` `by_size` bucket 0 includes unitemized money
-  (the dbt docs say itemized only, but Hawley's under-$200 band is $8M+); fix the docs or the chart note
 - [ ] Decide audience/hosting (public?) and whether judges stay in (they get profiles today; ideology/votes show
   "not applicable")
 

@@ -394,8 +394,10 @@ models:
     description: >
       Federal fundraising per member per cycle. `cycle total` rows come from FEC's candidate summary
       (receipts, individual/PAC/party money, self-funding, disbursements, cash on hand). `by_employer`,
-      `by_size` and `by_state` rows are the FEC API's aggregates of itemized individual donors (only when
-      FEC_API_KEY is set). Grain: (official, cycle, aggregate_kind, bucket). A member with several FEC
+      `by_size` and `by_state` rows are the FEC API's aggregates of individual contributions (only when
+      FEC_API_KEY is set): `by_employer` and `by_state` cover itemized donors only, while `by_size` bucket `0`
+      ($200 and under) also includes unitemized money, so the size buckets add up to about the cycle's
+      `individual contributions` total. Grain: (official, cycle, aggregate_kind, bucket). A member with several FEC
       candidate ids that FEC reports against one committee is counted once; separate campaigns are summed.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
