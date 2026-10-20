@@ -14,7 +14,7 @@ import SectionVoting from "../../components/SectionVoting.astro";
 import Layout from "../../layouts/Layout.astro";
 import { allOfficials } from "../../lib/exports/load";
 import type { OfficialBundle } from "../../lib/exports/types";
-import { LEVELS, officeLine } from "../../lib/format";
+import { LEVELS, officeLine, visibleCoverage } from "../../lib/format";
 import { href, reportErrorUrl } from "../../lib/site";
 
 export const getStaticPaths = (async () =>
@@ -53,7 +53,7 @@ const term = [o.current_term_start, o.current_term_end].filter(Boolean).join(" t
       </div>
     </header>
 
-    <CoverageStrip items={bundle.coverage} />
+    <CoverageStrip items={visibleCoverage(bundle.coverage)} />
 
     <div class="tools small">
       <ConfidenceToggle />

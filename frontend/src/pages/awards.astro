@@ -90,7 +90,8 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
                       (list) =>
                         list && (
                           <section class="card award">
-                            <h2>{AWARDS[list.award].title}</h2>
+                            <h2>{AWARDS[list.award].name}</h2>
+                            <p class="what">{AWARDS[list.award].title}</p>
                             <p class="small muted">
                               Among {count(list.group_size)} {plural(list.office)}
                               {period === "lifetime" ? ", all loaded years" : ` in ${period}`}
@@ -173,7 +174,14 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
     gap: 0 16px;
   }
   .award h2 {
+    margin-bottom: 2px;
     font-size: 1.0625rem;
+  }
+  .what {
+    margin: 0;
+    font-weight: 600;
+    color: var(--ink-2);
+    font-size: 0.9375rem;
   }
   ol {
     padding-left: 1.4rem;
