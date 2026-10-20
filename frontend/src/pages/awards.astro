@@ -1,0 +1,190 @@
+---
+// Awards: the officials at each end of one measured number, within their own office. Each award sits next
+// to its opposite, shows the number and what it's out of, and links to the profile with the sources.
+import Layout from "../layouts/Layout.astro";
+import { AWARD_PAIRS, AWARDS, awardLists, type AwardList } from "../lib/exports/awards";
+import { officialIndex } from "../lib/exports/load";
+import { count, money, pct } from "../lib/format";
+import { href } from "../lib/site";
+
+const lists = await awardLists();
+const titles = new Map((await officialIndex()).map((o) => [o.office, o.office_title ?? o.office]));
+const offices = [...new Set((lists ?? []).map((l) => l.office))].sort((a, b) =>
+  (titles.get(a) ?? a).localeCompare(titles.get(b) ?? b),
+);
+const periods = [
+  "lifetime",
+  ...[...new Set((lists ?? []).map((l) => l.period).filter((p) => p !== "lifetime"))].sort().reverse(),
+];
+const byKey = new Map((lists ?? []).map((l) => [`${l.award}|${l.office}|${l.period}`, l]));
+const plural = (office: string) => {
+  const t = titles.get(office) ?? office;
+  return t.endsWith("s") ? t : `${t}s`;
+};
+const value = (award: string, v: number) => (AWARDS[award].unit === "money" ? money(v) : pct(v));
+const outOf = (award: string, n: number | null) =>
+  n == null
+    ? ""
+    : AWARDS[award].outOf === "votes"
+      ? `of ${count(n)} votes`
+      : AWARDS[award].outOf === "raised"
+        ? `of ${money(n)} raised`
+        : "";
+const defaultOffice = offices.includes("state_house") ? "state_house" : offices[0];
+---
+
+<Layout
+  title="Awards"
+  description="Missouri officials at each end of attendance, committee money and party loyalty."
+>
+  <h1>Awards</h1>
+  <p class="lede">
+    Who sits at each end of one measured number, compared only with others holding the same office. Every
+    award has its opposite, every figure is on the official's profile with its source, and nothing is combined
+    into a score. <a href={href("/methodology/#awards")}>How these are ranked</a>.
+  </p>
+
+  {!lists ? (
+    <p class="card muted">Not available yet (the rpt_awards export is missing).</p>
+  ) : (
+    <>
+      <form class="filters card" onsubmit="return false">
+        <label>
+          Office
+          <select name="office">
+            {offices.map((o) => (
+              <option value={o} selected={o === defaultOffice}>
+                {titles.get(o) ?? o}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Period
+          <select name="period">
+            {periods.map((p) => (
+              <option value={p}>{p === "lifetime" ? "All loaded years" : p}</option>
+            ))}
+          </select>
+        </label>
+      </form>
+
+      {offices.flatMap((office) =>
+        periods.map((period) => {
+          const pairs = AWARD_PAIRS.map((pair) =>
+            pair.map((a) => byKey.get(`${a}|${office}|${period}`)),
+          ).filter((pair) => pair.some(Boolean)) as (AwardList | undefined)[][];
+          return (
+            <div
+              class="block"
+              data-office={office}
+              data-period={period}
+              hidden={!(office === defaultOffice && period === "lifetime")}
+            >
+              {pairs.length === 0 ? (
+                <p class="muted">No awards for {plural(office)} in this period (fewer than 5 qualified).</p>
+              ) : (
+                pairs.map((pair) => (
+                  <div class="pair">
+                    {pair.map(
+                      (list) =>
+                        list && (
+                          <section class="card award">
+                            <h2>{AWARDS[list.award].title}</h2>
+                            <p class="small muted">
+                              Among {count(list.group_size)} {plural(list.office)}
+                              {period === "lifetime" ? ", all loaded years" : ` in ${period}`}
+                            </p>
+                            <ol>
+                              {list.entries.map((e) => (
+                                <li value={e.rank}>
+                                  <a href={href(`/officials/${e.slug}/`)}>{e.name}</a>
+                                  <span class="muted small"> {e.party ?? ""}</span>
+                                  <span class="v">
+                                    {value(list.award, e.metric)}{" "}
+                                    <span class="muted small">{outOf(list.award, e.sample_size)}</span>
+                                  </span>
+                                </li>
+                              ))}
+                            </ol>
+                          </section>
+                        ),
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          );
+        }),
+      )}
+    </>
+  )}
+</Layout>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>("form.filters");
+  if (form) {
+    const blocks = [...document.querySelectorAll<HTMLElement>(".block")];
+    const apply = () => {
+      const f = new FormData(form);
+      for (const b of blocks)
+        b.hidden = !(b.dataset.office === f.get("office") && b.dataset.period === f.get("period"));
+      history.replaceState(null, "", `?${new URLSearchParams(f as unknown as Record<string, string>)}`);
+    };
+    for (const [k, v] of new URLSearchParams(location.search)) {
+      const el = form.elements.namedItem(k);
+      if (el instanceof HTMLSelectElement && [...el.options].some((o) => o.value === v)) el.value = v;
+    }
+    form.addEventListener("change", apply);
+    apply();
+  }
+</script>
+
+<style>
+  h1 {
+    margin-top: 24px;
+  }
+  .filters {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+  select {
+    font: inherit;
+    font-weight: 400;
+    font-size: 1rem;
+    padding: 6px 8px;
+    border: 1px solid var(--axis);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .pair {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 0 16px;
+  }
+  .award h2 {
+    font-size: 1.0625rem;
+  }
+  ol {
+    padding-left: 1.4rem;
+    margin: 8px 0 0;
+  }
+  li {
+    padding: 4px 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .v {
+    float: right;
+    font-variant-numeric: tabular-nums;
+  }
+</style>

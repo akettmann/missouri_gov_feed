@@ -123,8 +123,36 @@ exported by `mogov export`). If either export is missing, for example when the r
 been built yet, the build falls back to deterministic **sample data** behind a visible "Sample data"
 banner instead of failing (`frontend/src/lib/exports/fixtures.ts`).
 
+"Find my officials" (`/find/`) needs the `dim_district` and `fct_official_districts` exports (the
+`census_tiger` loader); ZIP-code search also needs `dim_zcta` (the `census_zcta` loader) and is left out of
+the page data without it. The build simplifies the TIGER boundaries to about 50 m and writes
+`dist/lookup/districts.json` (about 300 KB gzipped); the browser downloads it on the first lookup and matches the
+point itself, so a visitor's location never leaves the page. Without those exports the page says the boundaries
+aren't loaded.
+
 Optional build-time environment: `PUBLIC_SITE_URL` (canonical site URL), `PUBLIC_REPORT_ERROR_URL`
 (where "Report an error" goes; default: a prefilled GitHub issue on this repo).
+
+### Publishing to Google Cloud Storage
+
+The build is plain static files, so any static host works; the repo ships a script for a GCS bucket.
+
+1. One time: create a bucket and make it serve a website (or put it behind an HTTPS load balancer with Cloud
+   CDN, which is what a custom domain with HTTPS needs):
+   ```
+   gcloud storage buckets create gs://BUCKET --location=us-central1 --uniform-bucket-level-access
+   gcloud storage buckets add-iam-policy-binding gs://BUCKET --member=allUsers --role=roles/storage.objectViewer
+   gcloud storage buckets update gs://BUCKET --web-main-page-suffix=index.html --web-error-page=404.html
+   ```
+2. Each release, after `pnpm build` (and `pnpm sizes`):
+   ```
+   gcloud auth login
+   MOGOV_SITE_BUCKET=BUCKET pnpm deploy:gcs --dry-run   # see what would change
+   MOGOV_SITE_BUCKET=BUCKET pnpm deploy:gcs
+   ```
+   The bucket mirrors `dist/` (files no longer built are deleted). Hashed assets (`_astro/`) are cached for a
+   year; pages for 5 minutes and JSON for an hour, so a data refresh shows up quickly. Set `PUBLIC_SITE_URL` at
+   build time to the public address.
 
 ## Local, in Docker (Compose)
 

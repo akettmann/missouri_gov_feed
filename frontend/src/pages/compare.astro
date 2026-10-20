@@ -1,0 +1,185 @@
+---
+// Compare two officials side by side: the same measured numbers from each profile, in matching rows.
+// Rendered in the browser from the per-official JSON; both choices live in the URL (?a=slug&b=slug).
+import ConfidenceToggle from "../components/ConfidenceToggle.astro";
+import Layout from "../layouts/Layout.astro";
+import { officialIndex } from "../lib/exports/load";
+import { officeLine } from "../lib/format";
+
+const officials = (await officialIndex()).map((o) => ({
+  slug: o.slug,
+  label: `${o.full_name} — ${officeLine(o)}`,
+}));
+---
+
+<Layout title="Compare officials" description="Compare two Missouri officials' records side by side.">
+  <h1>Compare officials</h1>
+  <p class="lede">
+    Pick two officials to see the same measures side by side. Each name links to that profile, where every
+    number has its source.
+  </p>
+
+  <form class="pickers card" onsubmit="return false">
+    <label>
+      First official
+      <input name="a" list="officials" placeholder="Start typing a name" autocomplete="off" />
+    </label>
+    <label>
+      Second official
+      <input name="b" list="officials" placeholder="Start typing a name" autocomplete="off" />
+    </label>
+    <datalist id="officials">
+      {officials.map((o) => (
+        <option value={o.label} />
+      ))}
+    </datalist>
+  </form>
+  <div class="small tools">
+    <ConfidenceToggle />
+  </div>
+  <p class="small muted" id="status" aria-live="polite">
+    Choose two officials.
+  </p>
+  <div class="card table-scroll" id="result" hidden></div>
+
+  <script is:inline type="application/json" id="officials-index" set:html={JSON.stringify(officials)} />
+</Layout>
+
+<script>
+  import { compareRows } from "../lib/compare";
+  import type { OfficialBundle } from "../lib/exports/types";
+
+  const index: { slug: string; label: string }[] = JSON.parse(
+    document.getElementById("officials-index")!.textContent!,
+  );
+  const bySlug = new Map(index.map((o) => [o.slug, o.label]));
+  const byLabel = new Map(index.map((o) => [o.label, o.slug]));
+  const form = document.querySelector<HTMLFormElement>("form.pickers")!;
+  const status = document.getElementById("status")!;
+  const result = document.getElementById("result")!;
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const cache = new Map<string, Promise<OfficialBundle>>();
+  const bundle = (slug: string) => {
+    if (!cache.has(slug))
+      cache.set(
+        slug,
+        fetch(`${base}/officials/${slug}.json`).then((r) => r.json()),
+      );
+    return cache.get(slug)!;
+  };
+  const hideMedium = () => document.documentElement.classList.contains("hide-medium");
+
+  function el<K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, cls?: string) {
+    const e = document.createElement(tag);
+    if (text != null) e.textContent = text;
+    if (cls) e.className = cls;
+    return e;
+  }
+
+  async function render() {
+    const slugs = ["a", "b"].map((k) => byLabel.get(String(new FormData(form).get(k) ?? "")));
+    const chosen = slugs.filter((s): s is string => !!s);
+    const params = new URLSearchParams();
+    slugs.forEach((s, i) => s && params.set(i ? "b" : "a", s));
+    history.replaceState(null, "", params.size ? `?${params}` : location.pathname);
+    if (chosen.length < 2) {
+      result.hidden = true;
+      status.textContent = chosen.length ? "Choose a second official." : "Choose two officials.";
+      return;
+    }
+    status.textContent = "Loading…";
+    const bundles = await Promise.all(chosen.map(bundle));
+    const table = el("table");
+    const head = el("tr");
+    head.append(el("th", "Measure"));
+    for (const b of bundles) {
+      const th = el("th");
+      const a = el("a", b.official.full_name);
+      (a as HTMLAnchorElement).href = `${base}/officials/${b.official.slug}/`;
+      th.append(a);
+      head.append(th);
+    }
+    const thead = el("thead");
+    thead.append(head);
+    const tbody = el("tbody");
+    let section = "";
+    for (const row of compareRows(bundles, hideMedium())) {
+      if (row.section !== section) {
+        section = row.section;
+        const tr = el("tr", undefined, "section");
+        const th = el("th", section);
+        th.colSpan = bundles.length + 1;
+        tr.append(th);
+        tbody.append(tr);
+      }
+      const tr = el("tr");
+      tr.append(el("td", row.label));
+      for (const v of row.values) tr.append(el("td", v));
+      tbody.append(tr);
+    }
+    table.append(thead, tbody);
+    result.replaceChildren(table);
+    result.hidden = false;
+    status.textContent = "";
+  }
+
+  // restore a shared comparison (?a=slug&b=slug)
+  const params = new URLSearchParams(location.search);
+  for (const k of ["a", "b"]) {
+    const label = bySlug.get(params.get(k) ?? "");
+    if (label) (form.elements.namedItem(k) as HTMLInputElement).value = label;
+  }
+  form.addEventListener("change", render);
+  form.addEventListener("input", () => {
+    // datalist picks fire input with a complete label; typed partial names wait for change
+    const values = ["a", "b"].map((k) => String(new FormData(form).get(k) ?? ""));
+    if (values.every((v) => !v || byLabel.has(v))) render();
+  });
+  document.addEventListener("hide-medium-change", render);
+  render();
+</script>
+
+<style>
+  h1 {
+    margin-top: 24px;
+  }
+  .pickers {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 640px) {
+    .pickers {
+      grid-template-columns: 1fr;
+    }
+  }
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+  input {
+    font: inherit;
+    font-weight: 400;
+    font-size: 1rem;
+    padding: 6px 8px;
+    border: 1px solid var(--axis);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .tools {
+    margin: 4px 0 8px;
+  }
+  #result :global(tr.section th) {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+  #result :global(td:first-child) {
+    color: var(--ink-2);
+    width: 28%;
+  }
+</style>

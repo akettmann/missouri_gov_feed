@@ -1,0 +1,79 @@
+---
+// Section F: court record (fct_case_history, from CourtListener): cases the official decided as a judge or
+// argued as an attorney. Facts per case only; outcomes are never tallied into win/loss statistics.
+import type { OfficialBundle } from "../lib/exports/types";
+import { count, statusKind } from "../lib/format";
+import SourceLink from "./SourceLink.astro";
+import Viz from "./Viz.astro";
+
+interface Props {
+  bundle: OfficialBundle;
+}
+const { bundle } = Astro.props;
+const { courts } = bundle;
+const shown = courts.recent.length;
+---
+
+<section class="card" id="courts" aria-labelledby="courts-h">
+  <h2 id="courts-h">Court record</h2>
+  <p class="lede">
+    Published opinions and dockets naming this official as the judge or as an attorney, from CourtListener.
+  </p>
+  {statusKind(courts.status) !== "available" ? (
+    <p class="muted">No cases: {courts.status}.</p>
+  ) : courts.by_year === null ? (
+    <p class="muted small">Not available yet (the fct_case_history export is missing).</p>
+  ) : (
+    <>
+      <p class="small">{count(courts.total)} cases in CourtListener.</p>
+      <Viz id="cases-by-year" bundle={bundle} />
+      <details open={shown <= 8}>
+        <summary class="small">{courts.total > shown ? `The ${shown} most recent` : "All of them"}</summary>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Filed</th>
+                <th>Case</th>
+                <th>Court</th>
+                <th>Role</th>
+                <th>Disposition</th>
+                <th>Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {courts.recent.map((c) => (
+                <tr>
+                  <td class="nowrap">{c.date_filed ?? "—"}</td>
+                  <td class="what">
+                    {c.case_name}
+                    {c.docket_number && <span class="muted small"> ({c.docket_number})</span>}
+                    {c.publication_status === "Unpublished" && <span class="badge">unpublished</span>}
+                  </td>
+                  <td>{c.court}</td>
+                  <td>{c.role}</td>
+                  <td>{c.disposition ?? <span class="muted">not stated</span>}</td>
+                  <td>
+                    <SourceLink url={c.source_url} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </>
+  )}
+</section>
+
+<style>
+  .nowrap {
+    white-space: nowrap;
+  }
+  .what {
+    max-width: 44ch;
+  }
+  .badge {
+    margin-left: 6px;
+  }
+</style>

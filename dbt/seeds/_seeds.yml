@@ -1,5 +1,13 @@
 version: 2
 seeds:
+  - name: donor_employer_placeholders
+    description: >
+      Answers individual contributors give in the employer field that name no employer (retired, none,
+      "information requested", self-employed) or only an occupation (attorney, owner). Lower-case, compared
+      against lower(trim(employer)); rpt_donor_employers leaves these out. Add values as they show up.
+    columns:
+      - name: placeholder
+        data_tests: [unique, not_null]
   - name: statewide_officials
     description: >
       Missouri's six statewide elected executive officers. Curated by hand because the Open States

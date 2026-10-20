@@ -6,6 +6,8 @@ import { DONOR_GROUP_SQL } from "../rollups";
 import { exportedAt, hasExport, query } from "./db";
 import { sampleDonorCycles, sampleGiftRollup, sampleTopDonors } from "./fixtures";
 import type {
+  AttendanceRow,
+  CaseRow,
   CommercialTie,
   CoverageItem,
   Dataset,
@@ -15,9 +17,13 @@ import type {
   FederalDonorRow,
   GiftRollupRow,
   IndexEntry,
+  InterestOverlap,
   Indicator,
   Official,
   OfficialBundle,
+  PartyBreak,
+  PeerStrip,
+  SubjectVotes,
   TopDonorRow,
 } from "./types";
 
@@ -151,6 +157,165 @@ async function loadAll(): Promise<OfficialBundle[]> {
       )
     : null;
 
+  // Voting-record models have no fixture: a missing export renders as "not available yet".
+  type PeerRow = Omit<PeerStrip, "peers"> & { official_id: string; party: string | null };
+  const peerRows = hasExport("rpt_indicator_peers")
+    ? await query<PeerRow>(`
+        select official_id, party, indicator, peer_group, chamber, period, detail, value,
+               cast(peer_count as integer) as peer_count, peer_median, republican_median, democratic_median
+        from {rpt_indicator_peers} where value is not null`)
+    : [];
+  const peerValues = new Map<string, { value: number; party: string | null }[]>();
+  for (const r of peerRows) {
+    peerValues.set(r.peer_group, [
+      ...(peerValues.get(r.peer_group) ?? []),
+      { value: r.value, party: r.party },
+    ]);
+  }
+  const peers = groupBy(
+    // the row's own party only feeds peerValues; a strip carries party solely inside its peers list
+    peerRows.map(({ party: _party, ...r }) => ({ ...r, peers: peerValues.get(r.peer_group) ?? [] })),
+  );
+
+  const breaks = hasExport("rpt_party_breaks")
+    ? groupBy(
+        await query<PartyBreak & { official_id: string }>(`
+          select official_id, chamber, session_code, cast(vote_date as varchar) as vote_date, measure,
+                 vote_description, vote_cast, party_position, other_party_position,
+                 cast(republican_yea as integer) as republican_yea, cast(republican_nay as integer) as republican_nay,
+                 cast(democratic_yea as integer) as democratic_yea, cast(democratic_nay as integer) as democratic_nay,
+                 source_url
+          from {rpt_party_breaks} order by vote_date desc`),
+      )
+    : null;
+
+  const attendance = hasExport("rpt_attendance")
+    ? groupBy(
+        await query<AttendanceRow & { official_id: string }>(`
+          select official_id, chamber, session_code,
+                 cast(first_vote_date as varchar) as first_vote_date,
+                 cast(last_vote_date as varchar) as last_vote_date,
+                 cast(votes_recorded as integer) as votes_recorded, cast(votes_present as integer) as votes_present,
+                 cast(absent as integer) as absent, cast(absent_with_leave as integer) as absent_with_leave,
+                 cast(not_voting as integer) as not_voting, attendance_pct, chamber_attendance_pct
+          from {rpt_attendance} order by first_vote_date`),
+      )
+    : null;
+
+  type EmployerRow = OfficialBundle["money"]["employers"] & object;
+  const employers = hasExport("rpt_donor_employers")
+    ? groupBy(
+        await query<EmployerRow[number] & { official_id: string }>(`
+          select official_id, employer, match_confidence, cast(donor_count as integer) as donor_count,
+                 cast(total_amount as double) as total_amount, first_year, last_year, source_url
+          from (
+            select *, row_number() over (partition by official_id order by total_amount desc, employer) as rank
+            from {rpt_donor_employers}
+          ) ranked
+          where rank <= 20 order by official_id, rank`),
+      )
+    : null;
+
+  type SizeRow = OfficialBundle["money"]["size"] & object;
+  const sizes = hasExport("rpt_donor_size")
+    ? groupBy(
+        await query<SizeRow[number] & { official_id: string }>(`
+          select official_id, election_cycle as cycle, band_floor, match_confidence,
+                 cast(total_amount as double) as total_amount
+          from {rpt_donor_size} order by cycle, band_floor`),
+      )
+    : null;
+
+  // up to ~700 subjects per legislator; the page lists the 20 with the most roll calls
+  const subjects = hasExport("rpt_votes_by_subject")
+    ? groupBy(
+        await query<SubjectVotes & { official_id: string }>(`
+          select official_id, chamber, subject_name, subject_source,
+                 cast(roll_calls as integer) as roll_calls, cast(yea as integer) as yea,
+                 cast(nay as integer) as nay, cast(other as integer) as other, cast(bills as integer) as bills
+          from (
+            select *, row_number() over (partition by official_id order by roll_calls desc, subject_name) as rank
+            from {rpt_votes_by_subject}
+          ) ranked
+          where rank <= 20 order by official_id, rank`),
+      )
+    : null;
+
+  // rpt_interest_vote_overlap has one row per (vote, industry), ~2k per legislator: roll up per industry.
+  // Its money is cumulative ("in or before the vote's year"), so the latest row's amount is the total, and
+  // that row's match_confidence is the weakest of all the money counted.
+  const hasOverlap = hasExport("rpt_interest_vote_overlap");
+  type OverlapRow = Omit<InterestOverlap, "examples"> & { official_id: string };
+  const overlapRows = hasOverlap
+    ? await query<OverlapRow>(`
+        select official_id, industry,
+               cast(max(contributions_amount) as double) as contributions_amount,
+               cast(max(gifts_amount) as double) as gifts_amount,
+               min(first_money_year) as first_money_year, max(last_money_year) as last_money_year,
+               arg_max(match_confidence, vote_date) as match_confidence,
+               cast(count(distinct vote_id) as integer) as roll_calls,
+               cast(count(distinct case when vote_cast = 'yea' then vote_id end) as integer) as yea,
+               cast(count(distinct case when vote_cast = 'nay' then vote_id end) as integer) as nay,
+               cast(count(distinct case when vote_cast not in ('yea', 'nay') then vote_id end) as integer) as other,
+               cast(count(distinct bill) as integer) as bills
+        from {rpt_interest_vote_overlap}
+        group by official_id, industry
+        order by official_id, max(contributions_amount) + max(gifts_amount) desc`)
+    : [];
+  const examples = new Map<string, InterestOverlap["examples"]>();
+  if (hasOverlap) {
+    for (const r of await query<
+      InterestOverlap["examples"][number] & { official_id: string; industry: string }
+    >(`
+      select official_id, industry, cast(vote_date as varchar) as vote_date, bill, short_title, vote_cast,
+             vote_source_url, bill_source_url
+      from (
+        select *, row_number() over (partition by official_id, industry order by vote_date desc, bill) as rank
+        from {rpt_interest_vote_overlap}
+      ) ranked
+      where rank <= 5`)) {
+      const { official_id, industry, ...ex } = r;
+      const key = `${official_id}|${industry}`;
+      examples.set(key, [...(examples.get(key) ?? []), ex]);
+    }
+  }
+  const overlap = groupBy(
+    overlapRows.map((r) => ({ ...r, examples: examples.get(`${r.official_id}|${r.industry}`) ?? [] })),
+  );
+
+  // a federal appellate judge has ~6k cases: ship yearly counts plus the most recent ones
+  const RECENT_CASES = 50;
+  const hasCases = hasExport("fct_case_history");
+  const caseYears = hasCases
+    ? groupBy(
+        await query<{ official_id: string; year: number; role: string; cases: number }>(`
+          select official_id, cast(extract(year from date_filed) as integer) as year, role,
+                 cast(count(*) as integer) as cases
+          from {fct_case_history} where date_filed is not null
+          group by all order by year`),
+      )
+    : null;
+  const caseTotals = hasCases
+    ? new Map(
+        (
+          await query<{ official_id: string; n: number }>(`
+            select official_id, cast(count(*) as integer) as n from {fct_case_history} group by 1`)
+        ).map((r) => [r.official_id, r.n]),
+      )
+    : new Map<string, number>();
+  const recentCases = hasCases
+    ? groupBy(
+        await query<CaseRow & { official_id: string }>(`
+          select official_id, role, case_name, court, docket_number, cast(date_filed as varchar) as date_filed,
+                 disposition, publication_status, source_url
+          from (
+            select *, row_number() over (partition by official_id order by date_filed desc nulls last) as rank
+            from {fct_case_history}
+          ) ranked
+          where rank <= ${RECENT_CASES} order by official_id, rank`),
+      )
+    : null;
+
   return profiles
     .sort((a, b) => (SORT_LEVEL[a.level] ?? 9) - (SORT_LEVEL[b.level] ?? 9))
     .map((p): OfficialBundle => {
@@ -195,10 +360,28 @@ async function loadAll(): Promise<OfficialBundle[]> {
         },
         coverage,
         indicators: (indicators.get(id) ?? []) as Indicator[],
+        peers: (peers.get(id) ?? []) as PeerStrip[],
+        voting: {
+          status: status("votes"),
+          party_breaks: breaks ? ((breaks.get(id) ?? []) as PartyBreak[]) : null,
+          attendance: attendance ? ((attendance.get(id) ?? []) as AttendanceRow[]) : null,
+          by_subject: subjects ? ((subjects.get(id) ?? []) as SubjectVotes[]) : null,
+        },
+        overlap: hasOverlap ? ((overlap.get(id) ?? []) as InterestOverlap[]) : null,
+        courts: {
+          status: status("cases"),
+          by_year: caseYears
+            ? ((caseYears.get(id) ?? []) as { year: number; role: string; cases: number }[])
+            : null,
+          total: caseTotals.get(id) ?? 0,
+          recent: (recentCases?.get(id) ?? []) as CaseRow[],
+        },
         money: {
           status: status("donations"),
           federal: (federal.get(id) ?? []) as FederalDonorRow[],
           cycles,
+          size: sizes ? ((sizes.get(id) ?? []) as SizeRow) : null,
+          employers: employers ? ((employers.get(id) ?? []) as EmployerRow) : null,
           top_donors: topDonors,
         },
         gifts,
@@ -246,10 +429,15 @@ export function freshness(): { table: string; exported_at: string | null; sample
     "fct_disclosures",
     "rpt_donor_rollup",
     "rpt_gift_rollup",
+    "rpt_indicator_peers",
+    "rpt_party_breaks",
+    "rpt_attendance",
+    "rpt_votes_by_subject",
+    "rpt_interest_vote_overlap",
   ];
   return tables.map((t) => ({
     table: t,
     exported_at: exportedAt(t)?.toISOString() ?? null,
-    sample: t.startsWith("rpt_") && !hasExport(t),
+    sample: (t === "rpt_donor_rollup" || t === "rpt_gift_rollup") && !hasExport(t),
   }));
 }

@@ -2,7 +2,7 @@
 // table (works without JS) and the client renders the same rows as an Observable Plot chart, re-running
 // the spec when "hide possible matches" changes. Pure TS, safe to bundle for the browser.
 import type { OfficialBundle } from "./exports/types";
-import { count, money } from "./format";
+import { count, money, pct, sessionLabel } from "./format";
 import { DONOR_GROUPS, GIFT_GROUPS, giftGroup, sumBy, withoutMedium } from "./rollups";
 
 type DonorGroup = (typeof DONOR_GROUPS)[number];
@@ -14,14 +14,19 @@ export interface Column {
   label: string;
   money?: boolean;
   num?: boolean;
+  pct?: boolean;
   /** value is a URL rendered as a "source" link */
   link?: boolean;
 }
 
 export interface VizSpec {
   title: string;
-  /** stack: x = category axis, series stacked; hbar: one bar per y category */
-  kind: "stack" | "hbar";
+  /** stack: x = category axis, series stacked; hbar: one bar per y category; dumbbell: per y row, x is the
+   *  official value and `x2` a reference (chamber) value on the same 0-100 scale */
+  kind: "stack" | "hbar" | "dumbbell" | "hstack";
+  /** hstack: wide columns stacked along x, one bar per y row (the table stays wide) */
+  stackKeys?: { key: string; label: string }[];
+  x2?: string;
   x: string;
   y: string;
   series?: string;
@@ -31,6 +36,8 @@ export interface VizSpec {
   /** does hiding medium matches change this spec? */
   usesConfidence: boolean;
   note?: string;
+  /** y is a count, not dollars (axis and tooltip formatting) */
+  count?: boolean;
 }
 
 const FED_RECEIPT_KINDS = [
@@ -54,6 +61,7 @@ export function cellText(c: Column, r: Row): string {
   const v = r[c.key];
   if (c.money) return money(Number(v));
   if (c.num) return count(Number(v));
+  if (c.pct) return pct(Number(v));
   return String(v).replace(MEDIUM_SUFFIX, "");
 }
 
@@ -146,6 +154,61 @@ export const VIZ: Record<string, VizSpec> = {
             cmp(a, b, "cycle") || FED_RECEIPT_KINDS.indexOf(a.source) - FED_RECEIPT_KINDS.indexOf(b.source),
         ),
   },
+  "top-employers": {
+    title: "Top employers of individual donors, all years",
+    kind: "hbar",
+    x: "total",
+    y: "label",
+    usesConfidence: true,
+    note: "From the employer each individual donor reported. Retired, self-employed and similar answers are left out.",
+    columns: [
+      { key: "label", label: "Employer" },
+      { key: "donors", label: "Donors", num: true },
+      { key: "years", label: "Years" },
+      { key: "total", label: "Total", money: true },
+      { key: "source_url", label: "Source", link: true },
+    ],
+    rows: (b, hide) =>
+      withoutMedium(b.money.employers ?? [], hide)
+        .slice(0, 10)
+        .map((r) => ({
+          label: r.match_confidence === "medium" ? `${r.employer}${MEDIUM_SUFFIX}` : r.employer,
+          donors: r.donor_count,
+          years: r.first_year === r.last_year ? String(r.first_year) : `${r.first_year}–${r.last_year}`,
+          total: r.total_amount,
+          source_url: r.source_url ?? "",
+          confidence: r.match_confidence,
+        })),
+  },
+  "state-size": {
+    title: "Contributions from individuals by size and cycle (MEC)",
+    kind: "stack",
+    x: "cycle",
+    y: "total",
+    series: "band",
+    seriesOrder: Object.values(FED_SIZE_LABEL),
+    usesConfidence: true,
+    note: "Same bands as the federal chart. MEC itemizes only contributions over $100, so small donors are undercounted.",
+    columns: [
+      { key: "cycle", label: "Cycle" },
+      { key: "band", label: "Size" },
+      { key: "total", label: "Total", money: true },
+    ],
+    rows: (b, hide) => {
+      const rows = withoutMedium(b.money.size ?? [], hide);
+      const key = (r: (typeof rows)[number]) => `${r.cycle}|${r.band_floor}`;
+      return sumBy(rows, key, (r) => r.total_amount)
+        .map(({ key: k, total }) => {
+          const [cycle, floor] = String(k).split("|");
+          return { cycle, band: FED_SIZE_LABEL[floor], total };
+        })
+        .sort(
+          (a, b) =>
+            cmp(a, b, "cycle") ||
+            Object.values(FED_SIZE_LABEL).indexOf(a.band) - Object.values(FED_SIZE_LABEL).indexOf(b.band),
+        );
+    },
+  },
   "fed-size": {
     title: "Individual contributions by size and cycle (FEC)",
     kind: "stack",
@@ -154,7 +217,7 @@ export const VIZ: Record<string, VizSpec> = {
     series: "band",
     seriesOrder: Object.values(FED_SIZE_LABEL),
     usesConfidence: false,
-    note: "Size bands as the FEC API reports them (each band starts at the amount shown).",
+    note: "Bands as FEC reports them; the smallest includes unitemized contributions, so the bands add up to roughly the cycle's individual total.",
     columns: [
       { key: "cycle", label: "Cycle" },
       { key: "band", label: "Size" },
@@ -257,5 +320,82 @@ export const VIZ: Record<string, VizSpec> = {
         .sort((a, b) => b.total - a.total)
         .slice(0, 10);
     },
+  },
+  "votes-by-subject": {
+    title: "Votes on bills by subject (the 20 subjects with the most roll calls)",
+    kind: "hstack",
+    x: "n",
+    y: "subject",
+    stackKeys: [
+      { key: "yea", label: "Yea" },
+      { key: "nay", label: "Nay" },
+      { key: "other", label: "Present / absent" },
+    ],
+    count: true,
+    usesConfidence: false,
+    note: "Counts of roll calls on bills carrying each subject term; one roll call can fall under several subjects.",
+    columns: [
+      { key: "subject", label: "Subject" },
+      { key: "roll_calls", label: "Roll calls", num: true },
+      { key: "yea", label: "Yea", num: true },
+      { key: "nay", label: "Nay", num: true },
+      { key: "other", label: "Present / absent", num: true },
+    ],
+    rows: (b) =>
+      (b.voting.by_subject ?? []).map((r) => ({
+        subject: r.subject_name.charAt(0) + r.subject_name.slice(1).toLowerCase(),
+        roll_calls: r.roll_calls,
+        yea: r.yea,
+        nay: r.nay,
+        other: r.other,
+      })),
+  },
+  "cases-by-year": {
+    title: "Cases per year",
+    kind: "stack",
+    x: "year",
+    y: "cases",
+    series: "role",
+    seriesOrder: ["As judge", "As attorney"],
+    count: true,
+    usesConfidence: false,
+    note: "Counts of cases only. Outcomes aren't summarized: that needs a reviewed method.",
+    columns: [
+      { key: "year", label: "Year filed" },
+      { key: "role", label: "Role" },
+      { key: "cases", label: "Cases", num: true },
+    ],
+    rows: (b) =>
+      (b.courts.by_year ?? []).map((r) => ({
+        year: String(r.year),
+        role: r.role === "judge" ? "As judge" : "As attorney",
+        cases: r.cases,
+      })),
+  },
+  attendance: {
+    title: "Votes attended per session, against the whole chamber",
+    kind: "dumbbell",
+    x: "official",
+    x2: "chamber",
+    y: "session",
+    usesConfidence: false,
+    note: "● this official · ○ chamber average. Attended = voted yea, nay or present on a recorded vote.",
+    columns: [
+      { key: "session", label: "Session" },
+      { key: "official", label: "Attended", pct: true },
+      { key: "chamber", label: "Chamber", pct: true },
+      { key: "recorded", label: "Votes", num: true },
+      { key: "absent", label: "Absent or not voting", num: true },
+      { key: "excused", label: "Absent with leave", num: true },
+    ],
+    rows: (b) =>
+      (b.voting.attendance ?? []).map((r) => ({
+        session: sessionLabel(r.chamber, r.session_code),
+        official: r.attendance_pct,
+        chamber: r.chamber_attendance_pct,
+        recorded: r.votes_recorded,
+        absent: r.absent + r.not_voting,
+        excused: r.absent_with_leave,
+      })),
   },
 };

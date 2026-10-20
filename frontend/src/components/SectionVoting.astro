@@ -1,0 +1,124 @@
+---
+// Section B: voting record. Party loyalty (the votes where the official broke with their own party's majority)
+// and attendance per session against the chamber. Both are counts from recorded roll calls, not judgments.
+import type { OfficialBundle } from "../lib/exports/types";
+import { count, sessionLabel, statusKind } from "../lib/format";
+import { href } from "../lib/site";
+import SourceLink from "./SourceLink.astro";
+import Viz from "./Viz.astro";
+
+interface Props {
+  bundle: OfficialBundle;
+}
+const { bundle } = Astro.props;
+const { voting } = bundle;
+// a member who served in both chambers has a party-unity row per chamber; describe the current one
+const unityRows = bundle.indicators.filter((i) => i.indicator === "party_unity_pct" && i.value != null);
+const unity = unityRows.find((i) => i.detail?.startsWith(`${bundle.official.office}:`)) ?? unityRows[0];
+const breaks = voting.party_breaks ?? [];
+const BREAKS_SHOWN = 25;
+const tally = (yea: number | null, nay: number | null) => (yea == null ? "—" : `${yea}–${nay ?? 0}`);
+---
+
+<section class="card" id="voting" aria-labelledby="voting-h">
+  <h2 id="voting-h">Voting record</h2>
+  <p class="lede">How often this official votes with their party, and how often they show up to vote.</p>
+  {statusKind(voting.status) !== "available" ? (
+    <p class="muted">No roll-call votes: {voting.status}.</p>
+  ) : (
+    <>
+      <h3>Breaks with their party</h3>
+      {voting.party_breaks === null ? (
+        <p class="muted small">Not available yet (the rpt_party_breaks export is missing).</p>
+      ) : (
+        <>
+          <p class="small">
+            {unity && (
+              <>
+                Voted with their party on <strong>{unity.value!.toFixed(1)}%</strong> of party-line votes (
+                <a href={href("/methodology/#indicators")}>party unity</a>).{" "}
+              </>
+            )}
+            {breaks.length === 0
+              ? "No recorded votes against their party's majority on a party-line vote."
+              : `${count(breaks.length)} recorded votes against their party's majority on a party-line vote.`}
+          </p>
+          {breaks.length > 0 && (
+            <details open={breaks.length <= 8}>
+              <summary class="small">
+                {breaks.length > BREAKS_SHOWN ? `The ${BREAKS_SHOWN} most recent` : "All of them"}
+              </summary>
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Measure</th>
+                      <th>Their vote</th>
+                      <th>Party voted</th>
+                      <th class="num">Republicans</th>
+                      <th class="num">Democrats</th>
+                      <th>Source</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {breaks.slice(0, BREAKS_SHOWN).map((v) => (
+                      <tr>
+                        <td class="nowrap">{v.vote_date}</td>
+                        <td class="what">
+                          {v.measure && <strong>{v.measure}</strong>}
+                          {v.measure && v.vote_description && " · "}
+                          {v.vote_description}
+                          <span class="muted small"> ({sessionLabel(v.chamber, v.session_code)})</span>
+                        </td>
+                        <td>{v.vote_cast}</td>
+                        <td>{v.party_position}</td>
+                        <td class="num" title="yea–nay">
+                          {tally(v.republican_yea, v.republican_nay)}
+                        </td>
+                        <td class="num" title="yea–nay">
+                          {tally(v.democratic_yea, v.democratic_nay)}
+                        </td>
+                        <td>
+                          <SourceLink url={v.source_url} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {breaks.length > BREAKS_SHOWN && (
+                <p class="small muted">All {count(breaks.length)} are in this official's JSON download.</p>
+              )}
+            </details>
+          )}
+        </>
+      )}
+
+      <h3>Attendance</h3>
+      {voting.attendance === null ? (
+        <p class="muted small">Not available yet (the rpt_attendance export is missing).</p>
+      ) : voting.attendance.length === 0 ? (
+        <p class="muted small">No session with recorded votes for this official.</p>
+      ) : (
+        <Viz id="attendance" bundle={bundle} />
+      )}
+
+      {voting.by_subject && voting.by_subject.length > 0 && (
+        <>
+          <h3>By bill subject</h3>
+          <Viz id="votes-by-subject" bundle={bundle} />
+        </>
+      )}
+    </>
+  )}
+</section>
+
+<style>
+  .nowrap {
+    white-space: nowrap;
+  }
+  .what {
+    max-width: 52ch;
+  }
+</style>

@@ -2,7 +2,7 @@
 // "hide possible matches" toggle. Tables are already server-rendered, so this only enhances.
 import * as Plot from "@observablehq/plot";
 import type { OfficialBundle } from "../lib/exports/types";
-import { money } from "../lib/format";
+import { count, money } from "../lib/format";
 import { cellText, VIZ, type Row, type VizSpec } from "../lib/viz";
 
 const compactUsd = new Intl.NumberFormat("en-US", {
@@ -16,12 +16,82 @@ const compactUsd = new Intl.NumberFormat("en-US", {
 const MAX_LABEL = 32;
 const clip = (s: string) => (s.length > MAX_LABEL ? `${s.slice(0, MAX_LABEL - 1)}…` : s);
 
+function thinTicks(values: string[], width: number): string[] {
+  const unique = [...new Set(values)];
+  const every = Math.max(1, Math.ceil(unique.length / Math.max(1, Math.floor(width / 50))));
+  return unique.filter((_, i) => i % every === 0);
+}
+
 const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const seriesColors = () => [1, 2, 3, 4, 5].map((i) => css(`--series-${i}`));
 const hideMedium = () => document.documentElement.classList.contains("hide-medium");
 
 function chart(spec: VizSpec, rows: Row[], width: number): SVGSVGElement | HTMLElement {
   const style = { background: "transparent", color: css("--ink-2"), fontSize: "12px" };
+  if (spec.kind === "hstack") {
+    // melt the wide table rows into one segment per stack key; colors follow the key's fixed slot
+    const keys = spec.stackKeys ?? [];
+    const colors = seriesColors();
+    const long = rows.flatMap((r) =>
+      keys.map((k) => ({ y: String(r[spec.y]), part: k.label, n: Number(r[k.key]) })),
+    );
+    const longest = Math.min(MAX_LABEL, Math.max(...rows.map((r) => String(r[spec.y]).length)));
+    return Plot.plot({
+      width,
+      style,
+      marginLeft: 16 + longest * 6.5,
+      height: 24 * rows.length + 60,
+      x: { grid: true, label: null, tickFormat: (d: number) => count(d) },
+      y: { label: null, domain: rows.map((r) => String(r[spec.y])), tickFormat: clip },
+      color: { domain: keys.map((k) => k.label), range: keys.map((_, i) => colors[i]), legend: true },
+      marks: [
+        Plot.barX(long, {
+          x: "n",
+          y: "y",
+          fill: "part",
+          order: keys.map((k) => k.label),
+          insetTop: 3,
+          insetBottom: 3,
+          tip: true,
+        }),
+        Plot.ruleX([0], { stroke: css("--axis") }),
+      ],
+    });
+  }
+  if (spec.kind === "dumbbell") {
+    const ink = css("--ink");
+    const muted = css("--muted");
+    const longest = Math.max(...rows.map((r) => String(r[spec.y]).length));
+    // dots need no zero baseline; attendance clusters near 100%, so start at the nearest 10 below the data
+    const low = Math.min(...rows.flatMap((r) => [Number(r[spec.x]), Number(r[spec.x2!])]));
+    const from = Math.max(0, Math.floor((low - 2) / 10) * 10);
+    return Plot.plot({
+      width,
+      style,
+      marginLeft: 16 + longest * 6.5,
+      height: 26 * rows.length + 40,
+      x: { domain: [from, 100], grid: true, label: null, tickFormat: (d: number) => `${d}%` },
+      y: { label: null, domain: rows.map((r) => String(r[spec.y])) },
+      marks: [
+        Plot.link(rows, { x1: spec.x2!, x2: spec.x, y1: spec.y, y2: spec.y, stroke: muted, strokeWidth: 2 }),
+        Plot.dot(rows, {
+          x: spec.x2!,
+          y: spec.y,
+          r: 5,
+          stroke: muted,
+          strokeWidth: 2,
+          fill: css("--surface"),
+        }),
+        Plot.dot(rows, {
+          x: spec.x,
+          y: spec.y,
+          r: 5,
+          fill: ink,
+          tip: { format: { x: (d: number) => `${d.toFixed(1)}%` } },
+        }),
+      ],
+    });
+  }
   if (spec.kind === "hbar") {
     const longest = Math.min(MAX_LABEL, Math.max(...rows.map((r) => String(r[spec.y]).length)));
     return Plot.plot({
@@ -54,8 +124,16 @@ function chart(spec: VizSpec, rows: Row[], width: number): SVGSVGElement | HTMLE
     style,
     height: 240,
     marginLeft: 56,
-    x: { label: null, type: "band" },
-    y: { grid: true, label: null, tickFormat: (d: number) => compactUsd.format(d) },
+    // long year ranges (a judge's 40 years of cases) would overlap: label about one band per 50px
+    x: {
+      label: null,
+      type: "band",
+      ticks: thinTicks(
+        rows.map((r) => String(r[spec.x])),
+        width,
+      ),
+    },
+    y: { grid: true, label: null, tickFormat: (d: number) => (spec.count ? count(d) : compactUsd.format(d)) },
     color: {
       domain: present,
       range: present.map((s) => colors[order.indexOf(s) % colors.length]),
@@ -69,7 +147,7 @@ function chart(spec: VizSpec, rows: Row[], width: number): SVGSVGElement | HTMLE
         order: present,
         insetLeft: 2,
         insetRight: 2,
-        tip: { format: { y: (d: number) => money(d) } },
+        tip: { format: { y: (d: number) => (spec.count ? count(d) : money(d)) } },
       }),
       Plot.ruleY([0], { stroke: css("--axis") }),
     ],
@@ -109,7 +187,7 @@ function fillTable(fig: Element, spec: VizSpec, rows: Row[]) {
         } else {
           td.textContent = cellText(c, r);
         }
-        if (c.money || c.num) td.className = "num";
+        if (c.money || c.num || c.pct) td.className = "num";
         if (i === 0 && r.confidence === "medium") {
           const b = document.createElement("span");
           b.className = "badge medium";

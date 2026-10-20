@@ -16,33 +16,14 @@ The MVP is built in `frontend/`; build and refresh steps are in docs/environment
 - Keep each official's JSON under the 100 KB gzipped budget (`pnpm sizes` after every data refresh)
 
 ## High priority
-- [ ] FEC size bands: confirm whether `fct_federal_donor_summary` `by_size` bucket 0 includes unitemized money
-  (the dbt docs say itemized only, but Hawley's under-$200 band is $8M+); fix the docs or the chart note
-- [ ] Decide audience/hosting (public?) and whether judges stay in (they get profiles today; ideology/votes show
-  "not applicable")
 
 ## Medium priority
-- [ ] Section B, party loyalty: unity % and "votes where they broke with their party" list (`rpt_party_breaks`)
-- [ ] Peer strip charts for each indicator, chamber colleagues and party medians (`rpt_indicator_peers`)
-- [ ] Attendance per session vs chamber (`rpt_attendance`)
 - [ ] Businesses in their district (`fct_jurisdiction_businesses`): the regulated sites in a legislator's, U.S.
   representative's or mayor's area, with the ones that gave to them first (donor name, amount, link to the
   contributions). A house district can hold 1,400 sites, so ship the donor rows plus counts by industry (NAICS),
   not the full list, to stay under the JSON budget. Label the source's limit: EPA-regulated sites only, exact
-  name matches only
-- [ ] Find my officials: address / map click / geolocation to districts (`census_tiger`); lookup runs client-side
-  so addresses never leave the browser. First check whether the Census Geocoder allows browser calls (CORS);
-  otherwise map click / geolocation with client-side point-in-polygon
-- [ ] State size bands: `rpt_donor_rollup` has no per-contribution size, so only federal officials get a size view;
-  add a size-band column or a small `rpt_donor_size` model
-- [ ] `rpt_donor_rollup.donor_name` is an employer for individuals ("none", "retired", ...); the frontend leaves
-  individuals out of "Top donor organizations". A "top employers of individual donors" view needs those values
-  cleaned or excluded in dbt first
-- [ ] Compare view: two officials side by side, or official vs chamber/party median
-- [ ] Judges' profiles: disclosures, ties, case history (no outcome statistics without a reviewed methodology)
+  name or listed-brand matches only
 
 ## Low priority
-- [ ] Votes grouped by bill subject (bill subjects from `mo_senate_topics`)
-- [ ] Interest-vote overlap view (`rpt_interest_vote_overlap`)
-- [ ] Deploy static build to a GCS bucket + CDN
-- [ ] Add "Awards" such as "Worst Attendance", "Most Money from PACs", "Always Votes with the Party", each award can be by year and lifetime, implement the opposite positive version as well.
+- [ ] Ensure the page looks correct on a wide screen
+- [ ] Build a reference that explains what PACs are used for, to hide the sources of money being donated to politicians

@@ -1,0 +1,46 @@
+placeholder,kind
+none,no employer
+n/a,no employer
+na,no employer
+not applicable,no employer
+unknown,no employer
+requested,not given
+information requested,not given
+info requested,not given
+best efforts,not given
+retired,not employed
+not employed,not employed
+unemployed,not employed
+homemaker,not employed
+student,not employed
+community volunteer,not employed
+volunteer,not employed
+self,self-employed
+self employed,self-employed
+self-employed,self-employed
+selfemployed,self-employed
+attorney,occupation
+owner,occupation
+physician,occupation
+farmer,occupation
+consultant,occupation
+-,no employer
+.,no employer
+ceo,occupation
+president,occupation
+executive,occupation
+manager,occupation
+business owner,occupation
+teacher,occupation
+educator,occupation
+nurse,occupation
+engineer,occupation
+accountant,occupation
+realtor,occupation
+sales,occupation
+pastor,occupation
+dentist,occupation
+lawyer,occupation
+doctor,occupation
+contractor,occupation
+small business owner,occupation

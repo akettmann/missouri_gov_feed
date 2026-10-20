@@ -1,0 +1,20 @@
+---
+// Served by the host for unknown paths (GCS: --web-error-page=404.html).
+import Layout from "../layouts/Layout.astro";
+import { href } from "../lib/site";
+---
+
+<Layout title="Page not found">
+  <h1>Page not found</h1>
+  <p class="lede">
+    There's no page at this address. Officials' pages move only when their name changes; try
+    <a href={href("/")}>searching the list of officials</a> or{" "}
+    <a href={href("/find/")}>finding yours by location</a>.
+  </p>
+</Layout>
+
+<style>
+  h1 {
+    margin-top: 24px;
+  }
+</style>

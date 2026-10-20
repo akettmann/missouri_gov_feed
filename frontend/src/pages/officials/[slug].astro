@@ -4,10 +4,13 @@
 import type { GetStaticPaths } from "astro";
 import ConfidenceToggle from "../../components/ConfidenceToggle.astro";
 import CoverageStrip from "../../components/CoverageStrip.astro";
+import SectionCourts from "../../components/SectionCourts.astro";
 import SectionGifts from "../../components/SectionGifts.astro";
 import SectionIdeology from "../../components/SectionIdeology.astro";
 import SectionInterests from "../../components/SectionInterests.astro";
 import SectionMoney from "../../components/SectionMoney.astro";
+import SectionOverlap from "../../components/SectionOverlap.astro";
+import SectionVoting from "../../components/SectionVoting.astro";
 import Layout from "../../layouts/Layout.astro";
 import { allOfficials } from "../../lib/exports/load";
 import type { OfficialBundle } from "../../lib/exports/types";
@@ -57,15 +60,24 @@ const term = [o.current_term_start, o.current_term_end].filter(Boolean).join(" t
       <a href={jsonUrl} download>
         Download this data (JSON)
       </a>
+      <a href={href(`/compare/?a=${o.slug}`)}>Compare with another official</a>
       <a href={reportErrorUrl(o.full_name, Astro.url.pathname)} rel="noopener" target="_blank">
         Report an error
       </a>
     </div>
 
-    <SectionIdeology indicators={bundle.indicators} status={bias.status} />
+    <SectionIdeology
+      indicators={bundle.indicators}
+      status={bias.status}
+      peers={bundle.peers}
+      office={o.office}
+    />
+    <SectionVoting bundle={bundle} />
     <SectionMoney bundle={bundle} />
     <SectionGifts bundle={bundle} />
+    <SectionOverlap bundle={bundle} />
     <SectionInterests bundle={bundle} />
+    <SectionCourts bundle={bundle} />
   </article>
 </Layout>
 

@@ -1,0 +1,93 @@
+@startuml mo_bill_flow
+title Missouri General Assembly: how a bill becomes law
+
+|Originating chamber|
+start
+note right
+  Either chamber can originate a bill
+  (HB / SB). Budget bills (HB 1-13+)
+  start in the House by custom.
+  House: 163 members, majority 82, 2/3 = 109
+  Senate: 34 members, majority 18, 2/3 = 23
+end note
+:Introduced, 1st reading;
+:2nd reading, referred to committee;
+if (Committee reports "do pass"?) then (yes)
+  :Often as a substitute (HCS / SCS);
+else (no)
+  :Bill dies in committee;
+  stop
+endif
+if (House?) then (yes)
+  :Perfection: floor amendments,
+  voice vote to perfect;
+else (Senate)
+  :Floor debate and amendments
+  (unlimited debate: filibusters
+  can stall or kill the bill);
+endif
+:3rd reading and final passage
+(recorded roll call, constitutional majority);
+
+|Other chamber|
+:1st reading, 2nd reading, committee;
+:3rd reading and final passage
+(recorded roll call);
+if (Passed unchanged?) then (yes)
+else (amended / substitute,\ne.g. SS for HB)
+  |Originating chamber|
+  if (Concur in the changes?) then (yes)
+    :Adopt the other chamber's version
+    (roll call);
+  else (no)
+    :Refuse to concur,
+    request conference;
+    |Conference committee|
+    :Conferees from each chamber
+    negotiate one text (CCS);
+    :Conference report (CCR);
+    |Originating chamber|
+    :Adopt CCR, 3rd reading
+    and final passage;
+    |Other chamber|
+    :Adopt CCR, 3rd reading
+    and final passage;
+  endif
+endif
+
+|Originating chamber|
+:"Truly Agreed To and Finally Passed" (TAFP);
+:Signed by the Speaker and the
+President Pro Tem in open session;
+note right
+  Deadline for passage: 6 p.m. on the Friday
+  after the second Monday in May.
+  Joint resolutions (HJR / SJR) skip the
+  governor and go to the ballot.
+end note
+
+|Governor|
+if (Governor acts?) then (sign)
+  :Signed into law;
+elseif () then (no action in time)
+  :Becomes law without signature;
+else (veto / line-item veto\non appropriations)
+  :Returned with objections;
+  |Originating chamber|
+  :Veto session (September):
+  vote to override (2/3);
+  |Other chamber|
+  if (2/3 in both chambers?) then (yes)
+    :Veto overridden;
+  else (no)
+    :Veto stands;
+    stop
+  endif
+endif
+
+|Governor|
+:Takes effect August 28,
+or immediately with an emergency
+clause (2/3 in each chamber);
+stop
+@enduml
