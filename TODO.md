@@ -1,9 +1,17 @@
 # TODO List
 
 ## High priority
-- [ ] `fct_vote_bills`: House roll calls on combined bills (`HCS HBs 267 & 347`, `SS SCS SBs 49 & 118`) link only the lead bill. Link every bill number in the measure if bill-level reports need the others
+- [ ] Add "sanity check" dbt tests (CLAUDE.md guideline): bounds no real data has come near, so a parsing or loading bug fails loudly. Only `dbt_utils` is installed; its `accepted_range` and `expression_is_true` cover these, or add dbt-expectations. Observed October 2026 values, for setting the bounds:
+  - House roll calls per session day: max 95 (fail above 200)
+  - Members recorded on one roll call: House max 162 Yes+No (163 seats); Senate 34 seats
+  - Session day numbers: max 79 (fail above 120)
+  - Single campaign contribution: max $880,000 (fail at $10M); negatives down to -$11,600 are refunds
+  - Single lobbyist gift: max $3,045 (fail at $100,000)
+  - `fct_salaries.pay`: $388 (partial year) to $264,900 (fail above $1M)
+  - Percentages (`attendance_pct` and others): between 0 and 100
 
 ## Medium priority
+- [ ] `fct_vote_bills`: House roll calls on combined bills (`HCS HBs 267 & 347`, `SS SCS SBs 49 & 118`) link only the lead bill. Link every bill number in the measure if bill-level reports need the others
 - [ ] Send the Sunshine Law requests for personal financial disclosures (templates and requirements in docs/sunshine_requests.md): MEC for legislators, statewide officials and candidates; the Clerk of the Supreme Court for judges. Fill in the project description and contact, build the filer lists from `dim_official`, then log the dates sent. Once copies arrive, add them through a seed or a local-folder loader
 - [ ] Bill subjects for pre-2024 House bills that never reached the Senate (the House XML has no `SubjectIndex` before 2024, and the House site's subject index keeps only a few years: 2017-2024 return nothing, the static `sbjndx` archive stops at 2011). Candidates:
   - LegiScan: free API key (30,000 queries/month), weekly per-state datasets (JSON/CSV) with bills, subjects, sponsors and roll calls. Check the license terms and Missouri's coverage years before building a loader
@@ -20,4 +28,4 @@
   - EPA Facility Registry Service or OSHA establishment data: named, geocoded sites for regulated industries only
   - Census County Business Patterns: counts by industry, no company names
 - [ ] Each January: add the year's rates to the `federal_salaries` seed (senate.gov, uscourts.gov)
-- [] write a simplified summary of the missouri sunshine act
+- [ ] Write a simplified summary of the Missouri Sunshine Law (RSMo Chapter 610; full text in docs/reference/rsmo_chapter_610_sunshine_law.md): what's open, what can be closed, how to request records, deadlines, fees and remedies
