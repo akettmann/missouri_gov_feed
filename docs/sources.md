@@ -29,6 +29,7 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `shor_mccarty` | Harvard Dataverse | state legislator ideology scores | 1993–2022 | |
 | `mo_employee_pay` | data.mo.gov State Employee Pay | yearly gross pay of legislators, statewide officials and state judges | `MOGOV_LOOKBACK_YEARS` (published from 2007) | |
 | `census_tiger` | Census Bureau TIGER/Line | legislative and congressional district, county and city boundaries | newest vintage | |
+| `census_zcta` | Census Bureau Gazetteer | ZIP code area centers and land areas (find-by-ZIP) | newest vintage | |
 
 ## mo_house: Missouri House of Representatives
 
@@ -369,6 +370,25 @@ Quirks:
   cause was in the Official Manual's judge index, not TIGER: the dot leader can run straight into the circuit
   ("Associate ..............35th"). `int_judges__state_index` now accepts that, which also recovered six
   judges whose index line had failed to parse at all.
+
+## census_zcta: ZIP code areas
+
+Census Bureau Gazetteer file for ZIP Code Tabulation Areas: each ZCTA's internal point (a point inside the
+area, near its center) and land and water area. It feeds `dim_zcta` and the frontend's "find my officials by
+ZIP" lookup, which runs in the browser: the district at the internal point is the answer, and districts
+within a circle of the ZIP's land area are listed as "may also reach".
+
+- Lands: `census_zcta_gazetteer`, the national file verbatim (about 33,000 rows, all columns as text, names
+  lower-cased); `dim_zcta` keeps Missouri's ZIP prefixes 630-658.
+- Shard units: one, the national file.
+
+Quirks:
+- The delimiter changed: older Gazetteer files are tab-separated, the 2026 file is pipe-separated
+  (`GEOID|GEOIDFQ|ALAND|...`). The loader lets DuckDB sniff it instead of fixing one.
+- ZCTAs approximate USPS ZIP codes from census blocks; PO-box-only ZIPs have no ZCTA, so the page says the
+  ZIP isn't found and points to location or the map.
+- A ZIP can cross district lines (65101, Jefferson City, touches two Senate and four House districts), which
+  is why the page shows the other districts it may reach instead of a single answer.
 
 ## mo_employee_pay: Missouri state payroll
 

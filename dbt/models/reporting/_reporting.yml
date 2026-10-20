@@ -388,6 +388,175 @@ models:
         data_type: varchar
         description: The bill's page.
 
+  - name: rpt_votes_by_subject
+    description: >
+      Recorded votes per official on bills by subject (fct_votes -> fct_vote_bills -> fct_bill_subjects).
+      Counts are distinct roll calls, so a roll call on two bills sharing a subject counts once. Subjects come
+      from the House subject index and the Senate topics index and are kept apart (subject_source). Only votes
+      linked to a bill are counted. Grain: one row per (official, chamber, subject, subject source).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, chamber, subject_name, subject_source]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests: [not_null]
+      - name: chamber
+        data_type: varchar
+        description: state_house or state_senate.
+      - name: subject_name
+        data_type: varchar
+        description: Subject as the index names it (e.g. TRANSPORTATION).
+      - name: subject_source
+        data_type: varchar
+        description: Which index the subject comes from (house, senate).
+      - name: roll_calls
+        data_type: bigint
+        description: Distinct roll calls on bills with this subject where the official was recorded.
+      - name: yea
+        data_type: bigint
+        description: Of those, roll calls where they voted yea.
+      - name: nay
+        data_type: bigint
+        description: Of those, roll calls where they voted nay.
+      - name: other
+        data_type: bigint
+        description: Of those, roll calls where they were present, absent or not voting.
+      - name: bills
+        data_type: bigint
+        description: Distinct bills with this subject among those roll calls.
+      - name: first_session
+        data_type: varchar
+        description: Earliest session code among the roll calls.
+      - name: last_session
+        data_type: varchar
+        description: Latest session code among the roll calls.
+
+  - name: rpt_awards
+    description: >
+      Number-based awards for the frontend: the top 5 officials (ties share a rank) on one measured number
+      within one office, per calendar year and over all loaded years ('lifetime'), each paired with its
+      opposite: lowest/highest attendance (rpt_attendance, 100+ recorded votes), most money from PACs,
+      committees and parties / lowest share of it among officials raising $10,000+ (rpt_donor_rollup, medium
+      name matches excluded), most breaks with / most loyal to their party (party_unity_pct, current chamber,
+      lifetime only). Only offices with 5+ qualifying officials in the period. No composite scores. Grain:
+      one row per (award, office, period, official).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [award, office, period, official_id]
+    columns:
+      - name: award
+        data_type: varchar
+        description: >
+          lowest_attendance, highest_attendance, most_committee_money, least_committee_money_share,
+          most_party_breaks, most_party_loyal.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['lowest_attendance', 'highest_attendance', 'most_committee_money',
+                  'least_committee_money_share', 'most_party_breaks', 'most_party_loyal']
+      - name: office
+        data_type: varchar
+        description: The comparison group (dim_official.office); officials are ranked only against their office.
+      - name: period
+        data_type: varchar
+        description: Calendar year, or 'lifetime' for all loaded years.
+      - name: award_rank
+        data_type: bigint
+        description: 1 = the official the award describes most strongly; ties share a rank.
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests: [not_null]
+      - name: metric
+        data_type: decimal(28,6)
+        description: >
+          The ranked number: attendance %, dollars from PACs/committees/parties, % of money from them, or party
+          unity %.
+      - name: sample_size
+        data_type: decimal(28,6)
+        description: What the metric is out of (recorded votes, or total dollars raised); null for party unity.
+      - name: group_size
+        data_type: bigint
+        description: How many officials in the office qualified for this award and period.
+
+  - name: rpt_donor_size
+    description: >
+      State officials' contributions from individuals by contribution size and election cycle, in the FEC's
+      bands (0, 200, 500, 1000, 2000 dollars and up) so they compare with fct_federal_donor_summary by_size.
+      MEC itemizes only contributions over $100, so the smallest band undercounts small donors. Grain: one row
+      per (official, election cycle, band, match confidence).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, election_cycle, band_floor, match_confidence]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests: [not_null]
+      - name: election_cycle
+        data_type: integer
+        description: Two-year cycle, named by its even (election) year.
+      - name: band_floor
+        data_type: integer
+        description: The band's lower bound in dollars (0, 200, 500, 1000, 2000).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 200, 500, 1000, 2000]
+      - name: match_confidence
+        data_type: varchar
+        description: "{{ doc('match_confidence') }}"
+      - name: total_amount
+        data_type: decimal(28,6)
+        description: Dollars contributed in the band.
+      - name: contribution_count
+        data_type: bigint
+        description: Contributions in the band.
+
+  - name: rpt_donor_employers
+    description: >
+      Employers of the individuals who gave to each official, from the employer field on individual
+      contributions (fct_campaign_finance.counterparty_organization). Contributions with no employer, or with a
+      placeholder answer (donor_employer_placeholders seed: retired, none, self-employed, bare occupations), are
+      left out. Spelling variants are not merged. State money only. Grain: one row per (official, lower-cased
+      employer, match confidence).
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests: [not_null]
+      - name: employer
+        data_type: varchar
+        description: The employer as filed (one spelling per lower-cased name).
+        data_tests: [not_null]
+      - name: match_confidence
+        data_type: varchar
+        description: "{{ doc('match_confidence') }}"
+      - name: donor_count
+        data_type: bigint
+        description: Distinct contributors (by lower-cased name) giving that employer.
+      - name: contribution_count
+        data_type: bigint
+        description: Contributions summed.
+      - name: total_amount
+        data_type: decimal(28,6)
+        description: Dollars given by that employer's employees.
+      - name: first_year
+        data_type: integer
+        description: Earliest contribution year.
+      - name: last_year
+        data_type: integer
+        description: Latest contribution year.
+      - name: source_url
+        data_type: varchar
+        description: "{{ doc('source_url') }}"
+
 exposures:
   - name: voter_frontend
     label: Missouri officials frontend
@@ -423,4 +592,8 @@ exposures:
       - ref('rpt_donor_rollup')
       - ref('rpt_gift_rollup')
       - ref('rpt_attendance')
+      - ref('rpt_votes_by_subject')
+      - ref('rpt_awards')
+      - ref('rpt_donor_size')
+      - ref('rpt_donor_employers')
       - ref('rpt_interest_vote_overlap')

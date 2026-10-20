@@ -394,8 +394,10 @@ models:
     description: >
       Federal fundraising per member per cycle. `cycle total` rows come from FEC's candidate summary
       (receipts, individual/PAC/party money, self-funding, disbursements, cash on hand). `by_employer`,
-      `by_size` and `by_state` rows are the FEC API's aggregates of itemized individual donors (only when
-      FEC_API_KEY is set). Grain: (official, cycle, aggregate_kind, bucket). A member with several FEC
+      `by_size` and `by_state` rows are the FEC API's aggregates of individual contributions (only when
+      FEC_API_KEY is set): `by_employer` and `by_state` cover itemized donors only, while `by_size` bucket `0`
+      ($200 and under) also includes unitemized money, so the size buckets add up to about the cycle's
+      `individual contributions` total. Grain: (official, cycle, aggregate_kind, bucket). A member with several FEC
       candidate ids that FEC reports against one committee is counted once; separate campaigns are summed.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
@@ -944,6 +946,35 @@ models:
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"
+
+  - name: dim_zcta
+    description: >
+      Missouri ZIP Code Tabulation Areas (Census Gazetteer; ZIP prefixes 630-658) with each area's internal point
+      and land area, for the frontend's ZIP lookup. A ZCTA approximates a USPS ZIP code and can span several
+      districts; the lookup reports the district at the internal point and the others the area may reach.
+      Grain: one row per ZCTA.
+    columns:
+      - name: zcta
+        data_type: varchar
+        description: Five-digit ZIP Code Tabulation Area code.
+        data_tests: [unique, not_null]
+      - name: vintage
+        data_type: integer
+        description: Gazetteer year.
+      - name: interior_lat
+        data_type: float
+        description: Latitude of the Census internal point (inside the area, near its center).
+        data_tests: [not_null]
+      - name: interior_lon
+        data_type: float
+        description: Longitude of the Census internal point.
+        data_tests: [not_null]
+      - name: land_area_m2
+        data_type: bigint
+        description: Land area in square meters (Census ALAND).
+      - name: water_area_m2
+        data_type: bigint
+        description: Water area in square meters (Census AWATER).
 
   - name: fct_official_districts
     description: >

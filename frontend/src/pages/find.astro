@@ -1,0 +1,235 @@
+---
+// Find my officials: pick a point (device location or a click on the county map) and the browser works out the
+// districts from simplified TIGER boundaries. Nothing about the location is sent anywhere.
+import Layout from "../layouts/Layout.astro";
+import { districtData, type Ring } from "../lib/exports/districts";
+import { href } from "../lib/site";
+
+const data = await districtData();
+// equirectangular, corrected for Missouri's latitude so the state isn't stretched; the client inverts it
+const BOUNDS = { minLon: -95.8, maxLon: -89.0, minLat: 35.95, maxLat: 40.65 };
+const COS = Math.cos((38.3 * Math.PI) / 180);
+const W = 760;
+const K = W / ((BOUNDS.maxLon - BOUNDS.minLon) * COS);
+const H = Math.round((BOUNDS.maxLat - BOUNDS.minLat) * K);
+const path = (polygons: Ring[][]) =>
+  polygons
+    .flatMap((rings) =>
+      rings.map((ring) => {
+        let d = "";
+        for (let i = 0; i < ring.length; i += 2) {
+          const x = ((ring[i] - BOUNDS.minLon) * COS * K).toFixed(1);
+          const y = ((BOUNDS.maxLat - ring[i + 1]) * K).toFixed(1);
+          d += `${i ? "L" : "M"}${x},${y}`;
+        }
+        return `${d}Z`;
+      }),
+    )
+    .join("");
+---
+
+<Layout title="Find my officials" description="Find the Missouri officials who represent a location.">
+  <h1>Find my officials</h1>
+  <p class="lede">
+    Enter your ZIP code, use your device's location, or click where you live on the map. Whatever you enter is
+    matched to districts inside this page and is never sent anywhere.
+  </p>
+
+  {!data ? (
+    <p class="card muted">District boundaries aren't loaded yet (the dim_district export is missing).</p>
+  ) : (
+    <div class="find">
+      <div class="card map-card">
+        <form id="zip-form" class="zip" onsubmit="return false">
+          <label for="zip">ZIP code</label>
+          <input
+            id="zip"
+            name="zip"
+            inputmode="numeric"
+            pattern="[0-9]{5}"
+            maxlength="5"
+            autocomplete="postal-code"
+          />
+          <button type="submit">Find</button>
+          <span class="muted small">or</span>
+          <button type="button" id="locate">
+            Use my location
+          </button>
+        </form>
+        <p class="small muted" id="status" aria-live="polite">
+          Or click the map. Zoom with your browser if you need more detail.
+        </p>
+        <svg
+          id="map"
+          viewBox={`0 0 ${W} ${H}`}
+          role="img"
+          aria-label="Map of Missouri counties; click to choose a location"
+          data-min-lon={BOUNDS.minLon}
+          data-max-lat={BOUNDS.maxLat}
+          data-k={K}
+          data-cos={COS}
+        >
+          {data.map.map((c) => (
+            <path d={path(c.polygons)}>
+              <title>{c.name}</title>
+            </path>
+          ))}
+          <circle id="pin" r="6" cx="-20" cy="-20" />
+        </svg>
+        <p class="small muted">
+          Boundaries: U.S. Census Bureau TIGER/Line{data.vintage ? ` ${data.vintage}` : ""}, simplified to
+          about 50 m. Near a district line, confirm with your county election authority.
+        </p>
+      </div>
+      <div class="card results" id="results" hidden>
+        <h2>Your officials</h2>
+        <div id="groups" />
+      </div>
+    </div>
+  )}
+  <noscript>
+    <p class="card">
+      This lookup runs in your browser and needs JavaScript. You can also{" "}
+      <a href={href("/")}>search the list of officials</a>.
+    </p>
+  </noscript>
+</Layout>
+
+<script>
+  import { lookup, lookupZip, type Lookup } from "../scripts/find";
+
+  const map = document.querySelector<SVGSVGElement>("#map");
+  const status = document.getElementById("status")!;
+  const pin = document.getElementById("pin");
+  let data: Promise<Lookup> | undefined;
+  const load = () =>
+    (data ??= fetch(`${import.meta.env.BASE_URL.replace(/\/$/, "")}/lookup/districts.json`).then((r) =>
+      r.json(),
+    ));
+
+  function placePin(lon: number, lat: number) {
+    if (!map || !pin) return;
+    const d = map.dataset;
+    pin.setAttribute("cx", String((lon - Number(d.minLon)) * Number(d.cos) * Number(d.k)));
+    pin.setAttribute("cy", String((Number(d.maxLat) - lat) * Number(d.k)));
+  }
+  function showResults() {
+    const results = document.getElementById("results")!;
+    results.hidden = false;
+    results.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function choose(lon: number, lat: number) {
+    placePin(lon, lat);
+    status.textContent = "Looking up districts…";
+    lookup(await load(), lon, lat, document.getElementById("groups")!, status);
+    showResults();
+  }
+
+  document.getElementById("zip-form")?.addEventListener("submit", async () => {
+    const zip = (document.getElementById("zip") as HTMLInputElement).value.trim();
+    if (!/^\d{5}$/.test(zip)) {
+      status.textContent = "Enter a five-digit ZIP code.";
+      return;
+    }
+    status.textContent = "Looking up districts…";
+    const point = lookupZip(await load(), zip, document.getElementById("groups")!, status);
+    if (point) placePin(...point);
+    showResults();
+  });
+
+  map?.addEventListener("click", (e) => {
+    const pt = map.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const p = pt.matrixTransform(map.getScreenCTM()!.inverse());
+    const d = map.dataset;
+    choose(Number(d.minLon) + p.x / (Number(d.cos) * Number(d.k)), Number(d.maxLat) - p.y / Number(d.k));
+  });
+
+  document.getElementById("locate")?.addEventListener("click", () => {
+    if (!navigator.geolocation) {
+      status.textContent = "This browser can't share its location; click the map instead.";
+      return;
+    }
+    status.textContent = "Waiting for your location…";
+    navigator.geolocation.getCurrentPosition(
+      (pos) => choose(pos.coords.longitude, pos.coords.latitude),
+      () => (status.textContent = "Location not available; click the map instead."),
+      { enableHighAccuracy: true, timeout: 15000 },
+    );
+  });
+</script>
+
+<style>
+  h1 {
+    margin-top: 24px;
+  }
+  .find {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    gap: 0 16px;
+    align-items: start;
+  }
+  @media (max-width: 860px) {
+    .find {
+      grid-template-columns: 1fr;
+    }
+  }
+  #map {
+    width: 100%;
+    height: auto;
+    cursor: crosshair;
+    display: block;
+    margin: 8px 0;
+  }
+  #map path {
+    fill: var(--surface-2);
+    stroke: var(--surface);
+    stroke-width: 1;
+  }
+  #map path:hover {
+    fill: var(--hairline);
+  }
+  #pin {
+    fill: var(--ink);
+    stroke: var(--surface);
+    stroke-width: 2;
+  }
+  .zip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .zip label {
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+  .zip input {
+    font: inherit;
+    width: 7ch;
+    padding: 7px 8px;
+    border: 1px solid var(--axis);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .results :global(.also) {
+    margin-top: 16px;
+    padding-top: 8px;
+    border-top: 1px solid var(--hairline);
+  }
+  button {
+    font: inherit;
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--axis);
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .results h2 {
+    margin-bottom: 8px;
+  }
+</style>

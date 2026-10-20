@@ -32,6 +32,7 @@ uv run mogov run --shards 4
 | shor_mccarty | yearly release | 90 days | quarterly |
 | mo_employee_pay | yearly (each January) | current and previous year 7 days, older 30 days | monthly |
 | census_tiger | yearly vintage (each autumn); redistricting | listings 7 days; shapefiles forever | monthly |
+| census_zcta | yearly vintage | forever per vintage | monthly (picks up a new vintage) |
 
 Run a subset with `mogov load <loader ...>` followed by `mogov build`. For example, daily during
 session:

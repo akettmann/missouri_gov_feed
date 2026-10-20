@@ -40,6 +40,10 @@ const hasRollup = money.cycles.rows.length > 0;
             <Viz id="donors-by-cycle" bundle={bundle} />
             <Viz id="top-donors" bundle={bundle} />
           </div>
+          <div class="grid-2">
+            {money.employers && money.employers.length > 0 && <Viz id="top-employers" bundle={bundle} />}
+            {money.size && money.size.length > 0 && <Viz id="state-size" bundle={bundle} />}
+          </div>
         </>
       )}
     </>

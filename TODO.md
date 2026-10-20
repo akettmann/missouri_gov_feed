@@ -13,6 +13,9 @@
   - FEC committee data (`connected_organization_name`) for federally registered PACs; the `fec` loader already uses that API
   - FollowTheMoney (now part of OpenSecrets) industry codes for state contributors; check whether its API or downloads are still offered
 - [ ] Campaign contributions whose payer is "NONE" ($1.27M, October 2026): find which reports or loaders produce it, and use the real name if the source has one
+- [ ] `fct_federal_donor_summary`: some cycles' `by_size` buckets sum to far more than the cycle's `individual contributions` total (Hawley 2024: 1.96x; S001195 2024 and 2026: 1.3x; most members are 1.00-1.11x). Likely the API aggregates span more committees (joint fundraising, a second campaign) than the candidate summary. Find which committees feed each side and make them match
+- [ ] Federal judicial disclosures (AO-10): some scanned filings' OCR text reaches `fct_family_ties` / `fct_commercial_ties` as garbage, e.g. Judge Bowman's (fjc:1378081) spouse income row "2200 =oK00 =o OL00 Es 0. B1=$1,000,001:$5,000,000 + P4=More than $50,000,000". Detect low-quality OCR rows (few dictionary words, stray `=`) and flag or drop them in staging
+- [ ] `scripts/gen_model_docs.py` overwrites each `_<source>__models.yml` from the SQL headers, so it deletes hand-added column tests: rerunning it (October 2026) dropped the `session_day` accepted_range sanity check on `stg_mo_house__rollcalls`. Make it merge into the existing columns (or keep tests in a separate file, like the unit tests)
 - [ ] `fct_vote_bills`: House roll calls on combined bills (`HCS HBs 267 & 347`, `SS SCS SBs 49 & 118`) link only the lead bill. Link every bill number in the measure if bill-level reports need the others
 - [ ] Warning when running DBT via `uv run mogov run --shards 4`
 ```shell

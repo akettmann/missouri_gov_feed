@@ -18,6 +18,18 @@ export function statusKind(status: string): "available" | "none" | "not-public" 
   return "none";
 }
 
+/** MO House codes are two-digit year + type (1 regular, 2-4 extraordinary); Senate uses the year; Congress its number. */
+export function sessionLabel(chamber: string, code: string): string {
+  if (chamber.startsWith("us_")) return `${code}th Congress`;
+  if (chamber === "state_house" && /^\d{3}$/.test(code)) {
+    const year = `20${code.slice(0, 2)}`;
+    return code[2] === "1" ? `${year} regular` : `${year} extraordinary ${Number(code[2]) - 1}`;
+  }
+  return code;
+}
+
+export const pct = (n: number | null | undefined, digits = 1) => (n == null ? "—" : `${n.toFixed(digits)}%`);
+
 export const isMedium = (confidence: string | null | undefined) => confidence === "medium";
 
 export const LEVELS: Record<string, string> = { state: "State", federal: "Federal", local: "Local" };

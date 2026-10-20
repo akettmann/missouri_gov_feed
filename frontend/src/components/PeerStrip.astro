@@ -1,0 +1,107 @@
+---
+// An indicator value among the official's chamber colleagues (rpt_indicator_peers): every colleague is a muted
+// dot, the official is the dark dot, and medians are labelled ticks. Party appears only as text, never color.
+import type { PeerStrip } from "../lib/exports/types";
+import { indicatorMeta } from "../lib/indicators";
+
+interface Props {
+  strip: PeerStrip;
+}
+const { strip } = Astro.props;
+const meta = indicatorMeta(strip.indicator);
+const [lo, hi] = meta.domain;
+const W = 600;
+const PAD = 10;
+const x = (v: number) => PAD + ((Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo)) * (W - 2 * PAD);
+// fixed jitter so stacked values stay visible and rebuilds don't move dots
+const jitter = (i: number) => ((i * 37) % 11) - 5;
+const fmt = (v: number | null) =>
+  v == null ? "—" : strip.indicator === "party_unity_pct" ? `${v.toFixed(1)}%` : v.toFixed(2);
+const CHAMBERS: Record<string, string> = {
+  state_house: "Missouri House",
+  state_senate: "Missouri Senate",
+  us_house: "U.S. House",
+  us_senate: "U.S. Senate",
+};
+const where = CHAMBERS[strip.chamber] ?? strip.chamber;
+// party medians are short ticks above (Republican) and below (Democratic) the line; their labels live in the
+// HTML key, because SVG text scales with the card and is unreadable on phones or oversized on desktop
+const medians = [
+  { label: "Republican median", value: strip.republican_median, y1: 16, y2: 28 },
+  { label: "Democratic median", value: strip.democratic_median, y1: 50, y2: 62 },
+].filter((m) => m.value != null);
+const summary =
+  `Among ${strip.peer_count} ${where} members${strip.period ? ` (${strip.period})` : ""}: ` +
+  `this official ${fmt(strip.value)}, median ${fmt(strip.peer_median)}` +
+  medians.map((m) => `, ${m.label} ${fmt(m.value)}`).join("") +
+  ".";
+---
+
+<figure class="peer">
+  <svg viewBox={`0 0 ${W} 78`} role="img" aria-label={summary}>
+    <line class="axis" x1={PAD} x2={W - PAD} y1="39" y2="39"></line>
+    {strip.peer_median != null && (
+      <line class="median" x1={x(strip.peer_median)} x2={x(strip.peer_median)} y1="22" y2="56" />
+    )}
+    {strip.peers.map((p, i) => (
+      <circle class="dot" cx={x(p.value)} cy={39 + jitter(i)} r="3.5">
+        <title>{fmt(p.value)}</title>
+      </circle>
+    ))}
+    {medians.map((m) => (
+      <line class="party-median" x1={x(m.value!)} x2={x(m.value!)} y1={m.y1} y2={m.y2}>
+        <title>{m.label}: {fmt(m.value)}</title>
+      </line>
+    ))}
+    <circle class="me" cx={x(strip.value)} cy="39" r="7">
+      <title>This official: {fmt(strip.value)}</title>
+    </circle>
+  </svg>
+  <figcaption class="small muted">
+    {summary}
+    <span class="key">
+      <span aria-hidden="true">●</span> this official · <span aria-hidden="true">•</span> colleagues · long
+      tick: chamber median · tick above: Republican median · tick below: Democratic median
+    </span>
+  </figcaption>
+</figure>
+
+<style>
+  .peer {
+    margin: 4px 0 8px;
+  }
+  svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    overflow: visible;
+  }
+  .axis {
+    stroke: var(--hairline);
+    stroke-width: 1;
+  }
+  .median {
+    stroke: var(--axis);
+    stroke-width: 2;
+  }
+  .dot {
+    fill: var(--muted);
+    fill-opacity: 0.45;
+  }
+  .me {
+    fill: var(--ink);
+    stroke: var(--surface);
+    stroke-width: 2;
+  }
+  .party-median {
+    stroke: var(--ink-2);
+    stroke-width: 1.5;
+  }
+  .key {
+    display: block;
+    font-size: 0.75rem;
+  }
+  figcaption {
+    margin-top: 2px;
+  }
+</style>

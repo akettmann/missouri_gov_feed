@@ -86,12 +86,60 @@ const tables = freshness();
     </ul>
   </section>
 
+  <section class="card" id="courts">
+    <h2>Court records</h2>
+    <p>
+      Cases come from CourtListener: published opinions and dockets that name the official as the judge on the
+      panel or as an attorney. CourtListener covers appellate and federal courts well and most Missouri trial
+      courts barely, so a circuit judge with few cases here may simply sit in a court it doesn't index.
+    </p>
+    <p>
+      Profiles count cases per year and list the most recent ones with the court's own disposition text. They
+      do not tally outcomes (affirmed, reversed, who won): turning dispositions into win/loss figures needs a
+      reviewed method, and raw rates mislead when judges hear different kinds of cases.
+    </p>
+  </section>
+
+  <section class="card" id="awards">
+    <h2>Awards</h2>
+    <p>
+      Each award ranks one number that also appears on the profiles, among officials holding the same office,
+      and comes with its opposite (lowest and highest attendance, and so on). Ties share a rank. An office
+      needs at least five qualifying officials in a period, so single-seat offices like governor have no
+      awards.
+    </p>
+    <ul>
+      <li>
+        <strong>Attendance</strong>: share of recorded votes where the official voted yea, nay or present; at
+        least 100 recorded votes in the period.
+      </li>
+      <li>
+        <strong>Money from PACs, committees and parties</strong>: dollars received from them, and (the
+        opposite) the lowest share of all money raised, among officials raising at least $10,000. The Missouri
+        Ethics Commission files PACs as committees, so the two are counted together. Name-only matches are
+        left out.
+      </li>
+      <li>
+        <strong>Party loyalty</strong>: party unity over all loaded votes in the official's current chamber;
+        there is no per-year figure.
+      </li>
+    </ul>
+  </section>
+
   <section class="card" id="interest-votes">
     <h2>Interests and votes</h2>
     <p>
       Where the site shows money or gifts from an interest next to votes on related bills, that is
       <strong>co-occurrence, not causation</strong>. A donation alongside a vote doesn't show the vote was
       bought, and officials often get money from groups that already agree with them.
+    </p>
+    <p>
+      How the match is made: donors and lobbyist principals are assigned to an industry by name keywords, and
+      each industry is tied to bill subject terms from the House subject index and Senate topics. A vote
+      appears when the bill carries one of those terms and the industry gave the official money in or before
+      that year. Money shown is the total through the latest such vote. Keyword matching misses donors whose
+      names don't say what they do, and many large PACs (leadership or pass-through PACs) belong to no single
+      industry.
     </p>
   </section>
 
