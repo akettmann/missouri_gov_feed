@@ -13,5 +13,9 @@ geocoded facility (int_epa_frs__facilities);
 -> fct_district_facilities;
 :non-government sites in each legislator's, U.S. representative's
 or mayor's area, donor names matched -> fct_jurisdiction_businesses;
+:sites per NAICS sector (naics_sectors seed)
+-> rpt_district_business_industries;
+:frontend: donor sites grouped by donor, plus the sector counts
+("Businesses in their area" profile section);
 stop
 @enduml

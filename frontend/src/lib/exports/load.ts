@@ -12,6 +12,8 @@ import type {
   CoverageItem,
   Dataset,
   DisclosureFiling,
+  DistrictDonor,
+  DistrictIndustry,
   DonorCycleRow,
   FamilyTie,
   FederalDonorRow,
@@ -283,6 +285,42 @@ async function loadAll(): Promise<OfficialBundle[]> {
     overlapRows.map((r) => ({ ...r, examples: examples.get(`${r.official_id}|${r.industry}`) ?? [] })),
   );
 
+  // A U.S. House district holds up to ~10k EPA sites: ship only the ones tied to a donor (a few hundred at
+  // most), grouped under their donor, plus the per-sector counts. A site's donor columns repeat the totals
+  // for its set of donors, so rows sharing donor_names carry the same amount, years and link.
+  const hasBusinesses =
+    hasExport("fct_jurisdiction_businesses") && hasExport("rpt_district_business_industries");
+  const districtDonors = new Map<string, DistrictDonor[]>();
+  if (hasBusinesses) {
+    type SiteRow = Omit<DistrictDonor, "sites"> & DistrictDonor["sites"][number] & { official_id: string };
+    const byDonor = new Map<string, DistrictDonor>();
+    for (const r of await query<SiteRow>(`
+      select official_id, donor_names, cast(donated_amount as double) as donated_amount,
+             cast(n_contributions as integer) as n_contributions, first_year, last_year, match_confidence,
+             contributions_url, facility_name, city, naics_description, matched_by, frs_url
+      from {fct_jurisdiction_businesses} where is_donor
+      order by official_id, donated_amount desc, donor_names, facility_name, city`)) {
+      const { official_id, facility_name, city, naics_description, matched_by, frs_url, ...donor } = r;
+      const key = `${official_id}|${donor.donor_names}`;
+      let group = byDonor.get(key);
+      if (!group) {
+        group = { ...donor, sites: [] };
+        byDonor.set(key, group);
+        districtDonors.set(official_id, [...(districtDonors.get(official_id) ?? []), group]);
+      }
+      group.sites.push({ facility_name, city, naics_description, matched_by, frs_url });
+    }
+  }
+  const districtIndustries = hasBusinesses
+    ? groupBy(
+        await query<DistrictIndustry & { official_id: string }>(`
+          select official_id, sector_code, sector_name, cast(n_sites as integer) as n_sites,
+                 cast(n_donor_sites as integer) as n_donor_sites
+          from {rpt_district_business_industries}
+          order by official_id, sector_code is null, n_sites desc, sector_name`),
+      )
+    : null;
+
   // a federal appellate judge has ~6k cases: ship yearly counts plus the most recent ones
   const RECENT_CASES = 50;
   const hasCases = hasExport("fct_case_history");
@@ -385,6 +423,12 @@ async function loadAll(): Promise<OfficialBundle[]> {
           top_donors: topDonors,
         },
         gifts,
+        businesses: districtIndustries
+          ? {
+              donors: districtDonors.get(id) ?? [],
+              industries: (districtIndustries.get(id) ?? []) as DistrictIndustry[],
+            }
+          : null,
         interests: {
           commercial_ties: (ties.get(id) ?? []) as CommercialTie[],
           family_ties: (family.get(id) ?? []) as FamilyTie[],
@@ -434,6 +478,8 @@ export function freshness(): { table: string; exported_at: string | null; sample
     "rpt_attendance",
     "rpt_votes_by_subject",
     "rpt_interest_vote_overlap",
+    "fct_jurisdiction_businesses",
+    "rpt_district_business_industries",
   ];
   return tables.map((t) => ({
     table: t,

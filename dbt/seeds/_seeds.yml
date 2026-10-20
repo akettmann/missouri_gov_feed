@@ -142,6 +142,20 @@ seeds:
         data_tests: [not_null, unique]
       - name: brand
         data_tests: [not_null]
+  - name: naics_sectors
+    description: >
+      The 20 NAICS 2022 sectors (census.gov/naics), keyed by the first two digits of a NAICS code. Three sectors
+      span several prefixes (31-33 Manufacturing, 44-45 Retail Trade, 48-49 Transportation and Warehousing), so
+      a prefix maps to its sector_code. rpt_district_business_industries counts EPA FRS sites per sector.
+    config:
+      column_types: {naics_prefix: varchar, sector_code: varchar, sector_name: varchar}
+    columns:
+      - name: naics_prefix
+        data_tests: [unique, not_null]
+      - name: sector_code
+        data_tests: [not_null]
+      - name: sector_name
+        data_tests: [not_null]
   - name: industry_subjects
     description: >
       The legislature's bill subject index terms (fct_bill_subjects.subject_name, verbatim) that each interest_keywords

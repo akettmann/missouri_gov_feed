@@ -1290,7 +1290,8 @@ models:
       Corp...), or when both names carry the same brand from the company_brands seed (corporate PACs and
       subsidiaries: "Spire PAC" and "LACLEDE GAS CO"). A company not in the seed that gives under another name
       is missed. Statewide officials have no rows (they serve every area). Grain: one row per (official,
-      facility); district_id is the area that puts the facility in the official's jurisdiction.
+      facility); district_id is the area that puts the facility in the official's jurisdiction. The donor
+      columns (donor_names through contributions_url) are filled only when is_donor.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -1362,6 +1363,27 @@ models:
       - name: n_contributions
         data_type: hugeint
         description: Number of those contributions.
+      - name: first_year
+        data_type: integer
+        description: Year of the earliest matched contribution, when is_donor.
+      - name: last_year
+        data_type: integer
+        description: Year of the latest matched contribution, when is_donor.
+      - name: match_confidence
+        data_type: varchar
+        description: >
+          `medium` when any of the matched contributions was tied to the official by a name-only match
+          (fct_campaign_finance.match_confidence), else `high`; null when not is_donor. This is about who received
+          the money, not about the donor-to-facility match (see matched_by).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['high', 'medium']
+      - name: contributions_url
+        data_type: varchar
+        description: >
+          Where the matched contributions are filed (the receiving committee's MEC page or FEC receipts), when
+          is_donor.
       - name: frs_url
         data_type: varchar
         description: The facility's EPA FRS detail report.
