@@ -81,13 +81,23 @@ const path = (polygons: Ring[][]) =>
           about 50 m. Near a district line, confirm with your county election authority.
         </p>
       </div>
-      <div class="card results" id="results" hidden>
+      <div class="card results empty" id="results">
         <h2>Your officials</h2>
-        <div id="groups" />
+        <div id="groups">
+          <p class="muted placeholder">
+            Your officials will appear here once you enter a ZIP code, share your location, or click the map,
+            from statewide offices down to your Missouri House district.
+          </p>
+        </div>
       </div>
     </div>
   )}
   <noscript>
+    <style is:inline>
+      #results.empty {
+        display: none;
+      }
+    </style>
     <p class="card">
       This lookup runs in your browser and needs JavaScript. You can also{" "}
       <a href={href("/")}>search the list of officials</a>.
@@ -115,7 +125,7 @@ const path = (polygons: Ring[][]) =>
   }
   function showResults() {
     const results = document.getElementById("results")!;
-    results.hidden = false;
+    results.classList.remove("empty");
     results.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -174,6 +184,10 @@ const path = (polygons: Ring[][]) =>
   @media (max-width: 860px) {
     .find {
       grid-template-columns: 1fr;
+    }
+    /* stacked under the map, the empty placeholder only adds scrolling; it shows once there are results */
+    .results.empty {
+      display: none;
     }
   }
   #map {
