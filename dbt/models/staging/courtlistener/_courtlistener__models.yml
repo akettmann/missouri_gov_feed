@@ -8,8 +8,10 @@ models:
 - name: stg_courtlistener__courts
   description: 'CourtListener courts: id and full name.'
 - name: stg_courtlistener__judge_disclosure_items
-  description: Line items from federal judges' AO-10 reports, one shape for every part of the report (investments,
-    positions, agreements, income, gifts, liabilities, reimbursements).
+  description: 'Line items from federal judges'' AO-10 reports, one shape for every part of the report (investments,
+    positions, agreements, income, gifts, liabilities, reimbursements). Scanned reports are OCR text, and some items
+    are unreadable: is_garbled flags them (mogov.is_garbled_text). Investment descriptions are tickers and fund
+    codes, which read as garbled, so they are never flagged.'
 - name: stg_courtlistener__judge_disclosures
   description: Federal judges' financial disclosure reports (AO-10) as indexed by CourtListener, one row per report.
 - name: stg_courtlistener__mo_cluster_panel

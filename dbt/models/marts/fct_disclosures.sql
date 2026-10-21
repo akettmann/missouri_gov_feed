@@ -4,6 +4,8 @@
 --   Federal judges       AO-10 reports via CourtListener (structured, mostly 2020 and earlier)
 -- Missouri state officials' and state judges' personal financial disclosure statements are not online
 -- (MEC / Supreme Court clerk release them on Sunshine Law request); see official_profile coverage.
+-- is_garbled marks AO-10 items whose OCR text is unreadable. They stay here (the item was disclosed and counts
+-- toward the report) but are kept out of fct_commercial_ties and fct_family_ties.
 with house_members as (
     select
         o.official_id,
@@ -31,7 +33,8 @@ house as (
         l.owner_code as owner,
         l.amount_range as amount,
         l.line_text as description,
-        h.document_url
+        h.document_url,
+        false as is_garbled
     from house_members as h
     inner join {{ ref('int_house_fd__schedule_lines') }} as l on h.doc_id = l.doc_id
 ),
@@ -48,7 +51,8 @@ house_unparsed as (
         cast(null as {{ dbt.type_string() }}) as owner,
         cast(null as {{ dbt.type_string() }}) as amount,
         cast(null as {{ dbt.type_string() }}) as description,
-        h.document_url
+        h.document_url,
+        false as is_garbled
     from house_members as h
     where h.doc_id not in (select sl.doc_id from {{ ref('int_house_fd__schedule_lines') }} as sl)
 ),
@@ -67,7 +71,8 @@ senate as (
         s.owner,
         coalesce(s.amount, s.income_amount) as amount,
         s.description,
-        s.document_url
+        s.document_url,
+        false as is_garbled
     from {{ ref('dim_official') }} as o
     inner join {{ ref('stg_senate_efd__items') }} as s
         on
@@ -86,7 +91,8 @@ judges as (
         cast(null as {{ dbt.type_string() }}) as owner,
         i.amount_code as amount,
         i.description,
-        i.document_url
+        i.document_url,
+        i.is_garbled
     from {{ ref('int_judges__federal') }} as o
     inner join {{ ref('stg_fjc__appointments') }} as a on o.fjc_nid = a.fjc_nid and a.appointment_number = 1
     inner join {{ ref('int_courtlistener__judge_disclosure_items') }} as i on a.fjc_jid = i.fjc_id

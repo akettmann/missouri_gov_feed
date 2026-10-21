@@ -512,6 +512,14 @@ models:
       - name: document_url
         data_type: varchar
         description: Link to the filed report.
+      - name: is_garbled
+        data_type: boolean
+        description: >
+          True when the item is a federal judge's AO-10 item whose OCR text is unreadable (mogov.is_garbled_text,
+          e.g. "SIE = RE"). The row still counts as a disclosed item but is left out of fct_commercial_ties and
+          fct_family_ties. Investments are never flagged; always false for House and Senate rows (not checked).
+        data_tests:
+          - not_null
 
   - name: fct_voluntary_disclosures
     description: >

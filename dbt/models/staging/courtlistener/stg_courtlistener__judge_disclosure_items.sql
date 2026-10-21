@@ -1,5 +1,7 @@
 -- Line items from federal judges' AO-10 reports, one shape for every part of the report (investments,
 -- positions, agreements, income, gifts, liabilities, reimbursements).
+-- Scanned reports are OCR text, and some items are unreadable: is_garbled flags them (mogov.is_garbled_text).
+-- Investment descriptions are tickers and fund codes, which read as garbled, so they are never flagged.
 {% set parts = [
     ('fd_investments', 'investment', 'description', "coalesce(gross_value_code, '')", "coalesce(transaction_during_reporting_period, '')"),
     ('fd_positions', 'outside position', "position || ' - ' || organization_name", "''", "''"),
@@ -10,14 +12,21 @@
     ('fd_debts', 'liability', "creditor_name || ' - ' || description", "value_code", "''"),
     ('fd_reimbursements', 'reimbursement', "source || ': ' || coalesce(purpose, '') || ' (' || coalesce(location, '') || ')'", "''", "items_paid_or_provided"),
 ] %}
-{% for table, kind, descr, amount, extra in parts %}
-    select
-        financial_disclosure_id as disclosure_id,
-        '{{ kind }}' as item_kind,
-        {{ descr }} as description,  -- noqa: AL03,RF04
-        {{ amount }} as amount_code,
-        {{ extra }} as detail,
-        redacted = 't' as is_redacted
-    from {{ source('courtlistener', table) }}
-    {% if not loop.last %}union all{% endif %}
-{% endfor %}
+with items as (
+    {% for table, kind, descr, amount, extra in parts %}
+        select
+            financial_disclosure_id as disclosure_id,
+            '{{ kind }}' as item_kind,
+            {{ descr }} as description,  -- noqa: AL03,RF04
+            {{ amount }} as amount_code,
+            {{ extra }} as detail,
+            redacted = 't' as is_redacted
+        from {{ source('courtlistener', table) }}
+        {% if not loop.last %}union all{% endif %}
+    {% endfor %}
+)
+
+select
+    *,
+    item_kind <> 'investment' and {{ mogov.is_garbled_text('description') }} as is_garbled
+from items

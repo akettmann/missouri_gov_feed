@@ -8,7 +8,8 @@ select
     i.description,
     i.amount_code,
     i.detail,
-    i.is_redacted
+    i.is_redacted,
+    i.is_garbled
 from {{ ref('stg_courtlistener__judge_disclosure_items') }} as i
 inner join {{ ref('stg_courtlistener__judge_disclosures') }} as d on i.disclosure_id = d.disclosure_id
 inner join {{ ref('stg_courtlistener__people') }} as p on d.cl_person_id = p.cl_person_id
