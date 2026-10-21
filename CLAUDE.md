@@ -36,7 +36,24 @@ Maintain step by step documentation of:
 * a Per source section that describes the source in brief. Also it will include details of any quirks identified for that source
 * a summary of our sources and what types of data they provide
 ## Issue Tracking
-* Frontend issues go in `FRONTEND_TODO.md`
-* all other issues go to `TODO.md`
-* If you find a problem while working, if it is not blocking your progress, offload it to the proper todo file.
-* Put them in sections of low/medium/high priority
+Issues live in GitHub issues on `akettmann/missouri_gov_feed`, managed with the `gh` CLI (`gh issue create`, `gh issue list`).
+* If you find a problem while working, if it is not blocking your progress, file it as an issue instead of fixing it in passing.
+* Reference issues in commits and PRs (`Fixes #12`) so they close when the work merges.
+* Use only the labels below. If a new one seems needed (e.g. a new source), ask before creating it, and add it to this list.
+* Every issue gets exactly one priority label, at least one area label, and a `source:` label for each source it involves.
+
+Acceptable labels:
+* Priority: `priority: high`, `priority: medium`, `priority: low`
+* Area: `Frontend`, `Ingest` (Python loaders), `Transformation (DBT)`, `documentation`
+* Kind: `bug` (something is wrong; omit for new work)
+* Status: `needs-user` (blocked on an action or decision only the maintainer can take)
+* Source, one per loader in `src/mogov/loaders` (see docs/sources.md): `source: mo_house`, `source: mo_senate`,
+  `source: mo_senate_topics`, `source: mec`, `source: tap_mec`, `source: fec`, `source: voteview`,
+  `source: house_fd`, `source: senate_efd`, `source: courtlistener_bulk`, `source: courtlistener_case_bulk`,
+  `source: courtlistener_cases`, `source: bluebook`, `source: openstates_people`, `source: congress_legislators`,
+  `source: fjc_judges`, `source: wikidata`, `source: shor_mccarty`, `source: census_tiger`, `source: census_zcta`,
+  `source: mo_employee_pay`, `source: epa_frs`
+* Candidate sources (not loaded yet): `source: legiscan`, `source: followthemoney`, `source: osha_ita`,
+  `source: mo_sos_business`. When a candidate gets a loader, keep the label and update its description.
+
+Frontend issues follow the rules in docs/frontend_principles.md.

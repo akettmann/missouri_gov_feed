@@ -1,6 +1,6 @@
 version: 2
 
-# Reporting models are shaped for the frontend's pages (FRONTEND_TODO.md). Like the marts, their columns are
+# Reporting models are shaped for the frontend's pages (docs/frontend_principles.md). Like the marts, their columns are
 # a contract (data_type per column) and descriptions persist as warehouse comments. They read only marts and
 # intermediate models. Every row keeps official_id, and source_url / match_confidence wherever the facts
 # behind it have them.
@@ -675,7 +675,7 @@ exposures:
     maturity: low
     description: >
       Static site that shows each official's measurable lean and potential conflicts of interest, as
-      evidence rather than verdicts (FRONTEND_TODO.md). Its build reads the exported marts and reporting
+      evidence rather than verdicts (docs/frontend_principles.md). Its build reads the exported marts and reporting
       tables (`mogov export`).
     owner:
       name: mriswithe
