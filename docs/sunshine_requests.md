@@ -2,7 +2,7 @@
 
 Some records we want are public but not online. They have to be requested from the body that holds them.
 This page covers what a request needs and has a template letter for each request we plan to make.
-Records that arrive go in through a seed or a local-folder loader (see TODO.md).
+Records that arrive go in through a seed or a local-folder loader (GitHub issue #1).
 
 ## What a request needs
 
