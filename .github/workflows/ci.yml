@@ -24,10 +24,27 @@ jobs:
       - name: Install
         run: uv sync --frozen
 
-      - uses: actions/setup-java@v4  # for the plantuml-render hook
+      # for the plantuml-render hook; it only runs java when an SVG's source stamp is stale, and it lays
+      # out with PlantUML's built-in Smetana engine, so no Graphviz is needed
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
+
+      # frontend hooks (prettier, eslint, astro check); pnpm version comes from packageManager in package.json
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.node-version
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Frontend dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: frontend
 
       - name: dbt packages (sqlfluff's dbt templater needs them)
         run: uv run --frozen dbt deps --project-dir dbt --profiles-dir dbt

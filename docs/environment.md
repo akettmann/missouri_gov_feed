@@ -1,13 +1,13 @@
 # Building an environment from scratch
 
-Diagrams: [pipeline](diagrams/pipeline.puml), [lineage](diagrams/lineage.puml),
-[data model](diagrams/data_model.puml), and one per source under [diagrams/sources](diagrams/sources).
+Diagrams: [pipeline](diagrams/pipeline.svg), [lineage](diagrams/lineage.svg),
+[data model](diagrams/data_model.svg), and one per source; [diagrams/](diagrams/README.md) shows them all.
 
 ## Local (Windows, macOS, Linux)
 
 1. Install [uv](https://docs.astral.sh/uv/) (it fetches Python 3.13 itself).
    For diagram edits, also install Java 8+: the pre-commit hook renders `docs/diagrams/**/*.puml` to SVG
-   with a pinned PlantUML jar.
+   with a pinned PlantUML jar and its built-in Smetana layout, so Graphviz `dot` is not needed.
 2. Clone the repo and install dependencies:
    ```
    uv sync
@@ -98,7 +98,7 @@ docker compose run --rm mogov freshness
 
 The voter-facing site lives in `frontend/`: Astro (static build), Observable Plot, pnpm. It is built
 entirely from the parquet exports; there is no server. Data flow:
-[frontend_data_flow](diagrams/frontend_data_flow.puml).
+[frontend_data_flow](diagrams/frontend_data_flow.svg).
 
 1. Install Node.js 24 LTS (`frontend/.node-version` pins the version; `>=24.22.0`) and enable pnpm
    with `corepack enable` (the version comes from `packageManager` in `frontend/package.json`).
