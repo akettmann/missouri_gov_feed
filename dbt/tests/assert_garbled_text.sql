@@ -54,6 +54,14 @@ with cases as (
         false as expected
     union all
     select
+        'AT&T' as txt,
+        false as expected
+    union all
+    select
+        '<- AT&T' as txt,
+        false as expected
+    union all
+    select
         '' as txt,
         false as expected
     union all

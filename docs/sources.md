@@ -251,8 +251,8 @@ Quirks:
   ("State of Missoun"), but about 1% of non-investment items are noise, such as `SIE = RE`,
   `5. - Ie — ~~ Fe) 7 _ il`, or a form's value-code legend read as an item. Staging flags these as
   `is_garbled` (macro `mogov.is_garbled_text`). The rule: more than half of the letters and digits fall
-  outside 3+ letter words, or there's no run of 4 letters. Flagged items stay in `fct_disclosures` but are
-  kept out of `fct_commercial_ties` and `fct_family_ties`. Investments are never flagged, because their
+  outside 3+ letter words (or `&` names like AT&T), or there's no run of 4 letters and no `&` name.
+  Flagged items stay in `fct_disclosures` but are kept out of `fct_commercial_ties` and `fct_family_ties`. Investments are never flagged, because their
   tickers and fund codes would read as garbled. A sanity test fails if more than 5% of items get flagged.
 
 ## courtlistener_case_bulk: case history from bulk files

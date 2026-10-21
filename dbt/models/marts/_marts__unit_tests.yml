@@ -1,4 +1,4 @@
-# Unit tests for name matching inside marts (dbt unit tests: fixed input rows -> exact expected rows).
+# Unit tests for marts logic (dbt unit tests: fixed input rows -> exact expected rows).
 version: 2
 
 unit_tests:
@@ -28,3 +28,42 @@ unit_tests:
       rows:
         - {official_id: o_dan_jones, recipient_raw: 'JONES, DANIEL', match_confidence: medium}
         - {official_id: o_dan_jones, recipient_raw: 'JONES, DAN', match_confidence: high}
+
+  - name: commercial_ties_skip_garbled_disclosure_items
+    model: fct_commercial_ties
+    description: >
+      A disclosure item flagged is_garbled (unreadable AO-10 OCR text) is not a tie; a readable item in the
+      same report still is (#5).
+    given:
+      - input: ref('fct_disclosures')
+        rows:
+          - {official_id: j1, section: outside position, description: Trustee - Saint Louis Art Museum, report_year: 2019, disclosure_type: Federal judicial financial disclosure (AO-10), document_url: u1, owner: null, is_garbled: false}
+          - {official_id: j1, section: outside position, description: 'S. - LE fo NY', report_year: 2019, disclosure_type: Federal judicial financial disclosure (AO-10), document_url: u1, owner: null, is_garbled: true}
+          - {official_id: j1, section: agreement, description: 'SIE = RE', report_year: 2019, disclosure_type: Federal judicial financial disclosure (AO-10), document_url: u1, owner: null, is_garbled: true}
+      - input: ref('int_officials__wikidata')
+        rows: []
+      - input: ref('stg_wikidata__facts')
+        rows: []
+    expect:
+      rows:
+        - {official_id: j1, tie_kind: position held, whose: self, detail: Trustee - Saint Louis Art Museum, is_latest_report: true}
+
+  - name: family_ties_skip_garbled_spousal_income
+    model: fct_family_ties
+    description: >
+      A spouse income source flagged is_garbled (unreadable AO-10 OCR text) is not listed as a family tie;
+      a readable one is (#5).
+    given:
+      - input: ref('fct_disclosures')
+        rows:
+          - {official_id: j1, section: spousal income, description: AT&T, disclosure_type: Federal judicial financial disclosure (AO-10), document_url: u1, is_garbled: false}
+          - {official_id: j1, section: spousal income, description: '2200 =oK00 =o OL00 Es 0.', disclosure_type: Federal judicial financial disclosure (AO-10), document_url: u1, is_garbled: true}
+      - input: ref('fct_commercial_ties')
+        rows: []
+      - input: ref('int_officials__wikidata')
+        rows: []
+      - input: ref('stg_wikidata__relatives')
+        rows: []
+    expect:
+      rows:
+        - {official_id: j1, relation: spouse, role: spouse income source, organization: AT&T}
