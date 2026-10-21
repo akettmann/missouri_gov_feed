@@ -25,7 +25,8 @@ with disclosure_ties as (
         end
             as whose
     from {{ ref('fct_disclosures') }}
-    where section in (
+    -- unreadable OCR text (AO-10 scans) says nothing about the tie, so it isn't one
+    where not is_garbled and section in (
         'E: positions', 'Part 8. Positions', 'outside position',
         'C: earned income', 'Part 2. Earned and Non-Investment Income', 'non-investment income',
         'J: compensation over $5,000 from one source', 'Part 10. Compensation',

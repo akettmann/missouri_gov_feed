@@ -247,6 +247,13 @@ Quirks:
   told `escape='\'`. Left to sniffing, DuckDB dropped rows, and the reimbursements file looked like an
   unbalanced quote and ran out of memory. With the explicit dialect it lands all 33,472 rows.
 - Missouri filtering (mo, moctapp*, moed, mowd, ca8) happens in dbt.
+- Disclosure line items from scanned AO-10 reports are OCR text. Most of it is readable with typos
+  ("State of Missoun"), but about 1% of non-investment items are noise, such as `SIE = RE`,
+  `5. - Ie — ~~ Fe) 7 _ il`, or a form's value-code legend read as an item. Staging flags these as
+  `is_garbled` (macro `mogov.is_garbled_text`). The rule: more than half of the letters and digits fall
+  outside 3+ letter words, or there's no run of 4 letters. Flagged items stay in `fct_disclosures` but are
+  kept out of `fct_commercial_ties` and `fct_family_ties`. Investments are never flagged, because their
+  tickers and fund codes would read as garbled. A sanity test fails if more than 5% of items get flagged.
 
 ## courtlistener_case_bulk: case history from bulk files
 
