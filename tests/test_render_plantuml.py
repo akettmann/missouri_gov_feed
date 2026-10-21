@@ -34,6 +34,23 @@ def test_edited_source_is_stale(diagram: Path) -> None:
     assert not render_plantuml._is_fresh(diagram)
 
 
+@pytest.mark.parametrize(("setting", "bumped"), [("VERSION", "9.9999.9"), ("LAYOUT", "dot")])
+def test_renderer_change_makes_stamp_stale(
+    diagram: Path, monkeypatch: pytest.MonkeyPatch, setting: str, bumped: str
+) -> None:
+    def digest() -> str:
+        return render_plantuml._stamp(diagram).split("source-sha256=")[1].split()[0]
+
+    before = digest()
+    diagram.with_suffix(".svg").write_text(render_plantuml._stamp(diagram) + "<svg/>", encoding="utf-8", newline="\n")
+    monkeypatch.setattr(render_plantuml, setting, bumped)
+    assert digest() != before, f"{setting} is not part of the stamp hash"
+    assert not render_plantuml._is_fresh(diagram), (
+        f"changing {setting} left an existing stamp fresh: {setting} must be part of the stamp hash, "
+        "or SVGs won't re-render after a renderer change"
+    )
+
+
 def test_crlf_checkout_matches_lf_stamp(diagram: Path) -> None:
     diagram.with_suffix(".svg").write_text(render_plantuml._stamp(diagram) + "<svg/>", encoding="utf-8", newline="\n")
     diagram.write_bytes(diagram.read_bytes().replace(b"\n", b"\r\n"))
