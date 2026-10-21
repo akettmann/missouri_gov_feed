@@ -81,7 +81,8 @@ const path = (polygons: Ring[][]) =>
           about 50 m. Near a district line, confirm with your county election authority.
         </p>
       </div>
-      <div class="card results empty" id="results">
+      <!-- hidden until the script runs, so without JavaScript the empty card never shows -->
+      <div class="card results empty" id="results" hidden>
         <h2>Your officials</h2>
         <div id="groups">
           <p class="muted placeholder">
@@ -93,11 +94,6 @@ const path = (polygons: Ring[][]) =>
     </div>
   )}
   <noscript>
-    <style is:inline>
-      #results.empty {
-        display: none;
-      }
-    </style>
     <p class="card">
       This lookup runs in your browser and needs JavaScript. You can also{" "}
       <a href={href("/")}>search the list of officials</a>.
@@ -111,6 +107,8 @@ const path = (polygons: Ring[][]) =>
   const map = document.querySelector<SVGSVGElement>("#map");
   const status = document.getElementById("status")!;
   const pin = document.getElementById("pin");
+  const resultsCard = document.getElementById("results");
+  if (resultsCard) resultsCard.hidden = false;
   let data: Promise<Lookup> | undefined;
   const load = () =>
     (data ??= fetch(`${import.meta.env.BASE_URL.replace(/\/$/, "")}/lookup/districts.json`).then((r) =>
