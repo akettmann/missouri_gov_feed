@@ -109,7 +109,12 @@ municipal as (
         p.party,
         'local' as level,
         r.role_type as office,
-        {{ mogov.title_case("r.role_type || ' of ' || replace(r.place_slug, '_', ' ')") }} as office_title,
+        -- title-case the parts, not the joined string, so "of" stays lower case ("Mayor of Saint Louis")
+        {{ dbt.concat([
+            mogov.title_case("replace(r.role_type, '_', ' ')"),
+            "' of '",
+            mogov.title_case("replace(r.place_slug, '_', ' ')"),
+        ]) }} as office_title,
         cast(null as {{ dbt.type_string() }}) as district,
         r.start_date as current_term_start,
         r.end_date as current_term_end
