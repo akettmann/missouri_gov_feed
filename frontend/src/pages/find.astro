@@ -81,9 +81,15 @@ const path = (polygons: Ring[][]) =>
           about 50 m. Near a district line, confirm with your county election authority.
         </p>
       </div>
-      <div class="card results" id="results" hidden>
+      <!-- hidden until the script runs, so without JavaScript the empty card never shows -->
+      <div class="card results empty" id="results" hidden>
         <h2>Your officials</h2>
-        <div id="groups" />
+        <div id="groups">
+          <p class="muted placeholder">
+            Your officials will appear here once you enter a ZIP code, share your location, or click the map,
+            from statewide offices down to your Missouri House district.
+          </p>
+        </div>
       </div>
     </div>
   )}
@@ -101,6 +107,8 @@ const path = (polygons: Ring[][]) =>
   const map = document.querySelector<SVGSVGElement>("#map");
   const status = document.getElementById("status")!;
   const pin = document.getElementById("pin");
+  const resultsCard = document.getElementById("results");
+  if (resultsCard) resultsCard.hidden = false;
   let data: Promise<Lookup> | undefined;
   const load = () =>
     (data ??= fetch(`${import.meta.env.BASE_URL.replace(/\/$/, "")}/lookup/districts.json`).then((r) =>
@@ -115,7 +123,7 @@ const path = (polygons: Ring[][]) =>
   }
   function showResults() {
     const results = document.getElementById("results")!;
-    results.hidden = false;
+    results.classList.remove("empty");
     results.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -174,6 +182,10 @@ const path = (polygons: Ring[][]) =>
   @media (max-width: 860px) {
     .find {
       grid-template-columns: 1fr;
+    }
+    /* stacked under the map, the empty placeholder only adds scrolling; it shows once there are results */
+    .results.empty {
+      display: none;
     }
   }
   #map {
