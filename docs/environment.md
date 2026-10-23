@@ -144,6 +144,13 @@ Without JavaScript, the home page's `<noscript>` block links to those static `/y
 year, rendered from the same rows. The year control's error message also links to the matching static page when
 the JSON fetch fails.
 
+The businesses section of a profile carries only the donor-tied sites and counts by industry (a U.S. House
+district holds about 10,000 EPA-regulated sites). The full list per district or city is built from
+`fct_jurisdiction_businesses` into `dist/districts/<district>/sites/index.html` (a plain table, no JavaScript
+needed) and `dist/districts/<district>/sites.csv`, 201 districts in all; `<district>` is the `district_id` with
+`:` replaced by `-` (`state_house-135`). Together they add about 110 MB to `dist/` and about 3 s of build time.
+Without the export no site pages are built and the section shows no link.
+
 Optional build-time environment: `PUBLIC_SITE_URL` (canonical site URL), `PUBLIC_REPORT_ERROR_URL`
 (where "Report an error" goes; default: a prefilled GitHub issue on this repo).
 

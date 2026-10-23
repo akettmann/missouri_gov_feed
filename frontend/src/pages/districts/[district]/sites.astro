@@ -1,0 +1,97 @@
+---
+// Every EPA-regulated site in one district or city, the full list behind the profile's "Businesses in their
+// area" section (which carries only counts by industry and the donor-tied sites). Same columns for every
+// district; no filtering or ranking, and the CSV beside it has the same rows.
+import type { GetStaticPaths } from "astro";
+import Layout from "../../../layouts/Layout.astro";
+import { districtSiteLists, districtSites } from "../../../lib/exports/districtSites";
+import { allOfficials } from "../../../lib/exports/load";
+import { count, officeLine } from "../../../lib/format";
+import { href } from "../../../lib/site";
+
+export const getStaticPaths = (async () => {
+  const lists = await districtSiteLists();
+  const bySlug = new Map((await allOfficials()).map((b) => [b.official.slug, b.official]));
+  return [...(lists?.values() ?? [])].map((l) => ({
+    params: { district: l.slug },
+    props: { list: l, official: bySlug.get(l.official_slug)! },
+  }));
+}) satisfies GetStaticPaths;
+
+const { list, official } = Astro.props;
+const sites = await districtSites(list.district_id);
+const area = officeLine(official);
+---
+
+<Layout
+  title={`EPA-regulated sites: ${area}`}
+  description={`All ${list.n_sites} EPA-regulated sites in the area of ${area}.`}
+>
+  <div class="site-list-page">
+    <h1>EPA-regulated sites in this area</h1>
+    <p class="lede">
+      All {count(sites.length)} sites that EPA or a state environmental program regulates in the area
+      represented by <a href={href(`/officials/${official.slug}/`)}>{area}</a>. The list is the same for every
+      area: a site appears here because of where it is, not because of who owns it. Sites tied to a company
+      that gave this official money, by name or listed brand, come first.{" "}
+      <a href={href("/methodology/#district-businesses")}>How it's matched</a>.
+    </p>
+    <p class="small">
+      <a href={href(`/districts/${list.slug}/sites.csv`)} download>
+        Download as CSV
+      </a>{" "}
+      · <a href={href(`/officials/${official.slug}/#businesses`)}>Back to the profile</a>
+    </p>
+    <p class="small muted limits">
+      Limits: only EPA-regulated sites are listed (factories, fuel stations, utilities, repair shops, farms
+      with permits), so offices, stores and most service businesses are missing. A site's presence says
+      nothing about its conduct; being regulated is routine.
+    </p>
+    <div class="table-scroll card list">
+      <table aria-label={`Sites in ${area}`}>
+        <thead>
+          <tr>
+            <th>Site</th>
+            <th>Address</th>
+            <th>Industry</th>
+            <th>Owner</th>
+            <th>Gave to this official</th>
+            <th>Record</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sites.map((s) => (
+            <tr>
+              <td>{s.facility_name ?? "unnamed site"}</td>
+              <td>
+                {[s.address, s.city].filter(Boolean).join(", ")} {s.postal_code}
+              </td>
+              <td>{s.naics_description ?? "no industry code"}</td>
+              <td>{s.parent_company_name ?? s.owner_name ?? "not listed"}</td>
+              <td>{s.is_donor ? "Yes" : "No match"}</td>
+              <td>
+                {s.frs_url && (
+                  <a href={s.frs_url} rel="noopener noreferrer">
+                    EPA record
+                  </a>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</Layout>
+
+<style is:global>
+  .site-list-page h1 {
+    margin-top: 24px;
+  }
+  .site-list-page .limits {
+    max-width: 72ch;
+  }
+  .site-list-page .list {
+    padding: 4px 8px;
+  }
+</style>

@@ -39,6 +39,8 @@ load --> yearpage : rpt_officeholders_by_year
 idx --> yearpage : noscript links
 load --> page
 load --> json
+load --> sites : fct_jurisdiction_businesses
+page --> sites : "See all sites" link
 load --> meth : export timestamps
 viz --> page : server-rendered tables
 voter --> page : open profile
