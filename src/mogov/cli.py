@@ -175,7 +175,7 @@ def main() -> None:
     sub.add_parser("build", help="dbt build; extra arguments pass through to dbt (e.g. -s +fct_votes)")
     sub.add_parser("freshness", help="how long since each always-on loader last landed data (dbt source freshness)")
     p_export = sub.add_parser("export", help="write marts and reporting tables to data/exports/")
-    p_export.add_argument("--format", choices=["csv", "parquet"], default="csv")
+    p_export.add_argument("--format", choices=["csv", "parquet"], default="parquet")
     p_run = sub.add_parser("run", help="load everything, then dbt build")
     p_run.add_argument("sources", nargs="*")
     _shard_args(p_run)
