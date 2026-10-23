@@ -1,0 +1,18 @@
+@startuml census_zcta
+title census_zcta: ZIP Code Tabulation Area gazetteer
+start
+:try <year>_Gaz_zcta_national.zip for the last 3 years;
+repeat
+  :download the newest candidate (cached);
+repeat while (a zip?) is (no: HTML stub, try the previous vintage)
+-> yes;
+:extract the national .txt (one shard unit);
+note right: pipe-separated in 2026, tab-separated in older vintages;\nDuckDB sniffs the delimiter
+:census_zcta_gazetteer
+(national file verbatim, all columns text, names lower-cased);
+:dbt: stg_census_zcta__gazetteer (typed columns, vintage from file name)
+-> dim_zcta (Missouri prefixes 630-658);
+:frontend: "find my officials by ZIP" matches the internal point
+against district polygons in the browser;
+stop
+@enduml
