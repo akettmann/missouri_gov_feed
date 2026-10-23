@@ -9,9 +9,9 @@ projects", and the testing and documentation best practices.
 |---|---|---|
 | Only staging models read sources | 6 intermediate/mart models read 8 raw tables directly | Every raw table read downstream has a staging model; 0 `source()` calls outside staging |
 | Staging is 1:1 with a source, no joins | `stg_courtlistener__mo_cases` joined 3 sources, `stg_courtlistener__judge_disclosures` joined 2 | Split into one staging model per table; the joins live in `int_courtlistener__mo_cases` and `int_courtlistener__judge_disclosure_items` |
-| Every model's grain is tested | Primary-key tests on 2 of 17 marts | `dbt_utils.unique_combination_of_columns` on every mart with a natural key (10). Two grains failed and were fixed: duplicated FEC donor totals (a real double count) and per-chamber party unity (documented as part of the grain) |
+| Every model's grain is tested | Primary-key tests on 2 of 17 marts | `dbt_utils.unique_combination_of_columns` on every mart and reporting model with a natural key (28 now). Two grains failed and were fixed: duplicated FEC donor totals (a real double count) and per-chamber party unity (documented as part of the grain) |
 | Static mappings are seeds, not hardcoded lists | Missouri court ids hardcoded in 2 models; FEC committee-type codes undecoded | `mo_courts` and `fec_committee_types` seeds |
-| Source freshness | none | `loaded_at` freshness on the 15 always-on JSON landings; `mogov freshness` |
+| Source freshness | none | `loaded_at` freshness on the 17 always-on JSON landings; `mogov freshness` |
 | Packages | none | `dbt_utils` (pinned in `package-lock.yml`); installed automatically by `mogov build`, CI and the image |
 | Documentation | marts only, partly | every model, mart column and source (see `models/_docs.md`, `scripts/gen_model_docs.py`), persisted as warehouse comments |
 | Repeated logic in macros | partly | `normalize_party`, `classify_outcome` (with a singular test) |
@@ -20,7 +20,7 @@ projects", and the testing and documentation best practices.
 
 - Layered `staging` → `intermediate` → `marts`, with schemas and materializations set per folder in
   `dbt_project.yml`.
-- Naming: `stg_<source>__<entity>`, `int_<entity>__<verb/what>`, `fct_` / `dim_`; dbt Core 1.12 / dbt-duckdb 1.11 (latest releases).
+- Naming: `stg_<source>__<entity>`, `int_<entity>__<verb/what>`, `fct_` / `dim_`; dbt Core 1.12 / dbt-duckdb 1.11 (the versions locked in `uv.lock`).
 - `ref()` / `source()` everywhere; no hardcoded relation names.
 - Portable SQL through `adapter.dispatch` macros (`macros/compat`), so the backend can change.
 - sqlfluff with the dbt templater in pre-commit and CI.
@@ -43,11 +43,11 @@ projects", and the testing and documentation best practices.
 
 | Practice | Now |
 |---|---|
-| One source per system | 16 sources (`source('fec', 'candidates')`), each in `models/staging/<system>/` with its `_<system>__sources.yml`; `identifier` keeps the raw directory names, so loaders are unchanged. Staging models are named after their source (`stg_tap_mec__*` for the TAP mirror, `stg_mec__*` for MEC direct). |
-| Model contracts on the marts | `contract: {enforced: true}` for the marts folder; all 195 columns declare a `data_type`. A renamed, dropped, added or retyped column fails the build. Types are DuckDB's. |
-| Exposures | `voter_frontend` (`models/reporting/_reporting.yml`) lists the marts and reporting models the planned frontend reads, so they show in lineage before the frontend exists. |
+| One source per system | 19 sources (`source('fec', 'candidates')`), each in `models/staging/<system>/` with its `_<system>__sources.yml`; `identifier` keeps the raw directory names, so loaders are unchanged. Staging models are named after their source (`stg_tap_mec__*` for the TAP mirror, `stg_mec__*` for MEC direct). |
+| Model contracts on the marts | `contract: {enforced: true}` for the marts folder; all 299 columns declare a `data_type`. A renamed, dropped, added or retyped column fails the build. Types are DuckDB's. |
+| Exposures | `voter_frontend` (`models/reporting/_reporting.yml`) lists the tables `frontend/src/lib/exports` reads directly (marts and reporting models, exported by `mogov export`), so they show in lineage. |
 | Reporting layer | `models/reporting/` (`rpt_*`, schema `reporting`), contracts enforced like the marts. Built only from marts and intermediate models. |
-| Unit tests for fragile logic | dbt unit tests on the name matching: House vote tokens, Senate vote tokens, MEC committee attribution, CourtListener case matches, lobbyist-gift recipients (`_intermediate__unit_tests.yml`, `_marts__unit_tests.yml`). They run before their model in every `mogov build`. A failing one skips the model. |
+| Unit tests for fragile logic | 15 dbt unit tests on fragile matching and parsing logic: House and Senate vote tokens, MEC committee attribution, CourtListener case matches, judge index names, lobbyist-gift recipients, garbled disclosure items, committee donor chains, TAP contribution layouts, municipal office titles (`_*_unit_tests.yml` beside the models they cover). They run before their model in every `mogov build`. A failing one skips the model. |
 
 ## Still open
 
