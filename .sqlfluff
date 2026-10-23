@@ -14,6 +14,8 @@ max_parse_depth = 2000
 [sqlfluff:templater:dbt]
 project_dir = dbt
 profiles_dir = dbt
+# In-memory DuckDB target (dbt/profiles.yml): linting must not need data/mogov.duckdb to exist.
+target = lint
 
 [sqlfluff:indentation]
 tab_space_size = 4

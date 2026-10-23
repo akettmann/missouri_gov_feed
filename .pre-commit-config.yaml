@@ -21,23 +21,33 @@ repos:
         entry: uv run --frozen ruff check --fix
         language: system
         types_or: [python, pyi]
+      # ruff comes from uv.lock via `uv run --frozen`, so this hook and a bare `uv run ruff` always agree on
+      # version; bump it once with `uv lock --upgrade-package ruff`. ruff >= 0.17 also formats Python code
+      # blocks in Markdown, so ruff-format must see markdown files or `ruff format --check .` disagrees with it.
       - id: ruff-format
         name: ruff format
         entry: uv run --frozen ruff format
         language: system
-        types_or: [python, pyi]
+        types_or: [python, pyi, markdown]
       - id: sqlfluff-fix
         name: sqlfluff fix
-        entry: uv run --frozen sqlfluff fix --force
+        entry: uv run --frozen python scripts/sqlfluff_hook.py fix --force
         language: system
         files: ^dbt/(models|macros|tests)/.*\.sql$
         require_serial: true
       - id: sqlfluff-lint
         name: sqlfluff lint
-        entry: uv run --frozen sqlfluff lint
+        entry: uv run --frozen python scripts/sqlfluff_hook.py lint
         language: system
         files: ^dbt/(models|macros|tests)/.*\.sql$
         require_serial: true
+      - id: model-docs-check
+        name: dbt model docs are current (gen_model_docs.py --check)
+        # fails when a model header comment or the generated _<layer>.yml changed without the other
+        entry: uv run --frozen python scripts/gen_model_docs.py --check
+        language: system
+        files: ^(dbt/models/(staging|intermediate)/.*\.(sql|yml)|scripts/gen_model_docs\.py)$
+        pass_filenames: false
       - id: plantuml-render
         name: render PlantUML diagrams (svg)
         # needs java on PATH (or $JAVA); downloads a pinned plantuml.jar to ~/.cache/plantuml once
@@ -46,16 +56,16 @@ repos:
         files: ^docs/diagrams/.*\.puml$
         require_serial: true
       # frontend/: needs Node 24 + pnpm (`cd frontend && pnpm install` first). Hooks get repo-root paths,
-      # so the wrappers strip the frontend/ prefix and run inside frontend/.
+      # so scripts/frontend_hook.py strips the frontend/ prefix and runs inside frontend/.
       - id: prettier
         name: prettier (frontend)
-        entry: bash -c 'cd frontend && pnpm exec prettier --write --ignore-unknown "${@#frontend/}"' --
+        entry: uv run --frozen python scripts/frontend_hook.py prettier --write --ignore-unknown
         language: system
         files: ^frontend/
         exclude: ^frontend/pnpm-lock\.yaml$
       - id: eslint
         name: eslint (frontend)
-        entry: bash -c 'cd frontend && pnpm exec eslint --fix --no-warn-ignored "${@#frontend/}"' --
+        entry: uv run --frozen python scripts/frontend_hook.py eslint --fix --no-warn-ignored
         language: system
         files: ^frontend/.*\.(js|mjs|ts|astro)$
       - id: astro-check

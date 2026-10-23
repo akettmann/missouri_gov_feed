@@ -59,3 +59,27 @@ unit_tests:
         - {mec_committee_id: C000100, committee_name: New Name PAC, committee_total_amount: 1790, donor_rank: 9, donor_name: Org 05, total_amount: 50, trail_status: end of trail, donor_mec_committee_id: null}
         - {mec_committee_id: C000100, committee_name: New Name PAC, committee_total_amount: 1790, donor_rank: 10, donor_name: Org 06, total_amount: 40, trail_status: end of trail, donor_mec_committee_id: null}
         - {mec_committee_id: C000100, committee_name: New Name PAC, committee_total_amount: 1790, donor_rank: null, donor_name: (individuals), total_amount: 150, trail_status: individuals, donor_mec_committee_id: null}
+
+  - name: committee_donors_name_with_unknown_year_ranks_last
+    model: rpt_committee_donors
+    description: >
+      A committee name whose last_year_under_name is null must lose to one with a known year, whatever the
+      adapter's default null ordering is (guards the coalesce that replaced NULLS LAST). Name ties on year
+      fall back to alphabetical order.
+    given:
+      - input: ref('fct_campaign_finance')
+        rows:
+          - {official_id: o1, direction: received, counterparty_mec_committee_id: C000100}
+      - input: ref('int_mec__committee_names')
+        rows:
+          - {mec_committee_id: C000100, committee_name: AAA Unknown Year PAC, last_year_under_name: null}
+          - {mec_committee_id: C000100, committee_name: ZZZ Dated PAC, last_year_under_name: 2015}
+      - input: ref('int_mec__contributions_received')
+        rows:
+          - {mec_committee_id: C000100, contributor_type: Corporation, contributor_name: Acme Corp, contributor_committee_name: null, amount: 500, contribution_year: 2020}
+      - input: ref('int_mec__donor_committees')
+        rows:
+          - {donor_committee_name: Placeholder PAC, contribution_year: 2020, mec_committee_id: null, match_status: no match, match_confidence: null}
+    expect:
+      rows:
+        - {mec_committee_id: C000100, committee_name: ZZZ Dated PAC, committee_total_amount: 500, donor_rank: 1, donor_name: Acme Corp, total_amount: 500, trail_status: end of trail, donor_mec_committee_id: null}

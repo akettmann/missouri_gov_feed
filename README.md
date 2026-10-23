@@ -7,7 +7,7 @@ Python loaders fetch public records; dbt (DuckDB locally) turns them into one pr
 ```
 uv sync
 uv run mogov run          # stage-1 loaders -> dbt build -> stage-2 loaders -> dbt build
-uv run mogov export       # marts + reporting -> data/exports/*.csv   (--format parquet also works)
+uv run mogov export       # marts + reporting -> data/exports/*.parquet (--format csv also works); then `pnpm build` in frontend/
 ```
 
 Or with Docker only: `docker compose up` (see [docs/environment.md](docs/environment.md#local-in-docker-compose)).

@@ -21,7 +21,7 @@ latest_name as (
         mec_committee_id,
         committee_name,
         row_number() over (
-            partition by mec_committee_id order by last_year_under_name desc nulls last, committee_name asc
+            partition by mec_committee_id order by coalesce(last_year_under_name, 0) desc, committee_name asc
         ) as name_rank
     from {{ ref('int_mec__committee_names') }}
 ),

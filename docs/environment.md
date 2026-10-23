@@ -30,7 +30,9 @@ Diagrams: [pipeline](diagrams/pipeline.svg), [lineage](diagrams/lineage.svg),
    ten years of House roll-call PDFs and Senate journals. Everything fetched is cached under
    `data/cache`, so later runs are much faster.
 5. Check the result: `uv run mogov build` should end with `ERROR=0`. Run `uv run mogov export` to write
-   the marts and reporting tables to `data/exports/`.
+   the marts and reporting tables to `data/exports/` as parquet (the default; the frontend reads only
+   parquet. `--format csv` is for other tools). If you use the site, run `pnpm build` in `frontend/`
+   afterwards: `pnpm preview` serves the existing `dist/` and does not rebuild.
 
 Layout under `data/` (override the root with `MOGOV_DATA_DIR`):
 
