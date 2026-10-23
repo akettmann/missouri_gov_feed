@@ -13,77 +13,100 @@ import SectionMoney from "../../components/SectionMoney.astro";
 import SectionOverlap from "../../components/SectionOverlap.astro";
 import SectionVoting from "../../components/SectionVoting.astro";
 import Layout from "../../layouts/Layout.astro";
-import { allOfficials } from "../../lib/exports/load";
-import type { OfficialBundle } from "../../lib/exports/types";
+import PastOfficeholder from "../../components/PastOfficeholder.astro";
+import { allOfficials, pastOfficeholders } from "../../lib/exports/load";
+import type { OfficialBundle, PastPerson } from "../../lib/exports/types";
 import { LEVELS, officeLine, visibleCoverage } from "../../lib/format";
 import { href, reportErrorUrl } from "../../lib/site";
 
-export const getStaticPaths = (async () =>
-  (await allOfficials()).map((bundle) => ({
-    params: { slug: bundle.official.slug },
-    props: { bundle },
-  }))) satisfies GetStaticPaths;
+// Two kinds of page share this one URL space, both keyed slugFor(name, official_id): full profiles for people
+// serving now, and small pages for past officeholders (lib/exports/load.ts decides which; the sets are disjoint).
+// A past officeholder who is later elected to a tracked office keeps the same official_id, so the same slug
+// path just becomes their full profile.
+export const getStaticPaths = (async () => {
+  const past = await pastOfficeholders();
+  const rosterStart = Math.min(...(past?.years.keys() ?? []));
+  return [
+    ...(await allOfficials()).map((bundle) => ({
+      params: { slug: bundle.official.slug },
+      props: { bundle, person: undefined, rosterStart },
+    })),
+    ...(past?.people ?? []).map((person) => ({
+      params: { slug: person.slug },
+      props: { bundle: undefined, person, rosterStart },
+    })),
+  ];
+}) satisfies GetStaticPaths;
 
 interface Props {
-  bundle: OfficialBundle;
+  bundle?: OfficialBundle;
+  person?: PastPerson;
+  rosterStart: number;
 }
-const { bundle } = Astro.props;
-const o = bundle.official;
-const bias = bundle.coverage.find((c) => c.key === "bias")!;
-const jsonUrl = href(`/officials/${o.slug}.json`);
-const term = [o.current_term_start, o.current_term_end].filter(Boolean).join(" to ");
+const { bundle, person, rosterStart } = Astro.props;
+const o = bundle?.official;
+const bias = bundle?.coverage.find((c) => c.key === "bias");
+const jsonUrl = o ? href(`/officials/${o.slug}.json`) : undefined;
+const term = o ? [o.current_term_start, o.current_term_end].filter(Boolean).join(" to ") : "";
 ---
 
-<Layout title={o.full_name} description={`Evidence on ${o.full_name}: ${officeLine(o)}.`}>
-  <article data-bundle-url={jsonUrl}>
-    <header class="profile-head">
-      {o.image_url && (
-        <img src={o.image_url} alt="" width="96" height="120" loading="lazy" referrerpolicy="no-referrer" />
-      )}
-      <div class="who">
-        <p class="small muted crumbs">
-          <a href={href("/")}>Officials</a> / {LEVELS[o.level] ?? o.level}
-        </p>
-        <h1>{o.full_name}</h1>
-        <p class="office">{officeLine(o)}</p>
-        <p class="small muted facts">
-          <span>Party: {o.party ?? "none listed (non-partisan office or not recorded)"}</span>
-          {term && <span>Current term: {term}</span>}
-          {o.hometown && <span>Hometown: {o.hometown}</span>}
-        </p>
+{person && (
+  <Layout title={person.full_name} description={`Offices ${person.full_name} held in past years.`}>
+    <PastOfficeholder person={person} rosterStart={rosterStart} />
+  </Layout>
+)}
+{bundle && o && bias && (
+  <Layout title={o.full_name} description={`Evidence on ${o.full_name}: ${officeLine(o)}.`}>
+    <article data-bundle-url={jsonUrl}>
+      <header class="profile-head">
+        {o.image_url && (
+          <img src={o.image_url} alt="" width="96" height="120" loading="lazy" referrerpolicy="no-referrer" />
+        )}
+        <div class="who">
+          <p class="small muted crumbs">
+            <a href={href("/")}>Officials</a> / {LEVELS[o.level] ?? o.level}
+          </p>
+          <h1>{o.full_name}</h1>
+          <p class="office">{officeLine(o)}</p>
+          <p class="small muted facts">
+            <span>Party: {o.party ?? "none listed (non-partisan office or not recorded)"}</span>
+            {term && <span>Current term: {term}</span>}
+            {o.hometown && <span>Hometown: {o.hometown}</span>}
+          </p>
+        </div>
+      </header>
+
+      <CoverageStrip items={visibleCoverage(bundle.coverage)} />
+
+      <div class="tools small">
+        <ConfidenceToggle />
+        <a href={jsonUrl} download>
+          Download this data (JSON)
+        </a>
+        <a class="js-only" href={href(`/compare/?a=${o.slug}`)}>
+          Compare with another official
+        </a>
+        <a href={reportErrorUrl(o.full_name, Astro.url.pathname)} rel="noopener" target="_blank">
+          Report an error
+        </a>
       </div>
-    </header>
 
-    <CoverageStrip items={visibleCoverage(bundle.coverage)} />
-
-    <div class="tools small">
-      <ConfidenceToggle />
-      <a href={jsonUrl} download>
-        Download this data (JSON)
-      </a>
-      <a class="js-only" href={href(`/compare/?a=${o.slug}`)}>
-        Compare with another official
-      </a>
-      <a href={reportErrorUrl(o.full_name, Astro.url.pathname)} rel="noopener" target="_blank">
-        Report an error
-      </a>
-    </div>
-
-    <SectionIdeology
-      indicators={bundle.indicators}
-      status={bias.status}
-      peers={bundle.peers}
-      office={o.office}
-    />
-    <SectionVoting bundle={bundle} />
-    <SectionMoney bundle={bundle} />
-    <SectionGifts bundle={bundle} />
-    <SectionOverlap bundle={bundle} />
-    <SectionBusinesses bundle={bundle} />
-    <SectionInterests bundle={bundle} />
-    <SectionCourts bundle={bundle} />
-  </article>
-</Layout>
+      <SectionIdeology
+        indicators={bundle.indicators}
+        status={bias.status}
+        peers={bundle.peers}
+        office={o.office}
+      />
+      <SectionVoting bundle={bundle} />
+      <SectionMoney bundle={bundle} />
+      <SectionGifts bundle={bundle} />
+      <SectionOverlap bundle={bundle} />
+      <SectionBusinesses bundle={bundle} />
+      <SectionInterests bundle={bundle} />
+      <SectionCourts bundle={bundle} />
+    </article>
+  </Layout>
+)}
 
 <script>
   import "../../scripts/profile";

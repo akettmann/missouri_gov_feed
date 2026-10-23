@@ -87,3 +87,24 @@ export const OFFICE_GROUPS: { key: string; label: string; offices: Record<string
 ];
 
 export const officeGroup = (office: string) => OFFICE_GROUPS.find((g) => office in g.offices)?.key ?? "other";
+
+/** [2017, 2018, 2020] -> "2017–2018, 2020": consecutive years collapse into a range. */
+export function yearRanges(years: number[]): string {
+  const out: string[] = [];
+  const sorted = [...new Set(years)].sort((a, b) => a - b);
+  for (let i = 0; i < sorted.length;) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) j++;
+    out.push(j > i ? `${sorted[i]}–${sorted[j]}` : String(sorted[i]));
+    i = j + 1;
+  }
+  return out.join(", ");
+}
+
+/** Plain names for the roster sources behind rpt_officeholders_by_year; unknown values show as given. */
+export const ROSTER_SOURCES: Record<string, string> = {
+  "mo_house roster": "Missouri House roster",
+  openstates: "Open States people data",
+  "congress-legislators": "congress-legislators (U.S. Congress)",
+  fjc: "Federal Judicial Center biographical directory",
+};

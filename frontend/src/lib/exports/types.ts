@@ -347,7 +347,30 @@ export interface IndexEntry {
   district: string | null;
 }
 
-/** One past-year row of the browse list (rpt_officeholders_by_year); slug only for people serving now. */
-export interface PastOfficeholder extends Omit<IndexEntry, "slug"> {
-  slug: string | null;
+/**
+ * One past-year row of the browse list (rpt_officeholders_by_year). Every row links somewhere: the full profile
+ * for anyone serving now (has_profile), otherwise their small past-officeholder page. Same slug scheme for both.
+ */
+export interface PastOfficeholder extends IndexEntry {
+  has_profile: boolean;
+}
+
+/** One office a past officeholder held, with the years of the roster data in which they held it. */
+export interface PastStint {
+  office: string;
+  office_title: string | null;
+  level: string;
+  district: string | null;
+  party: string | null;
+  years: number[];
+}
+
+/** A past officeholder without a full profile: what the rosters say and nothing more. */
+export interface PastPerson {
+  slug: string;
+  official_id: string;
+  full_name: string;
+  party: string | null;
+  sources: string[];
+  stints: PastStint[];
 }
