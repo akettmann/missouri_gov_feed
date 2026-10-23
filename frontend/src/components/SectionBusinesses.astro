@@ -17,6 +17,9 @@ const industries = businesses?.industries ?? [];
 const totalSites = industries.reduce((n, i) => n + i.n_sites, 0);
 // bars compare the coded sectors; the uncoded group is usually most of the sites and would flatten them
 const maxSites = Math.max(1, ...industries.filter((i) => i.sector_code).map((i) => i.n_sites));
+// when every donor is a possible match, "Hide possible matches" would leave a bare table header
+const allPossible =
+  (businesses?.donors.length ?? 0) > 0 && businesses?.donors.every((d) => d.match_confidence === "medium");
 const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : `${a}–${b}`);
 ---
 
@@ -55,65 +58,73 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
           None of the {count(totalSites)} sites matched a donor to this official by name or listed brand.
         </p>
       ) : (
-        <div class="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Donor (as filed)</th>
-                <th class="num">Gave this official</th>
-                <th>Years</th>
-                <th>Their sites here</th>
-                <th>Contributions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {businesses.donors.map((d) => (
-                <tr data-confidence={d.match_confidence === "medium" ? "medium" : undefined}>
-                  <td>
-                    {d.donor_names} <ConfidenceBadge confidence={d.match_confidence} />
-                  </td>
-                  <td class="num">
-                    {money(d.donated_amount)}
-                    <span class="muted small">
-                      {" "}
-                      ({count(d.n_contributions)} {d.n_contributions === 1 ? "contribution" : "contributions"}
-                      )
-                    </span>
-                  </td>
-                  <td class="nowrap">{years(d.first_year, d.last_year)}</td>
-                  <td>
-                    <details>
-                      <summary class="small">
-                        {d.sites.length} {d.sites.length === 1 ? "site" : "sites"}
-                      </summary>
-                      <ul class="sites small">
-                        {d.sites.map((s) => (
-                          <li>
-                            {s.facility_name ?? "unnamed site"}
-                            {s.city && <span class="muted">, {s.city}</span>}
-                            {s.naics_description && <span class="muted"> · {s.naics_description}</span>}
-                            {s.matched_by === "same company" && (
-                              <span
-                                class="badge"
-                                title="Tied by a shared brand (company_brands list), not an identical name"
-                              >
-                                same brand
-                              </span>
-                            )}{" "}
-                            · <SourceLink url={s.frs_url} label="EPA record" />
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
-                  </td>
-                  <td>
-                    <SourceLink url={d.contributions_url} label="reports" />
-                  </td>
+        <>
+          {allPossible && (
+            <p class="small muted all-possible">
+              All matched donors here are possible matches, which are hidden. Untick "Hide possible matches"
+              to see them.
+            </p>
+          )}
+          <div class:list={["table-scroll", { "donor-table": allPossible }]}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Donor (as filed)</th>
+                  <th class="num">Gave this official</th>
+                  <th>Years</th>
+                  <th>Their sites here</th>
+                  <th>Contributions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {businesses.donors.map((d) => (
+                  <tr data-confidence={d.match_confidence === "medium" ? "medium" : undefined}>
+                    <td>
+                      {d.donor_names} <ConfidenceBadge confidence={d.match_confidence} />
+                    </td>
+                    <td class="num">
+                      {money(d.donated_amount)}
+                      <span class="muted small">
+                        {" "}
+                        ({count(d.n_contributions)}{" "}
+                        {d.n_contributions === 1 ? "contribution" : "contributions"})
+                      </span>
+                    </td>
+                    <td class="nowrap">{years(d.first_year, d.last_year)}</td>
+                    <td>
+                      <details>
+                        <summary class="small">
+                          {d.sites.length} {d.sites.length === 1 ? "site" : "sites"}
+                        </summary>
+                        <ul class="sites small">
+                          {d.sites.map((s) => (
+                            <li>
+                              {s.facility_name ?? "unnamed site"}
+                              {s.city && <span class="muted">, {s.city}</span>}
+                              {s.naics_description && <span class="muted"> · {s.naics_description}</span>}
+                              {s.matched_by === "same company" && (
+                                <span
+                                  class="badge"
+                                  title="Tied by a shared brand (company_brands list), not an identical name"
+                                >
+                                  same brand
+                                </span>
+                              )}{" "}
+                              · <SourceLink url={s.frs_url} label="EPA record" />
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    </td>
+                    <td>
+                      <SourceLink url={d.contributions_url} label="reports" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
       <h3>All {count(totalSites)} sites by industry</h3>
       <p class="small muted">
@@ -152,6 +163,15 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
 </section>
 
 <style>
+  .all-possible {
+    display: none;
+  }
+  :global(html.hide-medium) .all-possible {
+    display: block;
+  }
+  :global(html.hide-medium) .donor-table {
+    display: none;
+  }
   .nowrap {
     white-space: nowrap;
   }
