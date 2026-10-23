@@ -96,19 +96,23 @@ const groupInfo = Object.fromEntries(
     </div>
   </form>
 
-  {pastYears.length > 0 && (
-    <noscript>
-      <p class="small" id="year-links">
-        Search and filters need JavaScript. Who held these offices before:{" "}
-        {pastYears.map((y, i) => (
-          <>
-            {i > 0 && " · "}
-            <a href={href(`/years/${y}/`)}>{y}</a>
-          </>
-        ))}
-      </p>
-    </noscript>
-  )}
+  <noscript>
+    <p class="small" id="year-links">
+      Search and filters need JavaScript.
+      {pastYears.length > 0 && (
+        <>
+          {" "}
+          Who held these offices before:{" "}
+          {pastYears.map((y, i) => (
+            <>
+              {i > 0 && " · "}
+              <a href={href(`/years/${y}/`)}>{y}</a>
+            </>
+          ))}
+        </>
+      )}
+    </p>
+  </noscript>
 
   <h2 id="list-heading">Serving in {currentYear}</h2>
   <p class="small muted" id="list-note">
