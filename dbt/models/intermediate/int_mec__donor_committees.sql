@@ -29,7 +29,7 @@ with donations as (
 donor_names as (
     select distinct donor_committee_name
     from donations
-    where length(trim(donor_committee_name)) >= 2
+    where {{ dbt.length("trim(donor_committee_name)") }} >= 2
 ),
 
 donor_keys as (
@@ -124,7 +124,7 @@ candidates as (
         f.last_active_year
     from donor_keys as d
     inner join filer_keys as f on d.match_tier = f.match_tier and d.name_key = f.name_key
-    where d.name_key <> '' and (d.match_tier < 3 or length(d.name_key) >= 4)
+    where d.name_key <> '' and (d.match_tier < 3 or {{ dbt.length("d.name_key") }} >= 4)
 ),
 
 year_candidates as (
@@ -195,7 +195,7 @@ select
         when d.n_candidates = 1 then 'matched'
         when d.n_candidates > 1 then 'ambiguous'
         when n.donor_committee_name is not null then 'not active that year'
-        when length(trim(g.donor_committee_name)) < 2 then 'placeholder name'
+        when {{ dbt.length("trim(g.donor_committee_name)") }} < 2 then 'placeholder name'
         else 'no match'
     end as match_status,
     case d.match_tier

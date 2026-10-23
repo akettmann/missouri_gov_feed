@@ -50,6 +50,7 @@ package "seeds" {
   [interest_keywords\nindustry_subjects] as S_interest
   [company_brands] as S_brands
   [naics_sectors] as S_naics
+  [donor_employer_placeholders] as S_empph
 }
 
 package "intermediate (identity resolution)" {
@@ -74,6 +75,7 @@ package "marts" {
   [fct_salaries] as F_sal
   [fct_bills\nfct_bill_subjects\nfct_bill_sponsors\nfct_vote_bills] as F_bills
   [dim_district\nfct_official_districts] as D_dist
+  [dim_zcta] as D_zcta
   [fct_votes\nfct_federal_votes] as F_votes
   [fct_campaign_finance\nfct_federal_donor_summary\nfct_campaign_spending\nfct_campaign_reports] as F_money
   [fct_lobbyist_gifts] as F_gifts
@@ -96,6 +98,10 @@ package "reporting (frontend views)" {
   [rpt_interest_vote_overlap] as R_overlap
   [rpt_officeholders_by_year] as R_years
   [rpt_district_business_industries] as R_ind
+  [rpt_votes_by_subject] as R_subj
+  [rpt_awards] as R_awards
+  [rpt_donor_size] as R_size
+  [rpt_donor_employers] as R_emp
 }
 [voter_frontend\n(dbt exposure)] as EXP
 
@@ -167,6 +173,7 @@ F_legal --> profile
 F_cases --> profile
 
 L_tiger --> D_dist
+L_zcta --> D_zcta
 L_pay --> F_sal
 I_seats --> F_sal
 I_off --> F_sal
@@ -183,7 +190,6 @@ S_courts --> D_dist
 S_fedpay --> F_sal
 dim --> D_dist
 D_dist --> EXP
-L_zcta --> D_zcta
 D_zcta --> EXP
 
 F_bias --> R_peers
@@ -213,6 +219,20 @@ I_years --> R_years
 dim --> R_years
 R_years --> EXP
 profile --> EXP
+
+F_votes --> R_subj
+F_bills --> R_subj
+R_subj --> EXP
+dim --> R_awards
+R_votes --> R_awards
+R_money --> R_awards
+F_bias --> R_awards
+R_awards --> EXP
+F_money --> R_size
+R_size --> EXP
+F_money --> R_emp
+S_empph --> R_emp
+R_emp --> EXP
 
 L_epa --> I_frs
 I_frs --> F_fac

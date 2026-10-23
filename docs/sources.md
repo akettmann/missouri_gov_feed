@@ -444,6 +444,8 @@ Quirks:
 
 ## census_zcta: ZIP code areas
 
+Flow: [diagrams/sources/census_zcta.svg](diagrams/sources/census_zcta.svg)
+
 Census Bureau Gazetteer file for ZIP Code Tabulation Areas: each ZCTA's internal point (a point inside the
 area, near its center) and land and water area. It feeds `dim_zcta` and the frontend's "find my officials by
 ZIP" lookup, which runs in the browser: the district at the internal point is the answer, and districts

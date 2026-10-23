@@ -52,6 +52,12 @@ Census TIGER district, county and place boundaries. Source: [sources/census_tige
 
 ![census_tiger](sources/census_tiger.svg)
 
+### census_zcta
+
+Census Gazetteer ZIP code areas: internal points and land areas for find-by-ZIP. Source: [sources/census_zcta.puml](sources/census_zcta.puml)
+
+![census_zcta](sources/census_zcta.svg)
+
 ### congress_legislators
 
 The unitedstates/congress-legislators roster and terms. Source: [sources/congress_legislators.puml](sources/congress_legislators.puml)
@@ -165,5 +171,3 @@ Voteview congressional roll calls and DW-NOMINATE scores. Source: [sources/votev
 Wikidata positions, occupations and relatives. Source: [sources/wikidata.puml](sources/wikidata.puml)
 
 ![wikidata](sources/wikidata.svg)
-
-`census_zcta` has no flow diagram yet (#29).
