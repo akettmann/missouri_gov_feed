@@ -66,11 +66,11 @@ unit_tests:
         - {donor_committee_name: MO Values PAC, contribution_year: 2024, amount: 10, contribution_count: 1, mec_committee_id: C000012, match_status: matched, match_method: same name, match_confidence: high, candidate_mec_committee_ids: C000012}
         - {donor_committee_name: Missouri Values PAC, contribution_year: 2024, amount: 10, contribution_count: 1, mec_committee_id: C000013, match_status: matched, match_method: same name, match_confidence: high, candidate_mec_committee_ids: C000013}
 
-  - name: donor_committee_reviewed_aliases_link_acronym_donors
+  - name: donor_committee_curated_aliases_link_acronym_donors
     model: int_mec__donor_committees
     description: >
-      A reviewed alias (committee_donor_aliases, #33) links an acronym donor no rule can expand ("HRCC" ->
-      House Republican Campaign Committee), ignoring case and punctuation, labeled "reviewed alias", high.
+      A curated alias (committee_donor_aliases, #33) links an acronym donor no rule can expand ("HRCC" ->
+      House Republican Campaign Committee), ignoring case and punctuation, labeled "curated alias", high.
       It still needs the committee to be active that year ("not active that year" otherwise), it beats a rule
       match for the same name, and an alias naming a MECID that isn't a known committee creates no link (the
       name falls back to the rules, here an exact-name match; an acronym with only a bad alias stays "no match").
@@ -101,12 +101,12 @@ unit_tests:
           - {mec_committee_id: R1, contributor_committee_name: GHOST, contribution_year: 2020, amount: 60}
     expect:
       rows:
-        - {donor_committee_name: HRCC INC, contribution_year: 2020, amount: 100, contribution_count: 1, mec_committee_id: C000020, match_status: matched, match_method: reviewed alias, match_confidence: high, candidate_mec_committee_ids: C000020}
-        - {donor_committee_name: 'hrcc, inc', contribution_year: 2020, amount: 50, contribution_count: 1, mec_committee_id: C000020, match_status: matched, match_method: reviewed alias, match_confidence: high, candidate_mec_committee_ids: C000020}
+        - {donor_committee_name: HRCC INC, contribution_year: 2020, amount: 100, contribution_count: 1, mec_committee_id: C000020, match_status: matched, match_method: curated alias, match_confidence: high, candidate_mec_committee_ids: C000020}
+        - {donor_committee_name: 'hrcc, inc', contribution_year: 2020, amount: 50, contribution_count: 1, mec_committee_id: C000020, match_status: matched, match_method: curated alias, match_confidence: high, candidate_mec_committee_ids: C000020}
         - {donor_committee_name: HRCC, contribution_year: 2020, amount: 7, contribution_count: 1, mec_committee_id: null, match_status: no match, match_method: null, match_confidence: null, candidate_mec_committee_ids: null}
-        - {donor_committee_name: SLF, contribution_year: 2011, amount: 10, contribution_count: 1, mec_committee_id: C000021, match_status: matched, match_method: reviewed alias, match_confidence: high, candidate_mec_committee_ids: C000021}
+        - {donor_committee_name: SLF, contribution_year: 2011, amount: 10, contribution_count: 1, mec_committee_id: C000021, match_status: matched, match_method: curated alias, match_confidence: high, candidate_mec_committee_ids: C000021}
         - {donor_committee_name: SLF, contribution_year: 2020, amount: 20, contribution_count: 1, mec_committee_id: null, match_status: not active that year, match_method: null, match_confidence: null, candidate_mec_committee_ids: null}
-        - {donor_committee_name: Health PAC, contribution_year: 2020, amount: 30, contribution_count: 1, mec_committee_id: C000023, match_status: matched, match_method: reviewed alias, match_confidence: high, candidate_mec_committee_ids: C000023}
+        - {donor_committee_name: Health PAC, contribution_year: 2020, amount: 30, contribution_count: 1, mec_committee_id: C000023, match_status: matched, match_method: curated alias, match_confidence: high, candidate_mec_committee_ids: C000023}
         - {donor_committee_name: Rule PAC, contribution_year: 2020, amount: 40, contribution_count: 1, mec_committee_id: C000025, match_status: matched, match_method: same name, match_confidence: high, candidate_mec_committee_ids: C000025}
         - {donor_committee_name: GHOST, contribution_year: 2020, amount: 60, contribution_count: 1, mec_committee_id: null, match_status: no match, match_method: null, match_confidence: null, candidate_mec_committee_ids: null}
 

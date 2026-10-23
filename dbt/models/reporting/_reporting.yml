@@ -200,8 +200,8 @@ models:
       - name: donor_link_confidence
         data_type: varchar
         description: >
-          `high` (a reviewed alias, MECID written into the name, or same name) or `medium` (spelling-normalized name, with
-          abbreviations spelled out and filler words dropped; or core name, with words like PAC, Political,
+          `high` (a curated alias, MECID written into the name, or same name) or `medium` (spelling-normalized name,
+          with abbreviations spelled out and filler words dropped; or core name, with words like PAC, Political,
           Action, Committee, Fund, Account dropped, or a filer's parenthesized short name) for
           donor_mec_committee_id; null without one.
       - name: total_amount
@@ -758,9 +758,9 @@ models:
       - name: donor_link_confidence
         data_type: varchar
         description: >
-          `high` (a reviewed alias, MECID in the name, or same name) or `medium` (spelling-normalized name, with abbreviations
-          spelled out and filler words dropped; or core name, with words like PAC, Political, Action, Committee,
-          Fund, Account dropped, or a filer's parenthesized short name) for donor_mec_committee_id.
+          `high` (a curated alias, MECID in the name, or same name) or `medium` (spelling-normalized name, with
+          abbreviations spelled out and filler words dropped; or core name, with words like PAC, Political, Action,
+          Committee, Fund, Account dropped, or a filer's parenthesized short name) for donor_mec_committee_id.
       - name: source_url
         data_type: varchar
         description: The committee's MEC page, where its reports and itemized contributions are.

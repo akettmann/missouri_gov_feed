@@ -2,15 +2,19 @@ version: 2
 seeds:
   - name: committee_donor_aliases
     description: >
-      Hand-checked donor names for the committee-to-committee crosswalk (int_mec__donor_committees, #33): names
+      Curated donor names for the committee-to-committee crosswalk (int_mec__donor_committees, #33): names
       donors type for a Missouri committee that no normalization rule can expand ("HRCC", "AMECPAC", "MHA PAC").
-      Each alias maps to one MECID, with the evidence it was checked against; matching ignores case and
-      punctuation, so list a spelling once. Matches are labeled "reviewed alias", high confidence, and count only
-      in years the committee was active. An alias naming a MECID the committees don't have matches nothing.
-      Add an alias only after checking it against the committee's own filings; leave out ones that could
-      be two committees.
+      Each alias maps to one MECID, each checked by matching gifts reported under the name to the committee's own
+      filings (recipient, amount, date), with the evidence recorded. Matching ignores case and punctuation, so
+      list a spelling once. Matches are labeled "curated alias", high confidence, and count only in years the
+      committee was active. An alias naming a MECID the committees don't have matches nothing. Add an alias only
+      after checking it against the committee's own filings; leave out ones that could be two committees.
+      The matching was done by an automated check; checked_by and checked_on stay empty until a maintainer
+      signs the row off.
     config:
-      column_types: {alias: varchar, mec_committee_id: varchar, committee_name: varchar, evidence: varchar}
+      column_types:
+        {alias: varchar, mec_committee_id: varchar, committee_name: varchar, evidence: varchar,
+         checked_by: varchar, checked_on: date}
     columns:
       - name: alias
         data_tests: [unique, not_null]
@@ -23,6 +27,10 @@ seeds:
                 field: mec_committee_id
       - name: evidence
         data_tests: [not_null]
+      - name: checked_by
+        description: Maintainer who reviewed the row; empty until reviewed.
+      - name: checked_on
+        description: Date the maintainer reviewed the row; empty until reviewed.
   - name: donor_employer_placeholders
     description: >
       Answers individual contributors give in the employer field that name no employer (retired, none,

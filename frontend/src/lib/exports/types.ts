@@ -84,8 +84,8 @@ export interface CommitteeTrail {
   first_year: number;
   last_year: number;
   /**
-   * high = reviewed alias (a person checked the acronym against the committee's filings), committee ID written
-   * into the name, or the same name; medium = looser name (abbreviations spelled out,
+   * high = curated alias (a curated alias list, each alias matched against the committee's own filings), committee
+   * ID written into the name, or the same name; medium = looser name (abbreviations spelled out,
    * PAC/Fund etc. dropped, or a filer's parenthesized short name)
    */
   link_confidence: string;

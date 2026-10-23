@@ -1,9 +1,10 @@
 -- Name -> MECID crosswalk for committee donors. MEC records a committee-to-committee gift with the donor's
 -- name only (the row's MECID is the receiving committee), so the donor's own MECID is found by matching that
 -- name to the names committees file under (int_mec__committee_names), in tiers:
---   reviewed alias     a hand-checked donor name -> MECID in the committee_donor_aliases seed, for acronym and
---                      shortened names no rule can expand ("HRCC", "AMECPAC", "MHA PAC", #33); each row cites
---                      its evidence. Tried first, but only counts when that committee was active that year
+--   curated alias      a curated donor name -> MECID list (committee_donor_aliases seed), each alias checked
+--                      against the committee's own filings, for acronym and shortened names no rule can expand
+--                      ("HRCC", "AMECPAC", "MHA PAC", #33); each row cites its evidence. Tried first, but only
+--                      counts when that committee was active that year
 --   0 mecid in name    the filer typed the donor's MECID into the name ("... (MEC ID# C221962)") and it's a
 --                      known committee; taken whatever its active years
 --   1 same name       name_key: case, punctuation and spacing ignored
@@ -18,8 +19,8 @@
 -- are "not active that year" (usually an older or newer committee under the same name), the rest "no match"
 -- (mostly federal and out-of-state PACs, which don't file with MEC). One-character names ("C", "~") are
 -- placeholders (#31): "placeholder name", never matched.
--- match_confidence: high for reviewed aliases and tiers 0-1 (a person checked the alias, or the name is the
--- committee's own), medium for the looser tiers; either way it rests on the name.
+-- match_confidence: high for curated aliases and tiers 0-1 (the alias was matched to the committee's own
+-- filings, or the name is the committee's own), medium for the looser tiers; either way it rests on the name.
 with donations as (
     select
         contributor_committee_name as donor_committee_name,
@@ -229,7 +230,7 @@ select
         else 'no match'
     end as match_status,
     case d.match_tier
-        when -1 then 'reviewed alias'
+        when -1 then 'curated alias'
         when 0 then 'mecid in name'
         when 1 then 'same name'
         when 2 then 'normalized name'
