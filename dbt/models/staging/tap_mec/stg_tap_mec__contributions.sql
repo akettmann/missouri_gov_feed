@@ -27,19 +27,19 @@
 --     the reported type stays Corporation rather than becoming Individual.
 -- Not handled (left as reported): addresses typed into ctrb_name, and surnames repeated in first_name.
 -- The model exposes no address columns, so only name and type are repaired.
--- Identity and double loading (#82, #75): record_id is the source row's own id in its export layout, prefixed with the
--- layout ('txn:' / 'cd1_a:') because 19k values occur as both a txn and a cd1_a_id. TAP loaded 97.5k transactions
--- twice (same txn, same file; only address_clean differs, because TAP doubled the address), which counted ~$179M twice.
--- One row per record_id is kept, preferring the copy whose address_clean is not doubled (the shorter one).
+-- Identity and double loading (#82, #75, #83): record_id is the source row's own id, txn in the older export layout
+-- or cd1_a_id in the 2020-2022 layout. The two TAP files overlap for 2020 and share one MEC id space: all 19,231 ids
+-- present as both a txn and a cd1_a_id are the same record (same committee, date, amount, address), so the id is
+-- not prefixed with its layout. TAP also loaded 97.5k transactions twice (same id, same file; only address_clean
+-- differs, because TAP doubled the address), which counted ~$179M twice. One row per record_id is kept, preferring
+-- the newer layout (cd1_a_id, no txn) when an id is in both (the shared columns are identical; the older layout's
+-- only extras are ctrb_name / ctrb_type), then the copy whose address_clean is not doubled (the shorter one).
 with
 
 identified as (
     select
         *,
-        case
-            when txn is not null then 'txn:' || cast(txn as {{ dbt.type_string() }})
-            else 'cd1_a:' || cast(cd1_a_id as {{ dbt.type_string() }})
-        end as record_id
+        cast(coalesce(txn, cd1_a_id) as {{ dbt.type_string() }}) as record_id
     from {{ source('tap_mec', 'contributions') }}
     where coalesce(dupe_flag, 'FALSE') <> 'TRUE'
 ),
@@ -49,7 +49,9 @@ unique_records as (
         *,
         row_number() over (
             partition by record_id
-            order by coalesce(length(address_clean), 0), address_clean, address_1, amount
+            order by
+                case when txn is null then 0 else 1 end,
+                coalesce(length(address_clean), 0), address_clean, address_1, amount
         ) as record_rank
     from identified
 ),

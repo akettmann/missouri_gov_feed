@@ -7,8 +7,8 @@
 -- A Missouri committee donor's own MECID (counterparty_mec_committee_id) comes from the name crosswalk
 -- int_mec__donor_committees, unique matches only; it's how the profile goes one hop back (rpt_committee_donors).
 -- Grain: (official_id, direction, source_record_id). source_record_id is the source row's own identity: FEC
--- sub_id, TAP contribution (record_id: txn or cd1_a_id, deduplicated in staging, #82) or expenditure id, or MEC export
--- record id.
+-- sub_id, TAP contribution (record_id: txn or cd1_a_id, deduplicated in staging, #82/#83) or expenditure id, or
+-- MEC export record id.
 with
 
 fec_ids as (

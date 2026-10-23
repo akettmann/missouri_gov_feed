@@ -199,8 +199,9 @@ unit_tests:
     model: stg_tap_mec__contributions
     description: >
       TAP loaded some transactions twice (#82): the same txn, differing only in address_clean (TAP doubled the
-      address). One row per record_id is kept. A cd1_a_id equal to a txn is a different record (the id is
-      prefixed with its layout), and a dupe_flag TRUE row is still dropped.
+      address). One row per record_id is kept. A cd1_a_id equal to a txn (same committee, date,
+      amount) is the same record seen in both export layouts (#83): one row, and the newer layout wins. A dupe_flag
+      TRUE row is still dropped.
     given:
       - input: source('tap_mec', 'contributions')
         format: sql
@@ -224,7 +225,7 @@ unit_tests:
               cast(null as varchar) as state_clean,
               cast(null as varchar) as state,
               cast('100' as varchar) as amount,
-              cast(null as varchar) as date,
+              cast('2020-03-01' as varchar) as date,
               cast(null as varchar) as year,
               cast(null as varchar) as cont_type,
               cast(null as varchar) as contribution_type,
@@ -234,10 +235,9 @@ unit_tests:
               cast('1001' as varchar) as txn,
               cast(null as varchar) as cd1_a_id,
               cast('PO BOX 537 PO BOX 537' as varchar) as address_clean
-          union all select 'C1', null, null, null, 'Dup PAC', 'Committee', null, null, null, null, null, null, null, null, null, null, null, '100', null, null, null, null, null, null, 'FALSE', '1001', null, 'PO BOX 537'
-          union all select 'C1', null, null, null, 'Dup PAC', 'Committee', null, null, null, null, null, null, null, null, null, null, null, '7', null, null, null, null, null, null, 'FALSE', null, '1001', null
+          union all select 'C1', null, null, null, 'Dup PAC', 'Committee', null, null, null, null, null, null, null, null, null, null, null, '100', '2020-03-01', null, null, null, null, null, 'FALSE', '1001', null, 'PO BOX 537'
+          union all select 'C1', null, null, 'New layout', null, null, 'Dup PAC', null, null, null, null, null, null, null, null, null, null, '100', '2020-03-01', null, null, null, null, null, 'FALSE', null, '1001', null
           union all select 'C1', null, null, null, 'Flagged PAC', 'Committee', null, null, null, null, null, null, null, null, null, null, null, '3', null, null, null, null, null, null, 'TRUE', '1002', null, null
     expect:
       rows:
-        - {record_id: 'txn:1001', mec_committee_id: C1, contributor_name: Dup PAC, amount: 100}
-        - {record_id: 'cd1_a:1001', mec_committee_id: C1, contributor_name: Dup PAC, amount: 7}
+        - {record_id: '1001', mec_committee_id: C1, committee_name: New layout, contributor_name: Dup PAC, amount: 100}

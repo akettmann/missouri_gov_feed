@@ -29,15 +29,19 @@ models:
     a multi-word name (C000642 / C081050, 8 rows): the organization sits in first_name; the name is kept and the
     reported type stays Corporation rather than becoming Individual. Not handled (left as reported): addresses typed
     into ctrb_name, and surnames repeated in first_name. The model exposes no address columns, so only name and
-    type are repaired. Identity and double loading (#82, #75): record_id is the source row''s own id in its export
-    layout, prefixed with the layout (''txn:'' / ''cd1_a:'') because 19k values occur as both a txn and a cd1_a_id.
-    TAP loaded 97.5k transactions twice (same txn, same file; only address_clean differs, because TAP doubled the
-    address), which counted ~$179M twice. One row per record_id is kept, preferring the copy whose address_clean
+    type are repaired. Identity and double loading (#82, #75, #83): record_id is the source row''s own id, txn in
+    the older export layout or cd1_a_id in the 2020-2022 layout. The two TAP files overlap for 2020 and share one
+    MEC id space: all 19,231 ids present as both a txn and a cd1_a_id are the same record (same committee, date,
+    amount, address), so the id is not prefixed with its layout. TAP also loaded 97.5k transactions twice (same
+    id, same file; only address_clean differs, because TAP doubled the address), which counted ~$179M twice. One
+    row per record_id is kept, preferring the newer layout (cd1_a_id, no txn) when an id is in both (the shared
+    columns are identical; the older layout''s only extras are ctrb_name / ctrb_type), then the copy whose address_clean
     is not doubled (the shorter one).'
   columns:
   - name: record_id
-    description: 'The source row''s own id, prefixed with its TAP export layout (`txn:` or `cd1_a:`). One row per
-      id: TAP loaded some transactions twice and staging keeps one copy (#82).'
+    description: 'The source row''s own id (`txn`, or `cd1_a_id` in the 2020-2022 layout; one MEC id space). One
+      row per id: TAP loaded some transactions twice and exports two layouts overlapping in 2020, and staging keeps
+      one copy (#82, #83).'
     data_tests:
     - unique
     - not_null
