@@ -1,7 +1,7 @@
 # Sources
 
 One section per loader: what the source is, what lands, and the quirks found so far. Each has a
-flow diagram in [diagrams/sources](diagrams/sources). Raw tables land under `data/raw/<table>/`.
+flow diagram (SVG, rendered from the `.puml` next to it) in [diagrams/sources](diagrams/sources). Raw tables land under `data/raw/<table>/`.
 How a bill moves between the two chambers, which the `mo_house` and `mo_senate` records follow, is in
 [diagrams/mo_bill_flow.svg](diagrams/mo_bill_flow.svg).
 
@@ -33,6 +33,8 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `census_zcta` | Census Bureau Gazetteer | ZIP code area centers and land areas (find-by-ZIP) | newest vintage | |
 
 ## mo_house: Missouri House of Representatives
+
+Flow: [diagrams/sources/mo_house.svg](diagrams/sources/mo_house.svg)
 
 documents.house.mo.gov XML exports (members, bills, actions) plus one PDF per roll call. The PDFs are
 the only per-member House vote record.
@@ -82,6 +84,8 @@ Quirks:
 
 ## mo_senate: Missouri Senate journals
 
+Flow: [diagrams/sources/mo_senate.svg](diagrams/sources/mo_senate.svg)
+
 The daily journal PDFs are the only per-senator roll-call record.
 
 - Lands: `mo_senate_journals`, `mo_senate_votes`.
@@ -111,6 +115,8 @@ Quirks:
 
 ## mo_senate_topics: Missouri Senate topical index
 
+Flow: [diagrams/sources/mo_senate_topics.svg](diagrams/sources/mo_senate_topics.svg)
+
 senate.mo.gov's "Topical Index" (`/BillTracking/bills/keywords?year=YYYY&session=R`) lists every bill of a
 regular session under each subject keyword. It covers all Senate bills and resolutions, plus the House bills
 that reached the Senate. The keywords are the legislature's shared subject index. The House XML only carries
@@ -137,6 +143,8 @@ Quirks:
   linked to a bill.
 
 ## mec: Missouri Ethics Commission (opt-in)
+
+Flow: [diagrams/sources/mec.svg](diagrams/sources/mec.svg)
 
 Direct exports from mec.mo.gov: itemized contributions/expenditures (CD1_A, CD3_B, CD3_C, summary),
 the candidate↔committee crosswalk per election, and lobbyist expenditures.
@@ -186,6 +194,8 @@ Quirks:
 
 ## tap_mec: MEC via The Accountability Project
 
+Flow: [diagrams/sources/tap_mec.svg](diagrams/sources/tap_mec.svg)
+
 Cleaned MEC contributions, expenditures and lobbyist expenditures from TAP's public S3 mirror.
 
 - Lands: `tap_mec_contributions`, `tap_mec_expenditures`, `tap_mec_lobbyist_expenditures`.
@@ -208,6 +218,8 @@ Quirks:
 
 ## fec: Federal Election Commission
 
+Flow: [diagrams/sources/fec.svg](diagrams/sources/fec.svg)
+
 Bulk files (candidates, committees, links, committee→candidate contributions, candidate totals) plus
 API lookups for leadership PACs and donor aggregates.
 
@@ -228,11 +240,15 @@ Quirks:
 
 ## voteview: Congress roll calls and DW-NOMINATE
 
+Flow: [diagrams/sources/voteview.svg](diagrams/sources/voteview.svg)
+
 - Lands: `voteview_members`, `voteview_rollcalls`, `voteview_votes`.
 - Window: `MOGOV_VOTEVIEW_CONGRESSES`.
 - Full-chamber files; Missouri members are picked out in dbt.
 
 ## house_fd: U.S. House financial disclosures
+
+Flow: [diagrams/sources/house_fd.svg](diagrams/sources/house_fd.svg)
 
 Yearly national index plus each Missouri filing's PDF, split into text lines.
 
@@ -246,6 +262,8 @@ Quirks:
 
 ## senate_efd: U.S. Senate eFD (opt-in)
 
+Flow: [diagrams/sources/senate_efd.svg](diagrams/sources/senate_efd.svg)
+
 - Lands: `senate_efd_filings`, `senate_efd_rows`.
 - Enable with `MOGOV_ACCEPT_SENATE_EFD_TERMS=1`, which accepts the use statement (5 U.S.C. app.
   105(c)) on your behalf.
@@ -256,6 +274,8 @@ Quirks:
 - Report pages aren't cached.
 
 ## courtlistener_bulk: judges and judicial disclosures
+
+Flow: [diagrams/sources/courtlistener_bulk.svg](diagrams/sources/courtlistener_bulk.svg)
 
 Quarterly Postgres CSV exports from CourtListener's public S3 bucket: people, positions, courts,
 schools, and federal judges' financial disclosures.
@@ -276,6 +296,8 @@ Quirks:
   tickers and fund codes would read as garbled. A sanity test fails if more than 5% of items get flagged.
 
 ## courtlistener_case_bulk: case history from bulk files
+
+Flow: [diagrams/sources/courtlistener_case_bulk.svg](diagrams/sources/courtlistener_case_bulk.svg)
 
 The quarterly bulk dockets, opinion clusters and opinion panels, filtered to Missouri state and federal
 courts (mo, moctapp*, moed, mowd, ca8). They feed `fct_case_history` through
@@ -304,6 +326,8 @@ Quirks:
 
 ## courtlistener_cases: case history (stage 2)
 
+Flow: [diagrams/sources/courtlistener_cases.svg](diagrams/sources/courtlistener_cases.svg)
+
 Searches CourtListener's opinions for each official who is or was a judge or lawyer
 (`marts.fct_legal_careers`).
 
@@ -323,6 +347,8 @@ Quirks:
 
 ## bluebook: Missouri Official Manual
 
+Flow: [diagrams/sources/bluebook.svg](diagrams/sources/bluebook.svg)
+
 Chapter PDFs (executive, legislative, judicial), one row per text line.
 
 - Lands: `bluebook_lines`.
@@ -336,6 +362,8 @@ Quirks:
 
 ## openstates_people: Open States
 
+Flow: [diagrams/sources/openstates_people.svg](diagrams/sources/openstates_people.svg)
+
 - Lands: `openstates_people` (each `data/mo/**/*.yml` file) and `openstates_current_csv`.
 
 Quirks:
@@ -343,16 +371,22 @@ Quirks:
 
 ## congress_legislators: unitedstates/congress-legislators
 
+Flow: [diagrams/sources/congress_legislators.svg](diagrams/sources/congress_legislators.svg)
+
 - Lands: `congress_legislators_current`, `congress_legislators_historical`. Only people with any
   Missouri term are kept.
 - These records hold the cross-IDs: bioguide, FEC, ICPSR (Voteview), OpenSecrets, Vote Smart, Wikidata.
 
 ## fjc_judges: Federal Judicial Center
 
+Flow: [diagrams/sources/fjc_judges.svg](diagrams/sources/fjc_judges.svg)
+
 - Lands: `fjc_judges`, one wide row per Article III judge since 1789. Column names are kept as
   published.
 
 ## wikidata: positions, occupations, relatives
+
+Flow: [diagrams/sources/wikidata.svg](diagrams/sources/wikidata.svg)
 
 - Lands: `wikidata_positions`, `wikidata_attributes`, `wikidata_relatives`,
   `wikidata_own_leadership`, `wikidata_mo_officeholders`.
@@ -367,10 +401,14 @@ Quirks:
 
 ## shor_mccarty: state legislator ideology
 
+Flow: [diagrams/sources/shor_mccarty.svg](diagrams/sources/shor_mccarty.svg)
+
 - Lands: `shor_mccarty`. Harvard Dataverse, January 2025 release covering 1993–2022, with wide per-year
   columns. License CC BY-NC-SA 4.0.
 
 ## census_tiger: district and place boundaries
+
+Flow: [diagrams/sources/census_tiger.svg](diagrams/sources/census_tiger.svg)
 
 Census Bureau TIGER/Line shapefiles: state senate (SLDU) and house (SLDL) districts, congressional
 districts, counties and places. They feed `dim_district` and `fct_official_districts`, the "find my
@@ -420,6 +458,8 @@ Quirks:
 
 ## mo_employee_pay: Missouri state payroll
 
+Flow: [diagrams/sources/mo_employee_pay.svg](diagrams/sources/mo_employee_pay.svg)
+
 data.mo.gov's "<year> State Employee Pay" datasets (the Missouri Accountability Portal's employee data):
 calendar-year gross pay per employee, agency and position title. Legislators, statewide officials and
 state judges are on it; `fct_salaries` picks them out. Federal officials aren't on it. Their pay is fixed by
@@ -445,6 +485,8 @@ Quirks:
 - Federal officials (Congress, federal judges) are paid by the U.S. and are not in this source.
 
 ## epa_frs: EPA Facility Registry Service
+
+Flow: [diagrams/sources/epa_frs.svg](diagrams/sources/epa_frs.svg)
 
 EPA's Facility Registry Service (FRS) lists every site an EPA or state environmental program regulates:
 factories, fuel stations, quarries, auto body shops, dry cleaners, utilities, farms with permits, landfills.
