@@ -28,13 +28,13 @@ repos:
         types_or: [python, pyi]
       - id: sqlfluff-fix
         name: sqlfluff fix
-        entry: uv run --frozen sqlfluff fix --force
+        entry: uv run --frozen python scripts/sqlfluff_hook.py fix --force
         language: system
         files: ^dbt/(models|macros|tests)/.*\.sql$
         require_serial: true
       - id: sqlfluff-lint
         name: sqlfluff lint
-        entry: uv run --frozen sqlfluff lint
+        entry: uv run --frozen python scripts/sqlfluff_hook.py lint
         language: system
         files: ^dbt/(models|macros|tests)/.*\.sql$
         require_serial: true
