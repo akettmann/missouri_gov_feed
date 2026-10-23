@@ -62,7 +62,9 @@ unit_tests:
       as missing, the name falls back to the person's first/last name and the row is typed Individual, with no
       donor committee name. Without a person's name the name stays null and the reported type is kept. Real short
       names ('3M', 'TY') are two characters or more and survive untouched. The same holds for the second layout,
-      where the placeholder is in `committee`.
+      where the placeholder is in `committee`. A placeholder in the first/last name columns too ('~' / '~',
+      '-' / '-') is not a person's name: the row falls back to `company` and keeps its reported type. Single-letter
+      initials ('R Smith') are real and kept.
     given:
       - input: source('tap_mec', 'contributions')
         format: sql
@@ -97,6 +99,9 @@ unit_tests:
           union all select 'C1', null, null, null, '3M', 'Corporation', '3M', null, null, null, null, null, null, null, null, null, '4', null, null, null, null, null, null, null
           union all select 'C1', null, null, null, 'TY', 'Committee', 'TY', null, 'ANN', 'LEE', null, null, null, null, null, null, '5', null, null, null, null, null, null, null
           union all select null, 'C2', null, null, null, null, ' 0 ', '', 'JOHN', 'DOE', null, null, null, null, null, null, '6', null, null, null, null, null, null, null
+          union all select 'C1', null, null, null, '~', 'Committee', '~', 'Some PAC', '~', '~', null, null, null, null, null, null, '7', null, null, null, null, null, null, null
+          union all select 'C1', null, null, null, '-', 'Committee', '-', 'Other PAC', '-', '-', null, null, null, null, null, null, '8', null, null, null, null, null, null, null
+          union all select 'C1', null, null, null, 'C', 'Committee', 'C', null, 'R', 'Smith', null, null, null, null, null, null, '9', null, null, null, null, null, null, null
     expect:
       rows:
         - {mec_committee_id: C1, contributor_name: KATRINA REESE, contributor_type: Individual, contributor_committee_name: null, amount: 1}
@@ -105,3 +110,6 @@ unit_tests:
         - {mec_committee_id: C1, contributor_name: 3M, contributor_type: Corporation, contributor_committee_name: null, amount: 4}
         - {mec_committee_id: C1, contributor_name: TY, contributor_type: Committee, contributor_committee_name: TY, amount: 5}
         - {mec_committee_id: C2, contributor_name: JOHN DOE, contributor_type: Individual, contributor_committee_name: null, amount: 6}
+        - {mec_committee_id: C1, contributor_name: Some PAC, contributor_type: Committee, contributor_committee_name: null, amount: 7}
+        - {mec_committee_id: C1, contributor_name: Other PAC, contributor_type: Committee, contributor_committee_name: null, amount: 8}
+        - {mec_committee_id: C1, contributor_name: R Smith, contributor_type: Individual, contributor_committee_name: null, amount: 9}

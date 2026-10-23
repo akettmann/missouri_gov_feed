@@ -7,14 +7,35 @@
 -- '_'), almost all with a person's first/last name (federal-committee filings transferred to MEC). A name shorter
 -- than 2 characters is treated as missing, so the name falls back to the person's name and the row is typed
 -- Individual. With no person's name either, the name stays null and the reported type is kept.
+-- The first/last name columns carry the same fillers ('~' / '~', '-' / '-', '?', '.'): a part with no letter or
+-- number is dropped before the person's name is built (not "shorter than 2": real initials like 'R' or 'J' stay).
+-- Rows whose ctrb_name and both name parts are all '~' / '-' hold the real donor in `company`, so they fall
+-- through to it and keep the reported type (Committee) instead of becoming an Individual named '~ ~'.
 with
 
 source_rows as (
     select
         *,
-        case when length(trim(ctrb_name)) >= 2 then trim(ctrb_name) end as ctrb_name_clean,
-        case when length(trim(committee)) >= 2 then trim(committee) end as committee_clean,
-        nullif(trim(coalesce(first_name, '') || ' ' || coalesce(last_name, '')), '') as person_name
+        case
+            when length(trim(ctrb_name)) >= 2 and {{ mogov.regex_matches('ctrb_name', '[A-Za-z0-9]') }}
+                then trim(ctrb_name)
+        end as ctrb_name_clean,
+        case
+            when length(trim(committee)) >= 2 and {{ mogov.regex_matches('committee', '[A-Za-z0-9]') }}
+                then trim(committee)
+        end as committee_clean,
+        nullif(
+            trim(
+                coalesce(
+                    case when {{ mogov.regex_matches('first_name', '[A-Za-z0-9]') }} then trim(first_name) end, ''
+                )
+                || ' '
+                || coalesce(
+                    case when {{ mogov.regex_matches('last_name', '[A-Za-z0-9]') }} then trim(last_name) end, ''
+                )
+            ),
+            ''
+        ) as person_name
     from {{ source('tap_mec', 'contributions') }}
     where coalesce(dupe_flag, 'FALSE') <> 'TRUE'
 )
