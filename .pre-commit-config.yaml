@@ -74,3 +74,9 @@ repos:
         language: system
         files: ^frontend/
         pass_filenames: false
+      - id: frontend-tests
+        name: frontend unit tests (node:test)
+        entry: pnpm --dir frontend test
+        language: system
+        files: ^frontend/scripts/
+        pass_filenames: false
