@@ -20,6 +20,7 @@ package "frontend/ (pnpm build, Node + @duckdb/node-api)" {
 folder "frontend/dist (static)" as dist {
   [index.html\nbrowse / search] as idx
   [lookup/officeholders/<year>.json\npast years of the browse list] as yearjson
+  [years/<year>/index.html\nstatic past year (no JS)] as yearpage
   [officials/<slug>/index.html\nprofile + tables] as page
   [officials/<slug>.json\nper-official bundle] as json
   [methodology/index.html] as meth
@@ -34,6 +35,8 @@ fixtures ..> load : only when an\nrpt_* export is missing
 load --> idx
 load --> yearjson : rpt_officeholders_by_year
 idx --> yearjson : fetch when a\npast year is picked
+load --> yearpage : rpt_officeholders_by_year
+idx --> yearpage : noscript links
 load --> page
 load --> json
 load --> meth : export timestamps
