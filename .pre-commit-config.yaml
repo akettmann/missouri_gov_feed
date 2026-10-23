@@ -38,6 +38,13 @@ repos:
         language: system
         files: ^dbt/(models|macros|tests)/.*\.sql$
         require_serial: true
+      - id: model-docs-check
+        name: dbt model docs are current (gen_model_docs.py --check)
+        # fails when a model header comment or the generated _<layer>.yml changed without the other
+        entry: uv run --frozen python scripts/gen_model_docs.py --check
+        language: system
+        files: ^(dbt/models/(staging|intermediate)/.*\.(sql|yml)|scripts/gen_model_docs\.py)$
+        pass_filenames: false
       - id: plantuml-render
         name: render PlantUML diagrams (svg)
         # needs java on PATH (or $JAVA); downloads a pinned plantuml.jar to ~/.cache/plantuml once
