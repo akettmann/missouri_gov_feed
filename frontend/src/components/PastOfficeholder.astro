@@ -38,7 +38,7 @@ const parties = [...new Set(person.stints.map((s) => s.party))];
             <th>Office</th>
             <th>Level</th>
             <th>Party</th>
-            <th>Years</th>
+            <th>Years on roster (data starts {rosterStart})</th>
           </tr>
         </thead>
         <tbody>
@@ -54,9 +54,36 @@ const parties = [...new Set(person.stints.map((s) => s.party))];
       </table>
     </div>
     <p class="small muted">
-      Years are those in which this person appears on a roster in our data, which starts in {rosterStart};
-      earlier or later service may not be shown.
+      Years are those in which this person appears on a roster in our data, which starts in {rosterStart}; a
+      range such as 2017–2022 is not necessarily the whole length of service.
     </p>
+    {person.same_name.length > 0 && (
+      <p class="small" data-same-name>
+        {person.same_name.some((e) => e.kind === "current")
+          ? "A current officeholder profile with the same name:"
+          : "Another roster entry with the same name:"}
+        {person.same_name
+          .filter((e) => e.kind === "current")
+          .map((e) => (
+            <>
+              {" "}
+              <a href={href(`/officials/${e.slug}/`)}>{e.full_name}</a>
+            </>
+          ))}
+        {person.same_name.some((e) => e.kind === "current") && person.same_name.some((e) => e.kind === "past")
+          ? " Another roster entry with the same name:"
+          : ""}
+        {person.same_name
+          .filter((e) => e.kind === "past")
+          .map((e) => (
+            <>
+              {" "}
+              <a href={href(`/officials/${e.slug}/`)}>{e.full_name}</a>
+            </>
+          ))}{" "}
+        Same name only; we do not claim these are the same person.
+      </p>
+    )}
     <p class="small">
       Everyone listed for a year:
       {allYears.map((y) => (
@@ -71,8 +98,8 @@ const parties = [...new Set(person.stints.map((s) => s.party))];
   <section aria-labelledby="note">
     <h2 id="note">What is not shown here</h2>
     <p class="small">
-      This person does not hold an office we currently track, so votes, donations, disclosures and the other
-      profile sections are not built for them. Roster source:{" "}
+      This roster entry is not linked to a current officeholder profile, so votes, donations, disclosures and
+      the other profile sections are not built for it. Roster source:{" "}
       {person.sources.map((s) => ROSTER_SOURCES[s] ?? s).join("; ")}.{" "}
       <a href={href("/methodology/")}>How the data is gathered</a> ·
       <a href={reportErrorUrl(person.full_name, Astro.url.pathname)} rel="noopener" target="_blank">

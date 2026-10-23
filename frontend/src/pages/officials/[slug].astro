@@ -21,8 +21,9 @@ import { href, reportErrorUrl } from "../../lib/site";
 
 // Two kinds of page share this one URL space, both keyed slugFor(name, official_id): full profiles for people
 // serving now, and small pages for past officeholders (lib/exports/load.ts decides which; the sets are disjoint).
-// A past officeholder who is later elected to a tracked office keeps the same official_id, so the same slug
-// path just becomes their full profile.
+// The slug hashes official_id, so a past page's path carries over to a full profile only where the roster id
+// equals the dim_official id (Senate/Open States, Congress bioguide, federal judges fjc). House, statewide and
+// state-judge ids can differ between roster and dim_official (issue #97), so those paths may change.
 export const getStaticPaths = (async () => {
   const past = await pastOfficeholders();
   const rosterStart = Math.min(...(past?.years.keys() ?? []));

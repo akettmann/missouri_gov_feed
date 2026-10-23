@@ -373,4 +373,12 @@ export interface PastPerson {
   party: string | null;
   sources: string[];
   stints: PastStint[];
+  /** Other pages whose full name is identical once normalized. A pointer only, not a claim of identity. */
+  same_name: SameNameLink[];
+}
+
+export interface SameNameLink {
+  kind: "current" | "past";
+  slug: string;
+  full_name: string;
 }

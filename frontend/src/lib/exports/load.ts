@@ -4,6 +4,7 @@
 import { createHash } from "node:crypto";
 import { DONOR_GROUP_SQL } from "../rollups";
 import { exportedAt, hasExport, query } from "./db";
+import { groupPast, linkSameName, type RosterRow } from "./past";
 import { sampleDonorCycles, sampleGiftRollup, sampleTopDonors } from "./fixtures";
 import type {
   AttendanceRow,
@@ -552,58 +553,18 @@ export async function pastOfficeholders(): Promise<{
 } | null> {
   if (!hasExport("rpt_officeholders_by_year")) return null;
   const slugs = new Map((await allOfficials()).map(({ official: o }) => [o.official_id, o.slug]));
-  const rows = await query<
-    Omit<PastOfficeholder, "slug"> & { year: number; official_id: string; source: string | null }
-  >(`
+  const rows = await query<RosterRow>(`
     select year, official_id, has_profile, full_name, party, level, office, office_title, district, source
     from {rpt_officeholders_by_year}
     order by year desc, level, office, try_cast(district as integer), district, full_name`);
   const currentYear = Math.max(...rows.map((r) => r.year));
-  const years = new Map<number, PastOfficeholder[]>();
-  const people = new Map<string, PastPerson>();
-  const claimed = new Map<string, string>(); // slug -> official_id, to fail loudly on a collision
-  for (const { year, official_id, source, ...r } of rows) {
-    if (year === currentYear) continue;
-    // rows are newest first, so a person's first row carries their latest name
-    const known = people.get(official_id);
-    const slug = r.has_profile
-      ? (slugs.get(official_id) ?? slugFor(r.full_name, official_id))
-      : (known?.slug ?? slugFor(r.full_name, official_id));
-    if (!r.has_profile) {
-      if (claimed.get(slug) && claimed.get(slug) !== official_id)
-        throw new Error(`slug collision on ${slug}`);
-      claimed.set(slug, official_id);
-      const person = known ?? {
-        slug,
-        official_id,
-        full_name: r.full_name,
-        party: r.party,
-        sources: [],
-        stints: [],
-      };
-      people.set(official_id, person);
-      if (source && !person.sources.includes(source)) person.sources.push(source);
-      const stint = person.stints.find(
-        (s) => s.office === r.office && s.district === r.district && s.party === r.party,
-      );
-      if (stint) stint.years.push(year);
-      else
-        person.stints.push({
-          office: r.office,
-          office_title: r.office_title,
-          level: r.level,
-          district: r.district,
-          party: r.party,
-          years: [year],
-        });
-    }
-    const entry = { ...r, slug };
-    const list = years.get(year);
-    if (list) list.push(entry);
-    else years.set(year, [entry]);
-  }
-  for (const p of people.values()) for (const s of p.stints) s.years.sort((a, b) => a - b);
-  return { currentYear, years, people: [...people.values()] };
+  // rows are newest first, so a person's first row carries their latest name
+  const { years, people } = groupPast(rows, currentYear, slugs, slugFor);
+  linkSameName(
+    people,
+    (await allOfficials()).map(({ official: o }) => ({ full_name: o.full_name, slug: o.slug })),
+  );
+  return { currentYear, years, people };
 }
 
 /** Export timestamps shown on the methodology page as data freshness. */
