@@ -79,8 +79,10 @@ models:
     Associate ....... 13th   Harrell, Kevin D. ....... Circuit ....... 16th" Each index line holds up to two entries.
     Entries whose name wrapped onto two lines are lost (a handful per edition); compare the count against the manual''s
     chapter totals when reviewing. The dot leader sometimes runs straight into the circuit ("Associate ..............35th"),
-    so the space before it is optional; without that, 7 judges in the 2025-2026 edition lost their circuit. Grain:
-    one row per state judge in the Official Manual index.'
+    so the space before it is optional; without that, 7 judges in the 2025-2026 edition lost their circuit. The
+    page header can share a line with the first entry ("Alphabetical list of Missouri Judges Brewer, Craig D. ...",
+    #41), so it''s stripped first. Names may use a typographic apostrophe ("O’Hara", #42); it''s normalized to ''
+    so the name matches and IDs stay ASCII. Grain: one row per state judge in the Official Manual index.'
 - name: int_mec__committee_names
   description: 'Every name a Missouri committee has filed under, with the years the committee was active (filed
     a report, received or spent money, or was registered for an election), from both MEC feeds. A committee that

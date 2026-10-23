@@ -1,11 +1,13 @@
 """Write dbt/models/{staging,intermediate}/_<layer>.yml model descriptions from each model's header comment,
 plus a hand-written grain line. Run from the repo root:
 
-    uv run python scripts/gen_model_docs.py
+    uv run python scripts/gen_model_docs.py          # rewrite the yml
+    uv run python scripts/gen_model_docs.py --check  # write nothing; exit 1 if any yml is stale (pre-commit/CI)
 
 Re-run after adding a model or editing a header. Mart docs are hand-written in models/marts/_marts.yml;
 unit tests live in their own files so regenerating never touches them."""
 
+import sys
 from pathlib import Path
 
 import yaml
@@ -55,7 +57,7 @@ def header(path: Path) -> str:
     return " ".join(lines)
 
 
-def write(folder: Path, out: Path) -> None:
+def render(folder: Path, out: Path) -> str:
     # hand-written keys (columns with tests, data_tests...) survive regeneration; only descriptions are rewritten
     kept = {}
     if out.exists():
@@ -68,16 +70,37 @@ def write(folder: Path, out: Path) -> None:
         extra = {k: v for k, v in kept.get(path.stem, {}).items() if k not in ("name", "description")}
         models.append({"name": path.stem, "description": text.strip(), **extra})
     body = yaml.safe_dump({"version": 2, "models": models}, sort_keys=False, width=110, allow_unicode=True)
-    out.write_text(
+    return (
         f"# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,\n"
-        f"# not this file, then regenerate.\n{body}",
-        encoding="utf-8",
-        newline="\n",
+        f"# not this file, then regenerate.\n{body}"
     )
-    print(out, len(models))
 
 
-# staging: one folder per source system, docs beside its _<system>__sources.yml
-for system in sorted(p for p in Path("dbt/models/staging").iterdir() if p.is_dir()):
-    write(system, system / f"_{system.name}__models.yml")
-write(Path("dbt/models/intermediate"), Path("dbt/models/intermediate/_intermediate.yml"))
+def targets(models: Path) -> list[tuple[Path, Path]]:
+    # staging: one folder per source system, docs beside its _<system>__sources.yml
+    systems = sorted(p for p in (models / "staging").iterdir() if p.is_dir())
+    pairs = [(d, d / f"_{d.name}__models.yml") for d in systems]
+    return [*pairs, (models / "intermediate", models / "intermediate" / "_intermediate.yml")]
+
+
+def main(argv: list[str], models: Path = Path("dbt/models")) -> int:
+    check = "--check" in argv
+    stale = []
+    for folder, out in targets(models):
+        text = render(folder, out)
+        if check:
+            # read_text uses universal newlines, so a CRLF checkout does not read as stale
+            if not out.exists() or out.read_text(encoding="utf-8") != text:
+                stale.append(out)
+            continue
+        out.write_text(text, encoding="utf-8", newline="\n")
+        print(out)
+    for out in stale:
+        print(f"stale: {out}", file=sys.stderr)
+    if stale:
+        print("Run `uv run python scripts/gen_model_docs.py` and commit the result.", file=sys.stderr)
+    return 1 if stale else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

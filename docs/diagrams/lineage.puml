@@ -177,7 +177,6 @@ L_zcta --> D_zcta
 L_pay --> F_sal
 I_seats --> F_sal
 I_off --> F_sal
-F_sal --> EXP
 L_moh --> I_subj
 L_most --> I_subj
 I_subj --> F_bills
@@ -185,13 +184,13 @@ L_most --> F_bills
 L_moh --> F_bills
 I_votes --> F_bills
 I_seats --> F_bills
-F_bills --> EXP
 L_bb --> I_circ
 I_circ --> D_dist
 S_courts --> D_dist
 S_fedpay --> F_sal
 dim --> D_dist
 D_dist --> EXP
+D_zcta --> EXP
 
 F_bias --> R_peers
 dim --> R_peers
