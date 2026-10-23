@@ -1,6 +1,9 @@
 -- Name -> MECID crosswalk for committee donors. MEC records a committee-to-committee gift with the donor's
 -- name only (the row's MECID is the receiving committee), so the donor's own MECID is found by matching that
 -- name to the names committees file under (int_mec__committee_names), in tiers:
+--   reviewed alias     a hand-checked donor name -> MECID in the committee_donor_aliases seed, for acronym and
+--                      shortened names no rule can expand ("HRCC", "AMECPAC", "MHA PAC", #33); each row cites
+--                      its evidence. Tried first, but only counts when that committee was active that year
 --   0 mecid in name    the filer typed the donor's MECID into the name ("... (MEC ID# C221962)") and it's a
 --                      known committee; taken whatever its active years
 --   1 same name       name_key: case, punctuation and spacing ignored
@@ -15,7 +18,8 @@
 -- are "not active that year" (usually an older or newer committee under the same name), the rest "no match"
 -- (mostly federal and out-of-state PACs, which don't file with MEC). One-character names ("C", "~") are
 -- placeholders (#31): "placeholder name", never matched.
--- match_confidence: high for tiers 0-1, medium for the looser tiers; either way it rests on the name.
+-- match_confidence: high for reviewed aliases and tiers 0-1 (a person checked the alias, or the name is the
+-- committee's own), medium for the looser tiers; either way it rests on the name.
 with donations as (
     select
         contributor_committee_name as donor_committee_name,
@@ -34,6 +38,12 @@ donor_names as (
 ),
 
 donor_keys as (
+    select
+        donor_committee_name,
+        -1 as match_tier,
+        {{ mogov.name_key('donor_committee_name') }} as name_key
+    from donor_names
+    union all
     select
         donor_committee_name,
         0 as match_tier,
@@ -66,7 +76,26 @@ donor_keys as (
     from donor_names
 ),
 
+committee_years as (
+    select
+        mec_committee_id,
+        min(first_active_year) as first_active_year,
+        max(last_active_year) as last_active_year
+    from {{ ref('int_mec__committee_names') }}
+    group by mec_committee_id
+),
+
 filer_keys as (
+    -- an alias naming a MECID absent from the committees (or a typo) joins nothing, so it can't make a link
+    select
+        a.mec_committee_id,
+        c.first_active_year,
+        c.last_active_year,
+        -1 as match_tier,
+        {{ mogov.name_key('a.alias') }} as name_key
+    from {{ ref('committee_donor_aliases') }} as a
+    inner join committee_years as c on a.mec_committee_id = c.mec_committee_id
+    union all
     select distinct
         mec_committee_id,
         first_active_year,
@@ -200,7 +229,11 @@ select
         else 'no match'
     end as match_status,
     case d.match_tier
-        when 0 then 'mecid in name' when 1 then 'same name' when 2 then 'normalized name' when 3 then 'core name'
+        when -1 then 'reviewed alias'
+        when 0 then 'mecid in name'
+        when 1 then 'same name'
+        when 2 then 'normalized name'
+        when 3 then 'core name'
     end as match_method,
     case when d.n_candidates = 1 then case when d.match_tier <= 1 then 'high' else 'medium' end end
         as match_confidence,

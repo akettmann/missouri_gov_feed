@@ -200,7 +200,7 @@ models:
       - name: donor_link_confidence
         data_type: varchar
         description: >
-          `high` (MECID written into the name, or same name) or `medium` (spelling-normalized name, with
+          `high` (a reviewed alias, MECID written into the name, or same name) or `medium` (spelling-normalized name, with
           abbreviations spelled out and filler words dropped; or core name, with words like PAC, Political,
           Action, Committee, Fund, Account dropped, or a filer's parenthesized short name) for
           donor_mec_committee_id; null without one.
@@ -758,7 +758,7 @@ models:
       - name: donor_link_confidence
         data_type: varchar
         description: >
-          `high` (MECID in the name, or same name) or `medium` (spelling-normalized name, with abbreviations
+          `high` (a reviewed alias, MECID in the name, or same name) or `medium` (spelling-normalized name, with abbreviations
           spelled out and filler words dropped; or core name, with words like PAC, Political, Action, Committee,
           Fund, Account dropped, or a filer's parenthesized short name) for donor_mec_committee_id.
       - name: source_url

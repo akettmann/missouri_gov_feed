@@ -1,5 +1,28 @@
 version: 2
 seeds:
+  - name: committee_donor_aliases
+    description: >
+      Hand-checked donor names for the committee-to-committee crosswalk (int_mec__donor_committees, #33): names
+      donors type for a Missouri committee that no normalization rule can expand ("HRCC", "AMECPAC", "MHA PAC").
+      Each alias maps to one MECID, with the evidence it was checked against; matching ignores case and
+      punctuation, so list a spelling once. Matches are labeled "reviewed alias", high confidence, and count only
+      in years the committee was active. An alias naming a MECID the committees don't have matches nothing.
+      Add an alias only after checking it against the committee's own filings; leave out ones that could
+      be two committees.
+    config:
+      column_types: {alias: varchar, mec_committee_id: varchar, committee_name: varchar, evidence: varchar}
+    columns:
+      - name: alias
+        data_tests: [unique, not_null]
+      - name: mec_committee_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('int_mec__committee_names')
+                field: mec_committee_id
+      - name: evidence
+        data_tests: [not_null]
   - name: donor_employer_placeholders
     description: >
       Answers individual contributors give in the employer field that name no employer (retired, none,

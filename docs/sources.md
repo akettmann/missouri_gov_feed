@@ -178,14 +178,15 @@ Quirks:
   3 per election date.
 - Committee donors on CD1_A carry only a name (`committee`); `mecid` is the receiving committee. To go
   one hop back (who funds the PAC that funds an official, #9), `int_mec__donor_committees` matches that name
-  to the names committees file under, in tiers: a MECID typed into the name, the same name (case,
+  to the names committees file under, in tiers: a hand-checked alias (the `committee_donor_aliases` seed, e.g. HRCC, AMECPAC, MHA PAC, each with its
+  evidence; high confidence), a MECID typed into the name, the same name (case,
   punctuation and spacing ignored), a normalized name (MO = Missouri, Assn = Association, ...), and a core
   name without words like PAC, Political, Action, Committee, Fund, Account (also tried on the name outside
   parentheses, and on a filer's parenthesized short name). A match counts only if that committee was active within a year
   of the gift, and only when it is unique. Measured October 2026 over both feeds ($489M from committees):
   68% of the dollars match one committee, 1.4% are ambiguous, 30% match nothing. An exact name match alone
   got about 46%. Most of the misses are federal and out-of-state PACs (DRIVE, AFSCME, DGA), which don't
-  file with MEC, plus acronyms (HRCC, AMECPAC) that no name rule can expand. Distinct committees can differ
+  file with MEC, plus acronyms that no name rule can expand (the common ones, HRCC, AMECPAC and MHA PAC, are in the alias seed). Distinct committees can differ
   only by "MO" vs "Missouri" ("MO Values PAC" and "Missouri Values PAC"), so the exact-name tier is tried
   first.
 - Personal financial disclosures (PFDs) are not online. MEC's 2026 Ethics Guide: "State law requires a
