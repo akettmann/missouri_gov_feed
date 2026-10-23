@@ -1,0 +1,24 @@
+# Unit tests for int_judges__state_index (dbt unit tests: fixed input rows -> exact expected rows).
+# Kept apart from the generated _intermediate.yml so regenerating docs never touches them.
+version: 2
+
+unit_tests:
+  - name: judge_index_names_survive_page_header_and_curly_apostrophe
+    model: int_judges__state_index
+    description: >
+      Lines from the Official Manual's alphabetical judge index, as PDF extraction gives them. The page
+      header can share a line with the first entry; it must not become part of the surname (#41: "Craig D.
+      Alphabetical list of Missouri Judges Brewer"). A typographic apostrophe in a name must not drop the
+      entry (#42: O’Hara was missing); it's normalized to '. Two entries on one line both parse.
+    given:
+      - input: ref('stg_bluebook__lines')
+        rows:
+          - {edition: 2025-2026, page: 123, line_no: 17, chapter: judicial, source_url: u, line_text: 'Alphabetical list of Missouri Judges Brewer, Craig D. .................. Associate ............ 32nd'}
+          - {edition: 2025-2026, page: 125, line_no: 4, chapter: judicial, source_url: u, line_text: 'O’Hara, Alisha D. ................. Circuit ................... 7th'}
+          - {edition: 2025-2026, page: 123, line_no: 18, chapter: judicial, source_url: u, line_text: 'Crane, Sue M. ........ Associate ....... 13th   Harrell, Kevin D. ....... Circuit ....... 16th'}
+    expect:
+      rows:
+        - {index_name: 'Brewer, Craig D.', family_name: Brewer, given_names: Craig D., full_name: Craig D. Brewer, office: mo_associate_circuit_judge, circuit: '32'}
+        - {index_name: 'O''Hara, Alisha D.', family_name: O'Hara, given_names: Alisha D., full_name: Alisha D. O'Hara, office: mo_circuit_judge, circuit: '7'}
+        - {index_name: 'Crane, Sue M.', family_name: Crane, given_names: Sue M., full_name: Sue M. Crane, office: mo_associate_circuit_judge, circuit: '13'}
+        - {index_name: 'Harrell, Kevin D.', family_name: Harrell, given_names: Kevin D., full_name: Kevin D. Harrell, office: mo_circuit_judge, circuit: '16'}
