@@ -1,0 +1,90 @@
+# Unit tests for the committee-to-committee crosswalk (#9): fixed input rows -> exact expected rows.
+# Kept apart from the generated _intermediate.yml so regenerating docs never touches them.
+version: 2
+
+unit_tests:
+  - name: donor_committee_names_resolve_by_tier_and_active_year
+    model: int_mec__donor_committees
+    description: >
+      Each tier of the name match, and the active-year rule. A MECID typed into the name wins even outside the
+      committee's years; same name (case and punctuation ignored) -> high; MO/Missouri -> normalized, medium;
+      PAC vs Political Action Committee and a filer's parenthesized short name -> core, medium. A name reused
+      by two committees resolves to the one active that year (+-1); two active ones -> ambiguous with both
+      listed; a name known only from other years -> not active that year. Two committees that differ only by
+      MO/Missouri are each found by their exact name. One-character names are placeholders.
+    given:
+      - input: ref('int_mec__committee_names')
+        rows:
+          - {mec_committee_id: C000001, committee_name: Missouri Chamber PAC, first_active_year: 2010, last_active_year: 2026}
+          - {mec_committee_id: C000002, committee_name: Quality Building Political Action Committee, first_active_year: 2010, last_active_year: 2026}
+          - {mec_committee_id: C000003, committee_name: Carpenters Help in the Political Process (CHIPP), first_active_year: 2010, last_active_year: 2026}
+          - {mec_committee_id: C000004, committee_name: Better MO PAC, first_active_year: 2026, last_active_year: 2026}
+          - {mec_committee_id: C000005, committee_name: A Better Missouri Political Action Committee, first_active_year: 2017, last_active_year: 2024}
+          - {mec_committee_id: C000006, committee_name: Liberty PAC, first_active_year: 2010, last_active_year: 2013}
+          - {mec_committee_id: C000007, committee_name: LIBERTY PAC, first_active_year: 2016, last_active_year: 2026}
+          - {mec_committee_id: C000008, committee_name: Twin PAC, first_active_year: 2015, last_active_year: 2026}
+          - {mec_committee_id: C000009, committee_name: Twin PAC, first_active_year: 2018, last_active_year: 2026}
+          - {mec_committee_id: C000010, committee_name: Old Timers PAC, first_active_year: 2010, last_active_year: 2012}
+          - {mec_committee_id: C000011, committee_name: Teamsters Missouri PAC, first_active_year: 2020, last_active_year: 2026}
+          - {mec_committee_id: C000012, committee_name: MO Values PAC, first_active_year: 2020, last_active_year: 2026}
+          - {mec_committee_id: C000013, committee_name: Missouri Values PAC, first_active_year: 2023, last_active_year: 2026}
+      - input: ref('int_mec__contributions_received')
+        rows:
+          - {mec_committee_id: R1, contributor_committee_name: MISSOURI CHAMBER PAC, contribution_year: 2020, amount: 100}
+          - {mec_committee_id: R2, contributor_committee_name: MISSOURI CHAMBER PAC, contribution_year: 2020, amount: 50}
+          - {mec_committee_id: R1, contributor_committee_name: MO Chamber Pac, contribution_year: 2020, amount: 10}
+          - {mec_committee_id: R1, contributor_committee_name: Quality Building PAC, contribution_year: 2020, amount: 10}
+          - {mec_committee_id: R1, contributor_committee_name: CHIPP Political Account, contribution_year: 2020, amount: 10}
+          - {mec_committee_id: R1, contributor_committee_name: A Better MO PAC, contribution_year: 2018, amount: 10}
+          - {mec_committee_id: R1, contributor_committee_name: Liberty PAC, contribution_year: 2012, amount: 10}
+          - {mec_committee_id: R1, contributor_committee_name: Liberty PAC, contribution_year: 2020, amount: 10}
+          - {mec_committee_id: R1, contributor_committee_name: Twin PAC, contribution_year: 2020, amount: 10}
+          - {mec_committee_id: R1, contributor_committee_name: Old Timers PAC, contribution_year: 2020, amount: 10}
+          - {mec_committee_id: R1, contributor_committee_name: Federal Freedom Fund, contribution_year: 2020, amount: 10}
+          - {mec_committee_id: R1, contributor_committee_name: C, contribution_year: 2020, amount: 10}
+          - {mec_committee_id: R1, contributor_committee_name: 'Teamsters PAC - Fed Cmte (MEC ID# C000011)', contribution_year: 2015, amount: 10}
+          - {mec_committee_id: R1, contributor_committee_name: MO Values PAC, contribution_year: 2024, amount: 10}
+          - {mec_committee_id: R1, contributor_committee_name: Missouri Values PAC, contribution_year: 2024, amount: 10}
+          - {mec_committee_id: R1, contributor_committee_name: null, contribution_year: 2020, amount: 999}
+    expect:
+      rows:
+        - {donor_committee_name: MISSOURI CHAMBER PAC, contribution_year: 2020, amount: 150, contribution_count: 2, mec_committee_id: C000001, match_status: matched, match_method: same name, match_confidence: high, candidate_mec_committee_ids: C000001}
+        - {donor_committee_name: MO Chamber Pac, contribution_year: 2020, amount: 10, contribution_count: 1, mec_committee_id: C000001, match_status: matched, match_method: normalized name, match_confidence: medium, candidate_mec_committee_ids: C000001}
+        - {donor_committee_name: Quality Building PAC, contribution_year: 2020, amount: 10, contribution_count: 1, mec_committee_id: C000002, match_status: matched, match_method: core name, match_confidence: medium, candidate_mec_committee_ids: C000002}
+        - {donor_committee_name: CHIPP Political Account, contribution_year: 2020, amount: 10, contribution_count: 1, mec_committee_id: C000003, match_status: matched, match_method: core name, match_confidence: medium, candidate_mec_committee_ids: C000003}
+        - {donor_committee_name: A Better MO PAC, contribution_year: 2018, amount: 10, contribution_count: 1, mec_committee_id: C000005, match_status: matched, match_method: core name, match_confidence: medium, candidate_mec_committee_ids: C000005}
+        - {donor_committee_name: Liberty PAC, contribution_year: 2012, amount: 10, contribution_count: 1, mec_committee_id: C000006, match_status: matched, match_method: same name, match_confidence: high, candidate_mec_committee_ids: C000006}
+        - {donor_committee_name: Liberty PAC, contribution_year: 2020, amount: 10, contribution_count: 1, mec_committee_id: C000007, match_status: matched, match_method: same name, match_confidence: high, candidate_mec_committee_ids: C000007}
+        - {donor_committee_name: Twin PAC, contribution_year: 2020, amount: 10, contribution_count: 1, mec_committee_id: null, match_status: ambiguous, match_method: same name, match_confidence: null, candidate_mec_committee_ids: 'C000008, C000009'}
+        - {donor_committee_name: Old Timers PAC, contribution_year: 2020, amount: 10, contribution_count: 1, mec_committee_id: null, match_status: not active that year, match_method: null, match_confidence: null, candidate_mec_committee_ids: null}
+        - {donor_committee_name: Federal Freedom Fund, contribution_year: 2020, amount: 10, contribution_count: 1, mec_committee_id: null, match_status: no match, match_method: null, match_confidence: null, candidate_mec_committee_ids: null}
+        - {donor_committee_name: C, contribution_year: 2020, amount: 10, contribution_count: 1, mec_committee_id: null, match_status: placeholder name, match_method: null, match_confidence: null, candidate_mec_committee_ids: null}
+        - {donor_committee_name: 'Teamsters PAC - Fed Cmte (MEC ID# C000011)', contribution_year: 2015, amount: 10, contribution_count: 1, mec_committee_id: C000011, match_status: matched, match_method: mecid in name, match_confidence: high, candidate_mec_committee_ids: C000011}
+        - {donor_committee_name: MO Values PAC, contribution_year: 2024, amount: 10, contribution_count: 1, mec_committee_id: C000012, match_status: matched, match_method: same name, match_confidence: high, candidate_mec_committee_ids: C000012}
+        - {donor_committee_name: Missouri Values PAC, contribution_year: 2024, amount: 10, contribution_count: 1, mec_committee_id: C000013, match_status: matched, match_method: same name, match_confidence: high, candidate_mec_committee_ids: C000013}
+
+  - name: committee_names_carry_each_committees_active_years
+    model: int_mec__committee_names
+    description: >
+      Every (MECID, name) pair a committee filed under, with the committee's first and last active year across
+      all its names and feeds; lower-case MECIDs are folded into the upper-case one; years outside 2000..next
+      year (typos) don't stretch the range; blank names are dropped.
+    overrides:
+      vars:
+        mec_direct: false
+    given:
+      - input: ref('int_mec__contributions_received')
+        rows:
+          - {mec_committee_id: C000001, committee_name: MO Chamber PAC, contribution_year: 2012}
+          - {mec_committee_id: C000001, committee_name: Missouri Chamber PAC, contribution_year: 2018}
+          - {mec_committee_id: C000001, committee_name: Missouri Chamber PAC, contribution_year: 1917}
+          - {mec_committee_id: C000002, committee_name: '  ', contribution_year: 2015}
+      - input: ref('stg_tap_mec__expenditures')
+        rows:
+          - {mec_committee_id: c000001, committee_name: Missouri Chamber PAC, expenditure_year: 2020}
+          - {mec_committee_id: C000002, committee_name: Liberty PAC, expenditure_year: 2016}
+    expect:
+      rows:
+        - {mec_committee_id: C000001, committee_name: MO Chamber PAC, first_active_year: 2012, last_active_year: 2020, last_year_under_name: 2012}
+        - {mec_committee_id: C000001, committee_name: Missouri Chamber PAC, first_active_year: 2012, last_active_year: 2020, last_year_under_name: 2020}
+        - {mec_committee_id: C000002, committee_name: Liberty PAC, first_active_year: 2016, last_active_year: 2016, last_year_under_name: 2016}

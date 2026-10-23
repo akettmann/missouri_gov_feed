@@ -57,6 +57,39 @@ export interface TopDonorRow {
   last_year: number;
 }
 
+/** rpt_committee_donors: one donor of a Missouri committee (top 10 non-individual, plus summed individuals). */
+export interface CommitteeDonorRow {
+  donor_rank: number | null;
+  donor_class: string;
+  donor_name: string;
+  total_amount: number;
+  contribution_count: number;
+  first_year: number | null;
+  last_year: number | null;
+  /** mec committee | ambiguous mec name | not an mec filer | end of trail | individuals */
+  trail_status: string;
+  donor_mec_committee_id: string | null;
+}
+
+/**
+ * One of the official's committee donors, matched by name to a Missouri committee (rpt_donor_rollup's
+ * donor_mec_committee_id), with that committee's own donors. Always a name match: MEC records no donor ID.
+ */
+export interface CommitteeTrail {
+  mec_committee_id: string;
+  committee_name: string | null;
+  /** the donor's name(s) as the official's committee reported them */
+  donor_names: string;
+  gave_official: number;
+  first_year: number;
+  last_year: number;
+  /** high = same name, medium = normalized name */
+  link_confidence: string;
+  committee_total_amount: number;
+  source_url: string;
+  donors: CommitteeDonorRow[];
+}
+
 /** rpt_gift_rollup rows: official x year x principal x category x confidence x source. */
 export interface GiftRollupRow {
   year: number;
@@ -282,6 +315,8 @@ export interface OfficialBundle {
     /** state officials' individual contributions by size (rpt_donor_size); null when the export is missing */
     size: { cycle: number; band_floor: number; match_confidence: string; total_amount: number }[] | null;
     top_donors: Dataset<TopDonorRow>;
+    /** committee donors followed one hop back (rpt_committee_donors); null when the export is missing */
+    committee_trails: CommitteeTrail[] | null;
   };
   gifts: Dataset<GiftRollupRow>;
   /**

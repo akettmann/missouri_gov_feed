@@ -1,0 +1,61 @@
+# Unit tests for reporting logic (dbt unit tests: fixed input rows -> exact expected rows).
+# Kept apart from _reporting.yml (the contracts) so each stays readable.
+version: 2
+
+unit_tests:
+  - name: committee_donors_one_hop_back
+    model: rpt_committee_donors
+    description: >
+      Only committees that gave to an official get rows, under their most recent name. Their 10 largest
+      non-individual donors are ranked (an 11th and 12th are dropped) and itemized individuals are summed into
+      one unranked row; committee_total_amount counts every donor. trail_status follows each donor: a committee
+      matched to one MECID (over several years) -> mec committee with that ID; an ambiguous name -> ambiguous
+      mec name; an unmatched committee -> not an mec filer; a business -> end of trail.
+    given:
+      - input: ref('fct_campaign_finance')
+        rows:
+          - {official_id: o1, direction: received, counterparty_mec_committee_id: C000100}
+          - {official_id: o1, direction: received, counterparty_mec_committee_id: null}
+          - {official_id: o1, direction: given, counterparty_mec_committee_id: null}
+      - input: ref('int_mec__committee_names')
+        rows:
+          - {mec_committee_id: C000100, committee_name: Old Name PAC, last_year_under_name: 2015}
+          - {mec_committee_id: C000100, committee_name: New Name PAC, last_year_under_name: 2022}
+          - {mec_committee_id: C000200, committee_name: Not A Donor PAC, last_year_under_name: 2022}
+      - input: ref('int_mec__contributions_received')
+        rows:
+          - {mec_committee_id: C000100, contributor_type: Individual, contributor_name: Ann Doe, contributor_committee_name: null, amount: 100, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Individual, contributor_name: Bob Roe, contributor_committee_name: null, amount: 50, contribution_year: 2021}
+          - {mec_committee_id: C000100, contributor_type: Corporation, contributor_name: Acme Corp, contributor_committee_name: null, amount: 500, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Committee, contributor_name: Missouri Chamber PAC, contributor_committee_name: Missouri Chamber PAC, amount: 300, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Committee, contributor_name: Missouri Chamber PAC, contributor_committee_name: Missouri Chamber PAC, amount: 100, contribution_year: 2021}
+          - {mec_committee_id: C000100, contributor_type: Committee, contributor_name: Twin PAC, contributor_committee_name: Twin PAC, amount: 200, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Committee, contributor_name: Federal Freedom Fund, contributor_committee_name: Federal Freedom Fund, amount: 100, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Organization, contributor_name: Org 01, contributor_committee_name: null, amount: 90, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Organization, contributor_name: Org 02, contributor_committee_name: null, amount: 80, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Organization, contributor_name: Org 03, contributor_committee_name: null, amount: 70, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Organization, contributor_name: Org 04, contributor_committee_name: null, amount: 60, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Organization, contributor_name: Org 05, contributor_committee_name: null, amount: 50, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Organization, contributor_name: Org 06, contributor_committee_name: null, amount: 40, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Organization, contributor_name: Org 07, contributor_committee_name: null, amount: 30, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Organization, contributor_name: Org 08, contributor_committee_name: null, amount: 20, contribution_year: 2020}
+          - {mec_committee_id: C000200, contributor_type: Individual, contributor_name: Zed Poe, contributor_committee_name: null, amount: 10, contribution_year: 2020}
+      - input: ref('int_mec__donor_committees')
+        rows:
+          - {donor_committee_name: Missouri Chamber PAC, contribution_year: 2020, mec_committee_id: C000001, match_status: matched, match_confidence: high}
+          - {donor_committee_name: Missouri Chamber PAC, contribution_year: 2021, mec_committee_id: C000001, match_status: matched, match_confidence: high}
+          - {donor_committee_name: Twin PAC, contribution_year: 2020, mec_committee_id: null, match_status: ambiguous, match_confidence: null}
+          - {donor_committee_name: Federal Freedom Fund, contribution_year: 2020, mec_committee_id: null, match_status: no match, match_confidence: null}
+    expect:
+      rows:
+        - {mec_committee_id: C000100, committee_name: New Name PAC, committee_total_amount: 1790, donor_rank: 1, donor_name: Acme Corp, total_amount: 500, trail_status: end of trail, donor_mec_committee_id: null}
+        - {mec_committee_id: C000100, committee_name: New Name PAC, committee_total_amount: 1790, donor_rank: 2, donor_name: Missouri Chamber PAC, total_amount: 400, trail_status: mec committee, donor_mec_committee_id: C000001}
+        - {mec_committee_id: C000100, committee_name: New Name PAC, committee_total_amount: 1790, donor_rank: 3, donor_name: Twin PAC, total_amount: 200, trail_status: ambiguous mec name, donor_mec_committee_id: null}
+        - {mec_committee_id: C000100, committee_name: New Name PAC, committee_total_amount: 1790, donor_rank: 4, donor_name: Federal Freedom Fund, total_amount: 100, trail_status: not an mec filer, donor_mec_committee_id: null}
+        - {mec_committee_id: C000100, committee_name: New Name PAC, committee_total_amount: 1790, donor_rank: 5, donor_name: Org 01, total_amount: 90, trail_status: end of trail, donor_mec_committee_id: null}
+        - {mec_committee_id: C000100, committee_name: New Name PAC, committee_total_amount: 1790, donor_rank: 6, donor_name: Org 02, total_amount: 80, trail_status: end of trail, donor_mec_committee_id: null}
+        - {mec_committee_id: C000100, committee_name: New Name PAC, committee_total_amount: 1790, donor_rank: 7, donor_name: Org 03, total_amount: 70, trail_status: end of trail, donor_mec_committee_id: null}
+        - {mec_committee_id: C000100, committee_name: New Name PAC, committee_total_amount: 1790, donor_rank: 8, donor_name: Org 04, total_amount: 60, trail_status: end of trail, donor_mec_committee_id: null}
+        - {mec_committee_id: C000100, committee_name: New Name PAC, committee_total_amount: 1790, donor_rank: 9, donor_name: Org 05, total_amount: 50, trail_status: end of trail, donor_mec_committee_id: null}
+        - {mec_committee_id: C000100, committee_name: New Name PAC, committee_total_amount: 1790, donor_rank: 10, donor_name: Org 06, total_amount: 40, trail_status: end of trail, donor_mec_committee_id: null}
+        - {mec_committee_id: C000100, committee_name: New Name PAC, committee_total_amount: 1790, donor_rank: null, donor_name: (individuals), total_amount: 150, trail_status: individuals, donor_mec_committee_id: null}

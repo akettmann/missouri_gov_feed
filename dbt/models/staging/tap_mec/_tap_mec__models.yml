@@ -3,9 +3,11 @@
 version: 2
 models:
 - name: stg_tap_mec__contributions
-  description: MEC itemized contributions received by Missouri committees (TAP mirror, 2011-2022). The mirror combines
+  description: 'MEC itemized contributions received by Missouri committees (TAP mirror, 2011-2022). The mirror combines
     two MEC export layouts; coalesce the overlapping columns. dupe_flag marks rows TAP identified as duplicates
-    (amended reports) and they're dropped.
+    (amended reports) and they''re dropped. The second layout (2020-2022) has no ctrb_name / ctrb_type: a committee
+    donor is named in `committee`, an organization in `company`, a person in first/last name (blank strings, not
+    nulls, when absent).'
 - name: stg_tap_mec__expenditures
   description: 'MEC itemized expenditures by Missouri committees (TAP mirror, 2011-2022): includes contributions
     the committee made to other candidates and committees.'

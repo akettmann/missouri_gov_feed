@@ -1,9 +1,11 @@
 ---
 // Section C: money in. Federal officials also get FEC aggregates; everyone with donations gets the
-// rpt_donor_rollup views (sample data if that export is missing).
+// rpt_donor_rollup views (sample data if that export is missing), then its committee donors one hop back
+// (rpt_committee_donors).
 import type { OfficialBundle } from "../lib/exports/types";
 import { statusKind } from "../lib/format";
 import { href } from "../lib/site";
+import CommitteeTrails from "./CommitteeTrails.astro";
 import SampleBanner from "./SampleBanner.astro";
 import Viz from "./Viz.astro";
 
@@ -48,6 +50,7 @@ const hasRollup = money.cycles.rows.length > 0;
             {money.employers && money.employers.length > 0 && <Viz id="top-employers" bundle={bundle} />}
             {money.size && money.size.length > 0 && <Viz id="state-size" bundle={bundle} />}
           </div>
+          <CommitteeTrails trails={money.committee_trails} />
         </>
       )}
     </>

@@ -7,6 +7,9 @@ max_line_length = 120
 # ST05: the portable mogov.json_elements() macro must render a lateral subquery in the join.
 exclude_rules = layout.spacing, structure.column_order, references.keywords, structure.using, structure.subquery
 large_file_skip_byte_limit = 50000
+# committee_names.sql macros render ~16 nested regexp_replace calls per name key; the default 600 is too
+# shallow for int_mec__donor_committees.
+max_parse_depth = 2000
 
 [sqlfluff:templater:dbt]
 project_dir = dbt
