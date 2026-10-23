@@ -19,3 +19,14 @@ def test_jobs_for_one_shard(monkeypatch):
     monkeypatch.setattr(cli, "SERVICE", {"a": "x", "c": "y"})
     monkeypatch.setattr(cli, "SLOW", set())
     assert [(g, s.index, s.count) for g, s in cli._jobs(["a", "c"], 4, [2])] == [(["a"], 2, 4), (["c"], 2, 4)]
+
+
+def test_export_defaults_to_parquet(monkeypatch):
+    # The frontend reads only data/exports/*.parquet, so a bare `mogov export` must write parquet.
+    seen = []
+    monkeypatch.setattr(cli, "export", seen.append)
+    monkeypatch.setattr("sys.argv", ["mogov", "export"])
+    cli.main()
+    monkeypatch.setattr("sys.argv", ["mogov", "export", "--format", "csv"])
+    cli.main()
+    assert seen == ["parquet", "csv"]
