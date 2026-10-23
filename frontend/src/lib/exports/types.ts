@@ -83,7 +83,10 @@ export interface CommitteeTrail {
   gave_official: number;
   first_year: number;
   last_year: number;
-  /** high = committee ID written into the name, or the same name; medium = looser name (abbreviations spelled out, or PAC/Fund etc. dropped) */
+  /**
+   * high = committee ID written into the name, or the same name; medium = looser name (abbreviations spelled out,
+   * PAC/Fund etc. dropped, or a filer's parenthesized short name)
+   */
   link_confidence: string;
   committee_total_amount: number;
   source_url: string;
