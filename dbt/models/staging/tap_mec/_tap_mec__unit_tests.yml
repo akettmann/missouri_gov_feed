@@ -28,6 +28,7 @@ unit_tests:
               cast(null as varchar) as company,
               cast(null as varchar) as first_name,
               cast(null as varchar) as last_name,
+              cast(null as varchar) as address_1,
               cast(null as varchar) as employer,
               cast(null as varchar) as occupation,
               cast(null as varchar) as city_clean,
@@ -42,11 +43,11 @@ unit_tests:
               cast(null as varchar) as rpt_type,
               cast(null as varchar) as report,
               cast('FALSE' as varchar) as dupe_flag
-          union all select 'C1', null, null, null, 'Jane Roe', 'Individual', null, null, null, null, null, null, null, null, null, null, '5', null, null, null, null, null, null, null
-          union all select null, 'C2', null, null, null, null, ' New Layout PAC ', '', '', '', null, null, null, null, null, null, '50', null, null, null, null, null, null, null
-          union all select null, 'C2', null, null, null, null, '', 'Acme Corp', '', '', null, null, null, null, null, null, '20', null, null, null, null, null, null, null
-          union all select null, 'C2', null, null, null, null, '', '', 'John', 'Doe', null, null, null, null, null, null, '10', null, null, null, null, null, null, null
-          union all select null, 'C2', null, null, null, null, 'Dupe PAC', '', '', '', null, null, null, null, null, null, '1', null, null, null, null, null, null, 'TRUE'
+          union all select 'C1', null, null, null, 'Jane Roe', 'Individual', null, null, null, null, null, null, null, null, null, null, null, '5', null, null, null, null, null, null, null
+          union all select null, 'C2', null, null, null, null, ' New Layout PAC ', '', '', '', null, null, null, null, null, null, null, '50', null, null, null, null, null, null, null
+          union all select null, 'C2', null, null, null, null, '', 'Acme Corp', '', '', null, null, null, null, null, null, null, '20', null, null, null, null, null, null, null
+          union all select null, 'C2', null, null, null, null, '', '', 'John', 'Doe', null, null, null, null, null, null, null, '10', null, null, null, null, null, null, null
+          union all select null, 'C2', null, null, null, null, 'Dupe PAC', '', '', '', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, 'TRUE'
     expect:
       rows:
         - {mec_committee_id: C1, contributor_name: Old Layout PAC, contributor_type: Committee, contributor_committee_name: Old Layout PAC, amount: 100}
@@ -64,7 +65,7 @@ unit_tests:
       names ('3M', 'TY') are two characters or more and survive untouched. The same holds for the second layout,
       where the placeholder is in `committee`. A placeholder in the first/last name columns too ('~' / '~',
       '-' / '-') is not a person's name: the row falls back to `company` and keeps its reported type. Single-letter
-      initials ('R Smith') are real and kept. A shifted-column row (all-digit first name, #60) gets no name at all.
+      initials ('R Smith') are real and kept. A shifted-column row with nothing to un-shift from (all-digit first name, no address_1; #60) gets no name.
     given:
       - input: source('tap_mec', 'contributions')
         format: sql
@@ -80,6 +81,7 @@ unit_tests:
               cast('78531653' as varchar) as company,
               cast('KATRINA' as varchar) as first_name,
               cast('REESE' as varchar) as last_name,
+              cast(null as varchar) as address_1,
               cast(null as varchar) as employer,
               cast(null as varchar) as occupation,
               cast(null as varchar) as city_clean,
@@ -94,15 +96,15 @@ unit_tests:
               cast(null as varchar) as rpt_type,
               cast(null as varchar) as report,
               cast('FALSE' as varchar) as dupe_flag
-          union all select 'C1', null, null, null, '~', 'Corporation', '~', '99', 'NOAH', 'ARSLAN', null, null, null, null, null, null, '2', null, null, null, null, null, null, null
-          union all select 'C1', null, null, null, 'C', 'Committee', 'C', null, null, null, null, null, null, null, null, null, '3', null, null, null, null, null, null, null
-          union all select 'C1', null, null, null, '3M', 'Corporation', '3M', null, null, null, null, null, null, null, null, null, '4', null, null, null, null, null, null, null
-          union all select 'C1', null, null, null, 'TY', 'Committee', 'TY', null, 'ANN', 'LEE', null, null, null, null, null, null, '5', null, null, null, null, null, null, null
-          union all select null, 'C2', null, null, null, null, ' 0 ', '', 'JOHN', 'DOE', null, null, null, null, null, null, '6', null, null, null, null, null, null, null
-          union all select 'C1', null, null, null, '~', 'Committee', '~', 'Some PAC', '~', '~', null, null, null, null, null, null, '7', null, null, null, null, null, null, null
-          union all select 'C1', null, null, null, '-', 'Committee', '-', 'Other PAC', '-', '-', null, null, null, null, null, null, '8', null, null, null, null, null, null, null
-          union all select 'C1', null, null, null, 'C', 'Committee', 'C', null, 'R', 'Smith', null, null, null, null, null, null, '9', null, null, null, null, null, null, null
-          union all select 'C1', null, null, null, 'C', 'Corporation', 'C', 'C', '79047860', 'VINCENT', null, null, null, null, null, null, '10', null, null, null, null, null, null, null
+          union all select 'C1', null, null, null, '~', 'Corporation', '~', '99', 'NOAH', 'ARSLAN', null, null, null, null, null, null, null, '2', null, null, null, null, null, null, null
+          union all select 'C1', null, null, null, 'C', 'Committee', 'C', null, null, null, null, null, null, null, null, null, null, '3', null, null, null, null, null, null, null
+          union all select 'C1', null, null, null, '3M', 'Corporation', '3M', null, null, null, null, null, null, null, null, null, null, '4', null, null, null, null, null, null, null
+          union all select 'C1', null, null, null, 'TY', 'Committee', 'TY', null, 'ANN', 'LEE', null, null, null, null, null, null, null, '5', null, null, null, null, null, null, null
+          union all select null, 'C2', null, null, null, null, ' 0 ', '', 'JOHN', 'DOE', null, null, null, null, null, null, null, '6', null, null, null, null, null, null, null
+          union all select 'C1', null, null, null, '~', 'Committee', '~', 'Some PAC', '~', '~', null, null, null, null, null, null, null, '7', null, null, null, null, null, null, null
+          union all select 'C1', null, null, null, '-', 'Committee', '-', 'Other PAC', '-', '-', null, null, null, null, null, null, null, '8', null, null, null, null, null, null, null
+          union all select 'C1', null, null, null, 'C', 'Committee', 'C', null, 'R', 'Smith', null, null, null, null, null, null, null, '9', null, null, null, null, null, null, null
+          union all select 'C1', null, null, null, 'C', 'Corporation', 'C', 'C', '79047860', 'VINCENT', null, null, null, null, null, null, null, '10', null, null, null, null, null, null, null
     expect:
       rows:
         - {mec_committee_id: C1, contributor_name: KATRINA REESE, contributor_type: Individual, contributor_committee_name: null, amount: 1}
@@ -115,3 +117,66 @@ unit_tests:
         - {mec_committee_id: C1, contributor_name: Other PAC, contributor_type: Committee, contributor_committee_name: null, amount: 8}
         - {mec_committee_id: C1, contributor_name: R Smith, contributor_type: Individual, contributor_committee_name: null, amount: 9}
         - {mec_committee_id: C1, contributor_name: null, contributor_type: Corporation, contributor_committee_name: null, amount: 10}
+
+  - name: tap_contributions_unshift_rows
+    model: stg_tap_mec__contributions
+    description: >
+      Shifted-column rows (#60) are un-shifted only on a precise signature. (1) All-digit first_name, name in
+      last_name + address_1, nothing usable in ctrb_name / committee / company (Enterprise Holdings PAC, one-digit
+      ID variant): first-name + surname, Individual. (2) last_name '0' with ctrb_name 'FIRST 0': first_name +
+      address_1, Individual. (3) Individual 'FIRST LAST 0' with last_name 'LAST 0': drop the trailing ' 0'.
+      (4) Placeholder ctrb_name and company, blank last_name, multi-word first_name (organization in
+      first_name): name kept, type stays Corporation. Look-alikes stay as reported: an ID with a digit-bearing
+      address_1, a real company next to a '0' first/last name, a single-word first_name under a Corporation
+      placeholder, and a ctrb_name that merely ends in a real ' 0' without the '0' last_name.
+    given:
+      - input: source('tap_mec', 'contributions')
+        format: sql
+        rows: |
+          select
+              cast('C1' as varchar) as cmte_id,
+              cast(null as varchar) as mecid,
+              cast(null as varchar) as cmte_name,
+              cast(null as varchar) as committee_name,
+              cast('C' as varchar) as ctrb_name,
+              cast('Corporation' as varchar) as ctrb_type,
+              cast(null as varchar) as committee,
+              cast('C' as varchar) as company,
+              cast('79047860' as varchar) as first_name,
+              cast('VINCENT' as varchar) as last_name,
+              cast('SIEMER' as varchar) as address_1,
+              cast(null as varchar) as employer,
+              cast(null as varchar) as occupation,
+              cast(null as varchar) as city_clean,
+              cast(null as varchar) as city,
+              cast(null as varchar) as state_clean,
+              cast(null as varchar) as state,
+              cast('1' as varchar) as amount,
+              cast(null as varchar) as date,
+              cast(null as varchar) as year,
+              cast(null as varchar) as cont_type,
+              cast(null as varchar) as contribution_type,
+              cast(null as varchar) as rpt_type,
+              cast(null as varchar) as report,
+              cast('FALSE' as varchar) as dupe_flag
+          union all select null, 'C2', null, null, null, null, null, null, '0', 'JOE', 'ABBOTT', null, null, null, null, null, null, '2', null, null, null, null, null, null, null
+          union all select 'C3', null, null, null, 'KERRY 0', 'Individual', null, null, 'KERRY', '0', 'LAFFOON', null, null, null, null, null, null, '3', null, null, null, null, null, null, null
+          union all select 'C3', null, null, null, 'MATTHEW SMITH 0', 'Individual', null, null, 'MATTHEW', 'SMITH 0', '8808 N ANITA AVE', null, null, null, null, null, null, '4', null, null, null, null, null, null, null
+          union all select 'C4', null, null, null, '??????????', 'Corporation', null, '??????????', 'Missouri Optometric Association', null, 'x', null, null, null, null, null, null, '5', null, null, null, null, null, null, null
+          union all select 'C1', null, null, null, 'C', 'Corporation', null, 'C', '79047861', 'TRICIA', '1058 Golden Orchard Dr', null, null, null, null, null, null, '6', null, null, null, null, null, null, null
+          union all select 'C5', null, null, null, 'Acme Corp', 'Corporation', null, 'Acme Corp', '0', '0', '1010 Pine', null, null, null, null, null, null, '7', null, null, null, null, null, null, null
+          union all select 'C4', null, null, null, 'L', 'Corporation', null, 'L', 'Belisle', null, 'x', null, null, null, null, null, null, '8', null, null, null, null, null, null, null
+          union all select 'C4', null, null, null, '-', 'Corporation', null, '-', 'Harlan Harlan & Still', null, null, null, null, null, null, null, null, '10', null, null, null, null, null, null, null
+          union all select 'C6', null, null, null, 'ROBERT 0', 'Individual', null, null, 'ROBERT', 'JONES', 'MAIN ST', null, null, null, null, null, null, '9', null, null, null, null, null, null, null
+    expect:
+      rows:
+        - {mec_committee_id: C1, contributor_name: VINCENT SIEMER, contributor_type: Individual, amount: 1}
+        - {mec_committee_id: C2, contributor_name: JOE ABBOTT, contributor_type: Individual, amount: 2}
+        - {mec_committee_id: C3, contributor_name: KERRY LAFFOON, contributor_type: Individual, amount: 3}
+        - {mec_committee_id: C3, contributor_name: MATTHEW SMITH, contributor_type: Individual, amount: 4}
+        - {mec_committee_id: C4, contributor_name: Missouri Optometric Association, contributor_type: Corporation, amount: 5}
+        - {mec_committee_id: C1, contributor_name: null, contributor_type: Corporation, amount: 6}
+        - {mec_committee_id: C5, contributor_name: Acme Corp, contributor_type: Corporation, amount: 7}
+        - {mec_committee_id: C4, contributor_name: Belisle, contributor_type: Individual, amount: 8}
+        - {mec_committee_id: C4, contributor_name: Harlan Harlan & Still, contributor_type: Corporation, amount: 10}
+        - {mec_committee_id: C6, contributor_name: ROBERT 0, contributor_type: Individual, amount: 9}
