@@ -4,6 +4,8 @@
 -- Federal: FEC committee contributions (pas2) for every FEC candidate ID the official has used.
 -- State/local: MEC itemized contributions/expenditures (TAP mirror, 2011-2022) for name-matched committees.
 -- Individual federal donors are summarized in fct_federal_donor_summary rather than listed.
+-- A Missouri committee donor's own MECID (counterparty_mec_committee_id) comes from the name crosswalk
+-- int_mec__donor_committees, unique matches only; it's how the profile goes one hop back (rpt_committee_donors).
 with fec_ids as (
     select
         o.official_id,
@@ -77,9 +79,17 @@ mec_received as (
         || ' to ' || m.committee_name as kind,
         'MEC (via Accountability Project)' as source,
         m.confidence as match_confidence,
-        'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url
+        'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url,
+        x.mec_committee_id as counterparty_mec_committee_id,
+        x.match_confidence as counterparty_link_confidence
     from {{ ref('stg_tap_mec__contributions') }} as c
     inner join {{ ref('int_mec__official_committees') }} as m on c.mec_committee_id = m.mec_committee_id
+    left join {{ ref('int_mec__donor_committees') }} as x
+        on
+            c.contributor_committee_name = x.donor_committee_name
+            and coalesce(c.contribution_year, cast(extract(year from c.contribution_date) as {{ dbt.type_int() }}))
+            = x.contribution_year
+            and x.match_status = 'matched'
 ),
 
 mec_given as (
@@ -120,9 +130,16 @@ mec_direct_received as (
         lower(c.contribution_kind) || ' to ' || m.committee_name as kind,
         'MEC' as source,
         m.confidence as match_confidence,
-        'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url
+        'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url,
+        x.mec_committee_id as counterparty_mec_committee_id,
+        x.match_confidence as counterparty_link_confidence
     from {{ ref('stg_mec__contributions') }} as c
     inner join {{ ref('int_mec__official_committees') }} as m on c.mec_committee_id = m.mec_committee_id
+    left join {{ ref('int_mec__donor_committees') }} as x
+        on
+            c.contributor_committee_name = x.donor_committee_name
+            and c.contribution_year = x.contribution_year
+            and x.match_status = 'matched'
 ),
 
 mec_direct_given as (
@@ -146,16 +163,37 @@ mec_direct_given as (
 
 {% set cols = 'official_id, direction, level, transaction_date, amount, counterparty, counterparty_organization,
     counterparty_type, kind, source, match_confidence, source_url' %}
-select {{ cols }} from fec_received
+{% set link = 'counterparty_mec_committee_id, counterparty_link_confidence' %}
+{% set no_link = 'cast(null as ' ~ dbt.type_string() ~ ') as counterparty_mec_committee_id, cast(null as '
+    ~ dbt.type_string() ~ ') as counterparty_link_confidence' %}
+select
+    {{ cols }},
+    {{ no_link }}
+from fec_received
 union all
-select {{ cols }} from fec_given
+select
+    {{ cols }},
+    {{ no_link }}
+from fec_given
 union all
-select {{ cols }} from mec_received
+select
+    {{ cols }},
+    {{ link }}
+from mec_received
 union all
-select {{ cols }} from mec_given
+select
+    {{ cols }},
+    {{ no_link }}
+from mec_given
 {% if var('mec_direct', false) %}
-union all
-select {{ cols }} from mec_direct_received
-union all
-select {{ cols }} from mec_direct_given
+    union all
+    select
+        {{ cols }},
+        {{ link }}
+    from mec_direct_received
+    union all
+    select
+        {{ cols }},
+        {{ no_link }}
+    from mec_direct_given
 {% endif %}

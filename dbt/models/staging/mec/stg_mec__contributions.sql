@@ -11,6 +11,8 @@ select
         when company is not null and company <> '' then 'Organization'
         else 'Individual'
     end as contributor_type,
+    -- the donor committee's name as reported (no MECID: mecid is the receiving committee's)
+    nullif(trim(committee), '') as contributor_committee_name,
     coalesce(nullif(company, ''), nullif(committee, '')) as contributor_company,
     employer as contributor_employer,
     occupation as contributor_occupation,
@@ -18,6 +20,10 @@ select
     state as contributor_state,
     {{ dbt.safe_cast('amount', dbt.type_numeric()) }} as amount,
     {{ mogov.parse_date(dbt.split_part('date', "' '", 1), '%m/%d/%Y') }} as contribution_date,
+    cast(
+        extract(year from {{ mogov.parse_date(dbt.split_part('date', "' '", 1), '%m/%d/%Y') }})
+        as {{ dbt.type_int() }}
+    ) as contribution_year,
     contribution_type as contribution_kind,
     report,
     cd1_a_id as record_id

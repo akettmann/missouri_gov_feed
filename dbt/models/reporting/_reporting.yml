@@ -2,8 +2,8 @@ version: 2
 
 # Reporting models are shaped for the frontend's pages (docs/frontend_principles.md). Like the marts, their columns are
 # a contract (data_type per column) and descriptions persist as warehouse comments. They read only marts and
-# intermediate models. Every row keeps official_id, and source_url / match_confidence wherever the facts
-# behind it have them.
+# intermediate models. Every row keeps official_id (rpt_committee_donors, keyed by committee, is the exception),
+# and source_url / match_confidence wherever the facts behind it have them.
 
 models:
   - name: rpt_indicator_peers
@@ -147,12 +147,13 @@ models:
       Money received by each official's campaign committees (fct_campaign_finance, direction 'received'),
       summed per donor, donor class and year. Individual federal donors are only available summarized
       (fct_federal_donor_summary). Grain: one row per (official, level, year, donor class, donor, match
-      confidence, source, source_url).
+      confidence, source, source_url, donor's MECID).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns:
-              [official_id, level, transaction_year, donor_class, donor_name, match_confidence, source, source_url]
+              [official_id, level, transaction_year, donor_class, donor_name, match_confidence, source, source_url,
+                donor_mec_committee_id]
     columns:
       - name: official_id
         data_type: varchar
@@ -191,6 +192,14 @@ models:
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"
+      - name: donor_mec_committee_id
+        data_type: varchar
+        description: >
+          A Missouri committee donor's own MECID, matched by name (fct_campaign_finance.counterparty_mec_committee_id);
+          its donors are in rpt_committee_donors. Null for other donors and unmatched names.
+      - name: donor_link_confidence
+        data_type: varchar
+        description: "`high` (same name) or `medium` (normalized name) for donor_mec_committee_id; null without one."
       - name: total_amount
         data_type: decimal(38,6)
         description: Sum received, in dollars.
@@ -667,6 +676,86 @@ models:
         description: >
           Where the row comes from - dim_official (current year), mo_house roster, openstates,
           congress-legislators or fjc.
+  - name: rpt_committee_donors
+    description: >
+      One hop back from an official's donors: for each Missouri committee that gave to an official (a
+      unique name match, fct_campaign_finance.counterparty_mec_committee_id), who funded that committee, over
+      every year loaded from both MEC feeds (int_mec__contributions_received). Its 10 largest non-individual
+      donors are ranked; itemized individuals are summed into one unranked row. trail_status says whether a
+      donor can be followed further (mec committee), is a committee we can't place (ambiguous mec name, not an
+      mec filer), or is the end of the trail (a business or organization: MEC does not receive a
+      non-committee's donors, so nonprofits' funders are not disclosed). Keyed by committee, not official:
+      join on rpt_donor_rollup.donor_mec_committee_id. Grain: one row per (committee, donor class, donor).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [mec_committee_id, donor_class, donor_name]
+    columns:
+      - name: mec_committee_id
+        data_type: varchar
+        description: The committee whose donors these are (MECID).
+        data_tests: [not_null]
+      - name: committee_name
+        data_type: varchar
+        description: The committee's most recent name as filed.
+      - name: committee_total_amount
+        data_type: decimal(38,6)
+        description: >
+          All itemized contributions the committee received in the loaded years, every donor included (not only
+          the rows listed).
+      - name: donor_rank
+        data_type: bigint
+        description: 1 = the committee's largest non-individual donor by total_amount; null for the individuals row.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 10
+      - name: donor_class
+        data_type: varchar
+        description: As in rpt_donor_rollup (macro donor_class).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['individual', 'pac', 'party', 'candidate committee', 'committee',
+                  'business or organization', 'other']
+      - name: donor_name
+        data_type: varchar
+        description: The donor as the committee reported it; '(individuals)' for the summed individuals row.
+        data_tests: [not_null]
+      - name: total_amount
+        data_type: decimal(38,6)
+        description: Sum given to the committee, in dollars.
+      - name: contribution_count
+        data_type: bigint
+        description: Number of contributions summed.
+      - name: first_year
+        data_type: integer
+        description: Earliest contribution year.
+      - name: last_year
+        data_type: integer
+        description: Latest contribution year.
+      - name: trail_status
+        data_type: varchar
+        description: mec committee, ambiguous mec name, not an mec filer, end of trail, or individuals (see above).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['mec committee', 'ambiguous mec name', 'not an mec filer', 'end of trail', 'individuals']
+      - name: donor_mec_committee_id
+        data_type: varchar
+        description: >
+          For a committee donor matched by name to one Missouri committee (int_mec__donor_committees), its MECID;
+          the next hop is this table's rows for that ID. When the name matched different IDs in different years,
+          the one with the most money.
+      - name: donor_link_confidence
+        data_type: varchar
+        description: "`high` (MECID in the name, or same name) or `medium` (normalized name) for donor_mec_committee_id."
+      - name: source_url
+        data_type: varchar
+        description: The committee's MEC page, where its reports and itemized contributions are.
 
 exposures:
   - name: voter_frontend
@@ -711,3 +800,4 @@ exposures:
       - ref('fct_jurisdiction_businesses')
       - ref('rpt_district_business_industries')
       - ref('rpt_officeholders_by_year')
+      - ref('rpt_committee_donors')

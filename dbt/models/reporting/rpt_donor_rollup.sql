@@ -3,6 +3,8 @@
 -- organization), else the counterparty's own name. donor_class groups the sources' counterparty types
 -- into PAC / individual / party / ... . match_confidence is kept in the grain so the frontend can flag or
 -- hide medium matches. Individual federal donors are not itemized here (see fct_federal_donor_summary).
+-- donor_mec_committee_id is a Missouri committee donor's own MECID (a name match, see fct_campaign_finance),
+-- the key into rpt_committee_donors for the donor's own donors.
 with received as (
     select
         official_id,
@@ -12,18 +14,12 @@ with received as (
         match_confidence,
         amount,
         transaction_date,
+        counterparty_mec_committee_id as donor_mec_committee_id,
+        counterparty_link_confidence as donor_link_confidence,
         cast(extract(year from transaction_date) as {{ dbt.type_int() }}) as transaction_year,
         coalesce(nullif(trim(counterparty_organization), ''), nullif(trim(counterparty), ''), '(unnamed)')
             as donor_name,
-        case
-            when lower(counterparty_type) = 'individual' then 'individual'
-            when lower(counterparty_type) like '%pac%' then 'pac'
-            when lower(counterparty_type) like 'party%' then 'party'
-            when counterparty_type in ('House', 'Senate', 'Presidential') then 'candidate committee'
-            when lower(counterparty_type) = 'committee' then 'committee'
-            when lower(counterparty_type) in ('corporation', 'organization') then 'business or organization'
-            else 'other'
-        end as donor_class
+        {{ mogov.donor_class('counterparty_type') }} as donor_class
     from {{ ref('fct_campaign_finance') }}
     where direction = 'received'
 )
@@ -39,6 +35,8 @@ select
     match_confidence,
     source,
     source_url,
+    donor_mec_committee_id,
+    donor_link_confidence,
     sum(amount) as total_amount,
     count(*) as contribution_count,
     min(transaction_date) as first_date,
@@ -52,4 +50,6 @@ group by
     donor_name,
     match_confidence,
     source,
-    source_url
+    source_url,
+    donor_mec_committee_id,
+    donor_link_confidence

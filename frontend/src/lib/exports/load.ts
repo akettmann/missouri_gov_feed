@@ -9,6 +9,8 @@ import type {
   AttendanceRow,
   CaseRow,
   CommercialTie,
+  CommitteeDonorRow,
+  CommitteeTrail,
   CoverageItem,
   Dataset,
   DisclosureFiling,
@@ -149,6 +151,77 @@ async function loadAll(): Promise<OfficialBundle[]> {
           where rank <= 25 order by official_id, rank`),
       )
     : null;
+  // One hop back: each official's 5 largest committee donors that matched a Missouri committee by name,
+  // with that committee's own donors (rpt_committee_donors keeps its top 10 plus summed individuals).
+  const TRAILS = 5;
+  const hasTrails = hasDonors && hasExport("rpt_committee_donors");
+  type TrailRow = Omit<
+    CommitteeTrail,
+    "donors" | "committee_name" | "committee_total_amount" | "source_url"
+  > & {
+    official_id: string;
+  };
+  const trailRows = hasTrails
+    ? await query<TrailRow>(`
+        select official_id, mec_committee_id, donor_names, gave_official, first_year, last_year, link_confidence
+        from (
+          select official_id, donor_mec_committee_id as mec_committee_id,
+                 string_agg(distinct donor_name, '; ' order by donor_name) as donor_names,
+                 cast(sum(total_amount) as double) as gave_official,
+                 cast(min(transaction_year) as integer) as first_year,
+                 cast(max(transaction_year) as integer) as last_year,
+                 -- 'high' < 'medium': the weakest link among the rows shown
+                 max(donor_link_confidence) as link_confidence,
+                 row_number() over (partition by official_id order by sum(total_amount) desc) as rank
+          from {rpt_donor_rollup}
+          where donor_mec_committee_id is not null
+          group by official_id, donor_mec_committee_id
+        ) ranked
+        where rank <= ${TRAILS} order by official_id, rank`)
+    : [];
+  const committeeDonors = new Map<
+    string,
+    Pick<CommitteeTrail, "committee_name" | "committee_total_amount" | "source_url" | "donors">
+  >();
+  if (hasTrails && trailRows.length > 0) {
+    const ids = [...new Set(trailRows.map((t) => t.mec_committee_id))].map(
+      (id) => `'${id.replaceAll("'", "''")}'`,
+    );
+    for (const r of await query<
+      CommitteeDonorRow & {
+        mec_committee_id: string;
+        committee_name: string | null;
+        committee_total_amount: number;
+        source_url: string;
+      }
+    >(`
+      select mec_committee_id, committee_name, cast(committee_total_amount as double) as committee_total_amount,
+             source_url, cast(donor_rank as integer) as donor_rank, donor_class, donor_name,
+             cast(total_amount as double) as total_amount, cast(contribution_count as integer) as contribution_count,
+             first_year, last_year, trail_status, donor_mec_committee_id
+      from {rpt_committee_donors}
+      where mec_committee_id in (${ids.join(", ")})
+      order by mec_committee_id, donor_rank nulls last`)) {
+      const { mec_committee_id, committee_name, committee_total_amount, source_url, ...donor } = r;
+      const entry = committeeDonors.get(mec_committee_id) ?? {
+        committee_name,
+        committee_total_amount,
+        source_url,
+        donors: [],
+      };
+      entry.donors.push(donor);
+      committeeDonors.set(mec_committee_id, entry);
+    }
+  }
+  const trails = hasTrails
+    ? groupBy(
+        trailRows.flatMap((t) => {
+          const hop = committeeDonors.get(t.mec_committee_id);
+          return hop ? [{ ...t, ...hop }] : [];
+        }),
+      )
+    : null;
+
   const realGifts = hasExport("rpt_gift_rollup")
     ? groupBy(
         await query<GiftRollupRow & { official_id: string }>(`
@@ -422,6 +495,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
           size: sizes ? ((sizes.get(id) ?? []) as SizeRow) : null,
           employers: employers ? ((employers.get(id) ?? []) as EmployerRow) : null,
           top_donors: topDonors,
+          committee_trails: trails ? ((trails.get(id) ?? []) as CommitteeTrail[]) : null,
         },
         gifts,
         businesses: districtIndustries
@@ -499,6 +573,7 @@ export function freshness(): { table: string; exported_at: string | null; sample
     "fct_family_ties",
     "fct_disclosures",
     "rpt_donor_rollup",
+    "rpt_committee_donors",
     "rpt_gift_rollup",
     "rpt_indicator_peers",
     "rpt_party_breaks",

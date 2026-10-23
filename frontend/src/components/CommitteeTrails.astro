@@ -1,0 +1,136 @@
+---
+// One hop back (rpt_committee_donors): for this official's largest committee donors that matched a Missouri
+// committee by name, who funded that committee. MEC records no ID for a donor committee, so every link here
+// is a name match: each block carries the "possible match" badge and "Hide possible matches" removes it.
+import type { CommitteeDonorRow, CommitteeTrail } from "../lib/exports/types";
+import { count, money } from "../lib/format";
+import { href } from "../lib/site";
+import SourceLink from "./SourceLink.astro";
+
+interface Props {
+  trails: CommitteeTrail[] | null;
+}
+const { trails } = Astro.props;
+
+const CLASS_LABEL: Record<string, string> = {
+  pac: "PAC",
+  committee: "Committee",
+  "candidate committee": "Candidate committee",
+  party: "Party",
+  "business or organization": "Business or organization",
+  individual: "Individuals",
+  other: "Other",
+};
+const TRAIL_LABEL: Record<string, string> = {
+  "mec committee": "Missouri committee: its own donors are on MEC",
+  "ambiguous mec name": "Several Missouri committees use this name",
+  "not an mec filer": "Not a Missouri filer (federal and out-of-state PACs report elsewhere)",
+  "end of trail": "End of the trail: an organization's own funders aren't reported to MEC",
+  individuals: "People, each giving itemized amounts",
+};
+const MEC_PAGE = "https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=";
+const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : `${a}–${b}`);
+const donorName = (d: CommitteeDonorRow) =>
+  d.trail_status === "individuals" ? "Individuals (itemized)" : d.donor_name;
+---
+
+{trails !== null && trails.length > 0 && (
+  <div class="trails">
+    <h3>Where their committee donors get money</h3>
+    <p class="small muted lede">
+      One step back from the donors above: for this official's largest donors that are Missouri committees,
+      who gave to those committees, across every year loaded. The Missouri Ethics Commission records a gift
+      from one committee to another by the giver's name only, so each committee here was found by matching
+      that name, and may be a different committee with a similar name.{" "}
+      <a href={href("/methodology/#committee-donors")}>How it's matched</a>.
+    </p>
+    {trails.map((t) => (
+      <section
+        class="trail"
+        data-confidence="medium"
+        aria-label={`Donors to ${t.committee_name ?? t.mec_committee_id}`}
+      >
+        <h4>
+          {t.committee_name ?? t.mec_committee_id}{" "}
+          <span
+            class="badge medium"
+            title={`Matched by ${t.link_confidence === "high" ? "the same name" : "a normalized name"}: MEC records no ID for a donor committee`}
+          >
+            possible match
+          </span>
+        </h4>
+        <p class="small muted">
+          Filed by this official's committee as "{t.donor_names}": {money(t.gave_official)},{" "}
+          {years(t.first_year, t.last_year)}. The committee took in {money(t.committee_total_amount)} in
+          itemized contributions in total.{" "}
+          <SourceLink url={t.source_url} label={`MEC committee ${t.mec_committee_id}`} />
+        </p>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Gave to this committee</th>
+                <th>Type</th>
+                <th>Years</th>
+                <th class="num">Total</th>
+                <th class="num">Contributions</th>
+                <th>Behind this donor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {t.donors.map((d) => (
+                <tr>
+                  <td>{donorName(d)}</td>
+                  <td>{CLASS_LABEL[d.donor_class] ?? d.donor_class}</td>
+                  <td class="nowrap">{years(d.first_year, d.last_year)}</td>
+                  <td class="num">{money(d.total_amount)}</td>
+                  <td class="num">{count(d.contribution_count)}</td>
+                  <td class="small">
+                    {TRAIL_LABEL[d.trail_status] ?? d.trail_status}
+                    {d.donor_mec_committee_id && (
+                      <>
+                        {" "}
+                        ·{" "}
+                        <SourceLink
+                          url={`${MEC_PAGE}${d.donor_mec_committee_id}`}
+                          label={d.donor_mec_committee_id}
+                        />{" "}
+                        <span
+                          class="badge medium"
+                          title="Matched by name: MEC records no ID for a donor committee"
+                        >
+                          possible match
+                        </span>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    ))}
+  </div>
+)}
+
+<style>
+  .trails {
+    margin-top: 8px;
+  }
+  .lede {
+    max-width: 72ch;
+  }
+  .trail {
+    border-top: 1px solid var(--hairline);
+    padding-top: 12px;
+    margin-top: 12px;
+  }
+  h4 {
+    margin: 0 0 4px;
+    font-size: 0.9375rem;
+  }
+  .nowrap {
+    white-space: nowrap;
+  }
+</style>

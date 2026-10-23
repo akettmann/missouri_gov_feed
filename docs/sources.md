@@ -176,6 +176,17 @@ Quirks:
 - MEC answers in under a second (the lobbyist search takes about 13 s). The fixed `MOGOV_MEC_PAUSE`
   (3 s) between requests is most of the runtime. A cold run is about 4 requests per export year and
   3 per election date.
+- Committee donors on CD1_A carry only a name (`committee`); `mecid` is the receiving committee. To go
+  one hop back (who funds the PAC that funds an official, #9), `int_mec__donor_committees` matches that name
+  to the names committees file under, in tiers: a MECID typed into the name, the same name (case and
+  punctuation ignored), a normalized name (MO = Missouri, Assn = Association, ...), and a core name without
+  PAC / Political Action Committee / Fund. A match counts only if that committee was active within a year
+  of the gift, and only when it is unique. Measured October 2026 over both feeds ($489M from committees):
+  68% of the dollars match one committee, 1.4% are ambiguous, 30% match nothing. An exact name match alone
+  got about 46%. Most of the misses are federal and out-of-state PACs (DRIVE, AFSCME, DGA), which don't
+  file with MEC, plus acronyms (HRCC, AMECPAC) that no name rule can expand. Distinct committees can differ
+  only by "MO" vs "Missouri" ("MO Values PAC" and "Missouri Values PAC"), so the exact-name tier is tried
+  first.
 - Personal financial disclosures (PFDs) are not online. MEC's 2026 Ethics Guide: "State law requires a
   request to receive copies of PFDs filed with the Commission. Therefore, PFDs are not available for
   public viewing on the MEC's website." Anyone can request copies from MEC (legislators, statewide
@@ -195,6 +206,15 @@ Quirks:
 - Some rows are malformed, so they're read with `ignore_errors` and without strict mode. The quote and
   escape characters are set explicitly: with non-strict sniffing, DuckDB mis-read some quoted fields
   and silently merged the rows after them (about 900 rows lost before October 2026).
+- The contributions mirror combines two MEC layouts. The second (contribution years 2020-2022) has no
+  `ctrb_name` / `ctrb_type`: a committee donor is named in `committee`, an organization in `company`, a
+  person in first/last name, and absent parts are blank strings, not nulls. Until October 2026 staging lost
+  the donor's name and type on about 40,000 such rows ($93M), which showed as "(unnamed)" (#30).
+- About 10,000 contribution rows name the donor with one character (`C`, `~`, `0`), mostly individuals
+  itemized by federal committees transferred to MEC; the real name is in first/last name (#31).
+- A few MECIDs are lower-case (`c000525`); the intermediate models upper-case them.
+- A committee-to-committee gift names the donor committee only. `cmte_id` / `mecid` is the receiving
+  committee's ID, and there is no donor MECID. The same holds for MEC's direct export (see mec below).
 
 ## fec: Federal Election Commission
 

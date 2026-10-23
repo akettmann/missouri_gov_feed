@@ -58,7 +58,7 @@ package "intermediate (identity resolution)" {
   [int_mo_house__votes\nint_mo_senate__votes] as I_votes
   [int_votes__member_votes\nint_votes__party_positions] as I_party
   [int_judges__current\nint_judges__federal\nint_judges__state_index\nint_bluebook__bios\nint_bluebook__judge_bios] as I_judges
-  [int_mec__official_committees] as I_mec
+  [int_mec__official_committees\nint_mec__contributions_received\nint_mec__committee_names\nint_mec__donor_committees] as I_mec
   [int_bills__subjects] as I_subj
   [int_interests__industry_money] as I_interest
   [int_house_fd__schedule_lines\nint_courtlistener__judge_disclosure_items] as I_fd
@@ -90,7 +90,7 @@ package "marts" {
 package "reporting (frontend views)" {
   [rpt_indicator_peers] as R_peers
   [rpt_party_breaks\nrpt_attendance] as R_votes
-  [rpt_donor_rollup] as R_money
+  [rpt_donor_rollup\nrpt_committee_donors] as R_money
   [rpt_gift_rollup] as R_gifts
   [rpt_interest_vote_overlap] as R_overlap
   [rpt_officeholders_by_year] as R_years
@@ -190,6 +190,7 @@ dim --> R_peers
 F_votes --> R_votes
 I_party --> R_votes
 F_money --> R_money
+I_mec --> R_money
 F_gifts --> R_gifts
 R_peers --> EXP
 R_votes --> EXP
