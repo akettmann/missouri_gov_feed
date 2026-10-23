@@ -117,6 +117,8 @@ entirely from the parquet exports; there is no server. Data flow:
    pnpm preview        # http://localhost:4321
    pnpm sizes          # per-official payload sizes; exits 1 if any JSON is over budget (100 KB gzipped)
    ```
+   If any parquet file is older than `data/mogov.duckdb` (or `MOGOV_DB`), the build warns that you
+   skipped `uv run mogov export`; it never fails the build, and stays silent if the DuckDB file is absent.
 4. Checks (also run by pre-commit on `frontend/` changes): `pnpm check` (astro check / TypeScript),
    `pnpm lint` (ESLint), `pnpm format:check` (Prettier).
 
