@@ -21,11 +21,14 @@ repos:
         entry: uv run --frozen ruff check --fix
         language: system
         types_or: [python, pyi]
+      # ruff comes from uv.lock via `uv run --frozen`, so this hook and a bare `uv run ruff` always agree on
+      # version; bump it once with `uv lock --upgrade-package ruff`. ruff >= 0.17 also formats Python code
+      # blocks in Markdown, so ruff-format must see markdown files or `ruff format --check .` disagrees with it.
       - id: ruff-format
         name: ruff format
         entry: uv run --frozen ruff format
         language: system
-        types_or: [python, pyi]
+        types_or: [python, pyi, markdown]
       - id: sqlfluff-fix
         name: sqlfluff fix
         entry: uv run --frozen python scripts/sqlfluff_hook.py fix --force
