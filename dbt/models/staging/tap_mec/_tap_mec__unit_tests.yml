@@ -54,3 +54,54 @@ unit_tests:
         - {mec_committee_id: C2, contributor_name: New Layout PAC, contributor_type: Committee, contributor_committee_name: New Layout PAC, amount: 50}
         - {mec_committee_id: C2, contributor_name: Acme Corp, contributor_type: Organization, contributor_committee_name: null, amount: 20}
         - {mec_committee_id: C2, contributor_name: John Doe, contributor_type: Individual, contributor_committee_name: null, amount: 10}
+
+  - name: tap_contributions_placeholder_names
+    model: stg_tap_mec__contributions
+    description: >
+      A one-character donor name ('C', '~', '0', '-', 'x', '_') is a placeholder (#31), not a name: it is treated
+      as missing, the name falls back to the person's first/last name and the row is typed Individual, with no
+      donor committee name. Without a person's name the name stays null and the reported type is kept. Real short
+      names ('3M', 'TY') are two characters or more and survive untouched. The same holds for the second layout,
+      where the placeholder is in `committee`.
+    given:
+      - input: source('tap_mec', 'contributions')
+        format: sql
+        rows: |
+          select
+              cast('C1' as varchar) as cmte_id,
+              cast(null as varchar) as mecid,
+              cast(null as varchar) as cmte_name,
+              cast(null as varchar) as committee_name,
+              cast('C' as varchar) as ctrb_name,
+              cast('Committee' as varchar) as ctrb_type,
+              cast('C' as varchar) as committee,
+              cast('78531653' as varchar) as company,
+              cast('KATRINA' as varchar) as first_name,
+              cast('REESE' as varchar) as last_name,
+              cast(null as varchar) as employer,
+              cast(null as varchar) as occupation,
+              cast(null as varchar) as city_clean,
+              cast(null as varchar) as city,
+              cast(null as varchar) as state_clean,
+              cast(null as varchar) as state,
+              cast('1' as varchar) as amount,
+              cast(null as varchar) as date,
+              cast(null as varchar) as year,
+              cast(null as varchar) as cont_type,
+              cast(null as varchar) as contribution_type,
+              cast(null as varchar) as rpt_type,
+              cast(null as varchar) as report,
+              cast('FALSE' as varchar) as dupe_flag
+          union all select 'C1', null, null, null, '~', 'Corporation', '~', '99', 'NOAH', 'ARSLAN', null, null, null, null, null, null, '2', null, null, null, null, null, null, null
+          union all select 'C1', null, null, null, 'C', 'Committee', 'C', null, null, null, null, null, null, null, null, null, '3', null, null, null, null, null, null, null
+          union all select 'C1', null, null, null, '3M', 'Corporation', '3M', null, null, null, null, null, null, null, null, null, '4', null, null, null, null, null, null, null
+          union all select 'C1', null, null, null, 'TY', 'Committee', 'TY', null, 'ANN', 'LEE', null, null, null, null, null, null, '5', null, null, null, null, null, null, null
+          union all select null, 'C2', null, null, null, null, ' 0 ', '', 'JOHN', 'DOE', null, null, null, null, null, null, '6', null, null, null, null, null, null, null
+    expect:
+      rows:
+        - {mec_committee_id: C1, contributor_name: KATRINA REESE, contributor_type: Individual, contributor_committee_name: null, amount: 1}
+        - {mec_committee_id: C1, contributor_name: NOAH ARSLAN, contributor_type: Individual, contributor_committee_name: null, amount: 2}
+        - {mec_committee_id: C1, contributor_name: null, contributor_type: Committee, contributor_committee_name: null, amount: 3}
+        - {mec_committee_id: C1, contributor_name: 3M, contributor_type: Corporation, contributor_committee_name: null, amount: 4}
+        - {mec_committee_id: C1, contributor_name: TY, contributor_type: Committee, contributor_committee_name: TY, amount: 5}
+        - {mec_committee_id: C2, contributor_name: JOHN DOE, contributor_type: Individual, contributor_committee_name: null, amount: 6}
