@@ -1,0 +1,56 @@
+# Unit tests for the TAP contributions staging model: fixed source rows -> exact expected rows.
+# Kept apart from the generated _tap_mec__models.yml so regenerating docs never touches them.
+# The source is the raw parquet (no table to read column types from), so the fixture is SQL naming every
+# column the model reads, all text as in the raw files. Later rows list values in the first row's column order.
+version: 2
+
+unit_tests:
+  - name: tap_contributions_read_both_layouts
+    model: stg_tap_mec__contributions
+    description: >
+      The first layout names and types the donor in ctrb_name / ctrb_type. The second (2020-2022, #30) has
+      neither: a committee donor is in `committee`, an organization in `company`, a person in first/last name,
+      and absent parts are blank strings, not nulls. Before #30 the second layout came out with a blank name
+      and every donor typed Individual. contributor_committee_name is set only for committee donors.
+      dupe_flag TRUE rows are dropped.
+    given:
+      - input: source('tap_mec', 'contributions')
+        format: sql
+        rows: |
+          select
+              cast('C1' as varchar) as cmte_id,
+              cast(null as varchar) as mecid,
+              cast(null as varchar) as cmte_name,
+              cast(null as varchar) as committee_name,
+              cast('Old Layout PAC' as varchar) as ctrb_name,
+              cast('Committee' as varchar) as ctrb_type,
+              cast(null as varchar) as committee,
+              cast(null as varchar) as company,
+              cast(null as varchar) as first_name,
+              cast(null as varchar) as last_name,
+              cast(null as varchar) as employer,
+              cast(null as varchar) as occupation,
+              cast(null as varchar) as city_clean,
+              cast(null as varchar) as city,
+              cast(null as varchar) as state_clean,
+              cast(null as varchar) as state,
+              cast('100' as varchar) as amount,
+              cast(null as varchar) as date,
+              cast(null as varchar) as year,
+              cast(null as varchar) as cont_type,
+              cast(null as varchar) as contribution_type,
+              cast(null as varchar) as rpt_type,
+              cast(null as varchar) as report,
+              cast('FALSE' as varchar) as dupe_flag
+          union all select 'C1', null, null, null, 'Jane Roe', 'Individual', null, null, null, null, null, null, null, null, null, null, '5', null, null, null, null, null, null, null
+          union all select null, 'C2', null, null, null, null, ' New Layout PAC ', '', '', '', null, null, null, null, null, null, '50', null, null, null, null, null, null, null
+          union all select null, 'C2', null, null, null, null, '', 'Acme Corp', '', '', null, null, null, null, null, null, '20', null, null, null, null, null, null, null
+          union all select null, 'C2', null, null, null, null, '', '', 'John', 'Doe', null, null, null, null, null, null, '10', null, null, null, null, null, null, null
+          union all select null, 'C2', null, null, null, null, 'Dupe PAC', '', '', '', null, null, null, null, null, null, '1', null, null, null, null, null, null, 'TRUE'
+    expect:
+      rows:
+        - {mec_committee_id: C1, contributor_name: Old Layout PAC, contributor_type: Committee, contributor_committee_name: Old Layout PAC, amount: 100}
+        - {mec_committee_id: C1, contributor_name: Jane Roe, contributor_type: Individual, contributor_committee_name: null, amount: 5}
+        - {mec_committee_id: C2, contributor_name: New Layout PAC, contributor_type: Committee, contributor_committee_name: New Layout PAC, amount: 50}
+        - {mec_committee_id: C2, contributor_name: Acme Corp, contributor_type: Organization, contributor_committee_name: null, amount: 20}
+        - {mec_committee_id: C2, contributor_name: John Doe, contributor_type: Individual, contributor_committee_name: null, amount: 10}
