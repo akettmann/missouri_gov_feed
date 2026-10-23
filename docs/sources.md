@@ -359,6 +359,11 @@ Quirks:
   the 2019+ naming scheme.
 - Pages mix one- and two-column layouts. A page counts as two-column when almost no words cross the
   midline.
+- In the judicial chapter's alphabetical judge index, the page header can land on the same line as the
+  first entry ("Alphabetical list of Missouri Judges Brewer, Craig D. ...", 2025-2026 p. 123). The header
+  is stripped before parsing (#41).
+- Names in the index can use a typographic apostrophe (`O’Hara`). It is normalized to `'`. Before October
+  2026 those entries were dropped (#42).
 
 ## openstates_people: Open States
 

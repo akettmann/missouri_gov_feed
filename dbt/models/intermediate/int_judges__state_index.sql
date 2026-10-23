@@ -4,6 +4,9 @@
 -- (a handful per edition); compare the count against the manual's chapter totals when reviewing.
 -- The dot leader sometimes runs straight into the circuit ("Associate ..............35th"), so the space before
 -- it is optional; without that, 7 judges in the 2025-2026 edition lost their circuit.
+-- The page header can share a line with the first entry ("Alphabetical list of Missouri Judges Brewer, Craig D.
+-- ...", #41), so it's stripped first. Names may use a typographic apostrophe ("O’Hara", #42); it's
+-- normalized to ' so the name matches and IDs stay ASCII.
 {% set entry = "([A-Z][A-Za-z'.-]+(?: [A-Za-z'.-]+)*, [A-Za-z'. -]+?) [.]{3,} (Associate|Circuit|Supreme Court|Appellate Eastern|Appellate Western|Appellate Southern)(?: [.]{3,} ?([0-9]+)(?:st|nd|rd|th))?" %}  -- noqa: LT05
 
 with index_lines as (
@@ -11,7 +14,11 @@ with index_lines as (
         edition,
         page,
         line_no,
-        line_text,
+        {{ mogov.regex_replace_all(
+            dbt.replace('line_text', "'’'", "''''"),
+            '^ *Alphabetical list of Missouri Judges +',
+            ''
+        ) }} as line_text,
         source_url
     from {{ ref('stg_bluebook__lines') }}
     where chapter = 'judicial' and line_text like '%....%'
