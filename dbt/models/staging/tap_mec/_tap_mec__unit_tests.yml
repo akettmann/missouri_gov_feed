@@ -64,7 +64,7 @@ unit_tests:
       names ('3M', 'TY') are two characters or more and survive untouched. The same holds for the second layout,
       where the placeholder is in `committee`. A placeholder in the first/last name columns too ('~' / '~',
       '-' / '-') is not a person's name: the row falls back to `company` and keeps its reported type. Single-letter
-      initials ('R Smith') are real and kept.
+      initials ('R Smith') are real and kept. A shifted-column row (all-digit first name, #60) gets no name at all.
     given:
       - input: source('tap_mec', 'contributions')
         format: sql
@@ -102,6 +102,7 @@ unit_tests:
           union all select 'C1', null, null, null, '~', 'Committee', '~', 'Some PAC', '~', '~', null, null, null, null, null, null, '7', null, null, null, null, null, null, null
           union all select 'C1', null, null, null, '-', 'Committee', '-', 'Other PAC', '-', '-', null, null, null, null, null, null, '8', null, null, null, null, null, null, null
           union all select 'C1', null, null, null, 'C', 'Committee', 'C', null, 'R', 'Smith', null, null, null, null, null, null, '9', null, null, null, null, null, null, null
+          union all select 'C1', null, null, null, 'C', 'Corporation', 'C', 'C', '79047860', 'VINCENT', null, null, null, null, null, null, '10', null, null, null, null, null, null, null
     expect:
       rows:
         - {mec_committee_id: C1, contributor_name: KATRINA REESE, contributor_type: Individual, contributor_committee_name: null, amount: 1}
@@ -113,3 +114,4 @@ unit_tests:
         - {mec_committee_id: C1, contributor_name: Some PAC, contributor_type: Committee, contributor_committee_name: null, amount: 7}
         - {mec_committee_id: C1, contributor_name: Other PAC, contributor_type: Committee, contributor_committee_name: null, amount: 8}
         - {mec_committee_id: C1, contributor_name: R Smith, contributor_type: Individual, contributor_committee_name: null, amount: 9}
+        - {mec_committee_id: C1, contributor_name: null, contributor_type: Corporation, contributor_committee_name: null, amount: 10}

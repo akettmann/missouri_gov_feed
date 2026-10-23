@@ -11,6 +11,10 @@
 -- number is dropped before the person's name is built (not "shorter than 2": real initials like 'R' or 'J' stay).
 -- Rows whose ctrb_name and both name parts are all '~' / '-' hold the real donor in `company`, so they fall
 -- through to it and keep the reported type (Committee) instead of becoming an Individual named '~ ~'.
+-- Shifted rows (#60): 3.6k rows of one committee have the columns shifted (first_name holds a numeric record ID,
+-- last_name the donor's first name, address_1 the surname). A name part that is all digits is not a name, and
+-- when first_name is all digits the remaining parts are shifted too, so no person's name is built from the row:
+-- the name stays null (a one-character company is ignored too) and the reported type is kept. #60 un-shifts them.
 with
 
 source_rows as (
@@ -24,18 +28,29 @@ source_rows as (
             when length(trim(committee)) >= 2 and {{ mogov.regex_matches('committee', '[A-Za-z0-9]') }}
                 then trim(committee)
         end as committee_clean,
-        nullif(
-            trim(
-                coalesce(
-                    case when {{ mogov.regex_matches('first_name', '[A-Za-z0-9]') }} then trim(first_name) end, ''
+        coalesce({{ mogov.regex_matches('trim(first_name)', '^[0-9]+$') }}, false) as is_shifted,
+        case
+            when not coalesce({{ mogov.regex_matches('trim(first_name)', '^[0-9]+$') }}, false)
+                then nullif(
+                    trim(
+                        coalesce(
+                            case when {{ mogov.regex_matches('first_name', '[A-Za-z0-9]') }} then trim(first_name) end,
+                            ''
+                        )
+                        || ' '
+                        || coalesce(
+                            case
+                                when
+                                    {{ mogov.regex_matches('last_name', '[A-Za-z0-9]') }}
+                                    and not {{ mogov.regex_matches('trim(last_name)', '^[0-9]+$') }}
+                                    then trim(last_name)
+                            end,
+                            ''
+                        )
+                    ),
+                    ''
                 )
-                || ' '
-                || coalesce(
-                    case when {{ mogov.regex_matches('last_name', '[A-Za-z0-9]') }} then trim(last_name) end, ''
-                )
-            ),
-            ''
-        ) as person_name
+        end as person_name
     from {{ source('tap_mec', 'contributions') }}
     where coalesce(dupe_flag, 'FALSE') <> 'TRUE'
 )
@@ -47,7 +62,7 @@ select
         ctrb_name_clean,
         committee_clean,
         person_name,
-        nullif(trim(company), '')
+        case when not is_shifted or length(trim(company)) >= 2 then nullif(trim(company), '') end
     ) as contributor_name,
     case
         when ctrb_name is not null and ctrb_name_clean is null and person_name is not null then 'Individual'
