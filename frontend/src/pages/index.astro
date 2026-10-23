@@ -1,7 +1,8 @@
 ---
 // Browse/search. Today's officials are server-rendered (usable without JS); the script hides rows, and swaps
 // in a past year's list (lookup/officeholders/<year>.json) when the year control asks for one.
-// Without JS, a <noscript> row of links goes to the static per-year pages (years/<year>/).
+// Without JS the filter form is hidden (.js-only) and a <noscript> row of links goes to the static per-year
+// pages (years/<year>/).
 import Layout from "../layouts/Layout.astro";
 import OfficeIcon from "../components/OfficeIcon.astro";
 import { exportedAt } from "../lib/exports/db";
@@ -33,7 +34,7 @@ const groupInfo = Object.fromEntries(
     No composite scores: every number is a published or directly measured figure.
   </p>
 
-  <form class="filters card" role="search" onsubmit="return false">
+  <form class="filters card js-only" role="search" onsubmit="return false">
     <fieldset class="tiles">
       <legend>Office</legend>
       <div class="tile-row">
@@ -98,7 +99,7 @@ const groupInfo = Object.fromEntries(
   {pastYears.length > 0 && (
     <noscript>
       <p class="small" id="year-links">
-        Earlier years:{" "}
+        Search and filters need JavaScript. Who held these offices before:{" "}
         {pastYears.map((y, i) => (
           <>
             {i > 0 && " · "}
@@ -111,7 +112,8 @@ const groupInfo = Object.fromEntries(
 
   <h2 id="list-heading">Serving in {currentYear}</h2>
   <p class="small muted" id="list-note">
-    People holding office now.{pastYears.length > 0 && ` Pick a year to see who held these offices before.`}
+    People holding office now.
+    {pastYears.length > 0 && <span class="js-only"> Pick a year to see who held these offices before.</span>}
   </p>
   <p class="small muted" aria-live="polite" id="result-count">
     {officials.length} officials

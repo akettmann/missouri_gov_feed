@@ -5,6 +5,7 @@ import ConfidenceToggle from "../components/ConfidenceToggle.astro";
 import Layout from "../layouts/Layout.astro";
 import { officialIndex } from "../lib/exports/load";
 import { officeLine } from "../lib/format";
+import { href } from "../lib/site";
 
 const officials = (await officialIndex()).map((o) => ({
   slug: o.slug,
@@ -19,7 +20,7 @@ const officials = (await officialIndex()).map((o) => ({
     number has its source.
   </p>
 
-  <form class="pickers card" onsubmit="return false">
+  <form class="pickers card js-only" onsubmit="return false">
     <label>
       First official
       <input name="a" list="officials" placeholder="Start typing a name" autocomplete="off" />
@@ -34,10 +35,16 @@ const officials = (await officialIndex()).map((o) => ({
       ))}
     </datalist>
   </form>
-  <div class="small tools">
+  <div class="small tools js-only">
     <ConfidenceToggle />
   </div>
-  <p class="small muted" id="status" aria-live="polite">
+  <noscript>
+    <p class="card">
+      Comparing needs JavaScript. You can still open each official's profile from the{" "}
+      <a href={href("/")}>list of officials</a>.
+    </p>
+  </noscript>
+  <p class="small muted js-only" id="status" aria-live="polite">
     Choose two officials.
   </p>
   <div class="card table-scroll" id="result" hidden></div>

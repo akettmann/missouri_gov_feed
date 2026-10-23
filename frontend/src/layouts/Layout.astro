@@ -18,6 +18,8 @@ const { title, description = "Measured lean and potential conflicts of interest 
     <meta name="description" content={description} />
     <title>{title} · Missouri Officials</title>
     <script is:inline>
+      // mark JS as running before paint: controls tagged .js-only stay hidden without it (see global.css)
+      document.documentElement.classList.add("js");
       // apply the medium-match preference before paint so hidden rows never flash
       try {
         if (localStorage.getItem("hide-medium") === "1")

@@ -48,7 +48,7 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
     <p class="card muted">Not available yet (the rpt_awards export is missing).</p>
   ) : (
     <>
-      <form class="filters card" onsubmit="return false">
+      <form class="filters card js-only" onsubmit="return false">
         <label>
           Office
           <select name="office">
@@ -68,6 +68,13 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
           </select>
         </label>
       </form>
+
+      <noscript>
+        <p class="card small muted">
+          The office and period pickers need JavaScript, so this shows{" "}
+          {titles.get(defaultOffice) ?? defaultOffice} for all loaded years.
+        </p>
+      </noscript>
 
       {offices.flatMap((office) =>
         periods.map((period) => {
