@@ -13,7 +13,7 @@ export const getStaticPaths = (async () => {
 }) satisfies GetStaticPaths;
 
 export const GET: APIRoute = ({ props }) => {
-  // [name, slug or null, office, office group, office line, district, party, level label]: the row the page draws
+  // [name, slug, office, office group, office line, district, party, level label]: the row the page draws
   const rows = (props.rows as PastOfficeholder[]).map((o) => [
     o.full_name,
     o.slug,

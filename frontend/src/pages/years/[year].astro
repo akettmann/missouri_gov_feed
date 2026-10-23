@@ -65,7 +65,9 @@ const { rows, year, years, currentYear, missing } = Astro.props as {
       <tbody>
         {rows.map((o) => (
           <tr>
-            <td>{o.slug ? <a href={href(`/officials/${o.slug}/`)}>{o.full_name}</a> : o.full_name}</td>
+            <td>
+              <a href={href(`/officials/${o.slug}/`)}>{o.full_name}</a>
+            </td>
             <td>{officeLine(o)}</td>
             <td>{o.party ?? <span class="muted">none listed</span>}</td>
             <td>{LEVELS[o.level] ?? o.level}</td>

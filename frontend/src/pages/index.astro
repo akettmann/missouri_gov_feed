@@ -164,7 +164,7 @@ const groupInfo = Object.fromEntries(
 <script>
   import { missingOfficeLabels, pastNote } from "../lib/lookback";
 
-  type PastRow = [string, string | null, string, string, string, string | null, string | null, string];
+  type PastRow = [string, string, string, string, string, string | null, string | null, string];
 
   const form = document.querySelector<HTMLFormElement>("form.filters")!;
   const list = document.querySelector<HTMLElement>(".list")!;
@@ -192,12 +192,10 @@ const groupInfo = Object.fromEntries(
       district: (district ?? "").toLowerCase(),
     });
     const cell = (content: string | Node) => tr.insertCell().append(content);
-    if (slug) {
-      const a = document.createElement("a");
-      a.href = `${base}/officials/${slug}/`;
-      a.textContent = name;
-      cell(a);
-    } else cell(name);
+    const a = document.createElement("a");
+    a.href = `${base}/officials/${slug}/`;
+    a.textContent = name;
+    cell(a);
     cell(line);
     if (party) cell(party);
     else {

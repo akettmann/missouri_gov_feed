@@ -144,6 +144,17 @@ Without JavaScript, the home page's `<noscript>` block links to those static `/y
 year, rendered from the same rows. The year control's error message also links to the matching static page when
 the JSON fetch fails.
 
+Every name on a year page or in the year JSON links somewhere. People serving now link to their full profile; past
+officeholders without one get a small page (name, offices held with years, party, district, roster source, links to
+the year pages) at the same `/officials/<slug>/` path, with `slug = slugFor(name, official_id)` for both kinds.
+`pastOfficeholders()` in `frontend/src/lib/exports/load.ts` assigns the slugs, so the static year pages and the
+JSON cannot disagree, and the build fails on a slug collision (profile slugs included). The slug hash comes from
+`official_id`, so a past page's path becomes the full profile only where the roster id equals the `dim_official` id
+(Senate/Open States, Congress bioguide, federal judges `fjc`). House, statewide and state-judge ids may differ
+between the roster and `dim_official` (issue #97), so those paths are not guaranteed stable. Because the same person
+can therefore appear as a past entry and a current profile, a past page whose normalized full name equals a current
+profile's (or another past entry's) shows a neutral "same name" cross-link; names are never merged.
+
 Optional build-time environment: `PUBLIC_SITE_URL` (canonical site URL), `PUBLIC_REPORT_ERROR_URL`
 (where "Report an error" goes; default: a prefilled GitHub issue on this repo).
 
