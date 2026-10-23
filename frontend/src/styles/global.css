@@ -191,6 +191,11 @@ th.num {
   color: var(--sample-ink);
 }
 
+/* Controls that only work with JavaScript: the inline script in Layout adds html.js before paint */
+html:not(.js) .js-only {
+  display: none !important;
+}
+
 /* "Hide possible matches" toggle: rows and list items flagged medium disappear everywhere */
 html.hide-medium [data-confidence="medium"] {
   display: none;

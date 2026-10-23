@@ -38,7 +38,7 @@ const path = (polygons: Ring[][]) =>
   {!data ? (
     <p class="card muted">District boundaries aren't loaded yet (the dim_district export is missing).</p>
   ) : (
-    <div class="find">
+    <div class="find js-only">
       <div class="card map-card">
         <form id="zip-form" class="zip" onsubmit="return false">
           <label for="zip">ZIP code</label>
