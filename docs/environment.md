@@ -137,7 +137,12 @@ aren't loaded.
 The officials list (`/`) shows the people serving now; its year control loads earlier years from
 `dist/lookup/officeholders/<year>.json`, built from `rpt_officeholders_by_year`. Without that export the page
 lists today's officials only and hides the year control. Past years cover only offices with dated rosters (MO
-House, MO Senate where every seat is dated, Congress, federal courts); the page names the offices a year lacks.
+House, MO Senate where every seat is dated, Congress, federal courts). Both the JavaScript year control and the static `dist/years/<year>/index.html` pages name the
+offices a year lacks, using one shared helper (`frontend/src/lib/lookback.ts`).
+
+Without JavaScript, the home page's `<noscript>` block links to those static `/years/<year>/` pages, one per past
+year, rendered from the same rows. The year control's error message also links to the matching static page when
+the JSON fetch fails.
 
 Optional build-time environment: `PUBLIC_SITE_URL` (canonical site URL), `PUBLIC_REPORT_ERROR_URL`
 (where "Report an error" goes; default: a prefilled GitHub issue on this repo).

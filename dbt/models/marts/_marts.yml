@@ -408,8 +408,10 @@ models:
       - name: counterparty_link_confidence
         data_type: varchar
         description: >
-          How counterparty_mec_committee_id was matched: `high` = same name (case and punctuation ignored),
-          `medium` = normalized or core name. Null when there's no link.
+          How counterparty_mec_committee_id was matched: `high` = MECID written into the name, or same name
+          (case, punctuation and spacing ignored), `medium` = normalized name (abbreviations spelled out) or core
+          name (words like PAC, Political, Action, Committee, Fund dropped, or a parenthesized short name).
+          Null when there's no link.
         data_tests:
           - accepted_values:
               arguments:

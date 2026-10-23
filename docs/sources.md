@@ -178,9 +178,10 @@ Quirks:
   3 per election date.
 - Committee donors on CD1_A carry only a name (`committee`); `mecid` is the receiving committee. To go
   one hop back (who funds the PAC that funds an official, #9), `int_mec__donor_committees` matches that name
-  to the names committees file under, in tiers: a MECID typed into the name, the same name (case and
-  punctuation ignored), a normalized name (MO = Missouri, Assn = Association, ...), and a core name without
-  PAC / Political Action Committee / Fund. A match counts only if that committee was active within a year
+  to the names committees file under, in tiers: a MECID typed into the name, the same name (case,
+  punctuation and spacing ignored), a normalized name (MO = Missouri, Assn = Association, ...), and a core
+  name without words like PAC, Political, Action, Committee, Fund, Account (also tried on the name outside
+  parentheses, and on a filer's parenthesized short name). A match counts only if that committee was active within a year
   of the gift, and only when it is unique. Measured October 2026 over both feeds ($489M from committees):
   68% of the dollars match one committee, 1.4% are ambiguous, 30% match nothing. An exact name match alone
   got about 46%. Most of the misses are federal and out-of-state PACs (DRIVE, AFSCME, DGA), which don't

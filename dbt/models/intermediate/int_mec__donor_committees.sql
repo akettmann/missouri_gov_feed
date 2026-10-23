@@ -5,9 +5,10 @@
 --                      known committee; taken whatever its active years
 --   1 same name       name_key: case, punctuation and spacing ignored
 --   2 normalized name  committee_key: abbreviations spelled out (MO, Assn, Cmte...), "the/of/for/inc" dropped
---   3 core name        committee_core_key: also without PAC / Political Action Committee / Fund..., at least
---                      4 characters; also tried on the name outside parentheses, and against a filer's own
---                      parenthesized short name ("Carpenters Help in the Political Process (CHIPP)" -> CHIPP)
+--   3 core name        committee_core_key: also without words like PAC, Political, Action, Committee, Fund,
+--                      Account, at least 4 characters; also tried on the name outside parentheses, and against
+--                      a filer's own parenthesized short name
+--                      ("Carpenters Help in the Political Process (CHIPP)" -> CHIPP)
 -- A candidate counts only if it was active within a year of the gift (first_active_year - 1 ..
 -- last_active_year + 1). The lowest tier with an active candidate decides: one candidate -> matched, several
 -- -> ambiguous (no MECID; the candidates are listed). Names that only match committees active in other years

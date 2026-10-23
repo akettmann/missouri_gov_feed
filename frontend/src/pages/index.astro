@@ -1,11 +1,14 @@
 ---
 // Browse/search. Today's officials are server-rendered (usable without JS); the script hides rows, and swaps
 // in a past year's list (lookup/officeholders/<year>.json) when the year control asks for one.
+// Without JS the filter form is hidden (.js-only) and a <noscript> row of links goes to the static per-year
+// pages (years/<year>/).
 import Layout from "../layouts/Layout.astro";
 import OfficeIcon from "../components/OfficeIcon.astro";
 import { exportedAt } from "../lib/exports/db";
 import { officialIndex, pastOfficeholders } from "../lib/exports/load";
-import { LEVELS, OFFICE_GROUPS, officeGroup, officeLine } from "../lib/format";
+import { LEVELS, officeGroup, officeLine } from "../lib/format";
+import { buildOfficeGroups } from "../lib/lookback";
 import { href } from "../lib/site";
 
 const officials = await officialIndex();
@@ -14,23 +17,7 @@ const currentYear = past?.currentYear ?? (exportedAt("dim_official") ?? new Date
 const pastYears = [...(past?.years.keys() ?? [])].sort((a, b) => b - a);
 
 // tiles and their office chips cover every office in any year; labels fall back to the data's office title
-const titles = new Map<string, string>();
-for (const o of [...officials, ...[...(past?.years.values() ?? [])].flat()]) {
-  if (!titles.has(o.office)) titles.set(o.office, o.office_title ?? o.office.replaceAll("_", " "));
-}
-const groups = [
-  ...OFFICE_GROUPS,
-  { key: "other", label: "Other offices", offices: {} as Record<string, string> },
-].flatMap((g) => {
-  const offices = [...titles.keys()]
-    .filter((o) => officeGroup(o) === g.key)
-    .sort((a, b) => {
-      const order = Object.keys(g.offices);
-      return order.indexOf(a) - order.indexOf(b) || a.localeCompare(b);
-    })
-    .map((o) => [o, g.offices[o] ?? titles.get(o)!] as const);
-  return offices.length ? [{ key: g.key, label: g.label, offices }] : [];
-});
+const groups = buildOfficeGroups([...officials, ...[...(past?.years.values() ?? [])].flat()]);
 const currentOffices = Object.fromEntries(
   groups.flatMap((g) => g.offices.filter(([o]) => officials.some((x) => x.office === o))),
 );
@@ -47,7 +34,7 @@ const groupInfo = Object.fromEntries(
     No composite scores: every number is a published or directly measured figure.
   </p>
 
-  <form class="filters card" role="search" onsubmit="return false">
+  <form class="filters card js-only" role="search" onsubmit="return false">
     <fieldset class="tiles">
       <legend>Office</legend>
       <div class="tile-row">
@@ -109,9 +96,24 @@ const groupInfo = Object.fromEntries(
     </div>
   </form>
 
+  {pastYears.length > 0 && (
+    <noscript>
+      <p class="small" id="year-links">
+        Search and filters need JavaScript. Who held these offices before:{" "}
+        {pastYears.map((y, i) => (
+          <>
+            {i > 0 && " · "}
+            <a href={href(`/years/${y}/`)}>{y}</a>
+          </>
+        ))}
+      </p>
+    </noscript>
+  )}
+
   <h2 id="list-heading">Serving in {currentYear}</h2>
   <p class="small muted" id="list-note">
-    People holding office now.{pastYears.length > 0 && ` Pick a year to see who held these offices before.`}
+    People holding office now.
+    {pastYears.length > 0 && <span class="js-only"> Pick a year to see who held these offices before.</span>}
   </p>
   <p class="small muted" aria-live="polite" id="result-count">
     {officials.length} officials
@@ -156,6 +158,8 @@ const groupInfo = Object.fromEntries(
 </Layout>
 
 <script>
+  import { missingOfficeLabels, pastNote } from "../lib/lookback";
+
   type PastRow = [string, string | null, string, string, string, string | null, string | null, string];
 
   const form = document.querySelector<HTMLFormElement>("form.filters")!;
@@ -217,23 +221,12 @@ const groupInfo = Object.fromEntries(
   }
 
   // a past year lists only the offices with dated rosters: name the ones it has no records for
-  function pastNote(year: string, rows: HTMLTableRowElement[]) {
-    const held = new Set(rows.map((r) => r.dataset.office));
-    const missing = Object.values(groups).flatMap(({ label, offices }) => {
-      const gone = offices.filter((o) => o in currentOffices && !held.has(o));
-      if (!gone.length) return [];
-      return gone.length === offices.filter((o) => o in currentOffices).length
-        ? [label]
-        : gone.map((o) => currentOffices[o]);
-    });
-    return (
-      `Everyone recorded as holding these offices at some point in ${year}. Names link to a profile only for ` +
-      `people serving now.` +
-      (missing.length
-        ? ` No ${year} records for: ${missing.join(", ")}; those are listed for ${currentYear} only.`
-        : "")
+  const noteFor = (year: string, rows: HTMLTableRowElement[]) =>
+    pastNote(
+      year,
+      currentYear,
+      missingOfficeLabels(Object.values(groups), currentOffices, new Set(rows.map((r) => r.dataset.office!))),
     );
-  }
 
   let shownYear = "";
   let pending = 0;
@@ -245,7 +238,14 @@ const groupInfo = Object.fromEntries(
     try {
       rows = await rowsFor(year);
     } catch {
-      note.textContent = `Couldn't load the ${year} list. Check your connection and pick the year again.`;
+      const fallback = document.createElement("a");
+      fallback.href = `${base}/years/${year}/`;
+      fallback.textContent = `the ${year} page`;
+      note.replaceChildren(
+        `Couldn't load the ${year} list. Check your connection and pick the year again, or open `,
+        fallback,
+        ".",
+      );
       return;
     }
     if (ticket !== pending) return; // a newer change is already on its way
@@ -253,7 +253,7 @@ const groupInfo = Object.fromEntries(
       tbody.replaceChildren(...rows);
       shownYear = year;
       heading.textContent = year ? `Served in ${year}` : `Serving in ${currentYear}`;
-      note.textContent = year ? pastNote(year, rows) : defaultNote;
+      note.textContent = year ? noteFor(year, rows) : defaultNote;
     }
 
     const q = fold(String(f.get("q") ?? ""));

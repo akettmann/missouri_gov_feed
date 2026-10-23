@@ -18,13 +18,21 @@
 {%- endmacro %}
 
 
-{# Boolean: does expr match pattern (case-sensitive)? #}
+{# Boolean: does the pattern match ANYWHERE in expr (substring semantics, case-sensitive)?
+   This is the DuckDB regexp_matches / Postgres `~` behavior. Anchor explicitly (^...$) to require a whole-string match.
+   Do not use regexp_like in the default: on Snowflake (and Oracle/MySQL) it is implicitly anchored to the whole
+   string, so '[A-Za-z0-9]' would only match one-character strings (#69). regexp_instr returns the 1-based match
+   position (0 for none), is unanchored everywhere it exists, and is NULL for NULL input like the others. #}
 {% macro regex_matches(expr, pattern) -%}
     {{ return(adapter.dispatch('regex_matches', 'mogov')(expr, pattern)) }}
 {%- endmacro %}
 
 {% macro default__regex_matches(expr, pattern) -%}
-    regexp_like({{ expr }}, '{{ pattern | replace("'", "''") }}')
+    (regexp_instr({{ expr }}, '{{ pattern | replace("'", "''") }}') > 0)
+{%- endmacro %}
+
+{% macro snowflake__regex_matches(expr, pattern) -%}
+    (regexp_instr({{ expr }}, '{{ pattern | replace("'", "''") }}') > 0)
 {%- endmacro %}
 
 {% macro duckdb__regex_matches(expr, pattern) -%}
