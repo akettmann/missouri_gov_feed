@@ -3,44 +3,51 @@
 // The home page links here inside <noscript>; the same rows feed lookup/officeholders/<year>.json.
 import type { GetStaticPaths } from "astro";
 import Layout from "../../layouts/Layout.astro";
-import { pastOfficeholders } from "../../lib/exports/load";
+import { officialIndex, pastOfficeholders } from "../../lib/exports/load";
 import type { PastOfficeholder } from "../../lib/exports/types";
 import { LEVELS, officeLine } from "../../lib/format";
+import { buildOfficeGroups, missingOfficeLabels, pastNote } from "../../lib/lookback";
 import { href } from "../../lib/site";
 
 export const getStaticPaths = (async () => {
   const past = await pastOfficeholders();
   const years = [...(past?.years.keys() ?? [])].sort((a, b) => b - a);
+  // same grouping and "missing offices" logic as the home page's year control (lib/lookback.ts)
+  const officials = await officialIndex();
+  const groups = buildOfficeGroups([...officials, ...[...(past?.years.values() ?? [])].flat()]);
+  const currentOffices = Object.fromEntries(
+    groups.flatMap((g) => g.offices.filter(([o]) => officials.some((x) => x.office === o))),
+  );
+  const groupInfo = groups.map((g) => ({ label: g.label, offices: g.offices.map(([o]) => o) }));
   return [...(past?.years ?? [])].map(([year, rows]) => ({
     params: { year: String(year) },
-    props: { rows, year, years, currentYear: past!.currentYear },
+    props: {
+      rows,
+      year,
+      years,
+      currentYear: past!.currentYear,
+      missing: missingOfficeLabels(groupInfo, currentOffices, new Set(rows.map((r) => r.office))),
+    },
   }));
 }) satisfies GetStaticPaths;
 
-const { rows, year, years, currentYear } = Astro.props as {
+const { rows, year, years, currentYear, missing } = Astro.props as {
   rows: PastOfficeholder[];
   year: number;
   years: number[];
   currentYear: number;
+  missing: string[];
 };
 ---
 
 <Layout title={`Served in ${year}`}>
   <h1>Missouri officials who served in {year}</h1>
-  <p class="lede">
-    Everyone recorded as holding these offices at some point in {year}. Names link to a profile only for
-    people serving now. Offices without dated rosters for {year} are not listed.
-  </p>
+  <p class="lede">{pastNote(year, currentYear, missing)}</p>
   <nav aria-label="Other years" class="small">
     <a href={href("/")}>{currentYear} (serving now)</a>
-    {years
-      .filter((y) => y !== year)
-      .map((y) => (
-        <>
-          {" "}
-          · <a href={href(`/years/${y}/`)}>{y}</a>
-        </>
-      ))}
+    {years.map((y) => (
+      <> · {y === year ? <span aria-current="page">{y}</span> : <a href={href(`/years/${y}/`)}>{y}</a>}</>
+    ))}
   </nav>
   <p class="small muted">
     {rows.length} officeholders in {year}
