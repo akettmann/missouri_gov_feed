@@ -27,7 +27,32 @@
 --     the reported type stays Corporation rather than becoming Individual.
 -- Not handled (left as reported): addresses typed into ctrb_name, and surnames repeated in first_name.
 -- The model exposes no address columns, so only name and type are repaired.
+-- Identity and double loading (#82, #75): record_id is the source row's own id in its export layout, prefixed with the
+-- layout ('txn:' / 'cd1_a:') because 19k values occur as both a txn and a cd1_a_id. TAP loaded 97.5k transactions
+-- twice (same txn, same file; only address_clean differs, because TAP doubled the address), which counted ~$179M twice.
+-- One row per record_id is kept, preferring the copy whose address_clean is not doubled (the shorter one).
 with
+
+identified as (
+    select
+        *,
+        case
+            when txn is not null then 'txn:' || cast(txn as {{ dbt.type_string() }})
+            else 'cd1_a:' || cast(cd1_a_id as {{ dbt.type_string() }})
+        end as record_id
+    from {{ source('tap_mec', 'contributions') }}
+    where coalesce(dupe_flag, 'FALSE') <> 'TRUE'
+),
+
+unique_records as (
+    select
+        *,
+        row_number() over (
+            partition by record_id
+            order by coalesce(length(address_clean), 0), address_clean, address_1, amount
+        ) as record_rank
+    from identified
+),
 
 source_rows as (
     select
@@ -41,7 +66,8 @@ source_rows as (
                 then trim(committee)
         end as committee_clean,
         coalesce({{ mogov.regex_matches('trim(first_name)', '^[0-9]+$') }}, false) as is_shifted,
-        -- the new patterns are written '.*x.*' so they mean the same anchored or unanchored (#69)
+        -- rules 2-4 use anchored '^...$' patterns and rule 1 uses '.*x.*'; both mean the same whether the
+        -- backend's regex match is anchored or a substring search (#69)
         coalesce(
             {{ mogov.regex_matches('trim(first_name)', '^[0-9]+$') }}
             and {{ mogov.regex_matches('last_name', '.*[A-Za-z].*') }}
@@ -102,11 +128,12 @@ source_rows as (
                 and {{ mogov.regex_matches('trim(last_name)', '^.* 0$') }}
                 then trim(substring(trim(ctrb_name), 1, length(trim(ctrb_name)) - 2))
         end as ctrb_name_without_zero
-    from {{ source('tap_mec', 'contributions') }}
-    where coalesce(dupe_flag, 'FALSE') <> 'TRUE'
+    from unique_records
+    where record_rank = 1
 )
 
 select
+    record_id,
     coalesce(cmte_id, mecid) as mec_committee_id,
     coalesce(cmte_name, committee_name) as committee_name,
     coalesce(

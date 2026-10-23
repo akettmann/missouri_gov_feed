@@ -42,12 +42,15 @@ unit_tests:
               cast(null as varchar) as contribution_type,
               cast(null as varchar) as rpt_type,
               cast(null as varchar) as report,
-              cast('FALSE' as varchar) as dupe_flag
-          union all select 'C1', null, null, null, 'Jane Roe', 'Individual', null, null, null, null, null, null, null, null, null, null, null, '5', null, null, null, null, null, null, null
-          union all select null, 'C2', null, null, null, null, ' New Layout PAC ', '', '', '', null, null, null, null, null, null, null, '50', null, null, null, null, null, null, null
-          union all select null, 'C2', null, null, null, null, '', 'Acme Corp', '', '', null, null, null, null, null, null, null, '20', null, null, null, null, null, null, null
-          union all select null, 'C2', null, null, null, null, '', '', 'John', 'Doe', null, null, null, null, null, null, null, '10', null, null, null, null, null, null, null
-          union all select null, 'C2', null, null, null, null, 'Dupe PAC', '', '', '', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, 'TRUE'
+              cast('FALSE' as varchar) as dupe_flag,
+              cast('t1' as varchar) as txn,
+              cast(null as varchar) as cd1_a_id,
+              cast(null as varchar) as address_clean
+          union all select 'C1', null, null, null, 'Jane Roe', 'Individual', null, null, null, null, null, null, null, null, null, null, null, '5', null, null, null, null, null, null, null, 't2', null, null
+          union all select null, 'C2', null, null, null, null, ' New Layout PAC ', '', '', '', null, null, null, null, null, null, null, '50', null, null, null, null, null, null, null, 't3', null, null
+          union all select null, 'C2', null, null, null, null, '', 'Acme Corp', '', '', null, null, null, null, null, null, null, '20', null, null, null, null, null, null, null, 't4', null, null
+          union all select null, 'C2', null, null, null, null, '', '', 'John', 'Doe', null, null, null, null, null, null, null, '10', null, null, null, null, null, null, null, 't5', null, null
+          union all select null, 'C2', null, null, null, null, 'Dupe PAC', '', '', '', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, 'TRUE', 't6', null, null
     expect:
       rows:
         - {mec_committee_id: C1, contributor_name: Old Layout PAC, contributor_type: Committee, contributor_committee_name: Old Layout PAC, amount: 100}
@@ -95,16 +98,19 @@ unit_tests:
               cast(null as varchar) as contribution_type,
               cast(null as varchar) as rpt_type,
               cast(null as varchar) as report,
-              cast('FALSE' as varchar) as dupe_flag
-          union all select 'C1', null, null, null, '~', 'Corporation', '~', '99', 'NOAH', 'ARSLAN', null, null, null, null, null, null, null, '2', null, null, null, null, null, null, null
-          union all select 'C1', null, null, null, 'C', 'Committee', 'C', null, null, null, null, null, null, null, null, null, null, '3', null, null, null, null, null, null, null
-          union all select 'C1', null, null, null, '3M', 'Corporation', '3M', null, null, null, null, null, null, null, null, null, null, '4', null, null, null, null, null, null, null
-          union all select 'C1', null, null, null, 'TY', 'Committee', 'TY', null, 'ANN', 'LEE', null, null, null, null, null, null, null, '5', null, null, null, null, null, null, null
-          union all select null, 'C2', null, null, null, null, ' 0 ', '', 'JOHN', 'DOE', null, null, null, null, null, null, null, '6', null, null, null, null, null, null, null
-          union all select 'C1', null, null, null, '~', 'Committee', '~', 'Some PAC', '~', '~', null, null, null, null, null, null, null, '7', null, null, null, null, null, null, null
-          union all select 'C1', null, null, null, '-', 'Committee', '-', 'Other PAC', '-', '-', null, null, null, null, null, null, null, '8', null, null, null, null, null, null, null
-          union all select 'C1', null, null, null, 'C', 'Committee', 'C', null, 'R', 'Smith', null, null, null, null, null, null, null, '9', null, null, null, null, null, null, null
-          union all select 'C1', null, null, null, 'C', 'Corporation', 'C', 'C', '79047860', 'VINCENT', null, null, null, null, null, null, null, '10', null, null, null, null, null, null, null
+              cast('FALSE' as varchar) as dupe_flag,
+              cast('t7' as varchar) as txn,
+              cast(null as varchar) as cd1_a_id,
+              cast(null as varchar) as address_clean
+          union all select 'C1', null, null, null, '~', 'Corporation', '~', '99', 'NOAH', 'ARSLAN', null, null, null, null, null, null, null, '2', null, null, null, null, null, null, null, 't8', null, null
+          union all select 'C1', null, null, null, 'C', 'Committee', 'C', null, null, null, null, null, null, null, null, null, null, '3', null, null, null, null, null, null, null, 't9', null, null
+          union all select 'C1', null, null, null, '3M', 'Corporation', '3M', null, null, null, null, null, null, null, null, null, null, '4', null, null, null, null, null, null, null, 't10', null, null
+          union all select 'C1', null, null, null, 'TY', 'Committee', 'TY', null, 'ANN', 'LEE', null, null, null, null, null, null, null, '5', null, null, null, null, null, null, null, 't11', null, null
+          union all select null, 'C2', null, null, null, null, ' 0 ', '', 'JOHN', 'DOE', null, null, null, null, null, null, null, '6', null, null, null, null, null, null, null, 't12', null, null
+          union all select 'C1', null, null, null, '~', 'Committee', '~', 'Some PAC', '~', '~', null, null, null, null, null, null, null, '7', null, null, null, null, null, null, null, 't13', null, null
+          union all select 'C1', null, null, null, '-', 'Committee', '-', 'Other PAC', '-', '-', null, null, null, null, null, null, null, '8', null, null, null, null, null, null, null, 't14', null, null
+          union all select 'C1', null, null, null, 'C', 'Committee', 'C', null, 'R', 'Smith', null, null, null, null, null, null, null, '9', null, null, null, null, null, null, null, 't15', null, null
+          union all select 'C1', null, null, null, 'C', 'Corporation', 'C', 'C', '79047860', 'VINCENT', null, null, null, null, null, null, null, '10', null, null, null, null, null, null, null, 't16', null, null
     expect:
       rows:
         - {mec_committee_id: C1, contributor_name: KATRINA REESE, contributor_type: Individual, contributor_committee_name: null, amount: 1}
@@ -128,7 +134,8 @@ unit_tests:
       (4) Placeholder ctrb_name and company, blank last_name, multi-word first_name (organization in
       first_name): name kept, type stays Corporation. Look-alikes stay as reported: an ID with a digit-bearing
       address_1, a real company next to a '0' first/last name, a single-word first_name under a Corporation
-      placeholder, and a ctrb_name that merely ends in a real ' 0' without the '0' last_name.
+      placeholder, a ctrb_name that merely ends in a real ' 0' without the '0' last_name, a '0' last_name with a real ctrb_name
+      (not ending ' 0'), and an all-digit first_name with a real company and a blank ctrb_name.
     given:
       - input: source('tap_mec', 'contributions')
         format: sql
@@ -158,16 +165,21 @@ unit_tests:
               cast(null as varchar) as contribution_type,
               cast(null as varchar) as rpt_type,
               cast(null as varchar) as report,
-              cast('FALSE' as varchar) as dupe_flag
-          union all select null, 'C2', null, null, null, null, null, null, '0', 'JOE', 'ABBOTT', null, null, null, null, null, null, '2', null, null, null, null, null, null, null
-          union all select 'C3', null, null, null, 'KERRY 0', 'Individual', null, null, 'KERRY', '0', 'LAFFOON', null, null, null, null, null, null, '3', null, null, null, null, null, null, null
-          union all select 'C3', null, null, null, 'MATTHEW SMITH 0', 'Individual', null, null, 'MATTHEW', 'SMITH 0', '8808 N ANITA AVE', null, null, null, null, null, null, '4', null, null, null, null, null, null, null
-          union all select 'C4', null, null, null, '??????????', 'Corporation', null, '??????????', 'Missouri Optometric Association', null, 'x', null, null, null, null, null, null, '5', null, null, null, null, null, null, null
-          union all select 'C1', null, null, null, 'C', 'Corporation', null, 'C', '79047861', 'TRICIA', '1058 Golden Orchard Dr', null, null, null, null, null, null, '6', null, null, null, null, null, null, null
-          union all select 'C5', null, null, null, 'Acme Corp', 'Corporation', null, 'Acme Corp', '0', '0', '1010 Pine', null, null, null, null, null, null, '7', null, null, null, null, null, null, null
-          union all select 'C4', null, null, null, 'L', 'Corporation', null, 'L', 'Belisle', null, 'x', null, null, null, null, null, null, '8', null, null, null, null, null, null, null
-          union all select 'C4', null, null, null, '-', 'Corporation', null, '-', 'Harlan Harlan & Still', null, null, null, null, null, null, null, null, '10', null, null, null, null, null, null, null
-          union all select 'C6', null, null, null, 'ROBERT 0', 'Individual', null, null, 'ROBERT', 'JONES', 'MAIN ST', null, null, null, null, null, null, '9', null, null, null, null, null, null, null
+              cast('FALSE' as varchar) as dupe_flag,
+              cast('t17' as varchar) as txn,
+              cast(null as varchar) as cd1_a_id,
+              cast(null as varchar) as address_clean
+          union all select null, 'C2', null, null, null, null, null, null, '0', 'JOE', 'ABBOTT', null, null, null, null, null, null, '2', null, null, null, null, null, null, null, 't18', null, null
+          union all select 'C3', null, null, null, 'KERRY 0', 'Individual', null, null, 'KERRY', '0', 'LAFFOON', null, null, null, null, null, null, '3', null, null, null, null, null, null, null, 't19', null, null
+          union all select 'C3', null, null, null, 'MATTHEW SMITH 0', 'Individual', null, null, 'MATTHEW', 'SMITH 0', '8808 N ANITA AVE', null, null, null, null, null, null, '4', null, null, null, null, null, null, null, 't20', null, null
+          union all select 'C4', null, null, null, '??????????', 'Corporation', null, '??????????', 'Missouri Optometric Association', null, 'x', null, null, null, null, null, null, '5', null, null, null, null, null, null, null, 't21', null, null
+          union all select 'C1', null, null, null, 'C', 'Corporation', null, 'C', '79047861', 'TRICIA', '1058 Golden Orchard Dr', null, null, null, null, null, null, '6', null, null, null, null, null, null, null, 't22', null, null
+          union all select 'C5', null, null, null, 'Acme Corp', 'Corporation', null, 'Acme Corp', '0', '0', '1010 Pine', null, null, null, null, null, null, '7', null, null, null, null, null, null, null, 't23', null, null
+          union all select 'C4', null, null, null, 'L', 'Corporation', null, 'L', 'Belisle', null, 'x', null, null, null, null, null, null, '8', null, null, null, null, null, null, null, 't24', null, null
+          union all select 'C4', null, null, null, '-', 'Corporation', null, '-', 'Harlan Harlan & Still', null, null, null, null, null, null, null, null, '10', null, null, null, null, null, null, null, 't25', null, null
+          union all select 'C6', null, null, null, 'ROBERT 0', 'Individual', null, null, 'ROBERT', 'JONES', 'MAIN ST', null, null, null, null, null, null, '9', null, null, null, null, null, null, null, 't26', null, null
+          union all select 'C7', null, null, null, 'SAM JONES', 'Individual', null, null, 'SAM', '0', 'MAIN ST', null, null, null, null, null, null, '11', null, null, null, null, null, null, null, 't27', null, null
+          union all select 'C8', null, null, null, '', 'Corporation', null, 'Real Co LLC', '12345', 'ANNA', 'LEE', null, null, null, null, null, null, '12', null, null, null, null, null, null, null, 't28', null, null
     expect:
       rows:
         - {mec_committee_id: C1, contributor_name: VINCENT SIEMER, contributor_type: Individual, amount: 1}
@@ -180,3 +192,52 @@ unit_tests:
         - {mec_committee_id: C4, contributor_name: Belisle, contributor_type: Individual, amount: 8}
         - {mec_committee_id: C4, contributor_name: Harlan Harlan & Still, contributor_type: Corporation, amount: 10}
         - {mec_committee_id: C6, contributor_name: ROBERT 0, contributor_type: Individual, amount: 9}
+        - {mec_committee_id: C7, contributor_name: SAM JONES, contributor_type: Individual, amount: 11}
+        - {mec_committee_id: C8, contributor_name: Real Co LLC, contributor_type: Corporation, amount: 12}
+
+  - name: tap_contributions_dedupe_double_loaded
+    model: stg_tap_mec__contributions
+    description: >
+      TAP loaded some transactions twice (#82): the same txn, differing only in address_clean (TAP doubled the
+      address). One row per record_id is kept. A cd1_a_id equal to a txn is a different record (the id is
+      prefixed with its layout), and a dupe_flag TRUE row is still dropped.
+    given:
+      - input: source('tap_mec', 'contributions')
+        format: sql
+        rows: |
+          select
+              cast('C1' as varchar) as cmte_id,
+              cast(null as varchar) as mecid,
+              cast(null as varchar) as cmte_name,
+              cast(null as varchar) as committee_name,
+              cast('Dup PAC' as varchar) as ctrb_name,
+              cast('Committee' as varchar) as ctrb_type,
+              cast(null as varchar) as committee,
+              cast(null as varchar) as company,
+              cast(null as varchar) as first_name,
+              cast(null as varchar) as last_name,
+              cast(null as varchar) as address_1,
+              cast(null as varchar) as employer,
+              cast(null as varchar) as occupation,
+              cast(null as varchar) as city_clean,
+              cast(null as varchar) as city,
+              cast(null as varchar) as state_clean,
+              cast(null as varchar) as state,
+              cast('100' as varchar) as amount,
+              cast(null as varchar) as date,
+              cast(null as varchar) as year,
+              cast(null as varchar) as cont_type,
+              cast(null as varchar) as contribution_type,
+              cast(null as varchar) as rpt_type,
+              cast(null as varchar) as report,
+              cast('FALSE' as varchar) as dupe_flag,
+              cast('1001' as varchar) as txn,
+              cast(null as varchar) as cd1_a_id,
+              cast('PO BOX 537 PO BOX 537' as varchar) as address_clean
+          union all select 'C1', null, null, null, 'Dup PAC', 'Committee', null, null, null, null, null, null, null, null, null, null, null, '100', null, null, null, null, null, null, 'FALSE', '1001', null, 'PO BOX 537'
+          union all select 'C1', null, null, null, 'Dup PAC', 'Committee', null, null, null, null, null, null, null, null, null, null, null, '7', null, null, null, null, null, null, 'FALSE', null, '1001', null
+          union all select 'C1', null, null, null, 'Flagged PAC', 'Committee', null, null, null, null, null, null, null, null, null, null, null, '3', null, null, null, null, null, null, 'TRUE', '1002', null, null
+    expect:
+      rows:
+        - {record_id: 'txn:1001', mec_committee_id: C1, contributor_name: Dup PAC, amount: 100}
+        - {record_id: 'cd1_a:1001', mec_committee_id: C1, contributor_name: Dup PAC, amount: 7}

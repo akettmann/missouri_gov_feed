@@ -397,7 +397,7 @@ models:
       - name: source_record_id
         data_type: varchar
         description: >
-          The source row's own identity, prefixed by its feed: `fec:` (FEC sub_id), `tap:` (TAP expenditure id, or for TAP contributions a hash of the staged row plus its occurrence among identical rows, since staging carries no id for them yet), `mec_cd1_a:` / `mec_cd3_c:` (MEC export record ids).
+          The source row's own identity, prefixed by its feed: `fec:` (FEC sub_id), `tap:` (TAP expenditure id, or for TAP contributions the staged `record_id`: `txn:` or `cd1_a:` plus TAP's id, deduplicated in staging because TAP loaded some transactions twice), `mec_cd1_a:` / `mec_cd3_c:` (MEC export record ids).
         data_tests: [not_null]
       - name: counterparty_mec_committee_id
         data_type: varchar

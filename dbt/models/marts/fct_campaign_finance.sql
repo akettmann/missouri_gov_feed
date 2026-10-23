@@ -7,21 +7,9 @@
 -- A Missouri committee donor's own MECID (counterparty_mec_committee_id) comes from the name crosswalk
 -- int_mec__donor_committees, unique matches only; it's how the profile goes one hop back (rpt_committee_donors).
 -- Grain: (official_id, direction, source_record_id). source_record_id is the source row's own identity: FEC
--- sub_id, TAP expenditure id, or MEC export record id. TAP contributions carry no id through staging yet, so
--- they get a hash of the staged row plus its occurrence number among identical rows (identical itemized
--- contributions, e.g. two $100 gifts the same day, are real and distinct).
-with tap_contributions as (
-    select
-        *,
-        row_number() over (
-            partition by
-                mec_committee_id, committee_name, contributor_name, contributor_type, contributor_committee_name,
-                contributor_company, contributor_employer, contributor_occupation, contributor_city,
-                contributor_state, amount, contribution_date, contribution_year, contribution_kind, report
-            order by amount
-        ) as occurrence
-    from {{ ref('stg_tap_mec__contributions') }}
-),
+-- sub_id, TAP contribution (record_id: txn or cd1_a_id, deduplicated in staging, #82) or expenditure id, or MEC export
+-- record id.
+with
 
 fec_ids as (
     select
@@ -99,15 +87,10 @@ mec_received as (
         'MEC (via Accountability Project)' as source,
         m.confidence as match_confidence,
         'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url,
-        'tap:' || {{ dbt_utils.generate_surrogate_key([
-            'c.mec_committee_id', 'c.committee_name', 'c.contributor_name', 'c.contributor_type',
-            'c.contributor_committee_name', 'c.contributor_company', 'c.contributor_employer',
-            'c.contributor_occupation', 'c.contributor_city', 'c.contributor_state', 'c.amount',
-            'c.contribution_date', 'c.contribution_year', 'c.contribution_kind', 'c.report', 'c.occurrence'
-        ]) }} as source_record_id,
+        'tap:' || c.record_id as source_record_id,
         x.mec_committee_id as counterparty_mec_committee_id,
         x.match_confidence as counterparty_link_confidence
-    from tap_contributions as c
+    from {{ ref('stg_tap_mec__contributions') }} as c
     inner join {{ ref('int_mec__official_committees') }} as m on c.mec_committee_id = m.mec_committee_id
     left join {{ ref('int_mec__donor_committees') }} as x
         on
