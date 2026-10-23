@@ -9,7 +9,7 @@ projects", and the testing and documentation best practices.
 |---|---|---|
 | Only staging models read sources | 6 intermediate/mart models read 8 raw tables directly | Every raw table read downstream has a staging model; 0 `source()` calls outside staging |
 | Staging is 1:1 with a source, no joins | `stg_courtlistener__mo_cases` joined 3 sources, `stg_courtlistener__judge_disclosures` joined 2 | Split into one staging model per table; the joins live in `int_courtlistener__mo_cases` and `int_courtlistener__judge_disclosure_items` |
-| Every model's grain is tested | Primary-key tests on 2 of 17 marts | a grain test (`unique` or `dbt_utils.unique_combination_of_columns`) on most mart and reporting models; the few without one are transaction-level facts with no natural key. Two grains failed and were fixed: duplicated FEC donor totals (a real double count) and per-chamber party unity (documented as part of the grain) |
+| Every model's grain is tested | Primary-key tests on 2 of 17 marts | a grain test (`unique` or `dbt_utils.unique_combination_of_columns`) on most mart and reporting models; a few still have none (tracked in #73). Two grains failed and were fixed: duplicated FEC donor totals (a real double count) and per-chamber party unity (documented as part of the grain) |
 | Static mappings are seeds, not hardcoded lists | Missouri court ids hardcoded in 2 models; FEC committee-type codes undecoded | `mo_courts` and `fec_committee_types` seeds |
 | Source freshness | none | `loaded_at` freshness on every always-on JSON landing; `mogov freshness` |
 | Packages | none | `dbt_utils` (pinned in `package-lock.yml`); installed automatically by `mogov build`, CI and the image |
@@ -43,8 +43,8 @@ projects", and the testing and documentation best practices.
 
 | Practice | Now |
 |---|---|
-| One source per system | one source per system (`source('fec', 'candidates')`), each in `models/staging/<system>/` with its `_<system>__sources.yml`; `identifier` keeps the raw directory names, so loaders are unchanged. Staging models are named after their source (`stg_tap_mec__*` for the TAP mirror, `stg_mec__*` for MEC direct). |
-| Model contracts on the marts | `contract: {enforced: true}` for the marts and reporting folders; every column in those models declares a `data_type`. A renamed, dropped, added or retyped column fails the build. Types are DuckDB's. |
+| One source per system | a source per upstream system (e.g. `source('fec', 'candidates')`), each in `models/staging/<system>/` with its `_<system>__sources.yml`; `identifier` keeps the raw directory names, so loaders are unchanged. Staging models are named after their source (`stg_tap_mec__*` for the TAP mirror, `stg_mec__*` for MEC direct). |
+| Model contracts on the marts and reporting models | `contract: {enforced: true}` for the marts and reporting folders; every column in those models declares a `data_type`. A renamed, dropped, added or retyped column fails the build. Types are DuckDB's. |
 | Exposures | `voter_frontend` (`models/reporting/_reporting.yml`) lists the tables `frontend/src/lib/exports` reads directly (marts and reporting models, exported by `mogov export`), so they show in lineage. |
 | Reporting layer | `models/reporting/` (`rpt_*`, schema `reporting`), contracts enforced like the marts. Built only from marts and intermediate models. |
 | Unit tests for fragile logic | dbt unit tests on fragile matching and parsing logic, e.g. House and Senate vote tokens, MEC committee attribution, CourtListener case matches, judge index names, lobbyist-gift recipients, garbled disclosure items, committee donor chains, TAP contribution layouts, municipal office titles (`_*_unit_tests.yml` beside the models they cover). They run before their model in every `mogov build`. A failing one skips the model. |
@@ -53,3 +53,4 @@ projects", and the testing and documentation best practices.
 
 - **CI runs `dbt parse`, not the unit tests.** dbt unit tests read their inputs' column types from the
   warehouse, and CI has no landed data.
+- Grain tests on the marts and reporting models that still lack one (#73).
