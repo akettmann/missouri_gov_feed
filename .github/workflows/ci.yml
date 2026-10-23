@@ -46,6 +46,9 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: frontend
 
+      - name: Frontend tests (node:test)
+        run: pnpm --dir frontend test
+
       - name: dbt packages (sqlfluff's dbt templater needs them)
         run: uv run --frozen dbt deps --project-dir dbt --profiles-dir dbt
 

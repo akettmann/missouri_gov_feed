@@ -61,7 +61,9 @@ const term = [o.current_term_start, o.current_term_end].filter(Boolean).join(" t
       <a href={jsonUrl} download>
         Download this data (JSON)
       </a>
-      <a href={href(`/compare/?a=${o.slug}`)}>Compare with another official</a>
+      <a class="js-only" href={href(`/compare/?a=${o.slug}`)}>
+        Compare with another official
+      </a>
       <a href={reportErrorUrl(o.full_name, Astro.url.pathname)} rel="noopener" target="_blank">
         Report an error
       </a>
