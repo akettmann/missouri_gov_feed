@@ -46,16 +46,16 @@ repos:
         files: ^docs/diagrams/.*\.puml$
         require_serial: true
       # frontend/: needs Node 24 + pnpm (`cd frontend && pnpm install` first). Hooks get repo-root paths,
-      # so the wrappers strip the frontend/ prefix and run inside frontend/.
+      # so scripts/frontend_hook.py strips the frontend/ prefix and runs inside frontend/.
       - id: prettier
         name: prettier (frontend)
-        entry: bash -c 'cd frontend && pnpm exec prettier --write --ignore-unknown "${@#frontend/}"' --
+        entry: uv run --frozen python scripts/frontend_hook.py prettier --write --ignore-unknown
         language: system
         files: ^frontend/
         exclude: ^frontend/pnpm-lock\.yaml$
       - id: eslint
         name: eslint (frontend)
-        entry: bash -c 'cd frontend && pnpm exec eslint --fix --no-warn-ignored "${@#frontend/}"' --
+        entry: uv run --frozen python scripts/frontend_hook.py eslint --fix --no-warn-ignored
         language: system
         files: ^frontend/.*\.(js|mjs|ts|astro)$
       - id: astro-check
