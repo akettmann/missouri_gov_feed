@@ -77,6 +77,7 @@ List every payer a keyword would match, and the amount, before adding it:
 
 ```python
 import duckdb
+
 con = duckdb.connect("data/mogov.duckdb", read_only=True)
 con.sql("""
 with c as (
