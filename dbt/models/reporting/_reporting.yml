@@ -199,7 +199,11 @@ models:
           its donors are in rpt_committee_donors. Null for other donors and unmatched names.
       - name: donor_link_confidence
         data_type: varchar
-        description: "`high` (same name) or `medium` (normalized name) for donor_mec_committee_id; null without one."
+        description: >
+          `high` (MECID written into the name, or same name) or `medium` (spelling-normalized name, with
+          abbreviations spelled out and filler words dropped; or core name, with words like PAC, Political,
+          Action, Committee, Fund, Account dropped, or a filer's parenthesized short name) for
+          donor_mec_committee_id; null without one.
       - name: total_amount
         data_type: decimal(38,6)
         description: Sum received, in dollars.
@@ -748,11 +752,15 @@ models:
         data_type: varchar
         description: >
           For a committee donor matched by name to one Missouri committee (int_mec__donor_committees), its MECID;
-          the next hop is this table's rows for that ID. When the name matched different IDs in different years,
-          the one with the most money.
+          this table has rows for that ID only if the committee itself gave directly to an official; many matched
+          committees have none, so check before following it. When the name matched different IDs in different
+          years, the one with the most money.
       - name: donor_link_confidence
         data_type: varchar
-        description: "`high` (MECID in the name, or same name) or `medium` (normalized name) for donor_mec_committee_id."
+        description: >
+          `high` (MECID in the name, or same name) or `medium` (spelling-normalized name, with abbreviations
+          spelled out and filler words dropped; or core name, with words like PAC, Political, Action, Committee,
+          Fund, Account dropped, or a filer's parenthesized short name) for donor_mec_committee_id.
       - name: source_url
         data_type: varchar
         description: The committee's MEC page, where its reports and itemized contributions are.
