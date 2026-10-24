@@ -1,10 +1,13 @@
 {# Backend-portable regex and string helpers.
 
-   Supported adapters: DuckDB (the tested target, via dbt-duckdb) plus Postgres and Snowflake, the only others with
-   explicit dispatches in macros/compat. Trino/Athena (no regexp_instr), Spark < 3.3 and anything else are NOT
-   supported: the default__ regex macros assume Snowflake-style regexp_substr / regexp_instr.
+   Supported adapters: DuckDB (the tested target, via dbt-duckdb) is the only supported backend. The regex macros
+   also have Postgres and Snowflake dispatches (rendered SQL pinned by tests/test_regex_macros.py); other compat macros
+   (spatial, JSON) lack Snowflake dispatches. Which adapters to support is open in #121. Trino/Athena (no
+   regexp_instr), Spark < 3.3 and anything else are NOT supported: the default__ regex macros assume Snowflake-style
+   regexp_substr / regexp_instr.
 
-   Write patterns as plain POSIX ERE: no (?:...), lazy quantifiers, backslash-b/d/s/w classes or lookarounds.
+   Write patterns as plain POSIX ERE: no (?:...), lazy quantifiers, backslash-b/d/s/w classes or lookarounds
+   (existing exceptions tracked in #110).
    regex_literal() renders a pattern as a SQL string literal per adapter. Write a literal backslash as two
    backslashes in a Jinja string (Jinja unescapes it to one); the macros do the rest, so callers never think
    about the target's quoting rules. #}
