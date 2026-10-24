@@ -31,6 +31,7 @@ select
         when 'NAYS' then 'nay'
         when 'Absent' then 'absent'
         when 'Absent with leave' then 'absent with leave'
-        when 'Excused from voting' then 'not voting'
+        -- an excused non-vote, same footing as leave: not "not voting" (Congress), which counts as unexcused
+        when 'Excused from voting' then 'absent with leave'
     end as vote_cast
 from src

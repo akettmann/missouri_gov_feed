@@ -393,7 +393,7 @@ export const VIZ: Record<string, VizSpec> = {
       { key: "chamber", label: "Chamber", pct: true },
       { key: "recorded", label: "Votes", num: true },
       { key: "absent", label: "Absent or not voting", num: true },
-      { key: "excused", label: "Absent with leave", num: true },
+      { key: "excused", label: "Excused", num: true },
     ],
     rows: (b) =>
       (b.voting.attendance ?? []).map((r) => ({
@@ -414,11 +414,11 @@ export const VIZ: Record<string, VizSpec> = {
     views: ["attendance", "attendance-missed"],
     viewLabel: "Not attended",
     usesConfidence: false,
-    note: "Bars: absent or not voting, then absent with leave (an excused absence), as a share of recorded votes. | chamber average, all absences together: the export does not split out the chamber's excused absences.",
+    note: "Bars: absent or not voting, then excused (absent with leave, or excused from voting in the MO Senate), as a share of recorded votes. | chamber average, all absences together: the export does not split out the chamber's excused absences.",
     columns: [
       { key: "session", label: "Session" },
       { key: "unexcused", label: "Absent or not voting", pct: true },
-      { key: "excused", label: "Absent with leave", pct: true },
+      { key: "excused", label: "Excused", pct: true },
       { key: "chamber", label: "Chamber (all absences)", pct: true },
       { key: "recorded", label: "Votes", num: true },
     ],

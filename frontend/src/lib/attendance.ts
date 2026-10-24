@@ -14,7 +14,7 @@ export interface MissedInput {
 export interface Missed {
   /** absent or not voting, % of votes recorded */
   unexcused: number;
-  /** absent with leave (an excused absence), % of votes recorded */
+  /** excused: absent with leave or excused from voting, % of votes recorded */
   excused: number;
   /** the whole chamber's share of votes not attended; the export does not split out its excused absences */
   chamber: number;

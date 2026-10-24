@@ -308,10 +308,10 @@ models:
         description: Listed as absent.
       - name: absent_with_leave
         data_type: hugeint
-        description: Listed as absent with leave (excused; MO Senate journals).
+        description: Listed as absent with leave or excused from voting (both excused; MO Senate journals).
       - name: not_voting
         data_type: hugeint
-        description: Listed as not voting (Congress) or excused from voting (MO Senate journals).
+        description: Listed as not voting (Congress; counted as unexcused).
       - name: attendance_pct
         data_type: double
         description: 100 * votes_present / votes_recorded.
