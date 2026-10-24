@@ -5,8 +5,12 @@ const num = new Intl.NumberFormat("en-US");
 export const money = (n: number) => (Math.abs(n) >= 1000 ? usd0 : usd2).format(n);
 export const count = (n: number) => num.format(n);
 
+/** Federal courts: `district` holds a court key (moed, mowd, ca8), and the title already names the court. */
+const COURT_OFFICES = ["us_district_court", "us_court_of_appeals"];
+
 export function officeLine(o: { office_title: string | null; office: string; district: string | null }) {
   const title = o.office_title ?? o.office.replaceAll("_", " ");
+  if (COURT_OFFICES.includes(o.office)) return title;
   return o.district && !title.includes(o.district) ? `${title}, district ${o.district}` : title;
 }
 
@@ -87,3 +91,24 @@ export const OFFICE_GROUPS: { key: string; label: string; offices: Record<string
 ];
 
 export const officeGroup = (office: string) => OFFICE_GROUPS.find((g) => office in g.offices)?.key ?? "other";
+
+/** [2017, 2018, 2020] -> "2017–2018, 2020": consecutive years collapse into a range. */
+export function yearRanges(years: number[]): string {
+  const out: string[] = [];
+  const sorted = [...new Set(years)].sort((a, b) => a - b);
+  for (let i = 0; i < sorted.length;) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) j++;
+    out.push(j > i ? `${sorted[i]}–${sorted[j]}` : String(sorted[i]));
+    i = j + 1;
+  }
+  return out.join(", ");
+}
+
+/** Plain names for the roster sources behind rpt_officeholders_by_year; unknown values show as given. */
+export const ROSTER_SOURCES: Record<string, string> = {
+  "mo_house roster": "Missouri House roster",
+  openstates: "Open States people data",
+  "congress-legislators": "congress-legislators (U.S. Congress)",
+  fjc: "Federal Judicial Center biographical directory",
+};

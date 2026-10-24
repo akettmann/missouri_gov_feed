@@ -16,6 +16,7 @@ Linting itself uses the in-memory `lint` target (dbt/profiles.yml), so no data/ 
 """
 
 import hashlib
+import os
 import re
 import subprocess
 import sys
@@ -98,19 +99,29 @@ def run_sqlfluff_inprocess(args: list[str]) -> int:
     return result[0]
 
 
+def _echo(data: bytes) -> None:
+    """Write the child's UTF-8 bytes to stdout without depending on the console's encoding."""
+    buffer = getattr(sys.stdout, "buffer", None)
+    if buffer is not None:
+        sys.stdout.flush()
+        buffer.write(data)
+        buffer.flush()
+    else:
+        sys.stdout.write(data.decode("utf-8", errors="replace"))
+
+
 def run_sqlfluff(args: list[str]) -> int:
     """Run sqlfluff via the wrapper, echoing its output; non-zero if it exits non-zero or hit an internal error."""
+    # Force UTF-8 in the child so its pipe output does not use the locale encoding (cp1252 on Windows).
     proc = subprocess.run(
-        [sys.executable, str(Path(__file__).resolve()), "--run-sqlfluff", *args],
+        [sys.executable, "-X", "utf8", str(Path(__file__).resolve()), "--run-sqlfluff", *args],
         check=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
     )
-    sys.stdout.write(proc.stdout)
-    if has_internal_error(proc.stdout):
+    _echo(proc.stdout)
+    if has_internal_error(proc.stdout.decode("utf-8", errors="replace")):
         sys.stderr.write("sqlfluff_hook: sqlfluff hit an internal error on a file (see above); failing.\n")
         return proc.returncode or 1
     return proc.returncode

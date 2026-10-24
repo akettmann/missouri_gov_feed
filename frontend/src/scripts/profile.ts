@@ -2,6 +2,7 @@
 // "hide possible matches" toggle. Tables are already server-rendered, so this only enhances.
 import * as Plot from "@observablehq/plot";
 import type { OfficialBundle } from "../lib/exports/types";
+import { attendedAxisMin, missedAxisMax } from "../lib/attendance";
 import { count, money } from "../lib/format";
 import { cellText, VIZ, type Row, type VizSpec } from "../lib/viz";
 
@@ -62,9 +63,8 @@ function chart(spec: VizSpec, rows: Row[], width: number): SVGSVGElement | HTMLE
     const ink = css("--ink");
     const muted = css("--muted");
     const longest = Math.max(...rows.map((r) => String(r[spec.y]).length));
-    // dots need no zero baseline; attendance clusters near 100%, so start at the nearest 10 below the data
-    const low = Math.min(...rows.flatMap((r) => [Number(r[spec.x]), Number(r[spec.x2!])]));
-    const from = Math.max(0, Math.floor((low - 2) / 10) * 10);
+    // dots need no zero baseline; attendance clusters near 100%, so start just below the data
+    const from = attendedAxisMin(rows.flatMap((r) => [Number(r[spec.x]), Number(r[spec.x2!])]));
     return Plot.plot({
       width,
       style,
@@ -89,6 +89,43 @@ function chart(spec: VizSpec, rows: Row[], width: number): SVGSVGElement | HTMLE
           fill: ink,
           tip: { format: { x: (d: number) => `${d.toFixed(1)}%` } },
         }),
+      ],
+    });
+  }
+  if (spec.kind === "missed") {
+    // the flipped attendance view: values cluster near 0%, so the axis ends just above the data
+    const parts = [
+      { key: spec.x, label: "Absent or not voting" },
+      { key: spec.x2!, label: "Absent with leave" },
+    ];
+    const colors = seriesColors();
+    const long = rows.flatMap((r) =>
+      parts.map((p) => ({ y: String(r[spec.y]), part: p.label, n: Number(r[p.key]) })),
+    );
+    const to = missedAxisMax(
+      rows.flatMap((r) => [Number(r[spec.x]) + Number(r[spec.x2!]), Number(r.chamber)]),
+    );
+    const longest = Math.max(...rows.map((r) => String(r[spec.y]).length));
+    return Plot.plot({
+      width,
+      style,
+      marginLeft: 16 + longest * 6.5,
+      height: 26 * rows.length + 60,
+      x: { domain: [0, to], grid: true, label: null, tickFormat: (d: number) => `${d}%` },
+      y: { label: null, domain: rows.map((r) => String(r[spec.y])) },
+      color: { domain: parts.map((p) => p.label), range: [colors[0], colors[2]], legend: true },
+      marks: [
+        Plot.barX(long, {
+          x: "n",
+          y: "y",
+          fill: "part",
+          order: parts.map((p) => p.label),
+          insetTop: 4,
+          insetBottom: 4,
+          tip: { format: { x: (d: number) => `${d.toFixed(1)}%` } },
+        }),
+        Plot.tickX(rows, { x: "chamber", y: spec.y, stroke: css("--ink"), strokeWidth: 2, tip: false }),
+        Plot.ruleX([0], { stroke: css("--axis") }),
       ],
     });
   }
@@ -163,6 +200,25 @@ function emptyNote(): HTMLElement {
   return p;
 }
 
+/** Swap the title, note, button states and table head to the figure's active view. */
+function showView(fig: HTMLElement, id: string) {
+  const spec = VIZ[id];
+  fig.dataset.active = id;
+  fig.querySelector("figcaption")!.textContent = spec.title;
+  const note = fig.querySelector<HTMLElement>(":scope > p.small");
+  if (note) note.textContent = spec.note ?? "";
+  for (const b of fig.querySelectorAll<HTMLButtonElement>(".views button"))
+    b.setAttribute("aria-pressed", String(b.dataset.view === id));
+  const tr = document.createElement("tr");
+  for (const c of spec.columns) {
+    const th = document.createElement("th");
+    th.textContent = c.label;
+    if (c.money || c.num || c.pct) th.className = "num";
+    tr.append(th);
+  }
+  fig.querySelector("thead")?.replaceChildren(tr);
+}
+
 function fillTable(fig: Element, spec: VizSpec, rows: Row[]) {
   const tbody = fig.querySelector("tbody");
   if (!tbody) return;
@@ -203,11 +259,12 @@ function fillTable(fig: Element, spec: VizSpec, rows: Row[]) {
 
 function render(bundle: OfficialBundle, tablesToo: boolean) {
   for (const fig of document.querySelectorAll<HTMLElement>("figure[data-viz]")) {
-    const spec = VIZ[fig.dataset.viz!];
+    const spec = VIZ[fig.dataset.active ?? fig.dataset.viz!];
     const target = fig.querySelector<HTMLElement>(".chart");
     if (!spec || !target) continue;
     const rows = spec.rows(bundle, hideMedium());
-    if (tablesToo && spec.usesConfidence) fillTable(fig, spec, rows);
+    if ((tablesToo && spec.usesConfidence) || fig.dataset.refill) fillTable(fig, spec, rows);
+    delete fig.dataset.refill;
     target.replaceChildren(rows.length ? chart(spec, rows, Math.max(280, target.clientWidth)) : emptyNote());
   }
 }
@@ -220,6 +277,15 @@ async function main() {
   const bundle = (await res.json()) as OfficialBundle;
   // the server tables include medium rows; redraw them if the reader already hides those
   render(bundle, hideMedium());
+  for (const fig of document.querySelectorAll<HTMLElement>("figure[data-viz]")) {
+    fig.addEventListener("click", (e) => {
+      const id = (e.target as HTMLElement).closest<HTMLElement>(".views button")?.dataset.view;
+      if (!id || id === (fig.dataset.active ?? fig.dataset.viz)) return;
+      showView(fig, id);
+      fig.dataset.refill = "1";
+      render(bundle, false);
+    });
+  }
   document.addEventListener("hide-medium-change", () => render(bundle, true));
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => render(bundle, false));
   let lastWidth = window.innerWidth;

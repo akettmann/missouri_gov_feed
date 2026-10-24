@@ -4,6 +4,7 @@
 import { createHash } from "node:crypto";
 import { DONOR_GROUP_SQL } from "../rollups";
 import { exportedAt, hasExport, query } from "./db";
+import { groupPast, linkSameName, type RosterRow } from "./past";
 import { sampleDonorCycles, sampleGiftRollup, sampleTopDonors } from "./fixtures";
 import type {
   AttendanceRow,
@@ -27,6 +28,7 @@ import type {
   OfficialBundle,
   PartyBreak,
   PastOfficeholder,
+  PastPerson,
   PeerStrip,
   SubjectVotes,
   TopDonorRow,
@@ -539,27 +541,30 @@ export async function officialIndex(): Promise<IndexEntry[]> {
 /**
  * The browse list's look-back: past years of rpt_officeholders_by_year (its latest year is the one serving now,
  * which the page takes from dim_official), newest first. Null without the export, so the page lists today only.
+ *
+ * Single source of truth for where a past name links: every row gets a slug. People serving now (has_profile) get
+ * their profile's slug; everyone else gets slugFor(name, official_id), the same scheme, served by a small
+ * past-officeholder page at the same /officials/<slug>/ path. `people` holds those small pages' data.
  */
 export async function pastOfficeholders(): Promise<{
   currentYear: number;
   years: Map<number, PastOfficeholder[]>;
+  people: PastPerson[];
 } | null> {
   if (!hasExport("rpt_officeholders_by_year")) return null;
   const slugs = new Map((await allOfficials()).map(({ official: o }) => [o.official_id, o.slug]));
-  const rows = await query<PastOfficeholder & { year: number; official_id: string; has_profile: boolean }>(`
-    select year, official_id, has_profile, full_name, party, level, office, office_title, district
+  const rows = await query<RosterRow>(`
+    select year, official_id, has_profile, full_name, party, level, office, office_title, district, source
     from {rpt_officeholders_by_year}
     order by year desc, level, office, try_cast(district as integer), district, full_name`);
   const currentYear = Math.max(...rows.map((r) => r.year));
-  const years = new Map<number, PastOfficeholder[]>();
-  for (const { year, official_id, has_profile, ...r } of rows) {
-    if (year === currentYear) continue;
-    const entry = { ...r, slug: has_profile ? (slugs.get(official_id) ?? null) : null };
-    const list = years.get(year);
-    if (list) list.push(entry);
-    else years.set(year, [entry]);
-  }
-  return { currentYear, years };
+  // rows are newest first, so a person's first row carries their latest name
+  const { years, people } = groupPast(rows, currentYear, slugs, slugFor);
+  linkSameName(
+    people,
+    (await allOfficials()).map(({ official: o }) => ({ full_name: o.full_name, slug: o.slug })),
+  );
+  return { currentYear, years, people };
 }
 
 /** Export timestamps shown on the methodology page as data freshness. */
