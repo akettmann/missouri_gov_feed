@@ -22,6 +22,7 @@ folder "frontend/dist (static)" as dist {
   [lookup/officeholders/<year>.json\npast years of the browse list] as yearjson
   [years/<year>/index.html\nstatic past year (no JS)] as yearpage
   [officials/<slug>/index.html\nprofile + tables] as page
+  [officials/<slug>/index.html\nsmall past-officeholder page] as pastpage
   [officials/<slug>.json\nper-official bundle] as json
   [methodology/index.html] as meth
 }
@@ -36,6 +37,9 @@ load --> idx
 load --> yearjson : rpt_officeholders_by_year
 idx --> yearjson : fetch when a\npast year is picked
 load --> yearpage : rpt_officeholders_by_year
+load --> pastpage : rpt_officeholders_by_year
+yearpage --> pastpage : name links
+yearjson --> pastpage : name links
 idx --> yearpage : noscript links
 load --> page
 load --> json
