@@ -1,13 +1,17 @@
 -- Officials with at least one attributed MEC committee (int_mec__official_committees), by office group.
--- Issue #96: a build without the MEC crosswalk (var mec_direct off) silently dropped 295 -> 243 attributed
--- officials, and nothing flagged it. Measured October 2026 (595 current officials), attributed:
+-- Issue #96: a build without the MEC crosswalk (var mec_direct off) showed 295 -> 243 attributed officials.
+-- (Root cause: dbt was run without mogov's vars; no code regression.)
+-- Measured October 2026 (595 current officials), attributed:
 --                         mec_direct on     mec_direct off (name match only)
 --   state_house (155)     144               107
 --   state_senate (33)     33                29
 --   statewide (6 offices) 6                 3
 -- Floors sit about 15-20% below the measured counts so roster churn and a refresh don't trip them, while
--- losing the crosswalk (or breaking name matching) does. The mec_direct floors are the ones that catch the
--- #96 failure mode: crosswalk lost while the name-match floors still pass.
+-- losing the crosswalk (or breaking name matching) does. The mec_direct floors catch the crosswalk being
+-- lost or broken while mec_direct is true. They do NOT catch dbt being run without mogov's vars (the #96
+-- trigger): the floors follow the same var, so a bare build uses the low name-match floors and passes.
+-- mogov's cli.py sets the vars from raw_exists('mec_cd1_a'); that gap is tracked in issue #105, and
+-- threshold brittleness in #106.
 -- Fails when an office group has fewer attributed officials than its floor.
 with floors as (
     select
