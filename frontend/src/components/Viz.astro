@@ -17,6 +17,15 @@ const rows = spec.rows(bundle, false);
 {rows.length > 0 && (
   <figure class="viz" data-viz={id}>
     <figcaption>{spec.title}</figcaption>
+    {spec.views && (
+      <div class="views js-only" role="group" aria-label="Chart view">
+        {spec.views.map((v) => (
+          <button type="button" data-view={v} aria-pressed={v === id ? "true" : "false"}>
+            {VIZ[v].viewLabel}
+          </button>
+        ))}
+      </div>
+    )}
     <div class="chart" aria-hidden="true" />
     {spec.note && <p class="small muted">{spec.note}</p>}
     <details>
@@ -59,5 +68,25 @@ const rows = spec.rows(bundle, false);
   }
   .badge {
     margin-left: 6px;
+  }
+  .views {
+    display: inline-flex;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .views button {
+    font: inherit;
+    font-size: 0.8125rem;
+    padding: 2px 10px;
+    border: 1px solid var(--axis);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--ink-2);
+    cursor: pointer;
+  }
+  .views button[aria-pressed="true"] {
+    background: var(--ink);
+    color: var(--surface);
+    border-color: var(--ink);
   }
 </style>
