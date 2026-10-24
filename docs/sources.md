@@ -184,7 +184,7 @@ Quirks:
   ...), and a core name without words like PAC, Political, Action, Committee, Fund, Account (also tried on the name
   outside parentheses, and on a filer's parenthesized short name). A match counts only if that committee was active
   within a year of the gift, and only when it is unique. Measured October 2026 over both feeds ($489M from
-  committees): 68% of the dollars match one committee, 1.4% are ambiguous, 30% match nothing. An exact name match
+  committees): 71% of the dollars match one committee, 1.4% are ambiguous, 27% match nothing. An exact name match
   alone got about 46%. Most of the misses are federal and out-of-state PACs (DRIVE, AFSCME, DGA), which don't file
   with MEC, plus acronyms that no name rule can expand (the common ones, HRCC, AMECPAC and MHA PAC, are in the alias
   seed). Distinct committees can differ only by "MO" vs "Missouri" ("MO Values PAC" and "Missouri Values PAC"), so
