@@ -115,10 +115,10 @@ export function compareRows(bundles: OfficialBundle[], hideMedium: boolean): Com
   });
   rows.push({
     section: "Businesses in their area",
-    label: "Donor companies with sites there (co-occurrence, not influence)",
+    label: "Donors with sites there (co-occurrence, not influence)",
     values: biz.map((x) =>
       x
-        ? `${count(x.donorCompanies)} ${x.donorCompanies === 1 ? "company" : "companies"} (${sitesText(x.donorSites)})`
+        ? `${count(x.donorCompanies)} ${x.donorCompanies === 1 ? "donor" : "donors"} (${sitesText(x.donorSites)})`
         : NA,
     ),
   });

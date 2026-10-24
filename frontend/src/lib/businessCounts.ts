@@ -5,11 +5,18 @@ import type { DistrictDonor, DistrictIndustry } from "./exports/types";
 export interface BusinessCounts {
   /** every EPA-regulated site in the official's district or city */
   totalSites: number;
-  /** donor companies (as matched rows) that gave to the official and have sites there */
+  /**
+   * distinct contributor names that gave to the official and have sites there. A combined group naming
+   * two contributors counts both; a name in several groups counts once. The export has no company key,
+   * so one organisation filing under several names (state PAC variants) counts once per name.
+   */
   donorCompanies: number;
   /** sites tied to those donors */
   donorSites: number;
 }
+
+/** load.ts groups sites by `donor_names`, the "; "-joined set of contributors matched to one site. */
+const NAME_SEPARATOR = ";";
 
 /** null when the official has no area businesses (statewide office, judge, or the export is missing). */
 export function businessCounts(
@@ -22,7 +29,18 @@ export function businessCounts(
     : businesses.donors;
   return {
     totalSites: businesses.industries.reduce((n, i) => n + i.n_sites, 0),
-    donorCompanies: donors.length,
+    donorCompanies: distinctCompanies(donors),
     donorSites: donors.reduce((n, d) => n + d.sites.length, 0),
   };
+}
+
+function distinctCompanies(donors: DistrictDonor[]): number {
+  const names = new Set<string>();
+  for (const d of donors) {
+    for (const part of d.donor_names.split(NAME_SEPARATOR)) {
+      const name = part.replace(/\s+/g, " ").trim();
+      if (name) names.add(name);
+    }
+  }
+  return names.size;
 }
