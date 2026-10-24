@@ -43,8 +43,8 @@ Treat `medium` rows with care before publishing them as fact.
 {% enddocs %}
 
 {% docs vote_cast %}
-How the official voted: `yea`, `nay`, `present`, `absent`, `absent with leave` (MO Senate), `not voting`
-(Congress). State votes are read from roll-call PDFs and journals; federal from Voteview cast codes.
+How the official voted: `yea`, `nay`, `present`, `absent`, `absent with leave` (MO Senate; includes
+"excused from voting"), `not voting` (Congress). State votes are read from roll-call PDFs and journals; federal from Voteview cast codes.
 {% enddocs %}
 
 {% docs coverage_status %}

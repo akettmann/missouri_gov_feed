@@ -96,7 +96,7 @@ function chart(spec: VizSpec, rows: Row[], width: number): SVGSVGElement | HTMLE
     // the flipped attendance view: values cluster near 0%, so the axis ends just above the data
     const parts = [
       { key: spec.x, label: "Absent or not voting" },
-      { key: spec.x2!, label: "Absent with leave" },
+      { key: spec.x2!, label: "Excused" },
     ];
     const colors = seriesColors();
     const long = rows.flatMap((r) =>
