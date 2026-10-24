@@ -25,6 +25,10 @@ projects", and the testing and documentation best practices.
 - Portable SQL through `adapter.dispatch` macros (`macros/compat`), so the backend can change.
 - sqlfluff with the dbt templater in pre-commit and CI.
 - Optional inputs gate their models with vars (`mec_direct`, `cl_case_bulk`) instead of failing.
+- A bare `dbt build` can't silently drop optional models: an `on-run-start` hook
+  (`macros/optional_inputs.sql`) fails when `mec_direct` / `cl_case_bulk` is off but the raw table exists.
+  `mogov build` sets the vars from what is on disk; to disable them on purpose pass
+  `--vars '{skip_optional_raw_check: true}'`. The hook only runs when the selection has nodes to run.
 
 ## Deliberately not changed
 
