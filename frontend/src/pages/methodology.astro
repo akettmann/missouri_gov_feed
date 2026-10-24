@@ -130,9 +130,12 @@ const tables = freshness();
     <h2>Awards</h2>
     <p>
       Each award ranks one number that also appears on the profiles, among officials holding the same office,
-      and comes with its opposite (lowest and highest attendance, and so on). Ties share a rank. An office
-      needs at least five qualifying officials in a period, so single-seat offices like governor have no
-      awards.
+      and comes with its opposite (lowest and highest attendance, and so on). Ties share a rank. The top five
+      qualify unless an award sets its own cutoff (the awards_threshold setting). An office needs at least
+      five qualifying officials in a period, so single-seat offices like governor have no awards. An official
+      who qualified for the same award in consecutive years gets a marker such as X3 (3 years in a row); years
+      in another office, or without enough officials to rank, are skipped and neither add to nor break the
+      run, but a year ranked outside the cutoff breaks it. Lifetime rankings have no marker.
     </p>
     <ul>
       <li>
