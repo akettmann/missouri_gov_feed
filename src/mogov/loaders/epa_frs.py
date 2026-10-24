@@ -3,11 +3,13 @@
 address, coordinates, NAICS codes and the companies that own or operate it. dbt places each facility in the
 districts that contain it, so an official's district can be listed with the businesses that operate there.
 
-The state file is one zip of CSVs, refreshed by EPA every few months. Three of them are landed: facilities,
-organizations (owners/operators per program record) and NAICS codes. Each row lands verbatim as a JSON
-object keyed by the CSV header. The files have a few rows where two records are fused onto one line (a
-closing quote is missing); DuckDB's CSV reader dropped dozens of good rows after each one, so the files are
-read with Python's csv module instead, and a row of the wrong width keeps its fields under `_fields`.
+The state file is one zip of CSVs, refreshed by EPA every few months. Four of them are landed: facilities,
+organizations (owners/operators per program record), NAICS codes and SIC codes (the older industry
+classification, which many program records carry in place of a NAICS code; dbt maps it to a NAICS sector).
+Each row lands verbatim as a JSON object keyed by the CSV header. The files have a few rows where two
+records are fused onto one line (a closing quote is missing); DuckDB's CSV reader dropped dozens of good rows
+after each one, so the files are read with Python's csv module instead, and a row of the wrong width keeps
+its fields under `_fields`.
 """
 
 import csv
@@ -28,6 +30,7 @@ FILES = {  # raw table -> member of the zip
     "epa_frs_facilities": "MO_FACILITY_FILE.CSV",
     "epa_frs_organizations": "MO_ORGANIZATION_FILE.CSV",
     "epa_frs_naics": "MO_NAICS_FILE.CSV",
+    "epa_frs_sic": "MO_SIC_FILE.CSV",
 }
 
 

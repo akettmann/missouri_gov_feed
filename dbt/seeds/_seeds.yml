@@ -173,3 +173,23 @@ seeds:
     columns:
       - name: position_title
         data_tests: [unique, not_null]
+  - name: sic_naics_sectors
+    description: >
+      Maps a SIC code prefix (1987 Standard Industrial Classification; two digits, the major group, or a longer
+      prefix where one group splits across sectors) to the first two digits of the NAICS sector it falls in, a
+      naics_sectors.naics_prefix. The longest matching prefix wins (495, sanitary services, overrides 49, which is
+      otherwise utilities). Major groups are coarser than NAICS industries, so this gives a sector, never a NAICS
+      code; a few groups straddle sectors (73 business services is mostly 56 but also 51 and 54) and take the
+      majority one. int_epa_frs__facilities uses it for sites whose FRS records carry a SIC code but no NAICS code.
+    config:
+      column_types: {sic_prefix: varchar, naics_prefix: varchar}
+    columns:
+      - name: sic_prefix
+        data_tests: [unique, not_null]
+      - name: naics_prefix
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('naics_sectors')
+                field: naics_prefix
