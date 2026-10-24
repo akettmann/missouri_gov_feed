@@ -684,6 +684,16 @@ models:
         description: >
           Where the row comes from - dim_official (current year), mo_house roster, openstates,
           congress-legislators or fjc.
+      - name: source_url
+        data_type: varchar
+        description: >
+          Link to the roster behind a past-year row: the House's session XML export for that year (mo_house
+          roster), the Open States people data, the congress-legislators repository or the FJC judges
+          directory. Null for the current year (source dim_official).
+        data_tests:
+          - not_null:
+              config:
+                where: "source <> 'dim_official'"
   - name: rpt_committee_donors
     description: >
       One hop back from an official's donors: for each Missouri committee that gave to an official (a
