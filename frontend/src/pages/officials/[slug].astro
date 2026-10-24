@@ -4,6 +4,7 @@
 import type { GetStaticPaths } from "astro";
 import ConfidenceToggle from "../../components/ConfidenceToggle.astro";
 import CoverageStrip from "../../components/CoverageStrip.astro";
+import ProfileScript from "../../components/ProfileScript.astro";
 import SectionBusinesses from "../../components/SectionBusinesses.astro";
 import SectionCourts from "../../components/SectionCourts.astro";
 import SectionGifts from "../../components/SectionGifts.astro";
@@ -106,12 +107,9 @@ const term = o ? [o.current_term_start, o.current_term_end].filter(Boolean).join
       <SectionInterests bundle={bundle} />
       <SectionCourts bundle={bundle} />
     </article>
+    <ProfileScript />
   </Layout>
 )}
-
-<script>
-  import "../../scripts/profile";
-</script>
 
 <style>
   .profile-head {
