@@ -5,8 +5,12 @@ const num = new Intl.NumberFormat("en-US");
 export const money = (n: number) => (Math.abs(n) >= 1000 ? usd0 : usd2).format(n);
 export const count = (n: number) => num.format(n);
 
+/** Federal courts: `district` holds a court key (moed, mowd, ca8), and the title already names the court. */
+const COURT_OFFICES = ["us_district_court", "us_court_of_appeals"];
+
 export function officeLine(o: { office_title: string | null; office: string; district: string | null }) {
   const title = o.office_title ?? o.office.replaceAll("_", " ");
+  if (COURT_OFFICES.includes(o.office)) return title;
   return o.district && !title.includes(o.district) ? `${title}, district ${o.district}` : title;
 }
 
