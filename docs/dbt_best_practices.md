@@ -9,7 +9,7 @@ projects", and the testing and documentation best practices.
 |---|---|---|
 | Only staging models read sources | 6 intermediate/mart models read 8 raw tables directly | Every raw table read downstream has a staging model; 0 `source()` calls outside staging |
 | Staging is 1:1 with a source, no joins | `stg_courtlistener__mo_cases` joined 3 sources, `stg_courtlistener__judge_disclosures` joined 2 | Split into one staging model per table; the joins live in `int_courtlistener__mo_cases` and `int_courtlistener__judge_disclosure_items` |
-| Every model's grain is tested | Primary-key tests on 2 of 17 marts | a grain test (`unique` or `dbt_utils.unique_combination_of_columns`) on most mart and reporting models; a few still have none (tracked in #73). Two grains failed and were fixed: duplicated FEC donor totals (a real double count) and per-chamber party unity (documented as part of the grain) |
+| Every model's grain is tested | Primary-key tests on 2 of 17 marts | a grain test (`unique` or `dbt_utils.unique_combination_of_columns`) on every mart and reporting model (#73); `fct_voluntary_disclosures` passes vacuously while its seed is empty. Two grains failed and were fixed: duplicated FEC donor totals (a real double count) and per-chamber party unity (documented as part of the grain) |
 | Static mappings are seeds, not hardcoded lists | Missouri court ids hardcoded in 2 models; FEC committee-type codes undecoded | `mo_courts` and `fec_committee_types` seeds |
 | Source freshness | none | `loaded_at` freshness on every always-on JSON landing; `mogov freshness` |
 | Packages | none | `dbt_utils` (pinned in `package-lock.yml`); installed automatically by `mogov build`, CI and the image |

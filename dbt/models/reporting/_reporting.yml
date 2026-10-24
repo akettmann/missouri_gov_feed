@@ -540,6 +540,10 @@ models:
       placeholder answer (donor_employer_placeholders seed: retired, none, self-employed, bare occupations), are
       left out. Spelling variants are not merged. State money only. Grain: one row per (official, lower-cased
       employer, match confidence).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, employer, match_confidence]
     columns:
       - name: official_id
         data_type: varchar

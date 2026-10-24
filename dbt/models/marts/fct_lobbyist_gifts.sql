@@ -4,6 +4,9 @@
 -- name matches exactly, 'medium' when only its first three letters do (Dan/Daniel, Rob/Robert; not
 -- Mike/Michael, whose first three letters differ).
 -- With the opt-in MEC loader, 2019+ comes from MEC directly and the mirror supplies earlier years.
+-- Grain: (official_id, gift_key). The lobbyist reports carry no per-row id (TAP's ind_id repeats across rows), so
+-- gift_key hashes every reported field plus the occurrence number among identical rows: two identical $25
+-- meals the same day are real, distinct entries.
 with all_gifts as (
     select
         lobbyist_id,
@@ -39,13 +42,30 @@ with all_gifts as (
     {% endif %}
 ),
 
+keyed as (
+    select
+        *,
+        row_number() over (
+            partition by
+                lobbyist_id, lobbyist_name, principal_name, recipient_raw, recipient_title, recipient_last,
+                recipient_first, expenditure_category, description, amount, expenditure_date, source
+            order by amount
+        ) as occurrence
+    from all_gifts
+),
+
 gifts as (
     select
         *,
+        {{ dbt_utils.generate_surrogate_key([
+            'lobbyist_id', 'lobbyist_name', 'principal_name', 'recipient_raw', 'recipient_title', 'recipient_last',
+            'recipient_first', 'expenditure_category', 'description', 'amount', 'expenditure_date', 'source',
+            'occurrence'
+        ]) }} as gift_key,
         extract(year from expenditure_date) as expenditure_year,
         {{ mogov.name_key('recipient_last') }} as last_key,
         {{ mogov.name_key(dbt.split_part('recipient_first', "' '", 1)) }} as first_key
-    from all_gifts
+    from keyed
     where recipient_last is not null and recipient_first is not null
 ),
 
@@ -93,6 +113,7 @@ select
     recipient_title,
     recipient_raw,
     match_confidence,
-    source
+    source,
+    gift_key
 from matched
 where n_officials = 1
