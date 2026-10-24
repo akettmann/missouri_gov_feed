@@ -4,7 +4,7 @@
 import Layout from "../layouts/Layout.astro";
 import { AWARD_PAIRS, AWARDS, awardLists, type AwardList } from "../lib/exports/awards";
 import { officialIndex } from "../lib/exports/load";
-import { count, money, pct } from "../lib/format";
+import { count, money, pct, streakMarker } from "../lib/format";
 import { href } from "../lib/site";
 
 const lists = await awardLists();
@@ -89,7 +89,9 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
               hidden={!(office === defaultOffice && period === "lifetime")}
             >
               {pairs.length === 0 ? (
-                <p class="muted">No awards for {plural(office)} in this period (fewer than 5 qualified).</p>
+                <p class="muted">
+                  No awards for {plural(office)} in this period (too few officials were ranked).
+                </p>
               ) : (
                 pairs.map((pair) => (
                   <div class="pair">
@@ -107,6 +109,15 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
                               {list.entries.map((e) => (
                                 <li value={e.rank}>
                                   <a href={href(`/officials/${e.slug}/`)}>{e.name}</a>
+                                  {streakMarker(e.streak_years) && (
+                                    <abbr
+                                      class="streak"
+                                      title={streakMarker(e.streak_years)!.label}
+                                      aria-label={streakMarker(e.streak_years)!.label}
+                                    >
+                                      {streakMarker(e.streak_years)!.text}
+                                    </abbr>
+                                  )}
                                   <span class="muted small"> {e.party ?? ""}</span>
                                   <span class="v">
                                     {value(list.award, e.metric)}{" "}
@@ -197,6 +208,14 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
   li {
     padding: 4px 0;
     border-bottom: 1px solid var(--hairline);
+  }
+  .streak {
+    margin-left: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--ink-2);
+    text-decoration: none;
+    cursor: help;
   }
   .v {
     float: right;

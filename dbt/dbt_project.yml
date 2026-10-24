@@ -54,6 +54,14 @@ sources:
     +meta:
       external_location: "read_parquet('{{ env_var('MOGOV_RAW_DIR', 'data/raw') }}/{identifier}/*.parquet', union_by_name = true)"
 
+vars:
+  # rpt_awards: an official qualifies for an award when award_rank <= its threshold (`default` covers every
+  # award not listed; keys are award names, e.g. lowest_attendance: 3). A field smaller than
+  # awards_min_field_size is not ranked at all (it guards against thin rankings; it is not a threshold).
+  awards_threshold:
+    default: 5
+  awards_min_field_size: 5
+
 # Let this project override dbt's cross-database macros per adapter (see macros/compat/casts.sql).
 dispatch:
   - macro_namespace: dbt
