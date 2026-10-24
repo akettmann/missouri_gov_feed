@@ -83,3 +83,28 @@ unit_tests:
     expect:
       rows:
         - {mec_committee_id: C000100, committee_name: ZZZ Dated PAC, committee_total_amount: 500, donor_rank: 1, donor_name: Acme Corp, total_amount: 500, trail_status: end of trail, donor_mec_committee_id: null}
+
+  - name: officeholders_by_year_source_url
+    model: rpt_officeholders_by_year
+    description: >
+      A past row links to the roster it came from: the House's session export carries the year's two-digit
+      session code, the other sources one fixed page each. No current-year rows are given, so the test does not
+      depend on the build date.
+    given:
+      - input: ref('dim_official')
+        rows: []
+        format: dict
+      - input: ref('int_officeholders__years')
+        rows:
+          - {year: 2009, official_id: 'mohouse:1', full_name: Ann Roe, level: state, office: state_house, source: mo_house roster}
+          - {year: 2019, official_id: 'mohouse:2', full_name: Bob Poe, level: state, office: state_house, source: mo_house roster}
+          - {year: 2019, official_id: os1, full_name: Cy Doe, level: state, office: state_senate, source: openstates}
+          - {year: 2019, official_id: 'bioguide:X', full_name: Di Lee, level: federal, office: us_house, source: congress-legislators}
+          - {year: 2019, official_id: 'fjc:1', full_name: Ed Kay, level: federal, office: us_district_court, source: fjc}
+    expect:
+      rows:
+        - {year: 2009, official_id: 'mohouse:1', source_url: 'https://documents.house.mo.gov/xml/091.zip'}
+        - {year: 2019, official_id: 'mohouse:2', source_url: 'https://documents.house.mo.gov/xml/191.zip'}
+        - {year: 2019, official_id: os1, source_url: 'https://github.com/openstates/people/tree/main/data/mo/legislature'}
+        - {year: 2019, official_id: 'bioguide:X', source_url: 'https://github.com/unitedstates/congress-legislators'}
+        - {year: 2019, official_id: 'fjc:1', source_url: 'https://www.fjc.gov/history/judges'}
