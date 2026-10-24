@@ -1,4 +1,28 @@
-{# Backend-portable regex and string helpers. Patterns are POSIX-ish; avoid backend-specific escapes. #}
+{# Backend-portable regex and string helpers.
+
+   Supported adapters: DuckDB (the tested target, via dbt-duckdb) plus Postgres and Snowflake, the only others with
+   explicit dispatches in macros/compat. Trino/Athena (no regexp_instr), Spark < 3.3 and anything else are NOT
+   supported: the default__ regex macros assume Snowflake-style regexp_substr / regexp_instr.
+
+   Write patterns as plain POSIX ERE: no (?:...), lazy quantifiers, backslash-b/d/s/w classes or lookarounds.
+   regex_literal() renders a pattern as a SQL string literal per adapter. Write a literal backslash as two
+   backslashes in a Jinja string (Jinja unescapes it to one); the macros do the rest, so callers never think
+   about the target's quoting rules. #}
+
+{# SQL string literal for a regex pattern or replacement. Doubles single quotes everywhere. Snowflake string literals
+   also treat backslash as an escape character, so a backslash-dot would reach the regex engine as `.`; double it there.
+   DuckDB and Postgres (standard_conforming_strings) keep backslashes literally. #}
+{% macro regex_literal(text) -%}
+    {{ return(adapter.dispatch('regex_literal', 'mogov')(text)) }}
+{%- endmacro %}
+
+{% macro default__regex_literal(text) -%}
+    '{{ text | replace("'", "''") }}'
+{%- endmacro %}
+
+{% macro snowflake__regex_literal(text) -%}
+    '{{ text | replace("\\", "\\\\") | replace("'", "''") }}'
+{%- endmacro %}
 
 {# Capture group `group` of the first match, or NULL. #}
 {% macro regex_extract(expr, pattern, group=1) -%}
@@ -6,15 +30,19 @@
 {%- endmacro %}
 
 {% macro default__regex_extract(expr, pattern, group) -%}
-    regexp_substr({{ expr }}, '{{ pattern | replace("'", "''") }}', 1, 1, 'e', {{ group }})
+    regexp_substr({{ expr }}, {{ mogov.regex_literal(pattern) }}, 1, 1, 'e', {{ group }})
+{%- endmacro %}
+
+{% macro snowflake__regex_extract(expr, pattern, group) -%}
+    regexp_substr({{ expr }}, {{ mogov.regex_literal(pattern) }}, 1, 1, 'e', {{ group }})
 {%- endmacro %}
 
 {% macro duckdb__regex_extract(expr, pattern, group) -%}
-    nullif(regexp_extract({{ expr }}, '{{ pattern | replace("'", "''") }}', {{ group }}), '')
+    nullif(regexp_extract({{ expr }}, {{ mogov.regex_literal(pattern) }}, {{ group }}), '')
 {%- endmacro %}
 
 {% macro postgres__regex_extract(expr, pattern, group) -%}
-    (regexp_match({{ expr }}, '{{ pattern | replace("'", "''") }}'))[{{ group }}]
+    (regexp_match({{ expr }}, {{ mogov.regex_literal(pattern) }}))[{{ group }}]
 {%- endmacro %}
 
 
@@ -28,19 +56,19 @@
 {%- endmacro %}
 
 {% macro default__regex_matches(expr, pattern) -%}
-    (regexp_instr({{ expr }}, '{{ pattern | replace("'", "''") }}') > 0)
+    (regexp_instr({{ expr }}, {{ mogov.regex_literal(pattern) }}) > 0)
 {%- endmacro %}
 
 {% macro snowflake__regex_matches(expr, pattern) -%}
-    (regexp_instr({{ expr }}, '{{ pattern | replace("'", "''") }}') > 0)
+    (regexp_instr({{ expr }}, {{ mogov.regex_literal(pattern) }}) > 0)
 {%- endmacro %}
 
 {% macro duckdb__regex_matches(expr, pattern) -%}
-    regexp_matches({{ expr }}, '{{ pattern | replace("'", "''") }}')
+    regexp_matches({{ expr }}, {{ mogov.regex_literal(pattern) }})
 {%- endmacro %}
 
 {% macro postgres__regex_matches(expr, pattern) -%}
-    ({{ expr }} ~ '{{ pattern | replace("'", "''") }}')
+    ({{ expr }} ~ {{ mogov.regex_literal(pattern) }})
 {%- endmacro %}
 
 
@@ -50,15 +78,19 @@
 {%- endmacro %}
 
 {% macro default__regex_replace_all(expr, pattern, replacement) -%}
-    regexp_replace({{ expr }}, '{{ pattern | replace("'", "''") }}', '{{ replacement | replace("'", "''") }}')
+    regexp_replace({{ expr }}, {{ mogov.regex_literal(pattern) }}, {{ mogov.regex_literal(replacement) }})
+{%- endmacro %}
+
+{% macro snowflake__regex_replace_all(expr, pattern, replacement) -%}
+    regexp_replace({{ expr }}, {{ mogov.regex_literal(pattern) }}, {{ mogov.regex_literal(replacement) }})
 {%- endmacro %}
 
 {% macro duckdb__regex_replace_all(expr, pattern, replacement) -%}
-    regexp_replace({{ expr }}, '{{ pattern | replace("'", "''") }}', '{{ replacement | replace("'", "''") }}', 'g')
+    regexp_replace({{ expr }}, {{ mogov.regex_literal(pattern) }}, {{ mogov.regex_literal(replacement) }}, 'g')
 {%- endmacro %}
 
 {% macro postgres__regex_replace_all(expr, pattern, replacement) -%}
-    regexp_replace({{ expr }}, '{{ pattern | replace("'", "''") }}', '{{ replacement | replace("'", "''") }}', 'g')
+    regexp_replace({{ expr }}, {{ mogov.regex_literal(pattern) }}, {{ mogov.regex_literal(replacement) }}, 'g')
 {%- endmacro %}
 
 

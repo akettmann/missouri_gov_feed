@@ -23,6 +23,10 @@ projects", and the testing and documentation best practices.
 - Naming: `stg_<source>__<entity>`, `int_<entity>__<verb/what>`, `fct_` / `dim_`; dbt Core / dbt-duckdb (the versions pinned in `uv.lock`).
 - `ref()` / `source()` everywhere; no hardcoded relation names.
 - Portable SQL through `adapter.dispatch` macros (`macros/compat`), so the backend can change.
+- Supported adapters: DuckDB (the only one built and tested in CI) plus Postgres and Snowflake, which are the only others
+  with explicit `macros/compat` dispatches (rendered SQL is covered by `tests/test_regex_macros.py`, never run against a
+  real Snowflake/Postgres). Trino/Athena and Spark < 3.3 are not supported (no `regexp_instr`). Regex patterns are plain
+  POSIX ERE; `mogov.regex_literal` handles per-adapter string escaping (Snowflake treats backslash as an escape).
 - sqlfluff with the dbt templater in pre-commit and CI.
 - Optional inputs gate their models with vars (`mec_direct`, `cl_case_bulk`) instead of failing.
 
