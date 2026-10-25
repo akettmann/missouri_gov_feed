@@ -218,21 +218,23 @@ def _sql_literal(v) -> str:
     return "'" + str(v).replace("'", "''") + "'"
 
 
-# Raw JSON tables that may legitimately be absent: stage-2, opt-in or key-gated loaders. dbt models
-# read them unconditionally, so empty placeholders are created before a build when they're missing.
-OPTIONAL_JSON_TABLES = [
-    "cl_cases",
-    "senate_efd_filings",
-    "senate_efd_rows",
-    "fec_receipt_aggregates",
-    "fec_sponsored_committees",
-    "wikidata_positions",
-    "wikidata_attributes",
-    "wikidata_relatives",
-    "wikidata_own_leadership",
-    "wikidata_mo_officeholders",
-    "epa_frs_sic",  # added to the EPA FRS loader after the first landings (#123); older raw dirs lack it
-]
+# Raw JSON tables that may legitimately be absent: stage-2, opt-in or key-gated loaders, or tables added to a
+# loader after earlier landings. dbt models read them unconditionally, so empty placeholders are created before
+# a build when they're missing. Maps each table to the loader that writes it (the one to run to fill it); a test
+# checks every value is a registered loader.
+OPTIONAL_JSON_TABLES = {
+    "cl_cases": "courtlistener_cases",
+    "senate_efd_filings": "senate_efd",
+    "senate_efd_rows": "senate_efd",
+    "fec_receipt_aggregates": "fec",
+    "fec_sponsored_committees": "fec",
+    "wikidata_positions": "wikidata",
+    "wikidata_attributes": "wikidata",
+    "wikidata_relatives": "wikidata",
+    "wikidata_own_leadership": "wikidata",
+    "wikidata_mo_officeholders": "wikidata",
+    "epa_frs_sic": "epa_frs",  # added to the EPA FRS loader after the first landings (#123); older raw dirs lack it
+}
 
 
 def ensure_optional_tables() -> list[str]:
