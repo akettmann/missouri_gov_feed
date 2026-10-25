@@ -522,8 +522,18 @@ Quirks:
   never count. Add a title to the seed if the payroll renames a position.
 - Names are legal names, "LAST, FIRST M": "LUETKEMEYER, ANTON H" is Tony Luetkemeyer, and "BLACK, JAMES R"
   is Rusty Black. Legislators are therefore matched by surname, chamber and year against the seat history,
-  when exactly one member fits. Others are matched by name. In October 2026, 2025 pay matched 147 of 155
-  representatives and 32 of 33 senators; the rest share a surname with a colleague and use a nickname.
+  when exactly one member fits. The payroll prints suffixes inside the surname ("BRATTIN JR.", "HADEN DVM"),
+  legal compound surnames ("WALSH MOORE, BRIDGET" is Bridget Moore, "SCOBEE POUCHE, SEAN" is Sean Pouche),
+  and "VANSCHOIACK" for the House roster's "Van Schoiack"; all are compared without those differences.
+  Members who share a surname are paired by first name (Ed = EDWIN, Patty = PATRICIA); one member and one payee
+  left over once the others are paired also pair, at `medium` (Mike Jones = "JONES, MICHAEL J"). A payee also pairs, at `medium`, with the member whose usual
+  name is the payee's middle initial when nobody else fits that way: "SMITH, DAVID C" is David Cody Smith, known as
+  Cody Smith (R, HD163), and "SMITH, DAVID T" is David (Tyson) Smith (D, HD45 then HD46, from 2021). Others are
+  matched by name. Open States gives some seats no start date (stored as
+  1900-01-01), so a seat counts from the member's first House roster year instead, and a by-name match of
+  legislator pay is held to the years the member sat, unless nobody else holds the surname that year (a final
+  check after a term, or earlier service Open States records as another person). In October 2026, 2025 pay
+  matched all 155 representatives and all 33 senators.
 - The current year's dataset appears in January of the following year.
 - Federal officials (Congress, federal judges) are paid by the U.S. and are not in this source.
 

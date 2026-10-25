@@ -30,3 +30,27 @@
             )
     end
 {%- endmacro %}
+
+{#- A payroll surname as a match key: name_key without the trailing generational or professional suffixes the payroll
+    prints inside the surname field ("BRATTIN JR.", "HADEN DVM"), so it equals the official's family name. -#}
+{% macro surname_key(expr) -%}
+    {{ mogov.regex_replace_all(mogov.name_key(expr), '( (jr|sr|ii|iii|iv|md|dvm|dds|dmd|phd|esq|cpa))+$', '') }}
+{%- endmacro %}
+
+{#- How well a payroll first name fits an official's given name, for people already known to share a surname:
+    3 the first names are equal; 2 the given name is one of the payee's names ("JOHN KENT" for Kent); 1 one starts
+    with the other or they share their first three letters (Ed/Edwin, Patty/Patricia); 0 no fit. Equal initials
+    fit; an initial never fits a different name. -#}
+{% macro first_name_fit(first_key, first_all_key, given_key) -%}
+    case
+        when {{ first_key }} = {{ given_key }} then 3
+        when length({{ first_key }}) < 2 or length({{ given_key }}) < 2 then 0
+        when ' ' || {{ first_all_key }} || ' ' like '% ' || {{ given_key }} || ' %' then 2
+        when
+            left({{ first_key }}, 3) = left({{ given_key }}, 3)
+            or {{ first_key }} like {{ given_key }} || '%'
+            or {{ given_key }} like {{ first_key }} || '%'
+            then 1
+        else 0
+    end
+{%- endmacro %}
