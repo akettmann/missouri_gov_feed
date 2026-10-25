@@ -207,15 +207,27 @@ const officials = current.map((o) => ({
       const label = el("td", row.label);
       if (row.note) {
         const note = el("div", row.note, "small muted");
-        if (row.noteHref) {
-          const link = el("a", "How pay per vote is counted") as HTMLAnchorElement;
+        if (row.noteHref && row.noteLinkText) {
+          const link = el("a", row.noteLinkText) as HTMLAnchorElement;
           link.href = `${base}${row.noteHref}`;
           note.append(" ", link, ".");
         }
         label.append(note);
       }
       tr.append(label);
-      for (const v of row.values) tr.append(el("td", v));
+      row.values.forEach((v, i) => {
+        const td = el("td", v);
+        for (const l of row.valueLinks?.[i] ?? []) {
+          const a = el("a", `${l.text} ↗`) as HTMLAnchorElement;
+          a.href = l.href;
+          a.rel = "noopener noreferrer";
+          a.target = "_blank";
+          const line = el("div", undefined, "small");
+          line.append(a);
+          td.append(line);
+        }
+        tr.append(td);
+      });
       tbody.append(tr);
     }
     table.append(thead, tbody);
