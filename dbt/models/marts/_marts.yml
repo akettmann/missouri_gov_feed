@@ -1352,6 +1352,57 @@ models:
         data_type: varchar
         description: The Missouri Accountability Portal's employee pay search, or the federal pay table.
 
+  - name: fct_county_districts
+    description: >
+      The current state house, state senate and congressional districts that reach each county, from the full
+      unsimplified TIGER boundaries (the shipped map shapes are simplified to 50 m and open hairline gaps along
+      shared edges, so they cannot answer this). A pair counts only when the overlap exceeds 0.1 km2 (about 25
+      acres) and the overlap survives an inward buffer of 120 m (it contains a 120 m-radius circle); two
+      boundaries that merely share an edge intersect with zero area and are dropped, and so are long thin
+      slivers along a county line where two TIGER vintages disagree (Pulaski/CD 3 is 0.36 km2 but about 95 m
+      wide). Also holds the
+      cities (places) whose boundary covers at least 99% of the county, which is how St. Louis city (a county
+      and a city at once) gets its mayor into the county view. Areas are planar lon/lat areas scaled by
+      cos(latitude), accurate to a few tenths of a percent here. Grain: one row per (county, district).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [county_id, district_id]
+    columns:
+      - name: county_id
+        data_type: varchar
+        description: The county (dim_district).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_district')
+                field: district_id
+      - name: district_id
+        data_type: varchar
+        description: The district or city (dim_district) that overlaps the county.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_district')
+                field: district_id
+      - name: district_type
+        data_type: varchar
+        description: state_house, state_senate, us_house, or place.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [state_house, state_senate, us_house, place]
+      - name: overlap_km2
+        data_type: double
+        description: Area of the county that lies in the district, in square kilometers.
+        data_tests: [not_null]
+      - name: share_of_county
+        data_type: double
+        description: Fraction of the county's area that lies in the district (1 means the district covers the county).
+        data_tests: [not_null]
+
   - name: fct_district_facilities
     description: >
       EPA-regulated facilities (EPA Facility Registry Service) inside each current area of dim_district: state
@@ -1533,8 +1584,10 @@ models:
       - name: contributions_url
         data_type: varchar
         description: >
-          Where the matched contributions are filed (the receiving committee's MEC page or FEC receipts), when
-          is_donor.
+          A filing page, when is_donor. An MEC page is the committee that received the money (the committee
+          matched to the official), not filtered to the donor. An FEC page is the donor committee's
+          disbursements filtered to the receiving committee, so it lists the gifts themselves. The frontend labels
+          the link by which one it is (#236).
       - name: frs_url
         data_type: varchar
         description: The facility's EPA FRS detail report.
