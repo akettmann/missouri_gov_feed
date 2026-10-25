@@ -340,6 +340,74 @@ models:
                 min_value: 0
                 max_value: 100
 
+  - name: rpt_attendance_pay
+    description: >
+      Dollars paid per vote attended, to show next to rpt_attendance. Pay is per calendar year (fct_salaries), so
+      votes are counted per calendar year of the vote date and the two cover the same period; sessions sharing a
+      year (a regular and an extraordinary House session) are one year row. Attended = yea, nay or present, the
+      numerator of attendance_pct; a recusal (MO Senate Rule 91, open decision #135) is not attended. Pay =
+      the sum of the official's pay rows in that chamber's own positions for the year: gross pay from the state
+      payroll (everything paid that calendar year, not the base salary) or, for Congress, the statutory salary
+      of the office. Two kinds of row, told apart by period: a calendar year ('2021'), and 'covered years', the
+      official's total over the years where both pay and votes exist (a year with votes but no pay row, e.g.
+      before the payroll starts in 2017, stays out of the total; voting_years vs covered_years says how many
+      years that left out). Zero attended votes gives a null figure. Grain: one row per (official, chamber,
+      period).
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, chamber, period]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "votes_attended <= votes_recorded and covered_years <= voting_years"
+      # Sanity: nobody is paid more than the top federal salary in one year, and no vote costs $20,000
+      # (through 2026 the highest was $9,231: a senator who joined late in 2017 and cast one vote).
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "pay_amount <= 300000 or period = 'covered years'"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "dollars_per_vote_attended is null or dollars_per_vote_attended between 1 and 20000"
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests: [not_null]
+      - name: chamber
+        data_type: varchar
+        description: state_house, state_senate, us_house or us_senate (as rpt_attendance).
+      - name: period
+        data_type: varchar
+        description: A calendar year such as '2021', or 'covered years' for the total over years with both pay and votes.
+        data_tests: [not_null]
+      - name: calendar_year
+        data_type: bigint
+        description: The year of a yearly row; null on 'covered years'.
+      - name: voting_years
+        data_type: bigint
+        description: Calendar years in which the official has recorded votes in this chamber (1 on a yearly row).
+      - name: covered_years
+        data_type: hugeint
+        description: Of those, years with a pay row (the payroll starts in 2017). Only these count in 'covered years'.
+      - name: votes_recorded
+        data_type: hugeint
+        description: Votes on which the official was listed in the period; on 'covered years', only in covered years.
+      - name: votes_attended
+        data_type: hugeint
+        description: Of those, votes where they voted yea, nay or present.
+      - name: pay_amount
+        data_type: decimal(38,2)
+        description: Dollars paid in the period (see pay_basis); null when no pay row exists for the year.
+      - name: pay_basis
+        data_type: varchar
+        description: "'gross pay' (state payroll, all pay received in the year) or 'statutory salary' (Congress)."
+      - name: dollars_per_vote_attended
+        data_type: double
+        description: pay_amount / votes_attended, in dollars; null when there is no pay or no attended vote.
+
   - name: rpt_interest_vote_overlap
     description: >
       Missouri legislators' roll-call votes on bills whose subject index terms touch an industry or
