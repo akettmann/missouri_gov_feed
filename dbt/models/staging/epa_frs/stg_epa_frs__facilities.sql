@@ -1,6 +1,8 @@
 -- One row per EPA FRS facility in Missouri: name, street address, county, coordinates (NAD83; missing for about
 -- a third of the sites) and the federal agency for federal sites. Malformed CSV rows (no REGISTRY_ID) are left
--- out.
+-- out. A name that still has U+FFFD (EPA lost a letter) is taken from the epa_frs_name_corrections seed if it has a
+-- row, else from the one alternative name of the same registry id that equals it with each run of U+FFFD standing
+-- for one character; failing both, the U+FFFD is dropped.
 with src as (
     select
         {{ mogov.json_str('payload', '$.REGISTRY_ID') }} as registry_id,
@@ -26,11 +28,28 @@ fixes as (
         corrected_value
     from {{ ref('epa_frs_name_corrections') }}
     where field = 'facility_name'
+),
+
+-- one alternative name matches the damaged pattern; two different matches are ambiguous and repair nothing
+alt_repairs as (
+    select
+        src.registry_id,
+        src.facility_name,
+        min(alt.alt_name) as repaired_name
+    from src
+    inner join {{ ref('stg_epa_frs__alt_names') }} as alt on src.registry_id = alt.registry_id
+    where
+        src.facility_name like '%�%'
+        and alt.alt_name not like '%�%'
+        and alt.alt_name like {{ mogov.damaged_name_pattern('src.facility_name') }} escape '!'
+    group by src.registry_id, src.facility_name
+    having count(distinct alt.alt_name) = 1
 )
 
 select
     src.registry_id,
-    {{ mogov.fix_replacement_char('src.facility_name', 'fixes.corrected_value') }} as facility_name,
+    {{ mogov.fix_replacement_char('src.facility_name', 'coalesce(fixes.corrected_value, alt_repairs.repaired_name)') }}
+        as facility_name,
     nullif(trim({{ mogov.fix_replacement_char('src.address') }}), '') as address,
     nullif(src.city, '') as city,
     nullif(src.county, '') as county,
@@ -45,4 +64,6 @@ select
     src.source_url
 from src
 left join fixes on src.registry_id = fixes.record_key
+left join alt_repairs
+    on src.registry_id = alt_repairs.registry_id and src.facility_name = alt_repairs.facility_name
 where src.registry_id is not null

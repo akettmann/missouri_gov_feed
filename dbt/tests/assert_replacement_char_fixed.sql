@@ -1,4 +1,4 @@
--- mogov.fix_replacement_char on fixed examples, the seeded corrections applied, and no U+FFFD left in staged EPA
+-- mogov.fix_replacement_char on fixed examples, the alternative-name repairs applied, and no U+FFFD left in staged EPA
 -- FRS text; any row returned is a failure.
 with cases as (
     select
@@ -28,7 +28,9 @@ wrong as (
     where {{ mogov.fix_replacement_char('txt') }} != expected
 ),
 
--- the seeded corrections must reach staging (an empty seed would leave "DCOR PLUS")
+-- the known names must come out repaired whether the seed (raw without alternative names) or the alternative names
+-- do it; without either they would read "DCOR PLUS". Exception: stg_epa_frs__alt_names mirrors raw and may keep
+-- U+FFFD (8 rows today); it is not checked here because the repairs skip such names (see the unit tests).
 expected_names as (
     select
         '110014353788' as registry_id,

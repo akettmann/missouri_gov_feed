@@ -48,6 +48,11 @@ const area = officeLine(official);
       </a>{" "}
       · <a href={href(`/officials/${official.slug}/#businesses`)}>Back to the profile</a>
     </p>
+    <p class="small muted">
+      In the CSV, <code>donor_links</code> holds one line per donor and filing page inside one quoted cell,
+      each as <code>&lt;url&gt; &lt;donor name&gt;</code>, separated by line breaks. A donor with no filing
+      page has no line there; <code>donor_names</code> lists every matched donor, separated by "; ".
+    </p>
     <p class="small">
       <ConfidenceToggle />
     </p>
@@ -70,7 +75,7 @@ const area = officeLine(official);
           </tr>
         </thead>
         <tbody>
-          {sites.map((s) => (
+          {sites.map((s, si) => (
             <tr data-confidence={s.match_confidence === "medium" ? "medium" : undefined}>
               <td>{s.facility_name ?? "unnamed site"}</td>
               <td>
@@ -81,7 +86,11 @@ const area = officeLine(official);
               <td>
                 {s.is_donor ? (
                   <>
-                    {s.donor_names} <DonorLinks donorLinks={s.donor_links} />{" "}
+                    <DonorLinks
+                      donorNames={s.donor_names}
+                      donorLinks={s.donor_links}
+                      idPrefix={`site${si}`}
+                    />{" "}
                     <ConfidenceBadge confidence={s.match_confidence} />
                     <span class="muted small">
                       {" "}
