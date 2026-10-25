@@ -82,3 +82,10 @@ def test_shard_with_nothing_keeps_previous_count_parts(raw_dir):
     assert [k for k, _ in _rows("t")] == ["old"]
     db.replace_json("t", [("new", {})], shard=db.Shard(0, 2))
     assert [k for k, _ in _rows("t")] == ["new"]
+
+
+def test_ensure_optional_tables_creates_missing_epa_frs_sic_placeholder():
+    # Raw dirs landed before the SIC file joined the EPA FRS loader (#155) must still build.
+    assert "epa_frs_sic" in db.ensure_optional_tables()
+    assert _rows("epa_frs_sic") == []
+    assert "epa_frs_sic" not in db.ensure_optional_tables()  # idempotent; a landed table is left alone
