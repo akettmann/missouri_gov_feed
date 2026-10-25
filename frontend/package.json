@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
+    "build": "astro build && node scripts/export-sizes.mjs",
     "preview": "astro preview",
     "check": "astro check",
     "test": "node --test scripts/*.test.mjs",
