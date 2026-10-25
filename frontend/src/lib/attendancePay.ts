@@ -73,6 +73,41 @@ export function payPerVoteBlocks(
 }
 
 /**
+ * Why the block's year rows do not add up to its dbt total, or null when they do. The total is computed over every
+ * year in fct_votes while the rows are cut to the chart's sessions (rpt_attendance), so a stale export of either
+ * makes a label like "2023–2025" sit on a figure that covers 2021–2025. Checks that the rows are one per year
+ * with votes (total.voting_years) and that the years with pay among them are total.covered_years.
+ */
+export function payYearsMismatch(block: PayVoteBlock): string | null {
+  const withPay = block.years.filter((y) => y.pay_amount != null).length;
+  if (block.years.length === block.total.voting_years && withPay === block.total.covered_years) return null;
+  return (
+    `${block.chamber}: ${block.years.length} year rows (${withPay} with pay) but the total covers ` +
+    `${block.total.covered_years} of ${block.total.voting_years} years`
+  );
+}
+
+/** One message per official whose pay year rows do not add up to the total, naming the official. */
+export function payYearsProblems(
+  bundles: {
+    official: { full_name: string; official_id: string };
+    voting: {
+      attendance: { chamber: string; first_vote_date: string | null; last_vote_date: string | null }[] | null;
+      attendance_pay: PayVoteRow[] | null;
+    };
+  }[],
+): string[] {
+  const out: string[] = [];
+  for (const b of bundles) {
+    for (const block of payPerVoteBlocks(b.voting.attendance ?? [], b.voting.attendance_pay ?? [])) {
+      const why = payYearsMismatch(block);
+      if (why) out.push(`${b.official.full_name} (${b.official.official_id}) ${why}`);
+    }
+  }
+  return out;
+}
+
+/**
  * The total again with the "possible match" years left out, for when the reader hides medium matches: the
  * sums are recomputed from the visible year rows, never taken from the (medium-inclusive) dbt total.
  */

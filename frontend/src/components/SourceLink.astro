@@ -4,13 +4,16 @@ interface Props {
   url: string | null | undefined;
   label?: string;
   missing?: string;
+  /** screen-reader-only suffix, e.g. "for BNSF", so a list of links is not all the same text */
+  context?: string;
 }
-const { url, label = "source", missing = "no link" } = Astro.props;
+const { url, label = "source", missing = "no link", context } = Astro.props;
 ---
 
 {url ? (
   <a href={url} rel="noopener noreferrer" target="_blank">
     {label}
+    {context && <span class="sr-only"> {context}</span>}
     <span aria-hidden="true">↗</span>
   </a>
 ) : (

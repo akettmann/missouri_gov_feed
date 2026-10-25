@@ -11,6 +11,8 @@ with received as (
         level,
         source,
         source_url,
+        -- the grain follows the filing page: FEC urls are narrowed per recipient, which must not split a row
+        {{ dbt.split_part('source_url', "'&recipient_name='", 1) }} as filing_page,
         match_confidence,
         amount,
         transaction_date,
@@ -34,7 +36,7 @@ select
     donor_name,
     match_confidence,
     source,
-    source_url,
+    min(source_url) as source_url,
     donor_mec_committee_id,
     donor_link_confidence,
     sum(amount) as total_amount,
@@ -50,6 +52,6 @@ group by
     donor_name,
     match_confidence,
     source,
-    source_url,
+    filing_page,
     donor_mec_committee_id,
     donor_link_confidence
