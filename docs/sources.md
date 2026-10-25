@@ -306,7 +306,7 @@ Quirks:
 ### Alternatives to the eFD scrape (research for #185, checked 2026-10-25)
 
 No alternative is both current and covers annual reports. Recommendation: keep the manual import (#190) as the
-working path and ask the Senate Office of Public Records for a sanctioned feed (#272).
+working path and ask the Senate Office of Public Records for a sanctioned feed (#277).
 
 | Candidate | Covers | Freshness | Access | Terms | Fit |
 |---|---|---|---|---|---|
