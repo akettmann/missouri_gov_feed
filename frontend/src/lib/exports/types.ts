@@ -388,3 +388,24 @@ export interface SameNameLink {
   slug: string;
   full_name: string;
 }
+
+/** One EPA-regulated site in a district (fct_jurisdiction_businesses), with the donor match when there is one. */
+export interface SiteRow {
+  registry_id: string;
+  facility_name: string | null;
+  address: string | null;
+  city: string | null;
+  postal_code: string | null;
+  naics_description: string | null;
+  owner_name: string | null;
+  parent_company_name: string | null;
+  is_donor: boolean;
+  /** "same name" | "same company"; null when no donor matched */
+  matched_by: string | null;
+  /** donor names as filed, "; "-separated */
+  donor_names: string | null;
+  match_confidence: "high" | "medium" | null;
+  /** where the matched contributions are filed */
+  contributions_url: string | null;
+  frs_url: string | null;
+}

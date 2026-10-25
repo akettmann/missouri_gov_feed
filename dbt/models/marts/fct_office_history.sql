@@ -94,9 +94,9 @@ courtlistener as (
 -- State judges: appointment / election sentences from their Official Manual biography
 judge_bio_events as (
     {% for label, pattern in [
-        ('appointed', '([Aa]ppointed [^.]*(?:judge|[Cc]ourt)[^.]*[0-9]{4})'),
-        ('elected', '((?:[Ee]lected|[Rr]etained|[Rr]e-elected) [^.]*(?:judge|voters|term|[Cc]ourt)[^.]*[0-9]{4})'),
-        ('prior', '((?:Served|served) as [^.]*(?:prosecut|attorney|judge|commissioner)[^.]*)'),
+        ('appointed', '([Aa]ppointed [^.]*(judge|[Cc]ourt)[^.]*[0-9]{4})'),
+        ('elected', '(([Ee]lected|[Rr]etained|[Rr]e-elected) [^.]*(judge|voters|term|[Cc]ourt)[^.]*[0-9]{4})'),
+        ('prior', '((Served|served) as [^.]*(prosecut|attorney|judge|commissioner)[^.]*)'),
     ] %}
         select
             b.official_id,
