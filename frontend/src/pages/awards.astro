@@ -1,7 +1,6 @@
 ---
 // Awards: the officials at each end of one measured number, within their own office. Each award sits next
 // to its opposite, shows the number and what it's out of, and links to the profile with the sources.
-import AwardBadges from "../components/AwardBadges.astro";
 import Layout from "../layouts/Layout.astro";
 import { AWARD_PAIRS, AWARDS, awardLists, type AwardList } from "../lib/exports/awards";
 import { officialIndex } from "../lib/exports/load";
@@ -117,7 +116,6 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
                                         <span class="sr-only">{marker.label}</span>
                                       </span>
                                     )}
-                                    <AwardBadges slug={e.slug} streaks={false} />
                                     <span class="muted small"> {e.party ?? ""}</span>
                                     <span class="v">
                                       {value(list.award, e.metric)}{" "}
@@ -141,9 +139,10 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
       <section class="card key" id="award-key">
         <h2>What the award icons mean</h2>
         <p class="small muted">
-          An icon beside an official's name means they hold that award now: they rank within the award's
-          cutoff among those with the same office in the latest year loaded (party-break awards use all loaded
-          years). X2, X3 and so on is the number of qualifying years in a row. The icons are placeholders.
+          Icons beside an official's name elsewhere on the site mean they hold that award now (the lists above
+          are the awards, so they leave the icons off): they rank within the award's cutoff among those with
+          the same office in the latest year loaded (party-break awards use all loaded years). X2, X3 and so
+          on is the number of qualifying years in a row. The icons are placeholders.
         </p>
         <dl>
           {AWARD_PAIRS.flat().map((a) => (
