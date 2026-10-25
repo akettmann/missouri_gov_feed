@@ -192,35 +192,32 @@ test("every page or script that renders an official's name draws badges through 
 
 test("plural office label is circuit-free and does not depend on which judge came last", async () => {
   const { pluralOfficeLabel, singularOfficeLabel } = await import("../src/lib/awardBadges.ts");
-  const a = pluralOfficeLabel("mo_circuit_judge", "Circuit Judge, 22 Judicial Circuit");
-  const b = pluralOfficeLabel("mo_circuit_judge", "Circuit Judge, 45 Judicial Circuit");
+  const a = pluralOfficeLabel("mo_circuit_judge");
+  const b = pluralOfficeLabel("mo_circuit_judge");
   assert.equal(a, "Circuit Judges");
   assert.equal(a, b);
-  assert.equal(
-    pluralOfficeLabel("mo_associate_circuit_judge", "Associate Circuit Judge, 5 Judicial Circuit"),
-    "Associate Circuit Judges",
-  );
-  assert.equal(pluralOfficeLabel("state_senate", "State Senator"), "State Senators");
-  assert.equal(singularOfficeLabel("mo_associate_circuit_judge", "x"), "Associate Circuit Judge");
+  assert.equal(pluralOfficeLabel("mo_associate_circuit_judge"), "Associate Circuit Judges");
+  assert.equal(pluralOfficeLabel("state_senate"), "State Senators");
+  assert.equal(singularOfficeLabel("mo_associate_circuit_judge"), "Associate Circuit Judge");
   assert.equal(singularOfficeLabel("secretary_of_state"), "Secretary of State");
 });
 
-test("unknown office falls back to the title minus its circuit qualifier", async () => {
+test("unknown office is labelled from the key's words only", async () => {
   const { pluralOfficeLabel } = await import("../src/lib/awardBadges.ts");
-  assert.equal(pluralOfficeLabel("new_judge", "Probate Judge, 7 Judicial Circuits"), "Probate Judges");
-  assert.equal(pluralOfficeLabel("new_judge", "Probate Judge, 7th Judicial Circuit"), "Probate Judges");
-  assert.equal(pluralOfficeLabel("county_clerk", "County Clerk"), "County Clerks");
+  assert.equal(pluralOfficeLabel("new_judge"), "New Judges");
   assert.equal(pluralOfficeLabel("county_clerk"), "County Clerks");
-  assert.equal(
-    pluralOfficeLabel("appeals_east", "Judge, Missouri Court of Appeals, Eastern District"),
-    "Appeals Easts",
-  );
+  assert.equal(pluralOfficeLabel("kc_mayor"), "Kc Mayors");
+  // known crude plural: not worth a real pluralizer; map the key in OFFICE_GROUP_LABELS instead
+  assert.equal(pluralOfficeLabel("appeals_east"), "Appeals Easts");
 });
 
-test("every office key in dim_official has a plural label", () => {
+test("every office key in dim_official has a plural label", (t) => {
   const dir = process.env.MOGOV_EXPORTS ?? path.join(process.cwd(), "..", "data", "exports");
   const file = path.join(dir, "dim_official.csv");
-  if (!existsSync(file)) return; // no exports checked out: nothing to compare
+  if (!existsSync(file)) {
+    t.skip("no exports at MOGOV_EXPORTS");
+    return;
+  }
   const [head, ...lines] = readFileSync(file, "utf8").trim().split(/\r?\n/);
   const col = head.split(",").indexOf("office");
   assert.ok(col >= 0);
@@ -245,14 +242,18 @@ test("every office key in dim_official has a plural label", () => {
   assert.deepEqual(missing, []);
 });
 
-test("buildOfficeGroups labels an unmapped office by key, not by one holder's title", async () => {
+test("buildOfficeGroups labels an unmapped office from its key words, never a holder's title", async () => {
   const { buildOfficeGroups } = await import("../src/lib/lookback.ts");
   const groups = buildOfficeGroups([
     { office: "mo_circuit_judge", office_title: "Circuit Judge, 22 Judicial Circuit" },
     { office: "county_clerk", office_title: "County Clerk, 7 Judicial Circuit" },
     { office: "county_clerk", office_title: "County Clerk, 9 Judicial Circuit" },
+    { office: "kc_mayor", office_title: "Mayor of Kansas City" },
   ]);
-  assert.deepEqual(groups.find((g) => g.key === "other").offices, [["county_clerk", "County Clerks"]]);
+  assert.deepEqual(groups.find((g) => g.key === "other").offices, [
+    ["county_clerk", "County Clerks"],
+    ["kc_mayor", "Kc Mayors"],
+  ]);
   assert.deepEqual(groups.find((g) => g.key === "state_courts").offices, [
     ["mo_circuit_judge", "Circuit judges"],
   ]);

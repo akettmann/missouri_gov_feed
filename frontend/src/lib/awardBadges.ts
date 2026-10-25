@@ -162,25 +162,28 @@ export const OFFICE_GROUP_LABELS: Record<string, string> = {
   mayor: "Mayors",
 };
 
+const warnedOffices = new Set<string>();
+
 /**
- * Unknown office: drop a trailing ", <n> Judicial Circuit(s)" qualifier from the title, then pluralize. A title
- * that still has a comma after that (e.g. "Judge, Missouri Court of Appeals, Eastern District") carries a
- * qualifier we cannot safely strip, so the label comes from the key's words instead ("County Clerk").
+ * Plural label for an office key. A key missing from OFFICE_GROUP_LABELS is labelled from the key's words only
+ * ("county_clerk" -> "County Clerks"), never from a holder's title, which would name one holder's seat (a
+ * mayor's city, a judge's circuit). The pluralizer is crude on purpose ("appeals_east" -> "Appeals Easts"); add
+ * the key to OFFICE_GROUP_LABELS instead. Warns once per unmapped key so a build surfaces new keys.
  */
-export function pluralOfficeLabel(office: string, title?: string | null): string {
+export function pluralOfficeLabel(office: string): string {
   const known = OFFICE_GROUP_LABELS[office];
   if (known) return known;
-  const stripped = (title ?? "").replace(/,\s*(?:\d+\w*\s+)?Judicial Circuits?\b.*$/i, "").trim();
-  const base =
-    stripped && !stripped.includes(",")
-      ? stripped
-      : office.replaceAll("_", " ").replace(/\b[a-z]/g, (c) => c.toUpperCase());
+  if (!warnedOffices.has(office)) {
+    warnedOffices.add(office);
+    console.warn(`office key "${office}" has no entry in OFFICE_GROUP_LABELS; labelling it from the key`);
+  }
+  const base = office.replaceAll("_", " ").replace(/\b[a-z]/g, (c) => c.toUpperCase());
   return base.endsWith("s") ? base : `${base}s`;
 }
 
 /** Singular tab label for an office key (the plural minus its group "s"), for headings. */
-export function singularOfficeLabel(office: string, title?: string | null): string {
-  return pluralOfficeLabel(office, title)
+export function singularOfficeLabel(office: string): string {
+  return pluralOfficeLabel(office)
     .replace(/^Attorneys General$/, "Attorney General")
     .replace(/^Secretaries of State$/, "Secretary of State")
     .replace(/s$/, "");

@@ -5,11 +5,11 @@ import { OFFICE_GROUPS, officeGroup } from "./format.ts";
 
 export type OfficeGroup = { key: string; label: string; offices: (readonly [string, string])[] };
 
-/** Offices of any year, bucketed into the display groups; labels fall back to the shared plural office label, never one holder's title. */
+/** Offices of any year, bucketed into the display groups; labels come from the shared plural office label, which for an unmapped key uses the key's words only, never a holder's title. */
 export function buildOfficeGroups(rows: { office: string; office_title?: string | null }[]): OfficeGroup[] {
   const titles = new Map<string, string>();
   for (const o of rows) {
-    if (!titles.has(o.office)) titles.set(o.office, pluralOfficeLabel(o.office, o.office_title));
+    if (!titles.has(o.office)) titles.set(o.office, pluralOfficeLabel(o.office));
   }
   return [
     ...OFFICE_GROUPS,
