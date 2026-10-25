@@ -116,6 +116,46 @@ unit_tests:
         - {counterparty: Twin PAC, amount: 200, counterparty_mec_committee_id: null, counterparty_link_confidence: null}
         - {counterparty: Ann Doe, amount: 50, counterparty_mec_committee_id: null, counterparty_link_confidence: null}
 
+  - name: campaign_finance_fec_received_links_donor_disbursements
+    model: fct_campaign_finance
+    description: >
+      An FEC "received" row links the donor committee's disbursements page (its outgoing money, which includes
+      the gift), not its receipts page, which would never show the gift; a "given" row links the giving
+      committee's disbursements too (#236).
+    overrides:
+      vars:
+        mec_direct: false
+    given:
+      - input: ref('int_mec__official_committees')
+        rows: []
+      - input: ref('stg_tap_mec__contributions')
+        rows: []
+      - input: ref('int_mec__donor_committees')
+        rows: []
+      - input: ref('stg_tap_mec__expenditures')
+        rows: []
+      - input: ref('dim_official')
+        rows:
+          - {official_id: o1, bioguide_id: B1}
+      - input: ref('stg_congress__fec_ids')
+        rows:
+          - {bioguide_id: B1, fec_candidate_id: H0MO00001}
+      - input: ref('stg_fec__candidate_committees')
+        rows:
+          - {candidate_id: H0MO00001, committee_id: C00000001}
+      - input: ref('stg_fec__committee_contributions')
+        rows:
+          - {sub_id: 11, giving_committee_id: C00000099, candidate_id: H0MO00001, recipient_committee_id: C00000001, transaction_kind: direct contribution, amount: 500}
+          - {sub_id: 12, giving_committee_id: C00000001, candidate_id: H0MO00002, recipient_committee_id: C00000002, transaction_kind: direct contribution, amount: 250}
+      - input: ref('stg_fec__committees')
+        rows: []
+      - input: ref('fec_committee_types')
+        rows: []
+    expect:
+      rows:
+        - {direction: received, source_record_id: 'fec:11', source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C00000099'}
+        - {direction: given, source_record_id: 'fec:12', source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C00000001'}
+
   - name: campaign_finance_tap_contribution_and_expenditure_ids_do_not_collide
     model: fct_campaign_finance
     description: >

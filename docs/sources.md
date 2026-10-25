@@ -565,8 +565,9 @@ offices, shops and most service businesses are missing.
     TELEPHONE", "KANSAS CITY POWER & LIGHT"). The seed covers the largest corporate donors with Missouri sites.
   - In October 2026: 502 (official, facility) pairs by name and 1,541 more by brand, for 122 officials.
 - Each matched site also carries the matched donors' first and last contribution year, the committee
-  page (`contributions_url`: the official's own MEC committee, or the donor's FEC committee; not filtered to the donor) and `match_confidence` (`medium` when any of that money was tied
-  to the official by name only).
+  page (`contributions_url`: the MEC committee matched to the official, or the FEC disbursements page of the
+  donor's committee; neither is filtered to the donor) and `match_confidence` (`medium` when any of that money
+  was tied to the official by name only).
 - Industry: the NAICS code most of a site's programs give, taking primary codes first (`naics_source` `naics`,
   31% of the geocoded sites in October 2026), then codes FRS leaves UNKNOWN (`naics_unknown`, 2%), then SECONDARY
   ones (`naics_secondary`, 0.1%). A real NAICS code is more precise than a SIC-derived sector, so only a site with
