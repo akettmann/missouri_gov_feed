@@ -18,22 +18,31 @@ with src as (
         {{ mogov.json_str('payload', '$.FRS_FACILITY_DETAIL_REPORT_URL') }} as frs_url,
         source_url
     from {{ source('epa_frs', 'facilities') }}
+),
+
+fixes as (
+    select
+        record_key,
+        corrected_value
+    from {{ ref('epa_frs_name_corrections') }}
+    where field = 'facility_name'
 )
 
 select
-    registry_id,
-    facility_name,
-    nullif(address, '') as address,
-    nullif(city, '') as city,
-    nullif(county, '') as county,
-    nullif(county_fips, '') as county_fips,
-    nullif(postal_code, '') as postal_code,
-    nullif(site_type, '') as site_type,
-    nullif(federal_agency_name, '') as federal_agency_name,
-    program_systems,
-    {{ dbt.safe_cast("nullif(latitude_text, '')", dbt.type_float()) }} as latitude,
-    {{ dbt.safe_cast("nullif(longitude_text, '')", dbt.type_float()) }} as longitude,
-    frs_url,
-    source_url
+    src.registry_id,
+    {{ mogov.fix_replacement_char('src.facility_name', 'fixes.corrected_value') }} as facility_name,
+    nullif(trim({{ mogov.fix_replacement_char('src.address') }}), '') as address,
+    nullif(src.city, '') as city,
+    nullif(src.county, '') as county,
+    nullif(src.county_fips, '') as county_fips,
+    nullif(src.postal_code, '') as postal_code,
+    nullif(src.site_type, '') as site_type,
+    nullif(src.federal_agency_name, '') as federal_agency_name,
+    src.program_systems,
+    {{ dbt.safe_cast("nullif(src.latitude_text, '')", dbt.type_float()) }} as latitude,
+    {{ dbt.safe_cast("nullif(src.longitude_text, '')", dbt.type_float()) }} as longitude,
+    src.frs_url,
+    src.source_url
 from src
-where registry_id is not null
+left join fixes on src.registry_id = fixes.record_key
+where src.registry_id is not null
