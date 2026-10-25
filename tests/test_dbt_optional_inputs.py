@@ -6,6 +6,7 @@ import logging.handlers
 from pathlib import Path
 
 import pytest
+import yaml
 from dbt.cli.main import dbtRunner
 
 from mogov import cli
@@ -70,4 +71,4 @@ def test_run_dbt_passes_vars_to_every_subcommand(monkeypatch, args):
     monkeypatch.setattr(cli.subprocess, "check_call", lambda *_a, **_kw: 0)
     assert cli.run_dbt(args) == 0
     cmd = calls[0]
-    assert json.loads(cmd[cmd.index("--vars") + 1]) == {"mec_direct": True, "cl_case_bulk": True}
+    assert yaml.safe_load(cmd[cmd.index("--vars") + 1]) == {"mec_direct": True, "cl_case_bulk": True}

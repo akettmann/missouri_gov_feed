@@ -19,6 +19,7 @@ from opentelemetry.sdk.metrics.export import ConsoleMetricExporter, PeriodicExpo
 from opentelemetry.sdk.resources import Resource
 
 _configured = False
+_shut_down = False
 
 
 def configure() -> None:
@@ -78,7 +79,12 @@ def flush() -> None:
 
 
 def shutdown() -> None:
-    """Flush metric exporters (call before process exit)."""
+    """Flush metric exporters (call before process exit). Safe to call repeatedly: the SDK allows one shutdown
+    and logs an error on the second, and both the CLI's `finally` and its atexit hook call this."""
+    global _shut_down
+    if _shut_down:
+        return
+    _shut_down = True
     provider = metrics.get_meter_provider()
     if hasattr(provider, "shutdown"):
         provider.shutdown()
