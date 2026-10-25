@@ -1,7 +1,15 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { AWARD_ICONS, currentAwards, metricText, ordinal, renderBadges } from "../src/lib/awardBadges.ts";
+import {
+  AWARD_ICONS,
+  OFFICE_GROUP_LABELS,
+  currentAwards,
+  metricText,
+  ordinal,
+  renderBadges,
+} from "../src/lib/awardBadges.ts";
 import { AWARD_PAIRS } from "../src/lib/exports/awardDefs.ts";
 
 const e = (slug, rank, metric, streak_years = null, sample_size = 100) => ({
@@ -201,5 +209,50 @@ test("unknown office falls back to the title minus its circuit qualifier", async
   assert.equal(pluralOfficeLabel("new_judge", "Probate Judge, 7 Judicial Circuits"), "Probate Judges");
   assert.equal(pluralOfficeLabel("new_judge", "Probate Judge, 7th Judicial Circuit"), "Probate Judges");
   assert.equal(pluralOfficeLabel("county_clerk", "County Clerk"), "County Clerks");
-  assert.equal(pluralOfficeLabel("county_clerk"), "county_clerks");
+  assert.equal(pluralOfficeLabel("county_clerk"), "County Clerks");
+  assert.equal(
+    pluralOfficeLabel("appeals_east", "Judge, Missouri Court of Appeals, Eastern District"),
+    "Appeals Easts",
+  );
+});
+
+test("every office key in dim_official has a plural label", () => {
+  const dir = process.env.MOGOV_EXPORTS ?? path.join(process.cwd(), "..", "data", "exports");
+  const file = path.join(dir, "dim_official.csv");
+  if (!existsSync(file)) return; // no exports checked out: nothing to compare
+  const [head, ...lines] = readFileSync(file, "utf8").trim().split(/\r?\n/);
+  const col = head.split(",").indexOf("office");
+  assert.ok(col >= 0);
+  const keys = new Set();
+  for (const l of lines) {
+    // dim_official quotes fields containing commas; walk the line honouring quotes.
+    const f = [];
+    let cur = "";
+    let q = false;
+    for (const ch of l) {
+      if (ch === '"') q = !q;
+      else if (ch === "," && !q) {
+        f.push(cur);
+        cur = "";
+      } else cur += ch;
+    }
+    f.push(cur);
+    if (f[col]) keys.add(f[col]);
+  }
+  assert.ok(keys.size > 5, "found office keys");
+  const missing = [...keys].filter((k) => !(k in OFFICE_GROUP_LABELS));
+  assert.deepEqual(missing, []);
+});
+
+test("buildOfficeGroups labels an unmapped office by key, not by one holder's title", async () => {
+  const { buildOfficeGroups } = await import("../src/lib/lookback.ts");
+  const groups = buildOfficeGroups([
+    { office: "mo_circuit_judge", office_title: "Circuit Judge, 22 Judicial Circuit" },
+    { office: "county_clerk", office_title: "County Clerk, 7 Judicial Circuit" },
+    { office: "county_clerk", office_title: "County Clerk, 9 Judicial Circuit" },
+  ]);
+  assert.deepEqual(groups.find((g) => g.key === "other").offices, [["county_clerk", "County Clerks"]]);
+  assert.deepEqual(groups.find((g) => g.key === "state_courts").offices, [
+    ["mo_circuit_judge", "Circuit judges"],
+  ]);
 });

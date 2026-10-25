@@ -162,14 +162,19 @@ export const OFFICE_GROUP_LABELS: Record<string, string> = {
   mayor: "Mayors",
 };
 
-/** Unknown office: drop a trailing ", <n> Judicial Circuit(s)" / "District <n>" qualifier, then pluralize. */
+/**
+ * Unknown office: drop a trailing ", <n> Judicial Circuit(s)" qualifier from the title, then pluralize. A title
+ * that still has a comma after that (e.g. "Judge, Missouri Court of Appeals, Eastern District") carries a
+ * qualifier we cannot safely strip, so the label comes from the key's words instead ("County Clerk").
+ */
 export function pluralOfficeLabel(office: string, title?: string | null): string {
   const known = OFFICE_GROUP_LABELS[office];
   if (known) return known;
-  const base = (title ?? office)
-    .replace(/,\s*(?:\d+\w*\s+)?Judicial Circuits?\b.*$/i, "")
-    .replace(/,?\s*(?:\d+\w*\s+)?District(?:\s+\d+)?$/i, "")
-    .trim();
+  const stripped = (title ?? "").replace(/,\s*(?:\d+\w*\s+)?Judicial Circuits?\b.*$/i, "").trim();
+  const base =
+    stripped && !stripped.includes(",")
+      ? stripped
+      : office.replaceAll("_", " ").replace(/\b[a-z]/g, (c) => c.toUpperCase());
   return base.endsWith("s") ? base : `${base}s`;
 }
 
