@@ -558,6 +558,11 @@ offices, shops and most service businesses are missing.
   (`https://ordsext.epa.gov/FLA/www3/state_files/state_combined_mo.zip`, about 35 MB). The payload is the row
   as a JSON object keyed by the CSV header.
 - Shard units: the four CSV files. The zip is downloaded once and shared.
+- U+FFFD in EPA's own file: the state zip already contains the replacement character (bytes EF BF BD) in a few
+  names and addresses (4 in `MO_FACILITY_FILE.CSV`, 2 in `MO_ORGANIZATION_FILE.CSV`, 8 in the alternative-name file),
+  where EPA lost a non-ASCII letter. The loader decodes strictly, so it adds none; raw stays as EPA sent it.
+  Staging (`mogov.fix_replacement_char`) restores "D�COR" to "DÉCOR" (the one certain case) and drops any other
+  U+FFFD; `assert_replacement_char_fixed` fails if one survives in a staged facility or organization name.
 - `epa_frs_sic` joined the loader after the other three. A raw directory landed before that has no SIC table;
   `mogov build` then creates an empty placeholder (like the other late-added or optional JSON tables in
   `db.OPTIONAL_JSON_TABLES`), so the SIC fallback finds no codes and those sites show no industry until the

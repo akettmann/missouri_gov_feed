@@ -6,7 +6,7 @@ select
     {{ mogov.json_str('payload', '$.PGM_SYS_ACRNM') }} as program_system,
     {{ mogov.json_str('payload', '$.PGM_SYS_ID') }} as program_id,
     upper({{ mogov.json_str('payload', '$.AFFILIATION_TYPE') }}) as affiliation_type,
-    {{ mogov.json_str('payload', '$.ORG_NAME') }} as org_name,
+    {{ mogov.fix_replacement_char(mogov.json_str('payload', '$.ORG_NAME')) }} as org_name,
     upper(nullif({{ mogov.json_str('payload', '$.ORG_TYPE') }}, '')) as org_type,
     nullif({{ mogov.json_str('payload', '$.CITY_NAME') }}, '') as org_city,
     nullif({{ mogov.json_str('payload', '$.STATE_CODE') }}, '') as org_state,

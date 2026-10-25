@@ -22,8 +22,8 @@ with src as (
 
 select
     registry_id,
-    facility_name,
-    nullif(address, '') as address,
+    {{ mogov.fix_replacement_char('facility_name') }} as facility_name,
+    nullif(trim({{ mogov.fix_replacement_char('address') }}), '') as address,
     nullif(city, '') as city,
     nullif(county, '') as county,
     nullif(county_fips, '') as county_fips,
