@@ -120,7 +120,9 @@ const officials = (await officialIndex()).map((o) => ({
         tbody.append(tr);
       }
       const tr = el("tr");
-      tr.append(el("td", row.label));
+      const label = el("td", row.label);
+      if (row.note) label.append(el("div", row.note, "small muted"));
+      tr.append(label);
       for (const v of row.values) tr.append(el("td", v));
       tbody.append(tr);
     }
