@@ -377,7 +377,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
 
   // A U.S. House district holds up to ~10k EPA sites: ship only the ones tied to a donor (a few hundred at
   // most), grouped under their donor, plus the per-sector counts. A site's donor columns repeat the totals
-  // for its set of donors, so rows sharing donor_names carry the same amount, years and link.
+  // for its set of donors, so rows sharing donor_names carry the same amount, years and links.
   const hasBusinesses =
     hasExport("fct_jurisdiction_businesses") && hasExport("rpt_district_business_industries");
   const districtDonors = new Map<string, DistrictDonor[]>();
@@ -387,7 +387,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
     for (const r of await query<SiteRow>(`
       select official_id, donor_names, cast(donated_amount as double) as donated_amount,
              cast(n_contributions as integer) as n_contributions, first_year, last_year, match_confidence,
-             contributions_url, facility_name, city, naics_description, matched_by, frs_url
+             donor_links, facility_name, city, naics_description, matched_by, frs_url
       from {fct_jurisdiction_businesses} where is_donor
       order by official_id, donated_amount desc, donor_names, facility_name, city`)) {
       const { official_id, facility_name, city, naics_description, matched_by, frs_url, ...donor } = r;

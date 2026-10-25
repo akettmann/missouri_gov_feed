@@ -5,12 +5,11 @@
 import AwardBadges from "../../../components/AwardBadges.astro";
 import type { GetStaticPaths } from "astro";
 import ConfidenceBadge from "../../../components/ConfidenceBadge.astro";
-import SourceLink from "../../../components/SourceLink.astro";
+import DonorLinks from "../../../components/DonorLinks.astro";
 import ConfidenceToggle from "../../../components/ConfidenceToggle.astro";
 import Layout from "../../../layouts/Layout.astro";
 import { districtSiteLists, districtSites } from "../../../lib/exports/districtSites";
 import { allOfficials } from "../../../lib/exports/load";
-import { donorLinkLabel } from "../../../lib/donorLinks";
 import { count, officeLine } from "../../../lib/format";
 import { href } from "../../../lib/site";
 
@@ -82,13 +81,7 @@ const area = officeLine(official);
               <td>
                 {s.is_donor ? (
                   <>
-                    {s.donor_names}{" "}
-                    <SourceLink
-                      url={s.contributions_url}
-                      label={donorLinkLabel(s.contributions_url)}
-                      context={`for ${s.donor_names}`}
-                      missing=""
-                    />{" "}
+                    {s.donor_names} <DonorLinks donorLinks={s.donor_links} />{" "}
                     <ConfidenceBadge confidence={s.match_confidence} />
                     <span class="muted small">
                       {" "}

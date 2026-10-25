@@ -530,9 +530,13 @@ Quirks:
   name is the payee's middle initial when nobody else fits that way: "SMITH, DAVID C" is David Cody Smith, known as
   Cody Smith (R, HD163), and "SMITH, DAVID T" is David (Tyson) Smith (D, HD45 then HD46, from 2021). Others are
   matched by name. Open States gives some seats no start date (stored as
-  1900-01-01), so a seat counts from the member's first House roster year instead, and a by-name match of
+  1900-01-01), so a seat counts from the member's first roster year in that chamber (House or Senate, each on its own) instead, and a by-name match of
   legislator pay is held to the years the member sat, unless nobody else holds the surname that year (a final
-  check after a term, or earlier service Open States records as another person). In October 2026, 2025 pay
+  check after a term, or earlier service Open States records as another person: Steve Roberts' 2017-20 House
+  pay stays his because the "Steven Roberts" record that held the seat has a fitting first name, #263). A payee whose
+  first name fits a member whose seat ended the December before, and who earned under half the year's top pay, is
+  that member's final check and does not compete for the seats held now ("BLACK, LINDA R." 2017 beside Rusty
+  Black's "BLACK, JAMES R"). In October 2026, 2025 pay
   matched all 155 representatives and all 33 senators.
 - The current year's dataset appears in January of the following year.
 - Federal officials (Congress, federal judges) are paid by the U.S. and are not in this source.
@@ -582,9 +586,10 @@ offices, shops and most service businesses are missing.
     sites are filed under legal or subsidiary names ("UNION ELECTRIC CO", "LACLEDE GAS", "SOUTHWESTERN BELL
     TELEPHONE", "KANSAS CITY POWER & LIGHT"). The seed covers the largest corporate donors with Missouri sites.
   - In October 2026: 502 (official, facility) pairs by name and 1,541 more by brand, for 122 officials.
-- Each matched site also carries the matched donors' first and last contribution year, the committee
-  page (`contributions_url`: the MEC committee matched to the official, which is not filtered to the donor, or
-  the FEC disbursements of the donor's committee filtered to the receiving committee) and `match_confidence`
+- Each matched site also carries the matched donors' first and last contribution year, the links
+  (`donor_links`: one line per matched donor and filing page, `<url> <donor name>`. A page is the MEC committee
+  matched to the official, which is not filtered to the donor, or the FEC disbursements of the donor's committee
+  filtered to the receiving committee; a donor filed on both keeps both) and `match_confidence`
   (`medium` when any of that money was tied to the official by name only).
 - Industry: the NAICS code most of a site's programs give, taking primary codes first (`naics_source` `naics`,
   31% of the geocoded sites in October 2026), then codes FRS leaves UNKNOWN (`naics_unknown`, 2%), then SECONDARY

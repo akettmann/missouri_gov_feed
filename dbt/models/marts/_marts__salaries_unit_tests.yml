@@ -410,3 +410,151 @@ unit_tests:
       rows:
         - {official_id: p_cody, calendar_year: 2022, employee_name: 'SMITH, DAVID C', match_confidence: medium}
         - {official_id: p_david, calendar_year: 2022, employee_name: 'SMITH, DAVID T', match_confidence: medium}
+
+  - name: salaries_keep_earlier_pay_when_another_seat_holder_has_a_fitting_first_name
+    model: fct_salaries
+    description: >
+      Steve Roberts sits from 2021 (Open States keeps his 2017-20 House years under a separate "Steven Roberts"
+      record, who is no current official and so has no dim_official row). "ROBERTS, STEVEN" in 2018 is paid
+      outside Steve's years, but the other seat-holder's first name fits his, so the pay stays Steve's. His own 2021 pay is the control that gives him service years.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2018, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'ROBERTS, STEVEN', last_name: ROBERTS, first_names: STEVEN, gross_pay: 35914.8}
+          - {calendar_year: 2021, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'ROBERTS, STEVEN', last_name: ROBERTS, first_names: STEVEN, gross_pay: 35914.8}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_steve, full_name: Steve Roberts, surname_key: roberts, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
+          - {person_id: p_steven, full_name: Steven Roberts, surname_key: roberts, chamber: lower, start_date: '2017-01-01', end_date: '2020-12-31'}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p_steve, office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: p_steve, level: state, office: state_house, family_key: roberts, given_key: steve}
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows:
+          - {year: 2021, official_id: p_steve, office: state_house}
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: p_steve, calendar_year: 2018, employee_name: 'ROBERTS, STEVEN', match_confidence: medium}
+        - {official_id: p_steve, calendar_year: 2021, employee_name: 'ROBERTS, STEVEN', match_confidence: medium}
+
+  - name: salaries_drop_earlier_pay_when_the_other_seat_holder_has_no_fitting_first_name
+    model: fct_salaries
+    description: >
+      The same payee and years, but the member who held the surname in 2018 is Lane Roberts: no fitting first
+      name, so "ROBERTS, STEVEN" in 2018 is not given to Steve Roberts, who sat from 2021 (the pay is another
+      person's). In 2021, when Steve sits, "ROBERTS, STEVEN" is his as a control.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2018, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'ROBERTS, STEVEN', last_name: ROBERTS, first_names: STEVEN, gross_pay: 35914.8}
+          - {calendar_year: 2021, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'ROBERTS, STEVEN', last_name: ROBERTS, first_names: STEVEN, gross_pay: 35914.8}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_steve, full_name: Steve Roberts, surname_key: roberts, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
+          - {person_id: p_lane, full_name: Lane Roberts, surname_key: roberts, chamber: lower, start_date: '2017-01-01', end_date: '2020-12-31'}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p_steve, office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: p_steve, level: state, office: state_house, family_key: roberts, given_key: steve}
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows:
+          - {year: 2021, official_id: p_steve, office: state_house}
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: p_steve, calendar_year: 2021, employee_name: 'ROBERTS, STEVEN', match_confidence: medium}
+
+  - name: salaries_a_final_check_is_the_departed_members_not_a_claim_on_the_seat
+    model: fct_salaries
+    description: >
+      Linda Black's seat ended 2016-12-31, so "BLACK, LINDA R." in 2017 (a small final check) is hers. It shares
+      the middle initial R with "BLACK, JAMES R", who is Rusty Black (the seat holder in 2017); the final check
+      must not make that pairing ambiguous.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, JAMES R', last_name: BLACK, first_names: JAMES R, gross_pay: 34418.35}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, LINDA R.', last_name: BLACK, first_names: LINDA R., gross_pay: 1496.45}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_rusty, full_name: Rusty Black, surname_key: black, chamber: lower, start_date: '2017-01-01', end_date: '9999-12-31'}
+          - {person_id: p_linda, full_name: Linda Black, surname_key: black, chamber: lower, start_date: '2013-01-01', end_date: '2016-12-31'}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p_rusty, office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: p_rusty, level: state, office: state_house, family_key: black, given_key: rusty}
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows:
+          - {year: 2017, official_id: p_rusty, office: state_house}
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: p_rusty, calendar_year: 2017, employee_name: 'BLACK, JAMES R', match_confidence: medium}
+
+  - name: salaries_a_full_salary_fitting_a_departed_member_is_not_a_final_check
+    model: fct_salaries
+    description: >
+      Same seats as the Black case, but "BLACK, LINDA R." earns a full salary in 2017, so it is not a final check:
+      two payees compete for Rusty Black's one seat and neither is given to him.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, JAMES R', last_name: BLACK, first_names: JAMES R, gross_pay: 34418.35}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, LINDA R.', last_name: BLACK, first_names: LINDA R., gross_pay: 34418.35}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_rusty, full_name: Rusty Black, surname_key: black, chamber: lower, start_date: '2017-01-01', end_date: '9999-12-31'}
+          - {person_id: p_linda, full_name: Linda Black, surname_key: black, chamber: lower, start_date: '2013-01-01', end_date: '2016-12-31'}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p_rusty, office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: p_rusty, level: state, office: state_house, family_key: black, given_key: rusty}
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows:
+          - {year: 2017, official_id: p_rusty, office: state_house}
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        []

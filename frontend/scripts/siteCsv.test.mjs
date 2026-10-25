@@ -15,7 +15,7 @@ const site = (extra = {}) => ({
   matched_by: null,
   donor_names: null,
   match_confidence: null,
-  contributions_url: null,
+  donor_links: null,
   frs_url: "https://example.test/frs?id=1",
   ...extra,
 });
@@ -87,7 +87,7 @@ test("sitesCsv writes the header first, in order, then one line per site", () =>
   assert.equal(
     lines[0],
     "facility_name,address,city,postal_code,industry,owner_name,parent_company_name,donor_matched," +
-      "match_confidence,matched_by,donor_names,contributions_url,epa_record_url",
+      "match_confidence,matched_by,donor_names,donor_links,epa_record_url",
   );
   assert.equal(lines[0], SITE_CSV_HEADER.join(","));
   assert.equal(
@@ -105,13 +105,13 @@ test("sitesCsv carries the donor match columns and escapes them", () => {
       matched_by: "same company",
       donor_names: 'ACME "HOLDINGS"; ACME, LLC',
       match_confidence: "medium",
-      contributions_url: "https://example.test/c",
+      donor_links: "https://example.test/c ACME",
     }),
   ]);
   assert.equal(
     csv.split("\n")[1],
     'Acme,1 Main St,Joplin,64801,Mining,Acme LLC,,true,medium,same company,"ACME ""HOLDINGS""; ACME, LLC",' +
-      "https://example.test/c,https://example.test/frs?id=1",
+      "https://example.test/c ACME,https://example.test/frs?id=1",
   );
 });
 

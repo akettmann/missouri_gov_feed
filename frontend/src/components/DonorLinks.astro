@@ -1,0 +1,18 @@
+---
+// One link per matched donor and filing page (fct_jurisdiction_businesses.donor_links). The link text says
+// which regulator's page opens; the donor it is for is read out by screen readers (#248).
+import SourceLink from "./SourceLink.astro";
+import { donorLinkLabel, parseDonorLinks } from "../lib/donorLinks";
+
+interface Props {
+  donorLinks: string | null | undefined;
+}
+const links = parseDonorLinks(Astro.props.donorLinks);
+---
+
+{links.map((l, i) => (
+  <>
+    {i > 0 && " · "}
+    <SourceLink url={l.url} label={donorLinkLabel(l.url)} context={`for ${l.donor}`} />
+  </>
+))}
