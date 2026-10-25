@@ -31,11 +31,16 @@ def _session() -> httpx.Client:
     s = httpx.Client(headers={"User-Agent": USER_AGENT}, follow_redirects=True, timeout=60)
     home = s.get(f"{BASE}/search/home/")
     token = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', home.text).group(1)
-    s.post(
+    agreed = s.post(
         f"{BASE}/search/home/",
         data={"prohibition_agreement": "1", "csrfmiddlewaretoken": token},
         headers={"Referer": f"{BASE}/search/home/"},
     )
+    if agreed.status_code >= 400:  # fail here, not on the next call with a confusing error
+        raise RuntimeError(
+            f"senate_efd: the use-statement agreement POST to {BASE}/search/home/ returned HTTP {agreed.status_code}"
+            f"{' (Akamai Bot Manager block, see issue #161)' if agreed.status_code == 403 else ''}"
+        )
     return s
 
 

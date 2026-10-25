@@ -298,6 +298,10 @@ Quirks:
 - Requests are CSRF-protected, so the loader accepts the use statement and then searches.
 - Paper filings are page images: they're recorded with `is_paper = true` and not parsed.
 - Report pages aren't cached.
+- Since 2026-10-24 Akamai Bot Manager answers the agreement `POST /search/home/` with HTTP 403 ("Access
+  Denied"), because a plain HTTP client can't pass its browser check. The loader now fails right there with a
+  clear error instead of on the next call. It is blocked until the maintainer decides how to proceed
+  (see #161). Meanwhile `mogov run --allow-failed-loader senate_efd` builds on the last landed data.
 
 ## courtlistener_bulk: judges and judicial disclosures
 

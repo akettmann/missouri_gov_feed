@@ -12,6 +12,8 @@ uv run mogov export       # marts + reporting -> data/exports/*.parquet (--forma
 
 Or with Docker only: `docker compose up` (see [docs/environment.md](docs/environment.md#local-in-docker-compose)).
 
+If a loader fails, `mogov load` still runs the rest and exits non-zero; `mogov run` stops before `dbt build` unless you pass `--allow-failed-loader <source>` (stale data is warned about by name; exit stays non-zero). Fixed-arg runtimes (compose, Cloud Run) can set `MOGOV_ALLOW_FAILED_LOADERS=<source>[,<source>]` instead. Until #161 lands, `MOGOV_ACCEPT_SENATE_EFD_TERMS=1` users need `MOGOV_ALLOW_FAILED_LOADERS=senate_efd`.
+
 Other commands: `mogov list` (loaders), `mogov freshness`, `mogov load <loader> ...`, `mogov build [dbt args]` (for example `-s +fct_votes`).
 `load` and `run` take `--shards N` (every shard) or `--shards N --shard i` (one shard, as in a Cloud Run task), and `--workers N` (processes; loaders of different services run concurrently).
 
