@@ -12,13 +12,14 @@
 
 {#- Backends without a way to look at the raw files report "no", which skips the check. -#}
 {% macro default__raw_table_exists(identifier) -%}
+    {% do log("optional-input check skipped: no raw-file lookup for this adapter", info=true) %}
     {{ return(false) }}
 {%- endmacro %}
 
 {#- Raw tables are directories of Parquet parts under MOGOV_RAW_DIR (see the sources' external_location);
     DuckDB's glob() returns no rows, rather than failing, when nothing matches. -#}
 {% macro duckdb__raw_table_exists(identifier) -%}
-    {% set pattern = env_var('MOGOV_RAW_DIR', 'data/raw') ~ '/' ~ identifier ~ '/*.parquet' %}
+    {% set pattern = (env_var('MOGOV_RAW_DIR', 'data/raw') ~ '/' ~ identifier ~ '/*.parquet').replace("'", "''") %}
     {% set found = run_query("select count(*) from glob('" ~ pattern ~ "')") %}
     {{ return(found.columns[0].values()[0] > 0) }}
 {%- endmacro %}

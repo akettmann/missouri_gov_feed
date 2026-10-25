@@ -29,6 +29,8 @@ projects", and the testing and documentation best practices.
   (`macros/optional_inputs.sql`) fails when `mec_direct` / `cl_case_bulk` is off but the raw table exists.
   `mogov build` sets the vars from what is on disk; to disable them on purpose pass
   `--vars '{skip_optional_raw_check: true}'`. The hook only runs when the selection has nodes to run.
+  It also covers bare `dbt snapshot` and `dbt source freshness` (dbt 1.11 runs project hooks for them), so
+  `mogov` passes the vars to every dbt subcommand.
 
 ## Deliberately not changed
 
