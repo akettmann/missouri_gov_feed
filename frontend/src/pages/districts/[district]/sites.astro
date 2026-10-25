@@ -48,6 +48,12 @@ const area = officeLine(official);
       </a>{" "}
       · <a href={href(`/officials/${official.slug}/#businesses`)}>Back to the profile</a>
     </p>
+    <p class="small muted">
+      In the CSV, <code>donor_links</code> holds one line per donor and filing page inside a single quoted
+      cell:
+      <code>&lt;url&gt; &lt;donor name&gt;</code>, separated by line breaks. A donor with no filing page has
+      no line there; <code>donor_names</code> lists every matched donor, separated by "; ".
+    </p>
     <p class="small">
       <ConfidenceToggle />
     </p>
@@ -81,7 +87,7 @@ const area = officeLine(official);
               <td>
                 {s.is_donor ? (
                   <>
-                    {s.donor_names} <DonorLinks donorLinks={s.donor_links} />{" "}
+                    <DonorLinks donorNames={s.donor_names} donorLinks={s.donor_links} />{" "}
                     <ConfidenceBadge confidence={s.match_confidence} />
                     <span class="muted small">
                       {" "}

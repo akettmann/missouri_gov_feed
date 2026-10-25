@@ -121,7 +121,7 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
                       </details>
                     </td>
                     <td>
-                      <DonorLinks donorLinks={d.donor_links} />
+                      <DonorLinks donorNames={d.donor_names} donorLinks={d.donor_links} />
                     </td>
                   </tr>
                 ))}

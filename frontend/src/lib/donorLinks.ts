@@ -35,3 +35,31 @@ export function donorLinkLabel(url: string | null | undefined): string {
   if (url.includes("fec.gov")) return "donor's gifts to the official's committee (FEC)";
   return "committee page";
 }
+
+export interface DonorEntry {
+  donor: string;
+  /** filing pages for this donor; empty when the donor has none (rendered as "no link") */
+  urls: string[];
+}
+
+/**
+ * One entry per donor, in donor_names order (names are joined by "; "), each with its filing-page urls from
+ * donor_links. A donor named in donor_names with no link line has an empty list, so the page can say "no link"
+ * instead of showing the name bare (#268). A link whose donor is not in donor_names is kept, after the others.
+ */
+export function donorEntries(
+  names: string | null | undefined,
+  rawLinks: string | null | undefined,
+): DonorEntry[] {
+  const links = parseDonorLinks(rawLinks);
+  const order: string[] = [];
+  for (const n of (names ?? "").split("; ")) {
+    const name = n.trim();
+    if (name && !order.includes(name)) order.push(name);
+  }
+  for (const l of links) if (!order.includes(l.donor)) order.push(l.donor);
+  return order.map((donor) => ({
+    donor,
+    urls: links.filter((l) => l.donor === donor).map((l) => l.url),
+  }));
+}

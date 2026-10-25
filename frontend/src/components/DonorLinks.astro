@@ -1,18 +1,36 @@
 ---
-// One link per matched donor and filing page (fct_jurisdiction_businesses.donor_links). The link text says
-// which regulator's page opens; the donor it is for is read out by screen readers (#248).
+// One line per matched donor: the donor's name, then a link to each filing page its gifts to the official are
+// filed on (fct_jurisdiction_businesses.donor_links). The name is visible so sighted users can tell the links
+// apart (#248, #268); a donor with no page says "no link" instead of showing nothing.
 import SourceLink from "./SourceLink.astro";
-import { donorLinkLabel, parseDonorLinks } from "../lib/donorLinks";
+import { donorEntries, donorLinkLabel } from "../lib/donorLinks";
 
 interface Props {
+  donorNames: string | null | undefined;
   donorLinks: string | null | undefined;
 }
-const links = parseDonorLinks(Astro.props.donorLinks);
+const entries = donorEntries(Astro.props.donorNames, Astro.props.donorLinks);
 ---
 
-{links.map((l, i) => (
-  <>
-    {i > 0 && " · "}
-    <SourceLink url={l.url} label={donorLinkLabel(l.url)} context={`for ${l.donor}`} />
-  </>
+{entries.map((e) => (
+  <span class="donor-entry">
+    {e.donor}
+    {": "}
+    {e.urls.length === 0 ? (
+      <SourceLink url={null} />
+    ) : (
+      e.urls.map((u, i) => (
+        <>
+          {i > 0 && " · "}
+          <SourceLink url={u} label={donorLinkLabel(u)} />
+        </>
+      ))
+    )}
+  </span>
 ))}
+
+<style>
+  .donor-entry {
+    display: block;
+  }
+</style>

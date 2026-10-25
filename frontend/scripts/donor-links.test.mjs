@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { donorLinkLabel, parseDonorLinks } from "../src/lib/donorLinks.ts";
+import { donorEntries, donorLinkLabel, parseDonorLinks } from "../src/lib/donorLinks.ts";
 
 const FEC = "https://www.fec.gov/data/disbursements/?committee_id=C00235739&recipient_name=C00000001";
 const MEC = "https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C221944";
@@ -38,4 +38,24 @@ test("parseDonorLinks drops empty input and malformed lines", () => {
   assert.deepEqual(parseDonorLinks(null), []);
   assert.deepEqual(parseDonorLinks(""), []);
   assert.deepEqual(parseDonorLinks([FEC, " AMEREN", `${FEC} `].join("\n")), []);
+});
+
+test("donorEntries gives each donor its names and all its pages, in donor_names order", () => {
+  const raw = [`${FEC} AMEREN CORPORATION`, `${MEC} AMEREN CORPORATION`].join("\n");
+  assert.deepEqual(donorEntries("AMEREN CORPORATION; AT&T INC.", raw), [
+    { donor: "AMEREN CORPORATION", urls: [FEC, MEC] },
+    { donor: "AT&T INC.", urls: [] },
+  ]);
+});
+
+test("donorEntries marks a donor with no link line as having no urls (rendered 'no link')", () => {
+  assert.deepEqual(donorEntries("ACME", null), [{ donor: "ACME", urls: [] }]);
+  assert.deepEqual(donorEntries(null, null), []);
+});
+
+test("donorEntries keeps a linked donor missing from donor_names and does not repeat names", () => {
+  assert.deepEqual(donorEntries("ACME; ACME", `${FEC} OTHER`), [
+    { donor: "ACME", urls: [] },
+    { donor: "OTHER", urls: [FEC] },
+  ]);
 });
