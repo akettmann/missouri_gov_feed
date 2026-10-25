@@ -196,7 +196,9 @@ unit_tests:
       100 (90.0). Maverick (most_party_breaks) is the lowest unity, so b in 2023 and a in 2024; Team Player
       (most_party_loyal) is the highest, so a in 2023 and b in 2024. c has 19 party-line votes in 2024, below
       awards_min_party_line_votes (20), so c's 0.0% gets no row. d's only party-line votes were cast in the
-      state_house while d is a us_house member, so they are not ranked against the House. a's 10 undated
+      state_house while d is a us_house member, so they are not ranked against the House; d's us_house row
+      (60 of 100) is ranked against e's (40 of 100) in the us_house field of 2, so a join that ignores the
+      chamber fans d out into two rows and changes the us_house ranking. a's 10 undated
       votes (all with the party) count towards lifetime only: a 150 of 200 = 75.0, b 170 of 200 = 85.0.
       Dropping the yearly rows, ignoring the minimum or the chamber match fails this test.
     overrides:
@@ -211,6 +213,7 @@ unit_tests:
           - {official_id: b, office: state_house}
           - {official_id: c, office: state_house}
           - {official_id: d, office: us_house}
+          - {official_id: e, office: us_house}
       - input: ref('rpt_attendance')
         rows: []
       - input: ref('rpt_donor_rollup')
@@ -226,6 +229,8 @@ unit_tests:
           - {official_id: b, chamber: state_house, vote_year: 2024, party_line_votes: 100, with_party_votes: 90}
           - {official_id: c, chamber: state_house, vote_year: 2024, party_line_votes: 19, with_party_votes: 0}
           - {official_id: d, chamber: state_house, vote_year: 2024, party_line_votes: 100, with_party_votes: 0}
+          - {official_id: d, chamber: us_house, vote_year: 2024, party_line_votes: 100, with_party_votes: 60}
+          - {official_id: e, chamber: us_house, vote_year: 2024, party_line_votes: 100, with_party_votes: 40}
     expect:
       rows:
         - {award: most_party_breaks, period: '2023', official_id: b, award_rank: 1, metric: 80.0, sample_size: 100, group_size: 2, streak_years: 1}
@@ -234,6 +239,99 @@ unit_tests:
         - {award: most_party_loyal, period: '2023', official_id: a, award_rank: 1, metric: 100.0, sample_size: 90, group_size: 2, streak_years: 1}
         - {award: most_party_loyal, period: '2024', official_id: b, award_rank: 1, metric: 90.0, sample_size: 100, group_size: 2, streak_years: 1}
         - {award: most_party_loyal, period: lifetime, official_id: b, award_rank: 1, metric: 85.0, sample_size: 200, group_size: 2, streak_years: null}
+        - {award: most_party_breaks, period: '2024', official_id: e, award_rank: 1, metric: 40.0, sample_size: 100, group_size: 2, streak_years: 1}
+        - {award: most_party_breaks, period: lifetime, official_id: e, award_rank: 1, metric: 40.0, sample_size: 100, group_size: 2, streak_years: null}
+        - {award: most_party_loyal, period: '2024', official_id: d, award_rank: 1, metric: 60.0, sample_size: 100, group_size: 2, streak_years: 1}
+        - {award: most_party_loyal, period: lifetime, official_id: d, award_rank: 1, metric: 60.0, sample_size: 100, group_size: 2, streak_years: null}
+
+  - name: awards_party_awards_need_a_break_and_never_overlap
+    model: rpt_awards
+    description: >
+      A state_senate field of 6 in 2020 (shaped like the real one), default cutoff 5. p and q vote with their
+      party on 20 of 20 party-line votes (100.0%), r on 19, s on 18, t on 16, u on 14. Maverick (most_party_breaks)
+      needs at least one break, so p and q are never Maverick. Maverick and Team Player each take at most half
+      the field (3), so nobody sits in both lists: Maverick is u, t, s and Team Player is p, q (tied first) and
+      r. The old logic listed p and q as Maverick and put most of the field in both lists. Lifetime repeats
+      the one year.
+    overrides:
+      vars:
+        awards_threshold: {default: 5}
+        awards_min_field_size: 5
+        awards_min_party_line_votes: 20
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p, office: state_senate}
+          - {official_id: q, office: state_senate}
+          - {official_id: r, office: state_senate}
+          - {official_id: s, office: state_senate}
+          - {official_id: t, office: state_senate}
+          - {official_id: u, office: state_senate}
+      - input: ref('rpt_attendance')
+        rows: []
+      - input: ref('rpt_donor_rollup')
+        rows: []
+      - input: ref('fct_federal_donor_summary')
+        rows: []
+      - input: ref('fct_party_unity_yearly')
+        rows:
+          - {official_id: p, chamber: state_senate, vote_year: 2020, party_line_votes: 20, with_party_votes: 20}
+          - {official_id: q, chamber: state_senate, vote_year: 2020, party_line_votes: 20, with_party_votes: 20}
+          - {official_id: r, chamber: state_senate, vote_year: 2020, party_line_votes: 20, with_party_votes: 19}
+          - {official_id: s, chamber: state_senate, vote_year: 2020, party_line_votes: 20, with_party_votes: 18}
+          - {official_id: t, chamber: state_senate, vote_year: 2020, party_line_votes: 20, with_party_votes: 16}
+          - {official_id: u, chamber: state_senate, vote_year: 2020, party_line_votes: 20, with_party_votes: 14}
+    expect:
+      rows:
+        - {award: most_party_breaks, period: '2020', official_id: u, award_rank: 1, metric: 70.0, sample_size: 20, group_size: 6, streak_years: 1}
+        - {award: most_party_breaks, period: '2020', official_id: t, award_rank: 2, metric: 80.0, sample_size: 20, group_size: 6, streak_years: 1}
+        - {award: most_party_breaks, period: '2020', official_id: s, award_rank: 3, metric: 90.0, sample_size: 20, group_size: 6, streak_years: 1}
+        - {award: most_party_loyal, period: '2020', official_id: p, award_rank: 1, metric: 100.0, sample_size: 20, group_size: 6, streak_years: 1}
+        - {award: most_party_loyal, period: '2020', official_id: q, award_rank: 1, metric: 100.0, sample_size: 20, group_size: 6, streak_years: 1}
+        - {award: most_party_loyal, period: '2020', official_id: r, award_rank: 3, metric: 95.0, sample_size: 20, group_size: 6, streak_years: 1}
+        - {award: most_party_breaks, period: lifetime, official_id: u, award_rank: 1, metric: 70.0, sample_size: 20, group_size: 6, streak_years: null}
+        - {award: most_party_breaks, period: lifetime, official_id: t, award_rank: 2, metric: 80.0, sample_size: 20, group_size: 6, streak_years: null}
+        - {award: most_party_breaks, period: lifetime, official_id: s, award_rank: 3, metric: 90.0, sample_size: 20, group_size: 6, streak_years: null}
+        - {award: most_party_loyal, period: lifetime, official_id: p, award_rank: 1, metric: 100.0, sample_size: 20, group_size: 6, streak_years: null}
+        - {award: most_party_loyal, period: lifetime, official_id: q, award_rank: 1, metric: 100.0, sample_size: 20, group_size: 6, streak_years: null}
+        - {award: most_party_loyal, period: lifetime, official_id: r, award_rank: 3, metric: 95.0, sample_size: 20, group_size: 6, streak_years: null}
+
+  - name: awards_party_awards_drop_officials_tied_into_both_lists
+    model: rpt_awards
+    description: >
+      Six state_senate members all vote with their party on 18 of 20 party-line votes, so all six tie for
+      first in both lists (a tie at the cut would put them in both). Nobody is a Maverick and a Team Player
+      at once, so neither party award lists anyone. Without the overlap rule all six sit in both lists.
+    overrides:
+      vars:
+        awards_threshold: {default: 5}
+        awards_min_field_size: 5
+        awards_min_party_line_votes: 20
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p, office: state_senate}
+          - {official_id: q, office: state_senate}
+          - {official_id: r, office: state_senate}
+          - {official_id: s, office: state_senate}
+          - {official_id: t, office: state_senate}
+          - {official_id: u, office: state_senate}
+      - input: ref('rpt_attendance')
+        rows: []
+      - input: ref('rpt_donor_rollup')
+        rows: []
+      - input: ref('fct_federal_donor_summary')
+        rows: []
+      - input: ref('fct_party_unity_yearly')
+        rows:
+          - {official_id: p, chamber: state_senate, vote_year: 2020, party_line_votes: 20, with_party_votes: 18}
+          - {official_id: q, chamber: state_senate, vote_year: 2020, party_line_votes: 20, with_party_votes: 18}
+          - {official_id: r, chamber: state_senate, vote_year: 2020, party_line_votes: 20, with_party_votes: 18}
+          - {official_id: s, chamber: state_senate, vote_year: 2020, party_line_votes: 20, with_party_votes: 18}
+          - {official_id: t, chamber: state_senate, vote_year: 2020, party_line_votes: 20, with_party_votes: 18}
+          - {official_id: u, chamber: state_senate, vote_year: 2020, party_line_votes: 20, with_party_votes: 18}
+    expect:
+      rows: []
 
   - name: awards_federal_money_share_uses_fec_total_receipts
     model: rpt_awards

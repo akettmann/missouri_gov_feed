@@ -10,7 +10,7 @@ export const AWARD_PAIRS: [string, string][] = [
 /** `name` is the award's nickname (the heading); `title` says plainly what is measured, shown under it. */
 export const AWARDS: Record<
   string,
-  { name: string; title: string; unit: "pct" | "money"; outOf?: "votes" | "raised" }
+  { name: string; title: string; unit: "pct" | "money"; outOf?: "votes" | "raised" | "party-line votes" }
 > = {
   lowest_attendance: {
     name: "The “Where Do I Work Again?” Award",
@@ -40,10 +40,12 @@ export const AWARDS: Record<
     name: "The “Maverick” Award",
     title: "Breaks with their party most often",
     unit: "pct",
+    outOf: "party-line votes",
   },
   most_party_loyal: {
     name: "The “Team Player” Award",
     title: "Votes with their party most often",
     unit: "pct",
+    outOf: "party-line votes",
   },
 };
