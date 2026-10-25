@@ -544,6 +544,10 @@ offices, shops and most service businesses are missing.
   (`https://ordsext.epa.gov/FLA/www3/state_files/state_combined_mo.zip`, about 35 MB). The payload is the row
   as a JSON object keyed by the CSV header.
 - Shard units: the four CSV files. The zip is downloaded once and shared.
+- `epa_frs_sic` joined the loader after the other three. A raw directory landed before that has no SIC table;
+  `mogov build` then creates an empty placeholder (like the other late-added or optional JSON tables in
+  `db.OPTIONAL_JSON_TABLES`), so the SIC fallback finds no codes and those sites show no industry until the
+  loader is re-run. Bare `dbt build` does not create placeholders: use `mogov build`.
 - Districts: point-in-polygon of the facility's coordinates against the current `dim_district` boundaries.
   The geometry functions are dispatched per backend (`macros/compat/spatial.sql`); on DuckDB they need the
   `spatial` extension, which `dbt/profiles.yml` loads (downloaded on first use).
