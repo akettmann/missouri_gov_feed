@@ -36,7 +36,14 @@ models:
     id, same file; only address_clean differs, because TAP doubled the address), which counted ~$179M twice. One
     row per record_id is kept, preferring the newer layout (cd1_a_id, no txn) when an id is in both (the shared
     columns are identical; the older layout''s only extras are ctrb_name / ctrb_type), then the copy whose address_clean
-    is not doubled (the shorter one).'
+    is not doubled (the shorter one). Cross-layout near-duplicates (#99): 290 person and 107 organization gifts
+    (about $5.2M) appear once in each layout under different ids (an amended report re-filed in the 2020-2022 export).
+    Same committee, date, amount and donor (first + last name, else company / committee / ctrb_name, upper-cased
+    and trimmed), one older-layout row (txn) against one newer-layout row (cd1_a_id): the older row is dropped.
+    Matching is one-to-one: rows sharing that key are numbered within each layout (by record_id) and the nth older
+    row is dropped only if the newer layout has an nth row, so a donor who gave the same amount twice in a day in
+    ONE layout keeps both gifts, and a pair with a different amount, date, committee or donor is never matched.
+    Only 2 of 397 matched keys are not 1:1 (2 older rows, 1 newer; the extra older row is kept).'
   columns:
   - name: record_id
     description: 'The source row''s own id (`txn`, or `cd1_a_id` in the 2020-2022 layout; one MEC id space). One

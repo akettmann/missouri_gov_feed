@@ -241,3 +241,70 @@ unit_tests:
     expect:
       rows:
         - {record_id: '1001', mec_committee_id: C1, committee_name: New layout, contributor_name: Dup PAC, amount: 100}
+
+  - name: tap_contributions_dedupe_cross_layout
+    model: stg_tap_mec__contributions
+    description: >
+      The same gift filed once in each export layout under different ids (#99; typically an amended report
+      re-filed in the 2020-2022 export) is counted once: same committee, date, amount and donor, matched
+      one-to-one, and the older layout's row (txn) is dropped. Matching ignores case and padding. Identical gifts
+      inside ONE layout are real repeats and both stay; a pair that differs in amount or committee is not a
+      duplicate; with two older rows and one newer row only one older row is dropped; organization donors (name
+      in company / ctrb_name) match like people.
+    given:
+      - input: source('tap_mec', 'contributions')
+        format: sql
+        rows: |
+          select
+              cast('C1' as varchar) as cmte_id,
+              cast(null as varchar) as mecid,
+              cast(null as varchar) as cmte_name,
+              cast(null as varchar) as committee_name,
+              cast('Aaron Hankel' as varchar) as ctrb_name,
+              cast('Individual' as varchar) as ctrb_type,
+              cast(null as varchar) as committee,
+              cast(null as varchar) as company,
+              cast('Aaron' as varchar) as first_name,
+              cast('Hankel' as varchar) as last_name,
+              cast(null as varchar) as address_1,
+              cast(null as varchar) as employer,
+              cast(null as varchar) as occupation,
+              cast(null as varchar) as city_clean,
+              cast(null as varchar) as city,
+              cast(null as varchar) as state_clean,
+              cast(null as varchar) as state,
+              cast('100' as varchar) as amount,
+              cast('2020-07-01' as varchar) as date,
+              cast(null as varchar) as year,
+              cast(null as varchar) as cont_type,
+              cast(null as varchar) as contribution_type,
+              cast(null as varchar) as rpt_type,
+              cast(null as varchar) as report,
+              cast('FALSE' as varchar) as dupe_flag,
+              cast('a-old' as varchar) as txn,
+              cast(null as varchar) as cd1_a_id,
+              cast(null as varchar) as address_clean
+          union all select null, 'C1', null, null, null, null, '', '', ' AARON ', 'hankel', null, null, null, null, null, null, null, '100', '2020-07-01', null, null, null, null, null, 'FALSE', null, 'a-new', null
+          union all select 'C2', null, null, null, 'Bea Cole', 'Individual', null, null, 'Bea', 'Cole', null, null, null, null, null, null, null, '50', '2020-07-02', null, null, null, null, null, 'FALSE', 'b-old1', null, null
+          union all select 'C2', null, null, null, 'Bea Cole', 'Individual', null, null, 'Bea', 'Cole', null, null, null, null, null, null, null, '50', '2020-07-02', null, null, null, null, null, 'FALSE', 'b-old2', null, null
+          union all select 'C3', null, null, null, 'Cy Dunn', 'Individual', null, null, 'Cy', 'Dunn', null, null, null, null, null, null, null, '25', '2020-07-03', null, null, null, null, null, 'FALSE', 'c-old', null, null
+          union all select null, 'C3', null, null, null, null, '', '', 'Cy', 'Dunn', null, null, null, null, null, null, null, '26', '2020-07-03', null, null, null, null, null, 'FALSE', null, 'c-new', null
+          union all select 'C4', null, null, null, 'Di Eng', 'Individual', null, null, 'Di', 'Eng', null, null, null, null, null, null, null, '10', '2020-07-04', null, null, null, null, null, 'FALSE', 'd-old1', null, null
+          union all select 'C4', null, null, null, 'Di Eng', 'Individual', null, null, 'Di', 'Eng', null, null, null, null, null, null, null, '10', '2020-07-04', null, null, null, null, null, 'FALSE', 'd-old2', null, null
+          union all select null, 'C4', null, null, null, null, '', '', 'Di', 'Eng', null, null, null, null, null, null, null, '10', '2020-07-04', null, null, null, null, null, 'FALSE', null, 'd-new', null
+          union all select 'C5', null, null, null, 'Acme Corp', 'Corporation', null, 'Acme Corp', '', '', null, null, null, null, null, null, null, '900', '2020-07-05', null, null, null, null, null, 'FALSE', 'e-old', null, null
+          union all select null, 'C5', null, null, null, null, '', 'Acme Corp', '', '', null, null, null, null, null, null, null, '900', '2020-07-05', null, null, null, null, null, 'FALSE', null, 'e-new', null
+          union all select 'C6', null, null, null, 'Fay Gale', 'Individual', null, null, 'Fay', 'Gale', null, null, null, null, null, null, null, '5', '2020-07-06', null, null, null, null, null, 'FALSE', 'f-old', null, null
+          union all select null, 'C7', null, null, null, null, '', '', 'Fay', 'Gale', null, null, null, null, null, null, null, '5', '2020-07-06', null, null, null, null, null, 'FALSE', null, 'f-new', null
+    expect:
+      rows:
+        - {record_id: a-new, mec_committee_id: C1, amount: 100}
+        - {record_id: b-old1, mec_committee_id: C2, amount: 50}
+        - {record_id: b-old2, mec_committee_id: C2, amount: 50}
+        - {record_id: c-old, mec_committee_id: C3, amount: 25}
+        - {record_id: c-new, mec_committee_id: C3, amount: 26}
+        - {record_id: d-old2, mec_committee_id: C4, amount: 10}
+        - {record_id: d-new, mec_committee_id: C4, amount: 10}
+        - {record_id: e-new, mec_committee_id: C5, amount: 900}
+        - {record_id: f-old, mec_committee_id: C6, amount: 5}
+        - {record_id: f-new, mec_committee_id: C7, amount: 5}

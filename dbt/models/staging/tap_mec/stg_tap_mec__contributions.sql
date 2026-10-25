@@ -34,6 +34,14 @@
 -- differs, because TAP doubled the address), which counted ~$179M twice. One row per record_id is kept, preferring
 -- the newer layout (cd1_a_id, no txn) when an id is in both (the shared columns are identical; the older layout's
 -- only extras are ctrb_name / ctrb_type), then the copy whose address_clean is not doubled (the shorter one).
+-- Cross-layout near-duplicates (#99): 290 person and 107 organization gifts (about $5.2M) appear once in each layout
+-- under different ids (an amended report re-filed in the 2020-2022 export). Same committee, date, amount and donor
+-- (first + last name, else company / committee / ctrb_name, upper-cased and trimmed), one older-layout row (txn)
+-- against one newer-layout row (cd1_a_id): the older row is dropped. Matching is one-to-one: rows sharing that key
+-- are numbered within each layout (by record_id) and the nth older row is dropped only if the newer layout has an
+-- nth row, so a donor who gave the same amount twice in a day in ONE layout keeps both gifts, and a pair with a
+-- different amount, date, committee or donor is never matched. Only 2 of 397 matched keys are not 1:1 (2 older
+-- rows, 1 newer; the extra older row is kept).
 with
 
 identified as (
@@ -54,6 +62,50 @@ unique_records as (
                 coalesce(length(address_clean), 0), address_clean, address_1, amount
         ) as record_rank
     from identified
+),
+
+layout_keyed as (
+    select
+        *,
+        coalesce(cmte_id, mecid) as match_committee_id,
+        {{ dbt.safe_cast('date', 'date') }} as match_date,
+        {{ dbt.safe_cast('amount', dbt.type_numeric()) }} as match_amount,
+        case
+            when nullif(trim(first_name), '') is not null and nullif(trim(last_name), '') is not null
+                then upper(trim(first_name)) || ' ' || upper(trim(last_name))
+            else upper(coalesce(nullif(trim(company), ''), nullif(trim(committee), ''), nullif(trim(ctrb_name), '')))
+        end as match_donor,
+        txn is null as is_newer_layout
+    from unique_records
+    where record_rank = 1
+),
+
+layout_ranked as (
+    select
+        *,
+        row_number() over (
+            partition by match_committee_id, match_date, match_amount, match_donor, is_newer_layout
+            order by record_id
+        ) as layout_match_rank
+    from layout_keyed
+),
+
+cross_layout_unique as (
+    select older.*
+    from layout_ranked as older
+    where
+        older.is_newer_layout
+        or not exists (
+            select 1
+            from layout_ranked as newer
+            where
+                newer.is_newer_layout
+                and newer.match_committee_id = older.match_committee_id
+                and newer.match_date = older.match_date
+                and newer.match_amount = older.match_amount
+                and newer.match_donor = older.match_donor
+                and newer.layout_match_rank = older.layout_match_rank
+        )
 ),
 
 source_rows as (
@@ -130,8 +182,7 @@ source_rows as (
                 and {{ mogov.regex_matches('trim(last_name)', '^.* 0$') }}
                 then trim(substring(trim(ctrb_name), 1, length(trim(ctrb_name)) - 2))
         end as ctrb_name_without_zero
-    from unique_records
-    where record_rank = 1
+    from cross_layout_unique
 )
 
 select
