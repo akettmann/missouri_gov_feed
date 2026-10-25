@@ -84,7 +84,7 @@ def default_workers(shards: int) -> int:
 def _summarize(results: list[list[str]]) -> list[str]:
     failed = sorted({name for r in results for name in r})
     if failed:
-        log.error("loader.summary", failed=failed, message="these loaders failed; their raw data is stale")
+        log.error("loader.summary", failed=failed, hint="these loaders failed; their raw data is stale")
     return failed
 
 
@@ -143,11 +143,25 @@ def _gate_build(failed: list[str], allowed: list[str]) -> bool:
     for name in failed:
         if name in allowed:
             log.warning(
-                "build.stale_source", source=name, message=f"{name} failed to load; building on its stale raw data"
+                "build.stale_source", source=name, hint=f"{name} failed to load; building on its stale raw data"
             )
     if blocking:
-        log.error("build.skipped", failed=blocking, hint="fix them, or pass --allow-failed-loader NAME to build anyway")
+        log.error(
+            "build.skipped",
+            failed=blocking,
+            hint="fix them, or allow one: --allow-failed-loader NAME or MOGOV_ALLOW_FAILED_LOADERS=NAME",
+        )
     return not blocking
+
+
+def _allowed_failed(flag_values: list[str]) -> list[str]:
+    """Sources whose failure may not stop `run`: --allow-failed-loader flags plus $MOGOV_ALLOW_FAILED_LOADERS
+    (comma-separated; for runtimes with fixed args such as compose or Cloud Run). Unknown names are rejected."""
+
+    env = [n.strip() for n in os.environ.get("MOGOV_ALLOW_FAILED_LOADERS", "").split(",") if n.strip()]
+    names = [*flag_values, *env]
+    _resolve(names, None)  # reject unknown names up front
+    return names
 
 
 def _on_sigterm(signum, _frame):
@@ -248,7 +262,8 @@ def main() -> None:
         default=[],
         metavar="SOURCE",
         help="if this loader fails, still run dbt build on its stale raw data (warned by name; repeatable). "
-        "By default any failed loader stops the run before dbt. The exit code is non-zero either way.",
+        "By default any failed loader stops the run before dbt. The exit code is non-zero either way. "
+        "Also read from $MOGOV_ALLOW_FAILED_LOADERS (comma-separated), for runtimes with fixed args.",
     )
     args, extra = parser.parse_known_args()
     if extra and args.cmd != "build":
@@ -267,16 +282,16 @@ def main() -> None:
     elif args.cmd == "freshness":
         sys.exit(run_dbt(["source", "freshness"]))
     elif args.cmd == "run":
-        _resolve(args.allow_failed_loader, None)  # reject unknown names up front
+        allowed = _allowed_failed(args.allow_failed_loader)
         shards = {"shards": args.shards, "shard": args.shard, "workers": args.workers}
         failed = run_loaders(args.sources, stage=1, **shards)
-        if not _gate_build(failed, args.allow_failed_loader):
+        if not _gate_build(failed, allowed):
             sys.exit(1)
         rc = run_dbt(["build"])
         if not args.sources:
             stage2 = run_loaders([], stage=2, **shards)
             failed += stage2
-            if not _gate_build(stage2, args.allow_failed_loader):
+            if not _gate_build(stage2, allowed):
                 sys.exit(1)
             rc = run_dbt(["build"]) or rc
         sys.exit(rc or (1 if failed else 0))

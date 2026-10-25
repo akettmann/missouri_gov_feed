@@ -1,7 +1,10 @@
 """`mogov load/run` keep going past a failed loader; `run` builds on stale data only when told to."""
 
+import json
+
 import httpx
 import pytest
+import structlog.testing
 
 from mogov import cli
 from mogov.loaders import senate_efd
@@ -75,12 +78,13 @@ def test_run_is_strict_by_default(fake_loaders, dbt_calls, monkeypatch):
 
 
 def test_run_builds_when_the_failed_loader_is_allowed_but_still_exits_nonzero(fake_loaders, dbt_calls, monkeypatch):
-    warnings = []
-    monkeypatch.setattr(cli.log, "warning", lambda event, **kw: warnings.append((event, kw)))
-    code = _main(monkeypatch, "run", "--workers", "1", "--allow-failed-loader", "bad")
+    with structlog.testing.capture_logs() as logs:
+        code = _main(monkeypatch, "run", "--workers", "1", "--allow-failed-loader", "bad")
     assert code == 1  # Cloud Run still sees the failure
     assert dbt_calls  # but dbt ran
-    assert ("build.stale_source", "bad") in [(e, kw["source"]) for e, kw in warnings]
+    assert [(e["event"], e["source"]) for e in logs if e["event"] == "build.stale_source"] == [
+        ("build.stale_source", "bad")
+    ]
 
 
 def test_run_allowing_a_different_loader_still_blocks(fake_loaders, dbt_calls, monkeypatch):
@@ -116,3 +120,51 @@ def test_senate_efd_fails_fast_on_agreement_403(monkeypatch):
 def test_senate_efd_session_ok_when_agreement_accepted(monkeypatch):
     _efd_client(monkeypatch, 200)
     assert senate_efd._session().cookies is not None
+
+
+def test_allow_failed_loaders_env_merges_with_flags(fake_loaders, monkeypatch):
+    monkeypatch.setenv("MOGOV_ALLOW_FAILED_LOADERS", " bad , z,")
+    assert cli._allowed_failed(["a"]) == ["a", "bad", "z"]
+
+
+@pytest.mark.parametrize("value", ["", " ,, "])
+def test_allow_failed_loaders_env_empty_means_none(fake_loaders, monkeypatch, value):
+    monkeypatch.setenv("MOGOV_ALLOW_FAILED_LOADERS", value)
+    assert cli._allowed_failed([]) == []
+
+
+def test_allow_failed_loaders_env_rejects_unknown_name(fake_loaders, monkeypatch):
+    monkeypatch.setenv("MOGOV_ALLOW_FAILED_LOADERS", "bad,nope")
+    with pytest.raises(SystemExit, match="unknown source 'nope'"):
+        cli._allowed_failed([])
+
+
+def test_run_builds_when_env_allows_the_failed_loader(fake_loaders, dbt_calls, monkeypatch):
+    monkeypatch.setenv("MOGOV_ALLOW_FAILED_LOADERS", "bad")
+    assert _main(monkeypatch, "run", "--workers", "1") == 1
+    assert dbt_calls  # built on stale data, exit still non-zero
+
+
+def test_run_rejects_unknown_env_allowed_loader(fake_loaders, dbt_calls, monkeypatch):
+    monkeypatch.setenv("MOGOV_ALLOW_FAILED_LOADERS", "nope")
+    assert "unknown source" in str(_main(monkeypatch, "run", "--workers", "1"))
+    assert dbt_calls == []
+
+
+def test_explanatory_text_survives_cloud_logging_message_rewrite(monkeypatch, capsys):
+    """On Cloud Run `event` becomes `message`; an extra `message=` kwarg would be overwritten, so use `hint`."""
+    monkeypatch.setenv("CLOUD_RUN_JOB", "mogov")
+    monkeypatch.delenv("MOGOV_LOG_JSON", raising=False)
+    monkeypatch.setattr(cli.obs, "_configured", False)
+    try:
+        cli.obs.configure()
+        cli._summarize([["bad"]])
+        cli._gate_build(["bad"], ["bad"])
+        cli._gate_build(["z"], [])
+    finally:
+        cli.structlog.reset_defaults()
+    lines = [json.loads(line) for line in capsys.readouterr().err.splitlines() if line.startswith("{")]
+    by_message = {line["message"]: line for line in lines}
+    assert by_message["loader.summary"]["hint"] == "these loaders failed; their raw data is stale"
+    assert "building on its stale raw data" in by_message["build.stale_source"]["hint"]
+    assert "--allow-failed-loader" in by_message["build.skipped"]["hint"]

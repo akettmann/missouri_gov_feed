@@ -26,6 +26,13 @@ Diagrams: [pipeline](diagrams/pipeline.svg), [lineage](diagrams/lineage.svg),
    ```
    uv run mogov run --shards 4      # stage-1 loaders (concurrent, 4 shards) -> dbt build -> stage 2 -> dbt build
    ```
+   `run` is strict: if any loader fails it stops before `dbt build`, logs `build.skipped` naming the failed
+   loaders, and exits non-zero. Fix the cause and re-run (loaders are idempotent), or, for a known-flaky
+   source, build on its last landed data with `uv run mogov run --allow-failed-loader <source>` or
+   `MOGOV_ALLOW_FAILED_LOADERS=<source>[,<source>]` (env var form for compose / Cloud Run, where the args are
+   fixed). Until [#161](https://github.com/akettmann/missouri_gov_feed/issues/161) lands, if you opted in to
+   `senate_efd` (`MOGOV_ACCEPT_SENATE_EFD_TERMS=1`) you will need `MOGOV_ALLOW_FAILED_LOADERS=senate_efd`.
+
    The first run is the slow one: it downloads several GB (FEC, CourtListener bulk) and parses about
    ten years of House roll-call PDFs and Senate journals. Everything fetched is cached under
    `data/cache`, so later runs are much faster.
@@ -290,6 +297,9 @@ cached PDF sources.
 The image (`Dockerfile`) runs `mogov` as its entrypoint. Logs go to stderr as JSON with
 `severity`/`message` keys whenever `CLOUD_RUN_JOB` is set. A failing loader makes the task exit
 non-zero. SIGTERM exits cleanly: temp files are removed and metrics are flushed.
+The jobs below chain `load` and `build` as separate jobs, so a failed load job already stops the chain. If you
+instead run `mogov run` as a job, it is strict by default; set `MOGOV_ALLOW_FAILED_LOADERS=<source>` (via
+`--set-env-vars`) to tolerate a known-flaky source.
 
 > This setup follows the Cloud Run container contract but has not been deployed yet. Treat it as a
 > starting point.

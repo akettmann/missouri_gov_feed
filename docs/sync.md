@@ -49,7 +49,9 @@ uv run mogov build
   the failed loaders (their raw data is stale) and exits non-zero.
 - `mogov run` is strict by default: if any loader fails, it stops before `dbt build` and exits non-zero,
   so you never build on top of a source you know is stale.
-- To build anyway, name the loader you accept stale data from (repeatable):
+- To build anyway, name the loader you accept stale data from (repeatable), or set
+  `MOGOV_ALLOW_FAILED_LOADERS=senate_efd,...` (comma-separated, merged with the flags; for compose and
+  Cloud Run, where the args are fixed). Unknown names are rejected before anything loads:
 
   ```
   uv run mogov run --allow-failed-loader senate_efd
