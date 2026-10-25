@@ -212,10 +212,10 @@ const tables = freshness();
       qualify unless an award sets its own cutoff (the awards_threshold setting). An office needs at least
       five qualifying officials in a period, so single-seat offices like governor have no awards. An official
       who qualified for the same award in consecutive years gets a marker such as X3 (3 qualifying years in a
-      row). Years the official wasn't ranked for that award (in another office, not eligible for the measure,
-      or too few officials to rank) are skipped: they neither add to nor break the run, so the years in a run
-      can span more calendar years than the number shown. A year ranked outside the cutoff breaks it. Lifetime
-      rankings have no marker.
+      row; for the federal money share, 3 qualifying cycles in a row). Years the official wasn't ranked for
+      that award (in another office, not eligible for the measure, or too few officials to rank) are skipped:
+      they neither add to nor break the run, so the years in a run can span more calendar years than the
+      number shown. A year ranked outside the cutoff breaks it. Lifetime rankings have no marker.
     </p>
     <ul>
       <li>
@@ -226,7 +226,11 @@ const tables = freshness();
         <strong>Money from PACs, committees and parties</strong>: dollars received from them, and (the
         opposite) the lowest share of all money raised, among officials raising at least $10,000. The Missouri
         Ethics Commission files PACs as committees, so the two are counted together. Name-only matches are
-        left out.
+        left out. For members of Congress the share is per two-year FEC cycle (shown as, for example, "the
+        2025–26 cycle"; the period picker lists it under 2026), so it has no odd-year rows. Its denominator is
+        the FEC's total receipts for the cycle, which include loans and transfers as well as contributions (a
+        known limitation), and a cycle with no FEC total gets no share. The most-money award for federal
+        officials still counts calendar years.
       </li>
       <li>
         <strong>Party loyalty</strong>: party unity (the share of party-line votes cast with the official's

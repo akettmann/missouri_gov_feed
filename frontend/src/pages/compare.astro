@@ -218,7 +218,12 @@ const officials = current.map((o) => ({
       row.values.forEach((v, i) => {
         const td = el("td", v);
         for (const l of row.valueLinks?.[i] ?? []) {
-          const a = el("a", `${l.text} ↗`) as HTMLAnchorElement;
+          const a = el("a", l.text) as HTMLAnchorElement;
+          if (l.context) a.append(" ", el("span", l.context, "sr-only"));
+          // the arrow is decoration: hide it from screen readers (same markup as SourceLink)
+          const arrow = el("span", "↗");
+          arrow.setAttribute("aria-hidden", "true");
+          a.append(arrow);
           a.href = l.href;
           a.rel = "noopener noreferrer";
           a.target = "_blank";
