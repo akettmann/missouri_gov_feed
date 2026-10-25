@@ -4,15 +4,19 @@ interface Props {
   url: string | null | undefined;
   label?: string;
   missing?: string;
-  /** screen-reader-only suffix, e.g. "for BNSF", so a list of links is not all the same text */
+  /** screen-reader-only suffix, e.g. "for BNSF", so a list of links is not all the same text; ignored when labelledBy is set */
   context?: string;
+  /** ids of the elements that name this link, space-separated; with labelId, the link's own text is one of them */
+  labelledBy?: string;
+  /** id put on the label text so labelledBy can refer to it */
+  labelId?: string;
 }
-const { url, label = "source", missing = "no link", context } = Astro.props;
+const { url, label = "source", missing = "no link", context, labelledBy, labelId } = Astro.props;
 ---
 
 {url ? (
-  <a href={url} rel="noopener noreferrer" target="_blank">
-    {label}
+  <a href={url} rel="noopener noreferrer" target="_blank" aria-labelledby={labelledBy}>
+    {labelId ? <span id={labelId}>{label}</span> : label}
     {context && <span class="sr-only"> {context}</span>}
     <span aria-hidden="true">↗</span>
   </a>

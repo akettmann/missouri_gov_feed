@@ -624,7 +624,8 @@ offices, shops and most service businesses are missing.
 - Each matched site also carries the matched donors' first and last contribution year, the links
   (`donor_links`: one line per matched donor and filing page, `<url> <donor name>`. A page is the MEC committee
   matched to the official, which is not filtered to the donor, or the FEC disbursements of the donor's committee
-  filtered to the receiving committee; a donor filed on both keeps both) and `match_confidence`
+  filtered to the receiving committee; a donor filed on both keeps both. Line breaks in a donor name become spaces so a
+  line never splits; in the published sites.csv the cell holds several lines. A donor with no page has no line) and `match_confidence`
   (`medium` when any of that money was tied to the official by name only).
 - Industry: the NAICS code most of a site's programs give, taking primary codes first (`naics_source` `naics`,
   31% of the geocoded sites in October 2026), then codes FRS leaves UNKNOWN (`naics_unknown`, 2%), then SECONDARY
