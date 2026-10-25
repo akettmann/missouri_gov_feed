@@ -225,8 +225,19 @@ Quirks:
 - The two export layouts overlap for 2020: 19,231 ids appear as both `txn` and `cd1_a_id`. They are the
   same record (committee, date, amount, names and address all match), so staging uses an unprefixed
   `record_id = coalesce(txn, cd1_a_id)` and the newer layout wins (#83).
-- 312 cross-layout near-duplicates with different ids (about $1.0M) remain; they are tracked in #99.
-  Net effect of the dedupe: staging goes from 1,603,397 to 1,486,601 rows ($1.2487B to $1.0602B).
+- The same gift can also appear once in each layout under different ids, by two mechanisms: an amended
+  report re-filed in the 2020-2022 export (older report X vs newer "AMENDED X": 267 rows, $0.79M), and a 24-hour
+  notice re-itemized in the next full report (28 rows, $4.19M, ~81% of the dollars), plus ~100 rows
+  ($0.2M) pairing other reports (8-day-before vs 30-day-after / January Quarterly); e.g. txn 1513443 /
+  cd1_a_id 1623513, $100 from Aaron Hankel. Staging drops the older-layout
+  row when the newer layout has a row with the same committee, date, amount and donor (first + last name, else
+  company / committee / ctrb_name; upper-cased, trimmed), matched one-to-one: the nth older row is dropped only
+  if the newer layout has an nth row for that key, so identical same-day gifts inside one layout both stay (#99).
+  This removes 397 rows ($5.19M): 290 person gifts ($0.60M) and 107 organization gifts ($4.59M, e.g. the
+  Democratic Governors Association's $3.55M of 2020-10-26 gifts, $1.775M into each of C201190 and C201352). 395 of the 397 keys are 1:1; 2 keys have two
+  older rows against one newer row and keep the extra older row. Gifts that differ in amount, date, committee or
+  name are not matched, so some re-filed gifts may remain.
+  Net effect of the dedupe: staging goes from 1,603,397 to 1,486,204 rows ($1.2487B to $1.0550B).
 - A few MECIDs are lower-case (`c000525`); the intermediate models upper-case them.
 - A committee-to-committee gift names the donor committee only. `cmte_id` / `mecid` is the receiving
   committee's ID, and there is no donor MECID. The same holds for MEC's direct export (see mec below).
