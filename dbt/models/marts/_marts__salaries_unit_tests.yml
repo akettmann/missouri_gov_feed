@@ -37,6 +37,8 @@ unit_tests:
         rows: &no_current []
       - input: ref('stg_congress__terms')
         rows: &no_terms []
+      - input: ref('int_officeholders__years')
+        rows: &no_years []
       - input: ref('federal_salaries')
         rows: &no_federal []
     expect:
@@ -75,6 +77,8 @@ unit_tests:
         rows: *no_current
       - input: ref('stg_congress__terms')
         rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows: *no_years
       - input: ref('federal_salaries')
         rows: *no_federal
     expect:
@@ -106,6 +110,8 @@ unit_tests:
         rows: *no_current
       - input: ref('stg_congress__terms')
         rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows: *no_years
       - input: ref('federal_salaries')
         rows: *no_federal
     expect:
@@ -144,6 +150,8 @@ unit_tests:
         rows: *no_current
       - input: ref('stg_congress__terms')
         rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows: *no_years
       - input: ref('federal_salaries')
         rows: *no_federal
     expect:
@@ -188,6 +196,8 @@ unit_tests:
         rows: *no_current
       - input: ref('stg_congress__terms')
         rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows: *no_years
       - input: ref('federal_salaries')
         rows: *no_federal
     expect:
@@ -226,9 +236,177 @@ unit_tests:
         rows: *no_current
       - input: ref('stg_congress__terms')
         rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows: *no_years
       - input: ref('federal_salaries')
         rows: *no_federal
     expect:
       rows:
         - {official_id: j_hansbrough, calendar_year: 2022, employee_name: 'HANSBROUGH, W. ANN', match_confidence: high}
         - {official_id: j_hemenway, calendar_year: 2022, employee_name: 'HEMENWAY, JOSEPH JAY', match_confidence: medium}
+
+  - name: salaries_pay_from_before_the_first_term_never_matches
+    model: fct_salaries
+    description: >
+      David Smith's Open States seat starts on the 1900-01-01 placeholder; his first roster year is 2021. "SMITH,
+      DAVID C" is Cody Smith (another person, no official here) and was paid in 2019, before David took office;
+      neither the seat match (the seat counts from 2021) nor the name match (David sat from 2021, and Cody holds
+      the surname in 2019) may give that pay to David. "SMITH, DAVID T" in 2021 is his. A final check in 2017 for
+      Lincoln Hough, whose seat starts in 2019, stays his: nobody else holds the surname that year.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2019, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, DAVID C', last_name: SMITH, first_names: DAVID C, gross_pay: 34418.35}
+          - {calendar_year: 2021, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, DAVID T', last_name: SMITH, first_names: DAVID T, gross_pay: 22646.28}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'HOUGH, LINCOLN P', last_name: HOUGH, first_names: LINCOLN P, gross_pay: 1496.45}
+          - {calendar_year: 2021, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'COOPER, ANN', last_name: COOPER, first_names: ANN, gross_pay: 34418.35}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_david, full_name: David Smith, surname_key: smith, chamber: lower, start_date: '1900-01-01', end_date: '2023-01-03'}
+          - {person_id: p_david, full_name: David Smith, surname_key: smith, chamber: lower, start_date: '2023-01-01', end_date: '9999-12-31'}
+          - {person_id: p_cody, full_name: Cody Smith, surname_key: smith, chamber: lower, start_date: '2017-01-01', end_date: '2025-01-07'}
+          - {person_id: p_hough, full_name: Lincoln Hough, surname_key: hough, chamber: lower, start_date: '2019-01-01', end_date: '9999-12-31'}
+          - {person_id: p_cooper, full_name: Ann Cooper, surname_key: cooper, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p_david, office: state_house}
+          - {official_id: p_hough, office: state_house}
+          - {official_id: p_cooper, office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: p_david, level: state, office: state_house, family_key: smith, given_key: david}
+          - {official_id: p_hough, level: state, office: state_house, family_key: hough, given_key: lincoln}
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows:
+          - {year: 2021, official_id: p_david, office: state_house}
+          - {year: 2022, official_id: p_david, office: state_house}
+          - {year: 2019, official_id: p_hough, office: state_house}
+          - {year: 2021, official_id: p_cooper, office: state_house}
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: p_david, calendar_year: 2021, employee_name: 'SMITH, DAVID T', match_confidence: high}
+        - {official_id: p_hough, calendar_year: 2017, employee_name: 'HOUGH, LINCOLN P', match_confidence: high}
+        - {official_id: p_cooper, calendar_year: 2021, employee_name: 'COOPER, ANN', match_confidence: high}
+
+  - name: salaries_payee_fitting_two_members_equally_matches_neither
+    model: fct_salaries
+    description: >
+      "KING, ALEX" fits Alexander King (starts with it) and Alexis King (same first three letters) equally, so
+      the payee is given to neither: n_best_members is 2. "ABEL, ZED" is the only Abel and pairs, as a control.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2022, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'KING, ALEX', last_name: KING, first_names: ALEX, gross_pay: 36775.23}
+          - {calendar_year: 2022, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'ABEL, ZED', last_name: ABEL, first_names: ZED, gross_pay: 36775.23}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_alexander, full_name: Alexander King, surname_key: king, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
+          - {person_id: p_alexis, full_name: Alexis King, surname_key: king, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
+          - {person_id: p_abel, full_name: Zed Abel, surname_key: abel, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p_alexander, office: state_house}
+          - {official_id: p_alexis, office: state_house}
+          - {official_id: p_abel, office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows: *no_name_keys
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows: *no_years
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: p_abel, calendar_year: 2022, employee_name: 'ABEL, ZED', match_confidence: high}
+
+  - name: salaries_pair_by_mutual_best_first_name_fit
+    model: fct_salaries
+    description: >
+      A payee and a member pair only when each is the other's best first-name fit. LEWIS, EDWIN fits Edwin Lewis
+      exactly and Ed Lewis only as a prefix, so it pairs with Edwin alone (the payee's best). Edwin Hunt fits
+      HUNT, EDWIN exactly and HUNT, ED as a prefix, so he takes EDWIN and ED stays unpaired (the member's best).
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2022, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'LEWIS, EDWIN', last_name: LEWIS, first_names: EDWIN, gross_pay: 36775.23}
+          - {calendar_year: 2022, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'HUNT, EDWIN', last_name: HUNT, first_names: EDWIN, gross_pay: 36775.23}
+          - {calendar_year: 2022, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'HUNT, ED', last_name: HUNT, first_names: ED, gross_pay: 33744.92}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_edwin_lewis, full_name: Edwin Lewis, surname_key: lewis, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
+          - {person_id: p_ed_lewis, full_name: Ed Lewis, surname_key: lewis, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
+          - {person_id: p_edwin_hunt, full_name: Edwin Hunt, surname_key: hunt, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p_edwin_lewis, office: state_house}
+          - {official_id: p_ed_lewis, office: state_house}
+          - {official_id: p_edwin_hunt, office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows: *no_name_keys
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows: *no_years
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: p_edwin_lewis, calendar_year: 2022, employee_name: 'LEWIS, EDWIN', match_confidence: high}
+        - {official_id: p_edwin_hunt, calendar_year: 2022, employee_name: 'HUNT, EDWIN', match_confidence: high}
+
+  - name: salaries_pair_a_middle_initial_with_the_name_the_member_goes_by
+    model: fct_salaries
+    description: >
+      Cody Smith and David Smith both serve, and both payees fit David's first name: "SMITH, DAVID C" is David
+      Cody Smith, who goes by his middle name, and "SMITH, DAVID T" is David Smith. The middle initial pairs C
+      with Cody; David Smith is then the one member left for T. Both medium.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2022, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, DAVID C', last_name: SMITH, first_names: DAVID C, gross_pay: 36775.23}
+          - {calendar_year: 2022, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, DAVID T', last_name: SMITH, first_names: DAVID T, gross_pay: 36775.23}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_cody, full_name: Cody Smith, surname_key: smith, chamber: lower, start_date: '2017-01-01', end_date: '9999-12-31'}
+          - {person_id: p_david, full_name: David Smith, surname_key: smith, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p_cody, office: state_house}
+          - {official_id: p_david, office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows: *no_name_keys
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows: *no_years
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: p_cody, calendar_year: 2022, employee_name: 'SMITH, DAVID C', match_confidence: medium}
+        - {official_id: p_david, calendar_year: 2022, employee_name: 'SMITH, DAVID T', match_confidence: medium}
