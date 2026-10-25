@@ -1,0 +1,17 @@
+---
+// The official's current award icons, drawn next to their name. Renders nothing when they hold none.
+// Every place a name is shown uses this (or renderBadges in browser scripts) so the icons stay identical.
+import { renderBadges } from "../lib/awardBadges";
+import { currentAwardsBySlug } from "../lib/exports/awards";
+import { base } from "../lib/site";
+
+interface Props {
+  slug: string;
+  /** false where the page already shows its own X2/X3 marker beside the name */
+  streaks?: boolean;
+}
+const { slug, streaks = true } = Astro.props;
+const html = renderBadges((await currentAwardsBySlug()).get(slug) ?? [], base, streaks);
+---
+
+{html && <Fragment set:html={html} />}

@@ -36,6 +36,12 @@ projects", and the testing and documentation best practices.
   `--vars '{skip_optional_raw_check: true}'`. The hook only runs when the selection has nodes to run.
   It also covers bare `dbt snapshot` and `dbt source freshness` (dbt 1.11 runs project hooks for them), so
   `mogov` passes the vars to every dbt subcommand.
+- Only `mogov build` accepts a user `--vars` (YAML or JSON mapping; `freshness` and `run` pass just mogov's own
+  `mec_direct` / `cl_case_bulk`). `build` merges it with mogov's own
+  `mec_direct` / `cl_case_bulk` into the single `--vars` flag dbt gets. The merge is shallow (`dict.update`): a user
+  key replaces mogov's value, and a nested mapping is replaced whole, not deep-merged. Repeated `--vars` flags apply
+  in order, so the later one wins per key but earlier unique keys are kept (plain dbt would use only the last flag).
+  Values keep their YAML types (a date stays a date), because mogov hands dbt the merged vars as flow-style YAML.
 
 ## Deliberately not changed
 

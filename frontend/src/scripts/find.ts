@@ -1,5 +1,6 @@
 // Client side of "find my officials": point-in-polygon against /lookup/districts.json, then the officials
 // for each district, grouped by level. Runs entirely in the browser.
+import { renderBadges, type Badge } from "../lib/awardBadges";
 import type { DistrictShape } from "../lib/exports/districts";
 
 export interface Lookup {
@@ -9,8 +10,8 @@ export interface Lookup {
   statewide: string[];
   /** ZIP -> [lon, lat, equal-area radius in meters] */
   zips: Record<string, [number, number, number]>;
-  /** slug -> [full name, office line, party, office] */
-  directory: Record<string, [string, string, string | null, string]>;
+  /** slug -> [full name, office line, party, office, current award badges when they hold any] */
+  directory: Record<string, [string, string, string | null, string, Badge[]?]>;
 }
 
 /** Even-odd ray casting over every ring, so holes (enclaves) count as outside. */
@@ -55,6 +56,11 @@ const GROUPS: { title: string; offices: string[]; collapsed?: boolean }[] = [
     collapsed: true,
   },
 ];
+
+/** The official's award icons, drawn by the same renderer the built pages use. */
+function badgesFor(badges: Badge[] | undefined, base: string): DocumentFragment {
+  return document.createRange().createContextualFragment(renderBadges(badges ?? [], base));
+}
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}) =>
   Object.assign(document.createElement(tag), props);
@@ -130,6 +136,7 @@ export function lookupZip(
       for (const s of members) {
         li.append(" · ");
         li.append(el("a", { href: `${base}/officials/${s}/`, textContent: data.directory[s][0] }));
+        li.append(badgesFor(data.directory[s][4], base));
       }
       list.append(li);
     }
@@ -160,9 +167,10 @@ export function lookup(data: Lookup, lon: number, lat: number, out: HTMLElement,
     if (!members.length) continue;
     const list = el("ul", { className: "people" });
     for (const s of members.sort((a, b) => data.directory[a][0].localeCompare(data.directory[b][0]))) {
-      const [name, office, party] = data.directory[s];
+      const [name, office, party, , badges] = data.directory[s];
       const li = el("li");
       li.append(el("a", { href: `${base}/officials/${s}/`, textContent: name }));
+      li.append(badgesFor(badges, base));
       li.append(
         el("span", { className: "small muted", textContent: ` ${office}${party ? ` · ${party}` : ""}` }),
       );

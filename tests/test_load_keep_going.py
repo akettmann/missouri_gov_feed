@@ -151,18 +151,45 @@ def test_run_rejects_unknown_env_allowed_loader(fake_loaders, dbt_calls, monkeyp
     assert dbt_calls == []
 
 
+@pytest.fixture
+def stage2_failing(fake_loaders, monkeypatch):
+    """Stage 1 is clean (`a`, `z`); the stage-2 loader `late` raises."""
+
+    def late(_shard):
+        fake_loaders.append("late")
+        raise RuntimeError("stage 2 is down")
+
+    registry = {"a": cli.REGISTRY["a"], "z": cli.REGISTRY["z"], "late": late}
+    monkeypatch.setattr(cli, "REGISTRY", registry)
+    monkeypatch.setattr(cli, "SERVICE", {n: n for n in registry})
+    monkeypatch.setattr(cli, "STAGE", {"a": 1, "z": 1, "late": 2})
+    return fake_loaders
+
+
+def test_run_blocks_the_second_build_when_a_stage_2_loader_fails(stage2_failing, dbt_calls, monkeypatch):
+    assert _main(monkeypatch, "run", "--workers", "1") == 1
+    assert "late" in stage2_failing
+    assert dbt_calls == [["build"]]  # the stage-1 build ran; the stage-2 one did not
+
+
+def test_run_runs_the_second_build_when_the_stage_2_failure_is_allowed(stage2_failing, dbt_calls, monkeypatch):
+    assert _main(monkeypatch, "run", "--workers", "1", "--allow-failed-loader", "late") == 1  # exit stays non-zero
+    assert dbt_calls == [["build"], ["build"]]
+
+
 def test_explanatory_text_survives_cloud_logging_message_rewrite(monkeypatch, capsys):
     """On Cloud Run `event` becomes `message`; an extra `message=` kwarg would be overwritten, so use `hint`."""
     monkeypatch.setenv("CLOUD_RUN_JOB", "mogov")
     monkeypatch.delenv("MOGOV_LOG_JSON", raising=False)
     monkeypatch.setattr(cli.obs, "_configured", False)
+    saved_config = cli.structlog.get_config()
     try:
         cli.obs.configure()
         cli._summarize([["bad"]])
         cli._gate_build(["bad"], ["bad"])
         cli._gate_build(["z"], [])
     finally:
-        cli.structlog.reset_defaults()
+        cli.structlog.configure(**saved_config)
     lines = [json.loads(line) for line in capsys.readouterr().err.splitlines() if line.startswith("{")]
     by_message = {line["message"]: line for line in lines}
     assert by_message["loader.summary"]["hint"] == "these loaders failed; their raw data is stale"
