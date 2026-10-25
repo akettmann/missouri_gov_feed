@@ -246,3 +246,26 @@ seeds:
         description: Maintainer who reviewed the row; empty until reviewed.
       - name: checked_on
         description: Date the maintainer reviewed the row; empty until reviewed.
+  - name: epa_frs_name_corrections
+    description: >
+      Verified spellings for EPA FRS names whose raw text contains U+FFFD (EPA's file lost a non-ASCII letter).
+      EPA's other records for the same sites spell the words without the letter (DECOR, not DÉCOR), so the value
+      comes from those records, never from a guess; every row cites the EPA record that attests it. Applied in
+      stg_epa_frs__facilities (record_key = registry_id) and stg_epa_frs__organizations (record_key =
+      registry_id|program_system|program_id) only while the raw text still contains U+FFFD. Any other U+FFFD is
+      dropped.
+    config:
+      column_types: {record_key: varchar, field: varchar, corrected_value: varchar, source: varchar}
+    columns:
+      - name: record_key
+        data_tests: [unique, not_null]
+      - name: field
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [facility_name, org_name]
+      - name: corrected_value
+        data_tests: [not_null]
+      - name: source
+        data_tests: [not_null]
