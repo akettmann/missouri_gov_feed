@@ -138,9 +138,9 @@ def run_dbt(args: list[str]) -> int:
     dbt = [sys.executable, "-c", "from dbt.cli.main import cli; cli()"]
     if not (DBT_DIR / "dbt_packages" / "dbt_utils").exists():  # packages.yml (pinned by package-lock.yml)
         subprocess.check_call([*dbt, "deps", *dirs], cwd=ROOT, env=env)
-    cmd = [*dbt, *args, *dirs]
-    if args and args[0] in ("build", "run", "test", "compile", "seed"):
-        cmd += ["--vars", json.dumps(dbt_vars)]
+    # Every subcommand mogov uses accepts --vars, and dbt 1.11 also runs the on-run-start hook for
+    # `source freshness` (which reads the vars), so always pass them.
+    cmd = [*dbt, *args, *dirs, "--vars", json.dumps(dbt_vars)]
     return subprocess.call(cmd, cwd=ROOT, env=env)
 
 

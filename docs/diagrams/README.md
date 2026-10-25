@@ -84,7 +84,7 @@ Case history from the CourtListener API, for officials found in stage 1. Source:
 
 ### epa_frs
 
-EPA Facility Registry Service, Missouri state file: facilities, owners and NAICS codes. Source: [sources/epa_frs.puml](sources/epa_frs.puml)
+EPA Facility Registry Service, Missouri state file: facilities, owners, and NAICS and SIC codes. Source: [sources/epa_frs.puml](sources/epa_frs.puml)
 
 ![epa_frs](sources/epa_frs.svg)
 

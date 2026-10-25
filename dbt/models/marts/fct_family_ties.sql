@@ -39,7 +39,8 @@ spouse_income as (
         disclosure_type as source,
         document_url as source_url
     from {{ ref('fct_disclosures') }}
-    where section = 'spousal income' and not is_garbled  -- unreadable AO-10 OCR text
+    -- not a superseded report, not unreadable AO-10 OCR text
+    where section = 'spousal income' and is_latest_version and not is_garbled
 )
 
 select distinct * from wikidata

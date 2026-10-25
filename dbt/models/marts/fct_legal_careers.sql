@@ -23,7 +23,7 @@ bio_mentions as (
         end as legal_role,
         {{ mogov.regex_extract(
             'bio_text',
-            '([^.]*(?:attorney|J\\.D\\.|law degree|practic(?:ed|es|ing) law|law firm|prosecut|public defender|bar of|admitted to the bar|judge)[^.]*\\.)'
+            '([^.]*(attorney|J\\.D\\.|law degree|practic(ed|es|ing) law|law firm|prosecut|public defender|bar of|admitted to the bar|judge)[^.]*\\.)'
         ) }} as evidence,
         source
     from {{ ref('int_officials__bios') }}

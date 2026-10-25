@@ -1,10 +1,17 @@
 -- EPA FRS facilities in Missouri that have coordinates, with one owner, one parent company and one primary
 -- NAICS code each. The owner is the first owner-role organization (owner/operator, owner, operator,
 -- permittee; a known org_type before UNKNOWN); the NAICS code is the primary code most of the facility's
--- programs give. is_government: a federal site, any owner-role organization typed as a government body
+-- programs give. A facility with no NAICS code but a SIC code (a primary one before an unknown or secondary
+-- one, then the one most programs give) gets the NAICS sector that SIC code's major group falls in (seed
+-- sic_naics_sectors): naics_code is then the two-digit sector prefix, naics_description names the sector and
+-- the SIC code, and naics_source is 'sic' (otherwise 'naics', or null when the facility has neither).
+-- is_government: a federal site, any owner-role organization typed as a government body
 -- (municipal, county, state, federal, district, tribal), or a facility or owner named like one ("City of ...",
 -- "... County", "... School District"; most organizations are typed UNKNOWN). The *_key columns are
 -- company_key names for matching donors.
+{% set sic_description_parts = [
+    "sec.sector_name", "' sector, from SIC '", "ps.sic_code", "' '", "ps.sic_description"
+] %}
 {% set government_name = (
     '(^| )(city|town|village|county|state) of | county$|county commission'
     ~ '|school district|water district|sewer district|public works'
@@ -78,6 +85,42 @@ primary_naics as (
         naics_description,
         row_number() over (partition by registry_id order by n_programs desc, naics_code asc) as rn
     from naics
+),
+
+sic as (
+    select
+        registry_id,
+        sic_code,
+        max(sic_description) as sic_description,
+        min(case when is_primary then 0 when is_secondary then 2 else 1 end) as rank_class,
+        count(*) as n_programs
+    from {{ ref('stg_epa_frs__sic') }}
+    where sic_code is not null
+    group by registry_id, sic_code
+),
+
+sic_prefixes as (
+    select
+        s.registry_id,
+        s.sic_code,
+        s.sic_description,
+        s.rank_class,
+        s.n_programs,
+        m.naics_prefix,
+        row_number() over (partition by s.registry_id, s.sic_code order by length(m.sic_prefix) desc) as rn
+    from sic as s
+    inner join {{ ref('sic_naics_sectors') }} as m on left(s.sic_code, length(m.sic_prefix)) = m.sic_prefix
+),
+
+primary_sic as (
+    select
+        registry_id,
+        sic_code,
+        sic_description,
+        naics_prefix,
+        row_number() over (partition by registry_id order by rank_class asc, n_programs desc, sic_code asc) as rn
+    from sic_prefixes
+    where rn = 1
 )
 
 select
@@ -92,8 +135,19 @@ select
     o.owner_name,
     o.owner_type,
     p.parent_company_name,
-    n.naics_code,
-    n.naics_description,
+    coalesce(n.naics_code, ps.naics_prefix) as naics_code,
+    coalesce(
+        n.naics_description,
+        case
+            when ps.naics_prefix is not null
+                then
+                    {{ dbt.concat(sic_description_parts) }}
+        end
+    ) as naics_description,
+    case
+        when n.naics_code is not null then 'naics'
+        when ps.naics_prefix is not null then 'sic'
+    end as naics_source,
     (
         f.federal_agency_name is not null
         or g.registry_id is not null
@@ -108,5 +162,7 @@ from {{ ref('stg_epa_frs__facilities') }} as f
 left join owners as o on f.registry_id = o.registry_id and o.rn = 1
 left join parents as p on f.registry_id = p.registry_id and p.rn = 1
 left join primary_naics as n on f.registry_id = n.registry_id and n.rn = 1
+left join primary_sic as ps on f.registry_id = ps.registry_id and ps.rn = 1 and n.naics_code is null
+left join {{ ref('naics_sectors') }} as sec on ps.naics_prefix = sec.naics_prefix
 left join government as g on f.registry_id = g.registry_id
 where f.latitude is not null and f.longitude is not null

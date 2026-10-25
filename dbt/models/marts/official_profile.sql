@@ -25,6 +25,9 @@ with
             official_id,
             count(*) as n
         from {{ ref(model) }}
+        {% if model == 'fct_disclosures' %}
+            where is_latest_version
+        {% endif %}
         group by 1
     ),
 {% endfor %}
