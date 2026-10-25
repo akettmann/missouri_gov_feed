@@ -8,8 +8,8 @@ models:
     are left out.'
 - name: stg_epa_frs__naics
   description: One row per NAICS code an EPA FRS program record gives a facility. is_primary marks the program's
-    primary code (PRIMARY_INDICATOR); a facility can have several programs and so several primary codes. Malformed
-    CSV rows (no REGISTRY_ID) are left out.
+    primary code (PRIMARY_INDICATOR); is_secondary the ones FRS calls SECONDARY; the rest are UNKNOWN. A facility
+    can have several programs and so several codes. Malformed CSV rows (no REGISTRY_ID) are left out.
 - name: stg_epa_frs__organizations
   description: 'One row per organization affiliated with an EPA FRS facility through one program record: owner,
     operator, parent company, contacts... org_type is mostly UNKNOWN; PRIVATE, MUNICIPAL, STATE, FEDERAL, DISTRICT

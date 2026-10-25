@@ -38,9 +38,12 @@ def _resolve(names: list[str], stage: int | None) -> list[str]:
     return names or sorted(n for n in REGISTRY if stage is None or STAGE[n] == stage)
 
 
-def _run_shard(names: list[str], shard: db.Shard) -> bool:
+def _run_shard(names: list[str], shard: db.Shard) -> list[str]:
+    """Run `names` for one shard, one after another, and return the names that failed (a failure never stops
+    the rest)."""
+
     load_all_modules()
-    ok = True
+    failed: list[str] = []
     for name in names:
         attrs = {"loader": name, "shard": f"{shard.index}/{shard.count}"}
         structlog.contextvars.bind_contextvars(**attrs)
@@ -51,7 +54,7 @@ def _run_shard(names: list[str], shard: db.Shard) -> bool:
                 log.info("loader.landed", table=f"raw.{table}", rows=n)
                 obs.rows_landed.add(n, {**attrs, "table": table})
         except Exception:  # one broken upstream shouldn't stop the others
-            ok = False
+            failed.append(name)
             obs.loader_failures.add(1, attrs)
             log.exception("loader.failed")
         finally:
@@ -60,7 +63,7 @@ def _run_shard(names: list[str], shard: db.Shard) -> bool:
             log.info("loader.finished", seconds=round(elapsed, 1))
             structlog.contextvars.unbind_contextvars(*attrs)
     obs.flush()
-    return ok
+    return failed
 
 
 def _jobs(names: list[str], shards: int, indexes) -> list[tuple[list[str], db.Shard]]:
@@ -78,6 +81,13 @@ def default_workers(shards: int) -> int:
     return max(shards, min(os.cpu_count() or 1, 8))
 
 
+def _summarize(results: list[list[str]]) -> list[str]:
+    failed = sorted({name for r in results for name in r})
+    if failed:
+        log.error("loader.summary", failed=failed, hint="these loaders failed; their raw data is stale")
+    return failed
+
+
 def run_loaders(
     names: list[str],
     stage: int | None = None,
@@ -85,18 +95,22 @@ def run_loaders(
     shards: int = 1,
     shard: int | None = None,
     workers: int | None = None,
-) -> bool:
+) -> list[str]:
+    """Run every selected loader even if some fail; return the sorted names of the loaders that failed
+    (empty when all succeeded)."""
+
     names = _resolve(names, stage)
     db.migrate_legacy_layout()
     jobs = _jobs(names, shards, [shard] if shard is not None else range(shards))
     workers = min(len(jobs), workers or default_workers(shards))
     if workers <= 1:
-        return all([_run_shard(group, s) for group, s in jobs])
+        results = [_run_shard(group, s) for group, s in jobs]
+        return _summarize(results)
     log.info("loader.pool", shards=shards, workers=workers, jobs=len(jobs))
     # spawn, not fork: workers must not inherit the parent's HTTP client or DuckDB handles
     with ProcessPoolExecutor(workers, mp_context=multiprocessing.get_context("spawn")) as pool:
         futures = [pool.submit(_run_shard, group, s) for group, s in jobs]
-        return all([f.result() for f in futures])
+        return _summarize([f.result() for f in futures])
 
 
 def _shard_args(parser: argparse.ArgumentParser) -> None:
@@ -119,6 +133,35 @@ def _shard_args(parser: argparse.ArgumentParser) -> None:
         default=int(os.environ["MOGOV_WORKERS"]) if os.environ.get("MOGOV_WORKERS") else None,
         help="processes running loader jobs at once (default: $MOGOV_WORKERS, else max(shards, min(CPUs, 8)))",
     )
+
+
+def _gate_build(failed: list[str], allowed: list[str]) -> bool:
+    """True when it is OK to run dbt after a loader pass. Strict by default: any failed loader blocks the build.
+    A failed loader named in `allowed` (--allow-failed-loader) is tolerated with a stale-data warning."""
+
+    blocking = [n for n in failed if n not in allowed]
+    for name in failed:
+        if name in allowed:
+            log.warning(
+                "build.stale_source", source=name, hint=f"{name} failed to load; building on its stale raw data"
+            )
+    if blocking:
+        log.error(
+            "build.skipped",
+            failed=blocking,
+            hint="fix them, or allow one: --allow-failed-loader NAME or MOGOV_ALLOW_FAILED_LOADERS=NAME",
+        )
+    return not blocking
+
+
+def _allowed_failed(flag_values: list[str]) -> list[str]:
+    """Sources whose failure may not stop `run`: --allow-failed-loader flags plus $MOGOV_ALLOW_FAILED_LOADERS
+    (comma-separated; for runtimes with fixed args such as compose or Cloud Run). Unknown names are rejected."""
+
+    env = [n.strip() for n in os.environ.get("MOGOV_ALLOW_FAILED_LOADERS", "").split(",") if n.strip()]
+    names = [*flag_values, *env]
+    _resolve(names, None)  # reject unknown names up front
+    return names
 
 
 def _on_sigterm(signum, _frame):
@@ -213,6 +256,15 @@ def main() -> None:
     p_run = sub.add_parser("run", help="load everything, then dbt build")
     p_run.add_argument("sources", nargs="*")
     _shard_args(p_run)
+    p_run.add_argument(
+        "--allow-failed-loader",
+        action="append",
+        default=[],
+        metavar="SOURCE",
+        help="if this loader fails, still run dbt build on its stale raw data (warned by name; repeatable). "
+        "By default any failed loader stops the run before dbt. The exit code is non-zero either way. "
+        "Also read from $MOGOV_ALLOW_FAILED_LOADERS (comma-separated), for runtimes with fixed args.",
+    )
     args, extra = parser.parse_known_args()
     if extra and args.cmd != "build":
         parser.error(f"unrecognized arguments: {' '.join(extra)}")
@@ -221,7 +273,8 @@ def main() -> None:
         load_all_modules()
         print("\n".join(f"{n}  (stage {STAGE[n]}, service {SERVICE[n]})" for n in sorted(REGISTRY)))
     elif args.cmd == "load":
-        sys.exit(0 if run_loaders(args.sources, shards=args.shards, shard=args.shard, workers=args.workers) else 1)
+        failed = run_loaders(args.sources, shards=args.shards, shard=args.shard, workers=args.workers)
+        sys.exit(1 if failed else 0)
     elif args.cmd == "export":
         export(args.format)
     elif args.cmd == "build":
@@ -229,13 +282,19 @@ def main() -> None:
     elif args.cmd == "freshness":
         sys.exit(run_dbt(["source", "freshness"]))
     elif args.cmd == "run":
+        allowed = _allowed_failed(args.allow_failed_loader)
         shards = {"shards": args.shards, "shard": args.shard, "workers": args.workers}
-        loaded = run_loaders(args.sources, stage=1, **shards)
+        failed = run_loaders(args.sources, stage=1, **shards)
+        if not _gate_build(failed, allowed):
+            sys.exit(1)
         rc = run_dbt(["build"])
         if not args.sources:
-            loaded = run_loaders([], stage=2, **shards) and loaded
+            stage2 = run_loaders([], stage=2, **shards)
+            failed += stage2
+            if not _gate_build(stage2, allowed):
+                sys.exit(1)
             rc = run_dbt(["build"]) or rc
-        sys.exit(rc or (0 if loaded else 1))
+        sys.exit(rc or (1 if failed else 0))
 
 
 if __name__ == "__main__":

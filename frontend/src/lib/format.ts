@@ -123,6 +123,6 @@ export const ROSTER_SOURCES: Record<string, string> = {
 export function rosterDownloadNote(source: string, links: number): string | null {
   if (source !== "mo_house roster") return null;
   return links > 1
-    ? "each year is a ZIP download (about 3 MB) of that session's XML"
-    : "the link is a ZIP download (about 3 MB) of that session's XML";
+    ? "each year is a ZIP download (2-3 MB) of that session's XML"
+    : "the link is a ZIP download (2-3 MB) of that session's XML";
 }
