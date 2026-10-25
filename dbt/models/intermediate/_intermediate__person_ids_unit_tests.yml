@@ -250,13 +250,13 @@ unit_tests:
   - name: person_ids_join_a_given_name_variant_in_the_same_seat
     model: int_officials__person_ids
     description: >
-      Two Open States records for the same seat in the same year under "Ken" and "Kenneth" Jamison are one person.
+      Two Open States records for the same seat under "Ken" and "Kenneth" Jamison are one person: Kenneth's stub term (2025-01-01 to 2025-02-03) overlaps in time with Ken's term from 2025-01-01.
     given:
       - input: ref('int_officials__identity_terms')
         rows:
-          - {alias_id: ocd-person/jamison-ken, year: 2025, office: state_house, district: '15', name_key: ken jamison}
-          - {alias_id: ocd-person/jamison-ken, year: 2026, office: state_house, district: '15', name_key: ken jamison}
-          - {alias_id: ocd-person/jamison-kenneth, year: 2025, office: state_house, district: '15', name_key: kenneth jamison}
+          - {alias_id: ocd-person/jamison-ken, year: 2025, office: state_house, district: '15', name_key: ken jamison, term_start: '2025-01-01', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/jamison-ken, year: 2026, office: state_house, district: '15', name_key: ken jamison, term_start: '2025-01-01', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/jamison-kenneth, year: 2025, office: state_house, district: '15', name_key: kenneth jamison, term_start: '2025-01-01', term_end: '2025-02-03'}
       - input: ref('official_id_links')
         rows: []
     expect:
@@ -268,15 +268,54 @@ unit_tests:
     model: int_officials__person_ids
     description: >
       Dan Smith (HD10 2018-2019) and his successor Danielle Smith (HD10 2019-2021) both appear in 2019 in the same
-      seat, but neither name's years sit inside the other's, so they are two people.
+      seat, but Dan's term ends the day Danielle's starts, which is succession, not overlap, so they are two people.
     given:
       - input: ref('int_officials__identity_terms')
         rows:
-          - {alias_id: ocd-person/dan, year: 2018, office: state_house, district: '10', name_key: dan smith}
-          - {alias_id: ocd-person/dan, year: 2019, office: state_house, district: '10', name_key: dan smith}
-          - {alias_id: ocd-person/danielle, year: 2019, office: state_house, district: '10', name_key: danielle smith}
-          - {alias_id: ocd-person/danielle, year: 2020, office: state_house, district: '10', name_key: danielle smith}
-          - {alias_id: ocd-person/danielle, year: 2021, office: state_house, district: '10', name_key: danielle smith}
+          - {alias_id: ocd-person/dan, year: 2018, office: state_house, district: '10', name_key: dan smith, term_start: '2018-01-01', term_end: '2019-01-09'}
+          - {alias_id: ocd-person/dan, year: 2019, office: state_house, district: '10', name_key: dan smith, term_start: '2018-01-01', term_end: '2019-01-09'}
+          - {alias_id: ocd-person/danielle, year: 2019, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/danielle, year: 2020, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/danielle, year: 2021, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/dan, person_id: ocd-person/dan, basis: self}
+        - {alias_id: ocd-person/danielle, person_id: ocd-person/danielle, basis: self}
+
+  - name: person_ids_keep_a_successor_who_holds_only_the_first_year_of_the_seat_apart
+    model: int_officials__person_ids
+    description: >
+      Dan Smith (HD10 2019 only, term ending 2019-01-09) and Danielle Smith (HD10 2019-2021, term from 2019-01-09)
+      share one seat-year and Dan's years sit inside Danielle's, but the terms only touch, so they are two people.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/dan, year: 2019, office: state_house, district: '10', name_key: dan smith, term_start: '2017-01-04', term_end: '2019-01-09'}
+          - {alias_id: ocd-person/danielle, year: 2019, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/danielle, year: 2020, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/danielle, year: 2021, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/dan, person_id: ocd-person/dan, basis: self}
+        - {alias_id: ocd-person/danielle, person_id: ocd-person/danielle, basis: self}
+
+  - name: person_ids_keep_a_mid_year_special_election_successor_apart
+    model: int_officials__person_ids
+    description: >
+      Dan Smith (HD10 2023-2026, term ending 2026-03-10) and Danielle Smith (HD10 2026 only, from the special
+      election on 2026-03-10) are two people: Danielle's year sits inside Dan's but the terms only touch.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/dan, year: 2023, office: state_house, district: '10', name_key: dan smith, term_start: '2023-01-04', term_end: '2026-03-10'}
+          - {alias_id: ocd-person/dan, year: 2024, office: state_house, district: '10', name_key: dan smith, term_start: '2023-01-04', term_end: '2026-03-10'}
+          - {alias_id: ocd-person/dan, year: 2025, office: state_house, district: '10', name_key: dan smith, term_start: '2023-01-04', term_end: '2026-03-10'}
+          - {alias_id: ocd-person/dan, year: 2026, office: state_house, district: '10', name_key: dan smith, term_start: '2023-01-04', term_end: '2026-03-10'}
+          - {alias_id: ocd-person/danielle, year: 2026, office: state_house, district: '10', name_key: danielle smith, term_start: '2026-03-10', term_end: '9999-12-31'}
       - input: ref('official_id_links')
         rows: []
     expect:
@@ -390,9 +429,9 @@ unit_tests:
     given:
       - input: ref('int_officials__identity_terms')
         rows:
-          - {alias_id: ocd-person/dan, year: 2019, office: state_house, district: '10', name_key: dan smith}
+          - {alias_id: ocd-person/dan, year: 2019, office: state_house, district: '10', name_key: dan smith, term_start: '2018-01-01', term_end: '2019-01-09'}
           - {alias_id: ocd-person/dan, year: 2020, office: state_house, district: '10', name_key: dan smith}
-          - {alias_id: ocd-person/danielle, year: 2021, office: state_house, district: '10', name_key: danielle smith}
+          - {alias_id: ocd-person/danielle, year: 2021, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
       - input: ref('official_id_links')
         rows: []
     expect:

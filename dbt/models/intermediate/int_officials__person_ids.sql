@@ -13,12 +13,15 @@
 --      as different_people in official_id_links also keeps that whole name apart.
 --   2b. two names that differ only in the given name, one being the start of the other ("Steve"/"Steven" Roberts,
 --      "Ken"/"Kenneth" Jamison; #263), are one person when each name belongs to exactly one such pair and the
---      names never hold different seats in the same year (across all ids of both names), and either share a seat
---      in some year, with one name's years entirely inside the other's (Kenneth 2025 inside Ken 2025-26), or follow
---      each other within a year in a different chamber (a move, as Roberts went House to Senate). A successor in
---      the same seat is not a variant, even with a hand-over year under both names (Dan Smith 2018-19, then
---      Danielle Smith 2019-21), nor is the same chamber a year apart. After those seat checks, a name left with
---      more than one partner (a chain or a fork) is ambiguous and joins nothing.
+--      names never hold different seats in the same year (across all ids of both names), and either hold a seat
+--      at the same time (their dated terms in one seat overlap: start_a < end_b and start_b < end_a, an open term
+--      ending 9999-12-31; the same start day overlaps, one term ending the day the other starts does not), or
+--      follow each other within a year in a different chamber (a move, as Roberts went House to Senate). Years
+--      alone cannot decide the shared-seat case: Kenneth Jamison (2025 only) inside Ken Jamison (2025-26) is a
+--      duplicate, but Danielle Smith (2019 only, or 2026 only after a special election) inside a Dan Smith
+--      successor's span looks the same by year. Dates tell them apart: Kenneth's term is a stub that overlaps
+--      Ken's, while a successor's term starts on or after the predecessor's ends. Undated House-roster rows prove
+--      no overlap. A name left with more than one partner (a chain or a fork) is ambiguous and joins nothing.
 --   3. otherwise the id is its own person, basis = self.
 -- Among merged ids the person_id is an Open States id over mohouse:, then the one whose service ends latest, then
 -- the smaller id. The choice never looks at the latest roster year, so an official's id does not change when they
@@ -87,7 +90,7 @@ keep_apart as (
 ),
 
 -- names (not ids) that differ only in the given name, one starting with the other, and whose seats fit as one
--- person. A shared seat joins them only when one name's years sit inside the other's. Every id of either name
+-- person. A shared seat joins them only when their dated terms in it overlap in time. Every id of either name
 -- is checked, so another id of one name holding a different seat in the other name's years rules the pair out.
 name_spans as (
     select
@@ -104,7 +107,9 @@ name_terms as (
         a.sq,
         t.year,
         t.office,
-        t.district
+        t.district,
+        t.term_start,
+        t.term_end
     from terms as t
     inner join aliases as a on t.alias_id = a.alias_id
 ),
@@ -134,18 +139,16 @@ variant_pairs as (
         )
         and (
             (
+                -- the names hold one seat at the same time. Succession (a term starting on/after the other
+                -- ends: Dan 2019, Danielle 2019-21) is not overlap; Kenneth's stub inside Ken's term is.
                 exists (
                     select 1
                     from name_terms as ta
                     inner join name_terms as tb
-                        on ta.year = tb.year and ta.office = tb.office and ta.district = tb.district
-                    where ta.sq = a.sq and tb.sq = b.sq
-                )
-                -- one name's years fall entirely inside the other's. A successor in the same seat who overlaps
-                -- the predecessor only at the hand-over year (Dan 2018-19, Danielle 2019-21) is not contained.
-                and (
-                    (a.first_year >= b.first_year and a.last_year <= b.last_year)
-                    or (b.first_year >= a.first_year and b.last_year <= a.last_year)
+                        on ta.office = tb.office and ta.district = tb.district
+                    where
+                        ta.sq = a.sq and tb.sq = b.sq
+                        and ta.term_start < tb.term_end and tb.term_start < ta.term_end
                 )
             )
             -- no shared seat-year: only a move between chambers, one name ending as the other begins. The same

@@ -56,8 +56,9 @@ Quirks:
 - A member's seat is matched to an Open States person; when that fails the key is `mohouse:<member id>`.
   Open States also holds some people twice (after a redistricting or a move to the Senate). Both are
   reconciled to one stable `official_id` per person by `int_officials__person_ids` (same exact name, or names that differ only in the given
-  name like Steve/Steven or Ken/Kenneth (#228, #263), and no
-  conflicting seats; seed `official_id_links` for statewide officers and judges), #97.
+  name like Steve/Steven or Ken/Kenneth (#228, #263), no conflicting seats, and
+  either overlapping dated terms in one seat or a chamber move (years alone cannot tell a duplicate record, Kenneth
+  Jamison's 2025 stub inside Ken's term, from a successor like Danielle after Dan Smith; dates can); seed `official_id_links` for statewide officers and judges), #97.
 - The site asks clients not to poll its XML more than every 30 minutes. Cached copies keep it well
   under that.
 - Every shard reads every session zip to list the roll calls. In the October 2026 full run, two shards

@@ -231,8 +231,9 @@ models:
     years with a House roster, from the House''s own roster (its raw seat-matched key: an Open States id or mohouse:<House
     member id>) and from Open States seat-terms (both chambers). A term counts for a year when it runs past January
     15 of it, and terms with an undated start are left out, as in int_officeholders__years. name_key is the id''s
-    own full name. Grain: one row per (alias_id, year, office, district). Grain: one row per (id as sourced, year,
-    office, district).'
+    own full name. term_start/term_end are the Open States term''s dates (end 9999-12-31 while open; null for House
+    roster rows, which carry only a year), so a rule can tell overlap from succession. Grain: one row per (alias_id,
+    year, office, district). Grain: one row per (id as sourced, year, office, district).'
 - name: int_officials__name_keys
   description: 'Normalized name variants per current official, for matching sources that only carry names (MEC committees,
     lobbyist reports, Wikidata labels, ratings). One row per (official, variant). Grain: one row per (official,
@@ -251,10 +252,13 @@ models:
     also keeps that whole name apart. 2b. two names that differ only in the given name, one being the start of the
     other ("Steve"/"Steven" Roberts, "Ken"/"Kenneth" Jamison; #263), are one person when each name belongs to exactly
     one such pair and the names never hold different seats in the same year (across all ids of both names), and
-    either share a seat in some year, with one name''s years entirely inside the other''s (Kenneth 2025 inside Ken
-    2025-26), or follow each other within a year in a different chamber (a move, as Roberts went House to Senate).
-    A successor in the same seat is not a variant, even with a hand-over year under both names (Dan Smith 2018-19,
-    then Danielle Smith 2019-21), nor is the same chamber a year apart. After those seat checks, a name left with
+    either hold a seat at the same time (their dated terms in one seat overlap: start_a < end_b and start_b < end_a,
+    an open term ending 9999-12-31; the same start day overlaps, one term ending the day the other starts does not),
+    or follow each other within a year in a different chamber (a move, as Roberts went House to Senate). Years alone
+    cannot decide the shared-seat case: Kenneth Jamison (2025 only) inside Ken Jamison (2025-26) is a duplicate,
+    but Danielle Smith (2019 only, or 2026 only after a special election) inside a Dan Smith successor''s span looks
+    the same by year. Dates tell them apart: Kenneth''s term is a stub that overlaps Ken''s, while a successor''s
+    term starts on or after the predecessor''s ends. Undated House-roster rows prove no overlap. A name left with
     more than one partner (a chain or a fork) is ambiguous and joins nothing. 3. otherwise the id is its own person,
     basis = self. Among merged ids the person_id is an Open States id over mohouse:, then the one whose service
     ends latest, then the smaller id. The choice never looks at the latest roster year, so an official''s id does
