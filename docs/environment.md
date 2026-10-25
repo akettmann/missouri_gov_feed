@@ -37,8 +37,9 @@ Diagrams: [pipeline](diagrams/pipeline.svg), [lineage](diagrams/lineage.svg),
 
    The first run is the slow one: it downloads several GB (FEC, CourtListener bulk) and parses about
    ten years of House roll-call PDFs and Senate journals. The statutes (`mo_revisor`) take longest, about
-   15 hours: revisor.mo.gov blocks any IP that reads faster than about one page a second, so the loader
-   reads ~30,000 section-version pages 1.5 s apart, however many shards run. Everything fetched is cached under
+   17 hours: revisor.mo.gov blocks any IP that reads faster than about one page a second, so the loader
+   reads ~30,000 section-version pages 2 s apart, however many shards run. Avoid browsing revisor.mo.gov
+   from the same IP during the load: that traffic counts toward the limit too. Everything fetched is cached under
    `data/cache`, so later runs are much faster.
 
 5. Check the result: `uv run mogov build` should end with `ERROR=0`. Run `uv run mogov export` to write

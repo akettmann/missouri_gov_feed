@@ -187,9 +187,12 @@ Quirks:
   30 seconds. First it serves a warning page with status 200 in place of the page asked for (the same page it
   serves for a page that doesn't exist). If requests keep coming, every request from that IP, browsers
   included, redirects to `Block.aspx`. Three shards at ~10 requests/s got an IP blocked within two minutes on
-  2026-10-25. The block page gives WebMaster@LR.mo.gov for help. The loader waits 1.5 s × the shard count
-  before each request, so all shards together stay under one request per 1.5 s from one IP. It also stops with
-  `Blocked` on either page instead of caching it. A cold load reads ~30,500 section-version pages (October 2026), so it takes about 15 hours.
+  2026-10-25. The block page gives WebMaster@LR.mo.gov for help. The loader waits 2 s × the shard count
+  before each request, so all shards together stay under one request per 2 s from one IP. Neither page is
+  ever cached. A warning backs off 1, 5 and then 15 minutes and retries: at 1.5 s apart, one shard still drew a
+  warning after ~600 pages, since other traffic from the same IP counts too. The load stops with `Blocked` on
+  a fourth warning or on `Block.aspx`. A cold load reads ~30,500 section-version pages (October 2026), so it
+  takes about 17 hours.
 - Several versions of one section can be in force side by side: a later version with a future effective date
   (27.117 has one effective 28 Aug 2026 and one effective 1 Jul 2027), or conflicting enactments of the same
   year (`MultiEnact.aspx`). `fct_statute_sections.is_current` marks the in-force version with the latest

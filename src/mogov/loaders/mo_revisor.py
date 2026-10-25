@@ -15,6 +15,7 @@ parses dates, status and the history citations. Units: chapters, plus rx.aspx (o
 """
 
 import re
+import time
 
 import httpx
 import lxml.html
@@ -30,8 +31,10 @@ BASE = "https://revisor.mo.gov/main"
 # (served with 200 in place of the page asked for); keep going and every request from that IP, browsers included,
 # redirects to Block.aspx. ~10 requests/s from three shards got an IP blocked within two minutes on 2026-10-25.
 # Each shard waits POLITE_DELAY x the shard count between requests, so all shards together from one IP stay under
-# one request per POLITE_DELAY.
-POLITE_DELAY = 1.5
+# one request per POLITE_DELAY. Even at 1.5 s a single shard drew one warning after ~600 pages (other traffic from
+# the same IP counts too), so a warning backs off and retries; only repeated warnings or a block stop the load.
+POLITE_DELAY = 2.0
+WARNING_BACKOFF = (60, 300, 900)
 REFUSED_MARKER = b"Recent accesses are tracked over a thirty second interval"
 # A new enactment or amendment is a new version with its own bid (a new URL), found through the chapter lists,
 # which are re-read weekly. A version's page only changes with annotations, so it is re-read twice a year.
@@ -49,16 +52,28 @@ class Blocked(RuntimeError):
     warning page is also what a page that doesn't exist returns; a listed section never should."""
 
 
+class Warned(Blocked):
+    """The too-fast / no-such-page warning (not yet a block)."""
+
+
 def _not_blocked(resp: httpx.Response) -> None:
     if resp.url.path.lower().endswith("/block.aspx"):
         raise Blocked(f"revisor.mo.gov blocked this IP address; stop and retry later ({resp.url})")
     if REFUSED_MARKER in resp.content:
-        raise Blocked(f"revisor.mo.gov answered with its too-fast / no-such-page warning for {resp.url}")
+        raise Warned(f"revisor.mo.gov answered with its too-fast / no-such-page warning for {resp.url}")
 
 
 def _get(url: str, params: dict | None = None, *, max_age: float = LIST_MAX_AGE, shards: int = 1) -> str:
-    page = fetch(url, params, max_age=max_age, delay=POLITE_DELAY * shards, check=_not_blocked)
-    return page.decode("utf-8", "replace")
+    for wait in (*WARNING_BACKOFF, None):
+        try:
+            page = fetch(url, params, max_age=max_age, delay=POLITE_DELAY * shards, check=_not_blocked)
+            return page.decode("utf-8", "replace")
+        except Warned:
+            if wait is None:
+                raise
+            log.warning("mo_revisor.warned", url=url, params=params, backoff_s=wait)
+            time.sleep(wait)
+    raise AssertionError("unreachable")
 
 
 def _text(el) -> str:

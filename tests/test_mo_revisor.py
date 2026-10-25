@@ -98,6 +98,27 @@ def test_speeding_warning_raises_and_is_not_cached(tmp_path, monkeypatch):
     monkeypatch.setattr(http, "CACHE_DIR", tmp_path)
     monkeypatch.setattr(http, "_client", httpx.Client(transport=transport))
     monkeypatch.setattr(mo_revisor, "POLITE_DELAY", 0)
-    with pytest.raises(mo_revisor.Blocked):
+    monkeypatch.setattr(mo_revisor, "WARNING_BACKOFF", (0, 0))
+    with pytest.raises(mo_revisor.Warned):
         mo_revisor._get("https://revisor.mo.gov/main/OneChapter.aspx", {"chapter": "1"})
     assert not [p for p in tmp_path.iterdir() if not p.name.startswith(".")]
+
+
+def test_speeding_warning_backs_off_and_retries(tmp_path, monkeypatch):
+    # a single warning (other traffic from the same IP counts) waits and retries instead of failing the load
+    answers = ["<p>Recent accesses are tracked over a thirty second interval.</p>", "<html>the section</html>"]
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url)
+        return httpx.Response(200, text=answers[min(len(calls), len(answers)) - 1])
+
+    sleeps = []
+    monkeypatch.setattr(http, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(http, "_client", httpx.Client(transport=httpx.MockTransport(handler)))
+    monkeypatch.setattr(mo_revisor, "POLITE_DELAY", 0)
+    monkeypatch.setattr(mo_revisor, "WARNING_BACKOFF", (7, 11))
+    monkeypatch.setattr(mo_revisor.time, "sleep", sleeps.append)
+    assert mo_revisor._get("https://revisor.mo.gov/main/OneChapter.aspx", {"chapter": "1"}) == answers[1]
+    assert len(calls) == 2
+    assert sleeps == [7]

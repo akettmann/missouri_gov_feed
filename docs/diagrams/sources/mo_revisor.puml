@@ -6,9 +6,10 @@ start
 :owned chapters
 (one unit per chapter, by hash);
 note right
-  Every request waits 1.5 s x shard count:
+  Every request waits 2 s x shard count:
   the site blocks an IP that reads faster
-  than ~1 page/s.
+  than ~1 page/s. A warning page backs off
+  1 / 5 / 15 min and retries.
 end note
 fork
   :shard that owns "rx.aspx":
