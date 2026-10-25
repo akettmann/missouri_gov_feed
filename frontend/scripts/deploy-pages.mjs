@@ -13,7 +13,9 @@ import { cp, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  beginPush,
   checkLimits,
+  failureReport,
   InterruptedError,
   isInterruptExit,
   PAGES_BRANCH,
@@ -24,6 +26,7 @@ import {
   repoFromRemote,
   withTempDir,
 } from "./pages-config.mjs";
+import { budgetGate } from "./size-budget.mjs";
 import { resolveDbPath, resolveExportsDir, staleExportsWarning } from "./stale-exports.mjs";
 
 // Everything below resolves from frontend/ (this file's parent), so the cwd the script is started from is irrelevant.
@@ -104,6 +107,8 @@ if (opts.skipBuild) {
     console.error("dist/ is missing: drop --skip-build.");
     process.exit(2);
   }
+  // A --skip-build dist never went through the build's own budget check.
+  if (!budgetGate({ cwd: FRONTEND, spawn: spawnSync })) process.exit(1);
 } else {
   console.log(`> pnpm build (base ${target.base ?? "/"}, site ${target.site})`);
   const r = spawnSync("pnpm build", {
@@ -154,6 +159,7 @@ try {
       await git("add", "-A");
       await guard.check();
       await git("commit", "-q", "-m", `Deploy site (${new Date().toISOString()})`);
+      await guard.check();
       const sha = await git("rev-parse", "--short", "HEAD");
 
       if (opts.dryRun) {
@@ -161,8 +167,7 @@ try {
         console.log(`Would run: git push --force ${pushTo} ${PAGES_BRANCH}:refs/heads/${PAGES_BRANCH}`);
         console.log(`Would be live at ${target.url}`);
       } else {
-        await guard.check(); // last stop before the force-push
-        pushStarted = true;
+        await beginPush(guard, () => (pushStarted = true)); // last stop before the force-push
         await git("push", "--force", pushTo, `${PAGES_BRANCH}:refs/heads/${PAGES_BRANCH}`);
         console.log(`Pushed ${sha} to ${PAGES_BRANCH}. Live shortly at ${target.url}`);
       }
@@ -171,14 +176,8 @@ try {
   );
   if (opts.keep) console.log(`Kept temp repo: ${keptDir}`);
 } catch (e) {
-  const interrupted = e instanceof InterruptedError;
-  console.error(
-    interrupted && !pushStarted
-      ? "Interrupted; nothing was pushed."
-      : interrupted
-        ? "Interrupted during git push; the push may or may not have completed."
-        : e.message,
-  );
+  const report = failureReport(e, pushStarted);
+  console.error(report.message);
   if (opts.keep) console.error(`Kept temp repo: ${keptDir}`);
-  process.exit(e instanceof InterruptedError ? 130 : 1);
+  process.exit(report.code);
 }
