@@ -554,9 +554,9 @@ models:
       their party (party unity from fct_party_unity_yearly, current chamber, per calendar year and lifetime, at
       least awards_min_party_line_votes party-line votes in the period (default 20); the lifetime figure equals
       the profile's party_unity_pct, the yearly figures appear with the award only). Most breaks needs at least
-      one break, and the two party awards each take at most half the ranked field (floor(group_size / 2)) so
-      no official is in both lists for one office and period; an official a tie at the cut would put in both is
-      in neither. Only offices with awards_min_field_size
+      one break. The two ends of every pair each take at most half their ranked field (floor(group_size / 2)) so
+      no official is in both lists of a pair for one office and period; an official a tie at the cut would put
+      in both is in neither. Only offices with awards_min_field_size
       (5) or more qualifying officials in the period. streak_years counts consecutive qualifying years. No
       composite scores. Grain: one row per (award, office, period, official).
     data_tests:

@@ -209,13 +209,15 @@ const tables = freshness();
       opposite (lowest and highest attendance, and so on). Ranks use the unrounded figure, so two officials
       shown at the same rounded percentage can hold different ranks; only exact ties share a rank (this holds
       for every award, including the lowest share of money from PACs, committees and parties). The top five
-      qualify unless an award sets its own cutoff (the awards_threshold setting). An office needs at least
-      five qualifying officials in a period, so single-seat offices like governor have no awards. An official
-      who qualified for the same award in consecutive years gets a marker such as X3 (3 qualifying years in a
-      row). Years the official wasn't ranked for that award (in another office, not eligible for the measure,
-      or too few officials to rank) are skipped: they neither add to nor break the run, so the years in a run
-      can span more calendar years than the number shown. A year ranked outside the cutoff breaks it. Lifetime
-      rankings have no marker.
+      qualify unless an award sets its own cutoff (the awards_threshold setting). Because the two ends of a
+      pair are one ranking, each end holds at most half of the ranked officials (a field of 7 gives three on
+      each list), and an official tied into both lists is left out of both, so nobody holds both ends of a
+      pair in one period. An office needs at least five qualifying officials in a period, so single-seat
+      offices like governor have no awards. An official who qualified for the same award in consecutive years
+      gets a marker such as X3 (3 qualifying years in a row). Years the official wasn't ranked for that award
+      (in another office, not eligible for the measure, or too few officials to rank) are skipped: they
+      neither add to nor break the run, so the years in a run can span more calendar years than the number
+      shown. A year ranked outside the cutoff breaks it. Lifetime rankings have no marker.
     </p>
     <ul>
       <li>
@@ -233,9 +235,8 @@ const tables = freshness();
         own party) in the official's current chamber, per calendar year and over all loaded votes, with the
         number of party-line votes it rests on shown beside it. Needs at least 20 party-line votes in the
         period (the awards_min_party_line_votes setting, default 20). Maverick needs at least one vote against
-        the party, and each of the Maverick and Team Player lists holds at most half of the ranked officials;
-        an official tied into both lists is left out of both, so nobody holds both in one period. The lifetime
-        figure is the same number the profile page shows; yearly figures appear with the award only.
+        the party. The lifetime figure is the same number the profile page shows; yearly figures appear with
+        the award only.
       </li>
     </ul>
   </section>
