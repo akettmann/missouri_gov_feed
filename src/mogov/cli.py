@@ -221,7 +221,13 @@ def _dump_vars(dbt_vars: dict) -> str:
 
 def run_dbt(args: list[str]) -> int:
     for table in db.ensure_optional_tables():
-        log.warning("dbt.placeholder", table=f"raw.{table}", reason="not loaded yet; using an empty placeholder")
+        loader_name = db.OPTIONAL_JSON_TABLES[table]
+        log.warning(
+            "dbt.placeholder",
+            table=f"raw.{table}",
+            reason=f"not loaded yet; using an empty placeholder. Run `mogov load {loader_name}` to fill it",
+            loader=loader_name,
+        )
     # Models over opt-in CSV sources (no empty placeholder possible) are switched on when the data exists.
     dbt_vars = {"mec_direct": db.raw_exists("mec_cd1_a"), "cl_case_bulk": db.raw_exists("cl_mo_opinion_clusters")}
     args, dbt_vars = _merge_user_vars(args, dbt_vars)
