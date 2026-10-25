@@ -119,9 +119,9 @@ unit_tests:
   - name: campaign_finance_fec_received_links_donor_disbursements
     model: fct_campaign_finance
     description: >
-      An FEC "received" row links the donor committee's disbursements page (its outgoing money, which includes
-      the gift), not its receipts page, which would never show the gift; a "given" row links the giving
-      committee's disbursements too (#236).
+      An FEC "received" row links the donor committee's disbursements page narrowed to the receiving committee
+      (its outgoing money, which includes the gift), not its receipts page, which would never show the gift; a
+      "given" row links the giving committee's disbursements narrowed to the recipient committee (#236).
     overrides:
       vars:
         mec_direct: false
@@ -153,8 +153,8 @@ unit_tests:
         rows: []
     expect:
       rows:
-        - {direction: received, source_record_id: 'fec:11', source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C00000099'}
-        - {direction: given, source_record_id: 'fec:12', source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C00000001'}
+        - {direction: received, source_record_id: 'fec:11', source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C00000099&recipient_name=C00000001'}
+        - {direction: given, source_record_id: 'fec:12', source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C00000001&recipient_name=C00000002'}
 
   - name: campaign_finance_tap_contribution_and_expenditure_ids_do_not_collide
     model: fct_campaign_finance

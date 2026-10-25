@@ -40,9 +40,10 @@ fec_received as (
         c.transaction_kind as kind,
         'FEC' as source,
         'exact id' as match_confidence,
-        -- the donor committee's disbursements (its outgoing money, which includes this gift); the donor's
-        -- receipts page would not show it. Not narrowed to the recipient: fec.gov's page filters are unconfirmed.
-        'https://www.fec.gov/data/disbursements/?committee_id=' || c.giving_committee_id as source_url,
+        -- the donor committee's disbursements narrowed to this recipient with fec.gov's recipient_name filter,
+        -- which full-text matches committee ids (its receipts page would not show the gift)
+        'https://www.fec.gov/data/disbursements/?committee_id=' || c.giving_committee_id
+        || '&recipient_name=' || c.recipient_committee_id as source_url,
         'fec:' || cast(c.sub_id as {{ dbt.type_string() }}) as source_record_id
     from {{ ref('stg_fec__committee_contributions') }} as c
     inner join fec_ids as i on c.candidate_id = i.fec_candidate_id
@@ -64,7 +65,9 @@ fec_given as (
         c.transaction_kind || coalesce(' (from ' || g.committee_name || ')', '') as kind,
         'FEC' as source,
         'exact id' as match_confidence,
-        'https://www.fec.gov/data/disbursements/?committee_id=' || c.giving_committee_id as source_url,
+        -- the official's committee's disbursements narrowed to this recipient (recipient_name matches committee ids)
+        'https://www.fec.gov/data/disbursements/?committee_id=' || c.giving_committee_id
+        || '&recipient_name=' || c.recipient_committee_id as source_url,
         'fec:' || cast(c.sub_id as {{ dbt.type_string() }}) as source_record_id
     from {{ ref('stg_fec__committee_contributions') }} as c
     inner join fec_committees as fc on c.giving_committee_id = fc.committee_id

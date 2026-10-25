@@ -8,8 +8,8 @@ test("MEC links are the receiving (official's) committee, FEC links the donor's"
     "official's committee (MEC)",
   );
   assert.equal(
-    donorLinkLabel("https://www.fec.gov/data/disbursements/?committee_id=C00235739"),
-    "donor's disbursements (FEC)",
+    donorLinkLabel("https://www.fec.gov/data/disbursements/?committee_id=C00235739&recipient_name=C00000001"),
+    "donor's gifts to this committee (FEC)",
   );
 });
 
