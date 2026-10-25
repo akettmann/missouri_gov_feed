@@ -57,8 +57,11 @@ models:
     that SIC code''s major group falls in (seed sic_naics_sectors): naics_code is then the two-digit sector prefix,
     naics_description names the sector and the SIC code, and naics_source is ''sic''. naics_source is null when
     the facility has no usable code. A real NAICS code, even a non-primary one, is more precise than a two-digit
-    SIC-derived sector, and agrees with it on the sector for 92-98% of facilities. is_government: a federal site,
-    any owner-role organization typed as a government body (municipal, county, state, federal, district, tribal),
+    SIC-derived sector, and agrees with it on the sector for about 90% of facilities. Codes tied on tier and program
+    count go to the one in the SIC-derived sector (NAICS 31-33 count as one sector), then the lowest code. The SIC
+    sector counts only as a signal when the SIC code is not itself tied (same tier and program count) with a SIC
+    code in a different sector, and is not SIC 1629 (construction stormwater-permit noise). is_government: a federal
+    site, any owner-role organization typed as a government body (municipal, county, state, federal, district, tribal),
     or a facility or owner named like one ("City of ...", "... County", "... School District"; most organizations
     are typed UNKNOWN). The *_key columns are company_key names for matching donors. Grain: one row per geocoded
     EPA FRS facility.'
