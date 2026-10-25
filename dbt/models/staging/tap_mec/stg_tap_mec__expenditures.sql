@@ -7,7 +7,8 @@
 -- keeps different people sharing a surname apart. With no usable company the payee is "First Last", then the
 -- partial person name (first or last alone). Placeholders ('~', '-', no letter or number) are dropped, and a
 -- whole name (company) of one character is dropped; a part of a person's name keeps initials ('J Roe'). All-digit
--- name parts are dropped. Same rules as contributions (macros/names.sql).
+-- name parts are dropped. When the last name already starts with (or is) the first name (an organization typed
+-- into both boxes: 'USPS' / 'USPS'), the last name alone is used. Same rules as contributions (macros/names.sql).
 with
 
 names as (
@@ -16,7 +17,18 @@ names as (
         {{ mogov.clean_name('company') }} as company_clean,
         case
             when {{ mogov.name_part('first_name') }} is not null and {{ mogov.name_part('last_name') }} is not null
-                then {{ mogov.person_name('first_name', 'last_name') }}
+                then
+                    case
+                        when
+                            lower({{ mogov.name_part('last_name') }}) = lower({{ mogov.name_part('first_name') }})
+                            or left(
+                                lower({{ mogov.name_part('last_name') }}),
+                                length({{ mogov.name_part('first_name') }}) + 1
+                            )
+                            = lower({{ mogov.name_part('first_name') }}) || ' '
+                            then {{ mogov.name_part('last_name') }}
+                        else {{ mogov.person_name('first_name', 'last_name') }}
+                    end
         end as full_name,
         {{ mogov.person_name('first_name', 'last_name') }} as person_name_any,
         replace(lower({{ mogov.name_part('last_name') }}), ' ', '') as last_key
