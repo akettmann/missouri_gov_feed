@@ -233,16 +233,16 @@ unit_tests:
           - {official_id: e, chamber: us_house, vote_year: 2024, party_line_votes: 100, with_party_votes: 40}
     expect:
       rows:
-        - {award: most_party_breaks, period: '2023', official_id: b, award_rank: 1, metric: 80.0, sample_size: 100, group_size: 2, streak_years: 1}
-        - {award: most_party_breaks, period: '2024', official_id: a, award_rank: 1, metric: 50.0, sample_size: 100, group_size: 2, streak_years: 1}
-        - {award: most_party_breaks, period: lifetime, official_id: a, award_rank: 1, metric: 75.0, sample_size: 200, group_size: 2, streak_years: null}
-        - {award: most_party_loyal, period: '2023', official_id: a, award_rank: 1, metric: 100.0, sample_size: 90, group_size: 2, streak_years: 1}
-        - {award: most_party_loyal, period: '2024', official_id: b, award_rank: 1, metric: 90.0, sample_size: 100, group_size: 2, streak_years: 1}
-        - {award: most_party_loyal, period: lifetime, official_id: b, award_rank: 1, metric: 85.0, sample_size: 200, group_size: 2, streak_years: null}
-        - {award: most_party_breaks, period: '2024', official_id: e, award_rank: 1, metric: 40.0, sample_size: 100, group_size: 2, streak_years: 1}
-        - {award: most_party_breaks, period: lifetime, official_id: e, award_rank: 1, metric: 40.0, sample_size: 100, group_size: 2, streak_years: null}
-        - {award: most_party_loyal, period: '2024', official_id: d, award_rank: 1, metric: 60.0, sample_size: 100, group_size: 2, streak_years: 1}
-        - {award: most_party_loyal, period: lifetime, official_id: d, award_rank: 1, metric: 60.0, sample_size: 100, group_size: 2, streak_years: null}
+        - {award: most_party_breaks, period: '2023', period_kind: year, official_id: b, award_rank: 1, metric: 80.0, sample_size: 100, group_size: 2, streak_years: 1}
+        - {award: most_party_breaks, period: '2024', period_kind: year, official_id: a, award_rank: 1, metric: 50.0, sample_size: 100, group_size: 2, streak_years: 1}
+        - {award: most_party_breaks, period: lifetime, period_kind: lifetime, official_id: a, award_rank: 1, metric: 75.0, sample_size: 200, group_size: 2, streak_years: null}
+        - {award: most_party_loyal, period: '2023', period_kind: year, official_id: a, award_rank: 1, metric: 100.0, sample_size: 90, group_size: 2, streak_years: 1}
+        - {award: most_party_loyal, period: '2024', period_kind: year, official_id: b, award_rank: 1, metric: 90.0, sample_size: 100, group_size: 2, streak_years: 1}
+        - {award: most_party_loyal, period: lifetime, period_kind: lifetime, official_id: b, award_rank: 1, metric: 85.0, sample_size: 200, group_size: 2, streak_years: null}
+        - {award: most_party_breaks, period: '2024', period_kind: year, official_id: e, award_rank: 1, metric: 40.0, sample_size: 100, group_size: 2, streak_years: 1}
+        - {award: most_party_breaks, period: lifetime, period_kind: lifetime, official_id: e, award_rank: 1, metric: 40.0, sample_size: 100, group_size: 2, streak_years: null}
+        - {award: most_party_loyal, period: '2024', period_kind: year, official_id: d, award_rank: 1, metric: 60.0, sample_size: 100, group_size: 2, streak_years: 1}
+        - {award: most_party_loyal, period: lifetime, period_kind: lifetime, official_id: d, award_rank: 1, metric: 60.0, sample_size: 100, group_size: 2, streak_years: null}
 
   - name: awards_party_awards_need_a_break_and_never_overlap
     model: rpt_awards
@@ -672,14 +672,14 @@ unit_tests:
         rows: []
     expect:
       rows:
-        - {award: most_committee_money, period: '2024', official_id: b, award_rank: 1, metric: 20000, sample_size: 20000}
-        - {award: most_committee_money, period: '2024', official_id: a, award_rank: 2, metric: 4000, sample_size: 4000}
-        - {award: most_committee_money, period: lifetime, official_id: b, award_rank: 1, metric: 20000, sample_size: 20000}
-        - {award: most_committee_money, period: lifetime, official_id: a, award_rank: 2, metric: 10500, sample_size: 10500}
-        - {award: least_committee_money_share, period: '2024', official_id: a, award_rank: 1, metric: 25.0, sample_size: 40000}
-        - {award: least_committee_money_share, period: '2024', official_id: b, award_rank: 2, metric: 80.0, sample_size: 25000}
-        - {award: least_committee_money_share, period: lifetime, official_id: a, award_rank: 1, metric: 25.0, sample_size: 40000}
-        - {award: least_committee_money_share, period: lifetime, official_id: b, award_rank: 2, metric: 80.0, sample_size: 25000}
+        - {award: most_committee_money, period: '2024', period_kind: year, official_id: b, award_rank: 1, metric: 20000, sample_size: 20000}
+        - {award: most_committee_money, period: '2024', period_kind: year, official_id: a, award_rank: 2, metric: 4000, sample_size: 4000}
+        - {award: most_committee_money, period: lifetime, period_kind: lifetime, official_id: b, award_rank: 1, metric: 20000, sample_size: 20000}
+        - {award: most_committee_money, period: lifetime, period_kind: lifetime, official_id: a, award_rank: 2, metric: 10500, sample_size: 10500}
+        - {award: least_committee_money_share, period: '2024', period_kind: fec_cycle, official_id: a, award_rank: 1, metric: 25.0, sample_size: 40000}
+        - {award: least_committee_money_share, period: '2024', period_kind: fec_cycle, official_id: b, award_rank: 2, metric: 80.0, sample_size: 25000}
+        - {award: least_committee_money_share, period: lifetime, period_kind: lifetime, official_id: a, award_rank: 1, metric: 25.0, sample_size: 40000}
+        - {award: least_committee_money_share, period: lifetime, period_kind: lifetime, official_id: b, award_rank: 2, metric: 80.0, sample_size: 25000}
 
   - name: awards_state_money_share_uses_rollup_total
     model: rpt_awards
@@ -716,18 +716,18 @@ unit_tests:
         rows: []
     expect:
       rows:
-        - {award: most_committee_money, period: '2024', official_id: s2, award_rank: 1, metric: 9000, sample_size: 10000}
-        - {award: most_committee_money, period: '2024', official_id: s3, award_rank: 2, metric: 5000, sample_size: 10000}
-        - {award: most_committee_money, period: '2024', official_id: s1, award_rank: 3, metric: 3000, sample_size: 10000}
-        - {award: most_committee_money, period: lifetime, official_id: s2, award_rank: 1, metric: 9000, sample_size: 10000}
-        - {award: most_committee_money, period: lifetime, official_id: s3, award_rank: 2, metric: 5000, sample_size: 10000}
-        - {award: most_committee_money, period: lifetime, official_id: s1, award_rank: 3, metric: 3000, sample_size: 10000}
-        - {award: least_committee_money_share, period: '2024', official_id: s1, award_rank: 1, metric: 30.0, sample_size: 10000}
-        - {award: least_committee_money_share, period: '2024', official_id: s3, award_rank: 2, metric: 50.0, sample_size: 10000}
-        - {award: least_committee_money_share, period: '2024', official_id: s2, award_rank: 3, metric: 90.0, sample_size: 10000}
-        - {award: least_committee_money_share, period: lifetime, official_id: s1, award_rank: 1, metric: 30.0, sample_size: 10000}
-        - {award: least_committee_money_share, period: lifetime, official_id: s3, award_rank: 2, metric: 50.0, sample_size: 10000}
-        - {award: least_committee_money_share, period: lifetime, official_id: s2, award_rank: 3, metric: 90.0, sample_size: 10000}
+        - {award: most_committee_money, period: '2024', period_kind: year, official_id: s2, award_rank: 1, metric: 9000, sample_size: 10000}
+        - {award: most_committee_money, period: '2024', period_kind: year, official_id: s3, award_rank: 2, metric: 5000, sample_size: 10000}
+        - {award: most_committee_money, period: '2024', period_kind: year, official_id: s1, award_rank: 3, metric: 3000, sample_size: 10000}
+        - {award: most_committee_money, period: lifetime, period_kind: lifetime, official_id: s2, award_rank: 1, metric: 9000, sample_size: 10000}
+        - {award: most_committee_money, period: lifetime, period_kind: lifetime, official_id: s3, award_rank: 2, metric: 5000, sample_size: 10000}
+        - {award: most_committee_money, period: lifetime, period_kind: lifetime, official_id: s1, award_rank: 3, metric: 3000, sample_size: 10000}
+        - {award: least_committee_money_share, period: '2024', period_kind: year, official_id: s1, award_rank: 1, metric: 30.0, sample_size: 10000}
+        - {award: least_committee_money_share, period: '2024', period_kind: year, official_id: s3, award_rank: 2, metric: 50.0, sample_size: 10000}
+        - {award: least_committee_money_share, period: '2024', period_kind: year, official_id: s2, award_rank: 3, metric: 90.0, sample_size: 10000}
+        - {award: least_committee_money_share, period: lifetime, period_kind: lifetime, official_id: s1, award_rank: 1, metric: 30.0, sample_size: 10000}
+        - {award: least_committee_money_share, period: lifetime, period_kind: lifetime, official_id: s3, award_rank: 2, metric: 50.0, sample_size: 10000}
+        - {award: least_committee_money_share, period: lifetime, period_kind: lifetime, official_id: s2, award_rank: 3, metric: 90.0, sample_size: 10000}
 
   - name: officeholders_by_year_source_url
     model: rpt_officeholders_by_year

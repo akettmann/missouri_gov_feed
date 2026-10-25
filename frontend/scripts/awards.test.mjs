@@ -33,7 +33,7 @@ test("streakMarker counts cycles when asked", () => {
 
 test("MOGOV_SKIP_AWARD_CYCLES_CHECK skips the cycle check only when exactly 1, and says so", async () => {
   const { awardCyclesGate, skipAwardCyclesCheck } = await import("../src/lib/exports/awardDefs.ts");
-  const stale = [{ award: "least_committee_money_share", office: "us_house", period: "2025" }];
+  const stale = [{ office: "us_house", period: "2025", period_kind: "fec_cycle" }];
   const logs = [];
   for (const v of ["0", "", "true", undefined]) {
     assert.equal(skipAwardCyclesCheck({ MOGOV_SKIP_AWARD_CYCLES_CHECK: v }), false);
@@ -50,7 +50,7 @@ test("MOGOV_SKIP_AWARD_CYCLES_CHECK skips the cycle check only when exactly 1, a
 
 test("the cycle-check message names `uv run mogov build` and the switch", async () => {
   const { assertCyclePeriods } = await import("../src/lib/exports/awardDefs.ts");
-  const stale = [{ award: "least_committee_money_share", office: "us_house", period: "2025" }];
+  const stale = [{ office: "us_house", period: "2025", period_kind: "fec_cycle" }];
   assert.throws(() => assertCyclePeriods(stale), /`uv run mogov build` then `uv run mogov export/);
   assert.throws(() => assertCyclePeriods(stale), /MOGOV_SKIP_AWARD_CYCLES_CHECK=1/);
 });
@@ -58,4 +58,56 @@ test("the cycle-check message names `uv run mogov build` and the switch", async 
 test("the awards loader runs the cycle gate on the lists it returns", () => {
   const src = readFileSync(new URL("../src/lib/exports/awards.ts", import.meta.url), "utf8");
   assert.match(src, /awardCyclesGate\(out, process\.env, console\.warn\);\s*return out;/);
+});
+
+test("isCycleList reads period_kind, not the award or office", async () => {
+  const { isCycleList, officeHasCycles } = await import("../src/lib/exports/awardDefs.ts");
+  assert.equal(isCycleList({ period_kind: "fec_cycle" }), true);
+  assert.equal(isCycleList({ period_kind: "year" }), false);
+  assert.equal(isCycleList({ period_kind: "lifetime" }), false);
+  const lists = [
+    { office: "us_house", period_kind: "fec_cycle" },
+    { office: "us_house", period_kind: "year" },
+    { office: "state_house", period_kind: "year" },
+    { office: "governor", period_kind: "fec_cycle" },
+  ];
+  assert.equal(officeHasCycles(lists, "us_house"), true);
+  assert.equal(officeHasCycles(lists, "state_house"), false);
+  // a future federal office is a cycle office as soon as the data says so, with no frontend change
+  assert.equal(officeHasCycles(lists, "governor"), true);
+});
+
+test("an rpt_awards export without period_kind fails with the stale-export message", async () => {
+  const { assertPeriodKindColumn } = await import("../src/lib/exports/awardDefs.ts");
+  assert.doesNotThrow(() => assertPeriodKindColumn(["award", "period", "period_kind"]));
+  assert.throws(
+    () => assertPeriodKindColumn(["award", "period"]),
+    /stale.*no period_kind column.*`uv run mogov build` then `uv run mogov export/s,
+  );
+});
+
+test("unknown or mismatched period_kind values are rejected", async () => {
+  const { assertKnownPeriodKinds } = await import("../src/lib/exports/awardDefs.ts");
+  assert.doesNotThrow(() =>
+    assertKnownPeriodKinds([
+      { period: "2024", period_kind: "fec_cycle" },
+      { period: "2024", period_kind: "year" },
+      { period: "lifetime", period_kind: "lifetime" },
+    ]),
+  );
+  assert.throws(() => assertKnownPeriodKinds([{ period: "2024", period_kind: "decade" }]), /2024 \(decade\)/);
+  assert.throws(
+    () => assertKnownPeriodKinds([{ period: "lifetime", period_kind: "year" }]),
+    /lifetime \(year\)/,
+  );
+  assert.throws(
+    () => assertKnownPeriodKinds([{ period: "2024", period_kind: "lifetime" }]),
+    /2024 \(lifetime\)/,
+  );
+});
+
+test("the awards loader checks the period_kind column before reading", () => {
+  const src = readFileSync(new URL("../src/lib/exports/awards.ts", import.meta.url), "utf8");
+  assert.match(src, /assertPeriodKindColumn\(/);
+  assert.match(src, /select award, office, period, period_kind,/);
 });
