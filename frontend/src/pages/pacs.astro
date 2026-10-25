@@ -621,6 +621,11 @@ const url = Object.fromEntries(SOURCES.map((s) => [s.id, s.url])) as Record<Sour
     border: 1px solid var(--link);
     border-radius: 6px;
     font-weight: 600;
+    list-style: none;
+  }
+  /* Safari < 18.4 draws the marker here, independent of display */
+  .full-desc > summary::-webkit-details-marker {
+    display: none;
   }
   .full-desc > summary::before {
     content: "▸"; /* fallback for browsers without alt text on generated content */
