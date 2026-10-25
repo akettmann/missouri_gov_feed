@@ -336,3 +336,46 @@ unit_tests:
       rows:
         - {alias_id: ocd-person/steven, person_id: ocd-person/steven, basis: self}
         - {alias_id: ocd-person/steve, person_id: ocd-person/steve, basis: self}
+
+  - name: person_ids_keep_given_name_variants_apart_when_another_id_holds_a_different_seat
+    model: int_officials__person_ids
+    description: >
+      The seat check covers every id of both names. A second "Steven Smith" id (HD10 in 2017-18) does not clash with
+      "Steve Smith" (SD5, 2019-20) on its own, but the first "Steven Smith" id (one person with a2, same seat) also holds HD10 in 2019-20, the same
+      years Steve sits in SD5: the two names would put one person in two seats, so nothing is joined.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: 'mohouse:1', year: 2017, office: state_house, district: '10', name_key: steven smith}
+          - {alias_id: 'mohouse:1', year: 2019, office: state_house, district: '10', name_key: steven smith}
+          - {alias_id: 'mohouse:1', year: 2020, office: state_house, district: '10', name_key: steven smith}
+          - {alias_id: ocd-person/a2, year: 2017, office: state_house, district: '10', name_key: steven smith}
+          - {alias_id: ocd-person/a2, year: 2018, office: state_house, district: '10', name_key: steven smith}
+          - {alias_id: ocd-person/b, year: 2019, office: state_senate, district: '5', name_key: steve smith}
+          - {alias_id: ocd-person/b, year: 2020, office: state_senate, district: '5', name_key: steve smith}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: 'mohouse:1', person_id: ocd-person/a2, basis: name_continuity}
+        - {alias_id: ocd-person/a2, person_id: ocd-person/a2, basis: self}
+        - {alias_id: ocd-person/b, person_id: ocd-person/b, basis: self}
+
+  - name: person_ids_keep_a_successor_in_the_same_seat_apart
+    model: int_officials__person_ids
+    description: >
+      Dan Smith in HD10 until 2020 and Danielle Smith in HD10 from 2021 share no year and sit in the same chamber:
+      a successor whose given name starts with the predecessor's (Missouri precedent: Roeber, HD34), not one
+      person. Only a move between chambers a year apart joins variants with no shared seat-year.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/dan, year: 2019, office: state_house, district: '10', name_key: dan smith}
+          - {alias_id: ocd-person/dan, year: 2020, office: state_house, district: '10', name_key: dan smith}
+          - {alias_id: ocd-person/danielle, year: 2021, office: state_house, district: '10', name_key: danielle smith}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/dan, person_id: ocd-person/dan, basis: self}
+        - {alias_id: ocd-person/danielle, person_id: ocd-person/danielle, basis: self}

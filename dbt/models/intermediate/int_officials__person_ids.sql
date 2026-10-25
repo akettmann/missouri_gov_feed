@@ -13,9 +13,10 @@
 --      as different_people in official_id_links also keeps that whole name apart.
 --   2b. two names that differ only in the given name, one being the start of the other ("Steve"/"Steven" Roberts,
 --      "Ken"/"Kenneth" Jamison; #263), are one person when each name belongs to exactly one such pair and the
---      two ids never hold different seats in the same year, and either share a seat in some year or follow each
---      other with no gap of more than a year (a move between chambers). A chain or a fork of such pairs is
---      ambiguous and joins nothing.
+--      names never hold different seats in the same year (across all ids of both names), and either share a seat
+--      in some year or follow each other within a year in a different chamber (a move, as Roberts went House to
+--      Senate). The same chamber a year apart is a successor, not a variant (Dan, then Danielle Smith). A chain
+--      or a fork of such pairs is ambiguous and joins nothing.
 --   3. otherwise the id is its own person, basis = self.
 -- Among merged ids the person_id is an Open States id over mohouse:, then the one whose service ends latest, then
 -- the smaller id. The choice never looks at the latest roster year, so an official's id does not change when they
@@ -83,13 +84,35 @@ keep_apart as (
     select sq from separated
 ),
 
--- ids whose names differ only in the given name, one starting with the other, and whose seats fit as one person
+-- names (not ids) that differ only in the given name, one starting with the other, and whose seats fit as one
+-- person. Every id of either name is checked, so another id of one name holding a different seat in the other
+-- name's years rules the pair out.
+name_spans as (
+    select
+        sq,
+        min(given) as given,
+        min(first_year) as first_year,
+        max(last_year) as last_year
+    from aliases
+    group by sq
+),
+
+name_terms as (
+    select
+        a.sq,
+        t.year,
+        t.office,
+        t.district
+    from terms as t
+    inner join aliases as a on t.alias_id = a.alias_id
+),
+
 variant_pairs as (
     select distinct
         a.sq as sq_a,
         b.sq as sq_b
-    from aliases as a
-    inner join aliases as b
+    from name_spans as a
+    inner join name_spans as b
         on
             a.sq < b.sq
             and substr(a.sq, length(a.given) + 1) = substr(b.sq, length(b.given) + 1)
@@ -101,22 +124,52 @@ variant_pairs as (
     where
         not exists (
             select 1
-            from terms as ta
-            inner join terms as tb on ta.year = tb.year
+            from name_terms as ta
+            inner join name_terms as tb on ta.year = tb.year
             where
-                ta.alias_id = a.alias_id and tb.alias_id = b.alias_id
+                ta.sq = a.sq and tb.sq = b.sq
                 and (ta.office <> tb.office or ta.district <> tb.district)
         )
         and (
             exists (
                 select 1
-                from terms as ta
-                inner join terms as tb
+                from name_terms as ta
+                inner join name_terms as tb
                     on ta.year = tb.year and ta.office = tb.office and ta.district = tb.district
-                where ta.alias_id = a.alias_id and tb.alias_id = b.alias_id
+                where ta.sq = a.sq and tb.sq = b.sq
             )
-            or (a.last_year < b.first_year and b.first_year - a.last_year <= 1)
-            or (b.last_year < a.first_year and a.first_year - b.last_year <= 1)
+            -- no shared seat-year: only a move between chambers, one name ending as the other begins. The same
+            -- chamber a year apart is a successor ("Dan" Smith, then "Danielle" Smith in the same seat).
+            or (
+                a.last_year < b.first_year and b.first_year - a.last_year <= 1
+                and exists (
+                    select 1
+                    from name_terms as ta
+                    inner join name_terms as tb on ta.year = a.last_year and tb.year = b.first_year
+                    where ta.sq = a.sq and tb.sq = b.sq and ta.office <> tb.office
+                )
+                and not exists (
+                    select 1
+                    from name_terms as ta
+                    inner join name_terms as tb on ta.year = a.last_year and tb.year = b.first_year
+                    where ta.sq = a.sq and tb.sq = b.sq and ta.office = tb.office
+                )
+            )
+            or (
+                b.last_year < a.first_year and a.first_year - b.last_year <= 1
+                and exists (
+                    select 1
+                    from name_terms as ta
+                    inner join name_terms as tb on tb.year = b.last_year and ta.year = a.first_year
+                    where ta.sq = a.sq and tb.sq = b.sq and ta.office <> tb.office
+                )
+                and not exists (
+                    select 1
+                    from name_terms as ta
+                    inner join name_terms as tb on tb.year = b.last_year and ta.year = a.first_year
+                    where ta.sq = a.sq and tb.sq = b.sq and ta.office = tb.office
+                )
+            )
         )
         and a.sq not in (select k.sq from keep_apart as k)
         and b.sq not in (select k.sq from keep_apart as k)

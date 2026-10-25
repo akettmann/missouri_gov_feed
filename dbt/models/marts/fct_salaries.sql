@@ -165,7 +165,7 @@ seat_pairs_best as (
             row_number() over (
                 partition by
                     calendar_year, agency_name, position_title, seat_chamber, employee_name, gross_pay, person_id
-                order by name_fit desc, initial_fit desc
+                order by name_fit desc, initial_fit desc, same_surname desc
             ) as pair_rank
         from seat_pairs_raw
     ) as ranked_pairs

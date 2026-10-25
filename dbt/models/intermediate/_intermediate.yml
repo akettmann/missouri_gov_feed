@@ -247,13 +247,15 @@ models:
     people, while a single shared year is a hand-over between seats. A pair listed as different_people in official_id_links
     also keeps that whole name apart. 2b. two names that differ only in the given name, one being the start of the
     other ("Steve"/"Steven" Roberts, "Ken"/"Kenneth" Jamison; #263), are one person when each name belongs to exactly
-    one such pair and the two ids never hold different seats in the same year, and either share a seat in some year
-    or follow each other with no gap of more than a year (a move between chambers). A chain or a fork of such pairs
-    is ambiguous and joins nothing. 3. otherwise the id is its own person, basis = self. Among merged ids the person_id
-    is an Open States id over mohouse:, then the one whose service ends latest, then the smaller id. The choice
-    never looks at the latest roster year, so an official''s id does not change when they leave office. Curated
-    rows (official_id_links) take effect only once a maintainer has signed them off (checked_by filled). Grain:
-    one row per alias_id. Grain: one row per id a legislator has been given, with the stable person_id.'
+    one such pair and the names never hold different seats in the same year (across all ids of both names), and
+    either share a seat in some year or follow each other within a year in a different chamber (a move, as Roberts
+    went House to Senate). The same chamber a year apart is a successor, not a variant (Dan, then Danielle Smith).
+    A chain or a fork of such pairs is ambiguous and joins nothing. 3. otherwise the id is its own person, basis
+    = self. Among merged ids the person_id is an Open States id over mohouse:, then the one whose service ends latest,
+    then the smaller id. The choice never looks at the latest roster year, so an official''s id does not change
+    when they leave office. Curated rows (official_id_links) take effect only once a maintainer has signed them
+    off (checked_by filled). Grain: one row per alias_id. Grain: one row per id a legislator has been given, with
+    the stable person_id.'
 - name: int_officials__wikidata
   description: 'Wikidata QID per official: from roster cross-references when present, else a unique exact name match
     against living Missouri officeholders on Wikidata. Grain: one row per official with a Wikidata QID.'
