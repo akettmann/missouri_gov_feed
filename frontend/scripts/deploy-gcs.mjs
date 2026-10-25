@@ -1,5 +1,5 @@
-// Publish frontend/dist to a Google Cloud Storage bucket (run `pnpm build` first; a dist left by deploy:pages is refused). Needs the gcloud CLI,
-// logged in (`gcloud auth login`) with write access to the bucket.
+// Publish frontend/dist to a Google Cloud Storage bucket (run `pnpm build` first; a dist left by
+// deploy:pages is refused). Needs the gcloud CLI, logged in (`gcloud auth login`) with write access to the bucket.
 //   MOGOV_SITE_BUCKET=my-bucket pnpm deploy:gcs            # sync, then set cache headers
 //   MOGOV_SITE_BUCKET=my-bucket pnpm deploy:gcs --dry-run  # list what would change, touch nothing
 // Files the build no longer produces are deleted from the bucket, so it always mirrors dist/.

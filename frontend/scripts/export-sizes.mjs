@@ -5,6 +5,12 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { measure, overBudget } from "./size-budget.mjs";
 
+// Escape hatch for builds where the budget should not gate (e.g. a throwaway local build): MOGOV_SKIP_SIZE_BUDGET=1
+if (process.env.MOGOV_SKIP_SIZE_BUDGET) {
+  console.log("MOGOV_SKIP_SIZE_BUDGET is set: skipping the size budgets.");
+  process.exit(0);
+}
+
 const dir = path.join("dist", "officials");
 const BUDGET_GZ_KB = Number(process.env.JSON_BUDGET_GZ_KB ?? 100);
 

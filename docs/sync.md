@@ -91,13 +91,14 @@ The site is a static snapshot of the exports. After a sync:
 
 ```
 uv run mogov export --format parquet
-cd frontend && pnpm build && pnpm sizes
+cd frontend && pnpm build
 ```
 
 `pnpm build` reads the new parquet files and regenerates every page and per-official JSON, and prints a warning (and still succeeds) if any parquet file is older than `data/mogov.duckdb`
 (or `MOGOV_DB`), meaning you built but forgot to re-export; the fix is the two commands above. The
-methodology page's "data freshness" table shows each export's timestamp. Run `pnpm sizes` after
-each refresh: a new source can push one official's JSON over the per-page budget.
+methodology page's "data freshness" table shows each export's timestamp. `pnpm build` finishes by running the size budgets (`pnpm sizes`) and exits non-zero if a payload is over
+budget or a budgeted file is missing from the output, because a new source can push one official's JSON over the per-page budget.
+Set `MOGOV_SKIP_SIZE_BUDGET=1` to skip the check (the budgets are still enforced by a plain `pnpm sizes` unless it is set there too).
 
 ## Checking a sync
 

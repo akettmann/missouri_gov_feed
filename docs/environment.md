@@ -125,9 +125,9 @@ entirely from the parquet exports; there is no server. Data flow:
    ```
    cd frontend
    pnpm install
-   pnpm build          # dist/: one page + one JSON per official, browse page, methodology
+   pnpm build          # dist/: one page + one JSON per official, browse page, methodology; then runs the size budgets (exits 1 if over; MOGOV_SKIP_SIZE_BUDGET=1 skips them)
    pnpm preview        # http://localhost:4321
-   pnpm sizes          # per-official payload sizes (exits 1 if any JSON is over 100 KB gzipped) and the lookup/districts.json and /awards budgets in scripts/size-budget.mjs
+   pnpm sizes          # the same check on its own: per-official payload sizes (exits 1 if any JSON is over 100 KB gzipped) and the lookup/districts.json and /awards budgets in scripts/size-budget.mjs
    ```
    If any parquet file is older than `data/mogov.duckdb` (or `MOGOV_DB`), the build warns that you
    skipped `uv run mogov export`; it never fails the build, and stays silent if the DuckDB file is absent.
@@ -211,13 +211,13 @@ The build is plain static files, so any static host works; the repo ships a scri
 GCS (above) stays the end goal; Pages is a free stopgap while traffic is tiny. The site is built **locally** (CI has no data) and pushed to an
 orphan `gh-pages` branch; `main` history is never touched.
 
-Findings (checked against the ~170 MB `dist/`, 1052 pages):
+Findings (checked against the ~200 MB `dist/`, 1052 pages):
 
 - Limits: a published Pages site must be <= 1 GB, each file < 100 MB (git push limit), and the soft bandwidth cap is
-  100 GB/month. Our `dist/` is about 170 MB, the largest file is a 3.2 MB HTML page, so it fits comfortably.
+  100 GB/month. Our `dist/` is about 200 MB, the largest file is a 4.4 MB HTML page, so it fits comfortably.
   `deploy:pages` refuses to push if either limit would be broken.
 - Method (a), orphan `gh-pages` branch from a temp dir, was chosen over (b) `workflow_dispatch` +
-  `upload-pages-artifact`: (b) needs the built site inside CI, and CI has no data, so we would have to upload 170 MB
+  `upload-pages-artifact`: (b) needs the built site inside CI, and CI has no data, so we would have to upload 200 MB
   from a laptop anyway. (a) is one command, needs no workflow, and force-pushing the orphan branch replaces history
   so snapshots do not accumulate.
 - Project sites are served under `/missouri_gov_feed/`, so the build sets Astro `base` from `PUBLIC_BASE_PATH`.
@@ -245,7 +245,23 @@ The deploy only ever writes the `gh-pages` branch (there is no `--branch` flag),
 `https://github.com/<owner>/<name>.git` for the repo of the `origin` remote (`--remote NAME` picks another remote
 to read the repo from). It refuses to run with uncommitted changes under `frontend/` (`--allow-dirty` overrides)
 and removes its ~200 MB temp repo on every exit, dry runs and failures included (`--keep` leaves it for
-inspection).
+inspection). It can be started from any directory.
+
+Ctrl+C never reaches the push. What happens depends on the stage:
+
+| Stage                                       | Ctrl+C result                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm build`                                | Node's default handler (no listener is installed yet) kills the script and the build; no temp dir exists yet; exit code is the signal's (on Windows typically `0xC000013A`).                                                                                                                                                                                                                 |
+| Copy of `dist/` and size scan               | The first Ctrl+C deletes the temp repo (unless `--keep`) and exits 130 ("Interrupted; nothing was pushed.").                                                                                                                                                                                                                                                                                 |
+| `git init` / `add` / `commit` / `rev-parse` | These run as asynchronous child processes, so the same listener handles the signal: temp repo deleted, exit 130. If git itself dies from the Ctrl+C first (status 130 or `0xC000013A`), that is reported as "Interrupted; nothing was pushed.", also exit 130. An interrupt flag is also checked (after yielding to the event loop) before every git step and immediately before `git push`. |
+| `git push`                                  | If Ctrl+C arrives after the push has started the script exits 130 with "the push may or may not have completed"; check the `gh-pages` branch.                                                                                                                                                                                                                                                |
+
+A second Ctrl+C while the temp repo is being deleted is ignored until the deletion finishes, so no ~200 MB directory is
+left in the temp folder.
+
+The repo is always taken from a GitHub remote URL (`https://github.com/o/n`, `git@github.com:o/n`, or
+`ssh://git@github.com/o/n`). Explicit ports, `ssh.github.com:443` and SSH host aliases are not recognised; use a
+plain github.com URL for the remote, or point `--remote` at a remote that has one.
 
 ## Local, in Docker (Compose)
 
