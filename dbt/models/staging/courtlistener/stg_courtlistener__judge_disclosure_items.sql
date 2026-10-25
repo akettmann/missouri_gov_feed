@@ -16,6 +16,7 @@ with items as (
     {% for table, kind, descr, amount, extra in parts %}
         select
             financial_disclosure_id as disclosure_id,
+            '{{ kind }}' || ':' || id as item_id,  -- ids are unique per CourtListener table, not across them
             '{{ kind }}' as item_kind,
             {{ descr }} as description,  -- noqa: AL03,RF04
             {{ amount }} as amount_code,

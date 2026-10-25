@@ -12,6 +12,13 @@ models:
     positions, agreements, income, gifts, liabilities, reimbursements). Scanned reports are OCR text, and some items
     are unreadable: is_garbled flags them (mogov.is_garbled_text). Investment descriptions are tickers and fund
     codes, which read as garbled, so they are never flagged.'
+  columns:
+  - name: item_id
+    description: Item identity, `<kind>:<CourtListener id>`; CourtListener ids are unique per table, not across
+      them.
+    data_tests:
+    - unique
+    - not_null
 - name: stg_courtlistener__judge_disclosures
   description: Federal judges' financial disclosure reports (AO-10) as indexed by CourtListener, one row per report.
 - name: stg_courtlistener__mo_cluster_panel

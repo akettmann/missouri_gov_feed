@@ -6,6 +6,9 @@
 -- (MEC / Supreme Court clerk release them on Sunshine Law request); see official_profile coverage.
 -- is_garbled marks AO-10 items whose OCR text is unreadable. They stay here (the item was disclosed and counts
 -- toward the report) but are kept out of fct_commercial_ties and fct_family_ties.
+-- Grain: (official_id, disclosure_item_id), the source item's own identity (House: filing + PDF page + line;
+-- Senate: eFD table row; AO-10: CourtListener table + row id). Identical-looking items (the same asset listed
+-- twice on one report) are distinct source rows.
 with house_members as (
     select
         o.official_id,
@@ -34,7 +37,9 @@ house as (
         l.amount_range as amount,
         l.line_text as description,
         h.document_url,
-        false as is_garbled
+        false as is_garbled,
+        'house:' || h.doc_id || ':' || cast(l.page as {{ dbt.type_string() }}) || ':'
+        || cast(l.line_no as {{ dbt.type_string() }}) as disclosure_item_id
     from house_members as h
     inner join {{ ref('int_house_fd__schedule_lines') }} as l on h.doc_id = l.doc_id
 ),
@@ -52,7 +57,8 @@ house_unparsed as (
         cast(null as {{ dbt.type_string() }}) as amount,
         cast(null as {{ dbt.type_string() }}) as description,
         h.document_url,
-        false as is_garbled
+        false as is_garbled,
+        'house:' || h.doc_id as disclosure_item_id
     from house_members as h
     where h.doc_id not in (select sl.doc_id from {{ ref('int_house_fd__schedule_lines') }} as sl)
 ),
@@ -72,7 +78,8 @@ senate as (
         coalesce(s.amount, s.income_amount) as amount,
         s.description,
         s.document_url,
-        false as is_garbled
+        false as is_garbled,
+        'senate:' || s.row_key as disclosure_item_id
     from {{ ref('dim_official') }} as o
     inner join {{ ref('stg_senate_efd__items') }} as s
         on
@@ -92,7 +99,8 @@ judges as (
         i.amount_code as amount,
         i.description,
         i.document_url,
-        i.is_garbled
+        i.is_garbled,
+        'courtlistener:' || i.item_id as disclosure_item_id
     from {{ ref('int_judges__federal') }} as o
     inner join {{ ref('stg_fjc__appointments') }} as a on o.fjc_nid = a.fjc_nid and a.appointment_number = 1
     inner join {{ ref('int_courtlistener__judge_disclosure_items') }} as i on a.fjc_jid = i.fjc_id
