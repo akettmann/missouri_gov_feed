@@ -158,7 +158,9 @@ unit_tests:
       A facility's industry is its primary NAICS code when it has one. Otherwise its SIC codes are mapped to a
       NAICS sector through the sic_naics_sectors seed: a primary SIC code before an unknown one before a secondary
       one, and the longest matching prefix wins (4953 refuse systems matches its own row -> sector 56, but 4952 sewerage
-      systems has no longer row and stays under 49 -> utilities). A facility with no codes, or only a SIC code the seed does not cover, keeps a null industry.
+      systems has no longer row and stays under 49 -> utilities; 4922 natural gas transmission, 6798 REITs and 7384
+      photofinishing likewise override their groups 49 -> utilities, 67 -> finance and 73 -> administrative services
+      with sectors 48, 53 and 81). A facility with no codes, or only a SIC code the seed does not cover, keeps a null industry.
     given:
       - input: ref('stg_epa_frs__facilities')
         rows:
@@ -170,6 +172,9 @@ unit_tests:
           - {registry_id: f6, facility_name: Uncovered SIC, latitude: 38.5, longitude: -92.1}
           - {registry_id: f7, facility_name: Non-primary NAICS only, latitude: 38.5, longitude: -92.1}
           - {registry_id: f8, facility_name: Sewerage stays utilities, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f9, facility_name: Gas pipeline is transportation, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f10, facility_name: REIT is real estate, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f11, facility_name: Photofinishing is other services, latitude: 38.5, longitude: -92.1}
       - input: ref('stg_epa_frs__organizations')
         rows:
           - {registry_id: f1, org_name: Acme, org_type: PRIVATE, affiliation_type: OWNER}
@@ -188,18 +193,30 @@ unit_tests:
           - {registry_id: f6, sic_code: '9999', sic_description: NONCLASSIFIABLE, is_primary: true, is_secondary: false}
           - {registry_id: f7, sic_code: '4911', sic_description: ELECTRIC SERVICES, is_primary: true, is_secondary: false}
           - {registry_id: f8, sic_code: '4952', sic_description: SEWERAGE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: f9, sic_code: '4922', sic_description: NATURAL GAS TRANSMISSION, is_primary: true, is_secondary: false}
+          - {registry_id: f10, sic_code: '6798', sic_description: REAL ESTATE INVESTMENT TRUSTS, is_primary: true, is_secondary: false}
+          - {registry_id: f11, sic_code: '7384', sic_description: PHOTOFINISHING LABORATORIES, is_primary: true, is_secondary: false}
       - input: ref('sic_naics_sectors')
         rows:
           - {sic_prefix: '37', naics_prefix: '31'}
           - {sic_prefix: '58', naics_prefix: '72'}
           - {sic_prefix: '49', naics_prefix: '22'}
+          - {sic_prefix: '4922', naics_prefix: '48'}
           - {sic_prefix: '4953', naics_prefix: '56'}
+          - {sic_prefix: '67', naics_prefix: '52'}
+          - {sic_prefix: '6798', naics_prefix: '53'}
+          - {sic_prefix: '73', naics_prefix: '56'}
+          - {sic_prefix: '7384', naics_prefix: '81'}
       - input: ref('naics_sectors')
         rows:
           - {naics_prefix: '22', sector_code: '22', sector_name: Utilities}
           - {naics_prefix: '31', sector_code: 31-33, sector_name: Manufacturing}
+          - {naics_prefix: '48', sector_code: 48-49, sector_name: Transportation and Warehousing}
+          - {naics_prefix: '52', sector_code: '52', sector_name: Finance and Insurance}
+          - {naics_prefix: '53', sector_code: '53', sector_name: Real Estate and Rental and Leasing}
           - {naics_prefix: '56', sector_code: '56', sector_name: Waste Management}
           - {naics_prefix: '72', sector_code: '72', sector_name: Food Services}
+          - {naics_prefix: '81', sector_code: '81', sector_name: Other Services}
     expect:
       rows:
         - {registry_id: f1, naics_code: '311111', naics_description: Dog food, naics_source: naics}
@@ -210,3 +227,6 @@ unit_tests:
         - {registry_id: f6, naics_code: null, naics_description: null, naics_source: null}
         - {registry_id: f7, naics_code: '22', naics_description: "Utilities sector, from SIC 4911 ELECTRIC SERVICES", naics_source: sic}
         - {registry_id: f8, naics_code: '22', naics_description: "Utilities sector, from SIC 4952 SEWERAGE SYSTEMS", naics_source: sic}
+        - {registry_id: f9, naics_code: '48', naics_description: "Transportation and Warehousing sector, from SIC 4922 NATURAL GAS TRANSMISSION", naics_source: sic}
+        - {registry_id: f10, naics_code: '53', naics_description: "Real Estate and Rental and Leasing sector, from SIC 6798 REAL ESTATE INVESTMENT TRUSTS", naics_source: sic}
+        - {registry_id: f11, naics_code: '81', naics_description: "Other Services sector, from SIC 7384 PHOTOFINISHING LABORATORIES", naics_source: sic}
