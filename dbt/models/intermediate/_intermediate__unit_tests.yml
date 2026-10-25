@@ -253,3 +253,57 @@ unit_tests:
         - {registry_id: f14, naics_code: '48', naics_description: "Transportation and Warehousing sector, from SIC 4922 NATURAL GAS TRANSMISSION", naics_source: sic}
         - {registry_id: f15, naics_code: '53', naics_description: "Real Estate and Rental and Leasing sector, from SIC 6798 REAL ESTATE INVESTMENT TRUSTS", naics_source: sic}
         - {registry_id: f16, naics_code: '81', naics_description: "Other Services sector, from SIC 7384 PHOTOFINISHING LABORATORIES", naics_source: sic}
+
+  - name: epa_frs_facility_naics_tie_prefers_sic_sector
+    model: int_epa_frs__facilities
+    description: >
+      Codes tied on tier and program count go to the one whose two-digit sector agrees with the sector of the
+      facility's SIC code, then to the lowest code (#181). t1: primary codes 111998 and 424510 tie, SIC 5191
+      maps to wholesale (42), so 424510 beats the lower 111998; t2: UNKNOWN-type tie, same rule; t3: neither
+      tied code agrees with the SIC sector, so the lowest wins; t4: no SIC code, lowest wins; t5: the SIC
+      sector never beats a code that more programs give (111998 has two programs) or a better tier.
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: t1, facility_name: Primary tie, latitude: 38.5, longitude: -92.1}
+          - {registry_id: t2, facility_name: Unknown tie, latitude: 38.5, longitude: -92.1}
+          - {registry_id: t3, facility_name: No agreeing code, latitude: 38.5, longitude: -92.1}
+          - {registry_id: t4, facility_name: No SIC, latitude: 38.5, longitude: -92.1}
+          - {registry_id: t5, facility_name: Program count wins, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows: []
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: t1, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: t1, naics_code: '424510', naics_description: Grain wholesale, is_primary: true, is_secondary: false}
+          - {registry_id: t2, naics_code: '111998', naics_description: Crop farming, is_primary: false, is_secondary: false}
+          - {registry_id: t2, naics_code: '424510', naics_description: Grain wholesale, is_primary: false, is_secondary: false}
+          - {registry_id: t3, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: t3, naics_code: '424510', naics_description: Grain wholesale, is_primary: true, is_secondary: false}
+          - {registry_id: t4, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: t4, naics_code: '424510', naics_description: Grain wholesale, is_primary: true, is_secondary: false}
+          - {registry_id: t5, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: t5, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: t5, naics_code: '424510', naics_description: Grain wholesale, is_primary: true, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows:
+          - {registry_id: t1, sic_code: '5191', sic_description: FARM SUPPLIES, is_primary: true, is_secondary: false}
+          - {registry_id: t2, sic_code: '5191', sic_description: FARM SUPPLIES, is_primary: true, is_secondary: false}
+          - {registry_id: t3, sic_code: '4911', sic_description: ELECTRIC SERVICES, is_primary: true, is_secondary: false}
+          - {registry_id: t5, sic_code: '5191', sic_description: FARM SUPPLIES, is_primary: true, is_secondary: false}
+      - input: ref('sic_naics_sectors')
+        rows:
+          - {sic_prefix: '51', naics_prefix: '42'}
+          - {sic_prefix: '49', naics_prefix: '22'}
+      - input: ref('naics_sectors')
+        rows:
+          - {naics_prefix: '11', sector_code: '11', sector_name: Agriculture}
+          - {naics_prefix: '22', sector_code: '22', sector_name: Utilities}
+          - {naics_prefix: '42', sector_code: '42', sector_name: Wholesale Trade}
+    expect:
+      rows:
+        - {registry_id: t1, naics_code: '424510', naics_source: naics}
+        - {registry_id: t2, naics_code: '424510', naics_source: naics_unknown}
+        - {registry_id: t3, naics_code: '111998', naics_source: naics}
+        - {registry_id: t4, naics_code: '111998', naics_source: naics}
+        - {registry_id: t5, naics_code: '111998', naics_source: naics}

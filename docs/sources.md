@@ -600,7 +600,7 @@ offices, shops and most service businesses are missing.
   across sectors) to NAICS sector. That gives a sector, not a NAICS code: `int_epa_frs__facilities.naics_code`
   then holds the two-digit sector prefix and `naics_source` is `sic` (23%). Together they cover 56% of the
   geocoded sites; the rest have neither code. Where a site has both, the non-primary NAICS code and the SIC
-  sector agree on the sector for 92% (UNKNOWN) to 98% (SECONDARY) of sites.
+  sector agree on the sector for about 90% of sites; among codes tied on tier and program count, the one in the SIC sector wins.
   About 10,400 of the SIC-filled facilities are SIC 1629 (heavy construction), likely construction stormwater
   permits. Every seed row was checked in October 2026 against the Census 1987 SIC to 2002 NAICS concordance,
   carried to 2022 NAICS through the Census 2002-2007, 2007-2012, 2012-2017 and 2017-2022 concordances, and
