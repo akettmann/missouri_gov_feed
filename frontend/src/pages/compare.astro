@@ -2,16 +2,26 @@
 // Compare two officials side by side: the same measured numbers from each profile, in matching rows.
 // Rendered in the browser from the per-official JSON; both choices live in the URL (?a=slug&b=slug).
 import ConfidenceToggle from "../components/ConfidenceToggle.astro";
+import OfficeFilter from "../components/OfficeFilter.astro";
 import Layout from "../layouts/Layout.astro";
+import { pluralOfficeLabel } from "../lib/awardBadges";
 import { currentAwardsBySlug } from "../lib/exports/awards";
 import { officialIndex } from "../lib/exports/load";
 import { officeLine } from "../lib/format";
+import { buildOfficeGroups } from "../lib/lookback";
 import { href } from "../lib/site";
 
 const awards = await currentAwardsBySlug();
 // badges only for officials who hold awards, so the inline index stays small
-const officials = (await officialIndex()).map((o) => ({
+const current = await officialIndex();
+// the office key lets the filter bar narrow the pickers; chip labels use the shared helper because
+// office_title is circuit-specific for judges
+const groups = buildOfficeGroups(
+  current.map((o) => ({ office: o.office, office_title: pluralOfficeLabel(o.office, o.office_title) })),
+);
+const officials = current.map((o) => ({
   slug: o.slug,
+  office: o.office,
   label: `${o.full_name} — ${officeLine(o)}`,
   ...(awards.has(o.slug) && { badges: awards.get(o.slug) }),
 }));
@@ -38,6 +48,14 @@ const officials = (await officialIndex()).map((o) => ({
         <option value={o.label} />
       ))}
     </datalist>
+    <div class="office-bar">
+      <OfficeFilter groups={groups} />
+      <p class="small muted">
+        The lists above offer officials from the office you pick here. It follows your first pick; choose
+        &ldquo;All offices&rdquo; to compare across offices.
+      </p>
+      <p class="small muted" id="filter-status" role="status"></p>
+    </div>
   </form>
   <div class="small tools">
     <ConfidenceToggle />
@@ -59,9 +77,10 @@ const officials = (await officialIndex()).map((o) => ({
 <script>
   import { renderBadges, type Badge } from "../lib/awardBadges";
   import { compareRows } from "../lib/compare";
+  import { filterForOffice, filterOfficials, reconcileFilter, type OfficeFilter } from "../lib/compareFilter";
   import type { OfficialBundle } from "../lib/exports/types";
 
-  const index: { slug: string; label: string; badges?: Badge[] }[] = JSON.parse(
+  const index: { slug: string; office: string; label: string; badges?: Badge[] }[] = JSON.parse(
     document.getElementById("officials-index")!.textContent!,
   );
   const bySlug = new Map(index.map((o) => [o.slug, o.label]));
@@ -69,6 +88,10 @@ const officials = (await officialIndex()).map((o) => ({
   const byLabel = new Map(index.map((o) => [o.label, o.slug]));
   const form = document.querySelector<HTMLFormElement>("form.pickers")!;
   const status = document.getElementById("status")!;
+  const filterStatus = document.getElementById("filter-status")!;
+  const datalist = document.getElementById("officials") as HTMLDataListElement;
+  const chipSets = [...form.querySelectorAll<HTMLFieldSetElement>("fieldset.chips")];
+  const officeBySlug = new Map(index.map((o) => [o.slug, o.office]));
   const result = document.getElementById("result")!;
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   const cache = new Map<string, Promise<OfficialBundle>>();
@@ -89,11 +112,64 @@ const officials = (await officialIndex()).map((o) => ({
     return e;
   }
 
+  // the bar follows the first pick until the visitor uses it themselves
+  let touched = false;
+
+  function currentFilter(): OfficeFilter {
+    const group = String(new FormData(form).get("group") ?? "");
+    // the office comes only from the visible chip set: the radios share one name, so a checked radio in a
+    // hidden set must not narrow the list
+    const office = chipSets
+      .find((s) => s.dataset.group === group)
+      ?.querySelector<HTMLInputElement>("input:checked");
+    return { group, office: office?.value ?? "" };
+  }
+
+  function setFilter(f: OfficeFilter) {
+    f = reconcileFilter(f);
+    const tiles = [...form.querySelectorAll<HTMLInputElement>('input[name="group"]')];
+    const tile = tiles.find((r) => r.value === f.group) ?? tiles.find((r) => r.value === "");
+    for (const r of tiles) r.checked = r === tile;
+    for (const r of form.querySelectorAll<HTMLInputElement>('input[name="office"]')) r.checked = false;
+    // check the chip (or "All") inside the shown group's set; the sets share one radio group
+    const set = chipSets.find((s) => s.dataset.group === tile?.value);
+    const inputs = [...(set?.querySelectorAll<HTMLInputElement>("input") ?? [])];
+    const chip = inputs.find((r) => r.value === f.office) ?? inputs.find((r) => r.value === "");
+    if (chip) chip.checked = true;
+  }
+
+  function applyFilter() {
+    const f = currentFilter();
+    for (const set of chipSets) set.hidden = set.dataset.group !== f.group;
+    const shown = filterOfficials(index, f);
+    datalist.replaceChildren(
+      ...shown.map((o) => {
+        const opt = el("option");
+        opt.value = o.label;
+        return opt;
+      }),
+    );
+    const group = form.querySelector<HTMLInputElement>('input[name="group"]:checked')?.closest("label");
+    const chip = f.office
+      ? chipSets
+          .find((s) => s.dataset.group === f.group)
+          ?.querySelector<HTMLInputElement>("input:checked")
+          ?.closest("label")
+      : null;
+    const where = (chip ?? group)?.textContent?.trim() ?? "";
+    filterStatus.textContent = f.group
+      ? `Showing ${shown.length} officials: ${where}.`
+      : `Showing all ${shown.length} officials.`;
+  }
+
   async function render() {
     const slugs = ["a", "b"].map((k) => byLabel.get(String(new FormData(form).get(k) ?? "")));
     const chosen = slugs.filter((s): s is string => !!s);
     const params = new URLSearchParams();
     slugs.forEach((s, i) => s && params.set(i ? "b" : "a", s));
+    const f = currentFilter();
+    if (f.group) params.set("group", f.group);
+    if (f.office) params.set("office", f.office);
     history.replaceState(null, "", params.size ? `?${params}` : location.pathname);
     if (chosen.length < 2) {
       result.hidden = true;
@@ -149,8 +225,46 @@ const officials = (await officialIndex()).map((o) => ({
     const label = bySlug.get(params.get(k) ?? "");
     if (label) (form.elements.namedItem(k) as HTMLInputElement).value = label;
   }
-  form.addEventListener("change", render);
-  form.addEventListener("input", () => {
+  if (params.has("group") || params.has("office")) {
+    touched = true;
+    setFilter({ group: params.get("group") ?? "", office: params.get("office") ?? "" });
+  } else {
+    setFilter(
+      filterForOffice(officeBySlug.get(byLabel.get(String(new FormData(form).get("a") ?? "")) ?? "")),
+    );
+  }
+  applyFilter();
+  form.addEventListener("input", (e) => {
+    const t = e.target;
+    if (!(t instanceof HTMLInputElement)) return;
+    if (t.name === "group" || t.name === "office") {
+      touched = true;
+      if (t.name === "group") {
+        // a new tile starts from all of its offices
+        setFilter({ group: t.value, office: "" });
+      }
+      applyFilter();
+      void render();
+      return;
+    }
+    if (t.name === "a" && !touched) {
+      const a = byLabel.get(t.value);
+      if (a || !t.value) {
+        setFilter(filterForOffice(a && officeBySlug.get(a)));
+        applyFilter();
+      }
+    }
+  });
+  form.addEventListener("change", (e) => {
+    // the filter radios already rendered from their input event
+    const t = e.target;
+    if (t instanceof HTMLInputElement && (t.name === "group" || t.name === "office")) return;
+    void render();
+  });
+  form.addEventListener("input", (e) => {
+    // the filter radios render from their own handler above
+    if (e.target instanceof HTMLInputElement && (e.target.name === "group" || e.target.name === "office"))
+      return;
     // datalist picks fire input with a complete label; typed partial names wait for change
     const values = ["a", "b"].map((k) => String(new FormData(form).get(k) ?? ""));
     if (values.every((v) => !v || byLabel.has(v))) render();
@@ -190,6 +304,14 @@ const officials = (await officialIndex()).map((o) => ({
     border-radius: 6px;
     background: var(--surface);
     color: var(--ink);
+  }
+  .office-bar {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 12px;
+  }
+  .office-bar p {
+    margin: 0;
   }
   .tools {
     margin: 4px 0 8px;
