@@ -92,13 +92,12 @@
 
 
 {#
-  Metres to degrees for an inward buffer. A degree of latitude is about 110,570 m and a degree of longitude is
-  111,320 m * cos(latitude), which is shorter (about 87,000 m at Missouri's latitudes). One degree distance has to
-  serve both axes, so this divides by the larger length (latitude): the buffer then erodes at most `metres`
-  in every direction (exactly that north-south, about 0.8x of it east-west) and never drops a real overlap that
-  is wider than twice `metres`. Using the longitude length instead would erode about 1.3x too much north-south.
-  The buffer is a margin against sliver noise, not a measurement.
+  Metres to degrees for an inward buffer at latitude `lat` (a column or number, in degrees). A degree of longitude
+  is 111,320 m * cos(latitude), the shorter of the two degree lengths (about 87,700 m at Missouri's latitudes).
+  One degree distance has to serve both axes, so this divides by the longitude length: the buffer then erodes at
+  least `metres` in every direction (exactly that east-west, about 1.27x of it north-south), so a kept overlap
+  always contains a circle of radius `metres`. The buffer is a margin against sliver noise, not a measurement.
 #}
-{% macro geom_metres_to_degrees(metres) -%}
-    ({{ metres }} / 110570.0)
+{% macro geom_metres_to_degrees(metres, lat) -%}
+    ({{ metres }} / (111320.0 * cos(radians({{ lat }}))))
 {%- endmacro %}

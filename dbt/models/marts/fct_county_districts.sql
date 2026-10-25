@@ -9,14 +9,15 @@
 -- county when its overlap is at least min_city_share (99%) of the county's area.
 --
 -- Area alone is not enough: where two TIGER vintages (CD119 vs the 2026 layers) disagree along a county line,
--- the overlap is a long thin strip (e.g. Pulaski County / CD 3, about 95 m x 6 km = 0.36 km2) that passes the
+-- the overlap is a long thin strip (e.g. Pulaski County / CD 3, about 72 m x 6 km = 0.36 km2) that passes the
 -- area threshold but is not a real overlap. So a pair must also survive an inward buffer of core_buffer_m
--- (120 m) applied to the overlap polygon: the overlap must be wider than twice that, which any real overlap is
--- and a sliver narrower than that never is. Verified against exact shapely geometry in
--- scripts/check_county_districts.py. The buffer is in degrees, converted from metres with the latitude degree
--- length (110,570 m), so it erodes 120 m north-south and about 95 m east-west at Missouri's latitudes: never
--- more than 120 m in any direction, so no real overlap wider than 240 m is lost, while the thin strips seen
--- (about 95 m wide) still go.
+-- (120 m) applied to the overlap polygon: the overlap must contain a circle of at least 120 m radius, which
+-- any real overlap does and a sliver does not. Verified against exact shapely geometry in
+-- scripts/check_county_districts.py. The buffer is in degrees, converted from metres with the longitude degree
+-- length (111,320 m * cos(latitude)), so it erodes 120 m east-west and about 152 m north-south at Missouri's
+-- latitudes: at least 120 m in every direction. Any kept overlap is therefore more than 240 m wide in every
+-- direction (real overlaps here are at least about 1.7 km wide), while the thin slivers seen (about 72 m
+-- wide) go.
 --
 -- Areas come from the planar area of the lon/lat geometry scaled by cos(latitude): a few tenths of a percent
 -- off at Missouri's latitudes, which does not matter against these thresholds.
@@ -77,7 +78,7 @@ pair_areas as (
         {{ mogov.geom_intersection_area('county_geom', 'area_geom') }} as overlap_sq_degrees,
         {{ mogov.geom_area(mogov.geom_buffer(
             mogov.geom_intersection('county_geom', 'area_geom'),
-            '-' ~ mogov.geom_metres_to_degrees(core_buffer_m)
+            '-' ~ mogov.geom_metres_to_degrees(core_buffer_m, 'interior_lat')
         )) }} as core_sq_degrees
     from touching
 ),
