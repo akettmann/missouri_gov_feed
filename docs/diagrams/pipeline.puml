@@ -27,6 +27,18 @@ end fork
 data/raw/<table>/part-<i>-of-<N>.parquet;
 
 |dbt|
+if (any loader failed?) then (yes)
+  if (every failed loader allowed?
+--allow-failed-loader NAME or
+MOGOV_ALLOW_FAILED_LOADERS=NAME) then (yes)
+    :warn build.stale_source per loader;
+    note right: dbt builds on the last landed raw data
+  else (no, strict default)
+    :log build.skipped;
+    stop
+  endif
+else (no)
+endif
 :mogov build (dbt build);
 note right
   sources read <table>/*.parquet;
@@ -43,9 +55,23 @@ wikidata
 (needs QIDs from the landed rosters);
 
 |dbt|
+if (any stage-2 loader failed?) then (yes)
+  if (every failed loader allowed?
+--allow-failed-loader NAME or
+MOGOV_ALLOW_FAILED_LOADERS=NAME) then (yes)
+    :warn build.stale_source per loader;
+    note right: dbt builds on the last landed raw data
+  else (no, strict default)
+    :log build.skipped;
+    stop
+  endif
+else (no)
+endif
 :mogov build;
 :mogov export (optional)
 marts and reporting to
 data/exports/*.csv|parquet;
+:exit 1 if any loader failed
+(even when allowed), else 0;
 stop
 @enduml
