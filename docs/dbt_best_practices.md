@@ -9,7 +9,7 @@ projects", and the testing and documentation best practices.
 |---|---|---|
 | Only staging models read sources | 6 intermediate/mart models read 8 raw tables directly | Every raw table read downstream has a staging model; 0 `source()` calls outside staging |
 | Staging is 1:1 with a source, no joins | `stg_courtlistener__mo_cases` joined 3 sources, `stg_courtlistener__judge_disclosures` joined 2 | Split into one staging model per table; the joins live in `int_courtlistener__mo_cases` and `int_courtlistener__judge_disclosure_items` |
-| Every model's grain is tested | Primary-key tests on 2 of 17 marts | a grain test (`unique` or `dbt_utils.unique_combination_of_columns`) on most mart and reporting models; a few still have none (tracked in #73). Two grains failed and were fixed: duplicated FEC donor totals (a real double count) and per-chamber party unity (documented as part of the grain) |
+| Every model's grain is tested | Primary-key tests on 2 of 17 marts | a grain test (`unique` or `dbt_utils.unique_combination_of_columns`) on every mart and reporting model (#73); `fct_voluntary_disclosures` passes vacuously while its seed is empty. Two grains failed and were fixed: duplicated FEC donor totals (a real double count) and per-chamber party unity (documented as part of the grain) |
 | Static mappings are seeds, not hardcoded lists | Missouri court ids hardcoded in 2 models; FEC committee-type codes undecoded | `mo_courts` and `fec_committee_types` seeds |
 | Source freshness | none | `loaded_at` freshness on every always-on JSON landing; `mogov freshness` |
 | Packages | none | `dbt_utils` (pinned in `package-lock.yml`); installed automatically by `mogov build`, CI and the image |
@@ -23,6 +23,11 @@ projects", and the testing and documentation best practices.
 - Naming: `stg_<source>__<entity>`, `int_<entity>__<verb/what>`, `fct_` / `dim_`; dbt Core / dbt-duckdb (the versions pinned in `uv.lock`).
 - `ref()` / `source()` everywhere; no hardcoded relation names.
 - Portable SQL through `adapter.dispatch` macros (`macros/compat`), so the backend can change.
+- Supported adapters: DuckDB is the only supported and tested backend (built in CI). The regex macros also have Postgres
+  and Snowflake dispatches (rendered SQL pinned by `tests/test_regex_macros.py`, never run against a real
+  Snowflake/Postgres); other compat macros (spatial, JSON) lack Snowflake dispatches. Which adapters to support is open
+  in #121. Trino/Athena and Spark < 3.3 are not supported (no `regexp_instr`). Regex patterns are plain POSIX ERE;
+  `mogov.regex_literal` handles per-adapter string escaping (Snowflake treats backslash as an escape).
 - sqlfluff with the dbt templater in pre-commit and CI.
 - Optional inputs gate their models with vars (`mec_direct`, `cl_case_bulk`) instead of failing.
 

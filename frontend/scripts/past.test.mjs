@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { yearRanges } from "../src/lib/format.ts";
+import { officeLine, yearRanges } from "../src/lib/format.ts";
 import { groupPast, linkSameName, normalizeName } from "../src/lib/exports/past.ts";
 
 const slugFor = (name, id) => `${name.toLowerCase().replaceAll(" ", "-")}-${id}`;
@@ -71,4 +71,17 @@ test("linkSameName links exact normalized names only, never merges", () => {
   );
   assert.deepEqual(c.same_name, []);
   assert.equal(people.length, 3);
+});
+
+test("officeLine drops the raw court key for federal judges but keeps real districts", () => {
+  const judge = {
+    office: "us_district_court",
+    office_title: "Judge, U.S. District Court for the Eastern District of Missouri",
+    district: "moed",
+  };
+  assert.equal(officeLine(judge), "Judge, U.S. District Court for the Eastern District of Missouri");
+  assert.equal(
+    officeLine({ office: "mo_house", office_title: "State Representative", district: "12" }),
+    "State Representative, district 12",
+  );
 });

@@ -1,6 +1,7 @@
 -- MEC itemized expenditures by Missouri committees (TAP mirror, 2011-2022): includes contributions the
 -- committee made to other candidates and committees.
 select
+    cd3_b_id as record_id,
     mecid as mec_committee_id,
     committee_name,
     coalesce(payee_name, company, trim(coalesce(first_name, '') || ' ' || coalesce(last_name, ''))) as payee_name,

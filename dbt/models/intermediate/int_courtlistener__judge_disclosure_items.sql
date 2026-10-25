@@ -4,6 +4,7 @@ select
     p.fjc_id,
     d.report_year,
     d.document_url,
+    i.item_id,
     i.item_kind,
     i.description,
     i.amount_code,

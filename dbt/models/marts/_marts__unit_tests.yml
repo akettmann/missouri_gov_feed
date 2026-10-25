@@ -94,7 +94,8 @@ unit_tests:
           - {donor_committee_name: Missouri Chamber PAC, contribution_year: 2021, mec_committee_id: C000001, match_status: matched, match_confidence: medium}
           - {donor_committee_name: Twin PAC, contribution_year: 2020, mec_committee_id: null, match_status: ambiguous, match_confidence: null}
       - input: ref('stg_tap_mec__expenditures')
-        rows: []
+        rows:
+          - {record_id: E1, mec_committee_id: C999999, purpose: contribution, amount: 1}  # committee not attributed to an official
       - input: ref('dim_official')
         rows: []
       - input: ref('stg_congress__fec_ids')

@@ -213,6 +213,13 @@ Quirks:
   the donor's name and type on about 40,000 such rows ($93M), which showed as "(unnamed)" (#30).
 - About 10,000 contribution rows name the donor with one character (`C`, `~`, `0`), mostly individuals
   itemized by federal committees transferred to MEC; the real name is in first/last name (#31).
+- `mo_contribs_clean.csv` loads 97,565 transaction ids twice. The copies differ only in a doubled
+  `address_clean`, and about $179M was double-counted. Staging keeps one row per `record_id` (#82).
+- The two export layouts overlap for 2020: 19,231 ids appear as both `txn` and `cd1_a_id`. They are the
+  same record (committee, date, amount, names and address all match), so staging uses an unprefixed
+  `record_id = coalesce(txn, cd1_a_id)` and the newer layout wins (#83).
+- 312 cross-layout near-duplicates with different ids (about $1.0M) remain; they are tracked in #99.
+  Net effect of the dedupe: staging goes from 1,603,397 to 1,486,601 rows ($1.2487B to $1.0602B).
 - A few MECIDs are lower-case (`c000525`); the intermediate models upper-case them.
 - A committee-to-committee gift names the donor committee only. `cmte_id` / `mecid` is the receiving
   committee's ID, and there is no donor MECID. The same holds for MEC's direct export (see mec below).
