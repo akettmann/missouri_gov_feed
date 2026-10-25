@@ -686,7 +686,9 @@ unit_tests:
     description: >
       Two state_house members keep the calendar-year share from the donor rollup, individuals included in the
       total: s1 gets 3,000 of 10,000 = 30.0%, s2 gets 9,000 of 10,000 = 90.0% (lowest share ranks first). The
-      FEC cycle totals only apply to federal officials.
+      FEC cycle totals only apply to federal officials: s3 is a state_house member who also has FEC data (as if
+      it carried a bioguide id) and must keep only its calendar-year rows (5,000 of 10,000 = 50.0%), with no
+      extra cycle row from the 50,000 FEC total.
     overrides:
       vars:
         awards_threshold: {default: 5}
@@ -696,6 +698,7 @@ unit_tests:
         rows:
           - {official_id: s1, office: state_house, level: state}
           - {official_id: s2, office: state_house, level: state}
+          - {official_id: s3, office: state_house, level: state}
       - input: ref('rpt_attendance')
         rows: []
       - input: ref('rpt_donor_rollup')
@@ -704,20 +707,27 @@ unit_tests:
           - {official_id: s1, level: state, transaction_year: 2024, election_cycle: 2024, donor_class: individual, match_confidence: high, total_amount: 7000}
           - {official_id: s2, level: state, transaction_year: 2024, election_cycle: 2024, donor_class: pac, match_confidence: high, total_amount: 9000}
           - {official_id: s2, level: state, transaction_year: 2024, election_cycle: 2024, donor_class: individual, match_confidence: high, total_amount: 1000}
+          - {official_id: s3, level: state, transaction_year: 2024, election_cycle: 2024, donor_class: pac, match_confidence: high, total_amount: 5000}
+          - {official_id: s3, level: state, transaction_year: 2024, election_cycle: 2024, donor_class: individual, match_confidence: high, total_amount: 5000}
       - input: ref('fct_federal_donor_summary')
-        rows: []
+        rows:
+          - {official_id: s3, cycle: 2024, aggregate_kind: cycle total, bucket: total receipts, total: 50000}
       - input: ref('fct_party_unity_yearly')
         rows: []
     expect:
       rows:
         - {award: most_committee_money, period: '2024', official_id: s2, award_rank: 1, metric: 9000, sample_size: 10000}
-        - {award: most_committee_money, period: '2024', official_id: s1, award_rank: 2, metric: 3000, sample_size: 10000}
+        - {award: most_committee_money, period: '2024', official_id: s3, award_rank: 2, metric: 5000, sample_size: 10000}
+        - {award: most_committee_money, period: '2024', official_id: s1, award_rank: 3, metric: 3000, sample_size: 10000}
         - {award: most_committee_money, period: lifetime, official_id: s2, award_rank: 1, metric: 9000, sample_size: 10000}
-        - {award: most_committee_money, period: lifetime, official_id: s1, award_rank: 2, metric: 3000, sample_size: 10000}
+        - {award: most_committee_money, period: lifetime, official_id: s3, award_rank: 2, metric: 5000, sample_size: 10000}
+        - {award: most_committee_money, period: lifetime, official_id: s1, award_rank: 3, metric: 3000, sample_size: 10000}
         - {award: least_committee_money_share, period: '2024', official_id: s1, award_rank: 1, metric: 30.0, sample_size: 10000}
-        - {award: least_committee_money_share, period: '2024', official_id: s2, award_rank: 2, metric: 90.0, sample_size: 10000}
+        - {award: least_committee_money_share, period: '2024', official_id: s3, award_rank: 2, metric: 50.0, sample_size: 10000}
+        - {award: least_committee_money_share, period: '2024', official_id: s2, award_rank: 3, metric: 90.0, sample_size: 10000}
         - {award: least_committee_money_share, period: lifetime, official_id: s1, award_rank: 1, metric: 30.0, sample_size: 10000}
-        - {award: least_committee_money_share, period: lifetime, official_id: s2, award_rank: 2, metric: 90.0, sample_size: 10000}
+        - {award: least_committee_money_share, period: lifetime, official_id: s3, award_rank: 2, metric: 50.0, sample_size: 10000}
+        - {award: least_committee_money_share, period: lifetime, official_id: s2, award_rank: 3, metric: 90.0, sample_size: 10000}
 
   - name: officeholders_by_year_source_url
     model: rpt_officeholders_by_year

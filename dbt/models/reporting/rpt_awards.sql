@@ -172,6 +172,7 @@ share_money as (
         f.all_money
     from federal_share as f
     inner join offices as o on f.official_id = o.official_id
+    where o.level = 'federal'
 ),
 
 unity_counts as (
