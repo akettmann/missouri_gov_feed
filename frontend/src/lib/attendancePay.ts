@@ -87,6 +87,27 @@ export function payYearsMismatch(block: PayVoteBlock): string | null {
   );
 }
 
+/** MOGOV_SKIP_PAY_YEARS_CHECK skips the check only when it is exactly "1" (like MOGOV_SKIP_SIZE_BUDGET). */
+export function skipPayYearsCheck(env: Record<string, string | undefined>): boolean {
+  return env.MOGOV_SKIP_PAY_YEARS_CHECK === "1";
+}
+
+/**
+ * The problems that should fail the build: payYearsProblems, or none (with a log line) when the escape hatch
+ * is set. Used by the export loader; separate from it so the gate is testable on fixed inputs.
+ */
+export function payYearsGate(
+  bundles: Parameters<typeof payYearsProblems>[0],
+  env: Record<string, string | undefined>,
+  log: (msg: string) => void,
+): string[] {
+  if (skipPayYearsCheck(env)) {
+    log("MOGOV_SKIP_PAY_YEARS_CHECK=1: skipping the pay-per-vote year consistency check.");
+    return [];
+  }
+  return payYearsProblems(bundles);
+}
+
 /** One message per official whose pay year rows do not add up to the total, naming the official. */
 export function payYearsProblems(
   bundles: {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { payPerVote, yearsLabel } from "../src/lib/comparePay.ts";
+import { payPerVote, payPerVoteSources, yearsLabel } from "../src/lib/comparePay.ts";
 
 const row = (year, extra = {}) => ({
   chamber: "state_house",
@@ -120,7 +120,26 @@ test("the pay rows' links: note text travels with noteHref, and each official's 
   const pay = rows.find((r) => r.label.startsWith("Pay per vote attended, covered"));
   assert.equal(pay.noteHref, "/methodology/#pay-per-vote");
   assert.equal(pay.noteLinkText, "How pay per vote is counted");
-  assert.deepEqual(pay.valueLinks, [[{ text: "pay source", href: "https://pay.example/a" }], []]);
+  assert.deepEqual(pay.valueLinks, [
+    [{ text: "pay source", href: "https://pay.example/a", context: "for A" }],
+    [],
+  ]);
   // no other row may carry a noteHref without its own link text
   for (const r of rows) if (r.noteHref) assert.ok(r.noteLinkText, r.label);
+});
+
+test("pay source links carry the official's name as screen-reader context", () => {
+  const b = {
+    official: { full_name: "Bennie Cook" },
+    ...bundle(
+      [session("state_house", "2019-01-10", "2019-05-01")],
+      [
+        row(2019, { pay_source_url: "https://pay.example/" }),
+        total({ pay_source_url: "https://pay.example/" }),
+      ],
+    ),
+  };
+  assert.deepEqual(payPerVoteSources(b), [
+    { text: "pay source", href: "https://pay.example/", context: "for Bennie Cook" },
+  ]);
 });
