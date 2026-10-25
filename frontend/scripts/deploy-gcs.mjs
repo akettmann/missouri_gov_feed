@@ -5,6 +5,7 @@
 // Files the build no longer produces are deleted from the bucket, so it always mirrors dist/.
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
+import { budgetGate } from "./size-budget.mjs";
 
 const bucket = process.env.MOGOV_SITE_BUCKET;
 const dryRun = process.argv.includes("--dry-run");
@@ -25,6 +26,9 @@ if (lc.status !== 0) {
   );
   process.exit(1);
 }
+
+// Same size budgets as `pnpm build` (a build with MOGOV_SKIP_SIZE_BUDGET=1 would otherwise publish unchecked).
+if (!budgetGate({ cwd: process.cwd(), spawn: spawnSync })) process.exit(1);
 
 const dest = `gs://${bucket}`;
 function gcloud(args) {
