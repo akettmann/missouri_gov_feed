@@ -6,6 +6,10 @@
 -- (MEC / Supreme Court clerk release them on Sunshine Law request); see official_profile coverage.
 -- is_garbled marks AO-10 items whose OCR text is unreadable. They stay here (the item was disclosed and counts
 -- toward the report) but are kept out of fct_commercial_ties and fct_family_ties.
+-- Amended filings sit beside their originals (Senate "(amendment N)", House "amended report", AO-10 duplicate
+-- "_1.pdf"), so counting or summing items across a filer's reports over-counts. is_latest_version marks the
+-- newest version of each report (see the `reports` CTE for what "same report" means); filter on it for any
+-- count or sum, and leave it off when listing filings.
 -- Grain: (official_id, disclosure_item_id), the source item's own identity (House: filing + PDF page + line;
 -- Senate: eFD table row; AO-10: CourtListener table + row id). Identical-looking items (the same asset listed
 -- twice on one report) are distinct source rows.
@@ -104,12 +108,95 @@ judges as (
     from {{ ref('int_judges__federal') }} as o
     inner join {{ ref('stg_fjc__appointments') }} as a on o.fjc_nid = a.fjc_nid and a.appointment_number = 1
     inner join {{ ref('int_courtlistener__judge_disclosure_items') }} as i on a.fjc_jid = i.fjc_id
+),
+
+unioned as (
+    select * from house
+    union all
+    select * from house_unparsed
+    union all
+    select * from senate
+    union all
+    select * from judges
+),
+
+-- One row per filed report (document), with what makes two reports "the same report":
+--   report_group    annual reports and their amendments share 'annual report'; every other kind (periodic
+--                   transaction report, candidate report, extension request...) is its own group (the
+--                   document url), because those are separate filings, not revisions of each other.
+--                   A report with no report_year can't be matched to its siblings either (Senate candidate
+--                   reports), so it stays its own group.
+--   report_version  0 = original, N = amendment N (Senate "(amendment N)"; House "amended report" = 1; AO-10
+--                   pdf name suffix "_1" = 1)
+--   has_text        false for House scans with no extractable text. Such an amendment cannot stand in for a
+--                   readable report, so it never supersedes one.
+keyed as (
+    select
+        *,
+        case
+            when report_year is not null and filing_kind in ('annual report', 'amended report') then 'annual report'
+            when report_year is not null and filing_kind like 'annual report for cy%' then 'annual report'
+            else document_url
+        end as report_group,
+        case
+            when disclosure_type like 'U.S. Senate%'
+                then
+                    coalesce(
+                        {{ dbt.safe_cast(mogov.regex_extract('filing_kind', 'amendment ([0-9]+)'), dbt.type_int()) }}, 0
+                    )
+            when disclosure_type like 'U.S. House%'
+                then case when filing_kind = 'amended report' then 1 else 0 end
+            else
+                coalesce(
+                    {{ dbt.safe_cast(mogov.regex_extract('document_url', '_([0-9]+)[.]pdf$'), dbt.type_int()) }}, 0
+                )
+        end as report_version
+    from unioned
+),
+
+reports as (
+    select
+        official_id,
+        disclosure_type,
+        report_year,
+        document_url,
+        report_group,
+        max(report_version) as report_version,
+        max(filing_date) as filing_date,
+        min(case when section like 'document (not text-extractable%' then 0 else 1 end) as has_text
+    from keyed
+    group by official_id, disclosure_type, report_year, document_url, report_group
+),
+
+ranked as (
+    select
+        *,
+        row_number() over (
+            partition by official_id, disclosure_type, report_year, report_group
+            order by has_text desc, report_version desc, filing_date desc, document_url desc
+        ) = 1 as is_latest_version
+    from reports
 )
 
-select * from house
-union all
-select * from house_unparsed
-union all
-select * from senate
-union all
-select * from judges
+select
+    u.official_id,
+    u.disclosure_type,
+    u.filing_kind,
+    u.report_year,
+    u.filing_date,
+    u.section,
+    u.owner,
+    u.amount,
+    u.description,
+    u.document_url,
+    u.is_garbled,
+    u.disclosure_item_id,
+    r.report_version,
+    r.is_latest_version
+from unioned as u
+inner join ranked as r
+    on
+        u.official_id = r.official_id
+        and u.disclosure_type = r.disclosure_type
+        and u.document_url = r.document_url
+        and u.report_year is not distinct from r.report_year
