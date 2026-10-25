@@ -1406,7 +1406,7 @@ models:
         description: >
           The NAICS code most of the facility's programs give, primary codes before UNKNOWN or SECONDARY ones
           (int_epa_frs__facilities naics_source). A facility with no NAICS code but a SIC code instead gets the
-          two-digit NAICS sector prefix its SIC major group falls in (seed sic_naics_sectors), so a two-character
+          two-digit NAICS sector prefix its SIC code maps to (seed sic_naics_sectors), so a two-character
           value is a sector, not a full code. Null when the facility has neither.
       - name: naics_description
         data_type: varchar
