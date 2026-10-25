@@ -21,6 +21,7 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 
 import structlog
+import yaml
 
 from mogov import db, obs
 from mogov.config import DB_PATH, DBT_DIR, RAW_DIR, ROOT
@@ -126,11 +127,44 @@ def _on_sigterm(signum, _frame):
     sys.exit(128 + signum)
 
 
+def _merge_user_vars(args: list[str], dbt_vars: dict) -> tuple[list[str], dict]:
+    """Fold any user `--vars <yaml>` / `--vars=<yaml>` in `args` into `dbt_vars` (user keys win).
+
+    dbt parses --vars as YAML (JSON is a subset) and warns or drops one of two flags, so mogov must pass one.
+    Returns the args without the user's flag and the merged vars; exits with a clear error if it is malformed.
+    """
+
+    rest, merged, i = [], dict(dbt_vars), 0
+    while i < len(args):
+        arg = args[i]
+        if arg == "--vars" or arg.startswith("--vars="):
+            if arg == "--vars":
+                if i + 1 >= len(args):
+                    sys.exit("mogov: --vars needs a YAML/JSON mapping value")
+                raw, i = args[i + 1], i + 2
+            else:
+                raw, i = arg.removeprefix("--vars="), i + 1
+            try:
+                user = yaml.safe_load(raw)
+            except yaml.YAMLError as exc:
+                sys.exit(f"mogov: could not parse --vars {raw!r} as YAML/JSON: {exc}")
+            if user is None:
+                user = {}
+            if not isinstance(user, dict):
+                sys.exit(f"mogov: --vars must be a YAML/JSON mapping, got {raw!r}")
+            merged.update(user)
+        else:
+            rest.append(arg)
+            i += 1
+    return rest, merged
+
+
 def run_dbt(args: list[str]) -> int:
     for table in db.ensure_optional_tables():
         log.warning("dbt.placeholder", table=f"raw.{table}", reason="not loaded yet; using an empty placeholder")
     # Models over opt-in CSV sources (no empty placeholder possible) are switched on when the data exists.
     dbt_vars = {"mec_direct": db.raw_exists("mec_cd1_a"), "cl_case_bulk": db.raw_exists("cl_mo_opinion_clusters")}
+    args, dbt_vars = _merge_user_vars(args, dbt_vars)
     dirs = ["--project-dir", str(DBT_DIR), "--profiles-dir", str(DBT_DIR)]
     env = {**os.environ, "MOGOV_DB": str(DB_PATH), "MOGOV_RAW_DIR": RAW_DIR.as_posix()}
     # dbt's console-script entry point. Not `-m dbt.cli.main`: the dbt.cli package imports that module first, so
@@ -138,9 +172,9 @@ def run_dbt(args: list[str]) -> int:
     dbt = [sys.executable, "-c", "from dbt.cli.main import cli; cli()"]
     if not (DBT_DIR / "dbt_packages" / "dbt_utils").exists():  # packages.yml (pinned by package-lock.yml)
         subprocess.check_call([*dbt, "deps", *dirs], cwd=ROOT, env=env)
-    cmd = [*dbt, *args, *dirs]
-    if args and args[0] in ("build", "run", "test", "compile", "seed"):
-        cmd += ["--vars", json.dumps(dbt_vars)]
+    # Every subcommand mogov uses accepts --vars, and dbt 1.11 also runs the on-run-start hook for
+    # `source freshness` (which reads the vars), so always pass them.
+    cmd = [*dbt, *args, *dirs, "--vars", json.dumps(dbt_vars)]
     return subprocess.call(cmd, cwd=ROOT, env=env)
 
 

@@ -118,3 +118,11 @@ export const ROSTER_SOURCES: Record<string, string> = {
   "congress-legislators": "congress-legislators (U.S. Congress)",
   fjc: "Federal Judicial Center biographical directory",
 };
+
+/** Roster links that download a file rather than open a page, so the reader is told before clicking. */
+export function rosterDownloadNote(source: string, links: number): string | null {
+  if (source !== "mo_house roster") return null;
+  return links > 1
+    ? "each year is a ZIP download (about 3 MB) of that session's XML"
+    : "the link is a ZIP download (about 3 MB) of that session's XML";
+}

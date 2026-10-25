@@ -100,7 +100,10 @@ Quirks:
 - Running page headers ("Journal of the Senate 118", day lines) appear mid-block and are stripped.
 - The block regex is bounded at 2,500 characters, so a block missing its "Vacancies" line can't
   swallow the rest of the journal.
-- Some votes have an "Excused from voting—Senator Hegeman—1" line (recorded as `not voting`).
+- Some votes have an "Excused from voting—Senator Hegeman—1" line. These are Senate Rule 91 recusals by
+  members present on the floor ("Pursuant to Senate Rule 91, Senator Washington excused herself from voting
+  on ..."), not absences, so they are recorded as `recused` (distinct from `absent with leave`). Only the
+  Senate records this; the House PDFs and Voteview do not. Whether a recusal counts as attended is open (#135).
 - Some journals print a section's total before its names ("Absent with leave—Senators—2 Eigel
   Gannon"). A section's names therefore also end at the next section heading. Before October 2026 they
   ran on into it, picking up "Vacancies", "NAYS" or "Absent" as senators and filing the next section's
@@ -302,6 +305,12 @@ Quirks:
   outside 3+ letter words (or `&` names like AT&T), or there's no run of 4 letters and no `&` name.
   Flagged items stay in `fct_disclosures` but are kept out of `fct_commercial_ties` and `fct_family_ties`. Investments are never flagged, because their
   tickers and fund codes would read as garbled. A sanity test fails if more than 5% of items get flagged.
+- Amended filings sit beside originals in `fct_disclosures`: Senate "annual report for cy 2022 (amendment 1/2)",
+  House "amended report", and two AO-10 pdfs for one judge-year (`..._1.pdf`). `is_latest_version` marks the
+  newest version per filer, source, report year and report (annual report plus its amendments). Count or sum
+  items only over `is_latest_version`; the filing list shows all. It assumes an amendment restates the whole
+  report, and a House amendment that is a scan with no extractable text never supersedes a readable report.
+  Periodic transaction reports, candidate reports and extension requests are separate filings, never collapsed.
 
 ## courtlistener_case_bulk: case history from bulk files
 
@@ -515,11 +524,11 @@ business registry has no bulk export, the Missouri Accountability Portal's vendo
 (see Quirks), and Census County Business Patterns has counts but no names. FRS covers regulated sites only, so
 offices, shops and most service businesses are missing.
 
-- Lands: `epa_frs_facilities`, `epa_frs_organizations`, `epa_frs_naics`, one row per CSV row of
-  `MO_FACILITY_FILE.CSV`, `MO_ORGANIZATION_FILE.CSV` and `MO_NAICS_FILE.CSV` from the Missouri state file
+- Lands: `epa_frs_facilities`, `epa_frs_organizations`, `epa_frs_naics`, `epa_frs_sic`, one row per CSV row of
+  `MO_FACILITY_FILE.CSV`, `MO_ORGANIZATION_FILE.CSV`, `MO_NAICS_FILE.CSV` and `MO_SIC_FILE.CSV` from the Missouri state file
   (`https://ordsext.epa.gov/FLA/www3/state_files/state_combined_mo.zip`, about 35 MB). The payload is the row
   as a JSON object keyed by the CSV header.
-- Shard units: the three CSV files. The zip is downloaded once and shared.
+- Shard units: the four CSV files. The zip is downloaded once and shared.
 - Districts: point-in-polygon of the facility's coordinates against the current `dim_district` boundaries.
   The geometry functions are dispatched per backend (`macros/compat/spatial.sql`); on DuckDB they need the
   `spatial` extension, which `dbt/profiles.yml` loads (downloaded on first use).
@@ -535,6 +544,15 @@ offices, shops and most service businesses are missing.
 - Each matched site also carries the matched donors' first and last contribution year, the receiving
   committee's filing page (`contributions_url`) and `match_confidence` (`medium` when any of that money was tied
   to the official by name only).
+- Industry: the primary NAICS code when a site has one (31% of the geocoded sites in October 2026). Otherwise
+  the site's SIC code (1987 Standard Industrial Classification, from `MO_SIC_FILE.CSV`; a primary code before an
+  unknown or secondary one) is mapped to a NAICS sector through the `sic_naics_sectors` seed, a hand-written
+  table from SIC major group (two digits, longer where a group splits across sectors) to NAICS sector. That gives
+  a sector, not a NAICS code: `int_epa_frs__facilities.naics_code` then holds the two-digit sector prefix and
+  `naics_source` is `sic`. Together they cover 56% of the geocoded sites; the rest have neither code.
+  About 10,400 of the SIC-filled facilities are SIC 1629 (heavy construction), likely construction stormwater
+  permits. The seed follows the Census 1987 SIC to 2017 NAICS concordance at 3 or 4 digits where a group splits;
+  groups still mapped to one sector despite straddling (73 business services, 79, 80, 87, 89) take the majority one.
 - `rpt_district_business_industries` counts each official's sites by NAICS sector (`naics_sectors` seed, from
   the primary NAICS code's first two digits). The profile page ships only the donor sites plus these counts: a
   U.S. House district holds up to ~10,500 sites, too many for the per-official JSON budget.
