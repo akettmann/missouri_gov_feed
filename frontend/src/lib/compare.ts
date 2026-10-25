@@ -19,7 +19,7 @@ export interface CompareRow {
   /** the text of the noteHref link; required with it, so a row cannot pick up another row's wording */
   noteLinkText?: string;
   /** per official (same order as values): links to where that cell's figure came from */
-  valueLinks?: { text: string; href: string }[][];
+  valueLinks?: { text: string; href: string; context?: string }[][];
 }
 
 const NA = "—";
@@ -112,7 +112,6 @@ export function compareRows(bundles: OfficialBundle[], hideMedium: boolean): Com
     note: payNote,
     noteHref: "/methodology/#pay-per-vote",
     noteLinkText: "How pay per vote is counted",
-
     valueLinks: bundles.map(payPerVoteSources),
   });
   rows.push({
