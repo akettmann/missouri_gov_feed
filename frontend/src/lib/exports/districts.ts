@@ -23,6 +23,10 @@ export interface DistrictData {
   statewide: string[];
   /** county outlines for the clickable map, simplified harder */
   map: { district_id: string; name: string; polygons: Ring[][] }[];
+  /** county district_id -> ids of the House, Senate and congressional districts that intersect it */
+  countyDistricts: Record<string, string[]>;
+  /** county district_id -> ids of cities whose boundary covers the whole county (St. Louis city) */
+  countyCities: Record<string, string[]>;
   /** ZIP (ZCTA) -> [internal point lon, lat, radius in meters of a circle with the same land area] */
   zips: Record<string, [number, number, number]>;
 }
@@ -102,7 +106,12 @@ export function districtData(): Promise<DistrictData | null> {
 }
 
 async function load(): Promise<DistrictData | null> {
-  if (!hasExport("dim_district") || !hasExport("fct_official_districts")) return null;
+  if (
+    !hasExport("dim_district") ||
+    !hasExport("fct_official_districts") ||
+    !hasExport("fct_county_districts")
+  )
+    return null;
   const bundles = await allOfficials();
   const slugOf = new Map(bundles.map((b) => [b.official.official_id, b.official.slug]));
 
@@ -156,8 +165,25 @@ async function load(): Promise<DistrictData | null> {
     }
   }
 
+  // county -> districts reaching it, from the unsimplified boundaries (fct_county_districts), in the order
+  // congressional, senate, house; plus cities that cover the whole county
+  const countyDistricts: DistrictData["countyDistricts"] = {};
+  const countyCities: DistrictData["countyCities"] = {};
+  for (const r of await query<{ county_id: string; district_id: string; district_type: string }>(`
+    select f.county_id, f.district_id, f.district_type
+    from {fct_county_districts} as f
+    left join {dim_district} as d on d.district_id = f.district_id
+    order by f.county_id,
+      case f.district_type when 'us_house' then 1 when 'state_senate' then 2 when 'state_house' then 3 else 4 end,
+      d.district_number`)) {
+    const into = r.district_type === "place" ? countyCities : countyDistricts;
+    (into[r.county_id] ??= []).push(r.district_id);
+  }
+
   return {
     zips,
+    countyDistricts,
+    countyCities,
     vintage: rows.find((r) => r.vintage != null)?.vintage ?? null,
     shapes,
     officials,

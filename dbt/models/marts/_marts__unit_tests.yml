@@ -29,6 +29,36 @@ unit_tests:
         - {official_id: o_dan_jones, recipient_raw: 'JONES, DANIEL', match_confidence: medium}
         - {official_id: o_dan_jones, recipient_raw: 'JONES, DAN', match_confidence: high}
 
+  - name: party_unity_yearly_counts_party_line_votes_by_year_and_party_held
+    model: fct_party_unity_yearly
+    description: >
+      Only yea/nay votes on party-line votes count. m votes in 2023 on three votes: v1 (party-line, Republican
+      majority yea, Democratic majority nay), v2 (not party-line, both parties yea) and v3 (party-line, absent
+      so no vote cast). m cast yea as a Republican on v1 (with the party), then in 2024 switched to Democratic
+      and cast yea on v4 (party-line, Democratic majority nay): against the party. The party at the vote
+      decides the side, so the switch gives 1 of 1 in 2023 and 0 of 1 in 2024. An undated vote lands in a
+      null year. Counting v2, v3, or judging 2024 by the old party fails this test.
+    given:
+      - input: ref('fct_votes')
+        rows:
+          - {official_id: m, chamber: state_house, vote_id: v1, vote_date: 2023-02-01, vote_cast: yea, party_at_vote: Republican}
+          - {official_id: m, chamber: state_house, vote_id: v2, vote_date: 2023-02-02, vote_cast: yea, party_at_vote: Republican}
+          - {official_id: m, chamber: state_house, vote_id: v3, vote_date: 2023-02-03, vote_cast: absent, party_at_vote: Republican}
+          - {official_id: m, chamber: state_house, vote_id: v4, vote_date: 2024-02-01, vote_cast: yea, party_at_vote: Democratic}
+          - {official_id: m, chamber: state_house, vote_id: v5, vote_date: null, vote_cast: nay, party_at_vote: Democratic}
+      - input: ref('int_votes__party_positions')
+        rows:
+          - {chamber: state_house, vote_id: v1, republican_position: yea, democratic_position: nay, is_party_line: true}
+          - {chamber: state_house, vote_id: v2, republican_position: yea, democratic_position: yea, is_party_line: false}
+          - {chamber: state_house, vote_id: v3, republican_position: yea, democratic_position: nay, is_party_line: true}
+          - {chamber: state_house, vote_id: v4, republican_position: yea, democratic_position: nay, is_party_line: true}
+          - {chamber: state_house, vote_id: v5, republican_position: yea, democratic_position: nay, is_party_line: true}
+    expect:
+      rows:
+        - {official_id: m, chamber: state_house, vote_year: 2023, party_line_votes: 1, with_party_votes: 1}
+        - {official_id: m, chamber: state_house, vote_year: 2024, party_line_votes: 1, with_party_votes: 0}
+        - {official_id: m, chamber: state_house, vote_year: null, party_line_votes: 1, with_party_votes: 1}
+
   - name: commercial_ties_skip_garbled_disclosure_items
     model: fct_commercial_ties
     description: >
@@ -259,3 +289,34 @@ unit_tests:
         - {disclosure_item_id: 'courtlistener:t1', report_version: 0, is_latest_version: false}
         - {disclosure_item_id: 'courtlistener:t2', report_version: 1, is_latest_version: true}
         - {disclosure_item_id: 'courtlistener:t3', report_version: 0, is_latest_version: true}
+
+  - name: county_districts_ignore_edge_noise_and_keep_real_overlaps
+    model: fct_county_districts
+    description: >
+      Districts count for a county only when they overlap it by more than 0.1 km2, so boundaries that share an
+      edge (state_senate:2, touching along x=-92), sit a hair away from it (state_house:4), or poke 0.5 m past
+      it from a slightly misaligned layer (state_house:3, 0.04 km2) are dropped, however finely a grid would
+      have sampled the seam. A long thin strip (state_house:6 overlaps the county by about 100 m x 77 km, 8 km2, well over the area threshold) is dropped by the inward-buffer rule. A non-current district is ignored. A city counts only when it covers the whole
+      county (place:2999999), not when it is a small part of it (place:2999998).
+    given:
+      - input: ref('dim_district')
+        rows:
+          - {district_id: 'county:29901', district_type: county, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-93,38],[-92,38],[-92,39],[-93,39],[-93,38]]]}'}
+          - {district_id: 'us_house:119:1', district_type: us_house, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-94,37],[-91,37],[-91,40],[-94,40],[-94,37]]]}'}
+          - {district_id: 'state_senate:1', district_type: state_senate, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-93.5,38],[-92.5,38],[-92.5,39],[-93.5,39],[-93.5,38]]]}'}
+          - {district_id: 'state_house:1', district_type: state_house, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-93.5,38],[-92.5,38],[-92.5,39],[-93.5,39],[-93.5,38]]]}'}
+          - {district_id: 'state_house:2', district_type: state_house, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-92.5,38],[-92,38],[-92,39],[-92.5,39],[-92.5,38]]]}'}
+          - {district_id: 'state_house:3', district_type: state_house, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-92.000005,38],[-91,38],[-91,39],[-92.000005,39],[-92.000005,38]]]}'}
+          - {district_id: 'state_house:4', district_type: state_house, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-91.99999,38],[-91,38],[-91,39],[-91.99999,39],[-91.99999,38]]]}'}
+          - {district_id: 'state_house:5', district_type: state_house, is_current: false, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-93,38],[-92,38],[-92,39],[-93,39],[-93,38]]]}'}
+          - {district_id: 'place:2999999', district_type: place, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-93,38],[-92,38],[-92,39],[-93,39],[-93,38]]]}'}
+          - {district_id: 'place:2999998', district_type: place, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-92.9,38.1],[-92.8,38.1],[-92.8,38.2],[-92.9,38.2],[-92.9,38.1]]]}'}
+          - {district_id: 'state_senate:2', district_type: state_senate, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-92,38],[-91,38],[-91,39],[-92,39],[-92,38]]]}'}
+          - {district_id: 'state_house:6', district_type: state_house, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-92.0012,38.2],[-91,38.2],[-91,38.9],[-92.0012,38.9],[-92.0012,38.2]]]}'}
+    expect:
+      rows:
+        - {county_id: 'county:29901', district_id: 'us_house:119:1', district_type: us_house}
+        - {county_id: 'county:29901', district_id: 'state_senate:1', district_type: state_senate}
+        - {county_id: 'county:29901', district_id: 'state_house:1', district_type: state_house}
+        - {county_id: 'county:29901', district_id: 'state_house:2', district_type: state_house}
+        - {county_id: 'county:29901', district_id: 'place:2999999', district_type: place}

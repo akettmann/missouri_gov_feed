@@ -42,12 +42,23 @@ const orderOf = (award: string) => {
   return i < 0 ? ORDER.length : i;
 };
 
+/**
+ * What the number rests on, after the number: "of 1,203 votes", "of $5,000 raised", "with party, of 26 party-line votes".
+ * The party awards rank unity (the share cast with the official's own party), so they read "with party, of N party-line votes".
+ */
+export function outOfText(award: string, sampleSize: number | null): string {
+  const outOf = AWARDS[award]?.outOf;
+  if (sampleSize == null || !outOf) return "";
+  if (outOf === "votes") return `of ${count(sampleSize)} votes`;
+  if (outOf === "raised") return `of ${money(sampleSize)} raised`;
+  return `with party, of ${count(sampleSize)} party-line votes`;
+}
+
 /** "62.5% of 1,203 votes", the measured number with what it is out of. */
 export function metricText(award: string, metric: number, sampleSize: number | null): string {
-  const def = AWARDS[award];
-  const value = def?.unit === "money" ? money(metric) : pct(metric);
-  if (sampleSize == null || !def?.outOf) return value;
-  return `${value} of ${def.outOf === "votes" ? `${count(sampleSize)} votes` : `${money(sampleSize)} raised`}`;
+  const value = AWARDS[award]?.unit === "money" ? money(metric) : pct(metric);
+  const out = outOfText(award, sampleSize);
+  return out ? `${value} ${out}` : value;
 }
 
 /** "Never Misses a Vote": the award's nickname without the "The ... Award" wrapper and curly quotes. */
@@ -75,8 +86,8 @@ export function ordinal(n: number): string {
 /**
  * Current awards by official slug. "Current" is each award's latest yearly list within each office (the
  * awards page ranks officials only against the same office), so an office whose newest year was skipped, or
- * that is only ranked lifetime, still shows its own list. An award with no yearly list for an office, such
- * as party breaks, uses that office's lifetime list. An official ranked in the same award under two offices
+ * that is only ranked lifetime, still shows its own list. An award with no yearly list for an office
+ * uses that office's lifetime list. An official ranked in the same award under two offices
  * keeps the better rank. Order is the awards page's. `officeLabel` turns an office key into the plural name
  * of its holders for the badge text ("State Representatives", as the awards page writes it).
  */
