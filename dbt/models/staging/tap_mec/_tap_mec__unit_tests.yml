@@ -321,3 +321,69 @@ unit_tests:
         - {record_id: h-new, mec_committee_id: C9, amount: 60}
         - {record_id: j-new1, mec_committee_id: C10, amount: 30}
         - {record_id: j-new2, mec_committee_id: C10, amount: 30}
+
+  - name: tap_expenditures_payee_name
+    model: stg_tap_mec__expenditures
+    description: >
+      TAP's payee_name is just coalesce(last_name, first_name, company) and merged different people sharing a
+      surname (#85), so it is not used. A company wins over the contact's first/last name; when the company only
+      repeats the person's last name or "First Last" the payee is "First Last"; with no company the payee is
+      "First Last", then a lone first or last name. Placeholder parts ('~', '-', '?') and all-digit parts are
+      dropped, so '~' / '~' falls through to the company; a whole name of one character is dropped but initials
+      inside a person's name stay. TAP's payee_name alone (r8) yields null. An organization typed into both name boxes (r16, r17: the last
+      name already starts with the first name) is not doubled.
+    given:
+      - input: source('tap_mec', 'expenditures')
+        format: sql
+        rows: |
+          select
+              cast('r1' as varchar) as cd3_b_id,
+              cast('C1' as varchar) as mecid,
+              cast('Committee' as varchar) as committee_name,
+              cast('Shepard' as varchar) as payee_name,
+              cast(null as varchar) as company,
+              cast('Kimmie' as varchar) as first_name,
+              cast('Shepard' as varchar) as last_name,
+              cast(null as varchar) as purpose,
+              cast(null as varchar) as expenditure_type,
+              cast('1' as varchar) as amount,
+              cast(null as varchar) as date_clean,
+              cast(null as varchar) as year_clean,
+              cast(null as varchar) as city_final,
+              cast(null as varchar) as state_norm,
+              cast(null as varchar) as report,
+              cast('FALSE' as varchar) as dupe_flag
+          union all select 'r2', 'C1', 'Committee', 'Shepard', null, 'Kiara', ' Shepard ', null, null, '1', null, null, null, null, null, null
+          union all select 'r3', 'C1', 'Committee', 'Acme Printing', 'Acme Printing', null, null, null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r4', 'C1', 'Committee', 'Walmart', 'Walmart', '~', '~', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r5', 'C1', 'Committee', '~', 'Walmart', '~', '~', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r6', 'C1', 'Committee', 'Roe', null, 'J', 'Roe', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r7', 'C1', 'Committee', '?', null, 'Bob', '?', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r8', 'C1', 'Committee', 'Jane Doe', null, null, null, null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r9', 'C1', 'Committee', 'Jane Doe', null, 'Jane', 'Doe', null, null, '1', null, null, null, null, null, 'TRUE'
+          union all select 'r10', 'C1', 'Committee', null, null, null, null, null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r11', 'C1', 'Committee', 'Cady', 'JEFFERSON CITY MARKETING', 'Jeremy', 'Cady', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r12', 'C1', 'Committee', 'Pierce', 'Pierce', 'Mary', 'Pierce', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r13', 'C1', 'Committee', '1966', 'Discount Mugs', 'Bob', '1966', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r14', 'C1', 'Committee', 'Becky', 'Minuteman Press', 'Becky', null, null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r15', 'C1', 'Committee', 'Hertzog', ' bud  hertzog ', 'Bud', 'Hertzog', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r16', 'C1', 'Committee', 'USPS', 'USPS', 'USPS', 'USPS', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r17', 'C1', 'Committee', 'Kyler Cliffman', 'Kyler Cliffman', 'Kyler', 'Kyler Cliffman', null, null, '1', null, null, null, null, null, 'FALSE'
+    expect:
+      rows:
+        - {record_id: r1, payee_name: Kimmie Shepard}
+        - {record_id: r2, payee_name: Kiara Shepard}
+        - {record_id: r3, payee_name: Acme Printing}
+        - {record_id: r4, payee_name: Walmart}
+        - {record_id: r5, payee_name: Walmart}
+        - {record_id: r6, payee_name: J Roe}
+        - {record_id: r7, payee_name: Bob}
+        - {record_id: r8, payee_name: null}
+        - {record_id: r10, payee_name: null}
+        - {record_id: r11, payee_name: JEFFERSON CITY MARKETING}
+        - {record_id: r12, payee_name: Mary Pierce}
+        - {record_id: r13, payee_name: Discount Mugs}
+        - {record_id: r14, payee_name: Minuteman Press}
+        - {record_id: r15, payee_name: Bud Hertzog}
+        - {record_id: r16, payee_name: USPS}
+        - {record_id: r17, payee_name: Kyler Cliffman}
