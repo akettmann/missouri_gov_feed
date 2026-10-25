@@ -75,8 +75,8 @@ export function ordinal(n: number): string {
 /**
  * Current awards by official slug. "Current" is each award's latest yearly list within each office (the
  * awards page ranks officials only against the same office), so an office whose newest year was skipped, or
- * that is only ranked lifetime, still shows its own list. An award with no yearly list for an office, such
- * as party breaks, uses that office's lifetime list. An official ranked in the same award under two offices
+ * that is only ranked lifetime, still shows its own list. An award with no yearly list for an office
+ * uses that office's lifetime list. An official ranked in the same award under two offices
  * keeps the better rank. Order is the awards page's. `officeLabel` turns an office key into the plural name
  * of its holders for the badge text ("State Representatives", as the awards page writes it).
  */

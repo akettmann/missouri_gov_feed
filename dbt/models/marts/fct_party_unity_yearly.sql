@@ -7,9 +7,9 @@
 select
     v.official_id,
     v.chamber,
-    extract(year from v.vote_date) as vote_year,
-    count(*) as party_line_votes,
-    sum(
+    cast(extract(year from v.vote_date) as {{ dbt.type_bigint() }}) as vote_year,
+    cast(count(*) as {{ dbt.type_bigint() }}) as party_line_votes,
+    cast(sum(
         case
             when
                 v.vote_cast
@@ -17,7 +17,7 @@ select
                 then 1
             else 0
         end
-    ) as with_party_votes
+    ) as {{ dbt.type_bigint() }}) as with_party_votes
 from {{ ref('fct_votes') }} as v
 inner join {{ ref('int_votes__party_positions') }} as p on v.chamber = p.chamber and v.vote_id = p.vote_id
 where
