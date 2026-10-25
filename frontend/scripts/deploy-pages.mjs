@@ -7,13 +7,15 @@
 // have been built with the Pages base), --allow-stale, --allow-dirty (deploy with uncommitted frontend/
 // changes), --keep (keep the temp repo), --remote NAME (default origin; only used to learn which GitHub repo
 // this is: the push goes to https://github.com/<owner>/<name>.git).
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { cp, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   checkLimits,
+  InterruptedError,
+  isInterruptExit,
   PAGES_BRANCH,
   pagesTarget,
   parseArgs,
@@ -35,6 +37,24 @@ function run(cmd, args, opts = {}) {
     throw new Error(`${cmd} ${redactUrl(args.join(" "))} failed (${r.status ?? r.error?.message}).`);
   }
   return (r.stdout ?? "").trimEnd();
+}
+
+// Async so the event loop keeps turning (and a Ctrl+C reaches withTempDir's listener) while git works.
+function runAsync(cmd, args, opts = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { cwd: FRONTEND, ...opts });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (d) => (stdout += d));
+    child.stderr.setEncoding("utf8").on("data", (d) => (stderr += d));
+    child.on("error", reject);
+    child.on("close", (status, signal) => {
+      if (status === 0) return resolve(stdout.trimEnd());
+      if (isInterruptExit(status, signal)) return reject(new InterruptedError());
+      if (stderr) console.error(redactUrl(stderr));
+      reject(new Error(`${cmd} ${redactUrl(args.join(" "))} failed (${status ?? signal}).`));
+    });
+  });
 }
 
 async function listFiles(dir, rel = "") {
@@ -112,6 +132,7 @@ if (lc.status !== 0) {
 
 const identity = ["-c", "user.name=mogov deploy", "-c", "user.email=noreply@users.noreply.github.com"];
 let keptDir = null;
+let pushStarted = false;
 try {
   await withTempDir(
     "mogov-pages-",
@@ -126,20 +147,23 @@ try {
       console.log(`${mb(totalBytes)} MB total, largest file ${largest?.path} (${mb(largest?.size ?? 0)} MB)`);
       if (problems.length) throw new Error(problems.join("\n"));
 
-      const git = (...a) => run("git", [...identity, ...a], { cwd: work });
-      guard.check();
-      git("init", "-q", "-b", PAGES_BRANCH);
-      git("add", "-A");
-      git("commit", "-q", "-m", `Deploy site (${new Date().toISOString()})`);
-      const sha = git("rev-parse", "--short", "HEAD");
+      const git = (...a) => runAsync("git", [...identity, ...a], { cwd: work });
+      await guard.check();
+      await git("init", "-q", "-b", PAGES_BRANCH);
+      await guard.check();
+      await git("add", "-A");
+      await guard.check();
+      await git("commit", "-q", "-m", `Deploy site (${new Date().toISOString()})`);
+      const sha = await git("rev-parse", "--short", "HEAD");
 
       if (opts.dryRun) {
         console.log(`Dry run: committed ${sha} on ${PAGES_BRANCH}; nothing pushed.`);
         console.log(`Would run: git push --force ${pushTo} ${PAGES_BRANCH}:refs/heads/${PAGES_BRANCH}`);
         console.log(`Would be live at ${target.url}`);
       } else {
-        guard.check(); // last stop before the force-push
-        git("push", "--force", pushTo, `${PAGES_BRANCH}:refs/heads/${PAGES_BRANCH}`);
+        await guard.check(); // last stop before the force-push
+        pushStarted = true;
+        await git("push", "--force", pushTo, `${PAGES_BRANCH}:refs/heads/${PAGES_BRANCH}`);
         console.log(`Pushed ${sha} to ${PAGES_BRANCH}. Live shortly at ${target.url}`);
       }
     },
@@ -147,7 +171,14 @@ try {
   );
   if (opts.keep) console.log(`Kept temp repo: ${keptDir}`);
 } catch (e) {
-  console.error(e.message);
+  const interrupted = e instanceof InterruptedError;
+  console.error(
+    interrupted && !pushStarted
+      ? "Interrupted; nothing was pushed."
+      : interrupted
+        ? "Interrupted during git push; the push may or may not have completed."
+        : e.message,
+  );
   if (opts.keep) console.error(`Kept temp repo: ${keptDir}`);
-  process.exit(1);
+  process.exit(e instanceof InterruptedError ? 130 : 1);
 }

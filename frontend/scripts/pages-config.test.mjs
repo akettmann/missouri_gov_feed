@@ -16,6 +16,8 @@ import {
   pushUrl,
   redactUrl,
   repoFromRemote,
+  InterruptedError,
+  isInterruptExit,
   withTempDir,
 } from "./pages-config.mjs";
 
@@ -73,49 +75,84 @@ test("repoFromRemote anchors the host and rejects dot names", () => {
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
-test("withTempDir: a SIGINT delivered while fn awaits removes the dir and exits 130, unless keep", async () => {
+test("withTempDir: a SIGINT delivered while fn awaits rejects with InterruptedError and removes the dir, unless keep", async () => {
   for (const keep of [false, true]) {
     const proc = new EventEmitter();
-    const exits = [];
     let made;
-    await withTempDir(
-      "mogov-sigint-",
-      async (dir) => {
-        made = dir;
-        await tick();
-        proc.emit("SIGINT"); // arrives on a later turn of the event loop, as a real signal does
-        assert.equal(existsSync(dir), keep);
-      },
-      { keep, proc, exit: (c) => exits.push(c) },
+    await assert.rejects(
+      withTempDir(
+        "mogov-sigint-",
+        async (dir) => {
+          made = dir;
+          await tick();
+          proc.emit("SIGINT"); // arrives on a later turn of the event loop, as a real signal does
+          await new Promise((r) => setTimeout(r, 2000)); // fn is still busy; the interrupt must win the race
+        },
+        { keep, proc },
+      ),
+      InterruptedError,
     );
-    assert.deepEqual(exits, [130]);
+    assert.equal(existsSync(made), keep);
     assert.equal(proc.listenerCount("SIGINT"), 0);
     if (keep) rmSync(made, { recursive: true, force: true });
   }
 });
 
-test("withTempDir: guard.check() aborts after an interrupt (the pre-push guard) and a repeated SIGINT exits 130 again", async () => {
+test("withTempDir: a SIGINT pending across a synchronous step is only delivered by a yield, and guard.check() yields", async () => {
   const proc = new EventEmitter();
-  const exits = [];
   let pushed = false;
   await assert.rejects(
     withTempDir(
-      "mogov-guard-",
+      "mogov-pending-",
       async (_dir, guard) => {
-        guard.check(); // fine before any signal
-        await tick();
-        proc.emit("SIGINT");
-        proc.emit("SIGINT");
-        guard.check();
+        // Like git init/commit under spawnSync: the signal arrives while the loop is blocked, so its listener cannot
+        // run until the loop turns. Model that with an emit queued for the next turn.
+        setImmediate(() => proc.emit("SIGINT"));
+        const t = Date.now();
+        while (Date.now() - t < 20); // synchronous work; nothing is delivered yet
+        assert.equal(guard.interrupted, false);
+        await guard.check(); // the yield delivers the signal, then check() throws
         pushed = true;
       },
-      { proc, exit: (c) => exits.push(c) },
+      { proc },
     ),
-    /Interrupted/,
+    InterruptedError,
   );
   assert.equal(pushed, false);
-  assert.deepEqual(exits, [130, 130]);
   assert.equal(proc.listenerCount("SIGINT"), 0);
+});
+
+test("withTempDir: a further SIGINT during the dir removal is still caught (the listener outlives the removal)", async () => {
+  const proc = new EventEmitter();
+  const seen = [];
+  const remove = (dir, o) => {
+    seen.push(proc.listenerCount("SIGINT")); // a Ctrl+C now must hit our listener, not Node's kill-the-process default
+    assert.equal(proc.emit("SIGINT"), true);
+    rmSync(dir, o);
+  };
+  await assert.rejects(
+    withTempDir(
+      "mogov-twice-",
+      async () => {
+        await tick();
+        proc.emit("SIGINT");
+        proc.emit("SIGINT"); // second Ctrl+C before cleanup: ignored
+        await new Promise((r) => setTimeout(r, 2000));
+      },
+      { proc, remove },
+    ),
+    InterruptedError,
+  );
+  assert.deepEqual(seen, [1]);
+  assert.equal(proc.listenerCount("SIGINT"), 0);
+});
+
+test("isInterruptExit recognises SIGINT, 130 and the Windows Ctrl+C status", () => {
+  assert.equal(isInterruptExit(130, null), true);
+  assert.equal(isInterruptExit(3221225786, null), true);
+  assert.equal(isInterruptExit(null, "SIGINT"), true);
+  assert.equal(isInterruptExit(1, null), false);
+  assert.equal(isInterruptExit(0, null), false);
 });
 
 test("withTempDir leaves no SIGINT listener behind when nothing interrupts", async () => {
@@ -135,23 +172,31 @@ test("withTempDir leaves no SIGINT listener behind when nothing interrupts", asy
   assert.equal(proc.listenerCount("SIGINT"), 0);
 });
 
-test("withTempDir in a real process: SIGINT during an async step removes the dir and exits 130", () => {
+test("withTempDir in a real process: SIGINT during an async step removes the dir; the caller exits 130", () => {
   // Windows cannot deliver a console Ctrl+C to a child from node, so the child raises SIGINT on the real
   // process object after an await; the real listener, real process.exit and real filesystem are exercised.
   const script = `
     import { existsSync } from "node:fs";
-    import { withTempDir } from ${JSON.stringify(pathToFileURL(path.join(import.meta.dirname, "pages-config.mjs")).href)};
-    await withTempDir("mogov-child-", async (dir) => {
-      console.log(dir);
-      await new Promise((r) => setTimeout(r, 50));
-      process.emit("SIGINT");
-      await new Promise((r) => setTimeout(r, 5000));
-      console.log("NOT-INTERRUPTED");
-    });
+    import { withTempDir, InterruptedError } from ${JSON.stringify(pathToFileURL(path.join(import.meta.dirname, "pages-config.mjs")).href)};
+    let made;
+    try {
+      await withTempDir("mogov-child-", async (dir) => {
+        made = dir;
+        console.log(dir);
+        await new Promise((r) => setTimeout(r, 50));
+        process.emit("SIGINT");
+        await new Promise((r) => setTimeout(r, 5000));
+        console.log("NOT-INTERRUPTED");
+      });
+    } catch (e) {
+      console.log(e instanceof InterruptedError ? "GONE=" + !existsSync(made) : "other");
+      process.exit(130);
+    }
   `;
   const r = spawnSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8" });
   assert.equal(r.status, 130, r.stderr);
   assert.doesNotMatch(r.stdout, /NOT-INTERRUPTED/);
+  assert.match(r.stdout, /GONE=true/);
   const dir = r.stdout.trim().split(/\r?\n/)[0];
   assert.match(dir, /mogov-child-/);
   assert.equal(existsSync(dir), false);

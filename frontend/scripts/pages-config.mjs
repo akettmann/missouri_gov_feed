@@ -16,41 +16,66 @@ export function redactUrl(url) {
   return String(url).replace(/(\/\/)[^/@\s]+@/g, "$1***@");
 }
 
+/** Thrown (the caller then exits 130) when Ctrl+C / SIGINT arrives while a deploy is staged. */
+export class InterruptedError extends Error {
+  constructor() {
+    super("Interrupted.");
+    this.name = "InterruptedError";
+  }
+}
+
+/** True for a child's exit that means "it was Ctrl+C'd": SIGINT, POSIX 130, or Windows STATUS_CONTROL_C_EXIT. */
+export function isInterruptExit(status, signal) {
+  return signal === "SIGINT" || status === 130 || status === 3221225786;
+}
+
 /**
  * Run `await fn(dir, guard)` in a fresh temp dir that is removed afterwards, even when fn throws, unless keep is set.
- * fn must do its long work asynchronously (fs.promises, not *Sync) so the event loop can deliver SIGINT: the first
- * Ctrl+C removes the dir (unless keep) and exits 130 at once; a second one exits 130 without waiting. While fn is
- * blocked in a synchronous call (e.g. spawnSync) the signal is delivered when it returns, so `guard.check()`
- * throws if an interrupt arrived, and callers must call it immediately before any irreversible step (git push).
- * `proc` and `exit` are injectable for tests.
+ * The first SIGINT rejects the returned promise with InterruptedError at once, even while fn is mid-await (the caller
+ * then exits 130); the dir is removed unless keep. Further SIGINTs are ignored until that cleanup has finished, so
+ * a second Ctrl+C cannot kill the process mid-delete. fn must not block the event loop (no *Sync calls for long work,
+ * use async spawn), otherwise the signal cannot be delivered until the block ends; as a backstop `await guard.check()`
+ * yields one event-loop turn (delivering a pending signal) and throws InterruptedError if an interrupt arrived, and
+ * callers must call it immediately before any irreversible step (git push). `proc` and `remove` (the deleter) are injectable for tests.
  */
 export async function withTempDir(
   prefix,
   fn,
-  { keep = false, root = tmpdir(), proc = process, exit = process.exit } = {},
+  { keep = false, root = tmpdir(), proc = process, remove = rmSync } = {},
 ) {
   const dir = mkdtempSync(path.join(root, prefix));
   let interrupted = false;
+  let cleaning = false;
+  let rejectInterrupt;
+  const interrupt = new Promise((_, reject) => {
+    rejectInterrupt = reject;
+  });
   const guard = {
     get interrupted() {
       return interrupted;
     },
-    check() {
-      if (interrupted) throw new Error("Interrupted (SIGINT); nothing was pushed.");
+    async check() {
+      await new Promise((resolve) => setImmediate(resolve)); // let a pending signal's listener run first
+      if (interrupted) throw new InterruptedError();
     },
   };
   const onSigint = () => {
-    if (interrupted) return exit(130); // second Ctrl+C: leave immediately
+    if (cleaning || interrupted) return; // stay installed (and ignore Ctrl+C) until the dir is gone
     interrupted = true;
-    if (!keep) rmSync(dir, { recursive: true, force: true });
-    exit(130);
+    rejectInterrupt(new InterruptedError());
   };
   proc.on("SIGINT", onSigint);
+  const work = (async () => fn(dir, guard))(); // also tolerates a plain (sync) fn
+  work.catch(() => {}); // after an interrupt fn may still fail; the race below already reported the interrupt
   try {
-    return await fn(dir, guard);
+    return await Promise.race([work, interrupt]);
   } finally {
-    proc.removeListener("SIGINT", onSigint);
-    if (!keep) rmSync(dir, { recursive: true, force: true });
+    cleaning = true;
+    try {
+      if (!keep) remove(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } finally {
+      proc.removeListener("SIGINT", onSigint);
+    }
   }
 }
 

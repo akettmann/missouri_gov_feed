@@ -247,11 +247,17 @@ to read the repo from). It refuses to run with uncommitted changes under `fronte
 and removes its ~200 MB temp repo on every exit, dry runs and failures included (`--keep` leaves it for
 inspection). It can be started from any directory.
 
-Ctrl+C is safe at every stage and never reaches the push. The copy and size scan are asynchronous, so the first
-Ctrl+C deletes the temp repo and exits 130 immediately (a second one exits at once). Steps that block (the `git
-commit`) get the signal when they return, and the script checks for an interrupt right before `git init` and again
-immediately before `git push`, aborting if one arrived. During the build, `pnpm build` is killed by the same Ctrl+C
-and nothing is pushed.
+Ctrl+C never reaches the push. What happens depends on the stage:
+
+| Stage                                       | Ctrl+C result                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm build`                                | Node's default handler (no listener is installed yet) kills the script and the build; no temp dir exists yet; exit code is the signal's (on Windows typically `0xC000013A`).                                                                                                                                                                                                                 |
+| Copy of `dist/` and size scan               | The first Ctrl+C deletes the temp repo (unless `--keep`) and exits 130 ("Interrupted; nothing was pushed.").                                                                                                                                                                                                                                                                                 |
+| `git init` / `add` / `commit` / `rev-parse` | These run as asynchronous child processes, so the same listener handles the signal: temp repo deleted, exit 130. If git itself dies from the Ctrl+C first (status 130 or `0xC000013A`), that is reported as "Interrupted; nothing was pushed.", also exit 130. An interrupt flag is also checked (after yielding to the event loop) before every git step and immediately before `git push`. |
+| `git push`                                  | If Ctrl+C arrives after the push has started the script exits 130 with "the push may or may not have completed"; check the `gh-pages` branch.                                                                                                                                                                                                                                                |
+
+A second Ctrl+C while the temp repo is being deleted is ignored until the deletion finishes, so no ~200 MB directory is
+left in the temp folder.
 
 The repo is always taken from a GitHub remote URL (`https://github.com/o/n`, `git@github.com:o/n`, or
 `ssh://git@github.com/o/n`). Explicit ports, `ssh.github.com:443` and SSH host aliases are not recognised; use a
