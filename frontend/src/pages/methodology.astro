@@ -126,6 +126,37 @@ const tables = freshness();
     </p>
   </section>
 
+  <section class="card" id="attendance">
+    <h2>Attendance</h2>
+    <p>
+      Attendance is the share of roll-call votes on which the official was listed, per chamber and session,
+      where they voted yea, nay or present. Every other recorded position counts as not attended. The profile
+      chart's "Not attended" view shows the other side of the same figure, as a share of recorded votes: one
+      bar per session, made of three stacked parts:
+    </p>
+    <ul>
+      <li>
+        <strong>Absent or not voting</strong>: marked absent (MO House and Senate) or not voting (Congress).
+      </li>
+      <li>
+        <strong>Absent with leave</strong>: an excused absence, as recorded in the MO Senate journals.
+      </li>
+      <li>
+        <strong>Recused</strong>: the MO Senate's "Excused from voting", a Senate Rule 91 recusal by a member
+        who is on the floor. It is not an absence, but it is not counted as attended either, so it lowers the
+        attendance figure.
+      </li>
+    </ul>
+    <p>
+      Only the MO Senate records leave and recusals. The MO House and Congress sources don't, so a 0 in those
+      bars does not mean the official was never excused: an excused House absence shows up as plain absent.
+      The chamber average tick is 100 minus the whole chamber's attendance for that session (every member who
+      voted that session, not only the officials this site covers). It lumps all non-attended positions
+      together, because the export doesn't split out the chamber's excused absences or recusals, so compare it
+      with the end of the official's whole bar, not with one part alone.
+    </p>
+  </section>
+
   <section class="card" id="awards">
     <h2>Awards</h2>
     <p>
