@@ -3,7 +3,7 @@
 // has this page). Only what the year rosters say: name, offices with years, party, district, sources.
 // Same layout for everyone; the profile sections are replaced by one plain note on why they're absent.
 import type { PastPerson } from "../lib/exports/types";
-import { LEVELS, ROSTER_SOURCES, officeLine, yearRanges } from "../lib/format";
+import { LEVELS, ROSTER_SOURCES, officeLine, rosterDownloadNote, yearRanges } from "../lib/format";
 import { SAME_NAME_NOTE, sameNameKindLabel } from "../lib/exports/past";
 import { href, reportErrorUrl } from "../lib/site";
 
@@ -93,6 +93,7 @@ const parties = [...new Set(person.stints.map((s) => s.party))];
       {person.sources.map((s) => {
         const name = ROSTER_SOURCES[s.source] ?? s.source;
         const [only] = s.links;
+        const note = rosterDownloadNote(s.source, s.links.length);
         return s.links.length === 1 ? (
           <li>
             {only.url ? (
@@ -102,7 +103,7 @@ const parties = [...new Set(person.stints.map((s) => s.party))];
             ) : (
               name
             )}{" "}
-            ({yearRanges(only.years)})
+            ({yearRanges(only.years)}){note && <> - {note}</>}
           </li>
         ) : (
           <li>
@@ -119,6 +120,7 @@ const parties = [...new Set(person.stints.map((s) => s.party))];
                 )}
               </>
             ))}
+            {note && <> - {note}</>}
           </li>
         );
       })}

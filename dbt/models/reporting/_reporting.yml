@@ -683,9 +683,10 @@ models:
       - name: source_url
         data_type: varchar
         description: >
-          Link to the roster behind a past-year row: the House's session XML export for that year (mo_house
-          roster), the Open States people data, the congress-legislators repository or the FJC judges
-          directory. Null for the current year (source dim_official).
+          Link to the roster behind a past-year row: the House's session XML export (a zip download) for that
+          year (mo_house roster), the Open States people folder holding the person's file (retired or
+          legislature; openstates), the congress-legislators repository, or the judge's own FJC page (fjc).
+          Null for the current year (source dim_official).
         data_tests:
           - not_null:
               config:

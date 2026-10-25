@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { officeLine, yearRanges } from "../src/lib/format.ts";
+import { officeLine, rosterDownloadNote, yearRanges } from "../src/lib/format.ts";
 import {
   SAME_NAME_NOTE,
   groupPast,
@@ -120,4 +120,11 @@ test("same-name wording says the records are unlinked, not that the people diffe
   assert.equal(sameNameKindLabel("past"), "past roster entry");
   assert.match(SAME_NAME_NOTE, /may or may not be the same person/);
   assert.doesNotMatch(SAME_NAME_NOTE, /do not claim/);
+});
+
+test("House roster links are flagged as ZIP downloads; page-style sources are not", () => {
+  assert.match(rosterDownloadNote("mo_house roster", 2), /each year is a ZIP download/);
+  assert.match(rosterDownloadNote("mo_house roster", 1), /link is a ZIP download/);
+  assert.equal(rosterDownloadNote("fjc", 1), null);
+  assert.equal(rosterDownloadNote("openstates", 1), null);
 });
