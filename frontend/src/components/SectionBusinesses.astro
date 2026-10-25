@@ -6,6 +6,7 @@
 import ConfidenceBadge from "./ConfidenceBadge.astro";
 import SourceLink from "./SourceLink.astro";
 import type { OfficialBundle } from "../lib/exports/types";
+import { districtSiteLists } from "../lib/exports/districtSites";
 import { count, money } from "../lib/format";
 import { href } from "../lib/site";
 
@@ -13,6 +14,8 @@ interface Props {
   bundle: OfficialBundle;
 }
 const { businesses } = Astro.props.bundle;
+// the full per-district list lives on its own page (and CSV) so the per-official JSON stays small
+const siteList = (await districtSiteLists())?.get(Astro.props.bundle.official.official_id);
 const industries = businesses?.industries ?? [];
 const totalSites = industries.reduce((n, i) => n + i.n_sites, 0);
 // bars compare the coded sectors; the uncoded group is usually most of the sites and would flatten them
@@ -127,6 +130,12 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
         </>
       )}
       <h3>All {count(totalSites)} sites by industry</h3>
+      {siteList && (
+        <p class="small">
+          <a href={href(`/districts/${siteList.slug}/sites/`)}>See all {count(siteList.n_sites)} sites</a>{" "}
+          (one page) or <a href={href(`/districts/${siteList.slug}/sites.csv`)}>download them as CSV</a>.
+        </p>
+      )}
       <p class="small muted">
         NAICS sector of each site's main industry code. Most FRS sites carry no code, so the largest group is
         often "No industry code".
