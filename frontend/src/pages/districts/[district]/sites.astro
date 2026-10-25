@@ -2,6 +2,7 @@
 // Every EPA-regulated site in one district or city, the full list behind the profile's "Businesses in their
 // area" section (which carries only counts by industry and the donor-tied sites). Same columns for every
 // district; no filtering or ranking, and the CSV beside it has the same rows.
+import AwardBadges from "../../../components/AwardBadges.astro";
 import type { GetStaticPaths } from "astro";
 import ConfidenceBadge from "../../../components/ConfidenceBadge.astro";
 import ConfidenceToggle from "../../../components/ConfidenceToggle.astro";
@@ -33,10 +34,11 @@ const area = officeLine(official);
     <h1>EPA-regulated sites in this area</h1>
     <p class="lede">
       All {count(sites.length)} sites that EPA or a state environmental program regulates in the area
-      represented by <a href={href(`/officials/${official.slug}/`)}>{area}</a>. The list is the same for every
-      area: a site appears here because of where it is, not because of who owns it. Sites tied to a company
-      that gave this official money, by name or listed brand, come first. A "same company" match means a donor
-      with the same brand gave, not necessarily the owner of the site.{" "}
+      represented by <a href={href(`/officials/${official.slug}/`)}>{area}</a> ({official.full_name}
+      <AwardBadges slug={official.slug} />
+      ). The list is the same for every area: a site appears here because of where it is, not because of who
+      owns it. Sites tied to a company that gave this official money, by name or listed brand, come first. A
+      "same company" match means a donor with the same brand gave, not necessarily the owner of the site.{" "}
       <a href={href("/methodology/#district-businesses")}>How it's matched</a>.
     </p>
     <p class="small">

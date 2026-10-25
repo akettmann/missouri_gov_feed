@@ -258,6 +258,11 @@ docker compose --profile docs up docs               # dbt docs (every model/colu
 Set `MOGOV_HOST_DATA` to use a data folder other than `./data`. On Linux, files the container writes are
 owned by root.
 
+`docker compose up` runs `mogov run`, which is strict: if any loader fails it stops before `dbt build` and
+exits non-zero. To build anyway on the last landed raw data of a known-flaky source, set
+`MOGOV_ALLOW_FAILED_LOADERS=<source>[,<source>]` (shell or `.env`; compose passes it through). The exit code
+stays non-zero.
+
 ## Sharding
 
 Every loader splits its work into units (PDFs, files, people, report years...). A shard owns the units

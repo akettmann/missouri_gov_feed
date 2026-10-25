@@ -1,6 +1,7 @@
 ---
 // One prerendered profile per official. Identical layout for everyone: every section always renders,
 // and says why when it's empty.
+import AwardBadges from "../../components/AwardBadges.astro";
 import type { GetStaticPaths } from "astro";
 import ConfidenceToggle from "../../components/ConfidenceToggle.astro";
 import CoverageStrip from "../../components/CoverageStrip.astro";
@@ -68,7 +69,10 @@ const term = o ? [o.current_term_start, o.current_term_end].filter(Boolean).join
           <p class="small muted crumbs">
             <a href={href("/")}>Officials</a> / {LEVELS[o.level] ?? o.level}
           </p>
-          <h1>{o.full_name}</h1>
+          <div class="name-row">
+            <h1>{o.full_name}</h1>
+            <AwardBadges slug={o.slug} />
+          </div>
           <p class="office">{officeLine(o)}</p>
           <p class="small muted facts">
             <span>Party: {o.party ?? "none listed (non-partisan office or not recorded)"}</span>
@@ -124,9 +128,18 @@ const term = o ? [o.current_term_start, o.current_term_end].filter(Boolean).join
     background: var(--surface-2);
     flex: none;
   }
+  .name-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 4px;
+  }
   h1 {
     margin: 0;
     font-size: 1.75rem;
+  }
+  .name-row :global(.award-badges) {
+    font-size: 0.8125rem;
   }
   .crumbs {
     margin: 0 0 4px;
