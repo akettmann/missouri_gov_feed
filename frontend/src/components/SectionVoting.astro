@@ -198,7 +198,7 @@ const tally = (yea: number | null, nay: number | null) => (yea == null ? "—" :
                     {coverageNote(block.total)}
                   </span>
                   {block.total.match_confidence === "medium" && (
-                    <span class="total-sure">{coverageNote(sure(block))}</span>
+                    <span class="total-sure">{coverageNote(sure(block), true)}</span>
                   )}
                   .{" "}
                   {block.basis === "statutory salary" && (
