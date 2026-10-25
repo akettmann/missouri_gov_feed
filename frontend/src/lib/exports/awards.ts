@@ -1,7 +1,7 @@
 // rpt_awards for the awards page: each award ranks one measured number within one office, paired with its
 // opposite. The ranking itself is done in dbt; this only attaches names and links.
 import { hasExport, query } from "./db";
-import { currentAwards, type Badge } from "../awardBadges";
+import { currentAwards, pluralOfficeLabel, type Badge } from "../awardBadges";
 import { allOfficials, officialIndex } from "./load";
 
 export interface AwardEntry {
@@ -81,12 +81,8 @@ let currentCache: Promise<Map<string, Badge[]>> | undefined;
 /** slug -> the awards that official holds now (empty map when the export is missing). */
 export function currentAwardsBySlug(): Promise<Map<string, Badge[]>> {
   currentCache ??= Promise.all([awardLists(), officialIndex()]).then(([lists, index]) => {
-    const titles = new Map(index.map((o) => [o.office, o.office_title ?? o.office]));
-    // same plural the awards page uses for "Among N state representatives"
-    const label = (office: string) => {
-      const t = titles.get(office) ?? office;
-      return t.endsWith("s") ? t : `${t}s`;
-    };
+    const titles = new Map(index.map((o) => [o.office, o.office_title]));
+    const label = (office: string) => pluralOfficeLabel(office, titles.get(office));
     return currentAwards(lists ?? [], label);
   });
   return currentCache;

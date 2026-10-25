@@ -180,3 +180,26 @@ test("every page or script that renders an official's name draws badges through 
   for (const p of ["scripts/find.ts", "pages/compare.astro", "pages/index.astro"])
     assert.match(read(p), /renderBadges\(/, p);
 });
+
+test("plural office label is circuit-free and does not depend on which judge came last", async () => {
+  const { pluralOfficeLabel, singularOfficeLabel } = await import("../src/lib/awardBadges.ts");
+  const a = pluralOfficeLabel("mo_circuit_judge", "Circuit Judge, 22 Judicial Circuit");
+  const b = pluralOfficeLabel("mo_circuit_judge", "Circuit Judge, 45 Judicial Circuit");
+  assert.equal(a, "Circuit Judges");
+  assert.equal(a, b);
+  assert.equal(
+    pluralOfficeLabel("mo_associate_circuit_judge", "Associate Circuit Judge, 5 Judicial Circuit"),
+    "Associate Circuit Judges",
+  );
+  assert.equal(pluralOfficeLabel("state_senate", "State Senator"), "State Senators");
+  assert.equal(singularOfficeLabel("mo_associate_circuit_judge", "x"), "Associate Circuit Judge");
+  assert.equal(singularOfficeLabel("secretary_of_state"), "Secretary of State");
+});
+
+test("unknown office falls back to the title minus its circuit qualifier", async () => {
+  const { pluralOfficeLabel } = await import("../src/lib/awardBadges.ts");
+  assert.equal(pluralOfficeLabel("new_judge", "Probate Judge, 7 Judicial Circuits"), "Probate Judges");
+  assert.equal(pluralOfficeLabel("new_judge", "Probate Judge, 7th Judicial Circuit"), "Probate Judges");
+  assert.equal(pluralOfficeLabel("county_clerk", "County Clerk"), "County Clerks");
+  assert.equal(pluralOfficeLabel("county_clerk"), "county_clerks");
+});

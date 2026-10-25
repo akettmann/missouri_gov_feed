@@ -137,3 +137,46 @@ export function renderBadges(badges: Badge[], base: string, streaks = true): str
   });
   return `<span class="award-badges">${items.join("")}</span>`;
 }
+
+/**
+ * Plural group label for each office key in the exports. An office's ranking group is statewide, so the label
+ * must not carry a per-person qualifier (a circuit number or district) that dim_official.office_title has.
+ */
+export const OFFICE_GROUP_LABELS: Record<string, string> = {
+  state_house: "State Representatives",
+  state_senate: "State Senators",
+  us_house: "U.S. Representatives",
+  us_senate: "U.S. Senators",
+  mo_circuit_judge: "Circuit Judges",
+  mo_associate_circuit_judge: "Associate Circuit Judges",
+  mo_court_of_appeals: "Court of Appeals Judges",
+  mo_supreme_court: "Supreme Court Judges",
+  us_district_court: "U.S. District Court Judges",
+  us_court_of_appeals: "U.S. Court of Appeals Judges",
+  state_treasurer: "State Treasurers",
+  attorney_general: "Attorneys General",
+  lt_governor: "Lieutenant Governors",
+  governor: "Governors",
+  secretary_of_state: "Secretaries of State",
+  state_auditor: "State Auditors",
+  mayor: "Mayors",
+};
+
+/** Unknown office: drop a trailing ", <n> Judicial Circuit(s)" / "District <n>" qualifier, then pluralize. */
+export function pluralOfficeLabel(office: string, title?: string | null): string {
+  const known = OFFICE_GROUP_LABELS[office];
+  if (known) return known;
+  const base = (title ?? office)
+    .replace(/,\s*(?:\d+\w*\s+)?Judicial Circuits?\b.*$/i, "")
+    .replace(/,?\s*(?:\d+\w*\s+)?District(?:\s+\d+)?$/i, "")
+    .trim();
+  return base.endsWith("s") ? base : `${base}s`;
+}
+
+/** Singular tab label for an office key (the plural minus its group "s"), for headings. */
+export function singularOfficeLabel(office: string, title?: string | null): string {
+  return pluralOfficeLabel(office, title)
+    .replace(/^Attorneys General$/, "Attorney General")
+    .replace(/^Secretaries of State$/, "Secretary of State")
+    .replace(/s$/, "");
+}

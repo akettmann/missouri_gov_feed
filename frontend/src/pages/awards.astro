@@ -5,24 +5,22 @@ import AwardBadges from "../components/AwardBadges.astro";
 import Layout from "../layouts/Layout.astro";
 import { AWARD_PAIRS, AWARDS, awardLists, type AwardList } from "../lib/exports/awards";
 import { officialIndex } from "../lib/exports/load";
-import { AWARD_ICONS } from "../lib/awardBadges";
+import { AWARD_ICONS, pluralOfficeLabel, singularOfficeLabel } from "../lib/awardBadges";
 import { count, money, pct, streakMarker } from "../lib/format";
 import { href } from "../lib/site";
 
 const lists = await awardLists();
 const titles = new Map((await officialIndex()).map((o) => [o.office, o.office_title ?? o.office]));
+const plural = (office: string) => pluralOfficeLabel(office, titles.get(office));
+const singular = (office: string) => singularOfficeLabel(office, titles.get(office));
 const offices = [...new Set((lists ?? []).map((l) => l.office))].sort((a, b) =>
-  (titles.get(a) ?? a).localeCompare(titles.get(b) ?? b),
+  singular(a).localeCompare(singular(b)),
 );
 const periods = [
   "lifetime",
   ...[...new Set((lists ?? []).map((l) => l.period).filter((p) => p !== "lifetime"))].sort().reverse(),
 ];
 const byKey = new Map((lists ?? []).map((l) => [`${l.award}|${l.office}|${l.period}`, l]));
-const plural = (office: string) => {
-  const t = titles.get(office) ?? office;
-  return t.endsWith("s") ? t : `${t}s`;
-};
 const value = (award: string, v: number) => (AWARDS[award].unit === "money" ? money(v) : pct(v));
 const outOf = (award: string, n: number | null) =>
   n == null
@@ -56,7 +54,7 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
           <select name="office">
             {offices.map((o) => (
               <option value={o} selected={o === defaultOffice}>
-                {titles.get(o) ?? o}
+                {singular(o)}
               </option>
             ))}
           </select>
@@ -73,8 +71,8 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
 
       <noscript>
         <p class="card small muted">
-          The office and period pickers need JavaScript, so this shows{" "}
-          {titles.get(defaultOffice) ?? defaultOffice} for all loaded years.
+          The office and period pickers need JavaScript, so this shows {singular(defaultOffice)} for all
+          loaded years.
         </p>
       </noscript>
 
