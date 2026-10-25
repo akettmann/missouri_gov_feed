@@ -29,6 +29,7 @@ package "Disclosures" {
   [house_fd] as L_hfd
   [senate_efd\n(opt-in)] as L_efd
   [mo_employee_pay] as L_pay
+  [mo_state_expenditures] as L_exp
 }
 package "Boundaries" {
   [census_tiger] as L_tiger
@@ -73,6 +74,7 @@ package "intermediate (identity resolution)" {
 package "marts" {
   [dim_official] as dim
   [fct_salaries] as F_sal
+  [fct_legislator_expenses] as F_exp
   [fct_bills\nfct_bill_subjects\nfct_bill_sponsors\nfct_vote_bills] as F_bills
   [dim_district\nfct_official_districts] as D_dist
   [dim_zcta] as D_zcta
@@ -177,6 +179,8 @@ F_cases --> profile
 L_tiger --> D_dist
 L_zcta --> D_zcta
 L_pay --> F_sal
+L_exp --> F_exp
+F_sal --> F_exp
 I_seats --> F_sal
 I_off --> F_sal
 L_moh --> I_subj

@@ -1,0 +1,12 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: mo_state_expenditures
+  description: Missouri state expenditures from data.mo.gov ("<fiscal year> State Expenditures").
+  tables:
+  - name: payments
+    identifier: mo_state_expenditures
+    description: >
+      One payee's annual total per agency and detail line for each fiscal year, verbatim as JSON (every agency,
+      every payee). Optional: `mogov build` creates an empty placeholder when the loader has not run.

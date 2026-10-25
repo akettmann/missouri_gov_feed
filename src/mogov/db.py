@@ -233,6 +233,7 @@ OPTIONAL_JSON_TABLES = {
     "wikidata_relatives": "wikidata",
     "wikidata_own_leadership": "wikidata",
     "wikidata_mo_officeholders": "wikidata",
+    "mo_state_expenditures": "mo_state_expenditures",
     "epa_frs_sic": "epa_frs",  # added to the EPA FRS loader after the first landings (#123); older raw dirs lack it
 }
 

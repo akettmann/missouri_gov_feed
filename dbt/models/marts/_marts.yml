@@ -1352,6 +1352,69 @@ models:
         data_type: varchar
         description: The Missouri Accountability Portal's employee pay search, or the federal pay table.
 
+  - name: fct_legislator_expenses
+    description: >
+      Per diem (legislative daily expense allowance) and in-state mileage the state paid each legislator, per fiscal
+      year (July to June), from the state expenditures (data.mo.gov "State Expenditures", agency LEGISLATURE). Each
+      amount is the payee's annual total for that line, not one payment; negative totals are refunds and stay.
+      Payees are paired with officials through the state payroll (fct_salaries), by legal name and year; a payee
+      with no fitting payroll name, or whose fit is shared, is left out, so a legislator can be missing for a year.
+      Per diem is claimed by days attended and mileage follows distance, so neither is a measure of performance.
+      Grain: one row per (official, fiscal year, expense type).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, fiscal_year, expense_type]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: fiscal_year
+        data_type: integer
+        description: State fiscal year, July of the year before through June (fiscal year 2023 is July 2022 to June 2023).
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 2000
+                max_value: 2100
+      - name: expense_type
+        data_type: varchar
+        description: "'per diem' (LEGISLATIVE DAILY EXPENSE ALLOWANCE) or 'mileage' (IN-STATE MILEAGE)."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['per diem', 'mileage']
+      - name: payee_name
+        data_type: varchar
+        description: Payee as the expenditures print it ("LAST, FIRST MIDDLE", legal name), so a reader can check the match.
+      - name: amount
+        data_type: decimal(38,2)
+        description: >
+          Dollars paid to the payee for the fiscal year on this line. Sanity bounds: a legislator's annual per
+          diem has never been near $30,000 and a year of mileage is far under $20,000.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 30000
+      - name: match_confidence
+        data_type: varchar
+        description: "{{ doc('match_confidence') }}"
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['high', 'medium']
+      - name: source_url
+        data_type: varchar
+        description: The Socrata dataset the fiscal year's rows come from.
+
   - name: fct_county_districts
     description: >
       The current state house, state senate and congressional districts that reach each county, from the full

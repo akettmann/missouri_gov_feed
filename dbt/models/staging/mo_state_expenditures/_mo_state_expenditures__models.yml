@@ -1,0 +1,10 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_mo_state_expenditures__payments
+  description: 'Missouri state expenditures: one payee''s total for a fiscal year (July to June) per agency and
+    detail line, not one payment. Payees are people (legislators: "LAST, FIRST MIDDLE") and vendors alike. Negative
+    totals are refunds and corrections and are kept. The portal serves an occasional sparse row with only a few
+    of the columns filled (FY2025: fiscal_year "KEVIN KRAUS"); a row without a numeric fiscal year, payee or total
+    is left out here.'
