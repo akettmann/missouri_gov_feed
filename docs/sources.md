@@ -584,7 +584,7 @@ offices, shops and most service businesses are missing.
   hand table stays rather than a generated one: the concordance has 1,000+ SIC codes mapping to six-digit
   industries and needs a four-file NAICS vintage chain, far more than a sector label needs.
 - `rpt_district_business_industries` counts each official's sites by NAICS sector (`naics_sectors` seed, from
-  the primary NAICS code's first two digits). The profile page ships only the donor sites plus these counts: a
+  the first two digits of `naics_code`, which for a SIC-derived site is already the sector prefix). The profile page ships only the donor sites plus these counts: a
   U.S. House district holds up to ~10,500 sites, too many for the per-official JSON budget.
 
 Quirks:
@@ -594,8 +594,9 @@ Quirks:
   under `_fields` and drop out in staging.
 - About a third of the sites (36k of 112k in October 2026) have no coordinates and so no district. 54 have
   coordinates outside Missouri.
-- Most sites carry no NAICS code (149k of 218k (official, site) rows in October 2026), so the largest
-  per-sector group is usually "No industry code".
+- About 44% of geocoded sites have neither a NAICS nor a SIC code (see Industry above), so for many officials
+  the largest per-sector group is "No industry code". FRS programs often leave the NAICS code blank, which is
+  why the SIC fallback exists.
 - Organization types are mostly `UNKNOWN`, so government sites are also recognized by name ("City of ...",
   "... County", "... School District", "Public Works") as well as by a government org type or federal agency.
 - One owner per facility is kept: owner/operator, then owner, operator, permittee, preferring a known org
