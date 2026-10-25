@@ -49,3 +49,31 @@ export const AWARDS: Record<
     outOf: "party-line votes",
   },
 };
+
+/** Federal offices whose money share is ranked per FEC two-year cycle (calendar years everywhere else). */
+const CYCLE_OFFICES = new Set(["us_house", "us_senate"]);
+
+/**
+ * True when a list's period is a two-year FEC cycle named by its even end year: the money-share award for
+ * federal offices (rpt_awards.sql). Every other award, and every state office, ranks calendar years.
+ */
+export function isCycleList(award: string, office: string): boolean {
+  return award === "least_committee_money_share" && CYCLE_OFFICES.has(office);
+}
+
+/** True for offices that have any cycle-based list, so their period picker needs the cycle wording. */
+export function officeHasCycles(office: string): boolean {
+  return CYCLE_OFFICES.has(office);
+}
+
+/** "2025–26" for the cycle ending in 2026 (an even year, the way rpt_awards names it). */
+export function cycleLabel(endYear: string): string {
+  const y = Number(endYear);
+  return Number.isInteger(y) ? `${y - 1}–${String(y).slice(-2)}` : endYear;
+}
+
+/** "in 2025", or "in the 2025–26 cycle" for a federal money-share cycle; lifetime is "across all loaded years". */
+export function periodWhen(period: string, cycle: boolean): string {
+  if (period === "lifetime") return "across all loaded years";
+  return cycle ? `in the ${cycleLabel(period)} cycle` : `in ${period}`;
+}

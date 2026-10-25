@@ -22,7 +22,7 @@ export interface AwardList {
   entries: AwardEntry[];
 }
 
-export { AWARD_PAIRS, AWARDS } from "./awardDefs";
+export { AWARD_PAIRS, AWARDS, cycleLabel, isCycleList, officeHasCycles, periodWhen } from "./awardDefs";
 
 let cache: Promise<AwardList[] | null> | undefined;
 

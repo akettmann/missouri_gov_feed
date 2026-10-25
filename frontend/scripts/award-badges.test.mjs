@@ -259,3 +259,28 @@ test("buildOfficeGroups labels an unmapped office from its key words, never a ho
     ["mo_circuit_judge", "Circuit judges"],
   ]);
 });
+
+test("federal money-share badges say the FEC cycle and count cycles, not years", () => {
+  const lists = [
+    list("least_committee_money_share", "2026", [e("rep", 1, 4, 3, 900000)], "us_house", 10),
+    list("least_committee_money_share", "2026", [e("st", 1, 4, 3, 9000)], "state_house"),
+  ];
+  const awards = currentAwards(lists, (o) => o);
+  const fed = awards.get("rep")[0];
+  assert.match(fed[2], /in the 2025–26 cycle:/);
+  assert.doesNotMatch(fed[2], /in 2026/);
+  const html = renderBadges([fed], "");
+  assert.match(html, /3 qualifying cycles in a row/);
+  assert.doesNotMatch(html, /qualifying years/);
+  const state = awards.get("st")[0];
+  assert.match(state[2], /in 2026:/);
+  assert.match(renderBadges([state], ""), /3 qualifying years in a row/);
+});
+
+test("federal calendar-year awards (attendance, most money) stay in years", () => {
+  const awards = currentAwards(
+    [list("most_committee_money", "2026", [e("rep", 1, 5, 2, 9)], "us_house", 10)],
+    (o) => o,
+  );
+  assert.match(awards.get("rep")[0][2], /in 2026:/);
+});
