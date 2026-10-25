@@ -41,6 +41,46 @@ test("cell quotes commas, quotes, CR and LF and doubles embedded quotes", () => 
   assert.equal(cell("a\rb"), '"a\rb"');
 });
 
+test("cell prefixes text that a spreadsheet would run as a formula", () => {
+  for (const c of ["=", "+", "-", "@", "\t", "\r"]) {
+    const out = cell(`${c}SUM(A1)`);
+    assert.ok(out.replace(/^"/, "").startsWith(`'${c}`), `trigger ${JSON.stringify(c)}: ${out}`);
+  }
+  assert.equal(cell("=1+1"), "'=1+1");
+  assert.equal(cell("@SUM(A1)"), "'@SUM(A1)");
+  assert.equal(cell("\t=1"), "'\t=1");
+  assert.equal(cell('=HYPERLINK("http://x","y")'), '"\'=HYPERLINK(""http://x"",""y"")"');
+  assert.equal(cell("\r=1"), '"\'\r=1"');
+});
+
+test("cell leaves safe text and real numbers alone and only guards the first character", () => {
+  for (const s of [
+    "Acme",
+    "a=b",
+    "a+b",
+    "a-b",
+    "x@y.test",
+    "https://example.test/a?b=-1",
+    "",
+    " =1",
+    "1-2",
+  ]) {
+    assert.equal(cell(s), s);
+  }
+  assert.equal(cell(-5), "-5");
+  assert.equal(cell(0), "0");
+});
+
+test("sitesCsv guards every text column", () => {
+  const csv = sitesCsv([
+    site({ facility_name: "=cmd|' /C calc'!A0", address: "+1 Main", donor_names: "@x" }),
+  ]);
+  assert.equal(
+    csv.split("\n")[1],
+    "'=cmd|' /C calc'!A0,'+1 Main,Joplin,64801,Mining,Acme LLC,,false,,,'@x,,https://example.test/frs?id=1",
+  );
+});
+
 test("sitesCsv writes the header first, in order, then one line per site", () => {
   const csv = sitesCsv([site(), site({ facility_name: "Bob's, Inc." })]);
   const lines = csv.split("\n");

@@ -51,5 +51,7 @@ if (!dryRun) {
     "--cache-control=public, max-age=300, must-revalidate",
   ]);
   gcloud(["storage", "objects", "update", `${dest}/**.json`, "--cache-control=public, max-age=3600"]);
+  // the per-district site lists are data refreshed with the exports, so they cache like the JSON
+  gcloud(["storage", "objects", "update", `${dest}/**.csv`, "--cache-control=public, max-age=3600"]);
   console.log(`Published to ${dest}. Site URL depends on your bucket website / load balancer setup.`);
 }
