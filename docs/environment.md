@@ -125,9 +125,9 @@ entirely from the parquet exports; there is no server. Data flow:
    ```
    cd frontend
    pnpm install
-   pnpm build          # dist/: one page + one JSON per official, browse page, methodology
+   pnpm build          # dist/: one page + one JSON per official, browse page, methodology; then runs the size budgets (exits 1 if over; MOGOV_SKIP_SIZE_BUDGET=1 skips them)
    pnpm preview        # http://localhost:4321
-   pnpm sizes          # per-official payload sizes (exits 1 if any JSON is over 100 KB gzipped) and the lookup/districts.json and /awards budgets in scripts/size-budget.mjs
+   pnpm sizes          # the same check on its own: per-official payload sizes (exits 1 if any JSON is over 100 KB gzipped) and the lookup/districts.json and /awards budgets in scripts/size-budget.mjs
    ```
    If any parquet file is older than `data/mogov.duckdb` (or `MOGOV_DB`), the build warns that you
    skipped `uv run mogov export`; it never fails the build, and stays silent if the DuckDB file is absent.
