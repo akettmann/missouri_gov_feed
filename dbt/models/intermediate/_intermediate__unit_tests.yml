@@ -151,3 +151,62 @@ unit_tests:
         - {official_id: j_hall, role: judge, cluster_id: c1, matched_by: judges text}
         - {official_id: j_smith, role: judge, cluster_id: c4, matched_by: panel}
         - {official_id: l_doe, role: attorney, cluster_id: c5, matched_by: attorneys text}
+
+  - name: epa_frs_facility_industry_falls_back_from_naics_to_sic_sector
+    model: int_epa_frs__facilities
+    description: >
+      A facility's industry is its primary NAICS code when it has one. Otherwise its SIC codes are mapped to a
+      NAICS sector through the sic_naics_sectors seed: a primary SIC code before an unknown one before a secondary
+      one, and the longest matching prefix wins (4953 refuse systems matches its own row -> sector 56, but 4952 sewerage
+      systems has no longer row and stays under 49 -> utilities). A facility with no codes, or only a SIC code the seed does not cover, keeps a null industry.
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: f1, facility_name: Has NAICS, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f2, facility_name: Primary SIC wins, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f3, facility_name: Longest prefix, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f4, facility_name: No codes, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f5, facility_name: Unknown beats secondary, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f6, facility_name: Uncovered SIC, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f7, facility_name: Non-primary NAICS only, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f8, facility_name: Sewerage stays utilities, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows:
+          - {registry_id: f1, org_name: Acme, org_type: PRIVATE, affiliation_type: OWNER}
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: f1, naics_code: '311111', naics_description: Dog food, is_primary: true}
+          - {registry_id: f7, naics_code: '722511', naics_description: Restaurants, is_primary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows:
+          - {registry_id: f1, sic_code: '5812', sic_description: EATING PLACES, is_primary: true, is_secondary: false}
+          - {registry_id: f2, sic_code: '5812', sic_description: EATING PLACES, is_primary: false, is_secondary: false}
+          - {registry_id: f2, sic_code: '3714', sic_description: MOTOR VEHICLE PARTS, is_primary: true, is_secondary: false}
+          - {registry_id: f3, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: f5, sic_code: '3714', sic_description: MOTOR VEHICLE PARTS, is_primary: false, is_secondary: true}
+          - {registry_id: f5, sic_code: '5812', sic_description: EATING PLACES, is_primary: false, is_secondary: false}
+          - {registry_id: f6, sic_code: '9999', sic_description: NONCLASSIFIABLE, is_primary: true, is_secondary: false}
+          - {registry_id: f7, sic_code: '4911', sic_description: ELECTRIC SERVICES, is_primary: true, is_secondary: false}
+          - {registry_id: f8, sic_code: '4952', sic_description: SEWERAGE SYSTEMS, is_primary: true, is_secondary: false}
+      - input: ref('sic_naics_sectors')
+        rows:
+          - {sic_prefix: '37', naics_prefix: '31'}
+          - {sic_prefix: '58', naics_prefix: '72'}
+          - {sic_prefix: '49', naics_prefix: '22'}
+          - {sic_prefix: '4953', naics_prefix: '56'}
+      - input: ref('naics_sectors')
+        rows:
+          - {naics_prefix: '22', sector_code: '22', sector_name: Utilities}
+          - {naics_prefix: '31', sector_code: 31-33, sector_name: Manufacturing}
+          - {naics_prefix: '56', sector_code: '56', sector_name: Waste Management}
+          - {naics_prefix: '72', sector_code: '72', sector_name: Food Services}
+    expect:
+      rows:
+        - {registry_id: f1, naics_code: '311111', naics_description: Dog food, naics_source: naics}
+        - {registry_id: f2, naics_code: '31', naics_description: "Manufacturing sector, from SIC 3714 MOTOR VEHICLE PARTS", naics_source: sic}
+        - {registry_id: f3, naics_code: '56', naics_description: "Waste Management sector, from SIC 4953 REFUSE SYSTEMS", naics_source: sic}
+        - {registry_id: f4, naics_code: null, naics_description: null, naics_source: null}
+        - {registry_id: f5, naics_code: '72', naics_description: "Food Services sector, from SIC 5812 EATING PLACES", naics_source: sic}
+        - {registry_id: f6, naics_code: null, naics_description: null, naics_source: null}
+        - {registry_id: f7, naics_code: '22', naics_description: "Utilities sector, from SIC 4911 ELECTRIC SERVICES", naics_source: sic}
+        - {registry_id: f8, naics_code: '22', naics_description: "Utilities sector, from SIC 4952 SEWERAGE SYSTEMS", naics_source: sic}

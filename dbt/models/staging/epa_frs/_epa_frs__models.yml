@@ -14,3 +14,8 @@ models:
   description: 'One row per organization affiliated with an EPA FRS facility through one program record: owner,
     operator, parent company, contacts... org_type is mostly UNKNOWN; PRIVATE, MUNICIPAL, STATE, FEDERAL, DISTRICT
     and COUNTY are the common known values. Malformed CSV rows (no REGISTRY_ID) are left out.'
+- name: stg_epa_frs__sic
+  description: One row per SIC code (1987 Standard Industrial Classification, four digits) an EPA FRS program record
+    gives a facility. is_primary marks the program's primary code (PRIMARY_INDICATOR); is_secondary the ones FRS
+    calls SECONDARY; the rest are UNKNOWN. A facility can have several programs and so several codes. Malformed
+    CSV rows (no REGISTRY_ID) are left out.

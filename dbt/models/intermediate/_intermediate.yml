@@ -51,10 +51,13 @@ models:
   description: 'EPA FRS facilities in Missouri that have coordinates, with one owner, one parent company and one
     primary NAICS code each. The owner is the first owner-role organization (owner/operator, owner, operator, permittee;
     a known org_type before UNKNOWN); the NAICS code is the primary code most of the facility''s programs give.
-    is_government: a federal site, any owner-role organization typed as a government body (municipal, county, state,
-    federal, district, tribal), or a facility or owner named like one ("City of ...", "... County", "... School
-    District"; most organizations are typed UNKNOWN). The *_key columns are company_key names for matching donors.
-    Grain: one row per geocoded EPA FRS facility.'
+    A facility with no NAICS code but a SIC code (a primary one before an unknown or secondary one, then the one
+    most programs give) gets the NAICS sector that SIC code''s major group falls in (seed sic_naics_sectors): naics_code
+    is then the two-digit sector prefix, naics_description names the sector and the SIC code, and naics_source is
+    ''sic'' (otherwise ''naics'', or null when the facility has neither). is_government: a federal site, any owner-role
+    organization typed as a government body (municipal, county, state, federal, district, tribal), or a facility
+    or owner named like one ("City of ...", "... County", "... School District"; most organizations are typed UNKNOWN).
+    The *_key columns are company_key names for matching donors. Grain: one row per geocoded EPA FRS facility.'
 - name: int_house_fd__schedule_lines
   description: 'House disclosure PDF text, each line tagged with the schedule it falls under (the nearest preceding
     "Schedule X:" header in the same document). Column-header rows, "None disclosed." and boilerplate drop out.
