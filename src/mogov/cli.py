@@ -11,7 +11,6 @@ one after another within a shard, so a service sees at most one request stream p
 """
 
 import argparse
-import json
 import multiprocessing
 import os
 import signal
@@ -171,10 +170,17 @@ def _on_sigterm(signum, _frame):
 
 
 def _merge_user_vars(args: list[str], dbt_vars: dict) -> tuple[list[str], dict]:
-    """Fold any user `--vars <yaml>` / `--vars=<yaml>` in `args` into `dbt_vars` (user keys win).
+    """Fold any user `--vars <yaml>` / `--vars=<yaml>` in `args` into `dbt_vars`.
 
-    dbt parses --vars as YAML (JSON is a subset) and warns or drops one of two flags, so mogov must pass one.
-    Returns the args without the user's flag and the merged vars; exits with a clear error if it is malformed.
+    Merge semantics: SHALLOW. Each user flag is applied with `dict.update`, so a user key replaces mogov's value for
+    that key (a nested mapping is replaced whole, not deep-merged). Several user flags are applied in order, so for
+    a repeated key the later flag wins and keys unique to an earlier flag are kept (dbt itself would use only the
+    last flag). mogov's own `mec_direct` and `cl_case_bulk` are derived from the raw data on disk and are the base
+    that user keys override, e.g. `--vars '{mec_direct: false}'`.
+
+    dbt takes a single `--vars` and parses it as YAML (JSON is a subset), so mogov removes the user's flags and
+    passes one merged flag. Returns the remaining args and the merged vars (YAML-typed values such as dates are
+    kept as parsed; see `_dump_vars`). Exits with a clear error if a flag is malformed.
     """
 
     rest, merged, i = [], dict(dbt_vars), 0
@@ -202,6 +208,16 @@ def _merge_user_vars(args: list[str], dbt_vars: dict) -> tuple[list[str], dict]:
     return rest, merged
 
 
+def _dump_vars(dbt_vars: dict) -> str:
+    """Serialise merged vars as flow-style YAML, which dbt parses back to the same types.
+
+    JSON would crash on YAML-typed values (a date or datetime), and stringifying them would change what
+    `var()` returns in dbt compared with passing the flag directly.
+    """
+
+    return yaml.safe_dump(dbt_vars, default_flow_style=True, width=float("inf")).strip()
+
+
 def run_dbt(args: list[str]) -> int:
     for table in db.ensure_optional_tables():
         log.warning("dbt.placeholder", table=f"raw.{table}", reason="not loaded yet; using an empty placeholder")
@@ -217,7 +233,7 @@ def run_dbt(args: list[str]) -> int:
         subprocess.check_call([*dbt, "deps", *dirs], cwd=ROOT, env=env)
     # Every subcommand mogov uses accepts --vars, and dbt 1.11 also runs the on-run-start hook for
     # `source freshness` (which reads the vars), so always pass them.
-    cmd = [*dbt, *args, *dirs, "--vars", json.dumps(dbt_vars)]
+    cmd = [*dbt, *args, *dirs, "--vars", _dump_vars(dbt_vars)]
     return subprocess.call(cmd, cwd=ROOT, env=env)
 
 
@@ -249,7 +265,12 @@ def main() -> None:
     p_load.add_argument("sources", nargs="*")
     _shard_args(p_load)
     sub.add_parser("list", help="list loaders")
-    sub.add_parser("build", help="dbt build; extra arguments pass through to dbt (e.g. -s +fct_votes)")
+    sub.add_parser(
+        "build",
+        help="dbt build; extra arguments pass through to dbt (e.g. -s +fct_votes). "
+        "A --vars YAML/JSON mapping is merged (shallow) with mogov's own mec_direct/cl_case_bulk: "
+        "your keys win, repeated --vars flags apply in order (later wins per key)",
+    )
     sub.add_parser("freshness", help="how long since each always-on loader last landed data (dbt source freshness)")
     p_export = sub.add_parser("export", help="write marts and reporting tables to data/exports/")
     p_export.add_argument("--format", choices=["csv", "parquet"], default="parquet")
