@@ -253,7 +253,8 @@ export interface DistrictDonor {
   last_year: number | null;
   /** about who received the money (medium = tied to the official by name only), not the site match */
   match_confidence: string;
-  contributions_url: string | null;
+  /** one `<url> <donor name>` line per donor and filing page; see lib/donorLinks parseDonorLinks */
+  donor_links: string | null;
   sites: {
     facility_name: string | null;
     city: string | null;
@@ -410,7 +411,7 @@ export interface SiteRow {
   /** donor names as filed, "; "-separated */
   donor_names: string | null;
   match_confidence: "high" | "medium" | null;
-  /** where the matched contributions are filed */
-  contributions_url: string | null;
+  /** where each matched donor's contributions are filed: `<url> <donor name>` lines, see parseDonorLinks */
+  donor_links: string | null;
   frs_url: string | null;
 }

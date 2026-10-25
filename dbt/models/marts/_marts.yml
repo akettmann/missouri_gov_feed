@@ -1490,7 +1490,7 @@ models:
       subsidiaries: "Spire PAC" and "LACLEDE GAS CO"). A company not in the seed that gives under another name
       is missed. Statewide officials have no rows (they serve every area). Grain: one row per (official,
       facility); district_id is the area that puts the facility in the official's jurisdiction. The donor
-      columns (donor_names through contributions_url) are filled only when is_donor.
+      columns (donor_names through donor_links) are filled only when is_donor.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -1581,13 +1581,16 @@ models:
           - accepted_values:
               arguments:
                 values: ['high', 'medium']
-      - name: contributions_url
+      - name: donor_links
         data_type: varchar
         description: >
-          A filing page, when is_donor. An MEC page is the committee that received the money (the committee
+          One filing-page link per matched donor and page, when is_donor: lines of `<url> <donor name>` joined by a
+          newline (a url never contains a space), ordered by donor name then url. A donor gets a line for every
+          distinct page its gifts to the official are filed on, so a donor that gave through an MEC and an FEC
+          committee keeps both links. An MEC page is the committee that received the money (the committee
           matched to the official), not filtered to the donor. An FEC page is the donor committee's
           disbursements filtered to the receiving committee, so it lists the gifts themselves. The frontend labels
-          the link by which one it is (#236).
+          each link by which one it is (#236, #248). Null when no matched gift has a url.
       - name: frs_url
         data_type: varchar
         description: The facility's EPA FRS detail report.

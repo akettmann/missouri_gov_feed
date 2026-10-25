@@ -7,7 +7,7 @@ import ConfidenceBadge from "./ConfidenceBadge.astro";
 import SourceLink from "./SourceLink.astro";
 import type { OfficialBundle } from "../lib/exports/types";
 import { districtSiteLists } from "../lib/exports/districtSites";
-import { donorLinkLabel } from "../lib/donorLinks";
+import DonorLinks from "./DonorLinks.astro";
 import { count, money } from "../lib/format";
 import { href } from "../lib/site";
 
@@ -121,11 +121,7 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
                       </details>
                     </td>
                     <td>
-                      <SourceLink
-                        url={d.contributions_url}
-                        label={donorLinkLabel(d.contributions_url)}
-                        context={`for ${d.donor_names}`}
-                      />
+                      <DonorLinks donorLinks={d.donor_links} />
                     </td>
                   </tr>
                 ))}

@@ -33,7 +33,7 @@ export const SITE_CSV_HEADER = [
   "match_confidence",
   "matched_by",
   "donor_names",
-  "contributions_url",
+  "donor_links",
   "epa_record_url",
 ] as const;
 
@@ -52,7 +52,7 @@ export function sitesCsv(rows: SiteRow[]): string {
       r.match_confidence,
       r.matched_by,
       r.donor_names,
-      r.contributions_url,
+      r.donor_links,
       r.frs_url,
     ]
       .map(cell)

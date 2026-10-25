@@ -320,3 +320,36 @@ unit_tests:
         - {county_id: 'county:29901', district_id: 'state_house:1', district_type: state_house}
         - {county_id: 'county:29901', district_id: 'state_house:2', district_type: state_house}
         - {county_id: 'county:29901', district_id: 'place:2999999', district_type: place}
+
+  - name: jurisdiction_businesses_give_every_donor_its_own_link
+    model: fct_jurisdiction_businesses
+    description: >
+      A site tied to several donors lists one `<url> <donor name>` line per donor and per distinct filing page, so
+      each donor gets its own link. A donor filed on both an MEC and an FEC page keeps both: no single url is
+      picked by min(), which would silently prefer fec.gov over mec.mo.gov (#248). Gifts from individuals do not
+      count, and a site with no donor has no links.
+    given:
+      - input: ref('fct_official_districts')
+        rows:
+          - {official_id: o1, district_id: 'state_house:1', relation: elected from}
+      - input: ref('fct_district_facilities')
+        rows:
+          - {district_id: 'state_house:1', registry_id: F1, facility_name: Plant One, is_government: false}
+          - {district_id: 'state_house:1', registry_id: F2, facility_name: Plant Two, is_government: false}
+      - input: ref('int_epa_frs__facilities')
+        rows:
+          - {registry_id: F1, facility_key: plant one, owner_key: ameren, parent_company_key: acme holdings}
+          - {registry_id: F2, facility_key: plant two, owner_key: nobody, parent_company_key: null}
+      - input: ref('company_brands')
+        rows:
+          - {keyword: unusedbrand, brand: unusedbrand}
+      - input: ref('fct_campaign_finance')
+        rows:
+          - {official_id: o1, direction: received, counterparty: Ameren Corp PAC, counterparty_organization: AMEREN CORPORATION, counterparty_type: committee, amount: 100, transaction_date: '2020-03-01', match_confidence: high, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9'}
+          - {official_id: o1, direction: received, counterparty: Ameren Corp PAC, counterparty_organization: AMEREN CORPORATION, counterparty_type: committee, amount: 50, transaction_date: '2021-03-01', match_confidence: high, source_url: 'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C221944'}
+          - {official_id: o1, direction: received, counterparty: Acme Holdings PAC, counterparty_organization: ACME HOLDINGS INC, counterparty_type: committee, amount: 70, transaction_date: '2022-03-01', match_confidence: high, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9'}
+          - {official_id: o1, direction: received, counterparty: Pat Doe, counterparty_organization: AMEREN CORPORATION, counterparty_type: individual, amount: 900, transaction_date: '2022-04-01', match_confidence: high, source_url: 'https://example.test/individual'}
+    expect:
+      rows:
+        - {registry_id: F1, is_donor: true, donated_amount: 220, n_contributions: 3, donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9 ACME HOLDINGS INC\nhttps://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 AMEREN CORPORATION\nhttps://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C221944 AMEREN CORPORATION"}
+        - {registry_id: F2, is_donor: false, donated_amount: null, n_contributions: null, donor_links: null}

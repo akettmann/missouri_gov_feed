@@ -698,3 +698,20 @@ unit_tests:
         - {official_id: g, chamber: us_house, period: '2020', calendar_year: 2020, voting_years: 1, covered_years: 1, votes_recorded: 1, votes_attended: 1, pay_amount: 174000, pay_basis: statutory salary, match_confidence: high, pay_source_url: null, dollars_per_vote_attended: 174000}
         - {official_id: g, chamber: us_house, period: '2099', calendar_year: 2099, voting_years: 1, covered_years: 0, votes_recorded: 1, votes_attended: 1, pay_amount: null, pay_basis: null, match_confidence: null, pay_source_url: null, dollars_per_vote_attended: null}
         - {official_id: g, chamber: us_house, period: covered years, calendar_year: null, voting_years: 2, covered_years: 1, votes_recorded: 1, votes_attended: 1, pay_amount: 174000, pay_basis: statutory salary, match_confidence: high, pay_source_url: null, dollars_per_vote_attended: 174000}
+
+  - name: donor_rollup_keeps_one_row_per_filing_page_not_per_recipient_url
+    model: rpt_donor_rollup
+    description: >
+      FEC links are narrowed per recipient committee (`...&recipient_name=<recipient>`). One donor committee giving
+      to two of an official's FEC committees in a year stays one row (the grain is the filing page, the donor
+      committee's disbursements), while a different donor committee's page is its own row (#248).
+    given:
+      - input: ref('fct_campaign_finance')
+        rows:
+          - {official_id: o1, level: federal, direction: received, source: fec, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9', match_confidence: high, amount: 100, transaction_date: '2020-03-01', counterparty: Acme PAC, counterparty_type: committee}
+          - {official_id: o1, level: federal, direction: received, source: fec, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C8', match_confidence: high, amount: 50, transaction_date: '2020-04-01', counterparty: Acme PAC, counterparty_type: committee}
+          - {official_id: o1, level: federal, direction: received, source: fec, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9', match_confidence: high, amount: 25, transaction_date: '2020-05-01', counterparty: Acme PAC, counterparty_type: committee}
+    expect:
+      rows:
+        - {official_id: o1, donor_name: Acme PAC, total_amount: 150, contribution_count: 2}
+        - {official_id: o1, donor_name: Acme PAC, total_amount: 25, contribution_count: 1}

@@ -16,7 +16,7 @@ const donor = (donor_names, match_confidence, nSites) => ({
   first_year: 2020,
   last_year: 2020,
   match_confidence,
-  contributions_url: null,
+  donor_links: null,
   sites: Array.from({ length: nSites }, () => site),
 });
 const industries = [
