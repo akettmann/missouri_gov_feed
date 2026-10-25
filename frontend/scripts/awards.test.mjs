@@ -82,8 +82,35 @@ test("an rpt_awards export without period_kind fails with the stale-export messa
   assert.doesNotThrow(() => assertPeriodKindColumn(["award", "period", "period_kind"]));
   assert.throws(
     () => assertPeriodKindColumn(["award", "period"]),
-    /stale.*no period_kind column.*`uv run mogov build` then `uv run mogov export/s,
+    /stale.*no period_kind column.*`uv run mogov build` then `uv run mogov export.*MOGOV_SKIP_AWARD_CYCLES_CHECK=1/s,
   );
+  // only exactly "1" counts as the switch
+  assert.throws(() => assertPeriodKindColumn(["award"], { MOGOV_SKIP_AWARD_CYCLES_CHECK: "true" }), /stale/);
+});
+
+test("with MOGOV_SKIP_AWARD_CYCLES_CHECK=1 a stale export is allowed, warns once, and the kind is inferred", async () => {
+  const { assertPeriodKindColumn, legacyPeriodKind } = await import("../src/lib/exports/awardDefs.ts");
+  const logs = [];
+  const env = { MOGOV_SKIP_AWARD_CYCLES_CHECK: "1" };
+  assert.equal(
+    assertPeriodKindColumn(["award", "period"], env, (m) => logs.push(m)),
+    false,
+  );
+  assert.equal(logs.length, 1);
+  assert.match(logs[0], /stale.*inferring period_kind/);
+  // a current export with the switch set: no warning, no inference
+  assert.equal(
+    assertPeriodKindColumn(["period_kind"], env, (m) => logs.push(m)),
+    true,
+  );
+  assert.equal(logs.length, 1);
+  const m = "least_committee_money_share";
+  assert.equal(legacyPeriodKind(m, "us_house", "2024"), "fec_cycle");
+  assert.equal(legacyPeriodKind(m, "us_senate", "2022"), "fec_cycle");
+  assert.equal(legacyPeriodKind(m, "us_house", "lifetime"), "lifetime");
+  assert.equal(legacyPeriodKind(m, "state_house", "2024"), "year");
+  assert.equal(legacyPeriodKind("most_committee_money", "us_house", "2024"), "year");
+  assert.equal(legacyPeriodKind("lowest_attendance", "us_senate", "lifetime"), "lifetime");
 });
 
 test("unknown or mismatched period_kind values are rejected", async () => {
@@ -109,5 +136,6 @@ test("unknown or mismatched period_kind values are rejected", async () => {
 test("the awards loader checks the period_kind column before reading", () => {
   const src = readFileSync(new URL("../src/lib/exports/awards.ts", import.meta.url), "utf8");
   assert.match(src, /assertPeriodKindColumn\(/);
-  assert.match(src, /select award, office, period, period_kind,/);
+  assert.match(src, /select award, office, period, \$\{hasKind \?/);
+  assert.match(src, /legacyPeriodKind\(r\.award, r\.office, r\.period\)/);
 });

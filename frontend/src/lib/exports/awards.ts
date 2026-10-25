@@ -4,6 +4,7 @@ import {
   assertKnownPeriodKinds,
   assertPeriodKindColumn,
   awardCyclesGate,
+  legacyPeriodKind,
   type PeriodKind,
 } from "./awardDefs";
 import { hasExport, query } from "./db";
@@ -57,7 +58,11 @@ async function load(): Promise<AwardList[] | null> {
   const columns = await query<{ column_name: string }>(
     "select column_name from (describe select * from {rpt_awards})",
   );
-  assertPeriodKindColumn(columns.map((c) => c.column_name));
+  const hasKind = assertPeriodKindColumn(
+    columns.map((c) => c.column_name),
+    process.env,
+    console.warn,
+  );
   const officials = new Map((await allOfficials()).map((b) => [b.official.official_id, b.official]));
   const rows = await query<{
     award: string;
@@ -71,7 +76,7 @@ async function load(): Promise<AwardList[] | null> {
     group_size: number;
     streak_years: number | null;
   }>(`
-    select award, office, period, period_kind, cast(award_rank as integer) as award_rank, official_id,
+    select award, office, period, ${hasKind ? "period_kind" : "cast(null as varchar) as period_kind"}, cast(award_rank as integer) as award_rank, official_id,
            cast(metric as double) as metric, cast(sample_size as double) as sample_size,
            cast(group_size as integer) as group_size, cast(streak_years as integer) as streak_years
     from {rpt_awards} order by award, office, period, award_rank`);
@@ -80,11 +85,12 @@ async function load(): Promise<AwardList[] | null> {
     const o = officials.get(r.official_id);
     if (!o) continue;
     const key = `${r.award}|${r.office}|${r.period}`;
+    const kind = hasKind ? r.period_kind : legacyPeriodKind(r.award, r.office, r.period);
     const list = lists.get(key) ?? {
       award: r.award,
       office: r.office,
       period: r.period,
-      period_kind: r.period_kind,
+      period_kind: kind,
       group_size: r.group_size,
       entries: [],
     };

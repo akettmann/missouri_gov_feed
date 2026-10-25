@@ -117,12 +117,12 @@ unit_tests:
         rows: []
     expect:
       rows:
-        - {award: lowest_attendance, period: '2020', official_id: d, award_rank: 1, group_size: 4, streak_years: 1}
-        - {award: lowest_attendance, period: '2020', official_id: c, award_rank: 2, group_size: 4, streak_years: 1}
-        - {award: lowest_attendance, period: lifetime, official_id: d, award_rank: 1, group_size: 4, streak_years: null}
-        - {award: lowest_attendance, period: lifetime, official_id: c, award_rank: 2, group_size: 4, streak_years: null}
-        - {award: highest_attendance, period: '2020', official_id: a, award_rank: 1, group_size: 4, streak_years: 1}
-        - {award: highest_attendance, period: lifetime, official_id: a, award_rank: 1, group_size: 4, streak_years: null}
+        - {award: lowest_attendance, period: '2020', period_kind: year, official_id: d, award_rank: 1, group_size: 4, streak_years: 1}
+        - {award: lowest_attendance, period: '2020', period_kind: year, official_id: c, award_rank: 2, group_size: 4, streak_years: 1}
+        - {award: lowest_attendance, period: lifetime, period_kind: lifetime, official_id: d, award_rank: 1, group_size: 4, streak_years: null}
+        - {award: lowest_attendance, period: lifetime, period_kind: lifetime, official_id: c, award_rank: 2, group_size: 4, streak_years: null}
+        - {award: highest_attendance, period: '2020', period_kind: year, official_id: a, award_rank: 1, group_size: 4, streak_years: 1}
+        - {award: highest_attendance, period: lifetime, period_kind: lifetime, official_id: a, award_rank: 1, group_size: 4, streak_years: null}
 
   - name: awards_streak_counts_consecutive_qualifying_years
     model: rpt_awards

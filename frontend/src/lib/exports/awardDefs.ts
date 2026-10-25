@@ -72,17 +72,37 @@ export function officeHasCycles(
 }
 
 /**
- * Throws when the rpt_awards export predates `period_kind` (the column list from DESCRIBE lacks it). Without
- * the column the pages cannot tell a calendar year from an FEC cycle, and guessing would put back the very
- * inference period_kind replaced, so this fails the build (same message family as the cycle check) rather
- * than fall back. Not skippable: MOGOV_SKIP_AWARD_CYCLES_CHECK only skips the odd-period consistency guard.
+ * Checks the rpt_awards export has `period_kind` (the column list from DESCRIBE). Returns true when it does.
+ * Without it the pages cannot tell a calendar year from an FEC cycle, so by default this throws (same message
+ * family as the cycle check). With MOGOV_SKIP_AWARD_CYCLES_CHECK=1 it logs one warning and returns false: the
+ * caller then fills the kind with legacyPeriodKind, the inference period_kind replaced.
  */
-export function assertPeriodKindColumn(columns: string[]): void {
-  if (columns.includes("period_kind")) return;
+export function assertPeriodKindColumn(
+  columns: string[],
+  env: Record<string, string | undefined> = {},
+  log: (msg: string) => void = () => {},
+): boolean {
+  if (columns.includes("period_kind")) return true;
+  if (skipAwardCyclesCheck(env)) {
+    log(
+      "MOGOV_SKIP_AWARD_CYCLES_CHECK=1: the rpt_awards export is stale (no period_kind column); " +
+        "inferring period_kind from award and office. Re-export to stop inferring.",
+    );
+    return false;
+  }
   throw new Error(
     "rpt_awards export is stale: it has no period_kind column (exported before period_kind was added). " +
-      "Rebuild and re-export: `uv run mogov build` then `uv run mogov export --format parquet`.",
+      "Rebuild and re-export: `uv run mogov build` then `uv run mogov export --format parquet`, " +
+      "or set MOGOV_SKIP_AWARD_CYCLES_CHECK=1 (exactly 1) to build anyway, inferring the kind.",
   );
+}
+
+/** The pre-period_kind rule, used only for a stale export under the switch: federal money share is a cycle. */
+export function legacyPeriodKind(award: string, office: string, period: string): PeriodKind {
+  if (period === "lifetime") return "lifetime";
+  return award === "least_committee_money_share" && (office === "us_house" || office === "us_senate")
+    ? "fec_cycle"
+    : "year";
 }
 
 /** Throws on a period_kind value other than year / fec_cycle / lifetime (or a lifetime kind on a dated period). */
