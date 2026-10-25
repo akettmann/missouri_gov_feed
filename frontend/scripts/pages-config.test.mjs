@@ -16,6 +16,8 @@ import {
   pushUrl,
   redactUrl,
   repoFromRemote,
+  beginPush,
+  failureReport,
   InterruptedError,
   isInterruptExit,
   withTempDir,
@@ -105,7 +107,7 @@ test("withTempDir: a SIGINT pending across a synchronous step is only delivered 
     withTempDir(
       "mogov-pending-",
       async (_dir, guard) => {
-        // Like git init/commit under spawnSync: the signal arrives while the loop is blocked, so its listener cannot
+        // Like a blocking synchronous step (e.g. the dist scan): the signal arrives while the loop is blocked, so its listener cannot
         // run until the loop turns. Model that with an emit queued for the next turn.
         setImmediate(() => proc.emit("SIGINT"));
         const t = Date.now();
@@ -286,4 +288,86 @@ test("resolveFile: a file that exists only under the wrong prefix is not found",
   const stat = () => ({ isDirectory: () => false });
   assert.equal(resolveFile("dist", "/b", "/b/a/", exists, stat), null);
   assert.ok(resolveFile("dist", "", "/b/a/", exists, stat));
+});
+
+test("withTempDir: a failing dir removal after an interrupt keeps the interrupt and warns naming the dir", async () => {
+  const proc = new EventEmitter();
+  const warnings = [];
+  let dir;
+  await assert.rejects(
+    withTempDir(
+      "mogov-ebusy-",
+      async (d) => {
+        dir = d;
+        setImmediate(() => proc.emit("SIGINT"));
+        await new Promise(() => {});
+      },
+      {
+        proc,
+        remove: () => {
+          throw new Error("EBUSY");
+        },
+        warn: (m) => warnings.push(m),
+      },
+    ),
+    InterruptedError,
+  );
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /EBUSY/);
+  assert.ok(warnings[0].includes(dir));
+  assert.equal(proc.listenerCount("SIGINT"), 0);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("withTempDir: a failing dir removal after a clean run is still an error", async () => {
+  const proc = new EventEmitter();
+  let dir;
+  await assert.rejects(
+    withTempDir(
+      "mogov-ebusy2-",
+      async (d) => {
+        dir = d;
+      },
+      {
+        proc,
+        remove: () => {
+          throw new Error("EBUSY");
+        },
+      },
+    ),
+    /EBUSY/,
+  );
+  assert.equal(proc.listenerCount("SIGINT"), 0);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("failureReport: message and exit code per failure kind and push state", () => {
+  assert.deepEqual(failureReport(new InterruptedError(), false), {
+    message: "Interrupted; nothing was pushed.",
+    code: 130,
+  });
+  const during = failureReport(new InterruptedError(), true);
+  assert.match(during.message, /push may or may not have completed/);
+  assert.equal(during.code, 130);
+  assert.deepEqual(failureReport(new Error("boom"), true), { message: "boom", code: 1 });
+});
+
+test("beginPush: marks the push started only when no interrupt is pending", async () => {
+  let started = false;
+  await beginPush({ check: async () => {} }, () => (started = true));
+  assert.equal(started, true);
+
+  started = false;
+  await assert.rejects(
+    beginPush(
+      {
+        check: async () => {
+          throw new InterruptedError();
+        },
+      },
+      () => (started = true),
+    ),
+    InterruptedError,
+  );
+  assert.equal(started, false);
 });

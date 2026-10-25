@@ -162,20 +162,28 @@ export const OFFICE_GROUP_LABELS: Record<string, string> = {
   mayor: "Mayors",
 };
 
-/** Unknown office: drop a trailing ", <n> Judicial Circuit(s)" / "District <n>" qualifier, then pluralize. */
-export function pluralOfficeLabel(office: string, title?: string | null): string {
+const warnedOffices = new Set<string>();
+
+/**
+ * Plural label for an office key. A key missing from OFFICE_GROUP_LABELS is labelled from the key's words only
+ * ("county_clerk" -> "County Clerks"), never from a holder's title, which would name one holder's seat (a
+ * mayor's city, a judge's circuit). The pluralizer is crude on purpose ("appeals_east" -> "Appeals Easts"); add
+ * the key to OFFICE_GROUP_LABELS instead. Warns once per unmapped key so a build surfaces new keys.
+ */
+export function pluralOfficeLabel(office: string): string {
   const known = OFFICE_GROUP_LABELS[office];
   if (known) return known;
-  const base = (title ?? office)
-    .replace(/,\s*(?:\d+\w*\s+)?Judicial Circuits?\b.*$/i, "")
-    .replace(/,?\s*(?:\d+\w*\s+)?District(?:\s+\d+)?$/i, "")
-    .trim();
+  if (!warnedOffices.has(office)) {
+    warnedOffices.add(office);
+    console.warn(`office key "${office}" has no entry in OFFICE_GROUP_LABELS; labelling it from the key`);
+  }
+  const base = office.replaceAll("_", " ").replace(/\b[a-z]/g, (c) => c.toUpperCase());
   return base.endsWith("s") ? base : `${base}s`;
 }
 
 /** Singular tab label for an office key (the plural minus its group "s"), for headings. */
-export function singularOfficeLabel(office: string, title?: string | null): string {
-  return pluralOfficeLabel(office, title)
+export function singularOfficeLabel(office: string): string {
+  return pluralOfficeLabel(office)
     .replace(/^Attorneys General$/, "Attorney General")
     .replace(/^Secretaries of State$/, "Secretary of State")
     .replace(/s$/, "");

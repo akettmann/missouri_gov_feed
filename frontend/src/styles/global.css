@@ -222,6 +222,7 @@ th.num {
   white-space: nowrap;
 }
 .table-scroll {
+  position: relative;
   overflow-x: auto;
 }
 

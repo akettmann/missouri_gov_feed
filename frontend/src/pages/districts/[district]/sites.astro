@@ -5,6 +5,7 @@
 import AwardBadges from "../../../components/AwardBadges.astro";
 import type { GetStaticPaths } from "astro";
 import ConfidenceBadge from "../../../components/ConfidenceBadge.astro";
+import SourceLink from "../../../components/SourceLink.astro";
 import ConfidenceToggle from "../../../components/ConfidenceToggle.astro";
 import Layout from "../../../layouts/Layout.astro";
 import { districtSiteLists, districtSites } from "../../../lib/exports/districtSites";
@@ -80,13 +81,7 @@ const area = officeLine(official);
               <td>
                 {s.is_donor ? (
                   <>
-                    {s.contributions_url ? (
-                      <a href={s.contributions_url} rel="noopener noreferrer">
-                        {s.donor_names}
-                      </a>
-                    ) : (
-                      s.donor_names
-                    )}{" "}
+                    {s.donor_names} <SourceLink url={s.contributions_url} label="reports" missing="" />{" "}
                     <ConfidenceBadge confidence={s.match_confidence} />
                     <span class="muted small">
                       {" "}

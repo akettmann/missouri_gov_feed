@@ -2,7 +2,7 @@
 // opposite. The ranking itself is done in dbt; this only attaches names and links.
 import { hasExport, query } from "./db";
 import { currentAwards, pluralOfficeLabel, type Badge } from "../awardBadges";
-import { allOfficials, officialIndex } from "./load";
+import { allOfficials } from "./load";
 
 export interface AwardEntry {
   rank: number;
@@ -80,10 +80,6 @@ let currentCache: Promise<Map<string, Badge[]>> | undefined;
 
 /** slug -> the awards that official holds now (empty map when the export is missing). */
 export function currentAwardsBySlug(): Promise<Map<string, Badge[]>> {
-  currentCache ??= Promise.all([awardLists(), officialIndex()]).then(([lists, index]) => {
-    const titles = new Map(index.map((o) => [o.office, o.office_title]));
-    const label = (office: string) => pluralOfficeLabel(office, titles.get(office));
-    return currentAwards(lists ?? [], label);
-  });
+  currentCache ??= awardLists().then((lists) => currentAwards(lists ?? [], pluralOfficeLabel));
   return currentCache;
 }

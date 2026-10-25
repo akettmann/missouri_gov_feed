@@ -187,9 +187,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
     Pick<CommitteeTrail, "committee_name" | "committee_total_amount" | "source_url" | "donors">
   >();
   if (hasTrails && trailRows.length > 0) {
-    const ids = [...new Set(trailRows.map((t) => t.mec_committee_id))].map(
-      (id) => `'${id.replaceAll("'", "''")}'`,
-    );
+    const ids = [...new Set(trailRows.map((t) => t.mec_committee_id))];
     for (const r of await query<
       CommitteeDonorRow & {
         mec_committee_id: string;
@@ -197,14 +195,17 @@ async function loadAll(): Promise<OfficialBundle[]> {
         committee_total_amount: number;
         source_url: string;
       }
-    >(`
+    >(
+      `
       select mec_committee_id, committee_name, cast(committee_total_amount as double) as committee_total_amount,
              source_url, cast(donor_rank as integer) as donor_rank, donor_class, donor_name,
              cast(total_amount as double) as total_amount, cast(contribution_count as integer) as contribution_count,
              first_year, last_year, trail_status, donor_mec_committee_id
       from {rpt_committee_donors}
-      where mec_committee_id in (${ids.join(", ")})
-      order by mec_committee_id, donor_rank nulls last`)) {
+      where mec_committee_id in (${ids.map(() => "?").join(", ")})
+      order by mec_committee_id, donor_rank nulls last`,
+      ids,
+    )) {
       const { mec_committee_id, committee_name, committee_total_amount, source_url, ...donor } = r;
       const entry = committeeDonors.get(mec_committee_id) ?? {
         committee_name,

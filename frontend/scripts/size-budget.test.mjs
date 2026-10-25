@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { measure, overBudget } from "./size-budget.mjs";
+import { budgetGate, formatBudgetError, measure, overBudget, skipRequested } from "./size-budget.mjs";
 
 const budgets = [{ file: "a.json", maxRawKB: 10, maxGzKB: 2 }];
 
@@ -41,4 +41,37 @@ test("measure leaves out files that are not in the build output", () => {
   } finally {
     rmSync(dir, { recursive: true });
   }
+});
+
+test("a missing file's message points at BUDGETS/the build, not at trimming", () => {
+  const [missing] = overBudget({}, budgets);
+  const msg = formatBudgetError(missing);
+  assert.match(msg, /update BUDGETS in scripts\/size-budget\.mjs/);
+  assert.doesNotMatch(msg, /Trim the payload/);
+  const [over] = overBudget({ "a.json": { raw: 11 * 1024, gz: 1 } }, budgets);
+  assert.match(formatBudgetError(over), /^OVER BUDGET: .*Trim the payload/);
+});
+
+test("MOGOV_SKIP_SIZE_BUDGET skips only when exactly 1", () => {
+  assert.equal(skipRequested({ MOGOV_SKIP_SIZE_BUDGET: "1" }), true);
+  for (const v of ["0", "", "true", undefined])
+    assert.equal(skipRequested({ MOGOV_SKIP_SIZE_BUDGET: v }), false);
+});
+
+test("budgetGate runs the check before publishing, blocks on failure, and skips only on =1", () => {
+  const calls = [];
+  const log = { log: (m) => calls.push(["log", m]), error: (m) => calls.push(["error", m]) };
+  const spawn = (status) => () => (calls.push(["spawn"]), { status });
+  assert.equal(budgetGate({ cwd: "x", env: {}, spawn: spawn(0), log }), true);
+  assert.deepEqual(calls.splice(0), [["spawn"]]);
+  assert.equal(budgetGate({ cwd: "x", env: { MOGOV_SKIP_SIZE_BUDGET: "0" }, spawn: spawn(1), log }), false);
+  assert.deepEqual(
+    calls.splice(0).map((c) => c[0]),
+    ["spawn", "error"],
+  );
+  assert.equal(budgetGate({ cwd: "x", env: { MOGOV_SKIP_SIZE_BUDGET: "1" }, spawn: spawn(1), log }), true);
+  assert.deepEqual(
+    calls.splice(0).map((c) => c[0]),
+    ["log"],
+  );
 });
