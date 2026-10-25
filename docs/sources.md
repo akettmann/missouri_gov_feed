@@ -530,9 +530,13 @@ Quirks:
   name is the payee's middle initial when nobody else fits that way: "SMITH, DAVID C" is David Cody Smith, known as
   Cody Smith (R, HD163), and "SMITH, DAVID T" is David (Tyson) Smith (D, HD45 then HD46, from 2021). Others are
   matched by name. Open States gives some seats no start date (stored as
-  1900-01-01), so a seat counts from the member's first House roster year instead, and a by-name match of
+  1900-01-01), so a seat counts from the member's first roster year in that chamber (House or Senate, each on its own) instead, and a by-name match of
   legislator pay is held to the years the member sat, unless nobody else holds the surname that year (a final
-  check after a term, or earlier service Open States records as another person). In October 2026, 2025 pay
+  check after a term, or earlier service Open States records as another person: Steve Roberts' 2017-20 House
+  pay stays his because the "Steven Roberts" record that held the seat has a fitting first name, #263). A payee whose
+  first name fits a member whose seat ended the December before, and who earned under half the year's top pay, is
+  that member's final check and does not compete for the seats held now ("BLACK, LINDA R." 2017 beside Rusty
+  Black's "BLACK, JAMES R"). In October 2026, 2025 pay
   matched all 155 representatives and all 33 senators.
 - The current year's dataset appears in January of the following year.
 - Federal officials (Congress, federal judges) are paid by the U.S. and are not in this source.

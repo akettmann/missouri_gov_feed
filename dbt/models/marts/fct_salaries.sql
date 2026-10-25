@@ -15,7 +15,9 @@
 --                     that way ("SMITH, DAVID C" is Cody Smith), or
 --                  4. once 1 to 3 have paired the rest, one payee and one member remain (Mike Jones =
 --                     JONES, MICHAEL J after Holly Jones)
---                A seat counts from the member's first roster year when Open States has no start date (#227).
+--                A seat counts from the member's first roster year in that chamber (House and Senate each) when Open
+--                States has no start date (#227). A small payment that fits a member whose seat ended the December
+--                before is that member's final check and is left out of 1 to 4 (#250).
 --   by name      payroll "LAST, FIRST" against the official's name variants within the same group of
 --                offices, first names that fit (see mogov.first_name_fit): statewide officials, judges, and
 --                legislator rows the seat match leaves open (members without an Open States seat), and only in
@@ -38,7 +40,8 @@ with pay as (
         {{ dbt.replace(mogov.surname_key('p.last_name'), "' '", "''") }} as last_flat,
         {{ mogov.name_key(dbt.split_part('p.first_names', "' '", 1)) }} as first_key,
         {{ mogov.name_key('p.first_names') }} as first_all_key,
-        {{ mogov.name_key(dbt.split_part('p.first_names', "' '", 2)) }} as middle_key
+        {{ mogov.name_key(dbt.split_part('p.first_names', "' '", 2)) }} as middle_key,
+        max(p.gross_pay) over (partition by p.calendar_year, p.position_title) as top_pay
     from {{ ref('stg_mo_employee_pay__pay') }} as p
     inner join {{ ref('mo_payroll_office_titles') }} as t
         on p.agency_name = t.agency_name and p.position_title = t.position_title
@@ -89,6 +92,41 @@ service_years as (
     group by person_id
 ),
 
+-- A final check: a payee whose first name fits a member of the chamber whose seat ended the December before,
+-- and who was paid well under a full year's salary (under half of the year's highest pay for the position).
+-- It is that departed member's last pay, so it must not compete for the seats held now ("BLACK, LINDA R."
+-- 2017 is Linda Black's, not a second claimant to Rusty Black's seat, whose middle initial it shares, #250).
+final_checks as (
+    select distinct
+        p.calendar_year,
+        p.seat_chamber,
+        p.employee_name
+    from pay as p
+    inner join {{ ref('int_mo_legislators__seats') }} as d
+        on
+            p.seat_chamber = d.chamber
+            and extract(year from d.end_date) = p.calendar_year - 1
+            and {{ dbt.replace('d.surname_key', "' '", "''") }} = p.last_flat
+            and {{
+                mogov.first_name_fit(
+                    'p.first_key',
+                    'p.first_all_key',
+                    mogov.name_key(dbt.split_part('d.full_name', "' '", 1))
+                )
+            }} >= 1
+    where
+        p.office_group = 'legislature'
+        and p.gross_pay * 2 < p.top_pay
+        and not exists (
+            select 1
+            from {{ ref('int_mo_legislators__seats') }} as later
+            where
+                later.person_id = d.person_id
+                and later.chamber = d.chamber
+                and extract(year from later.end_date) >= p.calendar_year
+        )
+),
+
 -- every (payroll row, member of the same chamber and year) pair whose surnames agree: the whole surname
 -- (spaces ignored, so VANSCHOIACK = Van Schoiack), or its last words ("WALSH MOORE" for Moore), which also
 -- needs the first name to fit
@@ -112,7 +150,9 @@ seat_pairs_raw as (
             p.calendar_year = s.calendar_year
             and p.seat_chamber = s.chamber
             and (p.last_flat = s.surname_flat or p.last_key like '% ' || s.surname_key)
-    where p.office_group = 'legislature'
+    left join final_checks as f
+        on p.calendar_year = f.calendar_year and p.seat_chamber = f.seat_chamber and p.employee_name = f.employee_name
+    where p.office_group = 'legislature' and f.employee_name is null
 ),
 
 seat_pairs as (
