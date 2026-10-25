@@ -41,7 +41,7 @@ export function isInterruptExit(status, signal) {
 export async function withTempDir(
   prefix,
   fn,
-  { keep = false, root = tmpdir(), proc = process, remove = rmSync } = {},
+  { keep = false, root = tmpdir(), proc = process, remove = rmSync, warn = console.error } = {},
 ) {
   const dir = mkdtempSync(path.join(root, prefix));
   let interrupted = false;
@@ -67,16 +67,50 @@ export async function withTempDir(
   proc.on("SIGINT", onSigint);
   const work = (async () => fn(dir, guard))(); // also tolerates a plain (sync) fn
   work.catch(() => {}); // after an interrupt fn may still fail; the race below already reported the interrupt
-  try {
-    return await Promise.race([work, interrupt]);
-  } finally {
+  const cleanup = () => {
     cleaning = true;
     try {
       if (!keep) remove(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+      return null;
+    } catch (cleanupError) {
+      return cleanupError;
     } finally {
       proc.removeListener("SIGINT", onSigint);
     }
+  };
+  let result;
+  try {
+    result = await Promise.race([work, interrupt]);
+  } catch (e) {
+    // Keep the primary failure (an interrupt must stay an interrupt); a failed removal is an extra warning.
+    const cleanupError = cleanup();
+    if (cleanupError)
+      warn(`warning: could not delete the temp dir ${dir} (${cleanupError.message}); remove it by hand.`);
+    throw e;
   }
+  const cleanupError = cleanup();
+  if (cleanupError) throw cleanupError; // a clean run that cannot clean up is still an error
+  return result;
+}
+
+/**
+ * Last stop before the force-push: yields so a pending Ctrl+C is delivered, throws InterruptedError if one
+ * arrived, and only then calls `markStarted` (so "the push may have completed" is only claimed once it began).
+ */
+export async function beginPush(guard, markStarted) {
+  await guard.check();
+  markStarted();
+}
+
+/** What deploy-pages reports for a failure, and the exit code: 130 for an interrupt. */
+export function failureReport(e, pushStarted) {
+  if (!(e instanceof InterruptedError)) return { message: e.message, code: 1 };
+  return {
+    message: pushStarted
+      ? "Interrupted during git push; the push may or may not have completed."
+      : "Interrupted; nothing was pushed.",
+    code: 130,
+  };
 }
 
 /** Normalise a base path: "" / "/" / undefined -> undefined (Astro default), "x" or "/x/" -> "/x". */
