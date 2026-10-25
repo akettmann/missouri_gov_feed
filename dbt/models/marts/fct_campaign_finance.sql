@@ -87,7 +87,7 @@ mec_received as (
         'MEC (via Accountability Project)' as source,
         m.confidence as match_confidence,
         'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url,
-        'tap:' || c.record_id as source_record_id,
+        'tap_contrib:' || c.record_id as source_record_id,
         x.mec_committee_id as counterparty_mec_committee_id,
         x.match_confidence as counterparty_link_confidence
     from {{ ref('stg_tap_mec__contributions') }} as c
@@ -115,7 +115,7 @@ mec_given as (
         'MEC (via Accountability Project)' as source,
         m.confidence as match_confidence,
         'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url,
-        'tap:' || cast(e.record_id as {{ dbt.type_string() }}) as source_record_id
+        'tap_cd3_b:' || cast(e.record_id as {{ dbt.type_string() }}) as source_record_id
     from {{ ref('stg_tap_mec__expenditures') }} as e
     inner join {{ ref('int_mec__official_committees') }} as m on e.mec_committee_id = m.mec_committee_id
     where
