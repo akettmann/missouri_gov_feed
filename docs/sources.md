@@ -291,8 +291,8 @@ Quirks:
 Flow: [diagrams/sources/senate_efd.svg](diagrams/sources/senate_efd.svg)
 
 - Lands: `senate_efd_filings`, `senate_efd_rows`.
-- Enable with `MOGOV_ACCEPT_SENATE_EFD_TERMS=1`, which accepts the use statement (5 U.S.C. app.
-  105(c)) on your behalf.
+- Enable with `MOGOV_ACCEPT_SENATE_EFD_TERMS=1`, which accepts the use statement (5 U.S.C. § 13107(c),
+  formerly 5 U.S.C. app. § 105(c)) on your behalf.
 
 Quirks:
 - Requests are CSRF-protected, so the loader accepts the use statement and then searches.
@@ -305,22 +305,24 @@ Quirks:
 
 ### Alternatives to the eFD scrape (research for #185, checked 2026-10-25)
 
-No alternative is both current and covers annual reports. Recommendation: keep the manual import (#190) as the
+No free or openly licensed alternative is both current and covers annual reports (LegiStorm, a paid
+subscription, may; its format and terms are unverified). Recommendation: keep the manual import (#190) as the
 working path and ask the Senate Office of Public Records for a sanctioned feed (#277).
 
 | Candidate | Covers | Freshness | Access | Terms | Fit |
 |---|---|---|---|---|---|
-| Senate Office of Public Records (OPR) | everything in eFD | live | no bulk/API/allowlist is published; contact OPRGeneral@sec.senate.gov, (202) 224-0322; kiosk in Hart 144 | 5 U.S.C. app. 105(c) use limits apply | the only official route; maintainer must ask |
-| `jeremiak/us-senate-financial-disclosure-data` (GitHub) | scraped annual + PTR rows, 1,824 report ids, 2012 to 2020 filings | last push 2024-01-15; the CSV's newest filing is 2020-06; `reports.json` is broken (3,381 entries, 31 unique) | git clone, no key | CC-BY-SA-4.0 (share-alike), underlying data still subject to 105(c) | `report-id` is the eFD UUID, so ids map directly; stale, useful only as a 2012-2020 cross-check |
-| `timothycarambat/senate-stock-watcher-data` (GitHub) | PTRs only | last push 2021-03-16; no licence | git clone | none stated | stale, amendments removed, PTRs only |
+| Senate Office of Public Records (OPR) | everything in eFD | live | no bulk/API/allowlist is published; contact OPRGeneral@sec.senate.gov, (202) 224-0322 | 5 U.S.C. § 13107(c) use limits apply (no unlawful purpose, commercial purpose other than news/communications media, credit rating, or soliciting money) | the only official route; maintainer must ask |
+| `jeremiak/us-senate-financial-disclosure-data` (GitHub) | only `output/transactions.csv`: transaction rows from PTRs and from annual reports' transaction section (no assets, income, liabilities, positions, gifts or travel); 1,824 report ids, 2012 to 2020 filings | last push 2024-01-15; the CSV's newest filing is 2020-06; `reports.json` is broken (3,381 entries, 31 unique) | git clone, no key | CC-BY-SA-4.0 (share-alike), underlying data still subject to § 13107(c) | `report-id` is the eFD UUID, so ids map after lowercasing; stale, useful only as a 2012-2020 cross-check of transactions |
+| `timothycarambat/senate-stock-watcher-data` (GitHub) | PTRs only | last push 2021-03-16; no licence | git clone | none stated | stale, PTRs only |
 | Disclosed Capitol | PTRs (annual reports unclear) | claims minutes | API key, credits, rate limits | bulk resale barred; personal/news use only without written permission | paid, restrictive; do not build on it |
-| Financial Modeling Prep `senate-latest` | PTR trades | not verified | API key, paid tiers | commercial vendor terms, not read | PTRs only; not evaluated further |
-| Quiver Quantitative | congressional trades | not verified | API key, from about $10/month | terms page not retrievable | PTR trades only |
+| [Financial Modeling Prep](https://site.financialmodelingprep.com/developer/docs) `senate-latest` | PTR trades | not verified | API key, paid tiers | commercial vendor terms, not read | PTRs only; not evaluated further |
+| [Quiver Quantitative](https://pypi.org/project/quiverquant/) | congressional trades | not verified | API key, $30/month per the quiverquant PyPI README v0.2.6 (2026-05-07) | terms page not retrievable | PTR trades only |
+| [LegiStorm](https://www.legistorm.com) | Senate PFDs indexed by member, reportedly incl. annual, amendments, termination, new-hire and PTRs; a 2026 Annual report appears on Grassley's page | current | paid subscription | not read | format and terms unverified; possible but needs a subscription decision (see needs-user issue) |
 | Capitol Trades | trades | not verified | no public API; scraping only | terms not retrievable | not usable |
 | OpenSecrets personal finances | members' assets and liabilities | bulk CSV last seen for 2004-2007 (2009 notice) | site closed to our fetch; current terms unverified | CC BY-NC-SA in 2009; commercial use by fee | not verified current |
 
-Notes: every third-party feed re-publishes eFD data, so the 105(c) prohibition on commercial use still applies to
-it (news-media exception only). The only candidate with a stable id that maps to our `url` column is jeremiak's
+Notes: every third-party feed re-publishes eFD data, so the § 13107(c) use limits likely apply to it (a legal
+question for the maintainer / OPR). The only candidate with a stable id that maps to our `url` column is jeremiak's
 `report-id`. Third-party feeds carry PTR trades but not annual-report sections (assets, income, liabilities,
 positions, gifts, travel) that `stg_senate_efd__items` needs.
 
