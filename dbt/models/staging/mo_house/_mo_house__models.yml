@@ -14,6 +14,14 @@ models:
 - name: stg_mo_house__bills
   description: 'One row per MO House bill per session (House XML export): number, current version, titles, last
     action. bill_doc keeps the bill''s XML-as-JSON for the subject, sponsor and roll-call models built on this one.'
+- name: stg_mo_house__committee_list_members
+  description: 'Members of each House committee per session from the House COMMITTEELIST export: one row per (session,
+    committee, member). Held only for sessions 231, 241, 251, 253 and 254 (2023 onward). The member is identified
+    by the House district number, which is unique within a session.'
+- name: stg_mo_house__member_committees
+  description: 'Committee and subcommittee posts of each MO House member per session, as the member''s own XML page
+    lists them (end-of-session snapshot): committee name and position (Chair, Vice-Chair, Co-Chair, Ranking Minority
+    Member, Member). Subcommittees carry "Subcommittee" in the name. The export has none for session 253.'
 - name: stg_mo_house__members
   description: MO House members per session (end-of-session snapshot from the House XML export).
 - name: stg_mo_house__rollcall_votes

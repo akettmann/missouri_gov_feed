@@ -1,0 +1,56 @@
+# Unit tests for the committee-post and judge time-to-disposition metrics (fixed rows -> exact expected rows).
+version: 2
+
+unit_tests:
+  - name: committee_posts_count_titles_and_keep_subcommittees_apart
+    model: fct_committee_posts
+    description: >
+      One member in one session: chair of two full committees, vice-chair of one, ranking member of one,
+      plain member of one, and chair of a subcommittee. committees_held counts the five full committees only;
+      the subcommittee chair is counted in subcommittee_chair_posts and not in chair_posts.
+    given:
+      - input: ref('fct_committee_memberships')
+        rows:
+          - {official_id: o1, session_code: '254', session_year: 2024, committee_name: Budget, position_name: Chair, is_subcommittee: false}
+          - {official_id: o1, session_code: '254', session_year: 2024, committee_name: Rules, position_name: Chair, is_subcommittee: false}
+          - {official_id: o1, session_code: '254', session_year: 2024, committee_name: Health, position_name: Vice-Chair, is_subcommittee: false}
+          - {official_id: o1, session_code: '254', session_year: 2024, committee_name: Utilities, position_name: Ranking Minority Member, is_subcommittee: false}
+          - {official_id: o1, session_code: '254', session_year: 2024, committee_name: Ethics, position_name: Member, is_subcommittee: false}
+          - {official_id: o1, session_code: '254', session_year: 2024, committee_name: Subcommittee on Roads, position_name: Chair, is_subcommittee: true}
+          - {official_id: o1, session_code: '251', session_year: 2023, committee_name: Budget, position_name: Member, is_subcommittee: false}
+    expect:
+      rows:
+        - {official_id: o1, session_code: '254', committees_held: 5, chair_posts: 2, vice_chair_posts: 1, co_chair_posts: 0, ranking_posts: 1, subcommittee_chair_posts: 1}
+        - {official_id: o1, session_code: '251', committees_held: 1, chair_posts: 0, vice_chair_posts: 0, co_chair_posts: 0, ranking_posts: 0, subcommittee_chair_posts: 0}
+
+  - name: judge_time_to_disposition_excludes_negative_and_undated_dockets
+    model: fct_judge_time_to_disposition
+    description: >
+      Judge 1 has five dockets: durations 10, 20 and 100 days are measured, one ends before it was filed (-5)
+      and is counted apart, one has no termination date. The median is over the three measured (20), the
+      share with both dates is 4 of 5. Judge 2 has dockets in both districts: court moed+mowd, median of 30
+      and 50 is 40.
+    overrides:
+      vars:
+        cl_case_bulk: true
+    given:
+      - input: ref('int_courtlistener__district_dockets')
+        rows:
+          - {docket_id: d1, court_id: moed, cl_person_id: '1', has_both_dates: true, days_to_disposition: 10, ends_before_filed: false}
+          - {docket_id: d2, court_id: moed, cl_person_id: '1', has_both_dates: true, days_to_disposition: 20, ends_before_filed: false}
+          - {docket_id: d3, court_id: moed, cl_person_id: '1', has_both_dates: true, days_to_disposition: 100, ends_before_filed: false}
+          - {docket_id: d4, court_id: moed, cl_person_id: '1', has_both_dates: true, days_to_disposition: -5, ends_before_filed: true}
+          - {docket_id: d5, court_id: moed, cl_person_id: '1', has_both_dates: false, days_to_disposition: null, ends_before_filed: null}
+          - {docket_id: d6, court_id: moed, cl_person_id: '2', has_both_dates: true, days_to_disposition: 30, ends_before_filed: false}
+          - {docket_id: d7, court_id: mowd, cl_person_id: '2', has_both_dates: true, days_to_disposition: 50, ends_before_filed: false}
+      - input: ref('stg_courtlistener__people')
+        rows:
+          - {cl_person_id: 1, name_first: Ann, name_middle: null, name_last: Judge, name_suffix: null}
+          - {cl_person_id: 2, name_first: Bob, name_middle: Q, name_last: Jurist, name_suffix: jr}
+      - input: ref('int_courtlistener__official_people')
+        rows:
+          - {official_id: 'fjc:1', cl_person_id: 1}
+    expect:
+      rows:
+        - {cl_person_id: '1', official_id: 'fjc:1', judge_name: Ann Judge, court_id: moed, dockets_assigned: 5, dockets_with_both_dates: 4, dockets_ends_before_filed: 1, dockets_measured: 3, share_with_both_dates: 0.8, median_days_to_disposition: 20}
+        - {cl_person_id: '2', official_id: null, judge_name: Bob Q Jurist jr, court_id: moed+mowd, dockets_assigned: 2, dockets_with_both_dates: 2, dockets_ends_before_filed: 0, dockets_measured: 2, share_with_both_dates: 1.0, median_days_to_disposition: 40}
