@@ -12,33 +12,37 @@
 --   state_senate               33     33 (100%)   30 (91%)   29 (88%)
 --   statewide (6 offices)       6      6 (100%)    6 (100%)   3 (50%)
 --
--- Floors (share of officials in the group):
---                         mec_direct on                    mec_direct off
---                         attributed    exact              attributed    exact
---   state_house           0.80          0.65               0.50          none
---   state_senate          0.85          0.70               0.65          none
---   statewide             0.65          0.65               0.30          none
+-- Floors (share of officials in the group), and the margin under the measurement:
+--                         mec_direct on                           mec_direct off
+--                         attributed       exact                  attributed       exact
+--   state_house           0.80 (-12.9)     0.65 (-16.9)           0.35 (-34.0)     none
+--   state_senate          0.85 (-15.0)     0.70 (-20.9)           0.65 (-22.9)     none
+--   statewide             0.65 (-35.0)     0.65 (-35.0)           0.30 (-20.0)     none
 -- Rationale:
 --   * The exact floor is what detects a lost or broken crosswalk while mec_direct is true: without the
 --     crosswalk nothing is exact (0%), whereas the attributed share alone barely moves in the senate
---     (100% -> 88%) and can't tell the modes apart there. Exact floors sit 12-17 points under measured
---     and attributed floors 8-15 points under, enough for turnover of a few seats.
+--     (100% -> 88%) and can't tell the modes apart there. Exact floors sit 17-35 points under measured
+--     and attributed floors 13-35 points under, enough for turnover of a few seats.
 --   * Statewide is six seats, so a share is coarse: 0.65 needs 4 of 6, tolerating two without a match (a
 --     new appointee, or an officeholder with no committee yet) but not a missing crosswalk (exact 0 of 6).
---   * mec_direct off has no exact floor; its attributed floors sit 19 (house), 23 (senate) and 20
---     (statewide) points under the name-match measurements so post-2022 turnover doesn't trip them.
+--   * mec_direct off has no exact floor, and its shares DECAY as TAP ages: the name match reads TAP
+--     contributions, which stop at 2022, so members first seated after that match far less often (house
+--     members first seated in 2025 name-match 18/54 = 33%, the 2023 cohort 33/40, pre-2023 about 93%).
+--     Projected house name-only share is about 0.51-0.55 in Jan 2027 and about 0.40 in Jan 2029, so the
+--     off-mode house floor is 0.35, not tighter. Revisit these off-mode floors every election cycle
+--     (senate 0.65 and statewide 0.30 are less exposed but not immune).
 --   * The 'other' group (judges, mayors) has no floor: retention judges rarely run committees (about a
 --     third of circuit judges are attributed, mostly by name match), so the share is noisy and says little
 --     about the pipeline. The legislature and statewide offices are the canaries.
--- The floors follow the mec_direct var, so a bare dbt build (vars unset) uses the low name-match floors
--- and passes; it does NOT catch dbt being run without mogov's vars (the #96 trigger). mogov's cli.py sets
--- the vars from raw_exists('mec_cd1_a'); that gap is tracked in issue #105, and PR #115 (open) proposes an
--- on-run-start check for it. This test only guards the crosswalk while mec_direct is true.
+-- The floors follow the mec_direct var, so a run with mec_direct off (only possible when raw MEC data is
+-- absent or the on-run-start guard is skipped with skip_optional_raw_check) uses the low name-match floors.
+-- Running dbt without mogov's vars (the #96 trigger) is caught by that guard (issue #105, PR #115:
+-- check_optional_inputs), not by this test, which only guards the crosswalk while mec_direct is true.
 -- Fails when an office group has no officials, or a share is below its floor.
 with floors as (
     select
         'state_house' as office_group,
-        {{ 0.80 if var('mec_direct', false) else 0.50 }} as min_attributed_share,
+        {{ 0.80 if var('mec_direct', false) else 0.35 }} as min_attributed_share,
         {{ 0.65 if var('mec_direct', false) else 0.0 }} as min_exact_share
     union all
     select
