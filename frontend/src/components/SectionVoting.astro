@@ -101,7 +101,12 @@ const tally = (yea: number | null, nay: number | null) => (yea == null ? "—" :
       ) : voting.attendance.length === 0 ? (
         <p class="muted small">No session with recorded votes for this official.</p>
       ) : (
-        <Viz id="attendance" bundle={bundle} />
+        <>
+          <Viz id="attendance" bundle={bundle} />
+          <p class="small muted">
+            <a href={href("/methodology/#attendance")}>How attendance is counted</a>.
+          </p>
+        </>
       )}
 
       {voting.by_subject && voting.by_subject.length > 0 && (
