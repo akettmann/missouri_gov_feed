@@ -31,6 +31,7 @@ uv run mogov run --shards 4
 | wikidata (stage 2)            | continuously                                 | 7 days                                                                     | weekly                                                |
 | shor_mccarty                  | yearly release                               | 90 days                                                                    | quarterly                                             |
 | mo_employee_pay               | yearly (each January)                        | current and previous year 7 days, older 30 days                            | monthly                                               |
+| mo_sos_elections              | after each canvass (about 4 weeks after an election) | PDFs forever once 4 months old; the results page and newest PDFs daily | after each election, or monthly                       |
 | census_tiger                  | yearly vintage (each autumn); redistricting  | listings 7 days; shapefiles forever                                        | monthly                                               |
 | epa_frs                       | state file refreshed every few months        | 30 days                                                                    | monthly                                               |
 | census_zcta                   | yearly vintage                               | forever per vintage                                                        | monthly (picks up a new vintage)                      |

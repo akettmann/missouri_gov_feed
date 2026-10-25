@@ -1595,3 +1595,231 @@ models:
       - name: frs_url
         data_type: varchar
         description: The facility's EPA FRS detail report.
+
+  - name: fct_election_races
+    description: >
+      One row per race in the Missouri Secretary of State's official election returns (statewide Grand Totals
+      PDFs for the general and primary elections of 2012 on): office, winner, runner-up, margin, and whether the
+      winner had no opponent. A primary race is one party's ballot (race_party), so a contested primary has one
+      row per party. Candidates are counted without write-ins; a race whose only entries are write-ins is not
+      listed. Winner is the candidate with the most votes (single-seat races; the PDFs do not print the number
+      of seats). Keyed by election and contest, not by official: former officials and losing candidates are
+      here too. Grain: one row per (election, contest, race party).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [election_key, contest_seq, race_party]
+    columns:
+      - name: election_key
+        data_type: varchar
+        description: "`<yyyy-mm-dd>-general` or `<yyyy-mm-dd>-primary`."
+        data_tests: [not_null]
+      - name: election_type
+        data_type: varchar
+        description: general or primary.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [general, primary]
+      - name: election_date
+        data_type: date
+        description: Election day.
+        data_tests: [not_null]
+      - name: contest_seq
+        data_type: integer
+        description: Position of the contest in its PDF (1 = first); with election_key it identifies the contest.
+      - name: race_party
+        data_type: varchar
+        description: The party whose primary ballot this is; null in general elections.
+      - name: contest_title
+        data_type: varchar
+        description: Contest as printed, without the precinct count, e.g. "State Representative - District 34".
+      - name: office
+        data_type: varchar
+        description: The title before the first " - " ("State Representative", "U.S. Senator", "Circuit Judge"...).
+        data_tests: [not_null]
+      - name: district
+        data_type: varchar
+        description: District number when the title has "District n"; null for statewide offices and judicial circuits.
+      - name: candidates
+        data_type: integer
+        description: Candidates on the ballot, write-ins not counted.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 30
+      - name: is_uncontested
+        data_type: boolean
+        description: >
+          Exactly one candidate on the ballot, write-ins not counted (a write-in with votes does not make a race
+          contested). In a primary this is per party ballot.
+        data_tests: [not_null]
+      - name: total_votes
+        data_type: bigint
+        description: Votes for all candidates including write-ins; the PDF's "Total Votes" (checked against it in a test).
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 6000000
+      - name: write_in_votes
+        data_type: bigint
+        description: Votes for the write-in candidates the SoS lists.
+      - name: write_in_share
+        data_type: decimal(5,2)
+        description: write_in_votes as a percentage of total_votes (points).
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: winner_name
+        data_type: varchar
+        description: Candidate with the most votes (write-ins excluded), as printed.
+        data_tests: [not_null]
+      - name: winner_party
+        data_type: varchar
+        description: Winner's party as printed.
+      - name: winner_votes
+        data_type: bigint
+        description: Winner's votes.
+      - name: winner_share
+        data_type: decimal(5,2)
+        description: Winner's votes as a percentage of total_votes (points).
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: runner_up_name
+        data_type: varchar
+        description: Candidate with the second most votes (write-ins excluded); null when uncontested.
+      - name: runner_up_party
+        data_type: varchar
+        description: Runner-up's party as printed.
+      - name: runner_up_votes
+        data_type: bigint
+        description: Runner-up's votes.
+      - name: margin_votes
+        data_type: bigint
+        description: winner_votes minus runner_up_votes; null when uncontested.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: margin_pct
+        data_type: decimal(5,2)
+        description: (winner_votes minus runner_up_votes) as a percentage of total_votes, in points; null when uncontested.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: precincts_reported
+        data_type: integer
+        description: Precincts reported, from the contest header.
+      - name: precincts_total
+        data_type: integer
+        description: Precincts in the contest.
+      - name: winner_official_id
+        data_type: varchar
+        description: >
+          The winner's official_id when the winner is a current official with the same name (suffixes ignored) in
+          the same office and district; null otherwise (former officials, losers, offices not tracked).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: source_url
+        data_type: varchar
+        description: The Grand Totals PDF the race was read from.
+
+  - name: fct_judicial_retention
+    description: >
+      One row per judge on a retention ballot in the Secretary of State's official returns (Supreme Court, Court
+      of Appeals, and the circuit and associate circuit judges under the nonpartisan plan; elections of 2012 on):
+      Yes and No votes and the printed Yes share. A judge is retained with a majority of Yes votes. Keyed by
+      election and contest. Grain: one row per (election, contest, judge).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [election_key, contest_seq, subcontest_seq]
+    columns:
+      - name: election_key
+        data_type: varchar
+        description: "`<yyyy-mm-dd>-general` or `<yyyy-mm-dd>-primary`."
+        data_tests: [not_null]
+      - name: election_type
+        data_type: varchar
+        description: general or primary.
+      - name: election_date
+        data_type: date
+        description: Election day.
+      - name: contest_seq
+        data_type: integer
+        description: Position of the contest header in its PDF.
+      - name: subcontest_seq
+        data_type: integer
+        description: Which judge under that header (1 = first); a Court of Appeals header lists several judges.
+      - name: contest_title
+        data_type: varchar
+        description: Contest as printed, e.g. "Court of Appeals - Western District".
+      - name: office
+        data_type: varchar
+        description: The title before the first " - " ("Missouri Supreme Court", "Court of Appeals", "Circuit Judge"...).
+      - name: judge_name
+        data_type: varchar
+        description: Judge as printed.
+        data_tests: [not_null]
+      - name: yes_votes
+        data_type: bigint
+        description: Votes to retain.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 6000000
+      - name: no_votes
+        data_type: bigint
+        description: Votes against; null where the PDF's No line lost its vote count (2016 only).
+      - name: yes_pct
+        data_type: decimal(5,1)
+        description: The printed percentage of Yes votes (points), the official figure.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: no_pct
+        data_type: decimal(5,1)
+        description: The printed percentage of No votes (points).
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: is_retained
+        data_type: boolean
+        description: Yes share above 50%, the retention rule.
+      - name: precincts_reported
+        data_type: integer
+        description: Precincts reported, from the contest header.
+      - name: precincts_total
+        data_type: integer
+        description: Precincts in the contest.
+      - name: judge_official_id
+        data_type: varchar
+        description: >
+          The judge's official_id when they are a current Supreme Court or Court of Appeals judge with the same
+          name; null for circuit judges and former judges.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: source_url
+        data_type: varchar
+        description: The Grand Totals PDF the judge was read from.

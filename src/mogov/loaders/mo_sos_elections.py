@@ -31,7 +31,8 @@ _HEADING = re.compile(
     r"((?:General|Primary|Special|Presidential Preference Primary)\b[A-Za-z ]*?)\s+-\s+([A-Z][a-z]+ \d{1,2}, \d{4})"
 )
 _GRAND_TOTALS = re.compile(r'<a\s+[^>]*href="([^"]+\.pdf)"[^>]*>\s*Grand Totals\s*</a>', re.I)
-CANDIDATE_ROW = re.compile(r"^[\d,]+ \d+(?:\.\d+)?%$")
+# the 2016 file has one row whose "%" was lost ("No Votes 252,827 59.5"), so the sign is optional after a decimal
+CANDIDATE_ROW = re.compile(r"^[\d,]+ (?:\d+(?:\.\d+)?%|\d+\.\d+)$")
 # Header words give the party column's left edge; the name column ends well before it (name text ends by
 # x=230, party text starts at x=258 in the 2012 and 2024 files), so the boundary sits 30 points left of the
 # "Party" header (x=274).

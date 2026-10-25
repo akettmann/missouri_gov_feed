@@ -28,6 +28,7 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `wikidata` | Wikidata | past offices, occupations, employers, relatives and the organizations they lead | as edited | `MOGOV_CONTACT` |
 | `shor_mccarty` | Harvard Dataverse | state legislator ideology scores | 1993–2022 | |
 | `mo_employee_pay` | data.mo.gov State Employee Pay | yearly gross pay of legislators, statewide officials and state judges | `MOGOV_LOOKBACK_YEARS` (published from 2007) | |
+| `mo_sos_elections` | Missouri Secretary of State official returns | race results, margins, uncontested races, judicial retention votes | general and primary elections, Aug 2012 on | |
 | `census_tiger` | Census Bureau TIGER/Line | legislative and congressional district, county and city boundaries | newest vintage | |
 | `epa_frs` | EPA Facility Registry Service | regulated facilities (name, address, coordinates, NAICS, owner) placed in districts; businesses in each official's district that donated to them | current state file (refreshed every few months) | |
 | `census_zcta` | Census Bureau Gazetteer | ZIP code area centers and land areas (find-by-ZIP) | newest vintage | |
@@ -563,6 +564,63 @@ Quirks:
   matched all 155 representatives and all 33 senators.
 - The current year's dataset appears in January of the following year.
 - Federal officials (Congress, federal judges) are paid by the U.S. and are not in this source.
+
+## mo_sos_elections: Missouri Secretary of State official election returns
+
+Flow: [diagrams/sources/mo_sos_elections.svg](diagrams/sources/mo_sos_elections.svg)
+
+The Secretary of State's certified returns (https://www.sos.mo.gov/elections/results): one statewide "Grand
+Totals" PDF per general and primary election, as announced by the Board of State Canvassers. Each race lists
+its candidates with party, votes and percentage of votes, and "n of n Precincts Reported". Judicial retention
+(Supreme Court, Court of Appeals, and circuit judges under the nonpartisan plan) is a Yes Votes / No Votes pair per judge.
+Two marts come from it: `fct_election_races` (winner, runner-up, margin, uncontested flag, write-in share;
+serves the uncontested-wins award in #28) and `fct_judicial_retention` (Yes and No votes, Yes %).
+
+- Lands: `mo_sos_election_rows`, one row per printed PDF line: the PDF url, page and line, the verbatim text, a
+  structural `kind` (contest `header`, `candidate`, `total`, `party_total`, `other`), the contest's sequence number in
+  the PDF and, for candidate rows, the cells (name, party, votes, % as printed). Nothing is cleaned in Python; parsing
+  numbers, write-in flags and contest types is dbt (`stg_mo_sos_elections__*`).
+- Coverage: the 14 general and primary elections from August 2012 to November 2024 (7 generals, 7 primaries; about
+  17,700 lines). The election list is read from the results page on every run, so each new canvassed election is picked
+  up by re-running the loader. Not loaded: presidential preference primaries (a different layout with no party
+  column, party codes and "Last, First" names; the March 2020 PDF has no text layer at all), the single-district
+  special-election PDFs, the "Results by County" PDFs, the 1996-2011 results (a separate page, not verified), the
+  precinct files (sold by the Elections Division) and Election Night Reporting (`enr.sos.mo.gov`, JavaScript with no
+  downloads). The August 2026 primary is on Election Night Reporting only until its PDF is posted.
+- Terms: none stated on the site. The loader sends the project User-Agent, fetches one PDF at a time with a
+  2 second delay, and caches PDFs for good once an election is four months old (the newest is re-checked daily).
+- Shard units: elections (one PDF each); the PDFs are small (about 1 MB), so a full run takes about 90 seconds.
+
+Quirks:
+- Column positions, not text, separate the name from the party: the loader clusters words into lines and splits a
+  candidate row at the party column (left of the header's "Party" word minus 30 points). Names with commas or
+  suffixes ("Emanuel Cleaver, II", "John A. Hartwig, Jr.") stay whole.
+- A president/vice-president ticket wraps onto the next line in some years, so the running mate's last name can be
+  missing or on a separate `other` line ("Hillary Rodham Clinton, Timothy", then "Michael Kaine").
+- In a primary a contest lists every party's candidates with "Party Total" lines; percentages are within the party.
+  Each party's ballot is one race in `fct_election_races` (`race_party`), and "Total Votes" spans all parties.
+- A Court of Appeals header can list several judges (2014-2022), each a Yes row followed by a No row. `subcontest_seq`
+  counts the Yes rows. In 2022 the PDF prints a single "Total Votes" for four judges (the first judge's), so the
+  reconciliation test only compares contests with a total per judge.
+- Typos and layout losses in the PDFs, kept as printed: 2016 "No Votes 252,827 59.5" (the "%" lost; parsed), 2016
+  "No Votes 40.9%" (the vote count lost; the judge keeps the Yes figures and `no_votes` is null), and 2018 State
+  Representative District 66 prints its total on two lines ("10,376" and "Total Votes"). Several 2014-2020 ballot
+  measures use an older "Ballot Issue Yes: n Yes: pct%" layout and are not staged.
+- Candidate-less ballots: a Yes/No pair named like the contest title is a ballot measure (staged as
+  `contest_kind = 'ballot_issue'`, not in a mart); otherwise it is retention.
+- Uncontested means exactly one candidate on the ballot, write-ins not counted (a write-in with 19 votes does not
+  make the race contested). `write_in_share` carries the write-in votes for the 5% rule. In a primary it is per party
+  ballot. Races whose only entries are write-ins are dropped. Winner is the top vote getter; the PDFs do not print the
+  number of seats, so a vote-for-two race would show its second seat as the runner-up.
+- Margin is winner minus runner-up (write-ins excluded) in votes and in points of the race's total votes
+  (`margin_pct`), null when uncontested. Retention is `is_retained` when Yes is above 50%.
+- Links to officials: `winner_official_id` / `judge_official_id` are set only when the winner is a current official
+  with the same name in the same office and district (suffixes ignored, Supreme Court and Court of Appeals judges by
+  name); losers, former officials and circuit judges are unlinked. Officials who moved districts after redistricting
+  therefore do not link for older elections.
+- Checks: contest vote sums equal the PDF's printed totals where a total exists (3,481 of 3,486 contests and judges),
+  printed percentages sum to 100 within rounding, and figures copied from the 2024 general PDF (Governor, U.S.
+  Senator, State Representative districts 33 and 34, Broniec 63.1% and Gooch 62.2%) are asserted exactly.
 
 ## epa_frs: EPA Facility Registry Service
 
