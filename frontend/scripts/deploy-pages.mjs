@@ -1,6 +1,6 @@
 // Publish a locally built site to GitHub Pages via an orphan `gh-pages` branch (Pages source: "Deploy from a
 // branch"). CI has no data, so the build happens here. Only the `gh-pages` branch is ever written, and its
-// history is replaced on every deploy (force push) so 170+ MB snapshots do not pile up; main is untouched.
+// history is replaced on every deploy (force push) so ~200 MB snapshots do not pile up; main is untouched.
 //   pnpm deploy:pages --dry-run   # build, check, commit into a temp repo, report; pushes nothing
 //   pnpm deploy:pages             # the same, then force-push to gh-pages (publishes the site!)
 // The branch is fixed to gh-pages (there is no --branch flag). Flags: --skip-build (reuse dist/, which must
@@ -8,7 +8,8 @@
 // changes), --keep (keep the temp repo), --remote NAME (default origin; only used to learn which GitHub repo
 // this is: the push goes to https://github.com/<owner>/<name>.git).
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync } from "node:fs";
+import { cp, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -36,11 +37,15 @@ function run(cmd, args, opts = {}) {
   return (r.stdout ?? "").trimEnd();
 }
 
-function listFiles(dir, rel = "") {
-  return readdirSync(path.join(dir, rel), { withFileTypes: true }).flatMap((e) => {
-    const p = path.join(rel, e.name);
-    return e.isDirectory() ? listFiles(dir, p) : [{ path: p, size: statSync(path.join(dir, p)).size }];
-  });
+async function listFiles(dir, rel = "") {
+  const entries = await readdir(path.join(dir, rel), { withFileTypes: true });
+  const nested = await Promise.all(
+    entries.map(async (e) => {
+      const p = path.join(rel, e.name);
+      return e.isDirectory() ? listFiles(dir, p) : [{ path: p, size: (await stat(path.join(dir, p))).size }];
+    }),
+  );
+  return nested.flat();
 }
 
 const { opts, errors } = parseArgs(process.argv.slice(2));
@@ -108,20 +113,21 @@ if (lc.status !== 0) {
 const identity = ["-c", "user.name=mogov deploy", "-c", "user.email=noreply@users.noreply.github.com"];
 let keptDir = null;
 try {
-  withTempDir(
+  await withTempDir(
     "mogov-pages-",
-    (work) => {
+    async (work, guard) => {
       keptDir = work;
-      cpSync(DIST, work, { recursive: true });
-      writeFileSync(path.join(work, ".nojekyll"), ""); // serve _astro/ as-is
+      await cp(DIST, work, { recursive: true });
+      await writeFile(path.join(work, ".nojekyll"), ""); // serve _astro/ as-is
       if (!existsSync(path.join(work, "404.html"))) console.warn("warning: dist has no 404.html");
 
-      const { totalBytes, largest, problems } = checkLimits(listFiles(work));
+      const { totalBytes, largest, problems } = checkLimits(await listFiles(work));
       const mb = (n) => (n / 1048576).toFixed(1);
       console.log(`${mb(totalBytes)} MB total, largest file ${largest?.path} (${mb(largest?.size ?? 0)} MB)`);
       if (problems.length) throw new Error(problems.join("\n"));
 
       const git = (...a) => run("git", [...identity, ...a], { cwd: work });
+      guard.check();
       git("init", "-q", "-b", PAGES_BRANCH);
       git("add", "-A");
       git("commit", "-q", "-m", `Deploy site (${new Date().toISOString()})`);
@@ -132,6 +138,7 @@ try {
         console.log(`Would run: git push --force ${pushTo} ${PAGES_BRANCH}:refs/heads/${PAGES_BRANCH}`);
         console.log(`Would be live at ${target.url}`);
       } else {
+        guard.check(); // last stop before the force-push
         git("push", "--force", pushTo, `${PAGES_BRANCH}:refs/heads/${PAGES_BRANCH}`);
         console.log(`Pushed ${sha} to ${PAGES_BRANCH}. Live shortly at ${target.url}`);
       }

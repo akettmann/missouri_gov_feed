@@ -17,24 +17,37 @@ export function redactUrl(url) {
 }
 
 /**
- * Run fn(dir) in a fresh temp dir that is removed afterwards, even when fn throws, unless keep is set.
- * A SIGINT (Ctrl+C) while fn runs also removes the dir (unless keep) and exits 130; `proc` and `exit` are
- * injectable for tests. While fn is synchronous the handler only runs once it returns, but its presence stops
- * Node dying mid-copy, so the finally block below still cleans up.
+ * Run `await fn(dir, guard)` in a fresh temp dir that is removed afterwards, even when fn throws, unless keep is set.
+ * fn must do its long work asynchronously (fs.promises, not *Sync) so the event loop can deliver SIGINT: the first
+ * Ctrl+C removes the dir (unless keep) and exits 130 at once; a second one exits 130 without waiting. While fn is
+ * blocked in a synchronous call (e.g. spawnSync) the signal is delivered when it returns, so `guard.check()`
+ * throws if an interrupt arrived, and callers must call it immediately before any irreversible step (git push).
+ * `proc` and `exit` are injectable for tests.
  */
-export function withTempDir(
+export async function withTempDir(
   prefix,
   fn,
   { keep = false, root = tmpdir(), proc = process, exit = process.exit } = {},
 ) {
   const dir = mkdtempSync(path.join(root, prefix));
+  let interrupted = false;
+  const guard = {
+    get interrupted() {
+      return interrupted;
+    },
+    check() {
+      if (interrupted) throw new Error("Interrupted (SIGINT); nothing was pushed.");
+    },
+  };
   const onSigint = () => {
+    if (interrupted) return exit(130); // second Ctrl+C: leave immediately
+    interrupted = true;
     if (!keep) rmSync(dir, { recursive: true, force: true });
     exit(130);
   };
-  proc.once("SIGINT", onSigint);
+  proc.on("SIGINT", onSigint);
   try {
-    return fn(dir);
+    return await fn(dir, guard);
   } finally {
     proc.removeListener("SIGINT", onSigint);
     if (!keep) rmSync(dir, { recursive: true, force: true });
@@ -67,7 +80,7 @@ export function pagesTarget(repoSlug) {
 
 /** Anchored at the start: an https/ssh URL or scp-style `user@` prefix, then the github.com host itself. */
 const GITHUB_REMOTE =
-  /^(?:(?:https?|ssh|git\+ssh):\/\/(?:[^@/\s]+@)?|[^@/\s:]+@)github\.com[:/]([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/i;
+  /^(?:(?:https?|ssh|git\+ssh):\/\/(?:[^@/\\\s]+@)?|[^@/\\\s:]+@)github\.com[:/]([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/i;
 
 /** Extract "owner/name" from an https or ssh GitHub remote URL, or null (other hosts, local paths, "."/".." names). */
 export function repoFromRemote(url) {

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { existsSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { test } from "node:test";
 import { stripTrailingSlash, withBase } from "../src/lib/basePath.ts";
 import { extractLinks, resolveFile } from "./link-check.mjs";
@@ -63,21 +65,25 @@ test("repoFromRemote anchors the host and rejects dot names", () => {
   assert.equal(repoFromRemote("C:/x/github.com/a/b"), null);
   assert.equal(repoFromRemote("/home/me/github.com:a/b"), null);
   assert.equal(repoFromRemote("https://evil.example/x@github.com/a/b"), null);
+  assert.equal(repoFromRemote("https://evil.com\\@github.com/a/b"), null);
   assert.equal(repoFromRemote("https://github.com/a/.."), null);
   assert.equal(repoFromRemote("https://github.com/../b"), null);
   assert.throws(() => pagesTarget("a/.."));
 });
 
-test("withTempDir removes the dir and exits 130 on SIGINT, unless keep", () => {
+const tick = () => new Promise((resolve) => setImmediate(resolve));
+
+test("withTempDir: a SIGINT delivered while fn awaits removes the dir and exits 130, unless keep", async () => {
   for (const keep of [false, true]) {
     const proc = new EventEmitter();
     const exits = [];
     let made;
-    withTempDir(
+    await withTempDir(
       "mogov-sigint-",
-      (dir) => {
+      async (dir) => {
         made = dir;
-        proc.emit("SIGINT");
+        await tick();
+        proc.emit("SIGINT"); // arrives on a later turn of the event loop, as a real signal does
         assert.equal(existsSync(dir), keep);
       },
       { keep, proc, exit: (c) => exits.push(c) },
@@ -86,6 +92,69 @@ test("withTempDir removes the dir and exits 130 on SIGINT, unless keep", () => {
     assert.equal(proc.listenerCount("SIGINT"), 0);
     if (keep) rmSync(made, { recursive: true, force: true });
   }
+});
+
+test("withTempDir: guard.check() aborts after an interrupt (the pre-push guard) and a repeated SIGINT exits 130 again", async () => {
+  const proc = new EventEmitter();
+  const exits = [];
+  let pushed = false;
+  await assert.rejects(
+    withTempDir(
+      "mogov-guard-",
+      async (_dir, guard) => {
+        guard.check(); // fine before any signal
+        await tick();
+        proc.emit("SIGINT");
+        proc.emit("SIGINT");
+        guard.check();
+        pushed = true;
+      },
+      { proc, exit: (c) => exits.push(c) },
+    ),
+    /Interrupted/,
+  );
+  assert.equal(pushed, false);
+  assert.deepEqual(exits, [130, 130]);
+  assert.equal(proc.listenerCount("SIGINT"), 0);
+});
+
+test("withTempDir leaves no SIGINT listener behind when nothing interrupts", async () => {
+  const proc = new EventEmitter();
+  await withTempDir("mogov-nolistener-", async () => assert.equal(proc.listenerCount("SIGINT"), 1), { proc });
+  assert.equal(proc.listenerCount("SIGINT"), 0);
+  await assert.rejects(
+    withTempDir(
+      "mogov-nolistener-",
+      async () => {
+        throw new Error("boom");
+      },
+      { proc },
+    ),
+    /boom/,
+  );
+  assert.equal(proc.listenerCount("SIGINT"), 0);
+});
+
+test("withTempDir in a real process: SIGINT during an async step removes the dir and exits 130", () => {
+  // Windows cannot deliver a console Ctrl+C to a child from node, so the child raises SIGINT on the real
+  // process object after an await; the real listener, real process.exit and real filesystem are exercised.
+  const script = `
+    import { existsSync } from "node:fs";
+    import { withTempDir } from ${JSON.stringify(pathToFileURL(path.join(import.meta.dirname, "pages-config.mjs")).href)};
+    await withTempDir("mogov-child-", async (dir) => {
+      console.log(dir);
+      await new Promise((r) => setTimeout(r, 50));
+      process.emit("SIGINT");
+      await new Promise((r) => setTimeout(r, 5000));
+      console.log("NOT-INTERRUPTED");
+    });
+  `;
+  const r = spawnSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8" });
+  assert.equal(r.status, 130, r.stderr);
+  assert.doesNotMatch(r.stdout, /NOT-INTERRUPTED/);
+  const dir = r.stdout.trim().split(/\r?\n/)[0];
+  assert.match(dir, /mogov-child-/);
+  assert.equal(existsSync(dir), false);
 });
 
 test("checkLimits flags oversize files and sites", () => {
@@ -131,17 +200,17 @@ test("pushUrl and redactUrl", () => {
   assert.equal(redactUrl("git@github.com:a/b.git"), "git@github.com:a/b.git");
 });
 
-test("withTempDir removes the dir after success and after a throw, unless keep", () => {
+test("withTempDir removes the dir after success and after a throw, unless keep", async () => {
   let seen;
-  withTempDir("mogov-test-", (d) => (seen = d));
+  await withTempDir("mogov-test-", (d) => (seen = d));
   assert.equal(existsSync(seen), false);
   const failing = (d) => {
     seen = d;
     throw new Error("git failed");
   };
-  assert.throws(() => withTempDir("mogov-test-", failing), /git failed/);
+  await assert.rejects(withTempDir("mogov-test-", failing), /git failed/);
   assert.equal(existsSync(seen), false);
-  withTempDir("mogov-test-", (d) => (seen = d), { keep: true });
+  await withTempDir("mogov-test-", (d) => (seen = d), { keep: true });
   assert.equal(existsSync(seen), true);
   rmSync(seen, { recursive: true, force: true });
 });

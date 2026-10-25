@@ -23,9 +23,11 @@ Diagrams: [pipeline](diagrams/pipeline.svg), [lineage](diagrams/lineage.svg),
    ```
    See the configuration table in the [README](../README.md#configuration-env-gitignored) for the rest.
 4. First full load and build:
+
    ```
    uv run mogov run --shards 4      # stage-1 loaders (concurrent, 4 shards) -> dbt build -> stage 2 -> dbt build
    ```
+
    `run` is strict: if any loader fails it stops before `dbt build`, logs `build.skipped` naming the failed
    loaders, and exits non-zero. Fix the cause and re-run (loaders are idempotent), or, for a known-flaky
    source, build on its last landed data with `uv run mogov run --allow-failed-loader <source>` or
@@ -36,6 +38,7 @@ Diagrams: [pipeline](diagrams/pipeline.svg), [lineage](diagrams/lineage.svg),
    The first run is the slow one: it downloads several GB (FEC, CourtListener bulk) and parses about
    ten years of House roll-call PDFs and Senate journals. Everything fetched is cached under
    `data/cache`, so later runs are much faster.
+
 5. Check the result: `uv run mogov build` should end with `ERROR=0`. Run `uv run mogov export` to write
    the marts and reporting tables to `data/exports/` as parquet (the default; the frontend reads only
    parquet. `--format csv` is for other tools). If you use the site, run `pnpm build` in `frontend/`
@@ -43,12 +46,12 @@ Diagrams: [pipeline](diagrams/pipeline.svg), [lineage](diagrams/lineage.svg),
 
 Layout under `data/` (override the root with `MOGOV_DATA_DIR`):
 
-| Path | Contents |
-|---|---|
-| `data/cache/` | HTTP cache (one file per request, keyed by URL + params) and large downloads |
-| `data/raw/<table>/part-<i>-of-<N>.parquet` | Raw landings, one part per loader shard (`MOGOV_RAW_DIR`) |
-| `data/mogov.duckdb` | dbt warehouse (`MOGOV_DB`) |
-| `data/exports/` | `mogov export` output |
+| Path                                       | Contents                                                                     |
+| ------------------------------------------ | ---------------------------------------------------------------------------- |
+| `data/cache/`                              | HTTP cache (one file per request, keyed by URL + params) and large downloads |
+| `data/raw/<table>/part-<i>-of-<N>.parquet` | Raw landings, one part per loader shard (`MOGOV_RAW_DIR`)                    |
+| `data/mogov.duckdb`                        | dbt warehouse (`MOGOV_DB`)                                                   |
+| `data/exports/`                            | `mogov export` output                                                        |
 
 A `data/raw/<table>.parquet` file from before sharding existed is moved into
 `<table>/part-000-of-001.parquet` the next time any loader runs.
@@ -57,11 +60,11 @@ A `data/raw/<table>.parquet` file from before sharding existed is moved into
 
 Everything under `data/` can be regenerated. What you delete decides how long the rebuild takes:
 
-| Delete | Effect |
-|---|---|
-| `data/mogov.duckdb` | dbt rebuilds every model from the raw parts (under a minute). |
-| `data/raw/` | Every loader lands its tables again, from the cache where it can. |
-| `data/exports/` | Rewritten by the next `mogov export`. |
+| Delete                   | Effect                                                                                                                       |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `data/mogov.duckdb`      | dbt rebuilds every model from the raw parts (under a minute).                                                                |
+| `data/raw/`              | Every loader lands its tables again, from the cache where it can.                                                            |
+| `data/exports/`          | Rewritten by the next `mogov export`.                                                                                        |
 | `data/cache/` (optional) | Everything is downloaded and parsed again. About 10 GB as of October 2026. Keep it unless you suspect a bad cached response. |
 
 1. Stop anything using `data/` (a running `mogov`, a DuckDB shell, `dbt docs serve`). On Windows an open
@@ -86,6 +89,7 @@ Everything under `data/` can be regenerated. What you delete decides how long th
    and for `cl_cases` in the first dbt build (it is a stage-2 table).
 
 How long it takes (October 2026, one Windows desktop, `--shards 4`):
+
 - **Warm cache** (only raw and the warehouse deleted): the October 2026 full run took about 75 minutes,
   most of it filtering the CourtListener bulk files (about 50 minutes, one process) and parsing roll-call
   PDFs. A re-run 20 minutes later took about 20 minutes, still mostly PDF parsing. PDF text is now cached
@@ -96,6 +100,7 @@ How long it takes (October 2026, one Windows desktop, `--shards 4`):
 
 With Docker the steps are the same, against the host folder the container mounts (`./data`, or
 `MOGOV_HOST_DATA`):
+
 ```
 rm -rf data/raw data/mogov.duckdb data/exports
 docker compose up
@@ -206,13 +211,13 @@ The build is plain static files, so any static host works; the repo ships a scri
 GCS (above) stays the end goal; Pages is a free stopgap while traffic is tiny. The site is built **locally** (CI has no data) and pushed to an
 orphan `gh-pages` branch; `main` history is never touched.
 
-Findings (checked against the ~170 MB `dist/`, 1052 pages):
+Findings (checked against the ~200 MB `dist/`, 1052 pages):
 
 - Limits: a published Pages site must be <= 1 GB, each file < 100 MB (git push limit), and the soft bandwidth cap is
   100 GB/month. Our `dist/` is about 200 MB, the largest file is a 4.4 MB HTML page, so it fits comfortably.
   `deploy:pages` refuses to push if either limit would be broken.
 - Method (a), orphan `gh-pages` branch from a temp dir, was chosen over (b) `workflow_dispatch` +
-  `upload-pages-artifact`: (b) needs the built site inside CI, and CI has no data, so we would have to upload 170 MB
+  `upload-pages-artifact`: (b) needs the built site inside CI, and CI has no data, so we would have to upload 200 MB
   from a laptop anyway. (a) is one command, needs no workflow, and force-pushing the orphan branch replaces history
   so snapshots do not accumulate.
 - Project sites are served under `/missouri_gov_feed/`, so the build sets Astro `base` from `PUBLIC_BASE_PATH`.
@@ -239,8 +244,18 @@ the build now rejects that); the script sets it for you.
 The deploy only ever writes the `gh-pages` branch (there is no `--branch` flag), pushing to
 `https://github.com/<owner>/<name>.git` for the repo of the `origin` remote (`--remote NAME` picks another remote
 to read the repo from). It refuses to run with uncommitted changes under `frontend/` (`--allow-dirty` overrides)
-and removes its ~200 MB temp repo on every exit, dry runs, failures and Ctrl+C (exit 130) included (`--keep`
-leaves it for inspection). It can be started from any directory.
+and removes its ~200 MB temp repo on every exit, dry runs and failures included (`--keep` leaves it for
+inspection). It can be started from any directory.
+
+Ctrl+C is safe at every stage and never reaches the push. The copy and size scan are asynchronous, so the first
+Ctrl+C deletes the temp repo and exits 130 immediately (a second one exits at once). Steps that block (the `git
+commit`) get the signal when they return, and the script checks for an interrupt right before `git init` and again
+immediately before `git push`, aborting if one arrived. During the build, `pnpm build` is killed by the same Ctrl+C
+and nothing is pushed.
+
+The repo is always taken from a GitHub remote URL (`https://github.com/o/n`, `git@github.com:o/n`, or
+`ssh://git@github.com/o/n`). Explicit ports, `ssh.github.com:443` and SSH host aliases are not recognised; use a
+plain github.com URL for the remote, or point `--remote` at a remote that has one.
 
 ## Local, in Docker (Compose)
 
@@ -264,12 +279,12 @@ Every loader splits its work into units (PDFs, files, people, report years...). 
 where `crc32(key) % shards == shard`, so the split depends only on the keys. It doesn't depend on
 listing order or on which other shards run.
 
-| Invocation | Effect |
-|---|---|
-| `mogov load mo_house` | one process, all units (`part-000-of-001`) |
-| `mogov load mo_house --shards 4` | all 4 shards, in a pool of worker processes |
-| `mogov load mo_house --shards 4 --shard 2` | only shard 2 of 4 (for one container of a job) |
-| Cloud Run job with `--tasks 4` | same as the line above, taken from `CLOUD_RUN_TASK_COUNT` / `CLOUD_RUN_TASK_INDEX` |
+| Invocation                                 | Effect                                                                             |
+| ------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `mogov load mo_house`                      | one process, all units (`part-000-of-001`)                                         |
+| `mogov load mo_house --shards 4`           | all 4 shards, in a pool of worker processes                                        |
+| `mogov load mo_house --shards 4 --shard 2` | only shard 2 of 4 (for one container of a job)                                     |
+| Cloud Run job with `--tasks 4`             | same as the line above, taken from `CLOUD_RUN_TASK_COUNT` / `CLOUD_RUN_TASK_INDEX` |
 
 Loaders that talk to different services run at the same time. Each loader names its upstream service
 (`mogov list` shows it), and the work is split into jobs of (one service's loaders, one shard). A pool of
