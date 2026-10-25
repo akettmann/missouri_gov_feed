@@ -303,6 +303,27 @@ Quirks:
   clear error instead of on the next call. It is blocked until the maintainer decides how to proceed
   (see #161). Meanwhile `mogov run --allow-failed-loader senate_efd` builds on the last landed data.
 
+### Alternatives to the eFD scrape (research for #185, checked 2026-10-25)
+
+No alternative is both current and covers annual reports. Recommendation: keep the manual import (#190) as the
+working path and ask the Senate Office of Public Records for a sanctioned feed (#272).
+
+| Candidate | Covers | Freshness | Access | Terms | Fit |
+|---|---|---|---|---|---|
+| Senate Office of Public Records (OPR) | everything in eFD | live | no bulk/API/allowlist is published; contact OPRGeneral@sec.senate.gov, (202) 224-0322; kiosk in Hart 144 | 5 U.S.C. app. 105(c) use limits apply | the only official route; maintainer must ask |
+| `jeremiak/us-senate-financial-disclosure-data` (GitHub) | scraped annual + PTR rows, 1,824 report ids, 2012 to 2020 filings | last push 2024-01-15; the CSV's newest filing is 2020-06; `reports.json` is broken (3,381 entries, 31 unique) | git clone, no key | CC-BY-SA-4.0 (share-alike), underlying data still subject to 105(c) | `report-id` is the eFD UUID, so ids map directly; stale, useful only as a 2012-2020 cross-check |
+| `timothycarambat/senate-stock-watcher-data` (GitHub) | PTRs only | last push 2021-03-16; no licence | git clone | none stated | stale, amendments removed, PTRs only |
+| Disclosed Capitol | PTRs (annual reports unclear) | claims minutes | API key, credits, rate limits | bulk resale barred; personal/news use only without written permission | paid, restrictive; do not build on it |
+| Financial Modeling Prep `senate-latest` | PTR trades | not verified | API key, paid tiers | commercial vendor terms, not read | PTRs only; not evaluated further |
+| Quiver Quantitative | congressional trades | not verified | API key, from about $10/month | terms page not retrievable | PTR trades only |
+| Capitol Trades | trades | not verified | no public API; scraping only | terms not retrievable | not usable |
+| OpenSecrets personal finances | members' assets and liabilities | bulk CSV last seen for 2004-2007 (2009 notice) | site closed to our fetch; current terms unverified | CC BY-NC-SA in 2009; commercial use by fee | not verified current |
+
+Notes: every third-party feed re-publishes eFD data, so the 105(c) prohibition on commercial use still applies to
+it (news-media exception only). The only candidate with a stable id that maps to our `url` column is jeremiak's
+`report-id`. Third-party feeds carry PTR trades but not annual-report sections (assets, income, liabilities,
+positions, gifts, travel) that `stg_senate_efd__items` needs.
+
 ## courtlistener_bulk: judges and judicial disclosures
 
 Flow: [diagrams/sources/courtlistener_bulk.svg](diagrams/sources/courtlistener_bulk.svg)
