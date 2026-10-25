@@ -106,25 +106,25 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
                               {period === "lifetime" ? ", all loaded years" : ` in ${period}`}
                             </p>
                             <ol>
-                              {list.entries.map((e) => (
-                                <li value={e.rank}>
-                                  <a href={href(`/officials/${e.slug}/`)}>{e.name}</a>
-                                  {streakMarker(e.streak_years) && (
-                                    <abbr
-                                      class="streak"
-                                      title={streakMarker(e.streak_years)!.label}
-                                      aria-label={streakMarker(e.streak_years)!.label}
-                                    >
-                                      {streakMarker(e.streak_years)!.text}
-                                    </abbr>
-                                  )}
-                                  <span class="muted small"> {e.party ?? ""}</span>
-                                  <span class="v">
-                                    {value(list.award, e.metric)}{" "}
-                                    <span class="muted small">{outOf(list.award, e.sample_size)}</span>
-                                  </span>
-                                </li>
-                              ))}
+                              {list.entries.map((e) => {
+                                const marker = streakMarker(e.streak_years);
+                                return (
+                                  <li value={e.rank}>
+                                    <a href={href(`/officials/${e.slug}/`)}>{e.name}</a>
+                                    {marker && (
+                                      <span class="streak" title={marker.label}>
+                                        <span aria-hidden="true">{marker.text}</span>
+                                        <span class="sr-only">{marker.label}</span>
+                                      </span>
+                                    )}
+                                    <span class="muted small"> {e.party ?? ""}</span>
+                                    <span class="v">
+                                      {value(list.award, e.metric)}{" "}
+                                      <span class="muted small">{outOf(list.award, e.sample_size)}</span>
+                                    </span>
+                                  </li>
+                                );
+                              })}
                             </ol>
                           </section>
                         ),

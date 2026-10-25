@@ -501,10 +501,12 @@ models:
       - name: streak_years
         data_type: bigint
         description: >
-          Yearly periods only (null for 'lifetime'): how many yearly periods in a row, up to this one, the
-          official qualified for this award in this office. Years the official was not in the office, or the
-          field was below awards_min_field_size, are skipped (they neither count nor break the streak); a year
-          ranked outside the threshold breaks it. 1 = qualified this year only.
+          Yearly periods only (null for 'lifetime'): how many qualifying yearly periods in a row, up to this
+          one, the official qualified for this award in this office. Years the official wasn't ranked for that
+          award (in another office, not eligible for the measure, or too few officials to rank, i.e. below
+          awards_min_field_size) are skipped: they neither add to nor break the streak, so a streak can span
+          more calendar years than its count. A year ranked outside the threshold breaks it. 1 = qualified
+          this year only.
 
   - name: rpt_donor_size
     description: >

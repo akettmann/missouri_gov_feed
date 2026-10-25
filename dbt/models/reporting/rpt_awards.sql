@@ -196,14 +196,19 @@ thresholds as (
         sample_size,
         award_rank,
         group_size,
+        {%- set cutoffs = mogov.awards_thresholds() %}
+        {%- set own = cutoffs.items() | rejectattr(0, 'equalto', 'default') | list %}
+        {#- a case needs at least one when, so with no per-award cutoffs the default stands alone #}
+        {% if own | length > 0 -%}
         case
-            -- keeps the case valid when the var lists no award of its own
-            when award is null then {{ var('awards_threshold')['default'] }}
-            {%- for award_name, cutoff in var('awards_threshold').items() if award_name != 'default' %}
+            {%- for award_name, cutoff in own %}
             when award = '{{ award_name }}' then {{ cutoff }}
             {%- endfor %}
-            else {{ var('awards_threshold')['default'] }}
-        end as threshold
+            else {{ cutoffs['default'] }}
+        end
+        {%- else -%}
+            {{ cutoffs['default'] }}
+        {%- endif %} as threshold
     from ranked
     -- a ranking needs a field: single-seat offices (governor) and thin years are left out entirely, which is
     -- also why they neither add to nor break a streak
@@ -211,6 +216,9 @@ thresholds as (
 ),
 
 yearly as (
+    -- a year only has a row here if the official was ranked for this award that year. Office tenure is never
+    -- checked: "not in office", "not eligible for the measure" (e.g. under $10,000 raised, under 100 recorded
+    -- votes) and "field too thin" all show up as no row, and all are skipped the same way
     select
         award,
         office,

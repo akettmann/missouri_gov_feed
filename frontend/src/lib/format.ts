@@ -105,10 +105,10 @@ export function yearRanges(years: number[]): string {
   return out.join(", ");
 }
 
-/** Streak marker for an award: "X3" with an accessible label "3 years in a row"; null below 2 (no marker). */
+/** Streak marker for an award: "X3" with a spoken label "3 qualifying years in a row"; null below 2 (no marker). */
 export function streakMarker(years: number | null | undefined): { text: string; label: string } | null {
   if (years == null || years < 2) return null;
-  return { text: `X${years}`, label: `${years} years in a row` };
+  return { text: `X${years}`, label: `${years} qualifying years in a row` };
 }
 
 /** Plain names for the roster sources behind rpt_officeholders_by_year; unknown values show as given. */
