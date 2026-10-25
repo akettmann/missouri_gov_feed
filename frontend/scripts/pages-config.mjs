@@ -3,6 +3,12 @@
 /** Normalise a base path: "" / "/" / undefined -> undefined (Astro default), "x" or "/x/" -> "/x". */
 export function normalizeBase(raw) {
   const trimmed = (raw ?? "").trim().replace(/^\/+|\/+$/g, "");
+  // Git Bash on Windows rewrites "/x" in env vars to "C:/Program Files/Git/x"; fail loudly instead of shipping it.
+  if (trimmed && !/^[A-Za-z0-9._~-]+(\/[A-Za-z0-9._~-]+)*$/.test(trimmed)) {
+    throw new Error(
+      `Invalid base path ${JSON.stringify(raw)} (MSYS path conversion? set MSYS_NO_PATHCONV=1).`,
+    );
+  }
   return trimmed ? `/${trimmed}` : undefined;
 }
 

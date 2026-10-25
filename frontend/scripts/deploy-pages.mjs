@@ -64,6 +64,15 @@ if (opts.skipBuild) {
   if (r.status !== 0) process.exit(r.status ?? 1);
 }
 
+// Every root-relative link must resolve under the Pages base; a --skip-build dist from the wrong build fails here.
+const lc = spawnSync(process.execPath, ["scripts/link-check.mjs", "dist", target.base ?? ""], {
+  stdio: "inherit",
+});
+if (lc.status !== 0) {
+  console.error("Link check failed: was dist/ built with the Pages base?");
+  process.exit(1);
+}
+
 const work = mkdtempSync(path.join(tmpdir(), "mogov-pages-"));
 cpSync("dist", work, { recursive: true });
 writeFileSync(path.join(work, ".nojekyll"), ""); // serve _astro/ as-is

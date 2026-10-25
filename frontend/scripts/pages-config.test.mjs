@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import path from "node:path";
 import { test } from "node:test";
 import { stripTrailingSlash, withBase } from "../src/lib/basePath.ts";
+import { extractLinks, resolveFile } from "./link-check.mjs";
 import { checkLimits, normalizeBase, pagesTarget, parseArgs, repoFromRemote } from "./pages-config.mjs";
 
 test("withBase prefixes absolute paths and tolerates the root base", () => {
@@ -16,6 +18,7 @@ test("normalizeBase", () => {
   assert.equal(normalizeBase("/"), undefined);
   assert.equal(normalizeBase("missouri_gov_feed"), "/missouri_gov_feed");
   assert.equal(normalizeBase("/missouri_gov_feed/"), "/missouri_gov_feed");
+  assert.throws(() => normalizeBase("C:/Program Files/Git/missouri_gov_feed")); // MSYS-mangled
 });
 
 test("pagesTarget: project site vs user site, and bad input", () => {
@@ -67,4 +70,23 @@ test("parseArgs", () => {
   assert.equal(parseArgs(["--remote", "up"]).opts.remote, "up");
   assert.deepEqual(parseArgs(["--dry-runn"]).errors, ["unknown argument --dry-runn"]);
   assert.equal(parseArgs(["--remote"]).errors.length, 1);
+});
+
+test("extractLinks keeps only root-relative references", () => {
+  const html = `<a href="/a/">x</a><a href='/b.csv'>y</a><img src="//cdn/x.png"><a href="https://e.com/">z</a>
+    <a href="rel/">r</a><article data-bundle-url="/o/x.json"></article>`;
+  assert.deepEqual(extractLinks(html), ["/a/", "/b.csv", "/o/x.json"]);
+});
+
+test("resolveFile enforces the base and Pages-style index resolution", () => {
+  const files = new Set([path.join("dist", "a", "index.html"), path.join("dist", "x.csv")]);
+  const exists = (f) => files.has(f);
+  const stat = () => ({ isDirectory: () => false });
+  assert.ok(resolveFile("dist", "/b", "/b/a/", exists, stat));
+  assert.ok(resolveFile("dist", "/b", "/b/x.csv#frag", exists, stat));
+  assert.equal(resolveFile("dist", "/b", "/a/", exists, stat), null); // missing base
+  assert.equal(resolveFile("dist", "/b", "/xa/", exists, stat), null); // wrong prefix of the same length
+  assert.equal(resolveFile("dist", "/b", "/bb/a/", exists, stat), null);
+  assert.equal(resolveFile("dist", "/b", "/b/nope/", exists, stat), null);
+  assert.ok(resolveFile("dist", "", "/a/", exists, stat));
 });
