@@ -189,7 +189,7 @@ Quirks:
   included, redirects to `Block.aspx`. Three shards at ~10 requests/s got an IP blocked within two minutes on
   2026-10-25. The block page gives WebMaster@LR.mo.gov for help. The loader waits 1.5 s × the shard count
   before each request, so all shards together stay under one request per 1.5 s from one IP. It also stops with
-  `Blocked` on either page instead of caching it. A cold load reads ~20,000 pages, so it takes about 9 hours.
+  `Blocked` on either page instead of caching it. A cold load reads ~30,500 section-version pages (October 2026), so it takes about 15 hours.
 - Several versions of one section can be in force side by side: a later version with a future effective date
   (27.117 has one effective 28 Aug 2026 and one effective 1 Jul 2027), or conflicting enactments of the same
   year (`MultiEnact.aspx`). `fct_statute_sections.is_current` marks the in-force version with the latest
@@ -207,8 +207,12 @@ Quirks:
   bills. The House numbers every special session, so 2018's legislature-called impeachment session (House 183,
   resolutions only) makes the Revisor's 2018 "1st Ex. Sess." House session 184. Staging maps the Nth
   extraordinary session to the year's Nth House special-session code that has House bills.
-- A repeal that waits on a contingency is dated 1 Jan 2099 (2026 SB 1233). Staging keeps it as
-  `is_contingent` with no date.
+- A repeal or a new version that waits on a contingency is dated 1 Jan 2099 (repeals by 2026 SB 1233; section
+  44.098). Staging keeps it as `is_contingent` with no date; the mart's status is `contingent`.
+- A version a court held unconstitutional is marked "(all or part is unconstitutional)" in its effective line,
+  and the Revisor then also prints the version before it (56.067 and 56.816, both 2014 amendments).
+  `fct_statute_sections.held_unconstitutional` carries the mark. `is_current` still picks the newest version,
+  because "all or part" doesn't say which text applies.
 - `rx.aspx` also lists repealed constitution sections (`V Section 25`); staging leaves them out (the
   constitution is #224). One of them prints the year as "L. 1076" (for 1976).
 - Transfer notes read "(Transferred 2013; now 29.351)" or "(Transferred 1978 to 565.004; repealed 1983)".

@@ -1222,27 +1222,36 @@ models:
       - name: status
         data_type: varchar
         description: >
-          in force, not yet effective (a later version printed beside the one in force), historical (an expired
-          version still printed), repealed, transferred.
+          in force, not yet effective (a later version printed beside the one in force), contingent (takes effect
+          on an event, not a date; the Revisor dates it 1 Jan 2099), historical (an expired version still printed),
+          repealed, transferred.
         data_tests:
           - not_null
           - accepted_values:
               arguments:
-                values: [in force, not yet effective, historical, repealed, transferred]
+                values: [in force, not yet effective, contingent, historical, repealed, transferred]
       - name: is_current
         data_type: boolean
         description: >
           The in-force version with the latest effective date on the build date. Two versions of one section can
-          both be current when the Revisor prints conflicting enactments side by side.
+          both be current when the Revisor prints conflicting enactments side by side. Read with
+          held_unconstitutional: the newest version stays current even when a court struck it in whole or part.
       - name: effective_date
         data_type: date
         description: >
-          The version's effective date (null for repealed and transferred sections). Sanity bound: 1800-2100.
+          The version's effective date (null for contingent versions and for repealed and transferred sections).
+          Sanity bound: 1800 to 2098 (the Revisor's 2099 placeholder must have become `contingent`).
         data_tests:
           - dbt_utils.accepted_range:
               arguments:
                 min_value: "cast('1800-01-01' as date)"
-                max_value: "cast('2100-01-01' as date)"
+                max_value: "cast('2099-01-01' as date)"
+                inclusive: false
+      - name: held_unconstitutional
+        data_type: boolean
+        description: >
+          The Revisor marks this version "(all or part is unconstitutional)": a court struck it in whole or in part.
+          The Revisor then also prints the version before it (56.067, 56.816: 2014 amendments).
       - name: ended_date
         data_type: date
         description: >

@@ -1,8 +1,11 @@
 -- One row per RSMo section version listed in force on the Revisor's chapter pages. A section can have several
--- versions at once (bid = the Revisor's version id): a later version not yet effective, or conflicting
--- enactments of one section in the same year. section_id is the section number as the Revisor prints it
--- ("1.010", "1.1001", "67.1360"). effective_date is the version's effective date; history_note the session-law
--- history footnote ("(RSMo 1939 § 645, A.L. 1957 p. 587, A.L. 2015 S.B. 239)"), when the first footnote is one.
+-- versions at once (bid = the Revisor's version id): a later version not yet effective, conflicting enactments
+-- of one section in the same year, or an earlier version printed beside one a court held unconstitutional.
+-- section_id is the section number as the Revisor prints it ("1.010", "1.1001", "67.1360"). effective_date is the
+-- version's effective date; the Revisor dates a version that waits on a contingency 1 Jan 2099, which becomes
+-- is_contingent with no date. held_unconstitutional: the effective line says "(all or part is unconstitutional)".
+-- history_note is the session-law history footnote ("(RSMo 1939 § 645, A.L. 1957 p. 587, A.L. 2015 S.B. 239)"),
+-- when the first footnote is one.
 with src as (
     select
         {{ mogov.json_str('payload', '$.section') }} as section_id,
@@ -17,6 +20,14 @@ with src as (
         {{ mogov.json_fragment('payload', '$.footnotes') }} as footnotes,
         source_url
     from {{ source('mo_revisor', 'sections') }}
+),
+
+dated as (
+    select
+        *,
+        {{ mogov.parse_date(mogov.regex_extract('effective_line', '([0-9]{1,2} [A-Z][a-z]{2} [0-9]{4})'), '%d %b %Y') }}
+            as printed_date
+    from src
 )
 
 select
@@ -29,8 +40,9 @@ select
     {{ mogov.regex_replace_all(
         mogov.regex_replace_all('heading_line', '^[0-9A-Za-z]+\\.[0-9A-Za-z-]+\\. *', ''), ' *—$', ''
     ) }} as heading,
-    {{ mogov.parse_date(mogov.regex_extract('effective_line', '([0-9]{1,2} [A-Z][a-z]{2} [0-9]{4})'), '%d %b %Y') }}
-        as effective_date,
+    case when printed_date < cast('2099-01-01' as date) then printed_date end as effective_date,
+    coalesce(printed_date >= cast('2099-01-01' as date), false) as is_contingent,
+    coalesce(effective_line like '%unconstitutional%', false) as held_unconstitutional,
     {{ dbt.safe_cast(mogov.regex_extract('effective_line', '([0-9]+) histor'), dbt.type_int()) }} as history_count,
     coalesce(historical = 'true', false) as is_historical,
     effective_line,
@@ -38,4 +50,4 @@ select
     case when first_footnote like '(%' then first_footnote end as history_note,
     footnotes,
     source_url
-from src
+from dated

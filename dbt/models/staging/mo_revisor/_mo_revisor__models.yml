@@ -13,7 +13,10 @@ models:
     with no date. The list also carries repealed constitution sections ("V Section 25"); they are left out here.'
 - name: stg_mo_revisor__sections
   description: 'One row per RSMo section version listed in force on the Revisor''s chapter pages. A section can
-    have several versions at once (bid = the Revisor''s version id): a later version not yet effective, or conflicting
-    enactments of one section in the same year. section_id is the section number as the Revisor prints it ("1.010",
-    "1.1001", "67.1360"). effective_date is the version''s effective date; history_note the session-law history
-    footnote ("(RSMo 1939 § 645, A.L. 1957 p. 587, A.L. 2015 S.B. 239)"), when the first footnote is one.'
+    have several versions at once (bid = the Revisor''s version id): a later version not yet effective, conflicting
+    enactments of one section in the same year, or an earlier version printed beside one a court held unconstitutional.
+    section_id is the section number as the Revisor prints it ("1.010", "1.1001", "67.1360"). effective_date is
+    the version''s effective date; the Revisor dates a version that waits on a contingency 1 Jan 2099, which becomes
+    is_contingent with no date. held_unconstitutional: the effective line says "(all or part is unconstitutional)".
+    history_note is the session-law history footnote ("(RSMo 1939 § 645, A.L. 1957 p. 587, A.L. 2015 S.B. 239)"),
+    when the first footnote is one.'

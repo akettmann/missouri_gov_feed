@@ -1,7 +1,9 @@
 -- Revised Statutes of Missouri (RSMo), one row per section version from the Revisor of Statutes: the versions listed
 -- in force (text, heading, effective date, session-law history) and the repealed and transferred sections (note and
--- date only). A section can have several versions at once: is_current marks the one(s) in effect on the build date
--- (two when the Revisor prints conflicting enactments of the same section side by side).
+-- date only). A section can have several versions at once: is_current marks the in-force one(s) with the latest
+-- effective date on the build date (two when the Revisor prints conflicting enactments side by side). When a court
+-- held the newest version unconstitutional in whole or part (held_unconstitutional), the Revisor also prints the
+-- version before it; is_current still points at the newest, so read the flag alongside it.
 {% set as_of = "cast('" ~ var('as_of_date') ~ "' as date)" if var('as_of_date', none) else 'current_date' %}
 
 with listed as (
@@ -13,10 +15,12 @@ with listed as (
         heading,
         case
             when is_historical then 'historical'
+            when is_contingent then 'contingent'
             when effective_date > {{ as_of }} then 'not yet effective'
             else 'in force'
         end as status,
         effective_date,
+        held_unconstitutional,
         cast(null as date) as ended_date,
         cast(null as {{ dbt.type_string() }}) as transferred_to,
         history_note,
@@ -34,6 +38,7 @@ removed as (
         cast(null as {{ dbt.type_string() }}) as heading,
         change_kind as status,
         cast(null as date) as effective_date,
+        false as held_unconstitutional,
         action_date as ended_date,
         transferred_to,
         note as history_note,
@@ -69,6 +74,7 @@ select
     v.status,
     coalesce(v.status = 'in force' and v.effective_date = l.effective_date, false) as is_current,
     v.effective_date,
+    v.held_unconstitutional,
     v.ended_date,
     v.transferred_to,
     v.history_note,
