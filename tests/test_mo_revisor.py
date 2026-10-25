@@ -1,5 +1,10 @@
 from pathlib import Path
 
+import httpx
+import pytest
+
+from mogov import http
+from mogov.loaders import mo_revisor
 from mogov.loaders.mo_revisor import parse_chapter, parse_repeals, parse_section, parse_toc
 
 FIXTURES = Path(__file__).parent / "fixtures" / "mo_revisor"
@@ -35,8 +40,9 @@ def test_section_text_heading_and_history():
     assert s["effective"] == "Effective - 28 Aug 2015, 2 histories"
     assert not s["historical"]
     assert s["heading"].startswith("1.010. Common law in force")
-    assert s["paragraphs"][0].startswith(s["heading"] + " 1. The common law of England")
-    assert s["paragraphs"][1].startswith("2. The general assembly expressly excludes")
+    first, second = s["text"].split("\n\n")[:2]
+    assert first.startswith(s["heading"] + " 1. The common law of England")
+    assert second.startswith("2. The general assembly expressly excludes")
     assert s["footnotes"][0] == "(RSMo 1939 § 645, A.L. 1957 p. 587, A.L. 2015 S.B. 239)"
     assert s["html"].startswith('<div style="margin:.1em 0em .4em .5em;">')
     assert "<form" not in s["html"]
@@ -50,10 +56,11 @@ def test_future_effective_version():
 
 def test_tables_keep_their_rows():
     s = parse_section(read("section_28.160.html"))
-    table = s["paragraphs"][1]
-    assert table.splitlines()[0] == "For issuing commission to notary public\t$15.00"
-    assert s["paragraphs"][2].startswith("2. There is hereby established")
-    assert not any(p.strip("\xad ") == "" for p in s["paragraphs"])
+    paragraphs = s["text"].split("\n\n")
+    assert paragraphs[1].splitlines()[0] == "For issuing commission to notary public\t$15.00"
+    assert paragraphs[2].startswith("2. There is hereby established")
+    # the soft-hyphen spacer paragraphs around the table are dropped
+    assert all(p.strip("\xad ") for p in paragraphs)
 
 
 def test_repeals_and_transfers():
@@ -67,3 +74,18 @@ def test_repeals_and_transfers():
     }
     assert [r["kind"] for r in rows] == ["repealed"] * 3 + ["transferred"] * 2
     assert rows[3]["note"] == "(Transferred 1959; now 442.560 )"
+
+
+def test_block_page_raises_and_is_not_cached(tmp_path, monkeypatch):
+    # the site answers a blocked IP with a redirect to Block.aspx, which serves a 200 page
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/Block.aspx"):
+            return httpx.Response(200, text="<html>Blocked</html>")
+        return httpx.Response(302, headers={"location": "https://revisor.mo.gov/main/Block.aspx"})
+
+    monkeypatch.setattr(http, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(http, "_client", httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True))
+    monkeypatch.setattr(mo_revisor, "POLITE_DELAY", 0)
+    with pytest.raises(mo_revisor.Blocked):
+        mo_revisor._get("https://revisor.mo.gov/main/OneSection.aspx", {"section": "1.010", "bid": 42})
+    assert not [p for p in tmp_path.iterdir() if not p.name.startswith(".")]

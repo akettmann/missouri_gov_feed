@@ -5,7 +5,7 @@ import hashlib
 import json
 import os
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import httpx
@@ -120,11 +120,14 @@ def fetch(
     headers: dict | None = None,
     delay: float = 0.0,
     cache_only: bool = False,
+    check: Callable[[httpx.Response], None] | None = None,
 ) -> bytes:
     """GET url, returning bytes. Responses younger than max_age seconds come from cache (None = always cache).
 
     delay: seconds to sleep before a network request (not on cache hits), to stay polite to small state sites.
     cache_only: never touch the network; return any cached copy regardless of age, else raise CacheMiss.
+    check: called with each successful response before it is cached; raise to reject it (e.g. a block page
+    served with 200 after a redirect), so it is never cached.
     """
     path = _cache_path(url, params)
     host = httpx.URL(url).host
@@ -137,10 +140,20 @@ def fetch(
         if _fresh(path, max_age):  # another shard fetched it while we waited
             obs.http_requests.add(1, {"host": host, "cache_hit": True})
             return path.read_bytes()
-        return _get(url, params, path, host, retries=retries, headers=headers, delay=delay)
+        return _get(url, params, path, host, retries=retries, headers=headers, delay=delay, check=check)
 
 
-def _get(url: str, params: dict | None, path: Path, host: str, *, retries: int, headers: dict | None, delay: float):
+def _get(
+    url: str,
+    params: dict | None,
+    path: Path,
+    host: str,
+    *,
+    retries: int,
+    headers: dict | None,
+    delay: float,
+    check: Callable[[httpx.Response], None] | None = None,
+):
     if delay:
         time.sleep(delay)
     obs.http_requests.add(1, {"host": host, "cache_hit": False})
@@ -158,6 +171,8 @@ def _get(url: str, params: dict | None, path: Path, host: str, *, retries: int, 
             time.sleep(min(60, 2**attempt * 5))
             continue
         resp.raise_for_status()
+        if check:
+            check(resp)
         write_atomic(path, resp.content)
         return resp.content
     resp.raise_for_status()

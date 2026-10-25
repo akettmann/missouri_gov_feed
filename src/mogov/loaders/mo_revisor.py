@@ -16,6 +16,7 @@ parses dates, status and the history citations. Units: chapters, plus rx.aspx (o
 
 import re
 
+import httpx
 import lxml.html
 
 from mogov import db, obs
@@ -25,16 +26,32 @@ from mogov.loaders import loader
 log = obs.get_logger(__name__)
 
 BASE = "https://revisor.mo.gov/main"
-POLITE_DELAY = 0.3
-# Statutes change mostly on 28 August (plus emergency clauses and contingent effective dates); a month-old
-# copy of a section is fine. The chapter lists are re-read weekly so new versions are found sooner.
-SECTION_MAX_AGE = 30 * 86400
+# The site blocks an IP that reads too fast (it redirects every request to Block.aspx; ~10 requests/s did it on
+# 2026-10-25), so requests are spaced out and a run should use one shard per outgoing IP address.
+POLITE_DELAY = 1.5
+# A new enactment or amendment is a new version with its own bid (a new URL), found through the chapter lists,
+# which are re-read weekly. A version's page only changes with annotations, so it is re-read twice a year.
+SECTION_MAX_AGE = 180 * 86400
 LIST_MAX_AGE = 7 * 86400
 TABLES = ["mo_revisor_chapters", "mo_revisor_sections", "mo_revisor_repeals"]
 REPEALS_UNIT = "rx.aspx"
 
 CHAPTER_LINK = re.compile(r'href="/main/OneChapter\.aspx\?chapter=([0-9A-Za-z]+)"')
 SECTION_LINK = re.compile(r'href="/main/PageSelect\.aspx\?section=([^&"]+)&amp;bid=(\d+)')
+
+
+class Blocked(RuntimeError):
+    """revisor.mo.gov has blocked this IP address (requests redirect to Block.aspx)."""
+
+
+def _not_blocked(resp: httpx.Response) -> None:
+    if resp.url.path.lower().endswith("/block.aspx"):
+        raise Blocked(f"revisor.mo.gov blocked this IP address; stop and retry later ({resp.url})")
+
+
+def _get(url: str, params: dict | None = None, max_age: float = LIST_MAX_AGE) -> str:
+    page = fetch(url, params, max_age=max_age, delay=POLITE_DELAY, check=_not_blocked)
+    return page.decode("utf-8", "replace")
 
 
 def _text(el) -> str:
@@ -75,10 +92,11 @@ def _blocks(el) -> list[str]:
 
 
 def parse_section(page: str) -> dict:
-    """A section page -> {html, title_line, effective, historical, heading, paragraphs, footnotes}.
+    """A section page -> {html, title_line, effective, historical, heading, text, footnotes}.
 
     html is the content block as served (header with title and effective line, body, footnotes); the
-    other fields are its text, unparsed."""
+    other fields are its text, unparsed. text is the body's paragraphs separated by blank lines (table rows
+    one per line, cells tab-separated)."""
     start = page.find('<div style="margin:.1em 0em .4em .5em;">')
     end = page.find('<div id="BOTTOM"', start)
     if start < 0 or end < 0:
@@ -103,7 +121,7 @@ def parse_section(page: str) -> dict:
         "effective": _text(effdt) if effdt is not None else None,
         "historical": effdt is not None and effdt.find('.//span[@title="this section is historical"]') is not None,
         "heading": _text(heading) if heading is not None else None,
-        "paragraphs": paragraphs,
+        "text": "\n\n".join(paragraphs),
         "footnotes": footnotes,
     }
 
@@ -139,7 +157,7 @@ def parse_repeals(page: str) -> list[dict]:
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: chapters (their section pages), plus the repeals page."""
     toc_url = f"{BASE}/Home.aspx"
-    toc = parse_toc(fetch(toc_url, max_age=LIST_MAX_AGE, delay=POLITE_DELAY).decode("utf-8", "replace"))
+    toc = parse_toc(_get(toc_url))
     if not toc:
         raise RuntimeError("revisor table of contents lists no chapters; the page layout may have changed")
     chapters = shard.take(toc, key=lambda c: c["chapter"])
@@ -148,27 +166,22 @@ def load(shard: db.Shard) -> dict[str, int]:
             sink.add("mo_revisor_chapters", c["chapter"], c)
         if shard.owns(REPEALS_UNIT):
             rx_url = f"{BASE}/rx.aspx"
-            page = fetch(rx_url, max_age=LIST_MAX_AGE, delay=POLITE_DELAY).decode("utf-8", "replace")
-            for r in parse_repeals(page):
+            for r in parse_repeals(_get(rx_url)):
                 sink.add("mo_revisor_repeals", f"{r['section']}/{r['bid']}", r, source_url=rx_url)
         versions = []
         for c in chapters:
-            url = f"{BASE}/OneChapter.aspx"
-            page = fetch(url, {"chapter": c["chapter"]}, max_age=LIST_MAX_AGE, delay=POLITE_DELAY)
-            listed = parse_chapter(page.decode("utf-8", "replace"))
-            if not listed:
-                log.warning("mo_revisor.empty_chapter", chapter=c["chapter"])
+            listed = parse_chapter(_get(f"{BASE}/OneChapter.aspx", {"chapter": c["chapter"]}))
+            if not listed:  # every section of the chapter repealed or transferred
+                log.info("mo_revisor.empty_chapter", chapter=c["chapter"])
             versions += [(c["chapter"], section, bid) for section, bid in listed]
         progress = obs.Progress("section versions", len(versions), log)
+        url = f"{BASE}/OneSection.aspx"
         for chapter, section, bid in versions:
-            url = f"{BASE}/OneSection.aspx"
-            params = {"section": section, "bid": bid}
-            page = fetch(url, params, max_age=SECTION_MAX_AGE, delay=POLITE_DELAY).decode("utf-8", "replace")
+            page = _get(url, {"section": section, "bid": bid}, max_age=SECTION_MAX_AGE)
             try:
                 parsed = parse_section(page)
-            except ValueError:
-                log.warning("mo_revisor.unparsed_section", section=section, bid=bid)
-                continue
+            except ValueError as e:
+                raise ValueError(f"section {section} (bid {bid}): {e}") from e
             sink.add(
                 "mo_revisor_sections",
                 f"{section}/{bid}",
