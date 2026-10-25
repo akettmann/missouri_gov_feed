@@ -559,12 +559,16 @@ offices, shops and most service businesses are missing.
 - Each matched site also carries the matched donors' first and last contribution year, the receiving
   committee's filing page (`contributions_url`) and `match_confidence` (`medium` when any of that money was tied
   to the official by name only).
-- Industry: the primary NAICS code when a site has one (31% of the geocoded sites in October 2026). Otherwise
-  the site's SIC code (1987 Standard Industrial Classification, from `MO_SIC_FILE.CSV`; a primary code before an
-  unknown or secondary one) is mapped to a NAICS sector through the `sic_naics_sectors` seed, a hand-written
-  table from SIC major group (two digits, longer where a group splits across sectors) to NAICS sector. That gives
-  a sector, not a NAICS code: `int_epa_frs__facilities.naics_code` then holds the two-digit sector prefix and
-  `naics_source` is `sic`. Together they cover 56% of the geocoded sites; the rest have neither code.
+- Industry: the NAICS code most of a site's programs give, taking primary codes first (`naics_source` `naics`,
+  31% of the geocoded sites in October 2026), then codes FRS leaves UNKNOWN (`naics_unknown`, 2%), then SECONDARY
+  ones (`naics_secondary`, 0.1%). A real NAICS code is more precise than a SIC-derived sector, so only a site with
+  no NAICS code at all falls back to its SIC code (1987 Standard Industrial Classification, from
+  `MO_SIC_FILE.CSV`; a primary code before an unknown or secondary one), mapped to a NAICS sector through the
+  `sic_naics_sectors` seed, a hand-written table from SIC major group (two digits, longer where a group splits
+  across sectors) to NAICS sector. That gives a sector, not a NAICS code: `int_epa_frs__facilities.naics_code`
+  then holds the two-digit sector prefix and `naics_source` is `sic` (23%). Together they cover 56% of the
+  geocoded sites; the rest have neither code. Where a site has both, the non-primary NAICS code and the SIC
+  sector agree on the sector for 92% (UNKNOWN) to 98% (SECONDARY) of sites.
   About 10,400 of the SIC-filled facilities are SIC 1629 (heavy construction), likely construction stormwater
   permits. The seed follows the Census 1987 SIC to 2017 NAICS concordance at 3 or 4 digits where a group splits;
   groups still mapped to one sector despite straddling (73 business services, 79, 80, 87, 89) take the majority one.
