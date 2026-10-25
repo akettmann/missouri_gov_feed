@@ -50,3 +50,16 @@ export function findHref(baseUrl: string, sel: Exclude<FindParams, { kind: "inva
   if (sel.kind === "zip") return `${path}?zip=${sel.zip}`;
   return path;
 }
+
+/**
+ * Append what a shared link will do to a status line: a map click or location writes `?county=` (the link
+ * shows the whole county), a ZIP lookup writes `?zip=` (the link reopens that ZIP). Ends the status with a
+ * period first when it has none.
+ */
+export function withShareNote(status: string, kind: "county" | "zip"): string {
+  const note =
+    kind === "county"
+      ? "A shared link to this page shows the whole county."
+      : "A shared link reopens this ZIP.";
+  return `${status.replace(/\s+$/, "").replace(/(?<![.!?])$/, ".")} ${note}`;
+}

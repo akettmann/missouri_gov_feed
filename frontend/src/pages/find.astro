@@ -103,7 +103,7 @@ const path = (polygons: Ring[][]) =>
 
 <script>
   import { lookup, lookupCounty, lookupZip, type Lookup } from "../scripts/find";
-  import { countyDistrictId, countyFips, findHref, parseFindParams } from "../lib/findUrl";
+  import { countyDistrictId, countyFips, findHref, parseFindParams, withShareNote } from "../lib/findUrl";
 
   const map = document.querySelector<SVGSVGElement>("#map");
   const status = document.getElementById("status")!;
@@ -122,7 +122,6 @@ const path = (polygons: Ring[][]) =>
     pin.setAttribute("cx", String((lon - Number(d.minLon)) * Number(d.cos) * Number(d.k)));
     pin.setAttribute("cy", String((Number(d.maxLat) - lat) * Number(d.k)));
   }
-  const SHARE_NOTE = " A shared link to this page shows the whole county.";
   /** "exact": a point or ZIP result ("Your officials"); otherwise the county view, outlined on the map. */
   function setMode(countyId: string | null, title = "Your officials") {
     document.getElementById("results-title")!.textContent = title;
@@ -157,7 +156,7 @@ const path = (polygons: Ring[][]) =>
     setMode(null);
     if (fips) {
       remember({ kind: "county", fips });
-      status.textContent += SHARE_NOTE;
+      status.textContent = withShareNote(status.textContent ?? "", "county");
     } else {
       remember({ kind: "none" });
     }
@@ -176,7 +175,7 @@ const path = (polygons: Ring[][]) =>
     if (point) {
       placePin(...point);
       remember({ kind: "zip", zip });
-      status.textContent += SHARE_NOTE;
+      status.textContent = withShareNote(status.textContent ?? "", "zip");
     } else {
       remember({ kind: "none" });
     }

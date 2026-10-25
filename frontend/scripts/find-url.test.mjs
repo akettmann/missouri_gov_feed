@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { countyDistrictId, countyFips, findHref, parseFindParams } from "../src/lib/findUrl.ts";
+import {
+  countyDistrictId,
+  countyFips,
+  findHref,
+  parseFindParams,
+  withShareNote,
+} from "../src/lib/findUrl.ts";
 
 const counties = new Set(["29001", "29510"]);
 
@@ -51,4 +57,17 @@ test("href is base-aware and round-trips", () => {
 
 test("href never carries coordinates", () => {
   assert.doesNotMatch(findHref("/", { kind: "county", fips: "29001" }), /lat|lon|\d\.\d/);
+});
+
+test("share note matches what the written URL does, with a period before it", () => {
+  assert.equal(
+    withShareNote("Cole County: State House District 3", "county"),
+    "Cole County: State House District 3. A shared link to this page shows the whole county.",
+  );
+  assert.equal(
+    withShareNote("ZIP 65101, at its center: Cole County: House 3.", "zip"),
+    "ZIP 65101, at its center: Cole County: House 3. A shared link reopens this ZIP.",
+  );
+  assert.doesNotMatch(withShareNote("x", "zip"), /whole county/);
+  assert.doesNotMatch(withShareNote("x", "county"), /reopens this ZIP/);
 });
