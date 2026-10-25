@@ -1,6 +1,7 @@
 ---
 // One past year of the browse list as a plain page, so the look-back works without JavaScript.
 // The home page links here inside <noscript>; the same rows feed lookup/officeholders/<year>.json.
+import AwardBadges from "../../components/AwardBadges.astro";
 import type { GetStaticPaths } from "astro";
 import Layout from "../../layouts/Layout.astro";
 import { officialIndex, pastOfficeholders } from "../../lib/exports/load";
@@ -67,6 +68,7 @@ const { rows, year, years, currentYear, missing } = Astro.props as {
           <tr>
             <td>
               <a href={href(`/officials/${o.slug}/`)}>{o.full_name}</a>
+              <AwardBadges slug={o.slug} />
             </td>
             <td>{officeLine(o)}</td>
             <td>{o.party ?? <span class="muted">none listed</span>}</td>
