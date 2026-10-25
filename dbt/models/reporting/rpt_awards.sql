@@ -213,6 +213,8 @@ unity as (
         round(100.0 * with_party_votes / party_line_votes, 1) as metric,
         party_line_votes as sample_size,
         party_line_votes - with_party_votes as party_breaks,
+        -- the unrounded share ranks the party awards; the rounded metric is only displayed (rounding made fake ties)
+        100.0 * with_party_votes / party_line_votes as unity_exact,
         -- the whole ranked field, before Maverick drops the officials with no break
         count(*) over (partition by office, period) as field_size
     from unity_totals
@@ -273,7 +275,7 @@ measures as (
         period,
         metric,
         sample_size,
-        metric as sort_key,
+        unity_exact as sort_key,
         field_size
     from unity
     -- breaking with the party needs at least one break: 100.0% unity is not a Maverick
@@ -286,7 +288,7 @@ measures as (
         period,
         metric,
         sample_size,
-        -metric as sort_key,
+        -unity_exact as sort_key,
         field_size
     from unity
 ),
