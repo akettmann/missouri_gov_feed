@@ -1,6 +1,7 @@
-import json
+import datetime
 
 import pytest
+import yaml
 
 from mogov import cli
 
@@ -58,13 +59,13 @@ def _dbt_cmd(monkeypatch, args):
 def test_run_dbt_merges_user_vars_with_user_winning(monkeypatch, user_args):
     cmd = _dbt_cmd(monkeypatch, ["build", "--select", "m", *user_args])
     assert sum(a == "--vars" or a.startswith("--vars=") for a in cmd) == 1
-    assert json.loads(cmd[cmd.index("--vars") + 1]) == {"mec_direct": True, "cl_case_bulk": False, "x": 1}
+    assert yaml.safe_load(cmd[cmd.index("--vars") + 1]) == {"mec_direct": True, "cl_case_bulk": False, "x": 1}
     assert cmd[cmd.index("build") : cmd.index("build") + 3] == ["build", "--select", "m"]
 
 
 def test_run_dbt_without_user_vars_passes_only_mogov_vars(monkeypatch):
     cmd = _dbt_cmd(monkeypatch, ["build"])
-    assert json.loads(cmd[cmd.index("--vars") + 1]) == {"mec_direct": False, "cl_case_bulk": False}
+    assert yaml.safe_load(cmd[cmd.index("--vars") + 1]) == {"mec_direct": False, "cl_case_bulk": False}
 
 
 @pytest.mark.parametrize("bad", [["--vars"], ["--vars", "{a: [}"], ["--vars", "[1, 2]"], ["--vars=just a string"]])
@@ -72,3 +73,29 @@ def test_run_dbt_rejects_malformed_user_vars(monkeypatch, bad):
     with pytest.raises(SystemExit) as exc:
         _dbt_cmd(monkeypatch, ["build", *bad])
     assert "--vars" in str(exc.value)
+
+
+def test_run_dbt_keeps_yaml_dates_typed(monkeypatch):
+    cmd = _dbt_cmd(monkeypatch, ["build", "--vars", "{since: 2024-01-01, at: 2024-01-01 10:30:00, s: '2024-01-01'}"])
+    # dbt parses the flag as YAML: it must read the same types as when the user passes the flag directly.
+    got = yaml.safe_load(cmd[cmd.index("--vars") + 1])
+    assert got["since"] == datetime.date(2024, 1, 1)
+    assert got["at"] == datetime.datetime(2024, 1, 1, 10, 30)
+    assert got["s"] == "2024-01-01"
+    assert got["mec_direct"] is False
+
+
+def test_merge_user_vars_is_shallow_and_later_flag_wins():
+    rest, merged = cli._merge_user_vars(
+        ["x", "--vars", "{a: 1, n: {p: 1}}", "--vars={a: 2, n: {q: 2}, mec_direct: false}"],
+        {"mec_direct": True, "cl_case_bulk": True},
+    )
+    assert rest == ["x"]
+    assert merged == {"mec_direct": False, "cl_case_bulk": True, "a": 2, "n": {"q": 2}}
+
+
+def test_build_help_documents_vars_merge_semantics(monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["mogov", "build", "--help"])
+    with pytest.raises(SystemExit):
+        cli.main()
+    assert "merged (shallow)" in capsys.readouterr().out
