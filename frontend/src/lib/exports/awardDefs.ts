@@ -1,6 +1,6 @@
 // Award keys, their names and display order. Dependency-free so browser code and tests can import it.
 
-/** Display order and pairing: each pair is [the award, its positive opposite]. */
+/** Display order only: each pair is [the award, its positive opposite]. Whether a pair shares a field is decided in dbt. */
 export const AWARD_PAIRS: [string, string][] = [
   ["lowest_attendance", "highest_attendance"],
   ["most_committee_money", "least_committee_money_share"],
