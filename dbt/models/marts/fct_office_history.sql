@@ -1,6 +1,19 @@
 -- Past and present offices held by each current official, from every source that records careers.
 -- The same term can arrive from several sources; the most authoritative copy is kept.
-with os as (
+with os_roles as (
+    -- roles under every Open States id the person has had, not only today's
+    select
+        coalesce(x.person_id, r.openstates_id) as person_id,
+        r.role_type,
+        r.district,
+        r.jurisdiction,
+        r.start_date,
+        r.end_date
+    from {{ ref('stg_openstates__roles') }} as r
+    left join {{ ref('int_officials__person_ids') }} as x on r.openstates_id = x.alias_id
+),
+
+os as (
     select
         o.official_id,
         case r.role_type
@@ -15,7 +28,7 @@ with os as (
         'openstates' as source,
         3 as source_rank
     from {{ ref('int_officials__current') }} as o
-    inner join {{ ref('stg_openstates__roles') }} as r on o.openstates_id = r.openstates_id
+    inner join os_roles as r on o.official_id = r.person_id
 ),
 
 congress as (

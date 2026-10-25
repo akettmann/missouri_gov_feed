@@ -53,6 +53,10 @@ Quirks:
 - Vote tokens are printed surnames, sometimes with a district ("SMITH 46"), plus "MR SPEAKER".
   Some names are truncated ("FOUNTAIN HENDERS"). dbt matches them to members
   (`int_mo_house__member_identity`, seed `house_speakers`).
+- A member's seat is matched to an Open States person; when that fails the key is `mohouse:<member id>`.
+  Open States also holds some people twice (after a redistricting or a move to the Senate). Both are
+  reconciled to one stable `official_id` per person by `int_officials__person_ids` (same exact name and no
+  conflicting seats; seed `official_id_links` for statewide officers and judges), #97.
 - The site asks clients not to poll its XML more than every 30 minutes. Cached copies keep it well
   under that.
 - Every shard reads every session zip to list the roll calls. In the October 2026 full run, two shards

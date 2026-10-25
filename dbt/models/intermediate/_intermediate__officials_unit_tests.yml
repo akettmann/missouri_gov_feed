@@ -22,6 +22,8 @@ unit_tests:
         rows: []
       - input: ref('int_mo_house__member_identity')
         rows: []
+      - input: ref('int_officials__person_ids')
+        rows: []
       - input: ref('statewide_officials')
         rows: []
       - input: ref('stg_congress__legislators')

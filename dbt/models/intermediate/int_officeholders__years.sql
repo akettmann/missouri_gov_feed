@@ -38,7 +38,7 @@ house as (
 senate_terms as (
     select
         y.year,
-        s.openstates_id as official_id,
+        s.person_id as official_id,
         s.full_name,
         s.party,
         'state' as level,

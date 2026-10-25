@@ -173,3 +173,44 @@ seeds:
     columns:
       - name: position_title
         data_tests: [unique, not_null]
+  - name: official_id_links
+    description: >
+      Hand-kept links between the ids one legislator is known by (#97), applied by int_officials__person_ids on top of
+      its same-exact-name rule. relation same_person: alias_id is another id of the person whose current id is
+      person_id (a former legislator now a statewide officer or judge, whom the name rule leaves alone because they
+      hold no legislative seat today). relation different_people: alias_id and person_id are two people who share a
+      name; the name rule never merges that name, and the no-shared-name test accepts the pair. Every row records
+      its evidence. The links were made by an automated check; checked_by and checked_on stay empty until a
+      maintainer signs the row off.
+    config:
+      column_types:
+        {alias_id: varchar, person_id: varchar, relation: varchar, basis: varchar, evidence: varchar,
+         checked_by: varchar, checked_on: date}
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [alias_id, person_id, relation]
+    columns:
+      - name: alias_id
+        data_tests: [not_null]
+      - name: person_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('int_officials__current')
+                field: official_id
+              config:
+                where: "relation = 'same_person'"
+      - name: relation
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [same_person, different_people]
+      - name: evidence
+        data_tests: [not_null]
+      - name: checked_by
+        description: Maintainer who reviewed the row; empty until reviewed.
+      - name: checked_on
+        description: Date the maintainer reviewed the row; empty until reviewed.
