@@ -1,5 +1,6 @@
 // Side-by-side rows for the compare page, computed from two per-official bundles. Pure (runs in the browser).
 // Every row is one measured or published number; nothing is combined into a score.
+import { payPerVote } from "./comparePay";
 import { businessCounts, donorsText, sitesText } from "./businessCounts";
 import type { OfficialBundle } from "./exports/types";
 import { count, HIDE_UNLESS_AVAILABLE, money, pct, statusKind } from "./format";
@@ -13,6 +14,8 @@ export interface CompareRow {
   values: string[];
   /** short caveat shown under the label */
   note?: string;
+  /** a site path (no base) linked after the note, e.g. the methodology section */
+  noteHref?: string;
 }
 
 const NA = "—";
@@ -94,6 +97,22 @@ export function compareRows(bundles: OfficialBundle[], hideMedium: boolean): Com
   const att = bundles.map(attendance);
   rows.push({ section: "Voting", label: "Attendance, all loaded sessions", values: att.map((a) => a[0]) });
   rows.push({ section: "Voting", label: "Attendance, latest session", values: att.map((a) => a[1]) });
+
+  const pay = bundles.map((b) => payPerVote(b, hideMedium));
+  const payNote =
+    "Pay divided by votes attended. State officials: gross pay from the state payroll. U.S. Congress: the statutory salary of the office. These are different measures, so compare within one basis.";
+  rows.push({
+    section: "Voting",
+    label: "Pay per vote attended, covered years",
+    values: pay.map((x) => x[0]),
+    note: payNote,
+    noteHref: "/methodology/#pay-per-vote",
+  });
+  rows.push({
+    section: "Voting",
+    label: "Pay per vote attended, latest year with pay",
+    values: pay.map((x) => x[1]),
+  });
 
   const m = bundles.map((b) => moneyCells(b, hideMedium));
   rows.push({ section: "Money in", label: "Received, all loaded years", values: m.map((x) => x[0]) });
