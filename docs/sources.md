@@ -574,8 +574,15 @@ offices, shops and most service businesses are missing.
   geocoded sites; the rest have neither code. Where a site has both, the non-primary NAICS code and the SIC
   sector agree on the sector for 92% (UNKNOWN) to 98% (SECONDARY) of sites.
   About 10,400 of the SIC-filled facilities are SIC 1629 (heavy construction), likely construction stormwater
-  permits. The seed follows the Census 1987 SIC to 2017 NAICS concordance at 3 or 4 digits where a group splits;
-  groups still mapped to one sector despite straddling (73 business services, 79, 80, 87, 89) take the majority one.
+  permits. Every seed row was checked in October 2026 against the Census 1987 SIC to 2002 NAICS concordance,
+  carried to 2022 NAICS through the Census 2002-2007, 2007-2012, 2012-2017 and 2017-2022 concordances, and
+  3 or 4 digit rows override the group where a code maps to a single other sector (4922/4923 gas transmission
+  48, 6798 REITs 53, 6552 land subdividers 23, 7331/7335/7336 54, 7383 51, 7384 81 and others). Groups still mapped
+  to one sector despite straddling (73 business services, 79, 80, 87, 89) take the majority one. Codes that tie
+  between two sectors (0752 11/81 kept 81; 4923, 7331, 7335, 7383, 7378; 89) or split in the concordance with no
+  clear majority (1389, 2771, 3295, 5099, 5171, 5441, 5699, 5712, 7353) are listed in the seed description. The
+  hand table stays rather than a generated one: the concordance has 1,000+ SIC codes mapping to six-digit
+  industries and needs a four-file NAICS vintage chain, far more than a sector label needs.
 - `rpt_district_business_industries` counts each official's sites by NAICS sector (`naics_sectors` seed, from
   the primary NAICS code's first two digits). The profile page ships only the donor sites plus these counts: a
   U.S. House district holds up to ~10,500 sites, too many for the per-official JSON budget.

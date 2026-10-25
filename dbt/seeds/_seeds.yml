@@ -178,13 +178,21 @@ seeds:
       Maps a SIC code prefix (1987 Standard Industrial Classification; two digits, the major group, or a longer
       prefix where one group splits across sectors) to the first two digits of the NAICS sector it falls in, a
       naics_sectors.naics_prefix. The longest matching prefix wins, so a 3- or 4-digit row overrides its major
-      group: 4953/4955/4959 (refuse, hazardous waste and other sanitary services) are 56 while the rest of 49 stays
-      utilities (22), including 4952 sewerage systems (NAICS 221320); 737 computer services is 54 with 7372, 7374 and
+      group: 4953/4959 (refuse systems and other sanitary services) are 56 while the rest of 49 stays
+      utilities (22), including 4952 sewerage systems (NAICS 221320) while 4922 and 4923 gas transmission are pipeline transportation (48); 737 computer services is 54 with 7372, 7374 and
       7375 (software, data processing, information retrieval) in 51; the 07 vet, animal and lawn/garden services, 27
-      publishing, 67 holding companies and patent lessors, 731 advertising and 735 equipment rental likewise. Rows
-      follow the Census Bureau's 1987 SIC to 2017 NAICS concordance. Major groups are coarser than NAICS industries,
+      publishing, 67 holding companies and patent lessors (6798 REITs are 53), 731 advertising and 735 equipment
+      rental likewise; 73 business services is 56 but 7331, 7335, 7336 are 54, 7383 is 51 and 7384 is 81, and a
+      few other 4-digit codes the concordance puts in one sector other than their group's (4493 marinas, 6552 land
+      subdividers 23, 7514 car rental 53, 8399 81 ...) have rows. Every row was checked in October 2026 against
+      the Census Bureau's 1987 SIC to 2002 NAICS concordance carried forward through its 2002-2007, 2007-2012,
+      2012-2017 and 2017-2022 NAICS concordances (census.gov/naics). SIC 4955 is not in that concordance and has no row. Major groups are coarser than NAICS industries,
       so this gives a sector, never a NAICS code; groups that still straddle sectors (73 business services is
-      mostly 56 but also 51, 54 and 81 in places; 79 amusement, 80 health, 87 and 89 services) take the majority one. int_epa_frs__facilities uses it for sites whose FRS records carry a SIC code but no NAICS code.
+      mostly 56 but also 51, 54 and 81 in places; 79 amusement, 80 health, 87 and 89 services) take the majority one.
+      Ties between two sectors: 0752 animal specialty services (11 or 81; kept 81, pet care), 4923 gas transmission
+      and distribution (22 or 48; set 48 with 4922), 7331 (51 or 54), 7335 (48 or 54), 7383 (51 or 71) and 7378 (44
+      or 81; kept 81), and 89 services not elsewhere classified (51 or 54; kept 54). Also left in their group
+      although the concordance splits them: 1389, 2771 greeting cards (31 or 51), 3295, 5099, 5171, 5441, 5699, 5712, 7353. Majorities and ties are judged by concordance row count, with judgement overrides where rows are slices of one niche activity: 8741 management services has 10 construction-management rows (one per construction industry, sector 23) but is set 56 for the one general row (561110), which is the bulk of the code. int_epa_frs__facilities uses it for sites whose FRS records carry a SIC code but no NAICS code.
     config:
       column_types: {sic_prefix: varchar, naics_prefix: varchar}
     columns:
