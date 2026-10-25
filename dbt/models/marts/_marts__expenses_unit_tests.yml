@@ -1,0 +1,83 @@
+# Unit tests for fct_legislator_expenses' payee-to-official pairing: fixed expenditure and payroll rows -> exact rows.
+version: 2
+
+unit_tests:
+  - name: legislator_expenses_pair_legal_names_through_the_payroll_with_year_evidence
+    model: fct_legislator_expenses
+    description: >
+      Payees print legal names ("ANDERSON, MARLON SHEPARD"), the payroll "ANDERSON, MARLON". They pair on surname
+      (suffixes dropped: "BOGGS JR" = "BOGGS") and first name when the payroll paid that name in the fiscal year's
+      calendar years (FY2023 is 2022 and 2023). An exact first name with a surname no other legislator holds is high;
+      "Dave" for DAVID, where another legislator also holds the surname Griffith, is medium. A payee whose only
+      payroll year is 2019 is left out for FY2023, as are a LEGISLATURE non-travel line and another agency's payee of
+      the same name. Refunds net into the total.
+    given:
+      - input: ref('stg_mo_state_expenditures__payments')
+        rows:
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'ANDERSON, MARLON SHEPARD', payments_total: 8000.00, source_url: u23}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: IN-STATE MILEAGE, vendor_name: 'ANDERSON, MARLON SHEPARD', payments_total: 1500.50, source_url: u23}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: IN-STATE MILEAGE, vendor_name: 'ANDERSON, MARLON SHEPARD', payments_total: -100.50, source_url: u23}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'BOGGS JR, MITCHELL', payments_total: 7000.00, source_url: u23}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'GRIFFITH, DAVE', payments_total: 6000.00, source_url: u23}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'OLD, TIMER', payments_total: 5000.00, source_url: u23}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: SUPPLIES, detail_description: OFFICE SUPPLIES, vendor_name: 'ANDERSON, MARLON SHEPARD', payments_total: 99.00, source_url: u23}
+          - {fiscal_year: 2023, agency_name: CORRECTIONS, category_description: TRAVEL, detail_description: IN-STATE MILEAGE, vendor_name: 'CLERK, JOHN', payments_total: 50.00, source_url: u23}
+      - input: ref('fct_salaries')
+        rows:
+          - {official_id: o_anderson, calendar_year: 2022, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'ANDERSON, MARLON', pay: 35000, pay_basis: gross pay}
+          - {official_id: o_boggs, calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BOGGS JR., MITCHELL', pay: 36000, pay_basis: gross pay}
+          - {official_id: o_dave, calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'GRIFFITH, DAVID EARL', pay: 36000, pay_basis: gross pay}
+          - {official_id: o_susan, calendar_year: 2023, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'GRIFFITH, SUSAN', pay: 36000, pay_basis: gross pay}
+          - {official_id: o_old, calendar_year: 2019, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'OLD, TIMER', pay: 36000, pay_basis: gross pay}
+          - {official_id: o_clerk, calendar_year: 2023, agency_name: JUDICIARY, position_title: CIRCUIT JUDGE, employee_name: 'CLERK, JOHN', pay: 36000, pay_basis: gross pay}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: o_anderson}
+          - {official_id: o_boggs}
+          - {official_id: o_dave}
+          - {official_id: o_susan}
+          - {official_id: o_old}
+          - {official_id: o_clerk}
+    expect:
+      rows:
+        - {official_id: o_anderson, fiscal_year: 2023, expense_type: per diem, payee_name: 'ANDERSON, MARLON SHEPARD', amount: 8000.00, match_confidence: high}
+        - {official_id: o_anderson, fiscal_year: 2023, expense_type: mileage, payee_name: 'ANDERSON, MARLON SHEPARD', amount: 1400.00, match_confidence: high}
+        - {official_id: o_boggs, fiscal_year: 2023, expense_type: per diem, payee_name: 'BOGGS JR, MITCHELL', amount: 7000.00, match_confidence: high}
+        - {official_id: o_dave, fiscal_year: 2023, expense_type: per diem, payee_name: 'GRIFFITH, DAVE', amount: 6000.00, match_confidence: medium}
+
+  - name: legislator_expenses_never_guess_between_shared_surnames
+    model: fct_legislator_expenses
+    description: >
+      "BROWN, DAVID C" and "BROWN, DAVID T" both fit the payroll's DAVID, but their middle initials differ, so each
+      pairs only with the payroll name whose initial agrees (high: both names carry the initial). "BROWN, ANN" fits
+      the payroll's ANN exactly and ANNETTE only loosely; the exact fit wins at medium, since the surname is
+      shared and neither name has a middle initial. "KING, ROBERT" fits two officials equally (KING, ROBERT A and
+      KING, ROBERT B), so it is dropped rather than guessed.
+    given:
+      - input: ref('stg_mo_state_expenditures__payments')
+        rows:
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'BROWN, DAVID C', payments_total: 100.00, source_url: u}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'BROWN, DAVID T', payments_total: 200.00, source_url: u}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'BROWN, ANN', payments_total: 300.00, source_url: u}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'KING, ROBERT', payments_total: 400.00, source_url: u}
+      - input: ref('fct_salaries')
+        rows:
+          - {official_id: o_dc, calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BROWN, DAVID C', pay: 1, pay_basis: gross pay}
+          - {official_id: o_dt, calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BROWN, DAVID T', pay: 1, pay_basis: gross pay}
+          - {official_id: o_ann, calendar_year: 2023, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'BROWN, ANN', pay: 1, pay_basis: gross pay}
+          - {official_id: o_annette, calendar_year: 2023, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'BROWN, ANNETTE', pay: 1, pay_basis: gross pay}
+          - {official_id: o_king_a, calendar_year: 2023, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'KING, ROBERT A', pay: 1, pay_basis: gross pay}
+          - {official_id: o_king_b, calendar_year: 2023, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'KING, ROBERT B', pay: 1, pay_basis: gross pay}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: o_dc}
+          - {official_id: o_dt}
+          - {official_id: o_ann}
+          - {official_id: o_annette}
+          - {official_id: o_king_a}
+          - {official_id: o_king_b}
+    expect:
+      rows:
+        - {official_id: o_dc, fiscal_year: 2023, expense_type: per diem, payee_name: 'BROWN, DAVID C', amount: 100.00, match_confidence: high}
+        - {official_id: o_dt, fiscal_year: 2023, expense_type: per diem, payee_name: 'BROWN, DAVID T', amount: 200.00, match_confidence: high}
+        - {official_id: o_ann, fiscal_year: 2023, expense_type: per diem, payee_name: 'BROWN, ANN', amount: 300.00, match_confidence: medium}

@@ -29,6 +29,7 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `shor_mccarty` | Harvard Dataverse | state legislator ideology scores | 1993–2022 | |
 | `mo_employee_pay` | data.mo.gov State Employee Pay | yearly gross pay of legislators, statewide officials and state judges | `MOGOV_LOOKBACK_YEARS` (published from 2007) | |
 | `mo_sos_elections` | Missouri Secretary of State official returns | race results, margins, uncontested races, judicial retention votes | general and primary elections, Aug 2012 on | |
+| `mo_state_expenditures` | data.mo.gov State Expenditures | what each state agency paid each payee per fiscal year: legislators' per diem and mileage, payments to vendors | `MOGOV_LOOKBACK_YEARS` (fiscal years; published from 2000) | |
 | `census_tiger` | Census Bureau TIGER/Line | legislative and congressional district, county and city boundaries | newest vintage | |
 | `epa_frs` | EPA Facility Registry Service | regulated facilities (name, address, coordinates, NAICS, owner) placed in districts; businesses in each official's district that donated to them | current state file (refreshed every few months) | |
 | `census_zcta` | Census Bureau Gazetteer | ZIP code area centers and land areas (find-by-ZIP) | newest vintage | |
@@ -621,6 +622,55 @@ Quirks:
 - Checks: contest vote sums equal the PDF's printed totals where a total exists (3,481 of 3,486 contests and judges),
   printed percentages sum to 100 within rounding, and figures copied from the 2024 general PDF (Governor, U.S.
   Senator, State Representative districts 33 and 34, Broniec 63.1% and Gooch 62.2%) are asserted exactly.
+## mo_state_expenditures: Missouri state expenditures
+
+Flow: [diagrams/sources/mo_state_expenditures.svg](diagrams/sources/mo_state_expenditures.svg)
+
+data.mo.gov's "<fiscal year> State Expenditures" datasets (the Missouri Accountability Portal's spending data):
+for each fiscal year (July to June), the total each state agency paid each payee per category and detail line.
+Under the agency `LEGISLATURE` it lists every legislator's per diem (`LEGISLATIVE DAILY EXPENSE ALLOWANCE`) and
+`IN-STATE MILEAGE`; every other agency's rows are payments to vendors and people. `fct_legislator_expenses`
+pairs the legislators with officials.
+
+- Lands: `mo_state_expenditures`, one JSON row per dataset row exactly as the API serves it (`fiscal_year`,
+  `agency_name`, `category_description`, `detail_description`, `vendor_name`, `payments_total`, all text), keyed
+  `<fiscal year>:<n>` in `:id` order. All agencies land, about 100,000 to 130,000 rows a year, so the vendor
+  payments are on hand for later use. Optional like the other stage-1 JSON tables: `mogov build` creates an
+  empty placeholder when it has not been loaded.
+- Window: `MOGOV_LOOKBACK_YEARS`, counted as fiscal-year numbers (2017 to 2026 by default: about 1.1M rows).
+  Shard units: fiscal years (one dataset each; ids from the Socrata catalog). Pages of 50,000 rows with a
+  half-second pause; a page that comes back short fails the run rather than landing a partial year.
+- Terms: no licence field on the datasets. The state's data policy (https://mo.gov/data-policy) says the user
+  accepts the data as is, at their own risk, and that "applications using data supplied by this site must
+  include" its disclaimer: "The data made available here has been modified for use from its original source,
+  which is the State of Missouri. THE STATE OF MISSOURI MAKES NO REPRESENTATIONS OR WARRANTY AS TO THE
+  COMPLETENESS, ACCURACY, TIMELINESS, OR CONTENT OF ANY DATA MADE AVAILABLE THROUGH THIS SITE..." (full text on
+  that page). The site that shows this data, and the State Employee Pay data above, must carry that notice.
+
+Quirks:
+- A row is one payee's annual total for one agency and detail line, not one payment. FY2023 `LEGISLATURE` has
+  240 per diem rows ($1,799,338.96) and 295 in-state mileage rows ($880,139.52), one per payee.
+- Negative totals are refunds and corrections and are kept (the smallest is -$18,418). No legislator per diem or
+  mileage row has been negative. The largest total is $11.24B (the Medicaid recipient line, FY2026), so the
+  sanity test allows $20B.
+- Payees are people and vendors in one column (`vendor_name`), mixed with lines such as "PROCUREMENT CARD
+  PAYMENT". Legislators appear under their full legal name, "ATCHISON, FRANKLIN DARRELL", where the payroll
+  prints "ATCHISON, FRANKLIN D". Payees therefore pair with officials through the payroll names already matched
+  in `fct_salaries` (same legal-name form), not through the officials' own names: surname without suffixes plus
+  a fitting first name, middle initials that agree when both sides carry one ("SMITH, DAVID T" is not "SMITH,
+  DAVID C"), and a payroll row in the fiscal year's calendar years (fiscal year 2023 is July 2022 to June 2023,
+  so 2022 or 2023 payroll). One best-fitting official and one payee per official, line and year are required;
+  otherwise the payee is left out. `high` means equal first names and either a shared middle initial or a
+  surname no other legislator on the payroll holds that year; nicknames ("DAVE" for David) and shared surnames
+  without a middle initial are `medium`.
+- Because the payroll rows come from `fct_salaries`, which covers current officials, former legislators' per
+  diem is not linked. In October 2026, fiscal year 2026 paired 176 of 193 per diem payees (162 high), fiscal year
+  2025 paired 177 of 241, and the share falls to 19 of 229 for fiscal year 2017. Unpaired payees are former members.
+- The portal serves an occasional sparse row with only some columns set (FY2025 has `fiscal_year: "KEVIN KRAUS"`
+  and `agency_name: "11408"`). It lands as published and staging drops it.
+- Datasets are replaced when the state republishes them (FY2023 `rowsUpdatedAt` 2024-09-26), so a run replaces
+  the whole fiscal year. The fiscal year numbered 2026 ended in June 2026; the next appears after it closes.
+- Per diem is claimed per day attended and mileage follows distance, so neither is a measure of performance.
 
 ## epa_frs: EPA Facility Registry Service
 
@@ -638,19 +688,31 @@ business registry has no bulk export, the Missouri Accountability Portal's vendo
 (see Quirks), and Census County Business Patterns has counts but no names. FRS covers regulated sites only, so
 offices, shops and most service businesses are missing.
 
-- Lands: `epa_frs_facilities`, `epa_frs_organizations`, `epa_frs_naics`, `epa_frs_sic`, one row per CSV row of
-  `MO_FACILITY_FILE.CSV`, `MO_ORGANIZATION_FILE.CSV`, `MO_NAICS_FILE.CSV` and `MO_SIC_FILE.CSV` from the Missouri state file
+- Lands: `epa_frs_facilities`, `epa_frs_organizations`, `epa_frs_naics`, `epa_frs_sic`, `epa_frs_alt_names`, one row per CSV row of
+  `MO_FACILITY_FILE.CSV`, `MO_ORGANIZATION_FILE.CSV`, `MO_NAICS_FILE.CSV`, `MO_SIC_FILE.CSV` and `MO_ALTERNATIVE_NAME_FILE.CSV` from the Missouri state file
   (`https://ordsext.epa.gov/FLA/www3/state_files/state_combined_mo.zip`, about 35 MB). The payload is the row
   as a JSON object keyed by the CSV header.
-- Shard units: the four CSV files. The zip is downloaded once and shared.
+- Shard units: the five CSV files. The zip is downloaded once and shared.
 - U+FFFD in EPA's own file: the state zip already contains the replacement character (bytes EF BF BD) in a few
   names and addresses (4 in `MO_FACILITY_FILE.CSV`, 2 in `MO_ORGANIZATION_FILE.CSV`, 8 in the alternative-name file),
   where EPA lost a non-ASCII letter. The loader decodes strictly, so it adds none; raw stays as EPA sent it.
   EPA's other records spell the same words without an accent ("DECOR PLUS", "MARBLE DECOR INC" in its program and
-  alternative-name files), so nothing attests "DÉCOR". Staging (`mogov.fix_replacement_char`) takes the verified
-  spelling from the `epa_frs_name_corrections` seed (each row cites the EPA record that attests it) and drops any
-  other U+FFFD; `assert_replacement_char_fixed` fails if one survives or a seeded correction is not applied. The
-  alternative-name file (`MO_ALTERNATIVE_NAME_FILE`) is not loaded.
+  alternative-name files), so nothing attests "DÉCOR". Staging repairs a name that has U+FFFD in this order: a row of the
+  `epa_frs_name_corrections` seed (a maintainer override; each row cites the EPA record that attests it), else the
+  alternative name from `stg_epa_frs__alt_names` (`MO_ALTERNATIVE_NAME_FILE`, one row per program record) with the same
+  registry id (organizations: the same registry id, program system and program id) that equals the damaged name with
+  each run of U+FFFD standing for exactly one character (`mogov.damaged_name_pattern`; "D�COR PLUS" matches
+  "DECOR PLUS", "MARBLE D��COR INC" matches "MARBLE DECOR INC", "DECORATING PLUS" does not), when exactly one distinct
+  alternative name fits; with none or two different fits, the U+FFFD is dropped. The generic rule covers all three
+  damaged names seen so far (the facilities DECOR PLUS and MARBLE DECOR INC, and the DECOR PLUS owner and operator
+  rows). The seed still holds those three known cases, so a raw directory without alternative names builds with the
+  same names; once alternative names are loaded its rows are redundant and can be retired, and it stays for a future
+  name the alternatives cannot repair. The 2026-10 address
+  with U+FFFD ("17123 HWY 60�") has no alternative and just loses the character. `assert_replacement_char_fixed`
+  fails if one survives; `assert_epa_frs_name_correction_keys_exist` fails if a seed row matches no staged row. A raw
+  directory landed before `epa_frs_alt_names` existed gets an empty placeholder from `mogov build`; the seed covers the
+  known cases until `mogov load epa_frs` is re-run (a new damaged name would then lose its letter).
+  `stg_epa_frs__alt_names` mirrors raw, so alternative names containing U+FFFD stay there; the repairs never use them.
 - `epa_frs_sic` joined the loader after the other three. A raw directory landed before that has no SIC table;
   `mogov build` then creates an empty placeholder (like the other late-added or optional JSON tables in
   `db.OPTIONAL_JSON_TABLES`), so the SIC fallback finds no codes and those sites show no industry until the
@@ -670,7 +732,8 @@ offices, shops and most service businesses are missing.
 - Each matched site also carries the matched donors' first and last contribution year, the links
   (`donor_links`: one line per matched donor and filing page, `<url> <donor name>`. A page is the MEC committee
   matched to the official, which is not filtered to the donor, or the FEC disbursements of the donor's committee
-  filtered to the receiving committee; a donor filed on both keeps both) and `match_confidence`
+  filtered to the receiving committee; a donor filed on both keeps both. Line breaks in a donor name become spaces so a
+  line never splits; in the published sites.csv the cell holds several lines. A donor with no page has no line) and `match_confidence`
   (`medium` when any of that money was tied to the official by name only).
 - Industry: the NAICS code most of a site's programs give, taking primary codes first (`naics_source` `naics`,
   31% of the geocoded sites in October 2026), then codes FRS leaves UNKNOWN (`naics_unknown`, 2%), then SECONDARY

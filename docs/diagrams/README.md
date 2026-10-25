@@ -82,6 +82,12 @@ Case history from the CourtListener API, for officials found in stage 1. Source:
 
 ![courtlistener_cases](sources/courtlistener_cases.svg)
 
+### mo_state_expenditures
+
+Missouri State Expenditures, one dataset per fiscal year: legislator per diem and mileage, and vendor payments. Source: [sources/mo_state_expenditures.puml](sources/mo_state_expenditures.puml)
+
+![mo_state_expenditures](sources/mo_state_expenditures.svg)
+
 ### epa_frs
 
 EPA Facility Registry Service, Missouri state file: facilities, owners, and NAICS and SIC codes. Source: [sources/epa_frs.puml](sources/epa_frs.puml)

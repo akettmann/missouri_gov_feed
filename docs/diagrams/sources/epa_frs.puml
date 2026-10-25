@@ -3,10 +3,12 @@ title epa_frs: EPA Facility Registry Service (Missouri state file)
 start
 :download state_combined_mo.zip once (30-day cache);
 :for each CSV (one shard unit each):
-facilities, organizations, NAICS, SIC;
+facilities, organizations, NAICS, SIC, alternative names;
 note right: Python csv module: fused rows kept\nunder _fields instead of dropping good rows
-:epa_frs_facilities / epa_frs_organizations / epa_frs_naics / epa_frs_sic
-(one JSON row per CSV row);
+:epa_frs_facilities / epa_frs_organizations / epa_frs_naics / epa_frs_sic,
+epa_frs_alt_names (one JSON row per CSV row);
+:dbt staging: a facility or organization name with U+FFFD is
+repaired from the one matching alternative name (seed overrides);
 :dbt: one owner, parent company and primary NAICS per
 geocoded facility (int_epa_frs__facilities); a facility with no
 NAICS code gets the sector of its SIC code (sic_naics_sectors seed);
