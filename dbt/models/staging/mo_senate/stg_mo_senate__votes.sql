@@ -31,6 +31,8 @@ select
         when 'NAYS' then 'nay'
         when 'Absent' then 'absent'
         when 'Absent with leave' then 'absent with leave'
-        when 'Excused from voting' then 'not voting'
+        -- a Senate Rule 91 recusal by a member on the floor ("Senator X excused herself from voting on ..."):
+        -- neither an absence nor a Congress-style "not voting", so it gets its own value (#113, #135)
+        when 'Excused from voting' then 'recused'
     end as vote_cast
 from src

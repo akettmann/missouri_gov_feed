@@ -100,7 +100,10 @@ Quirks:
 - Running page headers ("Journal of the Senate 118", day lines) appear mid-block and are stripped.
 - The block regex is bounded at 2,500 characters, so a block missing its "Vacancies" line can't
   swallow the rest of the journal.
-- Some votes have an "Excused from voting—Senator Hegeman—1" line (recorded as `not voting`).
+- Some votes have an "Excused from voting—Senator Hegeman—1" line. These are Senate Rule 91 recusals by
+  members present on the floor ("Pursuant to Senate Rule 91, Senator Washington excused herself from voting
+  on ..."), not absences, so they are recorded as `recused` (distinct from `absent with leave`). Only the
+  Senate records this; the House PDFs and Voteview do not. Whether a recusal counts as attended is open (#135).
 - Some journals print a section's total before its names ("Absent with leave—Senators—2 Eigel
   Gannon"). A section's names therefore also end at the next section heading. Before October 2026 they
   ran on into it, picking up "Vacancies", "NAYS" or "Absent" as senators and filing the next section's

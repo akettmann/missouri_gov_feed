@@ -43,8 +43,10 @@ Treat `medium` rows with care before publishing them as fact.
 {% enddocs %}
 
 {% docs vote_cast %}
-How the official voted: `yea`, `nay`, `present`, `absent`, `absent with leave` (MO Senate), `not voting`
-(Congress). State votes are read from roll-call PDFs and journals; federal from Voteview cast codes.
+How the official voted: `yea`, `nay`, `present`, `absent`, `absent with leave` (MO Senate), `recused`
+(MO Senate "Excused from voting": a Senate Rule 91 recusal by a member present on the floor, not an absence),
+`not voting` (Congress; Voteview code 9, which does not say whether the absence was excused). State votes are
+read from roll-call PDFs and journals; federal from Voteview cast codes.
 {% enddocs %}
 
 {% docs coverage_status %}
