@@ -499,6 +499,141 @@ unit_tests:
     expect:
       rows: []
 
+  - name: awards_attendance_lists_never_overlap_in_a_small_field
+    model: rpt_awards
+    description: >
+      Six state_house members, default cutoff 5. Each attendance award takes at most floor(6 / 2) = 3, so the
+      three lowest and three highest are different officials. Without the cap each list takes 5 and the middle
+      four officials sit in both.
+    overrides:
+      vars:
+        awards_threshold: {default: 5}
+        awards_min_field_size: 5
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: a, office: state_house}
+          - {official_id: b, office: state_house}
+          - {official_id: c, office: state_house}
+          - {official_id: d, office: state_house}
+          - {official_id: e, office: state_house}
+          - {official_id: f, office: state_house}
+      - input: ref('rpt_attendance')
+        rows:
+          - {official_id: a, first_vote_date: 2020-03-01, votes_present: 99, votes_recorded: 100}
+          - {official_id: b, first_vote_date: 2020-03-01, votes_present: 98, votes_recorded: 100}
+          - {official_id: c, first_vote_date: 2020-03-01, votes_present: 97, votes_recorded: 100}
+          - {official_id: d, first_vote_date: 2020-03-01, votes_present: 96, votes_recorded: 100}
+          - {official_id: e, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
+          - {official_id: f, first_vote_date: 2020-03-01, votes_present: 94, votes_recorded: 100}
+      - input: ref('rpt_donor_rollup')
+        rows: []
+      - input: ref('fct_federal_donor_summary')
+        rows: []
+      - input: ref('fct_party_unity_yearly')
+        rows: []
+    expect:
+      rows:
+        - {award: lowest_attendance, period: '2020', official_id: f, award_rank: 1, metric: 94.0, sample_size: 100, group_size: 6, streak_years: 1}
+        - {award: lowest_attendance, period: '2020', official_id: e, award_rank: 2, metric: 95.0, sample_size: 100, group_size: 6, streak_years: 1}
+        - {award: lowest_attendance, period: '2020', official_id: d, award_rank: 3, metric: 96.0, sample_size: 100, group_size: 6, streak_years: 1}
+        - {award: highest_attendance, period: '2020', official_id: a, award_rank: 1, metric: 99.0, sample_size: 100, group_size: 6, streak_years: 1}
+        - {award: highest_attendance, period: '2020', official_id: b, award_rank: 2, metric: 98.0, sample_size: 100, group_size: 6, streak_years: 1}
+        - {award: highest_attendance, period: '2020', official_id: c, award_rank: 3, metric: 97.0, sample_size: 100, group_size: 6, streak_years: 1}
+        - {award: lowest_attendance, period: lifetime, official_id: f, award_rank: 1, metric: 94.0, sample_size: 100, group_size: 6, streak_years: null}
+        - {award: lowest_attendance, period: lifetime, official_id: e, award_rank: 2, metric: 95.0, sample_size: 100, group_size: 6, streak_years: null}
+        - {award: lowest_attendance, period: lifetime, official_id: d, award_rank: 3, metric: 96.0, sample_size: 100, group_size: 6, streak_years: null}
+        - {award: highest_attendance, period: lifetime, official_id: a, award_rank: 1, metric: 99.0, sample_size: 100, group_size: 6, streak_years: null}
+        - {award: highest_attendance, period: lifetime, official_id: b, award_rank: 2, metric: 98.0, sample_size: 100, group_size: 6, streak_years: null}
+        - {award: highest_attendance, period: lifetime, official_id: c, award_rank: 3, metric: 97.0, sample_size: 100, group_size: 6, streak_years: null}
+
+  - name: awards_attendance_cap_is_floor_of_half_an_odd_field
+    model: rpt_awards
+    description: >
+      A field of 7, default cutoff 5: each attendance award takes at most floor(7 / 2) = 3. m1 and m2 tie at 95
+      (4th and 5th of 7). Lowest is l1, l2, l3; Highest is h2, h1 and the tied m1 and m2 (rank 3 each). A cap of 4
+      (ceil) would also list m1 and m2 as Lowest (tied 4th), put them in both lists and drop them from both.
+    overrides:
+      vars:
+        awards_threshold: {default: 5}
+        awards_min_field_size: 5
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: l1, office: state_house}
+          - {official_id: l2, office: state_house}
+          - {official_id: l3, office: state_house}
+          - {official_id: m1, office: state_house}
+          - {official_id: m2, office: state_house}
+          - {official_id: h1, office: state_house}
+          - {official_id: h2, office: state_house}
+      - input: ref('rpt_attendance')
+        rows:
+          - {official_id: l1, first_vote_date: 2020-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: l2, first_vote_date: 2020-03-01, votes_present: 91, votes_recorded: 100}
+          - {official_id: l3, first_vote_date: 2020-03-01, votes_present: 92, votes_recorded: 100}
+          - {official_id: m1, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
+          - {official_id: m2, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
+          - {official_id: h1, first_vote_date: 2020-03-01, votes_present: 98, votes_recorded: 100}
+          - {official_id: h2, first_vote_date: 2020-03-01, votes_present: 99, votes_recorded: 100}
+      - input: ref('rpt_donor_rollup')
+        rows: []
+      - input: ref('fct_federal_donor_summary')
+        rows: []
+      - input: ref('fct_party_unity_yearly')
+        rows: []
+    expect:
+      rows:
+        - {award: lowest_attendance, period: '2020', official_id: l1, award_rank: 1, metric: 90.0, sample_size: 100, group_size: 7, streak_years: 1}
+        - {award: lowest_attendance, period: '2020', official_id: l2, award_rank: 2, metric: 91.0, sample_size: 100, group_size: 7, streak_years: 1}
+        - {award: lowest_attendance, period: '2020', official_id: l3, award_rank: 3, metric: 92.0, sample_size: 100, group_size: 7, streak_years: 1}
+        - {award: highest_attendance, period: '2020', official_id: h2, award_rank: 1, metric: 99.0, sample_size: 100, group_size: 7, streak_years: 1}
+        - {award: highest_attendance, period: '2020', official_id: h1, award_rank: 2, metric: 98.0, sample_size: 100, group_size: 7, streak_years: 1}
+        - {award: highest_attendance, period: '2020', official_id: m1, award_rank: 3, metric: 95.0, sample_size: 100, group_size: 7, streak_years: 1}
+        - {award: highest_attendance, period: '2020', official_id: m2, award_rank: 3, metric: 95.0, sample_size: 100, group_size: 7, streak_years: 1}
+        - {award: lowest_attendance, period: lifetime, official_id: l1, award_rank: 1, metric: 90.0, sample_size: 100, group_size: 7, streak_years: null}
+        - {award: lowest_attendance, period: lifetime, official_id: l2, award_rank: 2, metric: 91.0, sample_size: 100, group_size: 7, streak_years: null}
+        - {award: lowest_attendance, period: lifetime, official_id: l3, award_rank: 3, metric: 92.0, sample_size: 100, group_size: 7, streak_years: null}
+        - {award: highest_attendance, period: lifetime, official_id: h2, award_rank: 1, metric: 99.0, sample_size: 100, group_size: 7, streak_years: null}
+        - {award: highest_attendance, period: lifetime, official_id: h1, award_rank: 2, metric: 98.0, sample_size: 100, group_size: 7, streak_years: null}
+        - {award: highest_attendance, period: lifetime, official_id: m1, award_rank: 3, metric: 95.0, sample_size: 100, group_size: 7, streak_years: null}
+        - {award: highest_attendance, period: lifetime, official_id: m2, award_rank: 3, metric: 95.0, sample_size: 100, group_size: 7, streak_years: null}
+
+  - name: awards_attendance_drops_officials_tied_into_both_lists
+    model: rpt_awards
+    description: >
+      Six state_house members all attend 95 of 100 votes, so all six tie for first in both lists. Nobody is lowest and
+      highest at once, so neither attendance award lists anyone. Without the overlap rule all six sit in both lists.
+    overrides:
+      vars:
+        awards_threshold: {default: 5}
+        awards_min_field_size: 5
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: a, office: state_house}
+          - {official_id: b, office: state_house}
+          - {official_id: c, office: state_house}
+          - {official_id: d, office: state_house}
+          - {official_id: e, office: state_house}
+          - {official_id: f, office: state_house}
+      - input: ref('rpt_attendance')
+        rows:
+          - {official_id: a, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
+          - {official_id: b, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
+          - {official_id: c, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
+          - {official_id: d, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
+          - {official_id: e, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
+          - {official_id: f, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
+      - input: ref('rpt_donor_rollup')
+        rows: []
+      - input: ref('fct_federal_donor_summary')
+        rows: []
+      - input: ref('fct_party_unity_yearly')
+        rows: []
+    expect:
+      rows: []
+
   - name: awards_federal_money_share_uses_fec_total_receipts
     model: rpt_awards
     description: >
@@ -551,7 +686,9 @@ unit_tests:
     description: >
       Two state_house members keep the calendar-year share from the donor rollup, individuals included in the
       total: s1 gets 3,000 of 10,000 = 30.0%, s2 gets 9,000 of 10,000 = 90.0% (lowest share ranks first). The
-      FEC cycle totals only apply to federal officials.
+      FEC cycle totals only apply to federal officials: s3 is a state_house member who also has FEC data (as if
+      it carried a bioguide id) and must keep only its calendar-year rows (5,000 of 10,000 = 50.0%), with no
+      extra cycle row from the 50,000 FEC total.
     overrides:
       vars:
         awards_threshold: {default: 5}
@@ -561,6 +698,7 @@ unit_tests:
         rows:
           - {official_id: s1, office: state_house, level: state}
           - {official_id: s2, office: state_house, level: state}
+          - {official_id: s3, office: state_house, level: state}
       - input: ref('rpt_attendance')
         rows: []
       - input: ref('rpt_donor_rollup')
@@ -569,20 +707,27 @@ unit_tests:
           - {official_id: s1, level: state, transaction_year: 2024, election_cycle: 2024, donor_class: individual, match_confidence: high, total_amount: 7000}
           - {official_id: s2, level: state, transaction_year: 2024, election_cycle: 2024, donor_class: pac, match_confidence: high, total_amount: 9000}
           - {official_id: s2, level: state, transaction_year: 2024, election_cycle: 2024, donor_class: individual, match_confidence: high, total_amount: 1000}
+          - {official_id: s3, level: state, transaction_year: 2024, election_cycle: 2024, donor_class: pac, match_confidence: high, total_amount: 5000}
+          - {official_id: s3, level: state, transaction_year: 2024, election_cycle: 2024, donor_class: individual, match_confidence: high, total_amount: 5000}
       - input: ref('fct_federal_donor_summary')
-        rows: []
+        rows:
+          - {official_id: s3, cycle: 2024, aggregate_kind: cycle total, bucket: total receipts, total: 50000}
       - input: ref('fct_party_unity_yearly')
         rows: []
     expect:
       rows:
         - {award: most_committee_money, period: '2024', official_id: s2, award_rank: 1, metric: 9000, sample_size: 10000}
-        - {award: most_committee_money, period: '2024', official_id: s1, award_rank: 2, metric: 3000, sample_size: 10000}
+        - {award: most_committee_money, period: '2024', official_id: s3, award_rank: 2, metric: 5000, sample_size: 10000}
+        - {award: most_committee_money, period: '2024', official_id: s1, award_rank: 3, metric: 3000, sample_size: 10000}
         - {award: most_committee_money, period: lifetime, official_id: s2, award_rank: 1, metric: 9000, sample_size: 10000}
-        - {award: most_committee_money, period: lifetime, official_id: s1, award_rank: 2, metric: 3000, sample_size: 10000}
+        - {award: most_committee_money, period: lifetime, official_id: s3, award_rank: 2, metric: 5000, sample_size: 10000}
+        - {award: most_committee_money, period: lifetime, official_id: s1, award_rank: 3, metric: 3000, sample_size: 10000}
         - {award: least_committee_money_share, period: '2024', official_id: s1, award_rank: 1, metric: 30.0, sample_size: 10000}
-        - {award: least_committee_money_share, period: '2024', official_id: s2, award_rank: 2, metric: 90.0, sample_size: 10000}
+        - {award: least_committee_money_share, period: '2024', official_id: s3, award_rank: 2, metric: 50.0, sample_size: 10000}
+        - {award: least_committee_money_share, period: '2024', official_id: s2, award_rank: 3, metric: 90.0, sample_size: 10000}
         - {award: least_committee_money_share, period: lifetime, official_id: s1, award_rank: 1, metric: 30.0, sample_size: 10000}
-        - {award: least_committee_money_share, period: lifetime, official_id: s2, award_rank: 2, metric: 90.0, sample_size: 10000}
+        - {award: least_committee_money_share, period: lifetime, official_id: s3, award_rank: 2, metric: 50.0, sample_size: 10000}
+        - {award: least_committee_money_share, period: lifetime, official_id: s2, award_rank: 3, metric: 90.0, sample_size: 10000}
 
   - name: officeholders_by_year_source_url
     model: rpt_officeholders_by_year

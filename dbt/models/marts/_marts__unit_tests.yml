@@ -296,7 +296,10 @@ unit_tests:
       Districts count for a county only when they overlap it by more than 0.1 km2, so boundaries that share an
       edge (state_senate:2, touching along x=-92), sit a hair away from it (state_house:4), or poke 0.5 m past
       it from a slightly misaligned layer (state_house:3, 0.04 km2) are dropped, however finely a grid would
-      have sampled the seam. A long thin strip (state_house:6 overlaps the county by about 100 m x 77 km, 8 km2, well over the area threshold) is dropped by the inward-buffer rule. A non-current district is ignored. A city counts only when it covers the whole
+      have sampled the seam. A long thin strip (state_house:6 overlaps the county by about 100 m x 77 km, 8 km2,
+      well over the area threshold) is dropped by the inward-buffer rule, but narrow genuine overlaps about
+      500 m wide, running north-south (state_house:7) or east-west (state_house:8), are kept, so a buffer that
+      is far too large fails. A non-current district is ignored. A city counts only when it covers the whole
       county (place:2999999), not when it is a small part of it (place:2999998).
     given:
       - input: ref('dim_district')
@@ -313,12 +316,16 @@ unit_tests:
           - {district_id: 'place:2999998', district_type: place, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-92.9,38.1],[-92.8,38.1],[-92.8,38.2],[-92.9,38.2],[-92.9,38.1]]]}'}
           - {district_id: 'state_senate:2', district_type: state_senate, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-92,38],[-91,38],[-91,39],[-92,39],[-92,38]]]}'}
           - {district_id: 'state_house:6', district_type: state_house, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-92.0012,38.2],[-91,38.2],[-91,38.9],[-92.0012,38.9],[-92.0012,38.2]]]}'}
+          - {district_id: 'state_house:7', district_type: state_house, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-92.00574,38.2],[-91,38.2],[-91,38.9],[-92.00574,38.9],[-92.00574,38.2]]]}'}
+          - {district_id: 'state_house:8', district_type: state_house, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-92.9,38.99548],[-92.1,38.99548],[-92.1,40],[-92.9,40],[-92.9,38.99548]]]}'}
     expect:
       rows:
         - {county_id: 'county:29901', district_id: 'us_house:119:1', district_type: us_house}
         - {county_id: 'county:29901', district_id: 'state_senate:1', district_type: state_senate}
         - {county_id: 'county:29901', district_id: 'state_house:1', district_type: state_house}
         - {county_id: 'county:29901', district_id: 'state_house:2', district_type: state_house}
+        - {county_id: 'county:29901', district_id: 'state_house:7', district_type: state_house}
+        - {county_id: 'county:29901', district_id: 'state_house:8', district_type: state_house}
         - {county_id: 'county:29901', district_id: 'place:2999999', district_type: place}
 
   - name: jurisdiction_businesses_give_every_donor_its_own_link

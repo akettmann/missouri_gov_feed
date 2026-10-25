@@ -14,9 +14,11 @@
 --                      years). Needs awards_min_party_line_votes (default 20) party-line votes in the period.
 --                      fct_bias_indicators party_unity_pct sums the same counts, so the lifetime figure matches
 --                      the profile; the yearly figures appear with the award only.
---                      Maverick (most_party_breaks) needs at least one break, and Maverick and Team Player each
---                      take at most half the ranked field (floor(field / 2)) so nobody is both; an official the
---                      two lists would still share through a tie is dropped from both
+--                      Maverick (most_party_breaks) needs at least one break
+-- Paired awards (the awards_pairs macro: attendance, party unity;
+-- each pair ranks one number over one field): each end's cutoff is at most half of its ranked field
+-- (floor(field / 2)) so nobody is on both lists; ties at the cutoff can add more. An official the two lists
+-- would still share through a tie is dropped from both
 with offices as (
     select
         official_id,
@@ -170,6 +172,7 @@ share_money as (
         f.all_money
     from federal_share as f
     inner join offices as o on f.official_id = o.official_id
+    where o.level = 'federal'
 ),
 
 unity_counts as (
@@ -338,9 +341,11 @@ thresholds_by_award as (
 ),
 
 thresholds as (
-    -- Maverick and Team Player are two ends of one ranking, so each takes at most half the field: with a field
-    -- of 6 and a cutoff of 5, nobody could sit in both top-5 lists. Ties at the cut can still put one official
-    -- in both; such an official is dropped from both (sits in the middle), see `contested`
+    -- the two ends of a pair (see the awards_pairs macro) rank one number over one field, so each end's
+    -- cutoff is at most half of that field: with a field of 6 and a cutoff of 5, nobody could sit in both top-5
+    -- lists. Ties at the cut
+    -- can still put one official in both; such an official is dropped from both (sits in the middle), see
+    -- `contested`
     select
         award,
         office,
@@ -350,8 +355,9 @@ thresholds as (
         sample_size,
         award_rank,
         group_size,
+        {{ mogov.award_pair_expr('award') }} as pair_key,
         case
-            when award in ('most_party_breaks', 'most_party_loyal')
+            when {{ mogov.award_pair_expr('award') }} is not null
                 then least(base_threshold, cast(floor(group_size / 2.0) as {{ dbt.type_bigint() }}))
             else base_threshold
         end as threshold
@@ -369,17 +375,14 @@ contested as (
         award_rank,
         group_size,
         threshold,
-        -- both party lists would take this official for this office and period
-        award in ('most_party_breaks', 'most_party_loyal')
-        and coalesce(
-            sum(
-                case
-                    when award in ('most_party_breaks', 'most_party_loyal') and award_rank <= threshold then 1
-                    else 0
-                end
-            ) over (partition by office, period, official_id) > 1,
+        -- both ends of a pair would take this official for this office and period
+        coalesce(
+            pair_key is not null
+            and sum(case when award_rank <= threshold then 1 else 0 end)
+                over (partition by pair_key, office, period, official_id)
+            > 1,
             false
-        ) as in_both_party_lists
+        ) as in_both_pair_lists
     from thresholds
 ),
 
@@ -392,9 +395,9 @@ yearly as (
         office,
         period,
         official_id,
-        case when award_rank <= threshold and not in_both_party_lists then 1 else 0 end as qualifies,
+        case when award_rank <= threshold and not in_both_pair_lists then 1 else 0 end as qualifies,
         -- failed years so far (ranked but outside the threshold); each one starts a new run of qualifying years
-        sum(case when award_rank <= threshold and not in_both_party_lists then 0 else 1 end) over (
+        sum(case when award_rank <= threshold and not in_both_pair_lists then 0 else 1 end) over (
             partition by award, office, official_id
             order by period
             rows between unbounded preceding and current row
@@ -436,4 +439,4 @@ left join streaks as s
         and t.office = s.office
         and t.period = s.period
         and t.official_id = s.official_id
-where t.award_rank <= t.threshold and not t.in_both_party_lists
+where t.award_rank <= t.threshold and not t.in_both_pair_lists

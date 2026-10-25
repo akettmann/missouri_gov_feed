@@ -1357,10 +1357,11 @@ models:
       The current state house, state senate and congressional districts that reach each county, from the full
       unsimplified TIGER boundaries (the shipped map shapes are simplified to 50 m and open hairline gaps along
       shared edges, so they cannot answer this). A pair counts only when the overlap exceeds 0.1 km2 (about 25
-      acres) and the overlap survives an inward buffer of 120 m (it contains a 120 m-radius circle); two
-      boundaries that merely share an edge intersect with zero area and are dropped, and so are long thin
-      slivers along a county line where two TIGER vintages disagree (Pulaski/CD 3 is 0.36 km2 but about 95 m
-      wide). Also holds the
+      acres) and the overlap survives an inward buffer of 120 m (it erodes 120 m east-west and about 152 m
+      north-south, so a kept overlap contains a circle of at least 120 m radius and is more than 240 m wide in
+      every direction; real overlaps here are at least about 1.7 km wide); two boundaries that merely share an
+      edge intersect with zero area and are dropped, and so are long thin slivers along a county line where two
+      TIGER vintages disagree (Pulaski/CD 3 is 0.36 km2 but about 72 m wide). Also holds the
       cities (places) whose boundary covers at least 99% of the county, which is how St. Louis city (a county
       and a city at once) gets its mayor into the county view. Areas are planar lon/lat areas scaled by
       cos(latitude), accurate to a few tenths of a percent here. Grain: one row per (county, district).
