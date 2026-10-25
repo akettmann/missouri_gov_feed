@@ -25,3 +25,8 @@ test("awards page renders the streak marker as aria-hidden text plus visually hi
   const css = readFileSync(new URL("../src/styles/global.css", import.meta.url), "utf8");
   assert.match(css, /\.sr-only\s*\{[^}]*clip-path/);
 });
+
+test("streakMarker counts cycles when asked", () => {
+  assert.equal(streakMarker(3, true).label, "3 qualifying cycles in a row");
+  assert.equal(streakMarker(1, true), null);
+});
