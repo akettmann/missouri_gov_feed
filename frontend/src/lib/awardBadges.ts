@@ -10,7 +10,9 @@ export type Badge = [award: string, streak: number | null, detail: string];
 /** The slice of an awards list this needs (see AwardList in exports/awards.ts). */
 export interface BadgeList {
   award: string;
+  office: string;
   period: string;
+  group_size: number;
   entries: {
     rank: number;
     slug: string;
@@ -48,25 +50,56 @@ export function metricText(award: string, metric: number, sampleSize: number | n
   return `${value} of ${def.outOf === "votes" ? `${count(sampleSize)} votes` : `${money(sampleSize)} raised`}`;
 }
 
+/** "Never Misses a Vote": the award's nickname without the "The ... Award" wrapper and curly quotes. */
+export function awardNickname(award: string): string {
+  const name = AWARDS[award]?.name ?? award;
+  return name
+    .replace(/^The\s+/, "")
+    .replace(/\s+Award$/, "")
+    .replace(/[“”"]/g, "");
+}
+
+/** Lower-case the first letter only, so "PACs" stays "PACs". */
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
+/** 1st, 2nd, 3rd, 4th, 11th, 22nd. */
+export function ordinal(n: number): string {
+  const tail = n % 100;
+  const suffix =
+    tail >= 11 && tail <= 13
+      ? "th"
+      : (({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th");
+  return `${n}${suffix}`;
+}
+
 /**
- * Current awards by official slug. "Current" is each award's latest yearly list, so an award whose newest
- * year was skipped (a thin field early in a session) still shows the last year it was ranked; the year is in
- * the badge's text. An award with no yearly list at all, such as party breaks, uses its lifetime list. An
- * official ranked in the same award under two offices keeps the better rank. Order is the awards page's.
+ * Current awards by official slug. "Current" is each award's latest yearly list within each office (the
+ * awards page ranks officials only against the same office), so an office whose newest year was skipped, or
+ * that is only ranked lifetime, still shows its own list. An award with no yearly list for an office, such
+ * as party breaks, uses that office's lifetime list. An official ranked in the same award under two offices
+ * keeps the better rank. Order is the awards page's. `officeLabel` turns an office key into the plural name
+ * of its holders for the badge text ("State Representatives", as the awards page writes it).
  */
-export function currentAwards(lists: BadgeList[]): Map<string, Badge[]> {
+export function currentAwards(
+  lists: BadgeList[],
+  officeLabel: (office: string) => string = (o) => o,
+): Map<string, Badge[]> {
+  const key = (l: BadgeList) => `${l.award}|${l.office}`;
   const latest = new Map<string, string>();
   for (const l of lists)
-    if (l.period !== "lifetime" && l.period > (latest.get(l.award) ?? "")) latest.set(l.award, l.period);
-  const current = lists.filter((l) => l.period === (latest.get(l.award) ?? "lifetime"));
+    if (l.period !== "lifetime" && l.period > (latest.get(key(l)) ?? "")) latest.set(key(l), l.period);
+  const current = lists.filter((l) => l.period === (latest.get(key(l)) ?? "lifetime"));
   const best = new Map<string, Map<string, { rank: number; badge: Badge }>>();
   for (const l of current)
     for (const e of l.entries) {
       const mine = best.get(e.slug) ?? new Map<string, { rank: number; badge: Badge }>();
       const had = mine.get(l.award);
       if (!had || e.rank < had.rank) {
-        const where = l.period === "lifetime" ? "all loaded years" : l.period;
-        const detail = `${AWARDS[l.award]?.title ?? l.award}, ${where}: ${metricText(l.award, e.metric, e.sample_size)}`;
+        const when = l.period === "lifetime" ? "across all loaded years" : `in ${l.period}`;
+        const group = `${ordinal(e.rank)} of ${count(l.group_size)} ${officeLabel(l.office)}`;
+        const detail =
+          `${awardNickname(l.award)} (${lowerFirst(AWARDS[l.award]?.title ?? l.award)}), ranked ${group} ${when}: ` +
+          metricText(l.award, e.metric, e.sample_size);
         mine.set(l.award, {
           rank: e.rank,
           badge: [l.award, l.period === "lifetime" ? null : e.streak_years, detail],

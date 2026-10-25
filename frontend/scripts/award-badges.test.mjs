@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { AWARD_ICONS, currentAwards, metricText, renderBadges } from "../src/lib/awardBadges.ts";
+import { AWARD_ICONS, currentAwards, metricText, ordinal, renderBadges } from "../src/lib/awardBadges.ts";
 import { AWARD_PAIRS } from "../src/lib/exports/awardDefs.ts";
 
 const e = (slug, rank, metric, streak_years = null, sample_size = 100) => ({
@@ -11,7 +11,13 @@ const e = (slug, rank, metric, streak_years = null, sample_size = 100) => ({
   sample_size,
   streak_years,
 });
-const list = (award, period, entries) => ({ award, period, entries });
+const list = (award, period, entries, office = "state_house", group_size = 62) => ({
+  award,
+  office,
+  period,
+  group_size,
+  entries,
+});
 
 const LISTS = [
   list("highest_attendance", "2024", [e("old-timer", 1, 99, 5)]),
@@ -31,7 +37,7 @@ test("current awards are each award's latest yearly list; lifetime only for awar
   assert.deepEqual([...m.keys()].sort(), ["ann", "bob", "cy", "zed"]);
   assert.equal(m.has("old-timer"), false, "superseded years are not current");
   assert.equal(m.has("dee"), false);
-  assert.match(m.get("cy")[0][2], /, 2024: /, "the badge says which year it is for");
+  assert.match(m.get("cy")[0][2], / in 2024: /, "the badge says which year it is for");
   assert.deepEqual(
     m.get("bob").map((b) => b[0]),
     ["highest_attendance"],
@@ -68,6 +74,59 @@ test("an official ranked under two offices keeps the better rank once", () => {
   assert.equal(m.get("ann")[0][1], 2);
 });
 
+test("the latest period is chosen per award AND office, so one office's newer year doesn't hide another's", () => {
+  const m = currentAwards([
+    list("highest_attendance", "2026", [e("rep", 3, 99.6, 1, 561)], "state_house", 62),
+    list("highest_attendance", "2025", [e("us-rep", 1, 99, 1, 400)], "us_house", 8),
+    list("highest_attendance", "2024", [e("us-old", 1, 98, 1, 400)], "us_house", 8),
+    // one office has yearly lists, another only a lifetime list, for the same award
+    list("most_committee_money", "2024", [e("judge-a", 1, 5000, 1, 9000)], "associate_circuit_judge", 20),
+    list("most_committee_money", "lifetime", [e("judge-b", 1, 7000, null, 9000)], "circuit_judge", 10),
+    list("most_committee_money", "lifetime", [e("judge-a", 2, 1, null, 9)], "associate_circuit_judge", 20),
+  ]);
+  assert.equal(m.get("rep")[0][0], "highest_attendance");
+  assert.equal(m.get("us-rep")?.[0][0], "highest_attendance", "us_house keeps its own latest year, 2025");
+  assert.match(m.get("us-rep")[0][2], / in 2025: /);
+  assert.equal(m.has("us-old"), false, "an office's superseded year is still not current");
+  assert.equal(m.get("judge-b")?.[0][0], "most_committee_money", "lifetime-only office is kept");
+  assert.match(m.get("judge-b")[0][2], /across all loaded years/);
+  assert.match(m.get("judge-a")[0][2], / in 2024: /, "yearly list beats that office's own lifetime list");
+});
+
+test("badge text names the award, rank, group and office; rank is not always 'highest'", () => {
+  const m = currentAwards(
+    [list("highest_attendance", "2026", [e("rep", 3, 99.6, 1, 561)], "state_house", 62)],
+    (o) => (o === "state_house" ? "State Representatives" : o),
+  );
+  assert.equal(
+    currentAwards([list("most_committee_money", "2026", [e("p", 1, 5, 1, 9)])]).get("p")[0][2],
+    "PAC Magnet (most money from PACs, committees & parties), ranked 1st of 62 state_house in 2026: $5.00 of $9.00 raised",
+    "only the first letter of the plain title is lower-cased",
+  );
+  assert.equal(
+    m.get("rep")[0][2],
+    "Never Misses a Vote (highest attendance), ranked 3rd of 62 State Representatives in 2026: 99.6% of 561 votes",
+  );
+});
+
+test("ordinals", () => {
+  const got = [1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 101, 112].map(ordinal);
+  assert.deepEqual(got, [
+    "1st",
+    "2nd",
+    "3rd",
+    "4th",
+    "11th",
+    "12th",
+    "13th",
+    "21st",
+    "22nd",
+    "23rd",
+    "101st",
+    "112th",
+  ]);
+});
+
 test("no data means no badges", () => {
   assert.equal(currentAwards([]).size, 0);
   assert.equal(renderBadges([], "/x"), "");
@@ -88,7 +147,7 @@ test("badge HTML: icon and X marker aria-hidden, same words as sr-only text, lin
   assert.match(html, /<span class="award-streak" aria-hidden="true">X3<\/span>/);
   assert.match(
     html,
-    /<span class="sr-only">Award: Highest attendance, 2025: 99.5% of 678 votes; 3 qualifying years in a row<\/span>/,
+    /<span class="sr-only">Award: Never Misses a Vote \(highest attendance\), ranked 1st of 62 state_house in 2025: 99.5% of 678 votes; 3 qualifying years in a row<\/span>/,
   );
   assert.equal(html.match(/award-streak/g).length, 2, "X3 and X2 only; no marker on a single year");
   assert.doesNotMatch(html, /aria-label/);
@@ -97,7 +156,7 @@ test("badge HTML: icon and X marker aria-hidden, same words as sr-only text, lin
 test("streaks:false drops the marker everywhere but keeps the spoken award", () => {
   const html = renderBadges(currentAwards(LISTS).get("ann"), "", false);
   assert.doesNotMatch(html, /award-streak|in a row/);
-  assert.match(html, /Highest attendance, 2025/);
+  assert.match(html, /Never Misses a Vote \(highest attendance\), ranked 1st of 62 state_house in 2025/);
 });
 
 test("every award on the awards page has a placeholder icon, and text is escaped", () => {
