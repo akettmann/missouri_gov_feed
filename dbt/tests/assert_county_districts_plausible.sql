@@ -17,7 +17,9 @@ with per_type as (
     ) as t
     left join {{ ref('fct_county_districts') }} as f
         on c.district_id = f.county_id and t.district_type = f.district_type
-    where c.district_type = 'county'
+    where
+        c.district_type = 'county'
+        and c.is_current
     group by c.district_id, t.district_type
 )
 
