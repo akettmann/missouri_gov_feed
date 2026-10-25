@@ -169,7 +169,8 @@ difference, so no measurable cost). An earlier per-route query version took abou
 in 2 of 5 builds.
 Without the export no site pages are built and the section shows no link.
 
-Optional build-time environment: `PUBLIC_SITE_URL` (canonical site URL), `PUBLIC_REPORT_ERROR_URL`
+Optional build-time environment: `PUBLIC_SITE_URL` (canonical site URL), `PUBLIC_BASE_PATH` (path prefix such as `/missouri_gov_feed`; unset =
+site at the root, set by `deploy:pages`), `PUBLIC_REPORT_ERROR_URL`
 (where "Report an error" goes; default: a prefilled GitHub issue on this repo).
 
 ### Publishing to Google Cloud Storage
@@ -195,7 +196,7 @@ The build is plain static files, so any static host works; the repo ships a scri
 
 ### Publishing to GitHub Pages (free stopgap)
 
-Free alternative to GCS while traffic is tiny. The site is built **locally** (CI has no data) and pushed to an
+GCS (above) stays the end goal; Pages is a free stopgap while traffic is tiny. The site is built **locally** (CI has no data) and pushed to an
 orphan `gh-pages` branch; `main` history is never touched.
 
 Findings (checked against the ~170 MB `dist/`, 1052 pages):
@@ -211,6 +212,12 @@ Findings (checked against the ~170 MB `dist/`, 1052 pages):
   Every internal link goes through `href()` (`src/lib/site.ts`); the default (GCS) build has no base and is
   unchanged. `scripts/link-check.mjs` verifies a built `dist/` (every root-relative reference resolves under the base).
 
+Differences from GCS to keep in mind: Pages sends no custom `Cache-Control` headers (a fixed short cache; our
+year-long `_astro/` caching and 5-minute page caching do not apply), infers content types from file extensions,
+serves `404.html` for unknown paths, and 301-redirects a directory URL without a trailing slash to the slash form.
+The Pages build and the GCS build differ (base path), so **rebuild before `deploy:gcs`**: it refuses a dist built
+for Pages (link check at the root), and `deploy:pages` rebuilds with the Pages base itself.
+
 ```sh
 pnpm deploy:pages --dry-run   # build with the Pages base, stale check, link check, size check; pushes nothing
 pnpm deploy:pages             # the same, then force-push ONLY the gh-pages branch
@@ -221,6 +228,12 @@ Branch `gh-pages`, folder `/ (root)`. The site then appears at https://akettmann
 after each push. Note that Pages sites from a public repo are public; use `--allow-stale` only deliberately.
 On Windows Git Bash never set `PUBLIC_BASE_PATH=/x` by hand (MSYS rewrites it to a `C:/Program Files/Git/...` path;
 the build now rejects that); the script sets it for you.
+
+The deploy only ever writes the `gh-pages` branch (there is no `--branch` flag), pushing to
+`https://github.com/<owner>/<name>.git` for the repo of the `origin` remote (`--remote NAME` picks another remote
+to read the repo from). It refuses to run with uncommitted changes under `frontend/` (`--allow-dirty` overrides)
+and removes its ~200 MB temp repo on every exit, dry runs and failures included (`--keep` leaves it for
+inspection).
 
 ## Local, in Docker (Compose)
 

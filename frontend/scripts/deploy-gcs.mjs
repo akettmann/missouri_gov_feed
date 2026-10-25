@@ -1,4 +1,4 @@
-// Publish frontend/dist to a Google Cloud Storage bucket (run `pnpm build` first). Needs the gcloud CLI,
+// Publish frontend/dist to a Google Cloud Storage bucket (run `pnpm build` first; a dist left by deploy:pages is refused). Needs the gcloud CLI,
 // logged in (`gcloud auth login`) with write access to the bucket.
 //   MOGOV_SITE_BUCKET=my-bucket pnpm deploy:gcs            # sync, then set cache headers
 //   MOGOV_SITE_BUCKET=my-bucket pnpm deploy:gcs --dry-run  # list what would change, touch nothing
@@ -15,6 +15,15 @@ if (!bucket) {
 if (!existsSync("dist/index.html")) {
   console.error("dist/ is missing or empty: run `pnpm build` first.");
   process.exit(2);
+}
+
+// A dist built for GitHub Pages (deploy:pages) has every link under /<repo>/ and would 404 on GCS.
+const lc = spawnSync(process.execPath, ["scripts/link-check.mjs", "dist", ""], { stdio: "inherit" });
+if (lc.status !== 0) {
+  console.error(
+    "dist/ has broken root links (built with a Pages base?): run `pnpm build` again, then deploy:gcs.",
+  );
+  process.exit(1);
 }
 
 const dest = `gs://${bucket}`;

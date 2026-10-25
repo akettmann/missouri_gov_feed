@@ -1,4 +1,30 @@
-// Pure helpers shared by astro.config.mjs and deploy-pages.mjs (kept dependency-free so tests can import them).
+// Helpers shared by astro.config.mjs and deploy-pages.mjs (no dependencies beyond node:, so tests can import them).
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
+/** The only branch deploy:pages ever writes. Deliberately not configurable: it is force-pushed. */
+export const PAGES_BRANCH = "gh-pages";
+
+/** Where `repo` ("owner/name") is pushed to; derived from the same slug that sets the site URL and base. */
+export function pushUrl(repo) {
+  return `https://github.com/${repo}.git`;
+}
+
+/** Strip any user:password@ from a URL before it is printed. */
+export function redactUrl(url) {
+  return String(url).replace(/(\/\/)[^/@\s]+@/g, "$1***@");
+}
+
+/** Run fn(dir) in a fresh temp dir that is removed afterwards, even when fn throws, unless keep is set. */
+export function withTempDir(prefix, fn, { keep = false, root = tmpdir() } = {}) {
+  const dir = mkdtempSync(path.join(root, prefix));
+  try {
+    return fn(dir);
+  } finally {
+    if (!keep) rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 /** Normalise a base path: "" / "/" / undefined -> undefined (Astro default), "x" or "/x/" -> "/x". */
 export function normalizeBase(raw) {
@@ -53,19 +79,28 @@ export function checkLimits(files, limits = LIMITS) {
   return { totalBytes, largest, problems };
 }
 
-/** Parse `deploy:pages` flags. Unknown flags are errors so typos never trigger a real push. */
+/** Parse `deploy:pages` flags. Unknown flags (any --branch included) are errors: the target is fixed to PAGES_BRANCH. */
 export function parseArgs(argv) {
-  const opts = { dryRun: false, skipBuild: false, allowStale: false, remote: "origin", branch: "gh-pages" };
+  const opts = {
+    dryRun: false,
+    skipBuild: false,
+    allowStale: false,
+    allowDirty: false,
+    keep: false,
+    remote: "origin",
+  };
   const errors = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--dry-run") opts.dryRun = true;
     else if (a === "--skip-build") opts.skipBuild = true;
     else if (a === "--allow-stale") opts.allowStale = true;
-    else if (a === "--remote" || a === "--branch") {
+    else if (a === "--allow-dirty") opts.allowDirty = true;
+    else if (a === "--keep") opts.keep = true;
+    else if (a === "--remote") {
       const v = argv[++i];
       if (!v || v.startsWith("--")) errors.push(`${a} needs a value`);
-      else opts[a.slice(2)] = v;
+      else opts.remote = v;
     } else errors.push(`unknown argument ${a}`);
   }
   return { opts, errors };
