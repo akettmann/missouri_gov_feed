@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { officeLine, yearRanges } from "../src/lib/format.ts";
-import { groupPast, linkSameName, normalizeName } from "../src/lib/exports/past.ts";
+import { officeLine, rosterDownloadNote, yearRanges } from "../src/lib/format.ts";
+import {
+  SAME_NAME_NOTE,
+  groupPast,
+  linkSameName,
+  normalizeName,
+  sameNameKindLabel,
+} from "../src/lib/exports/past.ts";
 
 const slugFor = (name, id) => `${name.toLowerCase().replaceAll(" ", "-")}-${id}`;
 const row = (year, official_id, full_name, extra = {}) => ({
@@ -15,6 +21,7 @@ const row = (year, official_id, full_name, extra = {}) => ({
   office_title: null,
   district: "1",
   source: "mo_house roster",
+  source_url: `https://roster.example/${year}`,
   ...extra,
 });
 
@@ -84,4 +91,40 @@ test("officeLine drops the raw court key for federal judges but keeps real distr
     officeLine({ office: "mo_house", office_title: "State Representative", district: "12" }),
     "State Representative, district 12",
   );
+});
+
+test("groupPast keeps each roster page with the years it covers, per source", () => {
+  const rows = [
+    row(2024, "a", "Ann Roe"),
+    row(2023, "a", "Ann Roe"),
+    row(2022, "a", "Ann Roe", { source: "fjc", source_url: "https://fjc.example/" }),
+    row(2021, "a", "Ann Roe", { source: "fjc", source_url: "https://fjc.example/" }),
+    row(2020, "a", "Ann Roe", { source_url: null }),
+  ];
+  const { people } = groupPast(rows, 2025, new Map(), slugFor);
+  assert.deepEqual(people[0].sources, [
+    {
+      source: "mo_house roster",
+      links: [
+        { url: null, years: [2020] },
+        { url: "https://roster.example/2023", years: [2023] },
+        { url: "https://roster.example/2024", years: [2024] },
+      ],
+    },
+    { source: "fjc", links: [{ url: "https://fjc.example/", years: [2021, 2022] }] },
+  ]);
+});
+
+test("same-name wording says the records are unlinked, not that the people differ", () => {
+  assert.equal(sameNameKindLabel("current"), "current profile");
+  assert.equal(sameNameKindLabel("past"), "past roster entry");
+  assert.match(SAME_NAME_NOTE, /may or may not be the same person/);
+  assert.doesNotMatch(SAME_NAME_NOTE, /do not claim/);
+});
+
+test("House roster links are flagged as ZIP downloads; page-style sources are not", () => {
+  assert.match(rosterDownloadNote("mo_house roster", 2), /each year is a ZIP download/);
+  assert.match(rosterDownloadNote("mo_house roster", 1), /link is a ZIP download/);
+  assert.equal(rosterDownloadNote("fjc", 1), null);
+  assert.equal(rosterDownloadNote("openstates", 1), null);
 });

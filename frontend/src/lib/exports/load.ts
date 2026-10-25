@@ -554,7 +554,7 @@ export async function pastOfficeholders(): Promise<{
   if (!hasExport("rpt_officeholders_by_year")) return null;
   const slugs = new Map((await allOfficials()).map(({ official: o }) => [o.official_id, o.slug]));
   const rows = await query<RosterRow>(`
-    select year, official_id, has_profile, full_name, party, level, office, office_title, district, source
+    select year, official_id, has_profile, full_name, party, level, office, office_title, district, source, source_url
     from {rpt_officeholders_by_year}
     order by year desc, level, office, try_cast(district as integer), district, full_name`);
   const currentYear = Math.max(...rows.map((r) => r.year));
