@@ -23,8 +23,19 @@ projects", and the testing and documentation best practices.
 - Naming: `stg_<source>__<entity>`, `int_<entity>__<verb/what>`, `fct_` / `dim_`; dbt Core / dbt-duckdb (the versions pinned in `uv.lock`).
 - `ref()` / `source()` everywhere; no hardcoded relation names.
 - Portable SQL through `adapter.dispatch` macros (`macros/compat`), so the backend can change.
+- Supported adapters: DuckDB is the only supported and tested backend (built in CI). The regex macros also have Postgres
+  and Snowflake dispatches (rendered SQL pinned by `tests/test_regex_macros.py`, never run against a real
+  Snowflake/Postgres); other compat macros (spatial, JSON) lack Snowflake dispatches. Which adapters to support is open
+  in #121. Trino/Athena and Spark < 3.3 are not supported (no `regexp_instr`). Regex patterns are plain POSIX ERE;
+  `mogov.regex_literal` handles per-adapter string escaping (Snowflake treats backslash as an escape).
 - sqlfluff with the dbt templater in pre-commit and CI.
 - Optional inputs gate their models with vars (`mec_direct`, `cl_case_bulk`) instead of failing.
+- A bare `dbt build` can't silently drop optional models: an `on-run-start` hook
+  (`macros/optional_inputs.sql`) fails when `mec_direct` / `cl_case_bulk` is off but the raw table exists.
+  `mogov build` sets the vars from what is on disk; to disable them on purpose pass
+  `--vars '{skip_optional_raw_check: true}'`. The hook only runs when the selection has nodes to run.
+  It also covers bare `dbt snapshot` and `dbt source freshness` (dbt 1.11 runs project hooks for them), so
+  `mogov` passes the vars to every dbt subcommand.
 
 ## Deliberately not changed
 
