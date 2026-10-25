@@ -92,11 +92,12 @@
 
 
 {#
-  Metres to degrees of longitude at `lat_expr` (degrees). A degree of longitude is 111,320 m * cos(latitude);
-  a degree of latitude is about 110,570 m, so using the longitude figure for an isotropic degree buffer is
-  conservative east-west and about 1.3x generous north-south at Missouri's latitudes (the buffer is a margin
-  against sliver noise, not a measurement).
+  Metres to degrees for an inward buffer at latitude `lat` (a column or number, in degrees). A degree of longitude
+  is 111,320 m * cos(latitude), the shorter of the two degree lengths (about 87,700 m at Missouri's latitudes).
+  One degree distance has to serve both axes, so this divides by the longitude length: the buffer then erodes at
+  least `metres` in every direction (exactly that east-west, about 1.27x of it north-south), so a kept overlap
+  always contains a circle of radius `metres`. The buffer is a margin against sliver noise, not a measurement.
 #}
-{% macro geom_metres_to_degrees(metres, lat_expr) -%}
-    ({{ metres }} / (111320.0 * cos(radians({{ lat_expr }}))))
+{% macro geom_metres_to_degrees(metres, lat) -%}
+    ({{ metres }} / (111320.0 * cos(radians({{ lat }}))))
 {%- endmacro %}

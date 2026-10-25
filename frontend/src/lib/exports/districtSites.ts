@@ -31,7 +31,7 @@ function load(): Promise<Loaded | null> {
     const rows = await query<SiteRow & { official_id: string; district_id: string }>(`
       select official_id, district_id, registry_id, facility_name, address, city, postal_code,
              naics_description, owner_name, parent_company_name, is_donor, matched_by, donor_names,
-             match_confidence, contributions_url, frs_url
+             match_confidence, donor_links, frs_url
       from {fct_jurisdiction_businesses}
       order by district_id, is_donor desc, city, facility_name, frs_url`);
 

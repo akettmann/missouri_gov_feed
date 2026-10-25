@@ -586,9 +586,10 @@ offices, shops and most service businesses are missing.
     sites are filed under legal or subsidiary names ("UNION ELECTRIC CO", "LACLEDE GAS", "SOUTHWESTERN BELL
     TELEPHONE", "KANSAS CITY POWER & LIGHT"). The seed covers the largest corporate donors with Missouri sites.
   - In October 2026: 502 (official, facility) pairs by name and 1,541 more by brand, for 122 officials.
-- Each matched site also carries the matched donors' first and last contribution year, the committee
-  page (`contributions_url`: the MEC committee matched to the official, which is not filtered to the donor, or
-  the FEC disbursements of the donor's committee filtered to the receiving committee) and `match_confidence`
+- Each matched site also carries the matched donors' first and last contribution year, the links
+  (`donor_links`: one line per matched donor and filing page, `<url> <donor name>`. A page is the MEC committee
+  matched to the official, which is not filtered to the donor, or the FEC disbursements of the donor's committee
+  filtered to the receiving committee; a donor filed on both keeps both) and `match_confidence`
   (`medium` when any of that money was tied to the official by name only).
 - Industry: the NAICS code most of a site's programs give, taking primary codes first (`naics_source` `naics`,
   31% of the geocoded sites in October 2026), then codes FRS leaves UNKNOWN (`naics_unknown`, 2%), then SECONDARY

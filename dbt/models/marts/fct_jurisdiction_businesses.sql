@@ -29,7 +29,6 @@ donors as (
         count(*) as n_contributions,
         min(extract(year from transaction_date)) as first_year,
         max(extract(year from transaction_date)) as last_year,
-        min(source_url) as source_url,
         -- 1 when any of the money was tied to the official by a medium (name-only) match
         max(case when match_confidence = 'medium' then 1 else 0 end) as is_medium
     from {{ ref('fct_campaign_finance') }}
@@ -40,6 +39,21 @@ donors as (
     group by
         official_id,
         {{ mogov.company_key("coalesce(nullif(trim(counterparty_organization), ''), counterparty)") }}
+),
+
+donor_urls as (
+    -- every distinct filing page a donor's money to the official is filed on: a donor that gave to an MEC and
+    -- an FEC committee, or to two FEC committees, keeps one link each instead of min() picking one (#248)
+    select distinct
+        official_id,
+        {{ mogov.company_key("coalesce(nullif(trim(counterparty_organization), ''), counterparty)") }} as donor_key,
+        source_url
+    from {{ ref('fct_campaign_finance') }}
+    where
+        direction = 'received'
+        and lower(coalesce(counterparty_type, '')) <> 'individual'
+        and amount > 0
+        and source_url is not null
 ),
 
 donor_brands as (
@@ -101,11 +115,32 @@ matches as (
         min(d.n_contributions) as n_contributions,
         min(d.first_year) as first_year,
         min(d.last_year) as last_year,
-        min(d.source_url) as source_url,
         min(d.is_medium) as is_medium
     from matched_donors as m
     inner join donors as d on m.official_id = d.official_id and m.donor_key = d.donor_key
     group by m.official_id, m.registry_id, m.donor_key
+),
+
+links as (
+    -- one row per (official, facility, donor, filing page); donor_links below lists them per facility
+    select distinct
+        m.official_id,
+        m.registry_id,
+        d.donor_name,
+        u.source_url
+    from matched_donors as m
+    inner join donors as d on m.official_id = d.official_id and m.donor_key = d.donor_key
+    inner join donor_urls as u on m.official_id = u.official_id and m.donor_key = u.donor_key
+),
+
+facility_links as (
+    select
+        official_id,
+        registry_id,
+        {{ dbt.listagg("source_url || ' ' || donor_name", "chr(10)", 'order by donor_name, source_url') }}
+            as donor_links
+    from links
+    group by official_id, registry_id
 ),
 
 per_facility as (
@@ -118,7 +153,6 @@ per_facility as (
         sum(n_contributions) as n_contributions,
         min(first_year) as first_year,
         max(last_year) as last_year,
-        min(source_url) as source_url,
         case when max(is_medium) = 1 then 'medium' else 'high' end as match_confidence
     from matches
     group by official_id, registry_id
@@ -144,9 +178,10 @@ select
     cast(m.first_year as {{ dbt.type_int() }}) as first_year,
     cast(m.last_year as {{ dbt.type_int() }}) as last_year,
     m.match_confidence,
-    m.source_url as contributions_url,
+    l.donor_links,
     f.frs_url
 from areas as a
 inner join {{ ref('fct_district_facilities') }} as f
     on a.registry_id = f.registry_id and a.district_id = f.district_id
 left join per_facility as m on a.official_id = m.official_id and a.registry_id = m.registry_id
+left join facility_links as l on a.official_id = l.official_id and a.registry_id = l.registry_id

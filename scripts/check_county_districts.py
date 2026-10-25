@@ -36,7 +36,7 @@ def main() -> int:
     con = duckdb.connect(path, read_only=True)
     rows = con.execute(
         "select district_id, district_type, interior_lat, geometry_geojson from marts.dim_district "
-        "where district_type = 'county' or (is_current and district_type in ('state_house','state_senate','us_house'))"
+        "where is_current and district_type in ('county','state_house','state_senate','us_house')"
     ).fetchall()
     counties = {i: (shape(json.loads(g)), lat) for i, t, lat, g in rows if t == "county"}
     areas = {i: (t, shape(json.loads(g))) for i, t, _, g in rows if t != "county"}
