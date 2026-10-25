@@ -6,6 +6,7 @@
 -- source_url is the roster behind a past row: the House's session export for that year, the Open States
 -- folder (legislature, retired, ...) holding the person's file, the congress-legislators repository (one
 -- dataset), or the judge's own FJC page; null for the current year, whose rows come from dim_official.
+-- An Open States row with no matching person stays null, so the not_null test on source_url catches it.
 with this_year as (
     select cast(extract(year from current_date) as {{ dbt.type_int() }}) as year
 ),
@@ -65,7 +66,7 @@ select
             then
                 {{ dbt.concat(["'https://documents.house.mo.gov/xml/'", yy, "'1.zip'"]) }}
         when 'openstates'
-            then 'https://github.com/openstates/people/tree/main/data/mo/' || coalesce(o.folder, '')
+            then 'https://github.com/openstates/people/tree/main/data/mo/' || o.folder
         when 'congress-legislators' then 'https://github.com/unitedstates/congress-legislators'
         when 'fjc' then 'https://www.fjc.gov/node/' || {{ dbt.replace('u.official_id', "'fjc:'", "''") }}
     end as source_url
