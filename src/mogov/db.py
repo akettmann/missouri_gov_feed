@@ -234,6 +234,7 @@ OPTIONAL_JSON_TABLES = {
     "wikidata_own_leadership": "wikidata",
     "wikidata_mo_officeholders": "wikidata",
     "epa_frs_sic": "epa_frs",  # added to the EPA FRS loader after the first landings (#123); older raw dirs lack it
+    "epa_frs_alt_names": "epa_frs",  # added for U+FFFD name repair (#260); older raw dirs lack it
 }
 
 
