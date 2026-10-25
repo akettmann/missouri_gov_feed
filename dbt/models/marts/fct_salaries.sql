@@ -35,7 +35,7 @@ with pay as (
 -- legislature: by seat ----------------------------------------------------------------------------------
 seat_years as (
     select distinct
-        s.openstates_id,
+        s.person_id,
         s.chamber,
         s.surname_key,
         {{ mogov.name_key(dbt.split_part('s.full_name', "' '", 1)) }} as given_key,
@@ -49,13 +49,13 @@ seat_years as (
 seat_candidates as (
     select
         p.*,
-        s.openstates_id,
+        s.person_id,
         s.given_key,
-        count(distinct s.openstates_id) over (
+        count(distinct s.person_id) over (
             partition by p.calendar_year, p.seat_chamber, p.last_key, p.employee_name
         ) as n_members,
         count(distinct p.employee_name) over (
-            partition by p.calendar_year, p.seat_chamber, p.last_key, s.openstates_id
+            partition by p.calendar_year, p.seat_chamber, p.last_key, s.person_id
         ) as n_payees
     from pay as p
     inner join seat_years as s
@@ -76,7 +76,7 @@ by_seat as (
         c.gross_pay,
         case when c.first_key = c.given_key then 'high' else 'medium' end as match_confidence
     from seat_candidates as c
-    inner join {{ ref('dim_official') }} as o on c.openstates_id = o.openstates_id
+    inner join {{ ref('dim_official') }} as o on c.person_id = o.official_id
     where c.n_members = 1 and c.n_payees = 1
 ),
 

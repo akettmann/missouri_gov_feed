@@ -39,7 +39,7 @@ shor as (
             and seat.surname_key = {{ mogov.name_key('s.family_name') }}
             and extract(year from seat.start_date) <= s.last_year
             and extract(year from seat.end_date) >= s.last_year
-    inner join {{ ref('dim_official') }} as o on seat.openstates_id = o.official_id
+    inner join {{ ref('dim_official') }} as o on seat.person_id = o.official_id
 ),
 
 -- party unity: party majorities come from every member who voted (int_votes__party_positions) ----------

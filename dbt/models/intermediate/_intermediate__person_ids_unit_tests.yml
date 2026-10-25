@@ -1,0 +1,208 @@
+# Unit tests for the person-id reconciliation (#97): fixed input rows -> exact expected rows.
+# Kept apart from the generated _intermediate.yml so regenerating docs never touches them.
+version: 2
+
+unit_tests:
+  - name: person_ids_join_a_redistricted_seat_change
+    model: int_officials__person_ids
+    description: >
+      Open States holds one person twice when a redistricting renumbers their seat (David Smith, HD45 until 2022,
+      HD46 from 2023): the same exact name, different seats, never in the same year. Both ids resolve to the one
+      whose service ends latest, so the current profile keeps its id.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/smith-old, year: 2021, office: state_house, district: '45', name_key: david smith}
+          - {alias_id: ocd-person/smith-old, year: 2022, office: state_house, district: '45', name_key: david smith}
+          - {alias_id: ocd-person/smith-new, year: 2023, office: state_house, district: '46', name_key: david smith}
+          - {alias_id: ocd-person/smith-new, year: 2026, office: state_house, district: '46', name_key: david smith}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/smith-old, person_id: ocd-person/smith-new, basis: name_continuity}
+        - {alias_id: ocd-person/smith-new, person_id: ocd-person/smith-new, basis: self}
+
+  - name: person_ids_join_a_house_fallback_key_to_the_senate_record
+    model: int_officials__person_ids
+    description: >
+      The House roster keys a member mohouse:<id> when its seat match fails; the same person later has an Open States
+      record as a senator (Mike Cierpiot, HD30 in 2017-18, SD8 from 2023). The mohouse key resolves to the Open States
+      id, which is also the one whose service ends latest.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: 'mohouse:476', year: 2017, office: state_house, district: '30', name_key: mike cierpiot}
+          - {alias_id: 'mohouse:476', year: 2018, office: state_house, district: '30', name_key: mike cierpiot}
+          - {alias_id: ocd-person/cierpiot, year: 2026, office: state_senate, district: '8', name_key: mike cierpiot}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: 'mohouse:476', person_id: ocd-person/cierpiot, basis: name_continuity}
+        - {alias_id: ocd-person/cierpiot, person_id: ocd-person/cierpiot, basis: self}
+
+  - name: person_ids_join_a_same_seat_split
+    model: int_officials__person_ids
+    description: >
+      The same seat under two ids is the same person, not two (Jean Evans, HD99 under an Open States id until
+      February 2019 and under mohouse:1912 in 2019). The Open States id wins
+      over the fallback key.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/evans, year: 2017, office: state_house, district: '99', name_key: jean evans}
+          - {alias_id: ocd-person/evans, year: 2018, office: state_house, district: '99', name_key: jean evans}
+          - {alias_id: ocd-person/evans, year: 2019, office: state_house, district: '99', name_key: jean evans}
+          - {alias_id: 'mohouse:1912', year: 2019, office: state_house, district: '99', name_key: jean evans}
+          - {alias_id: ocd-person/someone-else, year: 2026, office: state_house, district: '1', name_key: some one}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/evans, person_id: ocd-person/evans, basis: self}
+        - {alias_id: 'mohouse:1912', person_id: ocd-person/evans, basis: name_continuity}
+        - {alias_id: ocd-person/someone-else, person_id: ocd-person/someone-else, basis: self}
+
+  - name: person_ids_keep_same_name_in_two_seats_the_same_year_apart
+    model: int_officials__person_ids
+    description: >
+      Two people can share a name. When two ids with the same exact name hold different seats across several of the
+      same years they cannot be one person, so neither is merged.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/smith-a, year: 2023, office: state_house, district: '10', name_key: pat smith}
+          - {alias_id: ocd-person/smith-a, year: 2024, office: state_house, district: '10', name_key: pat smith}
+          - {alias_id: ocd-person/smith-b, year: 2023, office: state_house, district: '77', name_key: pat smith}
+          - {alias_id: ocd-person/smith-b, year: 2024, office: state_house, district: '77', name_key: pat smith}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/smith-a, person_id: ocd-person/smith-a, basis: self}
+        - {alias_id: ocd-person/smith-b, person_id: ocd-person/smith-b, basis: self}
+
+  - name: person_ids_join_a_one_year_hand_over_between_seats
+    model: int_officials__person_ids
+    description: >
+      A member sworn into the Senate partway through their last House year shows in both seats for that one year
+      (Lauren Arthur, HD18 and SD17 in 2018; the House roster also had no Open States match for her). One shared
+      year is a hand-over, not two people, so the fallback key joins the Open States id.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: 'mohouse:1810', year: 2017, office: state_house, district: '18', name_key: lauren arthur}
+          - {alias_id: 'mohouse:1810', year: 2018, office: state_house, district: '18', name_key: lauren arthur}
+          - {alias_id: ocd-person/arthur, year: 2018, office: state_senate, district: '17', name_key: lauren arthur}
+          - {alias_id: ocd-person/arthur, year: 2019, office: state_senate, district: '17', name_key: lauren arthur}
+          - {alias_id: ocd-person/someone-else, year: 2026, office: state_house, district: '1', name_key: some one}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: 'mohouse:1810', person_id: ocd-person/arthur, basis: name_continuity}
+        - {alias_id: ocd-person/arthur, person_id: ocd-person/arthur, basis: self}
+        - {alias_id: ocd-person/someone-else, person_id: ocd-person/someone-else, basis: self}
+
+  - name: person_ids_keep_a_different_people_pair_apart
+    model: int_officials__person_ids
+    description: >
+      A pair listed as different_people in official_id_links is never merged by name, even when their seats never
+      overlap in time.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/lee-a, year: 2017, office: state_house, district: '10', name_key: sam lee}
+          - {alias_id: ocd-person/lee-b, year: 2024, office: state_house, district: '77', name_key: sam lee}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: ocd-person/lee-a, person_id: ocd-person/lee-b, relation: different_people, checked_by: maintainer}
+    expect:
+      rows:
+        - {alias_id: ocd-person/lee-a, person_id: ocd-person/lee-a, basis: self}
+        - {alias_id: ocd-person/lee-b, person_id: ocd-person/lee-b, basis: self}
+
+  - name: person_ids_follow_a_curated_link_to_a_judge
+    model: int_officials__person_ids
+    description: >
+      A former legislator who is now a state judge holds no legislative seat the name rule could continue, so a
+      curated same_person link names their current id (Joe Don McGaugh). The link applies to the id the name rule
+      chose as well as to the id it names, so both the Open States and the fallback key resolve to the judge.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/mcgaugh, year: 2017, office: state_house, district: '39', name_key: joe don mcgaugh}
+          - {alias_id: 'mohouse:658', year: 2017, office: state_house, district: '39', name_key: joe don mcgaugh}
+          - {alias_id: ocd-person/someone-else, year: 2026, office: state_house, district: '1', name_key: some one}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: ocd-person/mcgaugh, person_id: 'mojudge:joe don mcgaugh', relation: same_person, checked_by: maintainer}
+    expect:
+      rows:
+        - {alias_id: ocd-person/mcgaugh, person_id: 'mojudge:joe don mcgaugh', basis: curated}
+        - {alias_id: 'mohouse:658', person_id: 'mojudge:joe don mcgaugh', basis: curated}
+        - {alias_id: ocd-person/someone-else, person_id: ocd-person/someone-else, basis: self}
+
+  - name: person_ids_ignore_unsigned_curated_links
+    model: int_officials__person_ids
+    description: >
+      Curated rows wait for maintainer sign-off: a same_person row with no checked_by changes nothing (the ids stay
+      their own, joined only by name), and an unsigned different_people row does not keep a name apart.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/mcgaugh, year: 2017, office: state_house, district: '39', name_key: joe don mcgaugh}
+          - {alias_id: 'mohouse:658', year: 2017, office: state_house, district: '39', name_key: joe don mcgaugh}
+          - {alias_id: ocd-person/lee-a, year: 2017, office: state_house, district: '10', name_key: sam lee}
+          - {alias_id: ocd-person/lee-b, year: 2024, office: state_house, district: '10', name_key: sam lee}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: ocd-person/mcgaugh, person_id: 'mojudge:joe don mcgaugh', relation: same_person}
+          - {alias_id: ocd-person/lee-a, person_id: ocd-person/lee-b, relation: different_people}
+    expect:
+      rows:
+        - {alias_id: ocd-person/mcgaugh, person_id: ocd-person/mcgaugh, basis: self}
+        - {alias_id: 'mohouse:658', person_id: ocd-person/mcgaugh, basis: name_continuity}
+        - {alias_id: ocd-person/lee-a, person_id: ocd-person/lee-b, basis: name_continuity}
+        - {alias_id: ocd-person/lee-b, person_id: ocd-person/lee-b, basis: self}
+
+  - name: person_ids_keep_the_id_after_the_official_leaves_office
+    model: int_officials__person_ids
+    description: >
+      The chosen id does not depend on who serves in the latest roster year. Here the newer Open States id sorts
+      after the older one and neither serves in the latest year (someone else does); the id that served last is
+      kept, so a former official's id and URL do not change when the roster year moves on.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/aaa-old, year: 2013, office: state_house, district: '45', name_key: pat cook}
+          - {alias_id: ocd-person/aaa-old, year: 2016, office: state_house, district: '45', name_key: pat cook}
+          - {alias_id: ocd-person/zzz-new, year: 2017, office: state_house, district: '46', name_key: pat cook}
+          - {alias_id: ocd-person/zzz-new, year: 2020, office: state_house, district: '46', name_key: pat cook}
+          - {alias_id: ocd-person/someone-else, year: 2026, office: state_house, district: '1', name_key: some one}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/aaa-old, person_id: ocd-person/zzz-new, basis: name_continuity}
+        - {alias_id: ocd-person/zzz-new, person_id: ocd-person/zzz-new, basis: self}
+        - {alias_id: ocd-person/someone-else, person_id: ocd-person/someone-else, basis: self}
+
+  - name: house_member_identity_uses_the_stable_person_id
+    model: int_mo_house__member_identity
+    description: >
+      person_key is the person id for the key the seat match gave; raw_person_key keeps the key itself. A key with
+      no row in the crosswalk stays as it is.
+    given:
+      - input: ref('int_mo_house__member_seat_keys')
+        rows:
+          - {session_code: '171', district_number: 30, raw_person_key: 'mohouse:476'}
+          - {session_code: '171', district_number: 31, raw_person_key: 'mohouse:999'}
+      - input: ref('int_officials__person_ids')
+        rows:
+          - {alias_id: 'mohouse:476', person_id: ocd-person/cierpiot, basis: name_continuity}
+    expect:
+      rows:
+        - {session_code: '171', district_number: 30, raw_person_key: 'mohouse:476', person_key: ocd-person/cierpiot}
+        - {session_code: '171', district_number: 31, raw_person_key: 'mohouse:999', person_key: 'mohouse:999'}

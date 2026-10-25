@@ -241,3 +241,149 @@ unit_tests:
     expect:
       rows:
         - {record_id: '1001', mec_committee_id: C1, committee_name: New layout, contributor_name: Dup PAC, amount: 100}
+
+  - name: tap_contributions_dedupe_cross_layout
+    model: stg_tap_mec__contributions
+    description: >
+      The same gift filed once in each export layout under different ids (#99; an amended report re-filed
+      in the 2020-2022 export, or a 24-hour notice re-itemized in the next full report) is counted once: same committee, date, amount and donor, matched
+      one-to-one, and the older layout's row (txn) is dropped. Matching ignores case and padding. Identical gifts
+      inside ONE layout are real repeats and both stay; a pair that differs in amount or committee is not a
+      duplicate; with two older rows and one newer row only one older row is dropped; with one older row and two newer rows the older row is dropped and both newer rows stay; a pair that differs only in donor or only in date is not a duplicate; organization donors (name
+      in company / ctrb_name) match like people.
+    given:
+      - input: source('tap_mec', 'contributions')
+        format: sql
+        rows: |
+          select
+              cast('C1' as varchar) as cmte_id,
+              cast(null as varchar) as mecid,
+              cast(null as varchar) as cmte_name,
+              cast(null as varchar) as committee_name,
+              cast('Aaron Hankel' as varchar) as ctrb_name,
+              cast('Individual' as varchar) as ctrb_type,
+              cast(null as varchar) as committee,
+              cast(null as varchar) as company,
+              cast('Aaron' as varchar) as first_name,
+              cast('Hankel' as varchar) as last_name,
+              cast(null as varchar) as address_1,
+              cast(null as varchar) as employer,
+              cast(null as varchar) as occupation,
+              cast(null as varchar) as city_clean,
+              cast(null as varchar) as city,
+              cast(null as varchar) as state_clean,
+              cast(null as varchar) as state,
+              cast('100' as varchar) as amount,
+              cast('2020-07-01' as varchar) as date,
+              cast(null as varchar) as year,
+              cast(null as varchar) as cont_type,
+              cast(null as varchar) as contribution_type,
+              cast(null as varchar) as rpt_type,
+              cast(null as varchar) as report,
+              cast('FALSE' as varchar) as dupe_flag,
+              cast('a-old' as varchar) as txn,
+              cast(null as varchar) as cd1_a_id,
+              cast(null as varchar) as address_clean
+          union all select null, 'C1', null, null, null, null, '', '', ' AARON ', 'hankel', null, null, null, null, null, null, null, '100', '2020-07-01', null, null, null, null, null, 'FALSE', null, 'a-new', null
+          union all select 'C2', null, null, null, 'Bea Cole', 'Individual', null, null, 'Bea', 'Cole', null, null, null, null, null, null, null, '50', '2020-07-02', null, null, null, null, null, 'FALSE', 'b-old1', null, null
+          union all select 'C2', null, null, null, 'Bea Cole', 'Individual', null, null, 'Bea', 'Cole', null, null, null, null, null, null, null, '50', '2020-07-02', null, null, null, null, null, 'FALSE', 'b-old2', null, null
+          union all select 'C3', null, null, null, 'Cy Dunn', 'Individual', null, null, 'Cy', 'Dunn', null, null, null, null, null, null, null, '25', '2020-07-03', null, null, null, null, null, 'FALSE', 'c-old', null, null
+          union all select null, 'C3', null, null, null, null, '', '', 'Cy', 'Dunn', null, null, null, null, null, null, null, '26', '2020-07-03', null, null, null, null, null, 'FALSE', null, 'c-new', null
+          union all select 'C4', null, null, null, 'Di Eng', 'Individual', null, null, 'Di', 'Eng', null, null, null, null, null, null, null, '10', '2020-07-04', null, null, null, null, null, 'FALSE', 'd-old1', null, null
+          union all select 'C4', null, null, null, 'Di Eng', 'Individual', null, null, 'Di', 'Eng', null, null, null, null, null, null, null, '10', '2020-07-04', null, null, null, null, null, 'FALSE', 'd-old2', null, null
+          union all select null, 'C4', null, null, null, null, '', '', 'Di', 'Eng', null, null, null, null, null, null, null, '10', '2020-07-04', null, null, null, null, null, 'FALSE', null, 'd-new', null
+          union all select 'C5', null, null, null, 'Acme Corp', 'Corporation', null, 'Acme Corp', '', '', null, null, null, null, null, null, null, '900', '2020-07-05', null, null, null, null, null, 'FALSE', 'e-old', null, null
+          union all select null, 'C5', null, null, null, null, '', 'Acme Corp', '', '', null, null, null, null, null, null, null, '900', '2020-07-05', null, null, null, null, null, 'FALSE', null, 'e-new', null
+          union all select 'C6', null, null, null, 'Fay Gale', 'Individual', null, null, 'Fay', 'Gale', null, null, null, null, null, null, null, '5', '2020-07-06', null, null, null, null, null, 'FALSE', 'f-old', null, null
+          union all select null, 'C7', null, null, null, null, '', '', 'Fay', 'Gale', null, null, null, null, null, null, null, '5', '2020-07-06', null, null, null, null, null, 'FALSE', null, 'f-new', null
+          union all select 'C8', null, null, null, 'Gus Hale', 'Individual', null, null, 'Gus', 'Hale', null, null, null, null, null, null, null, '40', '2020-07-07', null, null, null, null, null, 'FALSE', 'g-old', null, null
+          union all select null, 'C8', null, null, null, null, '', '', 'Ivy', 'Hale', null, null, null, null, null, null, null, '40', '2020-07-07', null, null, null, null, null, 'FALSE', null, 'g-new', null
+          union all select 'C9', null, null, null, 'Hal Ivey', 'Individual', null, null, 'Hal', 'Ivey', null, null, null, null, null, null, null, '60', '2020-07-08', null, null, null, null, null, 'FALSE', 'h-old', null, null
+          union all select null, 'C9', null, null, null, null, '', '', 'Hal', 'Ivey', null, null, null, null, null, null, null, '60', '2020-07-09', null, null, null, null, null, 'FALSE', null, 'h-new', null
+          union all select 'C10', null, null, null, 'Jo Kim', 'Individual', null, null, 'Jo', 'Kim', null, null, null, null, null, null, null, '30', '2020-07-10', null, null, null, null, null, 'FALSE', 'j-old', null, null
+          union all select null, 'C10', null, null, null, null, '', '', 'Jo', 'Kim', null, null, null, null, null, null, null, '30', '2020-07-10', null, null, null, null, null, 'FALSE', null, 'j-new1', null
+          union all select null, 'C10', null, null, null, null, '', '', 'Jo', 'Kim', null, null, null, null, null, null, null, '30', '2020-07-10', null, null, null, null, null, 'FALSE', null, 'j-new2', null
+    expect:
+      rows:
+        - {record_id: a-new, mec_committee_id: C1, amount: 100}
+        - {record_id: b-old1, mec_committee_id: C2, amount: 50}
+        - {record_id: b-old2, mec_committee_id: C2, amount: 50}
+        - {record_id: c-old, mec_committee_id: C3, amount: 25}
+        - {record_id: c-new, mec_committee_id: C3, amount: 26}
+        - {record_id: d-old2, mec_committee_id: C4, amount: 10}
+        - {record_id: d-new, mec_committee_id: C4, amount: 10}
+        - {record_id: e-new, mec_committee_id: C5, amount: 900}
+        - {record_id: f-old, mec_committee_id: C6, amount: 5}
+        - {record_id: f-new, mec_committee_id: C7, amount: 5}
+        - {record_id: g-old, mec_committee_id: C8, amount: 40}
+        - {record_id: g-new, mec_committee_id: C8, amount: 40}
+        - {record_id: h-old, mec_committee_id: C9, amount: 60}
+        - {record_id: h-new, mec_committee_id: C9, amount: 60}
+        - {record_id: j-new1, mec_committee_id: C10, amount: 30}
+        - {record_id: j-new2, mec_committee_id: C10, amount: 30}
+
+  - name: tap_expenditures_payee_name
+    model: stg_tap_mec__expenditures
+    description: >
+      TAP's payee_name is just coalesce(last_name, first_name, company) and merged different people sharing a
+      surname (#85), so it is not used. A company wins over the contact's first/last name; when the company only
+      repeats the person's last name or "First Last" the payee is "First Last"; with no company the payee is
+      "First Last", then a lone first or last name. Placeholder parts ('~', '-', '?') and all-digit parts are
+      dropped, so '~' / '~' falls through to the company; a whole name of one character is dropped but initials
+      inside a person's name stay. TAP's payee_name alone (r8) yields null. An organization typed into both name boxes (r16, r17: the last
+      name already starts with the first name) is not doubled.
+    given:
+      - input: source('tap_mec', 'expenditures')
+        format: sql
+        rows: |
+          select
+              cast('r1' as varchar) as cd3_b_id,
+              cast('C1' as varchar) as mecid,
+              cast('Committee' as varchar) as committee_name,
+              cast('Shepard' as varchar) as payee_name,
+              cast(null as varchar) as company,
+              cast('Kimmie' as varchar) as first_name,
+              cast('Shepard' as varchar) as last_name,
+              cast(null as varchar) as purpose,
+              cast(null as varchar) as expenditure_type,
+              cast('1' as varchar) as amount,
+              cast(null as varchar) as date_clean,
+              cast(null as varchar) as year_clean,
+              cast(null as varchar) as city_final,
+              cast(null as varchar) as state_norm,
+              cast(null as varchar) as report,
+              cast('FALSE' as varchar) as dupe_flag
+          union all select 'r2', 'C1', 'Committee', 'Shepard', null, 'Kiara', ' Shepard ', null, null, '1', null, null, null, null, null, null
+          union all select 'r3', 'C1', 'Committee', 'Acme Printing', 'Acme Printing', null, null, null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r4', 'C1', 'Committee', 'Walmart', 'Walmart', '~', '~', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r5', 'C1', 'Committee', '~', 'Walmart', '~', '~', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r6', 'C1', 'Committee', 'Roe', null, 'J', 'Roe', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r7', 'C1', 'Committee', '?', null, 'Bob', '?', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r8', 'C1', 'Committee', 'Jane Doe', null, null, null, null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r9', 'C1', 'Committee', 'Jane Doe', null, 'Jane', 'Doe', null, null, '1', null, null, null, null, null, 'TRUE'
+          union all select 'r10', 'C1', 'Committee', null, null, null, null, null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r11', 'C1', 'Committee', 'Cady', 'JEFFERSON CITY MARKETING', 'Jeremy', 'Cady', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r12', 'C1', 'Committee', 'Pierce', 'Pierce', 'Mary', 'Pierce', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r13', 'C1', 'Committee', '1966', 'Discount Mugs', 'Bob', '1966', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r14', 'C1', 'Committee', 'Becky', 'Minuteman Press', 'Becky', null, null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r15', 'C1', 'Committee', 'Hertzog', ' bud  hertzog ', 'Bud', 'Hertzog', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r16', 'C1', 'Committee', 'USPS', 'USPS', 'USPS', 'USPS', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r17', 'C1', 'Committee', 'Kyler Cliffman', 'Kyler Cliffman', 'Kyler', 'Kyler Cliffman', null, null, '1', null, null, null, null, null, 'FALSE'
+    expect:
+      rows:
+        - {record_id: r1, payee_name: Kimmie Shepard}
+        - {record_id: r2, payee_name: Kiara Shepard}
+        - {record_id: r3, payee_name: Acme Printing}
+        - {record_id: r4, payee_name: Walmart}
+        - {record_id: r5, payee_name: Walmart}
+        - {record_id: r6, payee_name: J Roe}
+        - {record_id: r7, payee_name: Bob}
+        - {record_id: r8, payee_name: null}
+        - {record_id: r10, payee_name: null}
+        - {record_id: r11, payee_name: JEFFERSON CITY MARKETING}
+        - {record_id: r12, payee_name: Mary Pierce}
+        - {record_id: r13, payee_name: Discount Mugs}
+        - {record_id: r14, payee_name: Minuteman Press}
+        - {record_id: r15, payee_name: Bud Hertzog}
+        - {record_id: r16, payee_name: USPS}
+        - {record_id: r17, payee_name: Kyler Cliffman}

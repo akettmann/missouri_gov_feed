@@ -1,10 +1,13 @@
 -- EPA FRS facilities in Missouri that have coordinates, with one owner, one parent company and one primary
 -- NAICS code each. The owner is the first owner-role organization (owner/operator, owner, operator,
--- permittee; a known org_type before UNKNOWN); the NAICS code is the primary code most of the facility's
--- programs give. A facility with no NAICS code but a SIC code (a primary one before an unknown or secondary
--- one, then the one most programs give) gets the NAICS sector that SIC code's major group falls in (seed
--- sic_naics_sectors): naics_code is then the two-digit sector prefix, naics_description names the sector and
--- the SIC code, and naics_source is 'sic' (otherwise 'naics', or null when the facility has neither).
+-- permittee; a known org_type before UNKNOWN); the NAICS code is the code most of the facility's programs give,
+-- taking the programs' primary codes first (naics_source 'naics'), then the ones FRS leaves UNKNOWN
+-- ('naics_unknown'), then the ones it calls SECONDARY ('naics_secondary'). Only a facility with no NAICS code
+-- at all but a SIC code (a primary one before an unknown or secondary one, then the one most programs give)
+-- gets the NAICS sector that SIC code's major group falls in (seed sic_naics_sectors): naics_code is then the
+-- two-digit sector prefix, naics_description names the sector and the SIC code, and naics_source is 'sic'.
+-- naics_source is null when the facility has no usable code. A real NAICS code, even a non-primary one, is
+-- more precise than a two-digit SIC-derived sector, and agrees with it on the sector for 92-98% of facilities.
 -- is_government: a federal site, any owner-role organization typed as a government body
 -- (municipal, county, state, federal, district, tribal), or a facility or owner named like one ("City of ...",
 -- "... County", "... School District"; most organizations are typed UNKNOWN). The *_key columns are
@@ -72,18 +75,22 @@ naics as (
         registry_id,
         naics_code,
         max(naics_description) as naics_description,
+        case when is_primary then 0 when is_secondary then 2 else 1 end as rank_class,
         count(*) as n_programs
     from {{ ref('stg_epa_frs__naics') }}
-    where is_primary
-    group by registry_id, naics_code
+    where naics_code is not null
+    group by registry_id, naics_code, case when is_primary then 0 when is_secondary then 2 else 1 end
 ),
 
-primary_naics as (
+best_naics as (
     select
         registry_id,
         naics_code,
         naics_description,
-        row_number() over (partition by registry_id order by n_programs desc, naics_code asc) as rn
+        rank_class,
+        row_number() over (
+            partition by registry_id order by rank_class asc, n_programs desc, naics_code asc
+        ) as rn
     from naics
 ),
 
@@ -145,7 +152,9 @@ select
         end
     ) as naics_description,
     case
-        when n.naics_code is not null then 'naics'
+        when n.rank_class = 0 then 'naics'
+        when n.rank_class = 1 then 'naics_unknown'
+        when n.rank_class = 2 then 'naics_secondary'
         when ps.naics_prefix is not null then 'sic'
     end as naics_source,
     (
@@ -161,7 +170,7 @@ select
 from {{ ref('stg_epa_frs__facilities') }} as f
 left join owners as o on f.registry_id = o.registry_id and o.rn = 1
 left join parents as p on f.registry_id = p.registry_id and p.rn = 1
-left join primary_naics as n on f.registry_id = n.registry_id and n.rn = 1
+left join best_naics as n on f.registry_id = n.registry_id and n.rn = 1
 left join primary_sic as ps on f.registry_id = ps.registry_id and ps.rn = 1 and n.naics_code is null
 left join {{ ref('naics_sectors') }} as sec on ps.naics_prefix = sec.naics_prefix
 left join government as g on f.registry_id = g.registry_id

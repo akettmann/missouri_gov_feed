@@ -169,7 +169,8 @@ difference, so no measurable cost). An earlier per-route query version took abou
 in 2 of 5 builds.
 Without the export no site pages are built and the section shows no link.
 
-Optional build-time environment: `PUBLIC_SITE_URL` (canonical site URL), `PUBLIC_REPORT_ERROR_URL`
+Optional build-time environment: `PUBLIC_SITE_URL` (canonical site URL), `PUBLIC_BASE_PATH` (path prefix such as `/missouri_gov_feed`; unset =
+site at the root, set by `deploy:pages`), `PUBLIC_REPORT_ERROR_URL`
 (where "Report an error" goes; default: a prefilled GitHub issue on this repo).
 
 ### Publishing to Google Cloud Storage
@@ -192,6 +193,47 @@ The build is plain static files, so any static host works; the repo ships a scri
    The bucket mirrors `dist/` (files no longer built are deleted). Hashed assets (`_astro/`) are cached for a
    year; pages for 5 minutes and JSON for an hour, so a data refresh shows up quickly. Set `PUBLIC_SITE_URL` at
    build time to the public address.
+
+### Publishing to GitHub Pages (free stopgap)
+
+GCS (above) stays the end goal; Pages is a free stopgap while traffic is tiny. The site is built **locally** (CI has no data) and pushed to an
+orphan `gh-pages` branch; `main` history is never touched.
+
+Findings (checked against the ~170 MB `dist/`, 1052 pages):
+
+- Limits: a published Pages site must be <= 1 GB, each file < 100 MB (git push limit), and the soft bandwidth cap is
+  100 GB/month. Our `dist/` is about 170 MB, the largest file is a 3.2 MB HTML page, so it fits comfortably.
+  `deploy:pages` refuses to push if either limit would be broken.
+- Method (a), orphan `gh-pages` branch from a temp dir, was chosen over (b) `workflow_dispatch` +
+  `upload-pages-artifact`: (b) needs the built site inside CI, and CI has no data, so we would have to upload 170 MB
+  from a laptop anyway. (a) is one command, needs no workflow, and force-pushing the orphan branch replaces history
+  so snapshots do not accumulate.
+- Project sites are served under `/missouri_gov_feed/`, so the build sets Astro `base` from `PUBLIC_BASE_PATH`.
+  Every internal link goes through `href()` (`src/lib/site.ts`); the default (GCS) build has no base and is
+  unchanged. `scripts/link-check.mjs` verifies a built `dist/` (every root-relative reference resolves under the base).
+
+Differences from GCS to keep in mind: Pages sends no custom `Cache-Control` headers (a fixed short cache; our
+year-long `_astro/` caching and 5-minute page caching do not apply), infers content types from file extensions,
+serves `404.html` for unknown paths, and 301-redirects a directory URL without a trailing slash to the slash form.
+The Pages build and the GCS build differ (base path), so **rebuild before `deploy:gcs`**: it refuses a dist built
+for Pages (link check at the root), and `deploy:pages` rebuilds with the Pages base itself.
+
+```sh
+pnpm deploy:pages --dry-run   # build with the Pages base, stale check, link check, size check; pushes nothing
+pnpm deploy:pages             # the same, then force-push ONLY the gh-pages branch
+```
+
+One-time setup, in the repo on GitHub: Settings -> Pages -> Build and deployment -> Source "Deploy from a branch",
+Branch `gh-pages`, folder `/ (root)`. The site then appears at https://akettmann.github.io/missouri_gov_feed/ a minute
+after each push. Note that Pages sites from a public repo are public; use `--allow-stale` only deliberately.
+On Windows Git Bash never set `PUBLIC_BASE_PATH=/x` by hand (MSYS rewrites it to a `C:/Program Files/Git/...` path;
+the build now rejects that); the script sets it for you.
+
+The deploy only ever writes the `gh-pages` branch (there is no `--branch` flag), pushing to
+`https://github.com/<owner>/<name>.git` for the repo of the `origin` remote (`--remote NAME` picks another remote
+to read the repo from). It refuses to run with uncommitted changes under `frontend/` (`--allow-dirty` overrides)
+and removes its ~200 MB temp repo on every exit, dry runs and failures included (`--keep` leaves it for
+inspection).
 
 ## Local, in Docker (Compose)
 

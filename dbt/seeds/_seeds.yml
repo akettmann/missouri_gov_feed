@@ -192,7 +192,7 @@ seeds:
       Ties between two sectors: 0752 animal specialty services (11 or 81; kept 81, pet care), 4923 gas transmission
       and distribution (22 or 48; set 48 with 4922), 7331 (51 or 54), 7335 (48 or 54), 7383 (51 or 71) and 7378 (44
       or 81; kept 81), and 89 services not elsewhere classified (51 or 54; kept 54). Also left in their group
-      although the concordance splits them: 1389, 2771 greeting cards (31 or 51), 3295, 5099, 5171, 5441, 5699, 5712, 7353. int_epa_frs__facilities uses it for sites whose FRS records carry a SIC code but no NAICS code.
+      although the concordance splits them: 1389, 2771 greeting cards (31 or 51), 3295, 5099, 5171, 5441, 5699, 5712, 7353. Majorities and ties are judged by concordance row count, with judgement overrides where rows are slices of one niche activity: 8741 management services has 10 construction-management rows (one per construction industry, sector 23) but is set 56 for the one general row (561110), which is the bulk of the code. int_epa_frs__facilities uses it for sites whose FRS records carry a SIC code but no NAICS code.
     config:
       column_types: {sic_prefix: varchar, naics_prefix: varchar}
     columns:
@@ -205,3 +205,44 @@ seeds:
               arguments:
                 to: ref('naics_sectors')
                 field: naics_prefix
+  - name: official_id_links
+    description: >
+      Hand-kept links between the ids one legislator is known by (#97), applied by int_officials__person_ids on top of
+      its same-exact-name rule. relation same_person: alias_id is another id of the person whose current id is
+      person_id (a former legislator now a statewide officer or judge, whom the name rule leaves alone because they
+      hold no legislative seat today). relation different_people: alias_id and person_id are two people who share a
+      name; the name rule never merges that name, and the no-shared-name test accepts the pair. Every row records
+      its evidence. The links were made by an automated check and take effect only once a maintainer signs the
+      row off by filling checked_by and checked_on; unsigned rows are ignored by int_officials__person_ids.
+    config:
+      column_types:
+        {alias_id: varchar, person_id: varchar, relation: varchar, basis: varchar, evidence: varchar,
+         checked_by: varchar, checked_on: date}
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [alias_id, person_id, relation]
+    columns:
+      - name: alias_id
+        data_tests: [not_null]
+      - name: person_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('int_officials__current')
+                field: official_id
+              config:
+                where: "relation = 'same_person'"
+      - name: relation
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [same_person, different_people]
+      - name: evidence
+        data_tests: [not_null]
+      - name: checked_by
+        description: Maintainer who reviewed the row; empty until reviewed.
+      - name: checked_on
+        description: Date the maintainer reviewed the row; empty until reviewed.

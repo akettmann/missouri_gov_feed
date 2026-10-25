@@ -10,6 +10,8 @@ export interface AwardEntry {
   party: string | null;
   metric: number;
   sample_size: number | null;
+  /** Consecutive yearly periods qualified, up to this one; null for the lifetime period. */
+  streak_years: number | null;
 }
 export interface AwardList {
   award: string;
@@ -87,10 +89,11 @@ async function load(): Promise<AwardList[] | null> {
     metric: number;
     sample_size: number | null;
     group_size: number;
+    streak_years: number | null;
   }>(`
     select award, office, period, cast(award_rank as integer) as award_rank, official_id,
            cast(metric as double) as metric, cast(sample_size as double) as sample_size,
-           cast(group_size as integer) as group_size
+           cast(group_size as integer) as group_size, cast(streak_years as integer) as streak_years
     from {rpt_awards} order by award, office, period, award_rank`);
   const lists = new Map<string, AwardList>();
   for (const r of rows) {
@@ -111,6 +114,7 @@ async function load(): Promise<AwardList[] | null> {
       party: o.party,
       metric: r.metric,
       sample_size: r.sample_size,
+      streak_years: r.streak_years,
     });
     lists.set(key, list);
   }
