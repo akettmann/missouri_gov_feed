@@ -87,7 +87,8 @@ export function totalWithoutMedium(
   const pay = covered.reduce((n, y) => n + (y.pay_amount ?? 0), 0);
   const votes = covered.reduce((n, y) => n + y.votes_attended, 0);
   return {
-    voting_years: shown.length,
+    // all years with votes, so the coverage note still reads "0 of 4" when the possible matches are hidden
+    voting_years: years.length,
     covered_years: covered.length,
     pay_amount: covered.length ? pay : null,
     votes_attended: votes,
@@ -100,11 +101,19 @@ const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD",
 /** Whole dollars, or an em dash when there is no figure (no pay row, or no attended vote). */
 export const dollars = (n: number | null | undefined) => (n == null ? "—" : usd.format(n));
 
-/** What the total covers, e.g. "2 of 4 years with votes (the rest have no pay counted)". */
-export function coverageNote(total: Pick<PayVoteRow, "covered_years" | "voting_years">): string {
+/**
+ * What the total covers, e.g. "2 of 4 years with votes (the rest have no pay counted)". `hidesPossible` is set for
+ * the total without possible matches, whose leftover years may also be ones hidden as a name-only match.
+ */
+export function coverageNote(
+  total: Pick<PayVoteRow, "covered_years" | "voting_years">,
+  hidesPossible = false,
+): string {
   const { covered_years: c, voting_years: v } = total;
+  const years = (n: number) => `${n} ${n === 1 ? "year" : "years"}`;
   if (c >= v) return v === 1 ? "the 1 year with votes" : `all ${v} years with votes`;
-  return `${c} of ${v} years with votes (the rest have no pay counted)`;
+  const rest = hidesPossible ? "no pay counted or only a possible match" : "no pay counted";
+  return `${c} of ${years(v)} with votes (the rest have ${rest})`;
 }
 
 /** The pay basis in plain words, for the table's note. */

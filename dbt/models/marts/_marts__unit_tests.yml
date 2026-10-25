@@ -29,6 +29,36 @@ unit_tests:
         - {official_id: o_dan_jones, recipient_raw: 'JONES, DANIEL', match_confidence: medium}
         - {official_id: o_dan_jones, recipient_raw: 'JONES, DAN', match_confidence: high}
 
+  - name: party_unity_yearly_counts_party_line_votes_by_year_and_party_held
+    model: fct_party_unity_yearly
+    description: >
+      Only yea/nay votes on party-line votes count. m votes in 2023 on three votes: v1 (party-line, Republican
+      majority yea, Democratic majority nay), v2 (not party-line, both parties yea) and v3 (party-line, absent
+      so no vote cast). m cast yea as a Republican on v1 (with the party), then in 2024 switched to Democratic
+      and cast yea on v4 (party-line, Democratic majority nay): against the party. The party at the vote
+      decides the side, so the switch gives 1 of 1 in 2023 and 0 of 1 in 2024. An undated vote lands in a
+      null year. Counting v2, v3, or judging 2024 by the old party fails this test.
+    given:
+      - input: ref('fct_votes')
+        rows:
+          - {official_id: m, chamber: state_house, vote_id: v1, vote_date: 2023-02-01, vote_cast: yea, party_at_vote: Republican}
+          - {official_id: m, chamber: state_house, vote_id: v2, vote_date: 2023-02-02, vote_cast: yea, party_at_vote: Republican}
+          - {official_id: m, chamber: state_house, vote_id: v3, vote_date: 2023-02-03, vote_cast: absent, party_at_vote: Republican}
+          - {official_id: m, chamber: state_house, vote_id: v4, vote_date: 2024-02-01, vote_cast: yea, party_at_vote: Democratic}
+          - {official_id: m, chamber: state_house, vote_id: v5, vote_date: null, vote_cast: nay, party_at_vote: Democratic}
+      - input: ref('int_votes__party_positions')
+        rows:
+          - {chamber: state_house, vote_id: v1, republican_position: yea, democratic_position: nay, is_party_line: true}
+          - {chamber: state_house, vote_id: v2, republican_position: yea, democratic_position: yea, is_party_line: false}
+          - {chamber: state_house, vote_id: v3, republican_position: yea, democratic_position: nay, is_party_line: true}
+          - {chamber: state_house, vote_id: v4, republican_position: yea, democratic_position: nay, is_party_line: true}
+          - {chamber: state_house, vote_id: v5, republican_position: yea, democratic_position: nay, is_party_line: true}
+    expect:
+      rows:
+        - {official_id: m, chamber: state_house, vote_year: 2023, party_line_votes: 1, with_party_votes: 1}
+        - {official_id: m, chamber: state_house, vote_year: 2024, party_line_votes: 1, with_party_votes: 0}
+        - {official_id: m, chamber: state_house, vote_year: null, party_line_votes: 1, with_party_votes: 1}
+
   - name: commercial_ties_skip_garbled_disclosure_items
     model: fct_commercial_ties
     description: >

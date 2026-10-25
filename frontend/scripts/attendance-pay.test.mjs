@@ -116,6 +116,29 @@ test("coverage note says how many years the total leaves out", () => {
   );
 });
 
+test("coverage note singular and plural, and what hidden possible matches add", () => {
+  assert.equal(
+    coverageNote({ covered_years: 0, voting_years: 1 }),
+    "0 of 1 year with votes (the rest have no pay counted)",
+  );
+  assert.equal(
+    coverageNote({ covered_years: 0, voting_years: 4 }, true),
+    "0 of 4 years with votes (the rest have no pay counted or only a possible match)",
+  );
+});
+
+test("hiding every possible match keeps all years with votes as the denominator", () => {
+  const years = ["2018", "2019", "2020", "2021"].map((y) =>
+    pay("state_senate", y, { match_confidence: "medium" }),
+  );
+  const t = totalWithoutMedium(years);
+  assert.deepEqual([t.covered_years, t.voting_years], [0, 4]);
+  assert.equal(
+    coverageNote(t, true),
+    "0 of 4 years with votes (the rest have no pay counted or only a possible match)",
+  );
+});
+
 test("pay basis wording names what the pay is", () => {
   assert.match(payBasisText("gross pay"), /gross pay.*everything paid/);
   assert.match(payBasisText("statutory salary"), /statutory annual salary/);
@@ -138,8 +161,8 @@ test("hiding possible matches recomputes the total from the visible years", () =
   assert.equal(t.pay_amount, 16000);
   assert.equal(t.votes_attended, 14);
   assert.equal(t.dollars_per_vote_attended, 1142.86);
-  // 3 visible voting years (2016, 2019, 2021), 2 of them with pay
-  assert.deepEqual([t.voting_years, t.covered_years], [3, 2]);
+  // all 4 voting years stay in the denominator; 2 of them (2019, 2021) have pay that is not a possible match
+  assert.deepEqual([t.voting_years, t.covered_years], [4, 2]);
 });
 
 test("when every year is a possible match the hidden total has no figure", () => {

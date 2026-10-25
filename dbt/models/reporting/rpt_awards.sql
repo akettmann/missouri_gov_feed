@@ -1,7 +1,7 @@
 -- Number-based "awards": the top officials (5 unless the awards_threshold var says otherwise) on one measured
 -- number, within one office (House members against House members), per calendar year and over all loaded
 -- years, each paired with its opposite. streak_years counts consecutive qualifying yearly periods.
--- Every award ranks a single figure that the profile pages also show; nothing is combined into a score.
+-- Every award ranks a single measured figure; nothing is combined into a score.
 --   attendance:        rpt_attendance, present / recorded votes, at least 100 recorded votes in the period
 --   committee money:   rpt_donor_rollup from PACs, committees and parties (medium name matches left out);
 --                      the opposite ranks the lowest share of such money among officials raising $10,000+.
@@ -9,8 +9,14 @@
 --                      are not itemized), so a federal share would always be 100%: federal shares are per FEC
 --                      two-year cycle (period = the cycle's even end year) over FEC's total receipts for the
 --                      cycle (fct_federal_donor_summary); a cycle with no FEC total gets no share
---   party unity:       fct_bias_indicators party_unity_pct for the official's current chamber; the source
---                      computes it over all loaded votes, so it has a lifetime period only
+--   party unity:       share of party-line votes cast with the official's own party, for the official's current
+--                      chamber, from fct_party_unity_yearly (calendar year of the vote, and lifetime = all
+--                      years). Needs awards_min_party_line_votes (default 20) party-line votes in the period.
+--                      fct_bias_indicators party_unity_pct sums the same counts, so the lifetime figure matches
+--                      the profile; the yearly figures appear with the award only.
+--                      Maverick (most_party_breaks) needs at least one break, and Maverick and Team Player each
+--                      take at most half the ranked field (floor(field / 2)) so nobody is both; an official the
+--                      two lists would still share through a tie is dropped from both
 with offices as (
     select
         official_id,
@@ -166,18 +172,53 @@ share_money as (
     inner join offices as o on f.official_id = o.official_id
 ),
 
+unity_counts as (
+    -- the official's own chamber only (a senator's earlier House votes don't count for the Senate ranking)
+    select
+        y.official_id,
+        o.office,
+        y.vote_year,
+        y.party_line_votes,
+        y.with_party_votes
+    from {{ ref('fct_party_unity_yearly') }} as y
+    inner join offices as o on y.official_id = o.official_id and y.chamber = o.office
+),
+
+unity_totals as (
+    select
+        official_id,
+        office,
+        cast(vote_year as {{ dbt.type_string() }}) as period,
+        party_line_votes,
+        with_party_votes
+    from unity_counts
+    where vote_year is not null
+    union all
+    -- lifetime sums every year (and undated votes), the same sum as fct_bias_indicators party_unity_pct
+    select
+        official_id,
+        office,
+        'lifetime' as period,
+        sum(party_line_votes) as party_line_votes,
+        sum(with_party_votes) as with_party_votes
+    from unity_counts
+    group by official_id, office
+),
+
 unity as (
     select
-        b.official_id,
-        o.office,
-        'lifetime' as period,
-        b.value as metric
-    from {{ ref('fct_bias_indicators') }} as b
-    inner join offices as o on b.official_id = o.official_id
-    where
-        b.indicator = 'party_unity_pct'
-        and b.value is not null
-        and {{ dbt.split_part('b.detail', "':'", 1) }} = o.office
+        official_id,
+        office,
+        period,
+        round(100.0 * with_party_votes / party_line_votes, 1) as metric,
+        party_line_votes as sample_size,
+        party_line_votes - with_party_votes as party_breaks,
+        -- the unrounded share ranks the party awards; the rounded metric is only displayed (rounding made fake ties)
+        100.0 * with_party_votes / party_line_votes as unity_exact,
+        -- the whole ranked field, before Maverick drops the officials with no break
+        count(*) over (partition by office, period) as field_size
+    from unity_totals
+    where party_line_votes >= {{ var('awards_min_party_line_votes') }}
 ),
 
 measures as (
@@ -188,7 +229,8 @@ measures as (
         period,
         metric,
         sample_size,
-        metric as sort_key
+        metric as sort_key,
+        cast(null as {{ dbt.type_bigint() }}) as field_size
     from attendance_rates
     union all
     select
@@ -198,7 +240,8 @@ measures as (
         period,
         metric,
         sample_size,
-        -metric as sort_key
+        -metric as sort_key,
+        cast(null as {{ dbt.type_bigint() }}) as field_size
     from attendance_rates
     union all
     select
@@ -208,7 +251,8 @@ measures as (
         period,
         committee_money as metric,
         all_money as sample_size,
-        -committee_money as sort_key
+        -committee_money as sort_key,
+        cast(null as {{ dbt.type_bigint() }}) as field_size
     from money_with_office
     where committee_money > 0
     union all
@@ -219,7 +263,8 @@ measures as (
         period,
         round(100.0 * committee_money / all_money, 1) as metric,
         all_money as sample_size,
-        100.0 * committee_money / all_money as sort_key
+        100.0 * committee_money / all_money as sort_key,
+        cast(null as {{ dbt.type_bigint() }}) as field_size
     from share_money
     where all_money >= 10000
     union all
@@ -229,9 +274,12 @@ measures as (
         office,
         period,
         metric,
-        null as sample_size,
-        metric as sort_key
+        sample_size,
+        unity_exact as sort_key,
+        field_size
     from unity
+    -- breaking with the party needs at least one break: 100.0% unity is not a Maverick
+    where party_breaks > 0
     union all
     select
         'most_party_loyal' as award,
@@ -239,8 +287,9 @@ measures as (
         office,
         period,
         metric,
-        null as sample_size,
-        -metric as sort_key
+        sample_size,
+        -unity_exact as sort_key,
+        field_size
     from unity
 ),
 
@@ -253,11 +302,12 @@ ranked as (
         metric,
         sample_size,
         rank() over (partition by award, office, period order by sort_key) as award_rank,
-        count(*) over (partition by award, office, period) as group_size
+        -- party awards: the whole ranked field (Maverick drops no-break officials from its list, not the field)
+        coalesce(field_size, count(*) over (partition by award, office, period)) as group_size
     from measures
 ),
 
-thresholds as (
+thresholds_by_award as (
     -- per-award cutoff from the awards_threshold var (dbt_project.yml); awards not listed use its default
     select
         award,
@@ -280,11 +330,57 @@ thresholds as (
         end
         {%- else -%}
             {{ cutoffs['default'] }}
-        {%- endif %} as threshold
+        {%- endif %} as base_threshold
     from ranked
     -- a ranking needs a field: single-seat offices (governor) and thin years are left out entirely, which is
     -- also why they neither add to nor break a streak
     where group_size >= {{ var('awards_min_field_size') }}
+),
+
+thresholds as (
+    -- Maverick and Team Player are two ends of one ranking, so each takes at most half the field: with a field
+    -- of 6 and a cutoff of 5, nobody could sit in both top-5 lists. Ties at the cut can still put one official
+    -- in both; such an official is dropped from both (sits in the middle), see `contested`
+    select
+        award,
+        office,
+        period,
+        official_id,
+        metric,
+        sample_size,
+        award_rank,
+        group_size,
+        case
+            when award in ('most_party_breaks', 'most_party_loyal')
+                then least(base_threshold, cast(floor(group_size / 2.0) as {{ dbt.type_bigint() }}))
+            else base_threshold
+        end as threshold
+    from thresholds_by_award
+),
+
+contested as (
+    select
+        award,
+        office,
+        period,
+        official_id,
+        metric,
+        sample_size,
+        award_rank,
+        group_size,
+        threshold,
+        -- both party lists would take this official for this office and period
+        award in ('most_party_breaks', 'most_party_loyal')
+        and coalesce(
+            sum(
+                case
+                    when award in ('most_party_breaks', 'most_party_loyal') and award_rank <= threshold then 1
+                    else 0
+                end
+            ) over (partition by office, period, official_id) > 1,
+            false
+        ) as in_both_party_lists
+    from thresholds
 ),
 
 yearly as (
@@ -296,14 +392,14 @@ yearly as (
         office,
         period,
         official_id,
-        case when award_rank <= threshold then 1 else 0 end as qualifies,
+        case when award_rank <= threshold and not in_both_party_lists then 1 else 0 end as qualifies,
         -- failed years so far (ranked but outside the threshold); each one starts a new run of qualifying years
-        sum(case when award_rank <= threshold then 0 else 1 end) over (
+        sum(case when award_rank <= threshold and not in_both_party_lists then 0 else 1 end) over (
             partition by award, office, official_id
             order by period
             rows between unbounded preceding and current row
         ) as failures_so_far
-    from thresholds
+    from contested
     where period <> 'lifetime'
 ),
 
@@ -333,11 +429,11 @@ select
     cast(t.group_size as {{ dbt.type_bigint() }}) as group_size,
     -- null for lifetime rows: only yearly periods make a streak
     cast(s.streak_years as {{ dbt.type_bigint() }}) as streak_years
-from thresholds as t
+from contested as t
 left join streaks as s
     on
         t.award = s.award
         and t.office = s.office
         and t.period = s.period
         and t.official_id = s.official_id
-where t.award_rank <= t.threshold
+where t.award_rank <= t.threshold and not t.in_both_party_lists

@@ -71,6 +71,9 @@ vars:
   awards_threshold:
     default: 5
   awards_min_field_size: 5
+  # party-unity awards (rpt_awards): fewest party-line votes cast in a calendar year for that year to be ranked.
+  # Attendance uses 100 recorded votes, but the Missouri Senate casts only 16-50 party-line votes a year.
+  awards_min_party_line_votes: 20
 
 # Let this project override dbt's cross-database macros per adapter (see macros/compat/casts.sql).
 dispatch:

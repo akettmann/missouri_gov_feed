@@ -50,7 +50,7 @@ export const INDICATORS: Record<string, IndicatorMeta> = {
       "Of the party-line votes in our data (a majority of Republicans opposed a majority of Democrats), " +
       "the share where the official voted with their own party's majority.",
     limits:
-      "Computed over all loaded votes, not per session. High unity is the norm in every legislature; it " +
+      "Computed over all loaded votes; the Maverick and Team Player awards also rank each calendar year. High unity is the norm in every legislature; it " +
       "measures party alignment, not ideology.",
     source: "Computed from roll calls in this dataset",
   },
