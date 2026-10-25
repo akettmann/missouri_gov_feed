@@ -26,9 +26,13 @@ from mogov.loaders import loader
 log = obs.get_logger(__name__)
 
 BASE = "https://revisor.mo.gov/main"
-# The site blocks an IP that reads too fast (it redirects every request to Block.aspx; ~10 requests/s did it on
-# 2026-10-25), so requests are spaced out and a run should use one shard per outgoing IP address.
+# The site's rule: requests from one IP less than a second apart, several times in 30 seconds, get a warning page
+# (served with 200 in place of the page asked for); keep going and every request from that IP, browsers included,
+# redirects to Block.aspx. ~10 requests/s from three shards got an IP blocked within two minutes on 2026-10-25.
+# Each shard waits POLITE_DELAY x the shard count between requests, so all shards together from one IP stay under
+# one request per POLITE_DELAY.
 POLITE_DELAY = 1.5
+REFUSED_MARKER = b"Recent accesses are tracked over a thirty second interval"
 # A new enactment or amendment is a new version with its own bid (a new URL), found through the chapter lists,
 # which are re-read weekly. A version's page only changes with annotations, so it is re-read twice a year.
 SECTION_MAX_AGE = 180 * 86400
@@ -41,16 +45,19 @@ SECTION_LINK = re.compile(r'href="/main/PageSelect\.aspx\?section=([^&"]+)&amp;b
 
 
 class Blocked(RuntimeError):
-    """revisor.mo.gov has blocked this IP address (requests redirect to Block.aspx)."""
+    """revisor.mo.gov refused the request: this IP is blocked (Block.aspx) or was warned for reading too fast. The
+    warning page is also what a page that doesn't exist returns; a listed section never should."""
 
 
 def _not_blocked(resp: httpx.Response) -> None:
     if resp.url.path.lower().endswith("/block.aspx"):
         raise Blocked(f"revisor.mo.gov blocked this IP address; stop and retry later ({resp.url})")
+    if REFUSED_MARKER in resp.content:
+        raise Blocked(f"revisor.mo.gov answered with its too-fast / no-such-page warning for {resp.url}")
 
 
-def _get(url: str, params: dict | None = None, max_age: float = LIST_MAX_AGE) -> str:
-    page = fetch(url, params, max_age=max_age, delay=POLITE_DELAY, check=_not_blocked)
+def _get(url: str, params: dict | None = None, *, max_age: float = LIST_MAX_AGE, shards: int = 1) -> str:
+    page = fetch(url, params, max_age=max_age, delay=POLITE_DELAY * shards, check=_not_blocked)
     return page.decode("utf-8", "replace")
 
 
@@ -157,7 +164,7 @@ def parse_repeals(page: str) -> list[dict]:
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: chapters (their section pages), plus the repeals page."""
     toc_url = f"{BASE}/Home.aspx"
-    toc = parse_toc(_get(toc_url))
+    toc = parse_toc(_get(toc_url, shards=shard.count))
     if not toc:
         raise RuntimeError("revisor table of contents lists no chapters; the page layout may have changed")
     chapters = shard.take(toc, key=lambda c: c["chapter"])
@@ -166,18 +173,18 @@ def load(shard: db.Shard) -> dict[str, int]:
             sink.add("mo_revisor_chapters", c["chapter"], c)
         if shard.owns(REPEALS_UNIT):
             rx_url = f"{BASE}/rx.aspx"
-            for r in parse_repeals(_get(rx_url)):
+            for r in parse_repeals(_get(rx_url, shards=shard.count)):
                 sink.add("mo_revisor_repeals", f"{r['section']}/{r['bid']}", r, source_url=rx_url)
         versions = []
         for c in chapters:
-            listed = parse_chapter(_get(f"{BASE}/OneChapter.aspx", {"chapter": c["chapter"]}))
+            listed = parse_chapter(_get(f"{BASE}/OneChapter.aspx", {"chapter": c["chapter"]}, shards=shard.count))
             if not listed:  # every section of the chapter repealed or transferred
                 log.info("mo_revisor.empty_chapter", chapter=c["chapter"])
             versions += [(c["chapter"], section, bid) for section, bid in listed]
         progress = obs.Progress("section versions", len(versions), log)
         url = f"{BASE}/OneSection.aspx"
         for chapter, section, bid in versions:
-            page = _get(url, {"section": section, "bid": bid}, max_age=SECTION_MAX_AGE)
+            page = _get(url, {"section": section, "bid": bid}, max_age=SECTION_MAX_AGE, shards=shard.count)
             try:
                 parsed = parse_section(page)
             except ValueError as e:

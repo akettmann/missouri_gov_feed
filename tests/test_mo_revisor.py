@@ -89,3 +89,15 @@ def test_block_page_raises_and_is_not_cached(tmp_path, monkeypatch):
     with pytest.raises(mo_revisor.Blocked):
         mo_revisor._get("https://revisor.mo.gov/main/OneSection.aspx", {"section": "1.010", "bid": 42})
     assert not [p for p in tmp_path.iterdir() if not p.name.startswith(".")]
+
+
+def test_speeding_warning_raises_and_is_not_cached(tmp_path, monkeypatch):
+    # before blocking, the site serves a warning page with 200 in place of the page asked for
+    warning = "<p>Recent accesses are tracked over a thirty second interval.</p>"
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, text=warning))
+    monkeypatch.setattr(http, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(http, "_client", httpx.Client(transport=transport))
+    monkeypatch.setattr(mo_revisor, "POLITE_DELAY", 0)
+    with pytest.raises(mo_revisor.Blocked):
+        mo_revisor._get("https://revisor.mo.gov/main/OneChapter.aspx", {"chapter": "1"})
+    assert not [p for p in tmp_path.iterdir() if not p.name.startswith(".")]
