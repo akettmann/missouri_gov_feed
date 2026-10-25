@@ -1,6 +1,7 @@
 -- One row per alternative name an EPA FRS program record gives a facility (MO_ALTERNATIVE_NAME_FILE): the program
 -- system's own spelling of the site name. EPA pads some names with trailing spaces; alt_name is trimmed. Staging
--- of facilities and organizations uses these to repair names where EPA's file lost a letter to U+FFFD. Malformed
+-- of facilities and organizations uses these to repair names where EPA's file lost a letter to U+FFFD. Names are kept
+-- as raw has them, including the few with U+FFFD; the repairs skip those. Malformed
 -- CSV rows (no REGISTRY_ID) and blank names are left out.
 with src as (
     select

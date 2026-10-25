@@ -28,7 +28,9 @@ wrong as (
     where {{ mogov.fix_replacement_char('txt') }} != expected
 ),
 
--- the alternative-name repair (the seed is empty) must reach staging; without it these would read "DCOR PLUS"
+-- the known names must come out repaired whether the seed (raw without alternative names) or the alternative names
+-- do it; without either they would read "DCOR PLUS". Exception: stg_epa_frs__alt_names mirrors raw and may keep
+-- U+FFFD (8 rows today); it is not checked here because the repairs skip such names (see the unit tests).
 expected_names as (
     select
         '110014353788' as registry_id,

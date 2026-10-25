@@ -11,7 +11,8 @@ unit_tests:
       with no U+FFFD is left alone even when its alternative names differ. Alternative names that do not fit the
       damaged pattern (a longer name, another registry id) are not used: the U+FFFD is dropped instead. Two
       different matching alternatives are ambiguous and repair nothing. The seed wins over an alternative name.
-      LIKE wildcards in a name match literally.
+      LIKE wildcards in a name match literally (a damaged "50% FF" does not match the alternative "50X EFF").
+      An alternative name that itself has U+FFFD is never used. The damaged name is trimmed before matching.
     given:
       - input: source('epa_frs', 'facilities')
         format: sql
@@ -23,7 +24,10 @@ unit_tests:
             select cast('{"REGISTRY_ID": "5", "PRIMARY_NAME": "C�FE ONE"}' as varchar) as payload, 'u' as source_url union all
             select cast('{"REGISTRY_ID": "6", "PRIMARY_NAME": "100% �LL"}' as varchar) as payload, 'u' as source_url union all
             select cast('{"REGISTRY_ID": "7", "PRIMARY_NAME": "ZO� INC"}' as varchar) as payload, 'u' as source_url union all
-            select cast('{"REGISTRY_ID": "8", "PRIMARY_NAME": "A_B �"}' as varchar) as payload, 'u' as source_url
+            select cast('{"REGISTRY_ID": "8", "PRIMARY_NAME": "A_B �"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "10", "PRIMARY_NAME": "50% �FF"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "11", "PRIMARY_NAME": "CAF� TWO"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "12", "PRIMARY_NAME": "TRIM �X  "}' as varchar) as payload, 'u' as source_url
       - input: ref('stg_epa_frs__alt_names')
         rows:
           - {registry_id: '1', program_system: RCRAINFO, program_id: P1, alt_name: DECOR PLUS}
@@ -38,6 +42,9 @@ unit_tests:
           - {registry_id: '7', program_system: MO-DNR, program_id: P11, alt_name: ZOA INC}
           - {registry_id: '8', program_system: MO-DNR, program_id: P12, alt_name: AXB C}
           - {registry_id: '9', program_system: MO-DNR, program_id: P13, alt_name: DECOR SHOP}
+          - {registry_id: '10', program_system: MO-DNR, program_id: P14, alt_name: 50X EFF}
+          - {registry_id: '11', program_system: MO-DNR, program_id: P15, alt_name: CAF� TWO}
+          - {registry_id: '12', program_system: MO-DNR, program_id: P16, alt_name: TRIM EX}
       - input: ref('epa_frs_name_corrections')
         rows:
           - {record_key: '5', field: facility_name, corrected_value: CAFE OVERRIDE, source: s}
@@ -51,6 +58,9 @@ unit_tests:
         - {registry_id: '6', facility_name: 100% ALL}
         - {registry_id: '7', facility_name: ZO INC}
         - {registry_id: '8', facility_name: 'A_B '}
+        - {registry_id: '10', facility_name: 50% FF}
+        - {registry_id: '11', facility_name: CAF TWO}
+        - {registry_id: '12', facility_name: TRIM EX}
 
   - name: epa_frs_org_name_repaired_from_the_alt_name_of_the_same_program_record
     model: stg_epa_frs__organizations

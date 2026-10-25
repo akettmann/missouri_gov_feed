@@ -251,8 +251,11 @@ seeds:
       Maintainer overrides for EPA FRS names whose raw text contains U+FFFD (EPA's file lost a non-ASCII letter).
       Staging repairs these by itself from the MO_ALTERNATIVE_NAME_FILE (stg_epa_frs__alt_names: the one alternative
       name that equals the damaged name with each run of U+FFFD standing for one character), which covers the three
-      names seen so far (DECOR PLUS twice, MARBLE DECOR INC), so the seed is empty. Add a row only when the
-      alternative names cannot repair a name (none, or two different matches); a row wins over the alternative name.
+      names seen so far (DECOR PLUS twice, MARBLE DECOR INC). The seed still holds those three cases so a raw
+      directory landed before the alternative-name table existed (mogov build gives it an empty placeholder) repairs
+      them too; once alternative names are loaded the rows are redundant (they agree with the alternative names) and
+      can be retired. Add a row only when the alternative names cannot repair a name (none, or two different
+      matches); a row wins over the alternative name.
       Every row cites the EPA record that attests the value, never a guess. Applied in stg_epa_frs__facilities
       (record_key = registry_id) and stg_epa_frs__organizations (record_key = registry_id|program_system|program_id)
       only while the raw text still contains U+FFFD, and to every organization row on that key, so a row must not be

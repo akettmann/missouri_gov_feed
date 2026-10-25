@@ -597,11 +597,14 @@ offices, shops and most service businesses are missing.
   "DECOR PLUS", "MARBLE D��COR INC" matches "MARBLE DECOR INC", "DECORATING PLUS" does not), when exactly one distinct
   alternative name fits; with none or two different fits, the U+FFFD is dropped. The generic rule covers all three
   damaged names seen so far (the facilities DECOR PLUS and MARBLE DECOR INC, and the DECOR PLUS owner and operator
-  rows), so the seed is now empty and kept only for a future name the alternatives cannot repair. The 2026-10 address
+  rows). The seed still holds those three known cases, so a raw directory without alternative names builds with the
+  same names; once alternative names are loaded its rows are redundant and can be retired, and it stays for a future
+  name the alternatives cannot repair. The 2026-10 address
   with U+FFFD ("17123 HWY 60�") has no alternative and just loses the character. `assert_replacement_char_fixed`
   fails if one survives; `assert_epa_frs_name_correction_keys_exist` fails if a seed row matches no staged row. A raw
-  directory landed before `epa_frs_alt_names` existed gets an empty placeholder from `mogov build`, so those names
-  lose the letter ("DCOR PLUS") until `mogov load epa_frs` is re-run.
+  directory landed before `epa_frs_alt_names` existed gets an empty placeholder from `mogov build`; the seed covers the
+  known cases until `mogov load epa_frs` is re-run (a new damaged name would then lose its letter).
+  `stg_epa_frs__alt_names` mirrors raw, so alternative names containing U+FFFD stay there; the repairs never use them.
 - `epa_frs_sic` joined the loader after the other three. A raw directory landed before that has no SIC table;
   `mogov build` then creates an empty placeholder (like the other late-added or optional JSON tables in
   `db.OPTIONAL_JSON_TABLES`), so the SIC fallback finds no codes and those sites show no industry until the

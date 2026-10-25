@@ -17,7 +17,9 @@
 {# LIKE pattern (use with ESCAPE '!') for the names a damaged name could have been: each run of U+FFFD stands for
    exactly one lost character (a two-byte letter shows as one or two U+FFFD), so it becomes `_`; every other
    character must match as is, with LIKE's own wildcards escaped by `!`. "D�COR PLUS" -> "D_COR PLUS", which
-   "DECOR PLUS" matches and "DECORATING PLUS" does not. #}
+   "DECOR PLUS" matches and "DECORATING PLUS" does not. The damaged name is trimmed first (alternative names are
+   trimmed in staging). ESCAPE is not portable: BigQuery has no LIKE ... ESCAPE (it escapes with backslash in the
+   pattern), so a BigQuery backend needs its own variant of this macro and of the `escape '!'` in staging. #}
 {% macro damaged_name_pattern(expr) -%}
-    {{ mogov.regex_replace_all("replace(replace(replace(" ~ expr ~ ", '!', '!!'), '%', '!%'), '_', '!_')", '�+', '_') }}
+    {{ mogov.regex_replace_all("replace(replace(replace(trim(" ~ expr ~ "), '!', '!!'), '%', '!%'), '_', '!_')", '�+', '_') }}
 {%- endmacro %}
