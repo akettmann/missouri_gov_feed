@@ -202,7 +202,7 @@ orphan `gh-pages` branch; `main` history is never touched.
 Findings (checked against the ~170 MB `dist/`, 1052 pages):
 
 - Limits: a published Pages site must be <= 1 GB, each file < 100 MB (git push limit), and the soft bandwidth cap is
-  100 GB/month. Our `dist/` is about 193 MB, the largest file is a 4.3 MB HTML page, so it fits comfortably.
+  100 GB/month. Our `dist/` is about 200 MB, the largest file is a 4.4 MB HTML page, so it fits comfortably.
   `deploy:pages` refuses to push if either limit would be broken.
 - Method (a), orphan `gh-pages` branch from a temp dir, was chosen over (b) `workflow_dispatch` +
   `upload-pages-artifact`: (b) needs the built site inside CI, and CI has no data, so we would have to upload 170 MB
