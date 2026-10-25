@@ -1,6 +1,6 @@
 // Side-by-side rows for the compare page, computed from two per-official bundles. Pure (runs in the browser).
 // Every row is one measured or published number; nothing is combined into a score.
-import { businessCounts } from "./businessCounts";
+import { businessCounts, donorsText, sitesText } from "./businessCounts";
 import type { OfficialBundle } from "./exports/types";
 import { count, HIDE_UNLESS_AVAILABLE, money, pct, statusKind } from "./format";
 import { indicatorMeta } from "./indicators";
@@ -11,6 +11,8 @@ export interface CompareRow {
   label: string;
   /** one cell per official, already formatted; "—" when the measure doesn't apply or isn't available */
   values: string[];
+  /** short caveat shown under the label */
+  note?: string;
 }
 
 const NA = "—";
@@ -107,7 +109,6 @@ export function compareRows(bundles: OfficialBundle[], hideMedium: boolean): Com
   rows.push({ section: "Lobbyist gifts", label: "Largest principal", values: g.map((x) => x[1]) });
 
   const biz = bundles.map((b) => businessCounts(b.businesses, hideMedium));
-  const sitesText = (n: number) => `${count(n)} ${n === 1 ? "site" : "sites"}`;
   rows.push({
     section: "Businesses in their area",
     label: "EPA-regulated sites in their district or city",
@@ -116,11 +117,8 @@ export function compareRows(bundles: OfficialBundle[], hideMedium: boolean): Com
   rows.push({
     section: "Businesses in their area",
     label: "Donors with sites there (co-occurrence, not influence)",
-    values: biz.map((x) =>
-      x
-        ? `${count(x.donorCompanies)} ${x.donorCompanies === 1 ? "donor" : "donors"} (${sitesText(x.donorSites)})`
-        : NA,
-    ),
+    values: biz.map((x) => (x ? donorsText(x) : NA)),
+    note: "One donor can file under several names, so counts are inferred from matched name groups.",
   });
 
   // disclosures and commercial ties exist for federal officials only: show a row only if one side has data

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { businessCounts } from "../src/lib/businessCounts.ts";
+import { businessCounts, donorsText } from "../src/lib/businessCounts.ts";
 
 const site = {
   facility_name: "S",
@@ -23,8 +23,10 @@ const industries = [
   { sector_code: "31", sector_name: "Mfg", n_sites: 10, n_donor_sites: 3 },
   { sector_code: null, sector_name: "No industry code", n_sites: 5, n_donor_sites: 0 },
 ];
-// load.ts groups sites by the "; "-joined set of contributors matched to one site, so a site that
-// matches two companies yields a combined group alongside each company's own group.
+const counts = (groups, hide = false) => businessCounts({ donors: groups, industries }, hide);
+
+// load.ts groups sites by the "; "-joined set of contributor names matched to one site, so a site that
+// matches two donors yields a combined group alongside each donor's own group.
 const biz = {
   donors: [
     donor("AMEREN CORPORATION; AT&T INC.", "high", 1),
@@ -35,25 +37,77 @@ const biz = {
   industries,
 };
 
-test("businessCounts sums sites and counts distinct companies, not donor groups", () => {
-  assert.deepEqual(businessCounts(biz, false), { totalSites: 15, donorCompanies: 3, donorSites: 5 });
+test("businessCounts sums sites and counts donors, not donor groups", () => {
+  assert.deepEqual(businessCounts(biz, false), {
+    totalSites: 15,
+    donors: 3,
+    donorSites: 5,
+    allHidden: false,
+  });
 });
 
 test("businessCounts drops possible-match donors when hidden but keeps the site total", () => {
-  assert.deepEqual(businessCounts(biz, true), { totalSites: 15, donorCompanies: 2, donorSites: 4 });
+  assert.deepEqual(businessCounts(biz, true), {
+    totalSites: 15,
+    donors: 2,
+    donorSites: 4,
+    allHidden: false,
+  });
 });
 
-test("businessCounts only counts companies from groups that survive the possible-match filter", () => {
-  const only = {
-    donors: [
-      donor("ACME CO; BETA LLC", "medium", 1),
-      donor("ACME CO", "high", 1),
-      donor("BETA LLC", "medium", 1),
-    ],
-    industries,
-  };
-  assert.equal(businessCounts(only, false).donorCompanies, 2);
-  assert.equal(businessCounts(only, true).donorCompanies, 1);
+test("one donor's brand variants in a single group count once", () => {
+  assert.equal(counts([donor("SPIRE PAC; SPIRE POLITICAL ACTION COMMITTEE", "high", 1)]).donors, 1);
+  assert.equal(
+    counts([
+      donor("AMEREN MO PAC; AMEREN MISSOURI PAC", "high", 3),
+      donor("SPIRE PAC; SPIRE POLITICAL ACTION COMMITTEE", "high", 1),
+    ]).donors,
+    2,
+  );
+});
+
+test("a combined group beside its separate groups is not a third donor", () => {
+  const groups = [
+    donor("AMEREN CORPORATION; AT&T INC.", "high", 1),
+    donor("AMEREN CORPORATION", "high", 1),
+    donor("AT&T INC.", "high", 1),
+  ];
+  assert.equal(counts(groups).donors, 2);
+});
+
+test("a name covered only by a non-minimal group still counts", () => {
+  assert.equal(counts([donor("ACME CO; BETA LLC", "high", 1), donor("ACME CO", "high", 1)]).donors, 2);
+});
+
+test("identical name sets and whitespace differences collapse to one group", () => {
+  assert.equal(
+    counts([donor("A CO; B CO", "high", 1), donor("B CO;  A  CO", "high", 1), donor("", "high", 1)]).donors,
+    1,
+  );
+});
+
+test("the toggle removes the only group naming a donor", () => {
+  const groups = [
+    donor("ACME CO; BETA LLC", "medium", 1),
+    donor("ACME CO", "high", 1),
+    donor("BETA LLC", "medium", 1),
+  ];
+  assert.equal(counts(groups, false).donors, 2);
+  assert.equal(counts(groups, true).donors, 1);
+});
+
+test("allHidden is set only when the toggle hides every group", () => {
+  const groups = [donor("ACME CO", "medium", 1)];
+  assert.equal(counts(groups, true).allHidden, true);
+  assert.equal(counts(groups, true).donors, 0);
+  assert.equal(counts(groups, false).allHidden, false);
+  assert.equal(counts([], true).allHidden, false);
+});
+
+test("donors cell says none (possible matches hidden) when every donor is a possible match", () => {
+  const b = { donors: [donor("ACME CO", "medium", 1)], industries };
+  assert.equal(donorsText(businessCounts(b, true)), "none (possible matches hidden)");
+  assert.equal(donorsText(businessCounts(b, false)), "1 donor (1 site)");
 });
 
 test("businessCounts is null when not applicable or missing", () => {
