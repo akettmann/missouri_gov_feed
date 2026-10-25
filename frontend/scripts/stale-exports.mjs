@@ -4,13 +4,13 @@ import path from "node:path";
 
 /** Same resolution as src/mogov/config.py: MOGOV_DB, else <MOGOV_DATA_DIR or ../data>/mogov.duckdb. */
 export function resolveDbPath(env = process.env, cwd = process.cwd()) {
-  if (env.MOGOV_DB) return path.resolve(env.MOGOV_DB);
-  return path.resolve(env.MOGOV_DATA_DIR ?? path.join(cwd, "..", "data"), "mogov.duckdb");
+  if (env.MOGOV_DB) return path.resolve(cwd, env.MOGOV_DB);
+  return path.resolve(cwd, env.MOGOV_DATA_DIR ?? path.join("..", "data"), "mogov.duckdb");
 }
 
 /** Same default as src/lib/exports/db.ts. */
 export function resolveExportsDir(env = process.env, cwd = process.cwd()) {
-  return path.resolve(env.MOGOV_EXPORTS ?? path.join(cwd, "..", "data", "exports"));
+  return path.resolve(cwd, env.MOGOV_EXPORTS ?? path.join("..", "data", "exports"));
 }
 
 function formatAge(ms) {

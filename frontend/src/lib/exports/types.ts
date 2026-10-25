@@ -1,6 +1,8 @@
 // Shapes of the per-official bundle the build emits (one prerendered page + one JSON per official).
 // Column names follow the dbt marts / planned rpt_* contracts so a real export can replace a fixture as-is.
 
+import type { PayVoteRow } from "../attendancePay";
+
 export type Confidence = string; // 'exact id' | 'exact (MEC crosswalk)' | 'high' | 'medium' | ...
 
 export interface Official {
@@ -287,6 +289,8 @@ export interface OfficialBundle {
     /** null when the rpt_* export is missing (section says so instead of showing nothing) */
     party_breaks: PartyBreak[] | null;
     attendance: AttendanceRow[] | null;
+    /** rpt_attendance_pay: pay per vote attended by year and in total; null when the export is missing */
+    attendance_pay: PayVoteRow[] | null;
     /** the subjects with the most roll calls (top 20) */
     by_subject: SubjectVotes[] | null;
   };

@@ -3,7 +3,7 @@ import { mkdtempSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { resolveDbPath, staleExportsWarning } from "./stale-exports.mjs";
+import { resolveDbPath, resolveExportsDir, staleExportsWarning } from "./stale-exports.mjs";
 
 /** Fixed ages (seconds before now) so the outcome never depends on real data. */
 function setup(dbAge, files) {
@@ -41,4 +41,12 @@ test("silent when the DuckDB file is absent", () => {
 test("MOGOV_DB wins over MOGOV_DATA_DIR", () => {
   assert.equal(resolveDbPath({ MOGOV_DB: "/x/a.duckdb", MOGOV_DATA_DIR: "/y" }), path.resolve("/x/a.duckdb"));
   assert.equal(resolveDbPath({ MOGOV_DATA_DIR: "/y" }), path.resolve("/y/mogov.duckdb"));
+});
+
+test("relative MOGOV_DB / MOGOV_EXPORTS / MOGOV_DATA_DIR resolve against the given cwd (frontend/)", () => {
+  const cwd = path.resolve("/repo/frontend");
+  assert.equal(resolveDbPath({ MOGOV_DB: "x/a.duckdb" }, cwd), path.resolve(cwd, "x/a.duckdb"));
+  assert.equal(resolveDbPath({ MOGOV_DATA_DIR: "../d" }, cwd), path.resolve("/repo/d/mogov.duckdb"));
+  assert.equal(resolveExportsDir({ MOGOV_EXPORTS: "../e" }, cwd), path.resolve("/repo/e"));
+  assert.equal(resolveExportsDir({}, cwd), path.resolve("/repo/data/exports"));
 });

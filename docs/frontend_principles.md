@@ -15,4 +15,4 @@ and docs/sync.md. Open work is tracked in GitHub issues labeled `Frontend`.
 - "Report an error" link on every profile
 - Interest-vote views are labeled co-occurrence, not causation
 - Keep each official's JSON under the 100 KB gzipped budget (`pnpm sizes` after every data refresh)
-- Keep `lookup/districts.json` and the /awards page under the budgets in `frontend/scripts/size-budget.mjs` (also checked by `pnpm sizes`); do not repeat per-row decorations on hidden blocks
+- Keep `lookup/districts.json` and the /awards page under the budgets in `frontend/scripts/size-budget.mjs` (checked automatically at the end of `pnpm build`, or on their own with `pnpm sizes`; `MOGOV_SKIP_SIZE_BUDGET=1` skips); do not repeat per-row decorations on hidden blocks
