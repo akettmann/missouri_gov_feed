@@ -1,11 +1,14 @@
 // Award badges next to an official's name. Which awards are "current" is decided here from the rpt_awards
 // rows (already ranked and streak-counted in dbt); every page and browser script draws them with
 // renderBadges, so the icon, the link and the accessible text are the same everywhere.
-import { AWARD_PAIRS, AWARDS } from "./exports/awardDefs.ts";
+import { AWARD_PAIRS, AWARDS, isCycleList, periodWhen } from "./exports/awardDefs.ts";
 import { count, money, pct, streakMarker } from "./format.ts";
 
-/** One award an official holds now: [award key, consecutive-year streak or null, plain-language detail]. */
-export type Badge = [award: string, streak: number | null, detail: string];
+/**
+ * One award an official holds now: [award key, consecutive-period streak or null, plain-language detail,
+ * whether the periods are two-year FEC cycles rather than calendar years].
+ */
+export type Badge = [award: string, streak: number | null, detail: string, cycle?: boolean];
 
 /** The slice of an awards list this needs (see AwardList in exports/awards.ts). */
 export interface BadgeList {
@@ -106,14 +109,15 @@ export function currentAwards(
       const mine = best.get(e.slug) ?? new Map<string, { rank: number; badge: Badge }>();
       const had = mine.get(l.award);
       if (!had || e.rank < had.rank) {
-        const when = l.period === "lifetime" ? "across all loaded years" : `in ${l.period}`;
+        const cycle = isCycleList(l.award, l.office);
+        const when = periodWhen(l.period, cycle);
         const group = `${ordinal(e.rank)} of ${count(l.group_size)} ${officeLabel(l.office)}`;
         const detail =
           `${awardNickname(l.award)} (${lowerFirst(AWARDS[l.award]?.title ?? l.award)}), ranked ${group} ${when}: ` +
           metricText(l.award, e.metric, e.sample_size);
         mine.set(l.award, {
           rank: e.rank,
-          badge: [l.award, l.period === "lifetime" ? null : e.streak_years, detail],
+          badge: [l.award, l.period === "lifetime" ? null : e.streak_years, detail, cycle],
         });
       }
       best.set(e.slug, mine);
@@ -136,8 +140,8 @@ const esc = (s: string) =>
  */
 export function renderBadges(badges: Badge[], base: string, streaks = true): string {
   if (badges.length === 0) return "";
-  const items = badges.map(([award, streak, detail]) => {
-    const marker = streaks ? streakMarker(streak) : null;
+  const items = badges.map(([award, streak, detail, cycle]) => {
+    const marker = streaks ? streakMarker(streak, cycle === true) : null;
     const spoken = `Award: ${detail}${marker ? `; ${marker.label}` : ""}`;
     return (
       `<a class="award-badge" href="${esc(`${base}/awards/#${award}`)}" title="${esc(spoken)}">` +

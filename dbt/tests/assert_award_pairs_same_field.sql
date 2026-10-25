@@ -1,6 +1,6 @@
 -- Sanity check: the two awards of a pair rank one number over one field, so both have the same group_size for
 -- an office and period (a pair of a dollar award with a share award, which rank different officials, would not).
--- Returns the (pair, office, period) where the two ends disagree, or where only one end has rows.
+-- Returns the (pair, office, period) where the two ends disagree.
 select
     {{ mogov.award_pair_expr('award') }} as pair_key,
     office,

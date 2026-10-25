@@ -202,6 +202,17 @@ test("year rows must add up to the dbt total, else the mismatch names the offici
     pay("state_house", "covered years", { voting_years: 2, covered_years: 1 }),
   ];
   assert.equal(payYearsMismatch(payPerVoteBlocks(att, gap)[0]), null);
+  // covered_years half: right number of year rows, but pay on a different set of years than the total says
+  // (rpt_attendance_pay from another build). Row counts match, so only withPay !== covered_years catches it.
+  const drifted = [
+    pay("state_house", "2021", noPay),
+    pay("state_house", "2022"),
+    pay("state_house", "covered years", two),
+  ];
+  assert.match(
+    payYearsMismatch(payPerVoteBlocks(att, drifted)[0]),
+    /2 year rows \(1 with pay\) but the total covers 2 of 2/,
+  );
   const bundle = (name, a) => ({
     official: { full_name: name, official_id: "x" },
     voting: { attendance: a, attendance_pay: ok },
@@ -209,4 +220,32 @@ test("year rows must add up to the dbt total, else the mismatch names the offici
   const problems = payYearsProblems([bundle("Good Person", att), bundle("Bennie Cook", [att[1]])]);
   assert.equal(problems.length, 1);
   assert.match(problems[0], /^Bennie Cook/);
+});
+
+test("MOGOV_SKIP_PAY_YEARS_CHECK skips only when exactly 1, and says so", async () => {
+  const { payYearsGate, skipPayYearsCheck } = await import("../src/lib/attendancePay.ts");
+  const att = [session("state_house", "2022-01-05", "2022-05-13")];
+  const rows = [
+    pay("state_house", "2021"),
+    pay("state_house", "2022"),
+    pay("state_house", "covered years", { voting_years: 2, covered_years: 2 }),
+  ];
+  const bundles = [
+    {
+      official: { full_name: "Bennie Cook", official_id: "x" },
+      voting: { attendance: att, attendance_pay: rows },
+    },
+  ];
+  const logs = [];
+  for (const v of ["0", "", "true", undefined]) {
+    assert.equal(skipPayYearsCheck({ MOGOV_SKIP_PAY_YEARS_CHECK: v }), false);
+    assert.equal(payYearsGate(bundles, { MOGOV_SKIP_PAY_YEARS_CHECK: v }, (m) => logs.push(m)).length, 1);
+  }
+  assert.deepEqual(logs, []);
+  assert.deepEqual(
+    payYearsGate(bundles, { MOGOV_SKIP_PAY_YEARS_CHECK: "1" }, (m) => logs.push(m)),
+    [],
+  );
+  assert.equal(logs.length, 1);
+  assert.match(logs[0], /MOGOV_SKIP_PAY_YEARS_CHECK=1/);
 });

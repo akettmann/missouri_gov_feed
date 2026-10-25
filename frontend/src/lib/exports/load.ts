@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import { DONOR_GROUP_SQL } from "../rollups";
 import { exportedAt, hasExport, query } from "./db";
-import { payYearsProblems, type PayVoteRow } from "../attendancePay";
+import { payYearsGate, type PayVoteRow } from "../attendancePay";
 import { groupPast, linkSameName, type RosterRow } from "./past";
 import { sampleDonorCycles, sampleGiftRollup, sampleTopDonors } from "./fixtures";
 import type {
@@ -538,12 +538,13 @@ async function loadAll(): Promise<OfficialBundle[]> {
  * rpt_attendance and rpt_attendance_pay were exported from different builds: the years label would be wrong.
  */
 function assertPayYearsConsistent(bundles: OfficialBundle[]): OfficialBundle[] {
-  const bad = payYearsProblems(bundles);
+  const bad = payYearsGate(bundles, process.env, console.warn);
   if (bad.length) {
     const shown = bad.slice(0, 20).map((m) => `  ${m}`);
     throw new Error(
       `Pay per vote: year rows do not match the dbt total for ${bad.length} official(s); rebuild and ` +
-        `re-export rpt_attendance and rpt_attendance_pay together (mogov build, mogov export).` +
+        `re-export rpt_attendance and rpt_attendance_pay together (mogov build, mogov export), or set ` +
+        `MOGOV_SKIP_PAY_YEARS_CHECK=1 to build anyway.` +
         ["", ...shown].join("\n"),
     );
   }

@@ -71,7 +71,7 @@ export function payPerVote(b: OfficialBundle, hideMedium: boolean): [string, str
  * The payroll (or statutory salary) pages behind the pay figures, one per chamber shown, labelled with the
  * chamber when there is more than one. Chambers with no source URL are left out.
  */
-export function payPerVoteSources(b: OfficialBundle): { text: string; href: string }[] {
+export function payPerVoteSources(b: OfficialBundle): { text: string; href: string; context: string }[] {
   const blocks = payPerVoteBlocks(b.voting.attendance ?? [], b.voting.attendance_pay ?? []);
   return blocks.flatMap((block) =>
     block.sourceUrl
@@ -82,6 +82,8 @@ export function payPerVoteSources(b: OfficialBundle): { text: string; href: stri
                 ? `${CHAMBER_NAMES[block.chamber] ?? block.chamber} pay source`
                 : "pay source",
             href: block.sourceUrl,
+            // screen-reader-only, so a row of "pay source" links says whose pay each one is
+            context: `for ${b.official.full_name}`,
           },
         ]
       : [],
