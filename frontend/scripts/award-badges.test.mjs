@@ -10,7 +10,7 @@ import {
   ordinal,
   renderBadges,
 } from "../src/lib/awardBadges.ts";
-import { AWARD_PAIRS } from "../src/lib/exports/awardDefs.ts";
+import { AWARD_PAIRS, assertCyclePeriods } from "../src/lib/exports/awardDefs.ts";
 
 const e = (slug, rank, metric, streak_years = null, sample_size = 100) => ({
   rank,
@@ -283,4 +283,22 @@ test("federal calendar-year awards (attendance, most money) stay in years", () =
     (o) => o,
   );
   assert.match(awards.get("rep")[0][2], /in 2026:/);
+});
+
+test("a federal money-share list on an odd period (stale export) fails the build with a clear message", () => {
+  const ok = [
+    { award: "least_committee_money_share", office: "us_house", period: "2024" },
+    { award: "least_committee_money_share", office: "us_senate", period: "lifetime" },
+    { award: "least_committee_money_share", office: "state_house", period: "2025" },
+    { award: "highest_attendance", office: "us_house", period: "2025" },
+  ];
+  assert.doesNotThrow(() => assertCyclePeriods(ok));
+  assert.throws(
+    () =>
+      assertCyclePeriods([
+        ...ok,
+        { award: "least_committee_money_share", office: "us_house", period: "2025" },
+      ]),
+    /stale or inconsistent.*us_house 2025.*re-export/s,
+  );
 });

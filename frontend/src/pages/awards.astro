@@ -81,6 +81,10 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
         </label>
       </form>
 
+      <p class="small muted js-only" id="cycle-note" hidden>
+        The money share for U.S. offices is listed under even years, as two-year FEC cycles.
+      </p>
+
       <noscript>
         <p class="card small muted">
           The office and period pickers need JavaScript, so this shows {plural(defaultOffice)} for all loaded
@@ -114,8 +118,7 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
                             <h2>{AWARDS[list.award].name}</h2>
                             <p class="what">{AWARDS[list.award].title}</p>
                             <p class="small muted">
-                              Among {count(list.group_size)} {plural(list.office)}
-                              {", "}
+                              Among {count(list.group_size)} {plural(list.office)}{" "}
                               {periodWhen(period, isCycleList(list.award, list.office))}
                             </p>
                             <ol>
@@ -201,7 +204,12 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
       const federal = officeSel.selectedOptions[0]?.dataset.cycles === "1";
       for (const o of periodSel.options)
         if (o.dataset.year) o.textContent = federal ? (o.dataset.cycle ?? o.dataset.year) : o.dataset.year;
+      // Odd years have no federal money-share list: say why instead of leaving the card silently absent.
+      const year = Number(periodSel.value);
+      const note = document.getElementById("cycle-note");
+      if (note) note.hidden = !(federal && Number.isInteger(year) && year % 2 === 1);
     };
+    periodSel.addEventListener("change", relabel);
     officeSel.addEventListener("change", relabel);
     relabel();
     form.addEventListener("change", apply);

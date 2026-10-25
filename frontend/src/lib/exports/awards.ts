@@ -1,5 +1,6 @@
 // rpt_awards for the awards page: each award ranks one measured number within one office, paired with its
 // opposite. The ranking itself is done in dbt; this only attaches names and links.
+import { assertCyclePeriods } from "./awardDefs";
 import { hasExport, query } from "./db";
 import { currentAwards, pluralOfficeLabel, type Badge } from "../awardBadges";
 import { allOfficials } from "./load";
@@ -22,7 +23,15 @@ export interface AwardList {
   entries: AwardEntry[];
 }
 
-export { AWARD_PAIRS, AWARDS, cycleLabel, isCycleList, officeHasCycles, periodWhen } from "./awardDefs";
+export {
+  AWARD_PAIRS,
+  AWARDS,
+  assertCyclePeriods,
+  cycleLabel,
+  isCycleList,
+  officeHasCycles,
+  periodWhen,
+} from "./awardDefs";
 
 let cache: Promise<AwardList[] | null> | undefined;
 
@@ -73,7 +82,9 @@ async function load(): Promise<AwardList[] | null> {
     });
     lists.set(key, list);
   }
-  return [...lists.values()];
+  const out = [...lists.values()];
+  assertCyclePeriods(out);
+  return out;
 }
 
 let currentCache: Promise<Map<string, Badge[]>> | undefined;
