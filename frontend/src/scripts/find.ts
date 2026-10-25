@@ -15,7 +15,7 @@ export interface Lookup {
 }
 
 /** Even-odd ray casting over every ring, so holes (enclaves) count as outside. */
-function inside(polygons: number[][][], x: number, y: number): boolean {
+export function inside(polygons: number[][][], x: number, y: number): boolean {
   let hit = false;
   for (const rings of polygons)
     for (const r of rings)
@@ -146,13 +146,20 @@ export function lookupZip(
   return [lon, lat];
 }
 
-export function lookup(data: Lookup, lon: number, lat: number, out: HTMLElement, status: HTMLElement) {
+/** Renders the officials at a point; returns the county's district_id, or null when the point isn't in Missouri. */
+export function lookup(
+  data: Lookup,
+  lon: number,
+  lat: number,
+  out: HTMLElement,
+  status: HTMLElement,
+): string | null {
   const hits = hitsAt(data, lon, lat);
   out.replaceChildren();
   if (!hits.some((h) => h.district_type === "county")) {
     status.textContent = "That point isn't in Missouri. Try another spot.";
     out.append(el("p", { className: "muted", textContent: "No Missouri districts at that location." }));
-    return;
+    return null;
   }
   const county = hits.find((h) => h.district_type === "county")!;
   status.textContent = `${county.name}: ${hits
@@ -184,4 +191,5 @@ export function lookup(data: Lookup, lon: number, lat: number, out: HTMLElement,
       out.append(el("h3", { textContent: g.title }), list);
     }
   }
+  return county.district_id;
 }
