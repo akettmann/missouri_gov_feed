@@ -331,7 +331,11 @@ unit_tests:
       "First Last", then a lone first or last name. Placeholder parts ('~', '-', '?') and all-digit parts are
       dropped, so '~' / '~' falls through to the company; a whole name of one character is dropped but initials
       inside a person's name stay. TAP's payee_name alone (r8) yields null. An organization typed into both name boxes (r16, r17: the last
-      name already starts with the first name) is not doubled.
+      name already starts with the first name) is not doubled. The prefix rule needs the first name followed by a
+      space (r18: 'Robert' / 'Roberts' is a person, 'Robert Roberts'). A several-word last name equal to the company
+      is the vendor itself (r19), so the contact's first name is not prefixed; a several-word last name with no
+      company, or a company that is the full "First Last" (r20, r21), still gives the person. Known trade-off (r22):
+      a person with a several-word last name repeated in the company ('De La Cruz') is shown as the company alone.
     given:
       - input: source('tap_mec', 'expenditures')
         format: sql
@@ -369,6 +373,11 @@ unit_tests:
           union all select 'r15', 'C1', 'Committee', 'Hertzog', ' bud  hertzog ', 'Bud', 'Hertzog', null, null, '1', null, null, null, null, null, 'FALSE'
           union all select 'r16', 'C1', 'Committee', 'USPS', 'USPS', 'USPS', 'USPS', null, null, '1', null, null, null, null, null, 'FALSE'
           union all select 'r17', 'C1', 'Committee', 'Kyler Cliffman', 'Kyler Cliffman', 'Kyler', 'Kyler Cliffman', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r18', 'C1', 'Committee', 'Roberts', null, 'Robert', 'Roberts', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r19', 'C1', 'Committee', 'Mulligan Printing', 'Mulligan Printing', 'James', 'Mulligan Printing', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r20', 'C1', 'Committee', 'VAN DYKE', null, 'Bob', 'VAN DYKE', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r21', 'C1', 'Committee', 'Van Dyke', 'Bob Van Dyke', 'Bob', 'Van Dyke', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'r22', 'C1', 'Committee', 'De La Cruz', 'De La Cruz', 'Ana', 'De La Cruz', null, null, '1', null, null, null, null, null, 'FALSE'
     expect:
       rows:
         - {record_id: r1, payee_name: Kimmie Shepard}
@@ -387,3 +396,8 @@ unit_tests:
         - {record_id: r15, payee_name: Bud Hertzog}
         - {record_id: r16, payee_name: USPS}
         - {record_id: r17, payee_name: Kyler Cliffman}
+        - {record_id: r18, payee_name: Robert Roberts}
+        - {record_id: r19, payee_name: Mulligan Printing}
+        - {record_id: r20, payee_name: Bob VAN DYKE}
+        - {record_id: r21, payee_name: Bob Van Dyke}
+        - {record_id: r22, payee_name: De La Cruz}

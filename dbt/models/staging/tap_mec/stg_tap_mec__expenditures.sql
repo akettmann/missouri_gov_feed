@@ -4,11 +4,14 @@
 -- independent source and is not used. A payee with a company keeps that company, which stops a contact's name
 -- (the person at the vendor) replacing the vendor. When the company only repeats the person's last name or "First
 -- Last" (compared ignoring case and spaces), the payee is the individual, so "First Last" is used instead; this
--- keeps different people sharing a surname apart. With no usable company the payee is "First Last", then the
+-- keeps different people sharing a surname apart. Only a one-word last name is compared that way: a last name of
+-- several words ('Mulligan Printing' typed into the last-name box) is the vendor itself, so the company wins and
+-- the contact's first name is not prefixed. With no usable company the payee is "First Last", then the
 -- partial person name (first or last alone). Placeholders ('~', '-', no letter or number) are dropped, and a
 -- whole name (company) of one character is dropped; a part of a person's name keeps initials ('J Roe'). All-digit
--- name parts are dropped. When the last name already starts with (or is) the first name (an organization typed
--- into both boxes: 'USPS' / 'USPS'), the last name alone is used. Same rules as contributions (macros/names.sql).
+-- name parts are dropped. When the last name is the first name, or starts with the first name followed by a space
+-- (an organization typed into both boxes: 'USPS' / 'USPS'), the last name alone is used. Built from the shared
+-- macros in macros/names.sql; the contributions model adopting them is #127.
 with
 
 names as (
@@ -31,7 +34,10 @@ names as (
                     end
         end as full_name,
         {{ mogov.person_name('first_name', 'last_name') }} as person_name_any,
-        replace(lower({{ mogov.name_part('last_name') }}), ' ', '') as last_key
+        case
+            when {{ mogov.name_part('last_name') }} not like '% %'
+                then lower({{ mogov.name_part('last_name') }})
+        end as last_key
     from {{ source('tap_mec', 'expenditures') }}
     where coalesce(dupe_flag, 'FALSE') <> 'TRUE'
 ),

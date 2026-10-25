@@ -536,7 +536,9 @@ models:
       by the awards_threshold var) on one measured number within one office, per calendar year and over all
       loaded years ('lifetime'), each paired with its opposite: lowest/highest attendance (rpt_attendance,
       100+ recorded votes), most money from PACs, committees and parties / lowest share of it among officials
-      raising $10,000+ (rpt_donor_rollup, medium name matches excluded), most breaks with / most loyal to
+      raising $10,000+ (rpt_donor_rollup, medium name matches excluded; federal officials' share is per FEC
+      two-year cycle, reported under the cycle's end year, over FEC total receipts from fct_federal_donor_summary,
+      since the rollup holds only their committee receipts), most breaks with / most loyal to
       their party (party_unity_pct, current chamber, lifetime only). Only offices with awards_min_field_size
       (5) or more qualifying officials in the period. streak_years counts consecutive qualifying years. No
       composite scores. Grain: one row per (award, office, period, official).
@@ -670,10 +672,12 @@ models:
   - name: rpt_district_business_industries
     description: >
       EPA-regulated business sites (fct_jurisdiction_businesses) in each district-elected official's area,
-      counted by NAICS sector (naics_sectors seed, from the site's primary NAICS code), with how many are tied to
-      a donor. The donor sites themselves are listed in fct_jurisdiction_businesses (is_donor). EPA FRS covers
-      regulated sites only (factories, fuel stations, shops with permits), and most sites carry no NAICS code;
-      those are counted under sector_name "No industry code" with a null sector_code. Grain: one row per
+      counted by NAICS sector (naics_sectors seed, matched on the first two digits of the site's naics_code), with
+      how many are tied to a donor. The code is the NAICS code most of the site's programs give or, for a site
+      with no NAICS code, the sector its SIC code maps to (int_epa_frs__facilities). The donor sites themselves
+      are listed in fct_jurisdiction_businesses (is_donor). EPA FRS covers regulated sites only (factories, fuel
+      stations, shops with permits), and about 44% of sites have neither a NAICS nor a SIC code; those are
+      counted under sector_name "No industry code" with a null sector_code. Grain: one row per
       (official, sector).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
@@ -694,7 +698,7 @@ models:
                 field: official_id
       - name: sector_code
         data_type: varchar
-        description: NAICS sector code (`31-33` for manufacturing); null for sites with no NAICS code.
+        description: NAICS sector code (`31-33` for manufacturing); null for sites with neither a NAICS nor a SIC code.
       - name: sector_name
         data_type: varchar
         description: NAICS sector title, or "No industry code".

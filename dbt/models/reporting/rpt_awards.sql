@@ -4,13 +4,18 @@
 -- Every award ranks a single figure that the profile pages also show; nothing is combined into a score.
 --   attendance:        rpt_attendance, present / recorded votes, at least 100 recorded votes in the period
 --   committee money:   rpt_donor_rollup from PACs, committees and parties (medium name matches left out);
---                      the opposite ranks the lowest share of such money among officials raising $10,000+
+--                      the opposite ranks the lowest share of such money among officials raising $10,000+.
+--                      The rollup holds only committee receipts for federal officials (FEC individual donors
+--                      are not itemized), so a federal share would always be 100%: federal shares are per FEC
+--                      two-year cycle (period = the cycle's even end year) over FEC's total receipts for the
+--                      cycle (fct_federal_donor_summary); a cycle with no FEC total gets no share
 --   party unity:       fct_bias_indicators party_unity_pct for the official's current chamber; the source
 --                      computes it over all loaded votes, so it has a lifetime period only
 with offices as (
     select
         official_id,
-        office
+        office,
+        level
     from {{ ref('dim_official') }}
 ),
 
@@ -87,11 +92,78 @@ money_with_office as (
     select
         m.official_id,
         o.office,
+        o.level,
         m.period,
         m.committee_money,
         m.all_money
     from money as m
     inner join offices as o on m.official_id = o.official_id
+),
+
+federal_committee_cycles as (
+    select
+        official_id,
+        cast(election_cycle as {{ dbt.type_string() }}) as period,
+        sum(
+            case when donor_class in ('pac', 'committee', 'candidate committee', 'party') then total_amount else 0 end
+        ) as committee_money
+    from {{ ref('rpt_donor_rollup') }}
+    where level = 'federal' and match_confidence <> 'medium'
+    group by official_id, cast(election_cycle as {{ dbt.type_string() }})
+),
+
+federal_share_cycles as (
+    -- the denominator is FEC's own total receipts for the cycle (individuals, PACs, parties, the candidate);
+    -- a member with an FEC total but no itemized committee receipts has a committee share of 0
+    select
+        t.official_id,
+        cast(t.cycle as {{ dbt.type_string() }}) as period,
+        coalesce(c.committee_money, 0) as committee_money,
+        t.total as all_money
+    from {{ ref('fct_federal_donor_summary') }} as t
+    left join federal_committee_cycles as c
+        on
+            t.official_id = c.official_id
+            and cast(t.cycle as {{ dbt.type_string() }}) = c.period
+    where t.aggregate_kind = 'cycle total' and t.bucket = 'total receipts' and t.total > 0
+),
+
+federal_share as (
+    select
+        official_id,
+        period,
+        committee_money,
+        all_money
+    from federal_share_cycles
+    union all
+    select
+        official_id,
+        'lifetime' as period,
+        sum(committee_money) as committee_money,
+        sum(all_money) as all_money
+    from federal_share_cycles
+    group by official_id
+),
+
+share_money as (
+    -- state and local officials keep the calendar-year rollup figures; federal officials use FEC cycle figures
+    select
+        official_id,
+        office,
+        period,
+        committee_money,
+        all_money
+    from money_with_office
+    where level <> 'federal'
+    union all
+    select
+        f.official_id,
+        o.office,
+        f.period,
+        f.committee_money,
+        f.all_money
+    from federal_share as f
+    inner join offices as o on f.official_id = o.official_id
 ),
 
 unity as (
@@ -148,7 +220,7 @@ measures as (
         round(100.0 * committee_money / all_money, 1) as metric,
         all_money as sample_size,
         100.0 * committee_money / all_money as sort_key
-    from money_with_office
+    from share_money
     where all_money >= 10000
     union all
     select
