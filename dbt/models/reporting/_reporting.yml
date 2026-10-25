@@ -581,7 +581,20 @@ models:
         description: The comparison group (dim_official.office); officials are ranked only against their office.
       - name: period
         data_type: varchar
-        description: Calendar year, or 'lifetime' for all loaded years.
+        description: >
+          Calendar year, the even end year of a two-year FEC cycle (period_kind = 'fec_cycle'), or 'lifetime' for
+          all loaded years.
+      - name: period_kind
+        data_type: varchar
+        description: >
+          What the period is: 'year' (calendar year), 'fec_cycle' (two-year FEC cycle named by its even end
+          year; federal officials' least_committee_money_share) or 'lifetime' (all loaded years). The
+          frontend words the period from this instead of guessing from the award and office.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['year', 'fec_cycle', 'lifetime']
       - name: award_rank
         data_type: bigint
         description: 1 = the official the award describes most strongly; ties share a rank.
