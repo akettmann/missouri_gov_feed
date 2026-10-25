@@ -17,7 +17,7 @@ const current = await officialIndex();
 // the office key lets the filter bar narrow the pickers; chip labels use the shared helper because
 // office_title is circuit-specific for judges
 const groups = buildOfficeGroups(
-  current.map((o) => ({ office: o.office, office_title: pluralOfficeLabel(o.office, o.office_title) })),
+  current.map((o) => ({ office: o.office, office_title: pluralOfficeLabel(o.office) })),
 );
 const officials = current.map((o) => ({
   slug: o.slug,
