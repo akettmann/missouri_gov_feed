@@ -12,6 +12,7 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `mo_house` | Missouri House (documents.house.mo.gov) | members, bills, per-member roll-call votes | `MOGOV_LOOKBACK_YEARS` (default 10; PDFs from 2014) | |
 | `mo_senate` | Missouri Senate journals (senate.mo.gov) | per-senator roll-call votes | `MOGOV_LOOKBACK_YEARS` | |
 | `mo_senate_topics` | Missouri Senate topical index (senate.mo.gov) | Senate bills, subject terms for Senate bills and House bills that reached the Senate | `MOGOV_LOOKBACK_YEARS` (regular sessions) | |
+| `mo_revisor` | Missouri Revisor of Statutes (revisor.mo.gov) | statute text (RSMo) by section version, repeals and transfers, which bills enacted, amended or repealed each section | current statutes; repeals since 1945 | slow: ~1 request/s |
 | `mec` | Missouri Ethics Commission | state campaign contributions and spending, candidate↔committee links, lobbyist gifts | 2023+ | opt-in |
 | `tap_mec` | MEC via The Accountability Project | state campaign finance and lobbyist gifts | 2011–2022 (gifts from 2004) | |
 | `fec` | Federal Election Commission | federal candidates, committees, PAC contributions, donor aggregates | `MOGOV_FEC_CYCLES` | API key for aggregates |
@@ -85,6 +86,16 @@ Quirks:
   shard with 4 shards.
 - PDF text extraction is cached by PDF content (`data/cache/pdftext/`). Before that, a re-run spent
   3–10 minutes per shard re-parsing PDFs that were already downloaded.
+- Bill status (`fct_bills.status`, `outcome`; `int_bills__status`) comes from each bill's `Action` list. The
+  `SenateActList` file adds the Senate bills that reached the House, but only with their House-side and governor
+  actions. It sometimes stops at the speaker's signature: 2024 SB 727 was signed into law, yet the list ends at
+  "Signed by House Speaker". Such bills get the outcome "no governor action recorded", not "failed". Senate bills
+  that never reached the House have no actions in any source we load, so their status is null.
+- `ActivitySequence` (action order) is only present from 2024. About 1,000 of 138,000 actions are repeated word
+  for word under one `Guid` (mostly 2017–2018); staging keeps them once.
+- Session codes: 1 is the regular session and 2–4 are special sessions, in order. Code 2 doesn't appear in
+  2017–2026: the first special session of a year is 3. 2018's 183 was a legislature-called session with
+  resolutions only.
 
 ## mo_senate: Missouri Senate journals
 
@@ -148,6 +159,62 @@ Quirks:
   the House still have no subjects.
 - The House export doesn't name its roll calls on Senate bills, so House votes on Senate bills aren't
   linked to a bill.
+
+## mo_revisor: Missouri Revisor of Statutes (RSMo)
+
+Flow: [diagrams/sources/mo_revisor.svg](diagrams/sources/mo_revisor.svg)
+
+revisor.mo.gov publishes the Revised Statutes of Missouri as server-rendered pages, with no bulk download. The
+table of contents (`Home.aspx`) lists titles and chapters. Each chapter page (`OneChapter.aspx?chapter=N`) lists
+its sections in force, one link per section *version* (`bid`). A section page
+(`OneSection.aspx?section=S&bid=B`) has the heading, text, effective date and footnotes, starting with the
+session-law history ("(RSMo 1939 § 645, A.L. 1957 p. 587, A.L. 2015 S.B. 239)"). One page, `rx.aspx` (~10 MB),
+lists every repealed and transferred section with its note and date, so those ~14,700 sections need no page
+of their own.
+
+- Lands: `mo_revisor_chapters` (one row per chapter), `mo_revisor_sections` (one row per section version in
+  force: the page's content block verbatim, plus its text, effective-date line and footnotes) and
+  `mo_revisor_repeals` (one row per repealed or transferred section).
+- Shard units: chapters, plus `rx.aspx` (owned by one shard).
+- Freshness: the table of contents, chapter lists and `rx.aspx` are re-read weekly. A new enactment or amendment
+  is a new version with its own `bid` and URL, so the weekly chapter lists find it. A version's own page only
+  changes with annotations, so it is re-read every 180 days.
+- dbt: `stg_mo_revisor__*`, then `int_mo_revisor__session_law_bills` (history and repeal notes split into one
+  row per bill), then `fct_statute_sections` and `fct_bill_statute_links`.
+
+Quirks:
+- **Rate limit.** The site blocks an IP address that sends requests less than a second apart several times in
+  30 seconds. First it serves a warning page with status 200 in place of the page asked for (the same page it
+  serves for a page that doesn't exist). If requests keep coming, every request from that IP, browsers
+  included, redirects to `Block.aspx`. Three shards at ~10 requests/s got an IP blocked within two minutes on
+  2026-10-25. The block page gives WebMaster@LR.mo.gov for help. The loader waits 1.5 s × the shard count
+  before each request, so all shards together stay under one request per 1.5 s from one IP. It also stops with
+  `Blocked` on either page instead of caching it. A cold load reads ~20,000 pages, so it takes about 9 hours.
+- Several versions of one section can be in force side by side: a later version with a future effective date
+  (27.117 has one effective 28 Aug 2026 and one effective 1 Jul 2027), or conflicting enactments of the same
+  year (`MultiEnact.aspx`). `fct_statute_sections.is_current` marks the in-force version with the latest
+  effective date.
+- Section numbers aren't always `NNN.NNN`: there are four-digit sections (`1.1001`), letter chapters (`30A`),
+  and the uniform codes number sections article-section (`400.3-505`, `456.4A-411`).
+- Text: paragraphs are `p.norm` blocks. Tables (fee schedules, forms) come wrapped in `div`s and are kept one
+  row per line, cells tab-separated. Soft-hyphen spacer paragraphs around tables are dropped.
+- History notes have several act forms: `L.` (enacted), `A.L.` (amended), `A.` (amended, in the 1949 revision's
+  notes), and `Repealed L.` in repeal notes. Older acts are cited by session-law page (`p. 1428`) and name no
+  bill. Bills are joined by `merged with` (several bills changed the section in one session) and `&` (combined
+  bills: `S.B. 299 & 40` is SB 299 and SB 40). `, et al.` belongs to the act before it. `S.B` sometimes lacks
+  its last dot.
+- Extraordinary sessions: the Revisor writes "1st Ex. Sess." and counts only extraordinary sessions that passed
+  bills. The House numbers every special session, so 2018's legislature-called impeachment session (House 183,
+  resolutions only) makes the Revisor's 2018 "1st Ex. Sess." House session 184. Staging maps the Nth
+  extraordinary session to the year's Nth House special-session code that has House bills.
+- A repeal that waits on a contingency is dated 1 Jan 2099 (2026 SB 1233). Staging keeps it as
+  `is_contingent` with no date.
+- `rx.aspx` also lists repealed constitution sections (`V Section 25`); staging leaves them out (the
+  constitution is #224). One of them prints the year as "L. 1076" (for 1976).
+- Transfer notes read "(Transferred 2013; now 29.351)" or "(Transferred 1978 to 565.004; repealed 1983)".
+- Some chapters list no sections at all: every section in them was repealed or transferred.
+- History notes only cover bills that became law. A pending bill's statute targets are in its text, which
+  isn't loaded yet (#175).
 
 ## mec: Missouri Ethics Commission (opt-in)
 

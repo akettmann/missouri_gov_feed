@@ -232,6 +232,10 @@ OPTIONAL_JSON_TABLES = [
     "wikidata_own_leadership",
     "wikidata_mo_officeholders",
     "epa_frs_sic",  # added to the EPA FRS loader after the first landings (#123); older raw dirs lack it
+    # RSMo statutes (#34): a first load takes hours (the site allows ~1 request/s), so builds run without it
+    "mo_revisor_chapters",
+    "mo_revisor_sections",
+    "mo_revisor_repeals",
 ]
 
 

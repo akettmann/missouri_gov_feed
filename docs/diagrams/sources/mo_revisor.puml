@@ -1,0 +1,33 @@
+@startuml mo_revisor
+title mo_revisor: Revisor of Statutes (RSMo)
+start
+:GET revisor.mo.gov/main/Home.aspx
+(table of contents: titles and chapters; weekly);
+:owned chapters
+(one unit per chapter, by hash);
+note right
+  Every request waits 1.5 s x shard count:
+  the site blocks an IP that reads faster
+  than ~1 page/s.
+end note
+fork
+  :shard that owns "rx.aspx":
+  GET rx.aspx (~10 MB, weekly);
+  :one row per repealed or transferred
+  section: note and date as printed;
+  :mo_revisor_repeals;
+fork again
+  :GET OneChapter.aspx?chapter=N (weekly)
+  -> the (section, bid) versions in force;
+  :GET OneSection.aspx?section=S&bid=B
+  (re-read every 180 days; a new version is a new bid);
+  :content block verbatim + text, effective line,
+  footnotes (session-law history first);
+  :mo_revisor_sections;
+end fork
+:mo_revisor_chapters;
+:dbt: stg_mo_revisor__chapters / __sections / __repeals
+-> int_mo_revisor__session_law_bills (history notes -> bills)
+-> fct_statute_sections, fct_bill_statute_links;
+stop
+@enduml

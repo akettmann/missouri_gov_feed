@@ -3,6 +3,8 @@
 --   House bills  the House XML export: titles, current version, last action
 --   Senate bills the Senate topical index (regular sessions): its one-line description as the short
 --                title; Senate bills filed under no keyword aren't listed there and are missing
+-- status and outcome come from the House XML's actions (int_bills__status): null for Senate bills that never
+-- reached the House, whose actions aren't loaded.
 with subjects as (
     select
         session_code,
@@ -61,7 +63,10 @@ select
     b.long_title,
     s.subjects,
     b.last_action,
+    st.status,
+    st.outcome,
     b.proposed_effective_date,
     b.source_url
 from bills as b
 left join subjects as s on b.session_code = s.session_code and b.bill = s.bill
+left join {{ ref('int_bills__status') }} as st on b.session_code = st.session_code and b.bill = st.bill

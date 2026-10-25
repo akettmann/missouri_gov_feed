@@ -1,0 +1,47 @@
+# Unit tests for the Revisor session-law citation parser: fixed history and repeal notes -> exact bill rows.
+version: 2
+
+unit_tests:
+  - name: session_law_citations_split_into_bills
+    model: int_mo_revisor__session_law_bills
+    description: >
+      One row per (section version, bill) for each act that names a bill. "p. N" acts name no bill; "et al." stays
+      with its act; "merged with" and "&" name several bills of one act, the numbers after "&" sharing the first
+      bill's type; "A." (1949 revision) is an amendment; "S.B" without its last dot still parses. The Revisor's
+      2018 "1st Ex. Sess." is House session 184: 183 was a special session with resolutions only.
+    given:
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select '1.010' as section_id, '1.010/42' as section_version_id, '(RSMo 1939 § 645, A.L. 1957 p. 587, A.L. 2015 S.B. 239)' as history_note union all
+            select '27.117', '27.117/60727', '(L. 2026 H.B. 2273, et al. merged with H.B. 2637 & 3155 merged with S.B. 999)' union all
+            select '33.210', '33.210/822', '(L. 1945 p. 1428 § 48, A.L. 2003 S.B. 299 & 40)' union all
+            select '2.040', '2.040/60086', '(RSMo 1939 § 665, A.L. 1945 p. 1112; RSMo 1939 §§ 675, 676; A. 1949 S.B. 1002)' union all
+            select '9.100', '9.100/1', '(L. 1990 S.B 5 § 1)' union all
+            select '36.430', '36.430/999', '(L. 1945 p. 1157 § 41)'
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select '85.270' as section_id, '85.270/1' as section_version_id, 'repealed' as change_kind, '(Repealed L. 1983 H.B. 68 § 1 Revision)' as note union all
+            select '487.010', '487.010/2', 'repealed', '(Repealed L. 2018 1st Ex. Sess. H.B. 2)' union all
+            select '9.010', '9.010/3', 'transferred', '(Transferred 1959; now 442.560 )'
+      - input: ref('stg_mo_house__bills')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, 'HB1' as bill union all
+            select 2018, '183', 'HR1' union all
+            select 2018, '184', 'HB1' union all
+            select 2018, '184', 'HB2'
+    expect:
+      rows:
+        - {section_id: '1.010', bill: SB239, change: amended, session_code: '151'}
+        - {section_id: '27.117', bill: HB2273, change: enacted, session_code: '261'}
+        - {section_id: '27.117', bill: HB2637, change: enacted, session_code: '261'}
+        - {section_id: '27.117', bill: HB3155, change: enacted, session_code: '261'}
+        - {section_id: '27.117', bill: SB999, change: enacted, session_code: '261'}
+        - {section_id: '33.210', bill: SB299, change: amended, session_code: '031'}
+        - {section_id: '33.210', bill: SB40, change: amended, session_code: '031'}
+        - {section_id: '2.040', bill: SB1002, change: amended, session_code: '491'}
+        - {section_id: '9.100', bill: SB5, change: enacted, session_code: '901'}
+        - {section_id: '85.270', bill: HB68, change: repealed, session_code: '831'}
+        - {section_id: '487.010', bill: HB2, change: repealed, session_code: '184'}

@@ -1,0 +1,79 @@
+-- Revised Statutes of Missouri (RSMo), one row per section version from the Revisor of Statutes: the versions listed
+-- in force (text, heading, effective date, session-law history) and the repealed and transferred sections (note and
+-- date only). A section can have several versions at once: is_current marks the one(s) in effect on the build date
+-- (two when the Revisor prints conflicting enactments of the same section side by side).
+{% set as_of = "cast('" ~ var('as_of_date') ~ "' as date)" if var('as_of_date', none) else 'current_date' %}
+
+with listed as (
+    select
+        section_id,
+        bid,
+        section_version_id,
+        chapter,
+        heading,
+        case
+            when is_historical then 'historical'
+            when effective_date > {{ as_of }} then 'not yet effective'
+            else 'in force'
+        end as status,
+        effective_date,
+        cast(null as date) as ended_date,
+        cast(null as {{ dbt.type_string() }}) as transferred_to,
+        history_note,
+        section_text,
+        source_url
+    from {{ ref('stg_mo_revisor__sections') }}
+),
+
+removed as (
+    select
+        section_id,
+        bid,
+        section_version_id,
+        chapter,
+        cast(null as {{ dbt.type_string() }}) as heading,
+        change_kind as status,
+        cast(null as date) as effective_date,
+        action_date as ended_date,
+        transferred_to,
+        note as history_note,
+        cast(null as {{ dbt.type_string() }}) as section_text,
+        source_url
+    from {{ ref('stg_mo_revisor__repeals') }}
+),
+
+versions as (
+    select * from listed
+    union all
+    select * from removed
+),
+
+latest_in_force as (
+    select
+        section_id,
+        max(effective_date) as effective_date
+    from listed
+    where status = 'in force'
+    group by section_id
+)
+
+select
+    v.section_id,
+    v.bid,
+    v.section_version_id,
+    v.chapter,
+    c.chapter_name,
+    c.title_numeral,
+    c.title_name,
+    v.heading,
+    v.status,
+    coalesce(v.status = 'in force' and v.effective_date = l.effective_date, false) as is_current,
+    v.effective_date,
+    v.ended_date,
+    v.transferred_to,
+    v.history_note,
+    v.section_text,
+    v.source_url
+from versions as v
+left join {{ ref('stg_mo_revisor__chapters') }} as c on v.chapter = c.chapter
+left join latest_in_force as l on v.section_id = l.section_id

@@ -36,7 +36,9 @@ Diagrams: [pipeline](diagrams/pipeline.svg), [lineage](diagrams/lineage.svg),
    `senate_efd` (`MOGOV_ACCEPT_SENATE_EFD_TERMS=1`) you will need `MOGOV_ALLOW_FAILED_LOADERS=senate_efd`.
 
    The first run is the slow one: it downloads several GB (FEC, CourtListener bulk) and parses about
-   ten years of House roll-call PDFs and Senate journals. Everything fetched is cached under
+   ten years of House roll-call PDFs and Senate journals. The statutes (`mo_revisor`) take longest, about
+   9 hours: revisor.mo.gov blocks any IP that reads faster than about one page a second, so the loader
+   reads ~20,000 section pages 1.5 s apart, however many shards run. Everything fetched is cached under
    `data/cache`, so later runs are much faster.
 
 5. Check the result: `uv run mogov build` should end with `ERROR=0`. Run `uv run mogov export` to write
