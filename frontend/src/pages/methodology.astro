@@ -129,10 +129,10 @@ const tables = freshness();
   <section class="card" id="attendance">
     <h2>Attendance</h2>
     <p>
-      Attendance counts roll-call votes, per chamber and session, over the votes on which the official was
-      listed. An official counts as <strong>attended</strong> on a vote when they voted yea, nay or present.
-      Every other recorded position counts as not attended. The profile chart's "Not attended" view shows the
-      other side of the same figure, as a share of recorded votes, split into three stacked bars:
+      Attendance is the share of roll-call votes on which the official was listed, per chamber and session,
+      where they voted yea, nay or present. Every other recorded position counts as not attended. The profile
+      chart's "Not attended" view shows the other side of the same figure, as a share of recorded votes: one
+      bar per session, made of three stacked parts:
     </p>
     <ul>
       <li>
@@ -150,10 +150,10 @@ const tables = freshness();
     <p>
       Only the MO Senate records leave and recusals. The MO House and Congress sources don't, so a 0 in those
       bars does not mean the official was never excused: an excused House absence shows up as plain absent.
-      The tick marking the chamber is 100 minus the whole chamber's attendance for that session (every member,
-      not just those on the profile's list). It lumps all non-attended positions together, because the export
-      doesn't split out the chamber's excused absences or recusals, so compare it with the total of the
-      official's bars, not with one bar alone.
+      The chamber average tick is 100 minus the whole chamber's attendance for that session (every member who
+      voted that session, not only the officials this site covers). It lumps all non-attended positions
+      together, because the export doesn't split out the chamber's excused absences or recusals, so compare it
+      with the end of the official's whole bar, not with one part alone.
     </p>
   </section>
 
