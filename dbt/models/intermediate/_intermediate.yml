@@ -205,8 +205,9 @@ models:
     when it runs past January 15 of it, so a hand-over in the first days of January (Congress turns over on January
     3) doesn''t list both the outgoing and the incoming holder. Years are those with a House roster. Statewide officers,
     mayors and state judges have no dated past rosters here. person keys match dim_official.official_id, so a past
-    holder who serves today links to their profile. Grain: one row per (year, person, office) for offices with dated
-    past rosters.'
+    holder who serves today links to their profile. official_id is the stable person id; openstates_id is the Open
+    States record the senate row came from (null for other sources), kept so rpt_officeholders_by_year can find
+    that record''s folder. Grain: one row per (year, person, office) for offices with dated past rosters.'
 - name: int_officials__bios
   description: 'One biography text per current official where a source has one: Official Manual (legislators), MO
     House XML (representatives), FJC professional career (federal judges), Open States (others). Grain: one biography

@@ -162,7 +162,7 @@ unit_tests:
           - {alias_id: ocd-person/lee-a, person_id: ocd-person/lee-b, relation: different_people}
     expect:
       rows:
-        - {alias_id: ocd-person/mcgaugh, person_id: ocd-person/mcgaugh, basis: name_continuity}
+        - {alias_id: ocd-person/mcgaugh, person_id: ocd-person/mcgaugh, basis: self}
         - {alias_id: 'mohouse:658', person_id: ocd-person/mcgaugh, basis: name_continuity}
         - {alias_id: ocd-person/lee-a, person_id: ocd-person/lee-b, basis: name_continuity}
         - {alias_id: ocd-person/lee-b, person_id: ocd-person/lee-b, basis: self}
