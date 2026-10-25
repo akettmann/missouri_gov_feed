@@ -97,3 +97,30 @@ test("years run together only when unbroken", () => {
   assert.equal(yearsLabel([2021, 2019, 2022, 2019]), "2019, 2021–2022");
   assert.equal(yearsLabel([2020]), "2020");
 });
+
+test("the pay rows' links: note text travels with noteHref, and each official's pay source is linked", async () => {
+  const { compareRows } = await import("../src/lib/compare.ts");
+  const b = (name, url) => ({
+    official: { full_name: name, office: "state_house", office_title: "Rep.", party: "D" },
+    indicators: [],
+    peers: [],
+    voting: {
+      status: "available",
+      party_breaks: null,
+      attendance: [session("state_house", "2019-01-10", "2019-05-01")],
+      attendance_pay: [row(2019, { pay_source_url: url }), total({ pay_source_url: url })],
+    },
+    money: { cycles: { rows: [] } },
+    gifts: { rows: [] },
+    businesses: null,
+    coverage: [],
+    interests: { family_ties: [], commercial_ties: [] },
+  });
+  const rows = compareRows([b("A", "https://pay.example/a"), b("B", null)], false);
+  const pay = rows.find((r) => r.label.startsWith("Pay per vote attended, covered"));
+  assert.equal(pay.noteHref, "/methodology/#pay-per-vote");
+  assert.equal(pay.noteLinkText, "How pay per vote is counted");
+  assert.deepEqual(pay.valueLinks, [[{ text: "pay source", href: "https://pay.example/a" }], []]);
+  // no other row may carry a noteHref without its own link text
+  for (const r of rows) if (r.noteHref) assert.ok(r.noteLinkText, r.label);
+});
