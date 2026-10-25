@@ -14,6 +14,7 @@ export interface Lookup {
   zips: Record<string, [number, number, number]>;
   /** county district_id -> ids of the House, Senate and congressional districts that intersect it */
   countyDistricts: Record<string, string[]>;
+  countyCities: Record<string, string[]>;
   /** slug -> [full name, office line, party, office, current award badges when they hold any] */
   directory: Record<string, [string, string, string | null, string, Badge[]?]>;
 }

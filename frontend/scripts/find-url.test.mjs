@@ -1,12 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  countyDistrictId,
-  countyFips,
-  findHref,
-  interiorPoint,
-  parseFindParams,
-} from "../src/lib/findUrl.ts";
+import { countyDistrictId, countyFips, findHref, parseFindParams } from "../src/lib/findUrl.ts";
 
 const counties = new Set(["29001", "29510"]);
 
@@ -57,14 +51,4 @@ test("href is base-aware and round-trips", () => {
 
 test("href never carries coordinates", () => {
   assert.doesNotMatch(findHref("/", { kind: "county", fips: "29001" }), /lat|lon|\d\.\d/);
-});
-
-// C-shaped county: the bbox center (2,2) is in the notch, strictly outside, so the point must come from the scan.
-const C = [[[0, 0, 4, 0, 4, 1, 1, 1, 1, 3, 4, 3, 4, 4, 0, 4]]];
-const inC = (_p, x, y) => x >= 0 && x <= 4 && y >= 0 && y <= 4 && !(x > 1 && y > 1 && y < 3);
-test("interiorPoint lands inside a non-convex county", () => {
-  assert.equal(inC(C, 2, 2), false); // the bbox center really is outside
-  const p = interiorPoint(C, inC);
-  assert.ok(p && inC(C, p[0], p[1]));
-  assert.equal(interiorPoint([], inC), null);
 });

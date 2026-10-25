@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { countyDistricts } from "../src/lib/countyDistricts.ts";
 import { countyView } from "../src/lib/countyView.ts";
 
 const rect = (x0, y0, x1, y1) => [[[x0, y0, x1, y0, x1, y1, x0, y1]]];
@@ -27,44 +26,6 @@ const shapes = [
   shape("state_house:3", "state_house", "State House District 3", 6, 0, 10, 10),
 ];
 
-test("county -> districts lists every intersecting district, no others, in type order", () => {
-  const r = countyDistricts(shapes);
-  assert.deepEqual(r["county:29001"], [
-    "us_house:119:1",
-    "us_house:119:2",
-    "state_senate:1",
-    "state_house:1",
-    "state_house:2",
-  ]);
-  assert.deepEqual(r["county:29002"], [
-    "us_house:119:1",
-    "us_house:119:2",
-    "state_senate:1",
-    "state_house:2",
-    "state_house:3",
-  ]);
-});
-
-test("a small county gets sampled finely enough to land in one district only", () => {
-  assert.deepEqual(countyDistricts(shapes)["county:29510"], [
-    "us_house:119:2",
-    "state_senate:1",
-    "state_house:3",
-  ]);
-});
-
-test("a hole in a district does not count as inside it", () => {
-  const donut = shape("state_house:9", "state_house", "Donut", 0, 0, 10, 10);
-  donut.polygons = [
-    [
-      [0, 0, 10, 0, 10, 10, 0, 10],
-      [6.5, 6.5, 8.5, 6.5, 8.5, 8.5, 6.5, 8.5],
-    ],
-  ];
-  const city = shape("county:29510", "county", "Sample city", 7, 7, 8, 8);
-  assert.deepEqual(countyDistricts([city, donut])["county:29510"], []);
-});
-
 const data = {
   shapes,
   statewide: ["gov", "sen-a"],
@@ -72,8 +33,17 @@ const data = {
     "county:29001": ["judge-a"],
     "state_house:2": ["rep-two"],
     "us_house:119:1": ["cong-one"],
+    "place:2965000": ["mayor-spencer"],
+    "place:2938000": ["mayor-kc"],
   },
-  countyDistricts: countyDistricts(shapes),
+  // as fct_county_districts exports it: ordered congressional, senate, house; real overlaps only
+  countyDistricts: {
+    "county:29001": ["us_house:119:1", "us_house:119:2", "state_senate:1", "state_house:1", "state_house:2"],
+    "county:29002": ["us_house:119:1", "state_senate:1", "state_house:2", "state_house:3"],
+    "county:29510": ["us_house:119:2", "state_senate:1", "state_house:3"],
+  },
+  // St. Louis city is a county and a city at once; Kansas City only part of several counties, so it is absent
+  countyCities: { "county:29510": ["place:2965000"] },
 };
 
 test("view: title uses the data's name, city capitalized", () => {
@@ -102,21 +72,16 @@ test("view: districts carry members; empty seats stay listed", () => {
   );
 });
 
-// Bounding boxes overlap but the shapes do not: a triangle (below the diagonal) and a box in the far corner.
-const triangle = (id, type, name) => ({
-  district_id: id,
-  district_type: type,
-  name,
-  bbox: [0, 0, 10, 10],
-  polygons: [[[0, 0, 10, 0, 0, 10]]],
+test("view: the mayor of a city that is the whole county is county-wide; other cities' mayors are not", () => {
+  assert.deepEqual(countyView(data, "29510").slugs, ["gov", "sen-a", "mayor-spencer"]);
+  for (const fips of ["29001", "29002"]) assert.ok(!countyView(data, fips).slugs.includes("mayor-kc"));
 });
-test("overlapping bounding boxes are not intersections (district and county side)", () => {
-  const corner = shape("county:29003", "county", "Corner County", 8, 8, 10, 10);
-  const tri = triangle("state_house:7", "state_house", "Triangle");
-  assert.deepEqual(countyDistricts([corner, tri])["county:29003"], []);
-  const triCounty = { ...triangle("county:29004", "county", "Tri County") };
-  const box = shape("state_house:8", "state_house", "Corner box", 8, 8, 10, 10);
-  assert.deepEqual(countyDistricts([triCounty, box])["county:29004"], []);
-  const low = shape("state_house:9", "state_house", "Low box", 1, 1, 3, 3);
-  assert.deepEqual(countyDistricts([triCounty, low])["county:29004"], ["state_house:9"]);
+
+test("view: districts come from the export in its order, with their members", () => {
+  const v = countyView(data, "29002");
+  assert.deepEqual(
+    v.districts.map((d) => d.district_id),
+    ["us_house:119:1", "state_senate:1", "state_house:2", "state_house:3"],
+  );
+  assert.deepEqual(countyView(data, "29002").districts[2].members, ["rep-two"]);
 });

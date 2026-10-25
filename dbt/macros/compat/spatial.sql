@@ -41,3 +41,23 @@
 {% macro geom_contains(area, point) -%}
     st_contains({{ area }}, {{ point }})
 {%- endmacro %}
+
+
+{% macro geom_intersects(a, b) -%}
+    st_intersects({{ a }}, {{ b }})
+{%- endmacro %}
+
+
+{#
+  Area of the overlap of two boundaries, in square degrees (both backends return the planar area of the
+  geometry's own coordinates). Callers convert to km2 with the latitude of the area, which is plenty for
+  comparing overlaps against a threshold.
+#}
+{% macro geom_intersection_area(a, b) -%}
+    st_area(st_intersection({{ a }}, {{ b }}))
+{%- endmacro %}
+
+
+{% macro geom_area(geom) -%}
+    st_area({{ geom }})
+{%- endmacro %}
