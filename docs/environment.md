@@ -196,7 +196,7 @@ The build is plain static files, so any static host works; the repo ships a scri
    gcloud storage buckets add-iam-policy-binding gs://BUCKET --member=allUsers --role=roles/storage.objectViewer
    gcloud storage buckets update gs://BUCKET --web-main-page-suffix=index.html --web-error-page=404.html
    ```
-2. Each release, after `pnpm build` (and `pnpm sizes`):
+2. Each release, after `pnpm build`:
    ```
    gcloud auth login
    MOGOV_SITE_BUCKET=BUCKET pnpm deploy:gcs --dry-run   # see what would change
@@ -245,13 +245,14 @@ The deploy only ever writes the `gh-pages` branch (there is no `--branch` flag),
 `https://github.com/<owner>/<name>.git` for the repo of the `origin` remote (`--remote NAME` picks another remote
 to read the repo from). It refuses to run with uncommitted changes under `frontend/` (`--allow-dirty` overrides)
 and removes its ~200 MB temp repo on every exit, dry runs and failures included (`--keep` leaves it for
-inspection). It can be started from any directory.
+inspection). It can be started from any directory. It runs the size budget check (as `pnpm build` does) before publishing, including with `--skip-build`; `MOGOV_SKIP_SIZE_BUDGET=1` skips it, as it does for `pnpm deploy:gcs`. If deleting the temp repo fails (for example EBUSY) during an interrupt, the interrupt result stays (exit 130) and the left-over directory is named in an extra warning.
 
-Ctrl+C never reaches the push. What happens depends on the stage:
+A Ctrl+C before the push starts stops it. What happens depends on the stage:
 
 | Stage                                       | Ctrl+C result                                                                                                                                                                                                                                                                                                                                                                                |
 | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm build`                                | Node's default handler (no listener is installed yet) kills the script and the build; no temp dir exists yet; exit code is the signal's (on Windows typically `0xC000013A`).                                                                                                                                                                                                                 |
+| `pnpm build` / link check                   | Same as the build: no listener is installed yet, so Node's default handler kills the script (the link check is a child process); no temp dir exists yet.                                                                                                                                                                                                                                     |
 | Copy of `dist/` and size scan               | The first Ctrl+C deletes the temp repo (unless `--keep`) and exits 130 ("Interrupted; nothing was pushed.").                                                                                                                                                                                                                                                                                 |
 | `git init` / `add` / `commit` / `rev-parse` | These run as asynchronous child processes, so the same listener handles the signal: temp repo deleted, exit 130. If git itself dies from the Ctrl+C first (status 130 or `0xC000013A`), that is reported as "Interrupted; nothing was pushed.", also exit 130. An interrupt flag is also checked (after yielding to the event loop) before every git step and immediately before `git push`. |
 | `git push`                                  | If Ctrl+C arrives after the push has started the script exits 130 with "the push may or may not have completed"; check the `gh-pages` branch.                                                                                                                                                                                                                                                |

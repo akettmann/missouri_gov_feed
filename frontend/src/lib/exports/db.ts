@@ -30,14 +30,15 @@ function connection(): Promise<DuckDBConnection> {
 /**
  * Run SQL where `{table}` placeholders become read_parquet('<exports>/table.parquet').
  * Cast DATE/DECIMAL/BIGINT in the SQL so rows come back as plain JSON-safe values.
+ * Values that vary go in `params` (bound to `?` placeholders), never into the SQL text.
  */
-export async function query<T>(sql: string): Promise<T[]> {
+export async function query<T>(sql: string, params?: (string | number)[]): Promise<T[]> {
   const resolved = sql.replace(/\{(\w+)\}/g, (_, t: string) => {
     if (!hasExport(t)) {
       throw new Error(`missing export ${exportPath(t)}; run \`uv run mogov export --format parquet\``);
     }
     return `read_parquet('${exportPath(t)}')`;
   });
-  const reader = await (await connection()).runAndReadAll(resolved);
+  const reader = await (await connection()).runAndReadAll(resolved, params);
   return reader.getRowObjectsJson() as unknown as T[];
 }
