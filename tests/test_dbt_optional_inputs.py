@@ -1,6 +1,8 @@
 """The on-run-start hook that stops a bare `dbt build` silently disabling opt-in models (issue #105)."""
 
 import json
+import logging
+import logging.handlers
 from pathlib import Path
 
 import pytest
@@ -11,10 +13,24 @@ from mogov import cli
 DBT_DIR = Path(__file__).resolve().parents[1] / "dbt"
 
 
+@pytest.fixture(autouse=True)
+def _close_dbt_log_files():
+    # dbt swaps its dbt.log handler per invocation with `handlers.clear()`, leaking the open file (ResourceWarning).
+    yield
+    for log in logging.Logger.manager.loggerDict.values():
+        for h in getattr(log, "handlers", []):
+            if isinstance(h, logging.handlers.RotatingFileHandler):
+                h.close()
+
+
 def _check(monkeypatch, raw_dir, *vars_):
     monkeypatch.setenv("MOGOV_RAW_DIR", raw_dir.as_posix())
     args = ["run-operation", "check_optional_inputs", "--project-dir", str(DBT_DIR), "--profiles-dir", str(DBT_DIR)]
     args += ["--target", "lint"]
+    # Keep dbtRunner out of dbt/target (partial_parse.msgpack) and dbt/logs: writing them forces a full reparse
+    # (or dirties logs) on the next real dbt run.
+    out = raw_dir.parent
+    args += ["--target-path", str(out / "dbt_target"), "--log-path", str(out / "dbt_logs")]
     if vars_:
         args += ["--vars", json.dumps(vars_[0])]
     return dbtRunner().invoke(args)

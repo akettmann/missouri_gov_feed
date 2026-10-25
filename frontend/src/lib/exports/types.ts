@@ -186,6 +186,7 @@ export interface AttendanceRow {
   absent: number;
   absent_with_leave: number;
   not_voting: number;
+  recused_from_voting: number;
   attendance_pct: number;
   chamber_attendance_pct: number;
 }
@@ -371,10 +372,16 @@ export interface PastPerson {
   official_id: string;
   full_name: string;
   party: string | null;
-  sources: string[];
+  /** Roster sources behind this person's rows, each with the roster page(s) and the years each covers. */
+  sources: RosterSource[];
   stints: PastStint[];
   /** Other pages whose full name is identical once normalized. A pointer only, not a claim of identity. */
   same_name: SameNameLink[];
+}
+
+export interface RosterSource {
+  source: string;
+  links: { url: string | null; years: number[] }[];
 }
 
 export interface SameNameLink {

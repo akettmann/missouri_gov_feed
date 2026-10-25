@@ -275,7 +275,8 @@ async function loadAll(): Promise<OfficialBundle[]> {
                  cast(last_vote_date as varchar) as last_vote_date,
                  cast(votes_recorded as integer) as votes_recorded, cast(votes_present as integer) as votes_present,
                  cast(absent as integer) as absent, cast(absent_with_leave as integer) as absent_with_leave,
-                 cast(not_voting as integer) as not_voting, attendance_pct, chamber_attendance_pct
+                 cast(not_voting as integer) as not_voting,
+                 cast(recused_from_voting as integer) as recused_from_voting, attendance_pct, chamber_attendance_pct
           from {rpt_attendance} order by first_vote_date`),
       )
     : null;
@@ -554,7 +555,7 @@ export async function pastOfficeholders(): Promise<{
   if (!hasExport("rpt_officeholders_by_year")) return null;
   const slugs = new Map((await allOfficials()).map(({ official: o }) => [o.official_id, o.slug]));
   const rows = await query<RosterRow>(`
-    select year, official_id, has_profile, full_name, party, level, office, office_title, district, source
+    select year, official_id, has_profile, full_name, party, level, office, office_title, district, source, source_url
     from {rpt_officeholders_by_year}
     order by year desc, level, office, try_cast(district as integer), district, full_name`);
   const currentYear = Math.max(...rows.map((r) => r.year));

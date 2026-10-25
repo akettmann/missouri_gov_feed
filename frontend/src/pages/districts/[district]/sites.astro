@@ -54,15 +54,16 @@ const area = officeLine(official);
       nothing about its conduct; being regulated is routine.
     </p>
     <div class="table-scroll card list">
-      <table aria-label={`Sites in ${area}`}>
+      <table>
+        <caption class="sr-only">{`Sites in ${area}`}</caption>
         <thead>
           <tr>
-            <th>Site</th>
-            <th>Address</th>
-            <th>Industry</th>
-            <th>Owner</th>
-            <th>Matching donor</th>
-            <th>Record</th>
+            <th scope="col">Site</th>
+            <th scope="col">Address</th>
+            <th scope="col">Industry</th>
+            <th scope="col">Owner</th>
+            <th scope="col">Matching donor</th>
+            <th scope="col">Record</th>
           </tr>
         </thead>
         <tbody>
@@ -96,8 +97,10 @@ const area = officeLine(official);
               </td>
               <td>
                 {s.frs_url && (
-                  <a href={s.frs_url} rel="noopener noreferrer">
+                  <a href={s.frs_url} rel="noopener noreferrer" target="_blank">
                     EPA record
+                    <span class="sr-only"> for {s.facility_name ?? "unnamed site"}</span>
+                    <span aria-hidden="true">↗</span>
                   </a>
                 )}
               </td>

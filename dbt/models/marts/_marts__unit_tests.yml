@@ -116,6 +116,44 @@ unit_tests:
         - {counterparty: Twin PAC, amount: 200, counterparty_mec_committee_id: null, counterparty_link_confidence: null}
         - {counterparty: Ann Doe, amount: 50, counterparty_mec_committee_id: null, counterparty_link_confidence: null}
 
+  - name: campaign_finance_tap_contribution_and_expenditure_ids_do_not_collide
+    model: fct_campaign_finance
+    description: >
+      TAP contribution ids (txn / cd1_a_id) and expenditure ids (cd3_b_id) are separate id spaces, so a
+      contribution and an expenditure that happen to share a raw id still get distinct source_record_ids,
+      each prefixed by its own id space (#119).
+    overrides:
+      vars:
+        mec_direct: false
+    given:
+      - input: ref('int_mec__official_committees')
+        rows:
+          - {official_id: o1, mec_committee_id: C000100, committee_name: Friends of Jane Doe, confidence: high}
+      - input: ref('stg_tap_mec__contributions')
+        rows:
+          - {record_id: '777', mec_committee_id: C000100, contributor_name: Ann Doe, contributor_type: Individual, contributor_committee_name: null, amount: 50, contribution_date: '2020-03-01', contribution_year: 2020}
+      - input: ref('int_mec__donor_committees')
+        rows: []
+      - input: ref('stg_tap_mec__expenditures')
+        rows:
+          - {record_id: '777', mec_committee_id: C000100, payee_name: Other PAC, purpose: contribution, amount: 75, expenditure_date: '2020-04-01'}
+      - input: ref('dim_official')
+        rows: []
+      - input: ref('stg_congress__fec_ids')
+        rows: []
+      - input: ref('stg_fec__candidate_committees')
+        rows: []
+      - input: ref('stg_fec__committee_contributions')
+        rows: []
+      - input: ref('stg_fec__committees')
+        rows: []
+      - input: ref('fec_committee_types')
+        rows: []
+    expect:
+      rows:
+        - {direction: received, counterparty: Ann Doe, source_record_id: 'tap_contrib:777'}
+        - {direction: given, counterparty: Other PAC, source_record_id: 'tap_cd3_b:777'}
+
   - name: disclosures_flag_latest_version_of_each_report
     model: fct_disclosures
     description: >
