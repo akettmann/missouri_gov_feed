@@ -14,9 +14,11 @@
 --   2b. two names that differ only in the given name, one being the start of the other ("Steve"/"Steven" Roberts,
 --      "Ken"/"Kenneth" Jamison; #263), are one person when each name belongs to exactly one such pair and the
 --      names never hold different seats in the same year (across all ids of both names), and either share a seat
---      in some year or follow each other within a year in a different chamber (a move, as Roberts went House to
---      Senate). The same chamber a year apart is a successor, not a variant (Dan, then Danielle Smith). A chain
---      or a fork of such pairs is ambiguous and joins nothing.
+--      in some year, with one name's years entirely inside the other's (Kenneth 2025 inside Ken 2025-26), or follow
+--      each other within a year in a different chamber (a move, as Roberts went House to Senate). A successor in
+--      the same seat is not a variant, even with a hand-over year under both names (Dan Smith 2018-19, then
+--      Danielle Smith 2019-21), nor is the same chamber a year apart. After those seat checks, a name left with
+--      more than one partner (a chain or a fork) is ambiguous and joins nothing.
 --   3. otherwise the id is its own person, basis = self.
 -- Among merged ids the person_id is an Open States id over mohouse:, then the one whose service ends latest, then
 -- the smaller id. The choice never looks at the latest roster year, so an official's id does not change when they
@@ -85,8 +87,8 @@ keep_apart as (
 ),
 
 -- names (not ids) that differ only in the given name, one starting with the other, and whose seats fit as one
--- person. Every id of either name is checked, so another id of one name holding a different seat in the other
--- name's years rules the pair out.
+-- person. A shared seat joins them only when one name's years sit inside the other's. Every id of either name
+-- is checked, so another id of one name holding a different seat in the other name's years rules the pair out.
 name_spans as (
     select
         sq,
@@ -131,12 +133,20 @@ variant_pairs as (
                 and (ta.office <> tb.office or ta.district <> tb.district)
         )
         and (
-            exists (
-                select 1
-                from name_terms as ta
-                inner join name_terms as tb
-                    on ta.year = tb.year and ta.office = tb.office and ta.district = tb.district
-                where ta.sq = a.sq and tb.sq = b.sq
+            (
+                exists (
+                    select 1
+                    from name_terms as ta
+                    inner join name_terms as tb
+                        on ta.year = tb.year and ta.office = tb.office and ta.district = tb.district
+                    where ta.sq = a.sq and tb.sq = b.sq
+                )
+                -- one name's years fall entirely inside the other's. A successor in the same seat who overlaps
+                -- the predecessor only at the hand-over year (Dan 2018-19, Danielle 2019-21) is not contained.
+                and (
+                    (a.first_year >= b.first_year and a.last_year <= b.last_year)
+                    or (b.first_year >= a.first_year and b.last_year <= a.last_year)
+                )
             )
             -- no shared seat-year: only a move between chambers, one name ending as the other begins. The same
             -- chamber a year apart is a successor ("Dan" Smith, then "Danielle" Smith in the same seat).

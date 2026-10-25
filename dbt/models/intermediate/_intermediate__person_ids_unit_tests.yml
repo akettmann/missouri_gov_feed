@@ -264,6 +264,26 @@ unit_tests:
         - {alias_id: ocd-person/jamison-ken, person_id: ocd-person/jamison-ken, basis: self}
         - {alias_id: ocd-person/jamison-kenneth, person_id: ocd-person/jamison-ken, basis: name_continuity}
 
+  - name: person_ids_keep_a_same_seat_successor_with_a_hand_over_year_apart
+    model: int_officials__person_ids
+    description: >
+      Dan Smith (HD10 2018-2019) and his successor Danielle Smith (HD10 2019-2021) both appear in 2019 in the same
+      seat, but neither name's years sit inside the other's, so they are two people.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/dan, year: 2018, office: state_house, district: '10', name_key: dan smith}
+          - {alias_id: ocd-person/dan, year: 2019, office: state_house, district: '10', name_key: dan smith}
+          - {alias_id: ocd-person/danielle, year: 2019, office: state_house, district: '10', name_key: danielle smith}
+          - {alias_id: ocd-person/danielle, year: 2020, office: state_house, district: '10', name_key: danielle smith}
+          - {alias_id: ocd-person/danielle, year: 2021, office: state_house, district: '10', name_key: danielle smith}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/dan, person_id: ocd-person/dan, basis: self}
+        - {alias_id: ocd-person/danielle, person_id: ocd-person/danielle, basis: self}
+
   - name: person_ids_keep_given_name_variants_serving_at_once_apart
     model: int_officials__person_ids
     description: >
