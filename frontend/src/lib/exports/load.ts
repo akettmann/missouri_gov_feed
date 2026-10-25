@@ -275,7 +275,8 @@ async function loadAll(): Promise<OfficialBundle[]> {
                  cast(last_vote_date as varchar) as last_vote_date,
                  cast(votes_recorded as integer) as votes_recorded, cast(votes_present as integer) as votes_present,
                  cast(absent as integer) as absent, cast(absent_with_leave as integer) as absent_with_leave,
-                 cast(not_voting as integer) as not_voting, attendance_pct, chamber_attendance_pct
+                 cast(not_voting as integer) as not_voting,
+                 cast(recused_from_voting as integer) as recused_from_voting, attendance_pct, chamber_attendance_pct
           from {rpt_attendance} order by first_vote_date`),
       )
     : null;

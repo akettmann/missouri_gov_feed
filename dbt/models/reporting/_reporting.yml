@@ -275,6 +275,9 @@ models:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [official_id, chamber, session_code]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "votes_present + absent + absent_with_leave + not_voting + recused_from_voting = votes_recorded"
     columns:
       - name: official_id
         data_type: varchar
@@ -308,13 +311,21 @@ models:
         description: Listed as absent.
       - name: absent_with_leave
         data_type: hugeint
-        description: Listed as absent with leave or excused from voting (both excused; MO Senate journals).
+        description: Listed as absent with leave (an excused absence; MO Senate journals).
       - name: not_voting
         data_type: hugeint
-        description: Listed as not voting (Congress; counted as unexcused).
+        description: Listed as not voting (Congress, Voteview code 9; the source does not say whether it was excused).
+      - name: recused_from_voting
+        data_type: hugeint
+        description: >
+          Recused: "Excused from voting" in the MO Senate journals, a Senate Rule 91 recusal by a member present on the
+          floor. Only the MO Senate records this (0 elsewhere does not mean never recused). votes_present + absent +
+          absent_with_leave + not_voting + recused_from_voting = votes_recorded.
       - name: attendance_pct
         data_type: double
-        description: 100 * votes_present / votes_recorded.
+        description: >
+          100 * votes_present / votes_recorded. A recusal counts as not present here; whether it should count as
+          attended is an open decision (#135).
         data_tests:
           - dbt_utils.accepted_range:
               arguments:

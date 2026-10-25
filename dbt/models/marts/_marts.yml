@@ -267,7 +267,7 @@ models:
         data_tests:
           - accepted_values:
               arguments:
-                values: ['yea', 'nay', 'present', 'absent', 'absent with leave', 'not voting']
+                values: ['yea', 'nay', 'present', 'absent', 'absent with leave', 'not voting', 'recused']
       - name: party_at_vote
         data_type: varchar
         description: Party of the official when the vote was cast (state) or current party (federal), normalized as in dim_official.party.

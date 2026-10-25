@@ -186,6 +186,7 @@ export interface AttendanceRow {
   absent: number;
   absent_with_leave: number;
   not_voting: number;
+  recused_from_voting: number;
   attendance_pct: number;
   chamber_attendance_pct: number;
 }

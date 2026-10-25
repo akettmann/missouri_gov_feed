@@ -8,16 +8,31 @@ export interface MissedInput {
   absent: number;
   absent_with_leave: number;
   not_voting: number;
+  recused_from_voting: number;
   chamber_attendance_pct: number;
 }
 
 export interface Missed {
   /** absent or not voting, % of votes recorded */
   unexcused: number;
-  /** excused: absent with leave or excused from voting, % of votes recorded */
+  /** absent with leave (an excused absence), % of votes recorded */
   excused: number;
+  /** recused (MO Senate "Excused from voting", a Senate Rule 91 recusal by a member on the floor), % of votes recorded */
+  recused: number;
   /** the whole chamber's share of votes not attended; the export does not split out its excused absences */
   chamber: number;
+}
+
+/** The stacked segments of the not-attended view, in stacking order (keys are the Missed fields). */
+export const MISSED_PARTS = [
+  { key: "unexcused", label: "Absent or not voting" },
+  { key: "excused", label: "Absent with leave" },
+  { key: "recused", label: "Recused" },
+] as const;
+
+/** Public wording for a vote_cast value. Recusals are not absences, so say what they are. */
+export function voteCastLabel(voteCast: string): string {
+  return voteCast === "recused" ? "recused (Senate Rule 91)" : voteCast;
 }
 
 export function missedShares(r: MissedInput): Missed {
@@ -25,6 +40,7 @@ export function missedShares(r: MissedInput): Missed {
   return {
     unexcused: share(r.absent + r.not_voting),
     excused: share(r.absent_with_leave),
+    recused: share(r.recused_from_voting),
     chamber: round1(100 - r.chamber_attendance_pct),
   };
 }

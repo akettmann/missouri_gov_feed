@@ -2,12 +2,12 @@
 version: 2
 
 unit_tests:
-  - name: senate_excused_from_voting_is_an_excused_absence
+  - name: senate_excused_from_voting_is_a_recusal
     model: stg_mo_senate__votes
     description: >
-      Every journal vote category maps to a vote_cast. "Excused from voting" is excused like "Absent with
-      leave", so it maps to `absent with leave`; mapping it to `not voting` made the attendance views
-      count it as unexcused (#113).
+      Every journal vote category maps to a vote_cast. "Excused from voting" is a Senate Rule 91 recusal by a
+      member on the floor: it maps to its own `recused`, not `absent with leave` (an absence) or `not voting`
+      (Congress; counted as unexcused) (#113).
     given:
       - input: source('mo_senate', 'votes')
         format: sql
@@ -23,4 +23,4 @@ unit_tests:
         - {senator_token: Eigel, vote_cast: nay}
         - {senator_token: Schupp, vote_cast: absent}
         - {senator_token: Hoskins, vote_cast: absent with leave}
-        - {senator_token: Hegeman, vote_cast: absent with leave}
+        - {senator_token: Hegeman, vote_cast: recused}
