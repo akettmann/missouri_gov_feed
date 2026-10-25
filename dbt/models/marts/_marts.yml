@@ -565,6 +565,16 @@ models:
         description: >
           The source item's own identity: `house:` filing id + PDF page + line (or filing id alone for an unparsed scan), `senate:` eFD table row, `courtlistener:` AO-10 table + row id. Identical-looking items on one report are distinct source rows.
         data_tests: [not_null]
+      - name: report_version
+        data_type: integer
+        description: >
+          0 for an original report, N for amendment N (Senate "(amendment N)"; a House "amended report" is 1; an AO-10 pdf named `..._1.pdf` is 1).
+        data_tests: [not_null]
+      - name: is_latest_version
+        data_type: boolean
+        description: >
+          True when this row's report is the newest version of its report: same filer, source and report year, an annual report or one of its amendments, preferring a readable version over a scan with no extractable text, then the highest report_version, then the latest filing_date. Periodic transaction reports, candidate reports (Senate ones carry no report year to match on) and extension requests are separate filings, so each is its own latest. Filter on it for any item count or sum; leave it off to list every filing. Assumes an amendment restates the whole report.
+        data_tests: [not_null]
 
   - name: fct_voluntary_disclosures
     description: >

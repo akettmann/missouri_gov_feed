@@ -302,6 +302,12 @@ Quirks:
   outside 3+ letter words (or `&` names like AT&T), or there's no run of 4 letters and no `&` name.
   Flagged items stay in `fct_disclosures` but are kept out of `fct_commercial_ties` and `fct_family_ties`. Investments are never flagged, because their
   tickers and fund codes would read as garbled. A sanity test fails if more than 5% of items get flagged.
+- Amended filings sit beside originals in `fct_disclosures`: Senate "annual report for cy 2022 (amendment 1/2)",
+  House "amended report", and two AO-10 pdfs for one judge-year (`..._1.pdf`). `is_latest_version` marks the
+  newest version per filer, source, report year and report (annual report plus its amendments). Count or sum
+  items only over `is_latest_version`; the filing list shows all. It assumes an amendment restates the whole
+  report, and a House amendment that is a scan with no extractable text never supersedes a readable report.
+  Periodic transaction reports, candidate reports and extension requests are separate filings, never collapsed.
 
 ## courtlistener_case_bulk: case history from bulk files
 
