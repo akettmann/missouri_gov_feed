@@ -47,7 +47,11 @@ models:
     - not_null
 - name: stg_tap_mec__expenditures
   description: 'MEC itemized expenditures by Missouri committees (TAP mirror, 2011-2022): includes contributions
-    the committee made to other candidates and committees.'
+    the committee made to other candidates and committees. payee_name (#85): TAP''s own payee_name column holds
+    only the last name for an individual payee, which merged different people with a shared surname. A payee with
+    a usable first and last name is "First Last"; anything else keeps TAP''s payee_name, then company, then the
+    partial person name. Placeholders (''~'', ''-'', one character, no letter or number) are dropped with the same
+    rules as contributions (macros/names.sql).'
   columns:
   - name: record_id
     description: The source row's own id (cd3_b_id).
