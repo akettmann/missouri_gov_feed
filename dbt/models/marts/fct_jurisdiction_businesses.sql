@@ -24,7 +24,20 @@ donors as (
     select
         official_id,
         {{ mogov.company_key("coalesce(nullif(trim(counterparty_organization), ''), counterparty)") }} as donor_key,
-        min(coalesce(nullif(trim(counterparty_organization), ''), counterparty)) as donor_name,
+        -- CR/LF would split a donor_links line (`<url> <donor>`), so they become spaces here (#268)
+        trim(
+            replace(
+                replace(
+                    replace(
+                        min(coalesce(nullif(trim(counterparty_organization), ''), counterparty)),
+                        chr(13) || chr(10),
+                        ' '
+                    ),
+                    chr(13), ' '
+                ),
+                chr(10), ' '
+            )
+        ) as donor_name,
         sum(amount) as amount,
         count(*) as n_contributions,
         min(extract(year from transaction_date)) as first_year,

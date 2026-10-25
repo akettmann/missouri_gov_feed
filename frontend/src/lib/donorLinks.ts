@@ -28,10 +28,73 @@ export function parseDonorLinks(raw: string | null | undefined): DonorLink[] {
   return links;
 }
 
-/** visible link text for a filing-page url, by which regulator's page it is */
-export function donorLinkLabel(url: string | null | undefined): string {
+/** the committee ids a filing-page url names: MEC's MECID, or FEC's committee_id and recipient_name */
+function committeeIds(url: string): string[] {
+  try {
+    const q = new URL(url).searchParams;
+    return (url.includes("mec.mo.gov") ? ["MECID"] : ["committee_id", "recipient_name"]).map(
+      (k) => q.get(k) ?? "",
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * visible link text for a filing-page url, by which regulator's page it is. When the donor has 2+ pages of the
+ * same kind (`siblings`, all the donor's urls), the committee id that tells them apart goes in the label, so the
+ * links do not share one name though they open different pages. A donor's single page is left unchanged.
+ */
+export function donorLinkLabel(url: string | null | undefined, siblings: string[] = []): string {
   if (!url) return "committee page";
-  if (url.includes("mec.mo.gov")) return "official's committee (MEC)";
-  if (url.includes("fec.gov")) return "donor's gifts to the official's committee (FEC)";
-  return "committee page";
+  const kind = url.includes("mec.mo.gov") ? "MEC" : url.includes("fec.gov") ? "FEC" : null;
+  if (!kind) return "committee page";
+  const base = kind === "MEC" ? "official's committee" : "donor's gifts to the official's committee";
+  const same = siblings.filter((u) => (kind === "MEC" ? u.includes("mec.mo.gov") : u.includes("fec.gov")));
+  if (same.length < 2) return `${base} (${kind})`;
+  const mine = committeeIds(url);
+  const all = same.map(committeeIds);
+  const varying = mine.filter((id, i) => id && all.some((o) => o[i] !== id));
+  return varying.length ? `${base} (${kind}, ${varying.join(", ")})` : `${base} (${kind})`;
+}
+
+export interface DonorEntry {
+  donor: string;
+  /** filing pages for this donor; empty when the donor has none (rendered as "no link") */
+  urls: string[];
+}
+
+/**
+ * One entry per donor, in donor_names order (names are joined by "; "), each with its filing-page urls from
+ * donor_links. A donor named in donor_names with no link line has an empty list, so the page can say "no link"
+ * instead of showing the name bare (#268). A link whose donor is not in donor_names is kept, after the others.
+ */
+export function donorEntries(
+  names: string | null | undefined,
+  rawLinks: string | null | undefined,
+): DonorEntry[] {
+  const links = parseDonorLinks(rawLinks);
+  const order: string[] = [];
+  for (const n of (names ?? "").split("; ")) {
+    const name = n.trim();
+    if (name && !order.includes(name)) order.push(name);
+  }
+  for (const l of links) if (!order.includes(l.donor)) order.push(l.donor);
+  return order.map((donor) => ({
+    donor,
+    urls: links.filter((l) => l.donor === donor).map((l) => l.url),
+  }));
+}
+
+/**
+ * DOM ids for one donor link: the donor-name span and the link-label span. The link is named by both
+ * (aria-labelledby="<nameId> <labelId>") so each reads "<donor> <label>" to a screen reader instead of every link
+ * on a multi-donor row sharing the same name (#268). `prefix` must be unique per row on the page.
+ */
+export function donorLinkIds(
+  prefix: string,
+  donorIndex: number,
+  urlIndex: number,
+): { nameId: string; labelId: string } {
+  return { nameId: `${prefix}-d${donorIndex}-name`, labelId: `${prefix}-d${donorIndex}-l${urlIndex}` };
 }

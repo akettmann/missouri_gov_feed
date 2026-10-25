@@ -8,6 +8,7 @@ import SourceLink from "./SourceLink.astro";
 import type { OfficialBundle } from "../lib/exports/types";
 import { districtSiteLists } from "../lib/exports/districtSites";
 import DonorLinks from "./DonorLinks.astro";
+import { donorEntries } from "../lib/donorLinks";
 import { count, money } from "../lib/format";
 import { href } from "../lib/site";
 
@@ -81,7 +82,7 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
                 </tr>
               </thead>
               <tbody>
-                {businesses.donors.map((d) => (
+                {businesses.donors.map((d, ri) => (
                   <tr data-confidence={d.match_confidence === "medium" ? "medium" : undefined}>
                     <td>
                       {d.donor_names} <ConfidenceBadge confidence={d.match_confidence} />
@@ -121,7 +122,12 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
                       </details>
                     </td>
                     <td>
-                      <DonorLinks donorLinks={d.donor_links} />
+                      <DonorLinks
+                        donorNames={d.donor_names}
+                        donorLinks={d.donor_links}
+                        idPrefix={`biz${ri}`}
+                        hideName={donorEntries(d.donor_names, d.donor_links).length === 1}
+                      />
                     </td>
                   </tr>
                 ))}
