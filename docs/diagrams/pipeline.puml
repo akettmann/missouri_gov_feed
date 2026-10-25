@@ -48,30 +48,37 @@ end note
 :staging -> intermediate -> marts
 -> reporting;
 
-|Loaders (stage 2)|
-:courtlistener_cases
-(needs marts.fct_legal_careers)
-wikidata
-(needs QIDs from the landed rosters);
+if (no sources named on the command line?) then (yes, full refresh)
+  |Loaders (stage 2)|
+  :courtlistener_cases
+  (needs marts.fct_legal_careers)
+  wikidata
+  (needs QIDs from the landed rosters);
 
-|dbt|
-if (any stage-2 loader failed?) then (yes)
-  if (every failed loader allowed?
---allow-failed-loader NAME or
-MOGOV_ALLOW_FAILED_LOADERS=NAME) then (yes)
-    :warn build.stale_source per loader;
-    note right: dbt builds on the last landed raw data
-  else (no, strict default)
-    :log build.skipped;
-    stop
+  |dbt|
+  if (any stage-2 loader failed?) then (yes)
+    if (every failed loader allowed?
+  --allow-failed-loader NAME or
+  MOGOV_ALLOW_FAILED_LOADERS=NAME) then (yes)
+      :warn build.stale_source per loader;
+      note right: dbt builds on the last landed raw data
+    else (no, strict default)
+      :log build.skipped;
+      stop
+    endif
+  else (no)
   endif
-else (no)
+  :mogov build;
+else (no, sources named: stage 1 only)
 endif
-:mogov build;
-:mogov export (optional)
-marts and reporting to
-data/exports/*.csv|parquet;
-:exit 1 if any loader failed
-(even when allowed), else 0;
+:exit non-zero if dbt or any loader failed
+(even when the failure was allowed), else 0;
 stop
+
+note right
+  mogov run never calls export. Separately:
+  mogov export [--format csv|parquet]
+  writes marts and reporting to
+  data/exports/<table>.<fmt> (default parquet)
+end note
 @enduml
