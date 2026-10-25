@@ -208,7 +208,15 @@ const officials = current.map((o) => ({
       }
       const tr = el("tr");
       const label = el("td", row.label);
-      if (row.note) label.append(el("div", row.note, "small muted"));
+      if (row.note) {
+        const note = el("div", row.note, "small muted");
+        if (row.noteHref) {
+          const link = el("a", "How pay per vote is counted") as HTMLAnchorElement;
+          link.href = `${base}${row.noteHref}`;
+          note.append(" ", link, ".");
+        }
+        label.append(note);
+      }
       tr.append(label);
       for (const v of row.values) tr.append(el("td", v));
       tbody.append(tr);

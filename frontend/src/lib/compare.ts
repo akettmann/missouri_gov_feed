@@ -14,6 +14,8 @@ export interface CompareRow {
   values: string[];
   /** short caveat shown under the label */
   note?: string;
+  /** a site path (no base) linked after the note, e.g. the methodology section */
+  noteHref?: string;
 }
 
 const NA = "—";
@@ -104,6 +106,7 @@ export function compareRows(bundles: OfficialBundle[], hideMedium: boolean): Com
     label: "Pay per vote attended, covered years",
     values: pay.map((x) => x[0]),
     note: payNote,
+    noteHref: "/methodology/#pay-per-vote",
   });
   rows.push({
     section: "Voting",
