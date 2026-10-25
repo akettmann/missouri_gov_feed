@@ -180,13 +180,14 @@ test("every page or script that renders an official's name draws badges through 
     "pages/officials/[slug].astro",
     "pages/index.astro",
     "pages/years/[year].astro",
-    "pages/awards.astro",
     "pages/districts/[district]/sites.astro",
     "components/PastOfficeholder.astro",
   ])
     assert.match(read(p), /<AwardBadges slug=/, p);
   for (const p of ["scripts/find.ts", "pages/compare.astro", "pages/index.astro"])
     assert.match(read(p), /renderBadges\(/, p);
+  // a row on /awards already is an award listing: repeating every badge on every hidden block bloated the page
+  assert.doesNotMatch(read("pages/awards.astro"), /AwardBadges/);
 });
 
 test("plural office label is circuit-free and does not depend on which judge came last", async () => {

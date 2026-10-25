@@ -23,9 +23,11 @@ Diagrams: [pipeline](diagrams/pipeline.svg), [lineage](diagrams/lineage.svg),
    ```
    See the configuration table in the [README](../README.md#configuration-env-gitignored) for the rest.
 4. First full load and build:
+
    ```
    uv run mogov run --shards 4      # stage-1 loaders (concurrent, 4 shards) -> dbt build -> stage 2 -> dbt build
    ```
+
    `run` is strict: if any loader fails it stops before `dbt build`, logs `build.skipped` naming the failed
    loaders, and exits non-zero. Fix the cause and re-run (loaders are idempotent), or, for a known-flaky
    source, build on its last landed data with `uv run mogov run --allow-failed-loader <source>` or
@@ -36,6 +38,7 @@ Diagrams: [pipeline](diagrams/pipeline.svg), [lineage](diagrams/lineage.svg),
    The first run is the slow one: it downloads several GB (FEC, CourtListener bulk) and parses about
    ten years of House roll-call PDFs and Senate journals. Everything fetched is cached under
    `data/cache`, so later runs are much faster.
+
 5. Check the result: `uv run mogov build` should end with `ERROR=0`. Run `uv run mogov export` to write
    the marts and reporting tables to `data/exports/` as parquet (the default; the frontend reads only
    parquet. `--format csv` is for other tools). If you use the site, run `pnpm build` in `frontend/`
@@ -43,12 +46,12 @@ Diagrams: [pipeline](diagrams/pipeline.svg), [lineage](diagrams/lineage.svg),
 
 Layout under `data/` (override the root with `MOGOV_DATA_DIR`):
 
-| Path | Contents |
-|---|---|
-| `data/cache/` | HTTP cache (one file per request, keyed by URL + params) and large downloads |
-| `data/raw/<table>/part-<i>-of-<N>.parquet` | Raw landings, one part per loader shard (`MOGOV_RAW_DIR`) |
-| `data/mogov.duckdb` | dbt warehouse (`MOGOV_DB`) |
-| `data/exports/` | `mogov export` output |
+| Path                                       | Contents                                                                     |
+| ------------------------------------------ | ---------------------------------------------------------------------------- |
+| `data/cache/`                              | HTTP cache (one file per request, keyed by URL + params) and large downloads |
+| `data/raw/<table>/part-<i>-of-<N>.parquet` | Raw landings, one part per loader shard (`MOGOV_RAW_DIR`)                    |
+| `data/mogov.duckdb`                        | dbt warehouse (`MOGOV_DB`)                                                   |
+| `data/exports/`                            | `mogov export` output                                                        |
 
 A `data/raw/<table>.parquet` file from before sharding existed is moved into
 `<table>/part-000-of-001.parquet` the next time any loader runs.
@@ -57,11 +60,11 @@ A `data/raw/<table>.parquet` file from before sharding existed is moved into
 
 Everything under `data/` can be regenerated. What you delete decides how long the rebuild takes:
 
-| Delete | Effect |
-|---|---|
-| `data/mogov.duckdb` | dbt rebuilds every model from the raw parts (under a minute). |
-| `data/raw/` | Every loader lands its tables again, from the cache where it can. |
-| `data/exports/` | Rewritten by the next `mogov export`. |
+| Delete                   | Effect                                                                                                                       |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `data/mogov.duckdb`      | dbt rebuilds every model from the raw parts (under a minute).                                                                |
+| `data/raw/`              | Every loader lands its tables again, from the cache where it can.                                                            |
+| `data/exports/`          | Rewritten by the next `mogov export`.                                                                                        |
 | `data/cache/` (optional) | Everything is downloaded and parsed again. About 10 GB as of October 2026. Keep it unless you suspect a bad cached response. |
 
 1. Stop anything using `data/` (a running `mogov`, a DuckDB shell, `dbt docs serve`). On Windows an open
@@ -86,6 +89,7 @@ Everything under `data/` can be regenerated. What you delete decides how long th
    and for `cl_cases` in the first dbt build (it is a stage-2 table).
 
 How long it takes (October 2026, one Windows desktop, `--shards 4`):
+
 - **Warm cache** (only raw and the warehouse deleted): the October 2026 full run took about 75 minutes,
   most of it filtering the CourtListener bulk files (about 50 minutes, one process) and parsing roll-call
   PDFs. A re-run 20 minutes later took about 20 minutes, still mostly PDF parsing. PDF text is now cached
@@ -96,6 +100,7 @@ How long it takes (October 2026, one Windows desktop, `--shards 4`):
 
 With Docker the steps are the same, against the host folder the container mounts (`./data`, or
 `MOGOV_HOST_DATA`):
+
 ```
 rm -rf data/raw data/mogov.duckdb data/exports
 docker compose up
@@ -122,7 +127,7 @@ entirely from the parquet exports; there is no server. Data flow:
    pnpm install
    pnpm build          # dist/: one page + one JSON per official, browse page, methodology
    pnpm preview        # http://localhost:4321
-   pnpm sizes          # per-official payload sizes; exits 1 if any JSON is over budget (100 KB gzipped)
+   pnpm sizes          # per-official payload sizes (exits 1 if any JSON is over 100 KB gzipped) and the lookup/districts.json and /awards budgets in scripts/size-budget.mjs
    ```
    If any parquet file is older than `data/mogov.duckdb` (or `MOGOV_DB`), the build warns that you
    skipped `uv run mogov export`; it never fails the build, and stays silent if the DuckDB file is absent.
@@ -269,12 +274,12 @@ Every loader splits its work into units (PDFs, files, people, report years...). 
 where `crc32(key) % shards == shard`, so the split depends only on the keys. It doesn't depend on
 listing order or on which other shards run.
 
-| Invocation | Effect |
-|---|---|
-| `mogov load mo_house` | one process, all units (`part-000-of-001`) |
-| `mogov load mo_house --shards 4` | all 4 shards, in a pool of worker processes |
-| `mogov load mo_house --shards 4 --shard 2` | only shard 2 of 4 (for one container of a job) |
-| Cloud Run job with `--tasks 4` | same as the line above, taken from `CLOUD_RUN_TASK_COUNT` / `CLOUD_RUN_TASK_INDEX` |
+| Invocation                                 | Effect                                                                             |
+| ------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `mogov load mo_house`                      | one process, all units (`part-000-of-001`)                                         |
+| `mogov load mo_house --shards 4`           | all 4 shards, in a pool of worker processes                                        |
+| `mogov load mo_house --shards 4 --shard 2` | only shard 2 of 4 (for one container of a job)                                     |
+| Cloud Run job with `--tasks 4`             | same as the line above, taken from `CLOUD_RUN_TASK_COUNT` / `CLOUD_RUN_TASK_INDEX` |
 
 Loaders that talk to different services run at the same time. Each loader names its upstream service
 (`mogov list` shows it), and the work is split into jobs of (one service's loaders, one shard). A pool of
