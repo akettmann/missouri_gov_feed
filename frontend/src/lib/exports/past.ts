@@ -6,6 +6,16 @@ export interface RosterRow extends Omit<PastOfficeholder, "slug"> {
   year: number;
   official_id: string;
   source: string | null;
+  source_url: string | null;
+}
+
+/** Shown under the same-name links: the match is on the name alone, so say plainly what is not known. */
+export const SAME_NAME_NOTE =
+  "Our data does not link these records, so they may or may not be the same person.";
+
+/** What a same-name link points at, as the reader sees it. */
+export function sameNameKindLabel(kind: SameNameLink["kind"]): string {
+  return kind === "current" ? "current profile" : "past roster entry";
 }
 
 /** Name comparison key: case, accents, punctuation and spacing ignored. Used only to offer a cross-link. */
@@ -16,6 +26,14 @@ export function normalizeName(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+function addRoster(person: PastPerson, source: string, url: string | null, year: number): void {
+  let entry = person.sources.find((s) => s.source === source);
+  if (!entry) person.sources.push((entry = { source, links: [] }));
+  let link = entry.links.find((l) => l.url === url);
+  if (!link) entry.links.push((link = { url, years: [] }));
+  if (!link.years.includes(year)) link.years.push(year);
 }
 
 /**
@@ -33,7 +51,7 @@ export function groupPast(
   const people = new Map<string, PastPerson>();
   const claimed = new Map<string, string>(); // slug -> official_id
   for (const [id, slug] of profileSlugs) claimed.set(slug, id);
-  for (const { year, official_id, source, ...r } of rows) {
+  for (const { year, official_id, source, source_url, ...r } of rows) {
     if (year === currentYear) continue;
     const known = people.get(official_id);
     const slug = r.has_profile
@@ -53,7 +71,7 @@ export function groupPast(
         same_name: [],
       };
       people.set(official_id, person);
-      if (source && !person.sources.includes(source)) person.sources.push(source);
+      if (source) addRoster(person, source, source_url, year);
       const stint = person.stints.find(
         (s) => s.office === r.office && s.district === r.district && s.party === r.party,
       );
@@ -73,7 +91,13 @@ export function groupPast(
     if (list) list.push(entry);
     else years.set(year, [entry]);
   }
-  for (const p of people.values()) for (const s of p.stints) s.years.sort((a, b) => a - b);
+  for (const p of people.values()) {
+    for (const s of p.stints) s.years.sort((a, b) => a - b);
+    for (const s of p.sources) {
+      for (const l of s.links) l.years.sort((a, b) => a - b);
+      s.links.sort((a, b) => a.years[0] - b.years[0]);
+    }
+  }
   return { years, people: [...people.values()] };
 }
 

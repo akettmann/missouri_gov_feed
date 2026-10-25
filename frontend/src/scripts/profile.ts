@@ -2,7 +2,7 @@
 // "hide possible matches" toggle. Tables are already server-rendered, so this only enhances.
 import * as Plot from "@observablehq/plot";
 import type { OfficialBundle } from "../lib/exports/types";
-import { attendedAxisMin, missedAxisMax } from "../lib/attendance";
+import { MISSED_PARTS, attendedAxisMin, missedAxisMax } from "../lib/attendance";
 import { count, money } from "../lib/format";
 import { cellText, VIZ, type Row, type VizSpec } from "../lib/viz";
 
@@ -94,16 +94,13 @@ function chart(spec: VizSpec, rows: Row[], width: number): SVGSVGElement | HTMLE
   }
   if (spec.kind === "missed") {
     // the flipped attendance view: values cluster near 0%, so the axis ends just above the data
-    const parts = [
-      { key: spec.x, label: "Absent or not voting" },
-      { key: spec.x2!, label: "Absent with leave" },
-    ];
+    const parts = MISSED_PARTS;
     const colors = seriesColors();
     const long = rows.flatMap((r) =>
       parts.map((p) => ({ y: String(r[spec.y]), part: p.label, n: Number(r[p.key]) })),
     );
     const to = missedAxisMax(
-      rows.flatMap((r) => [Number(r[spec.x]) + Number(r[spec.x2!]), Number(r.chamber)]),
+      rows.flatMap((r) => [parts.reduce((s, p) => s + Number(r[p.key]), 0), Number(r.chamber)]),
     );
     const longest = Math.max(...rows.map((r) => String(r[spec.y]).length));
     return Plot.plot({
@@ -113,7 +110,7 @@ function chart(spec: VizSpec, rows: Row[], width: number): SVGSVGElement | HTMLE
       height: 26 * rows.length + 60,
       x: { domain: [0, to], grid: true, label: null, tickFormat: (d: number) => `${d}%` },
       y: { label: null, domain: rows.map((r) => String(r[spec.y])) },
-      color: { domain: parts.map((p) => p.label), range: [colors[0], colors[2]], legend: true },
+      color: { domain: parts.map((p) => p.label), range: [colors[0], colors[2], colors[3]], legend: true },
       marks: [
         Plot.barX(long, {
           x: "n",

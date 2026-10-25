@@ -25,7 +25,7 @@ marked as (
             end,
             {{ mogov.regex_extract(
                 'line_text',
-                "^([A-Z][A-Z.'’-]+(?: [A-Z][A-Z.'’-]*)+) (?:was|is|has|received|graduated|served|earned|began|grew)"
+                "^([A-Z][A-Z.'’-]+( [A-Z][A-Z.'’-]*)+) (was|is|has|received|graduated|served|earned|began|grew)"
             ) }}
         ) as entry_name
     from lines

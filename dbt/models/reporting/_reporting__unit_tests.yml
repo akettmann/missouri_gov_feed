@@ -83,3 +83,129 @@ unit_tests:
     expect:
       rows:
         - {mec_committee_id: C000100, committee_name: ZZZ Dated PAC, committee_total_amount: 500, donor_rank: 1, donor_name: Acme Corp, total_amount: 500, trail_status: end of trail, donor_mec_committee_id: null}
+
+  - name: awards_threshold_decides_who_qualifies
+    model: rpt_awards
+    description: >
+      Four state_house members are ranked on attendance in one year. lowest_attendance has its own threshold
+      of 2 in the awards_threshold var, every other award uses the default of 1: two officials qualify for
+      the lowest-attendance award and one for the highest. A threshold of 0 would leave an award empty and
+      the old hard-coded 5 would take all four, so ignoring the var fails this test. The 4-member field
+      clears awards_min_field_size (3). Each yearly row is a streak of 1; lifetime rows have no streak.
+    overrides:
+      vars:
+        awards_threshold: {default: 1, lowest_attendance: 2}
+        awards_min_field_size: 3
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: a, office: state_house}
+          - {official_id: b, office: state_house}
+          - {official_id: c, office: state_house}
+          - {official_id: d, office: state_house}
+      - input: ref('rpt_attendance')
+        rows:
+          - {official_id: a, first_vote_date: 2020-03-01, votes_present: 100, votes_recorded: 100}
+          - {official_id: b, first_vote_date: 2020-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: c, first_vote_date: 2020-03-01, votes_present: 80, votes_recorded: 100}
+          - {official_id: d, first_vote_date: 2020-03-01, votes_present: 70, votes_recorded: 100}
+      - input: ref('rpt_donor_rollup')
+        rows: []
+      - input: ref('fct_bias_indicators')
+        rows: []
+    expect:
+      rows:
+        - {award: lowest_attendance, period: '2020', official_id: d, award_rank: 1, group_size: 4, streak_years: 1}
+        - {award: lowest_attendance, period: '2020', official_id: c, award_rank: 2, group_size: 4, streak_years: 1}
+        - {award: lowest_attendance, period: lifetime, official_id: d, award_rank: 1, group_size: 4, streak_years: null}
+        - {award: lowest_attendance, period: lifetime, official_id: c, award_rank: 2, group_size: 4, streak_years: null}
+        - {award: highest_attendance, period: '2020', official_id: a, award_rank: 1, group_size: 4, streak_years: 1}
+        - {award: highest_attendance, period: lifetime, official_id: a, award_rank: 1, group_size: 4, streak_years: null}
+
+  - name: awards_streak_counts_consecutive_qualifying_years
+    model: rpt_awards
+    description: >
+      Official x ranks first on highest_attendance (threshold 1) in 2015, 2016, 2018, 2020 and 2022, with
+      three kinds of year in between. 2017: x is not in the field (not in that office); 2019: the field is
+      too thin (only x has 100+ recorded votes, below awards_min_field_size of 2); neither breaks the streak
+      or adds to it, so x reaches 4 in 2020. 2021: x is ranked second (outside the threshold), which breaks
+      the streak, so 2022 starts again at 1. Lifetime rows and the party-unity awards (lifetime only) never
+      get a streak. lowest_attendance has a threshold of 0 so its rows stay out of this test.
+    overrides:
+      vars:
+        awards_threshold: {default: 1, lowest_attendance: 0}
+        awards_min_field_size: 2
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: x, office: state_house}
+          - {official_id: r, office: state_house}
+          - {official_id: s, office: state_house}
+      - input: ref('rpt_attendance')
+        rows:
+          - {official_id: x, first_vote_date: 2015-03-01, votes_present: 99, votes_recorded: 100}
+          - {official_id: r, first_vote_date: 2015-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: x, first_vote_date: 2016-03-01, votes_present: 99, votes_recorded: 100}
+          - {official_id: r, first_vote_date: 2016-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: r, first_vote_date: 2017-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: s, first_vote_date: 2017-03-01, votes_present: 70, votes_recorded: 100}
+          - {official_id: x, first_vote_date: 2018-03-01, votes_present: 99, votes_recorded: 100}
+          - {official_id: r, first_vote_date: 2018-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: x, first_vote_date: 2019-03-01, votes_present: 99, votes_recorded: 100}
+          - {official_id: r, first_vote_date: 2019-03-01, votes_present: 50, votes_recorded: 50}
+          - {official_id: x, first_vote_date: 2020-03-01, votes_present: 99, votes_recorded: 100}
+          - {official_id: r, first_vote_date: 2020-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: x, first_vote_date: 2021-03-01, votes_present: 80, votes_recorded: 100}
+          - {official_id: r, first_vote_date: 2021-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: x, first_vote_date: 2022-03-01, votes_present: 99, votes_recorded: 100}
+          - {official_id: r, first_vote_date: 2022-03-01, votes_present: 90, votes_recorded: 100}
+      - input: ref('rpt_donor_rollup')
+        rows: []
+      - input: ref('fct_bias_indicators')
+        rows:
+          - {official_id: x, indicator: party_unity_pct, value: 95, detail: 'state_house:2015-2022'}
+          - {official_id: r, indicator: party_unity_pct, value: 80, detail: 'state_house:2015-2022'}
+    expect:
+      rows:
+        - {award: highest_attendance, period: '2015', official_id: x, award_rank: 1, group_size: 2, streak_years: 1}
+        - {award: highest_attendance, period: '2016', official_id: x, award_rank: 1, group_size: 2, streak_years: 2}
+        - {award: highest_attendance, period: '2017', official_id: r, award_rank: 1, group_size: 2, streak_years: 1}
+        - {award: highest_attendance, period: '2018', official_id: x, award_rank: 1, group_size: 2, streak_years: 3}
+        - {award: highest_attendance, period: '2020', official_id: x, award_rank: 1, group_size: 2, streak_years: 4}
+        - {award: highest_attendance, period: '2021', official_id: r, award_rank: 1, group_size: 2, streak_years: 1}
+        - {award: highest_attendance, period: '2022', official_id: x, award_rank: 1, group_size: 2, streak_years: 1}
+        - {award: highest_attendance, period: lifetime, official_id: x, award_rank: 1, group_size: 3, streak_years: null}
+        - {award: most_party_breaks, period: lifetime, official_id: r, award_rank: 1, group_size: 2, streak_years: null}
+        - {award: most_party_loyal, period: lifetime, official_id: x, award_rank: 1, group_size: 2, streak_years: null}
+
+  - name: officeholders_by_year_source_url
+    model: rpt_officeholders_by_year
+    description: >
+      A past row links to the roster it came from: the House's session export carries the year's two-digit
+      session code, an Open States senator the folder holding their file (retired or legislature), a judge their
+      own FJC page, Congress one dataset page. No current-year rows are given, so the test does not
+      depend on the build date.
+    given:
+      - input: ref('dim_official')
+        rows: []
+        format: dict
+      - input: ref('stg_openstates__people')
+        rows:
+          - {openstates_id: os1, folder: retired}
+          - {openstates_id: os2, folder: legislature}
+      - input: ref('int_officeholders__years')
+        rows:
+          - {year: 2009, official_id: 'mohouse:1', full_name: Ann Roe, level: state, office: state_house, source: mo_house roster}
+          - {year: 2019, official_id: 'mohouse:2', full_name: Bob Poe, level: state, office: state_house, source: mo_house roster}
+          - {year: 2019, official_id: os1, full_name: Cy Doe, level: state, office: state_senate, source: openstates}
+          - {year: 2019, official_id: os2, full_name: Fay Ray, level: state, office: state_senate, source: openstates}
+          - {year: 2019, official_id: 'bioguide:X', full_name: Di Lee, level: federal, office: us_house, source: congress-legislators}
+          - {year: 2019, official_id: 'fjc:1', full_name: Ed Kay, level: federal, office: us_district_court, source: fjc}
+    expect:
+      rows:
+        - {year: 2009, official_id: 'mohouse:1', source_url: 'https://documents.house.mo.gov/xml/091.zip'}
+        - {year: 2019, official_id: 'mohouse:2', source_url: 'https://documents.house.mo.gov/xml/191.zip'}
+        - {year: 2019, official_id: os1, source_url: 'https://github.com/openstates/people/tree/main/data/mo/retired'}
+        - {year: 2019, official_id: os2, source_url: 'https://github.com/openstates/people/tree/main/data/mo/legislature'}
+        - {year: 2019, official_id: 'bioguide:X', source_url: 'https://github.com/unitedstates/congress-legislators'}
+        - {year: 2019, official_id: 'fjc:1', source_url: 'https://www.fjc.gov/node/1'}

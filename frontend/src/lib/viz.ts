@@ -23,8 +23,8 @@ export interface Column {
 export interface VizSpec {
   title: string;
   /** stack: x = category axis, series stacked; hbar: one bar per y category; dumbbell: per y row, x is the
-   *  official value and `x2` a reference (chamber) value on the same 0-100 scale; missed: unexcused (`x`) and
-   *  excused (`x2`) shares stacked per `y` row, with the chamber's `chamber` value as a tick */
+   *  official value and `x2` a reference (chamber) value on the same 0-100 scale; missed: unexcused (`x`),
+   *  excused (`x2`) and recused shares (MISSED_PARTS) stacked per `y` row, with the chamber's `chamber` value as a tick */
   kind: "stack" | "hbar" | "dumbbell" | "hstack" | "missed";
   /** hstack: wide columns stacked along x, one bar per y row (the table stays wide) */
   stackKeys?: { key: string; label: string }[];
@@ -394,6 +394,7 @@ export const VIZ: Record<string, VizSpec> = {
       { key: "recorded", label: "Votes", num: true },
       { key: "absent", label: "Absent or not voting", num: true },
       { key: "excused", label: "Absent with leave", num: true },
+      { key: "recused", label: "Recused", num: true },
     ],
     rows: (b) =>
       (b.voting.attendance ?? []).map((r) => ({
@@ -403,6 +404,7 @@ export const VIZ: Record<string, VizSpec> = {
         recorded: r.votes_recorded,
         absent: r.absent + r.not_voting,
         excused: r.absent_with_leave,
+        recused: r.recused_from_voting,
       })),
   },
   "attendance-missed": {
@@ -414,11 +416,12 @@ export const VIZ: Record<string, VizSpec> = {
     views: ["attendance", "attendance-missed"],
     viewLabel: "Not attended",
     usesConfidence: false,
-    note: "Bars: absent or not voting, then absent with leave (an excused absence), as a share of recorded votes. | chamber average, all absences together: the export does not split out the chamber's excused absences.",
+    note: "Bars: absent or not voting, then absent with leave, then recused (a Senate Rule 91 recusal by a member on the floor), as a share of recorded votes. Only the MO Senate records leave and recusals: the House and Congress sources do not, so 0 there does not mean never excused. Recusals are not counted as attended (open question). | chamber average, all absences together: the export does not split out the chamber's excused absences.",
     columns: [
       { key: "session", label: "Session" },
       { key: "unexcused", label: "Absent or not voting", pct: true },
       { key: "excused", label: "Absent with leave", pct: true },
+      { key: "recused", label: "Recused", pct: true },
       { key: "chamber", label: "Chamber (all absences)", pct: true },
       { key: "recorded", label: "Votes", num: true },
     ],

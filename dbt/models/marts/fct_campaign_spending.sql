@@ -19,7 +19,7 @@ with tap as (
         m.mec_committee_id,
         m.confidence as match_confidence,
         'MEC (via Accountability Project)' as source,
-        'tap:' || cast(e.record_id as {{ dbt.type_string() }}) as source_record_id
+        'tap_cd3_b:' || cast(e.record_id as {{ dbt.type_string() }}) as source_record_id
     from {{ ref('stg_tap_mec__expenditures') }} as e
     inner join {{ ref('int_mec__official_committees') }} as m on e.mec_committee_id = m.mec_committee_id
 ){% if var('mec_direct', false) %},

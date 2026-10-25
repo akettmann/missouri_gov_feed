@@ -105,6 +105,12 @@ export function yearRanges(years: number[]): string {
   return out.join(", ");
 }
 
+/** Streak marker for an award: "X3" with a spoken label "3 qualifying years in a row"; null below 2 (no marker). */
+export function streakMarker(years: number | null | undefined): { text: string; label: string } | null {
+  if (years == null || years < 2) return null;
+  return { text: `X${years}`, label: `${years} qualifying years in a row` };
+}
+
 /** Plain names for the roster sources behind rpt_officeholders_by_year; unknown values show as given. */
 export const ROSTER_SOURCES: Record<string, string> = {
   "mo_house roster": "Missouri House roster",
@@ -112,3 +118,11 @@ export const ROSTER_SOURCES: Record<string, string> = {
   "congress-legislators": "congress-legislators (U.S. Congress)",
   fjc: "Federal Judicial Center biographical directory",
 };
+
+/** Roster links that download a file rather than open a page, so the reader is told before clicking. */
+export function rosterDownloadNote(source: string, links: number): string | null {
+  if (source !== "mo_house roster") return null;
+  return links > 1
+    ? "each year is a ZIP download (about 3 MB) of that session's XML"
+    : "the link is a ZIP download (about 3 MB) of that session's XML";
+}

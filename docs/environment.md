@@ -155,6 +155,20 @@ between the roster and `dim_official` (issue #97), so those paths are not guaran
 can therefore appear as a past entry and a current profile, a past page whose normalized full name equals a current
 profile's (or another past entry's) shows a neutral "same name" cross-link; names are never merged.
 
+The businesses section of a profile carries only the donor-tied sites and counts by industry (a U.S. House
+district holds about 10,000 EPA-regulated sites). The full list per district or city is built from
+`fct_jurisdiction_businesses` into `dist/districts/<district>/sites/index.html` (a plain table, no JavaScript
+needed) and `dist/districts/<district>/sites.csv`, 201 districts in all; `<district>` is the `district_id` with
+`:` replaced by `-` (`state_house-135`). Donor-tied rows name the donor, link to where the contributions are filed
+and carry the "possible match" badge, so the "Hide possible matches" toggle applies; the CSV has the same columns.
+`lib/exports/districtSites.ts` reads the table once (one query, grouped in memory) and fails the build if a
+district maps to several officials or an official to several districts. Measured on this machine against main
+(about 218k site rows, 402 extra routes): `dist/` 64 MB to 174 MB; peak node memory about 0.6-0.7 GB to about
+1.0 GB; build time 100-121 s on main vs 78-113 s with the pages (three runs; machine load varied more than the
+difference, so no measurable cost). An earlier per-route query version took about 70 s more and ran out of memory
+in 2 of 5 builds.
+Without the export no site pages are built and the section shows no link.
+
 Optional build-time environment: `PUBLIC_SITE_URL` (canonical site URL), `PUBLIC_REPORT_ERROR_URL`
 (where "Report an error" goes; default: a prefilled GitHub issue on this repo).
 
