@@ -36,7 +36,8 @@ pay as (
             when agency_name = 'LEGISLATURE' then 'state_senate'
         end as chamber,
         pay_basis,
-        pay
+        pay,
+        source_url
     from {{ ref('fct_salaries') }}
 ),
 
@@ -46,7 +47,8 @@ pay_by_year as (
         chamber,
         calendar_year,
         sum(pay) as pay_amount,
-        min(pay_basis) as pay_basis
+        min(pay_basis) as pay_basis,
+        min(source_url) as pay_source_url
     from pay
     where
         chamber is not null
@@ -64,7 +66,8 @@ yearly as (
         v.votes_recorded,
         v.votes_attended,
         p.pay_amount,
-        p.pay_basis
+        p.pay_basis,
+        p.pay_source_url
     from votes as v
     left join pay_by_year as p
         on
@@ -84,7 +87,8 @@ year_rows as (
         votes_recorded,
         votes_attended,
         pay_amount,
-        pay_basis
+        pay_basis,
+        pay_source_url
     from yearly
 ),
 
@@ -99,7 +103,8 @@ total_rows as (
         sum(case when pay_amount is null then 0 else votes_recorded end) as votes_recorded,
         sum(case when pay_amount is null then 0 else votes_attended end) as votes_attended,
         sum(pay_amount) as pay_amount,
-        min(pay_basis) as pay_basis
+        min(pay_basis) as pay_basis,
+        min(pay_source_url) as pay_source_url
     from yearly
     group by official_id, chamber
     having sum(case when pay_amount is null then 0 else 1 end) > 0
@@ -122,6 +127,7 @@ select
     votes_attended,
     pay_amount,
     pay_basis,
+    pay_source_url,
     case
         when pay_amount is null or votes_attended = 0 then null
         else round(pay_amount / votes_attended, 2)

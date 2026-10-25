@@ -404,6 +404,9 @@ models:
       - name: pay_basis
         data_type: varchar
         description: "'gross pay' (state payroll, all pay received in the year) or 'statutory salary' (Congress)."
+      - name: pay_source_url
+        data_type: varchar
+        description: Where the pay comes from (the state payroll site, or the page the federal salary was taken from).
       - name: dollars_per_vote_attended
         data_type: double
         description: pay_amount / votes_attended, in dollars; null when there is no pay or no attended vote.

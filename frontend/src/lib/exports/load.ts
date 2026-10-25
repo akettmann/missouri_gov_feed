@@ -4,6 +4,7 @@
 import { createHash } from "node:crypto";
 import { DONOR_GROUP_SQL } from "../rollups";
 import { exportedAt, hasExport, query } from "./db";
+import type { PayVoteRow } from "../attendancePay";
 import { groupPast, linkSameName, type RosterRow } from "./past";
 import { sampleDonorCycles, sampleGiftRollup, sampleTopDonors } from "./fixtures";
 import type {
@@ -281,6 +282,17 @@ async function loadAll(): Promise<OfficialBundle[]> {
       )
     : null;
 
+  const attendancePay = hasExport("rpt_attendance_pay")
+    ? groupBy(
+        await query<PayVoteRow & { official_id: string }>(`
+          select official_id, chamber, period, cast(calendar_year as integer) as calendar_year,
+                 cast(voting_years as integer) as voting_years, cast(covered_years as integer) as covered_years,
+                 cast(votes_recorded as integer) as votes_recorded, cast(votes_attended as integer) as votes_attended,
+                 cast(pay_amount as double) as pay_amount, pay_basis, pay_source_url, dollars_per_vote_attended
+          from {rpt_attendance_pay} order by calendar_year`),
+      )
+    : null;
+
   type EmployerRow = OfficialBundle["money"]["employers"] & object;
   const employers = hasExport("rpt_donor_employers")
     ? groupBy(
@@ -480,6 +492,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
           status: status("votes"),
           party_breaks: breaks ? ((breaks.get(id) ?? []) as PartyBreak[]) : null,
           attendance: attendance ? ((attendance.get(id) ?? []) as AttendanceRow[]) : null,
+          attendance_pay: attendancePay ? ((attendancePay.get(id) ?? []) as PayVoteRow[]) : null,
           by_subject: subjects ? ((subjects.get(id) ?? []) as SubjectVotes[]) : null,
         },
         overlap: hasOverlap ? ((overlap.get(id) ?? []) as InterestOverlap[]) : null,
@@ -584,6 +597,7 @@ export function freshness(): { table: string; exported_at: string | null; sample
     "rpt_indicator_peers",
     "rpt_party_breaks",
     "rpt_attendance",
+    "rpt_attendance_pay",
     "rpt_votes_by_subject",
     "rpt_interest_vote_overlap",
     "fct_jurisdiction_businesses",
