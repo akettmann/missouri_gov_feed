@@ -12,5 +12,4 @@ inner join {{ ref('dim_official') }} as o on a.official_id = o.official_id
 where
     a.award = 'least_committee_money_share'
     and o.level = 'federal'
-    and a.period <> 'lifetime'
-    and cast(a.period as integer) % 2 <> 0
+    and case when a.period <> 'lifetime' then cast(a.period as integer) end % 2 <> 0

@@ -30,3 +30,32 @@ test("streakMarker counts cycles when asked", () => {
   assert.equal(streakMarker(3, true).label, "3 qualifying cycles in a row");
   assert.equal(streakMarker(1, true), null);
 });
+
+test("MOGOV_SKIP_AWARD_CYCLES_CHECK skips the cycle check only when exactly 1, and says so", async () => {
+  const { awardCyclesGate, skipAwardCyclesCheck } = await import("../src/lib/exports/awardDefs.ts");
+  const stale = [{ award: "least_committee_money_share", office: "us_house", period: "2025" }];
+  const logs = [];
+  for (const v of ["0", "", "true", undefined]) {
+    assert.equal(skipAwardCyclesCheck({ MOGOV_SKIP_AWARD_CYCLES_CHECK: v }), false);
+    assert.throws(
+      () => awardCyclesGate(stale, { MOGOV_SKIP_AWARD_CYCLES_CHECK: v }, (m) => logs.push(m)),
+      /stale/,
+    );
+  }
+  assert.deepEqual(logs, []);
+  awardCyclesGate(stale, { MOGOV_SKIP_AWARD_CYCLES_CHECK: "1" }, (m) => logs.push(m));
+  assert.equal(logs.length, 1);
+  assert.match(logs[0], /MOGOV_SKIP_AWARD_CYCLES_CHECK=1/);
+});
+
+test("the cycle-check message names `uv run mogov build` and the switch", async () => {
+  const { assertCyclePeriods } = await import("../src/lib/exports/awardDefs.ts");
+  const stale = [{ award: "least_committee_money_share", office: "us_house", period: "2025" }];
+  assert.throws(() => assertCyclePeriods(stale), /`uv run mogov build` then `uv run mogov export/);
+  assert.throws(() => assertCyclePeriods(stale), /MOGOV_SKIP_AWARD_CYCLES_CHECK=1/);
+});
+
+test("the awards loader runs the cycle gate on the lists it returns", () => {
+  const src = readFileSync(new URL("../src/lib/exports/awards.ts", import.meta.url), "utf8");
+  assert.match(src, /awardCyclesGate\(out, process\.env, console\.warn\);\s*return out;/);
+});

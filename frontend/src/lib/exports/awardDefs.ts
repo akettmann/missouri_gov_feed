@@ -96,6 +96,27 @@ export function assertCyclePeriods(lists: { award: string; office: string; perio
   const seen = [...new Set(bad.map((l) => `${l.office} ${l.period}`))].sort().join(", ");
   throw new Error(
     `rpt_awards export is stale or inconsistent: least_committee_money_share has odd (non-FEC-cycle) periods for federal offices (${seen}). ` +
-      "Rebuild and re-export: `mogov build` then `uv run mogov export --format parquet`.",
+      "Rebuild and re-export: `uv run mogov build` then `uv run mogov export --format parquet`, or set MOGOV_SKIP_AWARD_CYCLES_CHECK=1 (exactly 1) to build anyway.",
   );
+}
+
+/** MOGOV_SKIP_AWARD_CYCLES_CHECK skips the check only when it is exactly "1" (like MOGOV_SKIP_PAY_YEARS_CHECK). */
+export function skipAwardCyclesCheck(env: Record<string, string | undefined>): boolean {
+  return env.MOGOV_SKIP_AWARD_CYCLES_CHECK === "1";
+}
+
+/**
+ * assertCyclePeriods, or nothing (with a log line) when the escape hatch is set. Used by the awards loader;
+ * separate from it so the gate is testable on fixed inputs.
+ */
+export function awardCyclesGate(
+  lists: Parameters<typeof assertCyclePeriods>[0],
+  env: Record<string, string | undefined>,
+  log: (msg: string) => void,
+): void {
+  if (skipAwardCyclesCheck(env)) {
+    log("MOGOV_SKIP_AWARD_CYCLES_CHECK=1: skipping the award-cycle period check.");
+    return;
+  }
+  assertCyclePeriods(lists);
 }
