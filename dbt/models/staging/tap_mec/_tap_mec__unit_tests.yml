@@ -245,11 +245,11 @@ unit_tests:
   - name: tap_contributions_dedupe_cross_layout
     model: stg_tap_mec__contributions
     description: >
-      The same gift filed once in each export layout under different ids (#99; typically an amended report
-      re-filed in the 2020-2022 export) is counted once: same committee, date, amount and donor, matched
+      The same gift filed once in each export layout under different ids (#99; an amended report re-filed
+      in the 2020-2022 export, or a 24-hour notice re-itemized in the next full report) is counted once: same committee, date, amount and donor, matched
       one-to-one, and the older layout's row (txn) is dropped. Matching ignores case and padding. Identical gifts
       inside ONE layout are real repeats and both stay; a pair that differs in amount or committee is not a
-      duplicate; with two older rows and one newer row only one older row is dropped; organization donors (name
+      duplicate; with two older rows and one newer row only one older row is dropped; with one older row and two newer rows the older row is dropped and both newer rows stay; a pair that differs only in donor or only in date is not a duplicate; organization donors (name
       in company / ctrb_name) match like people.
     given:
       - input: source('tap_mec', 'contributions')
@@ -296,6 +296,13 @@ unit_tests:
           union all select null, 'C5', null, null, null, null, '', 'Acme Corp', '', '', null, null, null, null, null, null, null, '900', '2020-07-05', null, null, null, null, null, 'FALSE', null, 'e-new', null
           union all select 'C6', null, null, null, 'Fay Gale', 'Individual', null, null, 'Fay', 'Gale', null, null, null, null, null, null, null, '5', '2020-07-06', null, null, null, null, null, 'FALSE', 'f-old', null, null
           union all select null, 'C7', null, null, null, null, '', '', 'Fay', 'Gale', null, null, null, null, null, null, null, '5', '2020-07-06', null, null, null, null, null, 'FALSE', null, 'f-new', null
+          union all select 'C8', null, null, null, 'Gus Hale', 'Individual', null, null, 'Gus', 'Hale', null, null, null, null, null, null, null, '40', '2020-07-07', null, null, null, null, null, 'FALSE', 'g-old', null, null
+          union all select null, 'C8', null, null, null, null, '', '', 'Ivy', 'Hale', null, null, null, null, null, null, null, '40', '2020-07-07', null, null, null, null, null, 'FALSE', null, 'g-new', null
+          union all select 'C9', null, null, null, 'Hal Ivey', 'Individual', null, null, 'Hal', 'Ivey', null, null, null, null, null, null, null, '60', '2020-07-08', null, null, null, null, null, 'FALSE', 'h-old', null, null
+          union all select null, 'C9', null, null, null, null, '', '', 'Hal', 'Ivey', null, null, null, null, null, null, null, '60', '2020-07-09', null, null, null, null, null, 'FALSE', null, 'h-new', null
+          union all select 'C10', null, null, null, 'Jo Kim', 'Individual', null, null, 'Jo', 'Kim', null, null, null, null, null, null, null, '30', '2020-07-10', null, null, null, null, null, 'FALSE', 'j-old', null, null
+          union all select null, 'C10', null, null, null, null, '', '', 'Jo', 'Kim', null, null, null, null, null, null, null, '30', '2020-07-10', null, null, null, null, null, 'FALSE', null, 'j-new1', null
+          union all select null, 'C10', null, null, null, null, '', '', 'Jo', 'Kim', null, null, null, null, null, null, null, '30', '2020-07-10', null, null, null, null, null, 'FALSE', null, 'j-new2', null
     expect:
       rows:
         - {record_id: a-new, mec_committee_id: C1, amount: 100}
@@ -308,3 +315,9 @@ unit_tests:
         - {record_id: e-new, mec_committee_id: C5, amount: 900}
         - {record_id: f-old, mec_committee_id: C6, amount: 5}
         - {record_id: f-new, mec_committee_id: C7, amount: 5}
+        - {record_id: g-old, mec_committee_id: C8, amount: 40}
+        - {record_id: g-new, mec_committee_id: C8, amount: 40}
+        - {record_id: h-old, mec_committee_id: C9, amount: 60}
+        - {record_id: h-new, mec_committee_id: C9, amount: 60}
+        - {record_id: j-new1, mec_committee_id: C10, amount: 30}
+        - {record_id: j-new2, mec_committee_id: C10, amount: 30}

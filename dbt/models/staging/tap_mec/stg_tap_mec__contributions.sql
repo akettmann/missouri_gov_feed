@@ -35,7 +35,11 @@
 -- the newer layout (cd1_a_id, no txn) when an id is in both (the shared columns are identical; the older layout's
 -- only extras are ctrb_name / ctrb_type), then the copy whose address_clean is not doubled (the shorter one).
 -- Cross-layout near-duplicates (#99): 290 person and 107 organization gifts (about $5.2M) appear once in each layout
--- under different ids (an amended report re-filed in the 2020-2022 export). Same committee, date, amount and donor
+-- under different ids. Two mechanisms: an amended report re-filed in the 2020-2022 export (older report X against
+-- newer "AMENDED X": 267 rows, $0.79M), and a 24-hour notice re-itemized in the next full report (28 rows, $4.19M,
+-- about 81% of the dollars, including all four Democratic Governors Association gifts: $3.55M across two
+-- committees); the remaining ~100 rows ($0.2M) pair other reports (8-day-before vs 30-day-after / January
+-- Quarterly). Same committee, date, amount and donor
 -- (first + last name, else company / committee / ctrb_name, upper-cased and trimmed), one older-layout row (txn)
 -- against one newer-layout row (cd1_a_id): the older row is dropped. Matching is one-to-one: rows sharing that key
 -- are numbered within each layout (by record_id) and the nth older row is dropped only if the newer layout has an
