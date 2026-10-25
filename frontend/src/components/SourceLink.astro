@@ -4,7 +4,7 @@ interface Props {
   url: string | null | undefined;
   label?: string;
   missing?: string;
-  /** screen-reader-only suffix, e.g. "for BNSF", so a list of links is not all the same text */
+  /** screen-reader-only suffix, e.g. "for BNSF", so a list of links is not all the same text; ignored when labelledBy is set */
   context?: string;
   /** ids of the elements that name this link, space-separated; with labelId, the link's own text is one of them */
   labelledBy?: string;

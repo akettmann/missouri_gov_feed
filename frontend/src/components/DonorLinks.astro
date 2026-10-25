@@ -31,7 +31,7 @@ const entries = donorEntries(Astro.props.donorNames, Astro.props.donorLinks);
           {i > 0 && " · "}
           <SourceLink
             url={u}
-            label={donorLinkLabel(u)}
+            label={donorLinkLabel(u, e.urls)}
             labelId={donorLinkIds(idPrefix, di, i).labelId}
             labelledBy={`${donorLinkIds(idPrefix, di, i).nameId} ${donorLinkIds(idPrefix, di, i).labelId}`}
           />

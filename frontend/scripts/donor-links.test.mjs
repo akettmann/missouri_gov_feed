@@ -75,3 +75,18 @@ test("donorLinkIds gives every link on a row, and every row, a distinct id pair"
   assert.equal(donorLinkIds("p", 0, 0).nameId, donorLinkIds("p", 0, 1).nameId);
   assert.notEqual(donorLinkIds("p", 0, 0).labelId, donorLinkIds("p", 0, 1).labelId);
 });
+
+test("a donor with 2+ pages of one kind gets the differing committee id in each label (#268)", () => {
+  const f1 = "https://www.fec.gov/data/disbursements/?committee_id=C00001&recipient_name=C00481309";
+  const f2 = "https://www.fec.gov/data/disbursements/?committee_id=C00001&recipient_name=C00902783";
+  const m1 = "https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C171365";
+  const m2 = "https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C222315";
+  const urls = [f1, f2, m1, m2];
+  assert.equal(donorLinkLabel(f1, urls), "donor's gifts to the official's committee (FEC, C00481309)");
+  assert.equal(donorLinkLabel(f2, urls), "donor's gifts to the official's committee (FEC, C00902783)");
+  assert.equal(donorLinkLabel(m1, urls), "official's committee (MEC, C171365)");
+  assert.equal(donorLinkLabel(m2, urls), "official's committee (MEC, C222315)");
+  // one page per kind stays unchanged
+  assert.equal(donorLinkLabel(f1, [f1, m1]), "donor's gifts to the official's committee (FEC)");
+  assert.equal(donorLinkLabel(m1, [f1, m1]), "official's committee (MEC)");
+});

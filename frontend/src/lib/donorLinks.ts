@@ -28,12 +28,34 @@ export function parseDonorLinks(raw: string | null | undefined): DonorLink[] {
   return links;
 }
 
-/** visible link text for a filing-page url, by which regulator's page it is */
-export function donorLinkLabel(url: string | null | undefined): string {
+/** the committee ids a filing-page url names: MEC's MECID, or FEC's committee_id and recipient_name */
+function committeeIds(url: string): string[] {
+  try {
+    const q = new URL(url).searchParams;
+    return (url.includes("mec.mo.gov") ? ["MECID"] : ["committee_id", "recipient_name"]).map(
+      (k) => q.get(k) ?? "",
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * visible link text for a filing-page url, by which regulator's page it is. When the donor has 2+ pages of the
+ * same kind (`siblings`, all the donor's urls), the committee id that tells them apart goes in the label, so the
+ * links do not share one name though they open different pages. A donor's single page is left unchanged.
+ */
+export function donorLinkLabel(url: string | null | undefined, siblings: string[] = []): string {
   if (!url) return "committee page";
-  if (url.includes("mec.mo.gov")) return "official's committee (MEC)";
-  if (url.includes("fec.gov")) return "donor's gifts to the official's committee (FEC)";
-  return "committee page";
+  const kind = url.includes("mec.mo.gov") ? "MEC" : url.includes("fec.gov") ? "FEC" : null;
+  if (!kind) return "committee page";
+  const base = kind === "MEC" ? "official's committee" : "donor's gifts to the official's committee";
+  const same = siblings.filter((u) => (kind === "MEC" ? u.includes("mec.mo.gov") : u.includes("fec.gov")));
+  if (same.length < 2) return `${base} (${kind})`;
+  const mine = committeeIds(url);
+  const all = same.map(committeeIds);
+  const varying = mine.filter((id, i) => id && all.some((o) => o[i] !== id));
+  return varying.length ? `${base} (${kind}, ${varying.join(", ")})` : `${base} (${kind})`;
 }
 
 export interface DonorEntry {
