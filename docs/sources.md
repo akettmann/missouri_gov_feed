@@ -582,19 +582,31 @@ business registry has no bulk export, the Missouri Accountability Portal's vendo
 (see Quirks), and Census County Business Patterns has counts but no names. FRS covers regulated sites only, so
 offices, shops and most service businesses are missing.
 
-- Lands: `epa_frs_facilities`, `epa_frs_organizations`, `epa_frs_naics`, `epa_frs_sic`, one row per CSV row of
-  `MO_FACILITY_FILE.CSV`, `MO_ORGANIZATION_FILE.CSV`, `MO_NAICS_FILE.CSV` and `MO_SIC_FILE.CSV` from the Missouri state file
+- Lands: `epa_frs_facilities`, `epa_frs_organizations`, `epa_frs_naics`, `epa_frs_sic`, `epa_frs_alt_names`, one row per CSV row of
+  `MO_FACILITY_FILE.CSV`, `MO_ORGANIZATION_FILE.CSV`, `MO_NAICS_FILE.CSV`, `MO_SIC_FILE.CSV` and `MO_ALTERNATIVE_NAME_FILE.CSV` from the Missouri state file
   (`https://ordsext.epa.gov/FLA/www3/state_files/state_combined_mo.zip`, about 35 MB). The payload is the row
   as a JSON object keyed by the CSV header.
-- Shard units: the four CSV files. The zip is downloaded once and shared.
+- Shard units: the five CSV files. The zip is downloaded once and shared.
 - U+FFFD in EPA's own file: the state zip already contains the replacement character (bytes EF BF BD) in a few
   names and addresses (4 in `MO_FACILITY_FILE.CSV`, 2 in `MO_ORGANIZATION_FILE.CSV`, 8 in the alternative-name file),
   where EPA lost a non-ASCII letter. The loader decodes strictly, so it adds none; raw stays as EPA sent it.
   EPA's other records spell the same words without an accent ("DECOR PLUS", "MARBLE DECOR INC" in its program and
-  alternative-name files), so nothing attests "DÉCOR". Staging (`mogov.fix_replacement_char`) takes the verified
-  spelling from the `epa_frs_name_corrections` seed (each row cites the EPA record that attests it) and drops any
-  other U+FFFD; `assert_replacement_char_fixed` fails if one survives or a seeded correction is not applied. The
-  alternative-name file (`MO_ALTERNATIVE_NAME_FILE`) is not loaded.
+  alternative-name files), so nothing attests "DÉCOR". Staging repairs a name that has U+FFFD in this order: a row of the
+  `epa_frs_name_corrections` seed (a maintainer override; each row cites the EPA record that attests it), else the
+  alternative name from `stg_epa_frs__alt_names` (`MO_ALTERNATIVE_NAME_FILE`, one row per program record) with the same
+  registry id (organizations: the same registry id, program system and program id) that equals the damaged name with
+  each run of U+FFFD standing for exactly one character (`mogov.damaged_name_pattern`; "D�COR PLUS" matches
+  "DECOR PLUS", "MARBLE D��COR INC" matches "MARBLE DECOR INC", "DECORATING PLUS" does not), when exactly one distinct
+  alternative name fits; with none or two different fits, the U+FFFD is dropped. The generic rule covers all three
+  damaged names seen so far (the facilities DECOR PLUS and MARBLE DECOR INC, and the DECOR PLUS owner and operator
+  rows). The seed still holds those three known cases, so a raw directory without alternative names builds with the
+  same names; once alternative names are loaded its rows are redundant and can be retired, and it stays for a future
+  name the alternatives cannot repair. The 2026-10 address
+  with U+FFFD ("17123 HWY 60�") has no alternative and just loses the character. `assert_replacement_char_fixed`
+  fails if one survives; `assert_epa_frs_name_correction_keys_exist` fails if a seed row matches no staged row. A raw
+  directory landed before `epa_frs_alt_names` existed gets an empty placeholder from `mogov build`; the seed covers the
+  known cases until `mogov load epa_frs` is re-run (a new damaged name would then lose its letter).
+  `stg_epa_frs__alt_names` mirrors raw, so alternative names containing U+FFFD stay there; the repairs never use them.
 - `epa_frs_sic` joined the loader after the other three. A raw directory landed before that has no SIC table;
   `mogov build` then creates an empty placeholder (like the other late-added or optional JSON tables in
   `db.OPTIONAL_JSON_TABLES`), so the SIC fallback finds no codes and those sites show no industry until the
