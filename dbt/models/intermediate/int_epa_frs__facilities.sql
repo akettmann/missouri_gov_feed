@@ -8,7 +8,10 @@
 -- two-digit sector prefix, naics_description names the sector and the SIC code, and naics_source is 'sic'.
 -- naics_source is null when the facility has no usable code. A real NAICS code, even a non-primary one, is
 -- more precise than a two-digit SIC-derived sector, and agrees with it on the sector for about 90% of facilities.
--- Codes tied on tier and program count go to the one in the SIC-derived sector, then the lowest code.
+-- Codes tied on tier and program count go to the one in the SIC-derived sector (NAICS 31-33 count as one
+-- sector), then the lowest code. The SIC sector counts only as a signal when the SIC code is not itself tied
+-- (same tier and program count) with a SIC code in a different sector, and is not SIC 1629 (construction
+-- stormwater-permit noise).
 -- is_government: a federal site, any owner-role organization typed as a government body
 -- (municipal, county, state, federal, district, tribal), or a facility or owner named like one ("City of ...",
 -- "... County", "... School District"; most organizations are typed UNKNOWN). The *_key columns are
@@ -96,15 +99,35 @@ sic_prefixes as (
     inner join {{ ref('sic_naics_sectors') }} as m on left(s.sic_code, length(m.sic_prefix)) = m.sic_prefix
 ),
 
+sic_sectors as (
+    select
+        sp.registry_id,
+        sp.sic_code,
+        sp.sic_description,
+        sp.naics_prefix,
+        sp.rank_class,
+        sp.n_programs,
+        sec.sector_code
+    from sic_prefixes as sp
+    left join {{ ref('naics_sectors') }} as sec on sp.naics_prefix = sec.naics_prefix
+    where sp.rn = 1
+),
+
 primary_sic as (
     select
         registry_id,
         sic_code,
         sic_description,
         naics_prefix,
+        sector_code,
+        -- SIC codes tied on tier and program count that fall in different sectors: the lowest-code tie-break
+        -- picked the SIC code, so its sector is no evidence of the facility's industry (#181)
+        (
+            min(sector_code) over (partition by registry_id, rank_class, n_programs)
+            != max(sector_code) over (partition by registry_id, rank_class, n_programs)
+        ) as sic_is_tied_across_sectors,
         row_number() over (partition by registry_id order by rank_class asc, n_programs desc, sic_code asc) as rn
-    from sic_prefixes
-    where rn = 1
+    from sic_sectors
 ),
 
 naics as (
@@ -130,14 +153,21 @@ best_naics as (
             order by
                 n.rank_class asc,
                 n.n_programs desc,
-                -- among tied codes, the one in the sector the facility's SIC code maps to (#181)
-                case when sc.sector_code = sic_sc.sector_code then 0 else 1 end asc,
+                -- among tied codes, the one in the sector the facility's SIC code maps to (#181); no signal from
+                -- SIC 1629 (construction stormwater-permit noise) or a SIC code tied across sectors
+                case
+                    when
+                        ps.sic_code != '1629'
+                        and not ps.sic_is_tied_across_sectors
+                        and sc.sector_code = ps.sector_code
+                        then 0
+                    else 1
+                end asc,
                 n.naics_code asc
         ) as rn
     from naics as n
     left join primary_sic as ps on n.registry_id = ps.registry_id and ps.rn = 1
     left join {{ ref('naics_sectors') }} as sc on left(n.naics_code, 2) = sc.naics_prefix
-    left join {{ ref('naics_sectors') }} as sic_sc on ps.naics_prefix = sic_sc.naics_prefix
 )
 
 select
