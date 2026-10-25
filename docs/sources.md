@@ -88,7 +88,7 @@ Quirks:
   3–10 minutes per shard re-parsing PDFs that were already downloaded.
 - Bill status (`fct_bills.status`, `outcome`; `int_bills__status`) comes from each bill's `Action` list. The
   `SenateActList` file adds the Senate bills that reached the House, but only with their House-side and governor
-  actions. It sometimes stops at the speaker's signature: 2024 SB 727 was signed into law, yet the list ends at
+  actions. In 2024 it stops at the speaker's signature for 15 of its 38 bills: 2024 SB 727 was signed into law, yet the list ends at
   "Signed by House Speaker". Such bills get the outcome "no governor action recorded", not "failed". Senate bills
   that never reached the House have no actions in any source we load, so their status is null.
 - `ActivitySequence` (action order) is only present from 2024. About 1,000 of 138,000 actions are repeated word

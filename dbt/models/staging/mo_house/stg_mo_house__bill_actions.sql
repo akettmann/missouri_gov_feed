@@ -6,9 +6,11 @@
 with senate_bills as (
     select
         {{ mogov.json_str('l.payload', '$.session_code') }} as session_code,
-        {{ mogov.json_fragment('s.value', '$.BillInformation[0]') }} as bill_doc
+        b.value as bill_doc
     from {{ source('mo_house', 'lists') }} as l
+    -- one wrapper element per file, holding every Senate bill in its BillInformation array
     cross join lateral {{ mogov.json_elements('l.payload', '$.doc.SenateBillsWithHouseActions') }} as s
+    cross join lateral {{ mogov.json_elements('s.value', '$.BillInformation') }} as b
     where {{ mogov.json_str('l.payload', '$.list') }} = 'SENATEACTLIST'
 ),
 

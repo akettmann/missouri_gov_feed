@@ -1,0 +1,24 @@
+# Unit tests for MO House staging models: fixed source rows -> exact expected rows.
+version: 2
+
+unit_tests:
+  - name: senate_act_list_stages_every_senate_bill
+    model: stg_mo_house__bill_actions
+    description: >
+      The SenateActList file wraps all of a session's Senate bills in one element's BillInformation array
+      (38 bills in 2024). Every bill and each of its actions must be staged, not just the first bill; repeated
+      actions under one Guid are kept once.
+    given:
+      - input: ref('stg_mo_house__bills')
+        format: sql
+        rows: |
+            select '261' as session_code, 'HB1' as bill, cast('{"Action": [{"Guid": ["1"], "Description": ["Referred: General Laws(H)"], "PubDate": ["2026-01-10"]}]}' as varchar) as bill_doc
+      - input: source('mo_house', 'lists')
+        format: sql
+        rows: |
+            select cast('{"session_code": "261", "list": "SENATEACTLIST", "doc": {"SenateBillsWithHouseActions": [{"BillInformation": [{"BillNumber": ["SB834"], "Action": [{"Guid": ["2"], "Description": ["Reported to the House and First Read (H)"], "PubDate": ["2026-03-25"]}, {"Guid": ["2"], "Description": ["Reported to the House and First Read (H)"], "PubDate": ["2026-03-25"]}]}, {"BillNumber": ["SB999"], "Action": [{"Guid": ["3"], "Description": ["Truly Agreed To and Finally Passed"], "PubDate": ["2026-05-14"]}]}]}]}}' as varchar) as payload
+    expect:
+      rows:
+        - {session_code: '261', bill: HB1, listed_in: house_bill_list, description: 'Referred: General Laws(H)'}
+        - {session_code: '261', bill: SB834, listed_in: senate_act_list, description: 'Reported to the House and First Read (H)'}
+        - {session_code: '261', bill: SB999, listed_in: senate_act_list, description: 'Truly Agreed To and Finally Passed'}
