@@ -158,7 +158,7 @@ best_naics as (
                 case
                     when
                         ps.sic_code != '1629'
-                        and not ps.sic_is_tied_across_sectors
+                        and not coalesce(ps.sic_is_tied_across_sectors, false)
                         and sc.sector_code = ps.sector_code
                         then 0
                     else 1

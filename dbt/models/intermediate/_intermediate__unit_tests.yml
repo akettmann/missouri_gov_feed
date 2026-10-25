@@ -354,12 +354,17 @@ unit_tests:
       When the facility's chosen SIC code is itself tied (same tier and program count) with a SIC code in another
       sector, the lowest-code tie-break chose it and its sector is no signal. s1: SIC 4953 (sector 56) ties
       SIC 5015 (42), so the tied NAICS codes 111998 and 561990 go to the lowest, 111998, not the 56 code;
-      s2: SIC 4953 alone (no tie) still pulls 561990.
+      s2: SIC 4953 alone (no tie) still pulls 561990;
+      s3: SIC 4953 on two program records beats SIC 5015 (42) on one, so it is not tied (same tier, more programs)
+      and still pulls 561990; s4: SIC 4953 primary beats SIC 5015 (42) secondary, same program count (better tier),
+      so it still pulls 561990. s3 and s4 pin the partition to registry, tier and program count.
     given:
       - input: ref('stg_epa_frs__facilities')
         rows:
           - {registry_id: s1, facility_name: SIC tied across sectors, latitude: 38.5, longitude: -92.1}
           - {registry_id: s2, facility_name: SIC not tied, latitude: 38.5, longitude: -92.1}
+          - {registry_id: s3, facility_name: SIC wins on program count, latitude: 38.5, longitude: -92.1}
+          - {registry_id: s4, facility_name: SIC wins on tier, latitude: 38.5, longitude: -92.1}
       - input: ref('stg_epa_frs__organizations')
         rows: []
       - input: ref('stg_epa_frs__naics')
@@ -368,11 +373,20 @@ unit_tests:
           - {registry_id: s1, naics_code: '561990', naics_description: Other support, is_primary: true, is_secondary: false}
           - {registry_id: s2, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
           - {registry_id: s2, naics_code: '561990', naics_description: Other support, is_primary: true, is_secondary: false}
+          - {registry_id: s3, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: s3, naics_code: '561990', naics_description: Other support, is_primary: true, is_secondary: false}
+          - {registry_id: s4, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: s4, naics_code: '561990', naics_description: Other support, is_primary: true, is_secondary: false}
       - input: ref('stg_epa_frs__sic')
         rows:
           - {registry_id: s1, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
           - {registry_id: s1, sic_code: '5015', sic_description: MOTOR VEHICLE PARTS USED, is_primary: true, is_secondary: false}
           - {registry_id: s2, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: s3, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: s3, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: s3, sic_code: '5015', sic_description: MOTOR VEHICLE PARTS USED, is_primary: true, is_secondary: false}
+          - {registry_id: s4, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: s4, sic_code: '5015', sic_description: MOTOR VEHICLE PARTS USED, is_primary: false, is_secondary: true}
       - input: ref('sic_naics_sectors')
         rows:
           - {sic_prefix: '4953', naics_prefix: '56'}
@@ -390,6 +404,8 @@ unit_tests:
       rows:
         - {registry_id: s1, naics_code: '111998', naics_source: naics}
         - {registry_id: s2, naics_code: '561990', naics_source: naics}
+        - {registry_id: s3, naics_code: '561990', naics_source: naics}
+        - {registry_id: s4, naics_code: '561990', naics_source: naics}
 
   - name: epa_frs_facility_naics_tie_ignores_sic_1629
     model: int_epa_frs__facilities
