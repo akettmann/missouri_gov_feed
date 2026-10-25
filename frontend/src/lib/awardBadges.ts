@@ -1,7 +1,7 @@
 // Award badges next to an official's name. Which awards are "current" is decided here from the rpt_awards
 // rows (already ranked and streak-counted in dbt); every page and browser script draws them with
 // renderBadges, so the icon, the link and the accessible text are the same everywhere.
-import { AWARD_PAIRS, AWARDS, isCycleList, periodWhen } from "./exports/awardDefs.ts";
+import { AWARD_PAIRS, AWARDS, isCycleList, periodWhen, type PeriodKind } from "./exports/awardDefs.ts";
 import { count, money, pct, streakMarker } from "./format.ts";
 
 /**
@@ -15,6 +15,7 @@ export interface BadgeList {
   award: string;
   office: string;
   period: string;
+  period_kind: PeriodKind;
   group_size: number;
   entries: {
     rank: number;
@@ -109,7 +110,7 @@ export function currentAwards(
       const mine = best.get(e.slug) ?? new Map<string, { rank: number; badge: Badge }>();
       const had = mine.get(l.award);
       if (!had || e.rank < had.rank) {
-        const cycle = isCycleList(l.award, l.office);
+        const cycle = isCycleList(l);
         const when = periodWhen(l.period, cycle);
         const group = `${ordinal(e.rank)} of ${count(l.group_size)} ${officeLabel(l.office)}`;
         const detail =
