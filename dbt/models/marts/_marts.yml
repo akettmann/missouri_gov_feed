@@ -602,6 +602,51 @@ models:
         data_type: varchar
         description: "{{ doc('source_url') }}"
 
+  - name: fct_party_unity_yearly
+    description: >
+      Party-line votes per official, chamber and calendar year of the vote: how many they cast (yea or nay,
+      where the Republican and Democratic majorities from int_votes__party_positions took opposite sides) and
+      how many went with their own party's majority. The party is the one held at the vote, so a member who
+      switched parties counts each vote under the party then held. Summed by fct_bias_indicators into the
+      lifetime party_unity_pct and read by rpt_awards for the yearly Maverick and Team Player awards. Votes with
+      no date have a null vote_year. Grain: one row per (official, chamber, vote year).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, chamber, vote_year]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: with_party_votes between 0 and party_line_votes
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests: [not_null]
+      - name: chamber
+        data_type: varchar
+        description: Chamber whose votes were counted.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['state_house', 'state_senate', 'us_house', 'us_senate']
+      - name: vote_year
+        data_type: bigint
+        description: Calendar year of the vote; null when the vote has no date.
+      - name: party_line_votes
+        data_type: bigint
+        description: >
+          Yea or nay votes cast on party-line votes. Sanity bound: the busiest official-year loaded has about 600,
+          and no chamber has ever held 2,000 party-line votes in a year.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 2000
+      - name: with_party_votes
+        data_type: bigint
+        description: Of those, how many matched the majority position of the party held at the vote.
+
   - name: fct_bias_indicators
     description: >
       Measured lean, not judgments. One row per (official, indicator, period, detail):

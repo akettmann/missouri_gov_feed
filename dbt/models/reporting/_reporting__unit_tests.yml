@@ -113,7 +113,7 @@ unit_tests:
         rows: []
       - input: ref('fct_federal_donor_summary')
         rows: []
-      - input: ref('fct_bias_indicators')
+      - input: ref('fct_party_unity_yearly')
         rows: []
     expect:
       rows:
@@ -131,8 +131,8 @@ unit_tests:
       three kinds of year in between. 2017: x is not in the field (not in that office); 2019: the field is
       too thin (only x has 100+ recorded votes, below awards_min_field_size of 2); neither breaks the streak
       or adds to it, so x reaches 4 in 2020. 2021: x is ranked second (outside the threshold), which breaks
-      the streak, so 2022 starts again at 1. Lifetime rows and the party-unity awards (lifetime only) never
-      get a streak. lowest_attendance has a threshold of 0 so its rows stay out of this test.
+      the streak, so 2022 starts again at 1. Lifetime rows never get a streak; the party-unity
+      awards (x loyal, r breaks in 2015 and 2016) streak like the rest. lowest_attendance has a threshold of 0 so its rows stay out of this test.
     overrides:
       vars:
         awards_threshold: {default: 1, lowest_attendance: 0}
@@ -165,10 +165,12 @@ unit_tests:
         rows: []
       - input: ref('fct_federal_donor_summary')
         rows: []
-      - input: ref('fct_bias_indicators')
+      - input: ref('fct_party_unity_yearly')
         rows:
-          - {official_id: x, indicator: party_unity_pct, value: 95, detail: 'state_house:2015-2022'}
-          - {official_id: r, indicator: party_unity_pct, value: 80, detail: 'state_house:2015-2022'}
+          - {official_id: x, chamber: state_house, vote_year: 2015, party_line_votes: 100, with_party_votes: 95}
+          - {official_id: r, chamber: state_house, vote_year: 2015, party_line_votes: 100, with_party_votes: 80}
+          - {official_id: x, chamber: state_house, vote_year: 2016, party_line_votes: 100, with_party_votes: 95}
+          - {official_id: r, chamber: state_house, vote_year: 2016, party_line_votes: 100, with_party_votes: 80}
     expect:
       rows:
         - {award: highest_attendance, period: '2015', official_id: x, award_rank: 1, group_size: 2, streak_years: 1}
@@ -179,8 +181,59 @@ unit_tests:
         - {award: highest_attendance, period: '2021', official_id: r, award_rank: 1, group_size: 2, streak_years: 1}
         - {award: highest_attendance, period: '2022', official_id: x, award_rank: 1, group_size: 2, streak_years: 1}
         - {award: highest_attendance, period: lifetime, official_id: x, award_rank: 1, group_size: 3, streak_years: null}
+        - {award: most_party_breaks, period: '2015', official_id: r, award_rank: 1, group_size: 2, streak_years: 1}
+        - {award: most_party_breaks, period: '2016', official_id: r, award_rank: 1, group_size: 2, streak_years: 2}
         - {award: most_party_breaks, period: lifetime, official_id: r, award_rank: 1, group_size: 2, streak_years: null}
+        - {award: most_party_loyal, period: '2015', official_id: x, award_rank: 1, group_size: 2, streak_years: 1}
+        - {award: most_party_loyal, period: '2016', official_id: x, award_rank: 1, group_size: 2, streak_years: 2}
         - {award: most_party_loyal, period: lifetime, official_id: x, award_rank: 1, group_size: 2, streak_years: null}
+
+  - name: awards_party_unity_per_year
+    model: rpt_awards
+    description: >
+      Party unity is ranked per calendar year as well as lifetime (issue 164). a votes with its party on
+      90 of 90 party-line votes in 2023 (100.0) and 50 of 100 in 2024 (50.0); b on 80 of 100 (80.0) and 90 of
+      100 (90.0). Maverick (most_party_breaks) is the lowest unity, so b in 2023 and a in 2024; Team Player
+      (most_party_loyal) is the highest, so a in 2023 and b in 2024. c has 19 party-line votes in 2024, below
+      awards_min_party_line_votes (20), so c's 0.0% gets no row. d's only party-line votes were cast in the
+      state_house while d is a us_house member, so they are not ranked against the House. a's 10 undated
+      votes (all with the party) count towards lifetime only: a 150 of 200 = 75.0, b 170 of 200 = 85.0.
+      Dropping the yearly rows, ignoring the minimum or the chamber match fails this test.
+    overrides:
+      vars:
+        awards_threshold: {default: 1}
+        awards_min_field_size: 2
+        awards_min_party_line_votes: 20
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: a, office: state_house}
+          - {official_id: b, office: state_house}
+          - {official_id: c, office: state_house}
+          - {official_id: d, office: us_house}
+      - input: ref('rpt_attendance')
+        rows: []
+      - input: ref('rpt_donor_rollup')
+        rows: []
+      - input: ref('fct_federal_donor_summary')
+        rows: []
+      - input: ref('fct_party_unity_yearly')
+        rows:
+          - {official_id: a, chamber: state_house, vote_year: 2023, party_line_votes: 90, with_party_votes: 90}
+          - {official_id: a, chamber: state_house, vote_year: 2024, party_line_votes: 100, with_party_votes: 50}
+          - {official_id: a, chamber: state_house, vote_year: null, party_line_votes: 10, with_party_votes: 10}
+          - {official_id: b, chamber: state_house, vote_year: 2023, party_line_votes: 100, with_party_votes: 80}
+          - {official_id: b, chamber: state_house, vote_year: 2024, party_line_votes: 100, with_party_votes: 90}
+          - {official_id: c, chamber: state_house, vote_year: 2024, party_line_votes: 19, with_party_votes: 0}
+          - {official_id: d, chamber: state_house, vote_year: 2024, party_line_votes: 100, with_party_votes: 0}
+    expect:
+      rows:
+        - {award: most_party_breaks, period: '2023', official_id: b, award_rank: 1, metric: 80.0, sample_size: 100, group_size: 2, streak_years: 1}
+        - {award: most_party_breaks, period: '2024', official_id: a, award_rank: 1, metric: 50.0, sample_size: 100, group_size: 2, streak_years: 1}
+        - {award: most_party_breaks, period: lifetime, official_id: a, award_rank: 1, metric: 75.0, sample_size: 200, group_size: 2, streak_years: null}
+        - {award: most_party_loyal, period: '2023', official_id: a, award_rank: 1, metric: 100.0, sample_size: 90, group_size: 2, streak_years: 1}
+        - {award: most_party_loyal, period: '2024', official_id: b, award_rank: 1, metric: 90.0, sample_size: 100, group_size: 2, streak_years: 1}
+        - {award: most_party_loyal, period: lifetime, official_id: b, award_rank: 1, metric: 85.0, sample_size: 200, group_size: 2, streak_years: null}
 
   - name: awards_federal_money_share_uses_fec_total_receipts
     model: rpt_awards
@@ -216,7 +269,7 @@ unit_tests:
           - {official_id: a, cycle: 2024, aggregate_kind: cycle total, bucket: total receipts, total: 40000}
           - {official_id: a, cycle: 2024, aggregate_kind: cycle total, bucket: PAC contributions, total: 9999}
           - {official_id: b, cycle: 2024, aggregate_kind: cycle total, bucket: total receipts, total: 25000}
-      - input: ref('fct_bias_indicators')
+      - input: ref('fct_party_unity_yearly')
         rows: []
     expect:
       rows:
@@ -254,7 +307,7 @@ unit_tests:
           - {official_id: s2, level: state, transaction_year: 2024, election_cycle: 2024, donor_class: individual, match_confidence: high, total_amount: 1000}
       - input: ref('fct_federal_donor_summary')
         rows: []
-      - input: ref('fct_bias_indicators')
+      - input: ref('fct_party_unity_yearly')
         rows: []
     expect:
       rows:

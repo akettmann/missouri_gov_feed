@@ -468,7 +468,9 @@ models:
       raising $10,000+ (rpt_donor_rollup, medium name matches excluded; federal officials' share is per FEC
       two-year cycle, reported under the cycle's end year, over FEC total receipts from fct_federal_donor_summary,
       since the rollup holds only their committee receipts), most breaks with / most loyal to
-      their party (party_unity_pct, current chamber, lifetime only). Only offices with awards_min_field_size
+      their party (party unity from fct_party_unity_yearly, current chamber, per calendar year and lifetime, 20+
+      party-line votes in the period, the awards_min_party_line_votes var; the lifetime figure equals the profile's
+      party_unity_pct). Only offices with awards_min_field_size
       (5) or more qualifying officials in the period. streak_years counts consecutive qualifying years. No
       composite scores. Grain: one row per (award, office, period, official).
     data_tests:
@@ -507,7 +509,7 @@ models:
           unity %.
       - name: sample_size
         data_type: decimal(28,6)
-        description: What the metric is out of (recorded votes, or total dollars raised); null for party unity.
+        description: What the metric is out of (recorded votes, total dollars raised, or party-line votes cast).
       - name: group_size
         data_type: bigint
         description: How many officials in the office qualified for this award and period.

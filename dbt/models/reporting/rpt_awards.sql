@@ -9,8 +9,10 @@
 --                      are not itemized), so a federal share would always be 100%: federal shares are per FEC
 --                      two-year cycle (period = the cycle's even end year) over FEC's total receipts for the
 --                      cycle (fct_federal_donor_summary); a cycle with no FEC total gets no share
---   party unity:       fct_bias_indicators party_unity_pct for the official's current chamber; the source
---                      computes it over all loaded votes, so it has a lifetime period only
+--   party unity:       share of party-line votes cast with the official's own party, for the official's current
+--                      chamber, from fct_party_unity_yearly (calendar year of the vote, and lifetime = all
+--                      years). Needs awards_min_party_line_votes (20) party-line votes in the period.
+--                      fct_bias_indicators party_unity_pct sums the same counts, so the profile figure matches
 with offices as (
     select
         official_id,
@@ -166,18 +168,48 @@ share_money as (
     inner join offices as o on f.official_id = o.official_id
 ),
 
+unity_counts as (
+    -- the official's own chamber only (a senator's earlier House votes don't count for the Senate ranking)
+    select
+        y.official_id,
+        o.office,
+        y.vote_year,
+        y.party_line_votes,
+        y.with_party_votes
+    from {{ ref('fct_party_unity_yearly') }} as y
+    inner join offices as o on y.official_id = o.official_id and y.chamber = o.office
+),
+
+unity_totals as (
+    select
+        official_id,
+        office,
+        cast(vote_year as {{ dbt.type_string() }}) as period,
+        party_line_votes,
+        with_party_votes
+    from unity_counts
+    where vote_year is not null
+    union all
+    -- lifetime sums every year (and undated votes), the same sum as fct_bias_indicators party_unity_pct
+    select
+        official_id,
+        office,
+        'lifetime' as period,
+        sum(party_line_votes) as party_line_votes,
+        sum(with_party_votes) as with_party_votes
+    from unity_counts
+    group by official_id, office
+),
+
 unity as (
     select
-        b.official_id,
-        o.office,
-        'lifetime' as period,
-        b.value as metric
-    from {{ ref('fct_bias_indicators') }} as b
-    inner join offices as o on b.official_id = o.official_id
-    where
-        b.indicator = 'party_unity_pct'
-        and b.value is not null
-        and {{ dbt.split_part('b.detail', "':'", 1) }} = o.office
+        official_id,
+        office,
+        period,
+        round(100.0 * with_party_votes / party_line_votes, 1) as metric,
+        party_line_votes as sample_size
+    from unity_totals
+    where party_line_votes >= {{ var('awards_min_party_line_votes') }}
 ),
 
 measures as (
@@ -229,7 +261,7 @@ measures as (
         office,
         period,
         metric,
-        null as sample_size,
+        sample_size,
         metric as sort_key
     from unity
     union all
@@ -239,7 +271,7 @@ measures as (
         office,
         period,
         metric,
-        null as sample_size,
+        sample_size,
         -metric as sort_key
     from unity
 ),
