@@ -10,6 +10,7 @@
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   checkLimits,
   PAGES_BRANCH,
@@ -22,8 +23,12 @@ import {
 } from "./pages-config.mjs";
 import { resolveDbPath, resolveExportsDir, staleExportsWarning } from "./stale-exports.mjs";
 
+// Everything below resolves from frontend/ (this file's parent), so the cwd the script is started from is irrelevant.
+const FRONTEND = fileURLToPath(new URL("..", import.meta.url));
+const DIST = path.join(FRONTEND, "dist");
+
 function run(cmd, args, opts = {}) {
-  const r = spawnSync(cmd, args, { encoding: "utf8", ...opts });
+  const r = spawnSync(cmd, args, { encoding: "utf8", cwd: FRONTEND, ...opts });
   if (r.status !== 0) {
     if (r.stderr) console.error(redactUrl(r.stderr));
     throw new Error(`${cmd} ${redactUrl(args.join(" "))} failed (${r.status ?? r.error?.message}).`);
@@ -60,31 +65,41 @@ if (dirty && !opts.allowDirty) {
   process.exit(1);
 }
 
-const stale = staleExportsWarning(resolveDbPath(), resolveExportsDir());
+const stale = staleExportsWarning(
+  resolveDbPath(process.env, FRONTEND),
+  resolveExportsDir(process.env, FRONTEND),
+);
 if (stale && !opts.allowStale) {
   console.error(`${stale}\nRefusing to deploy stale data (override with --allow-stale).`);
   process.exit(1);
 }
 
 if (opts.skipBuild) {
-  if (!existsSync("dist/index.html")) {
+  if (!existsSync(path.join(DIST, "index.html"))) {
     console.error("dist/ is missing: drop --skip-build.");
     process.exit(2);
   }
 } else {
   console.log(`> pnpm build (base ${target.base ?? "/"}, site ${target.site})`);
-  const r = spawnSync("pnpm", ["build"], {
+  const r = spawnSync("pnpm build", {
+    // A single command string with shell: true (pnpm is pnpm.cmd on Windows) avoids Node's DEP0190 warning.
+    shell: true,
+    cwd: FRONTEND,
     stdio: "inherit",
-    shell: process.platform === "win32",
     env: { ...process.env, PUBLIC_SITE_URL: target.site, PUBLIC_BASE_PATH: target.base ?? "" },
   });
   if (r.status !== 0) process.exit(r.status ?? 1);
 }
 
 // Every root-relative link must resolve under the Pages base; a --skip-build dist from the wrong build fails here.
-const lc = spawnSync(process.execPath, ["scripts/link-check.mjs", "dist", target.base ?? ""], {
-  stdio: "inherit",
-});
+const lc = spawnSync(
+  process.execPath,
+  [path.join(FRONTEND, "scripts", "link-check.mjs"), DIST, target.base ?? ""],
+  {
+    cwd: FRONTEND,
+    stdio: "inherit",
+  },
+);
 if (lc.status !== 0) {
   console.error("Link check failed: was dist/ built with the Pages base?");
   process.exit(1);
@@ -97,7 +112,7 @@ try {
     "mogov-pages-",
     (work) => {
       keptDir = work;
-      cpSync("dist", work, { recursive: true });
+      cpSync(DIST, work, { recursive: true });
       writeFileSync(path.join(work, ".nojekyll"), ""); // serve _astro/ as-is
       if (!existsSync(path.join(work, "404.html"))) console.warn("warning: dist has no 404.html");
 

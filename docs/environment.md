@@ -202,7 +202,7 @@ orphan `gh-pages` branch; `main` history is never touched.
 Findings (checked against the ~170 MB `dist/`, 1052 pages):
 
 - Limits: a published Pages site must be <= 1 GB, each file < 100 MB (git push limit), and the soft bandwidth cap is
-  100 GB/month. Our `dist/` is about 170 MB, the largest file is a 3.2 MB HTML page, so it fits comfortably.
+  100 GB/month. Our `dist/` is about 193 MB, the largest file is a 4.3 MB HTML page, so it fits comfortably.
   `deploy:pages` refuses to push if either limit would be broken.
 - Method (a), orphan `gh-pages` branch from a temp dir, was chosen over (b) `workflow_dispatch` +
   `upload-pages-artifact`: (b) needs the built site inside CI, and CI has no data, so we would have to upload 170 MB
@@ -232,8 +232,8 @@ the build now rejects that); the script sets it for you.
 The deploy only ever writes the `gh-pages` branch (there is no `--branch` flag), pushing to
 `https://github.com/<owner>/<name>.git` for the repo of the `origin` remote (`--remote NAME` picks another remote
 to read the repo from). It refuses to run with uncommitted changes under `frontend/` (`--allow-dirty` overrides)
-and removes its ~200 MB temp repo on every exit, dry runs and failures included (`--keep` leaves it for
-inspection).
+and removes its ~200 MB temp repo on every exit, dry runs, failures and Ctrl+C (exit 130) included (`--keep`
+leaves it for inspection). It can be started from any directory.
 
 ## Local, in Docker (Compose)
 

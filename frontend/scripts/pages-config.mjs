@@ -16,12 +16,27 @@ export function redactUrl(url) {
   return String(url).replace(/(\/\/)[^/@\s]+@/g, "$1***@");
 }
 
-/** Run fn(dir) in a fresh temp dir that is removed afterwards, even when fn throws, unless keep is set. */
-export function withTempDir(prefix, fn, { keep = false, root = tmpdir() } = {}) {
+/**
+ * Run fn(dir) in a fresh temp dir that is removed afterwards, even when fn throws, unless keep is set.
+ * A SIGINT (Ctrl+C) while fn runs also removes the dir (unless keep) and exits 130; `proc` and `exit` are
+ * injectable for tests. While fn is synchronous the handler only runs once it returns, but its presence stops
+ * Node dying mid-copy, so the finally block below still cleans up.
+ */
+export function withTempDir(
+  prefix,
+  fn,
+  { keep = false, root = tmpdir(), proc = process, exit = process.exit } = {},
+) {
   const dir = mkdtempSync(path.join(root, prefix));
+  const onSigint = () => {
+    if (!keep) rmSync(dir, { recursive: true, force: true });
+    exit(130);
+  };
+  proc.once("SIGINT", onSigint);
   try {
     return fn(dir);
   } finally {
+    proc.removeListener("SIGINT", onSigint);
     if (!keep) rmSync(dir, { recursive: true, force: true });
   }
 }
@@ -43,16 +58,22 @@ export function pagesTarget(repoSlug) {
   const m = /^([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+)$/.exec(repoSlug ?? "");
   if (!m) throw new Error(`Expected a repo like "owner/name", got ${JSON.stringify(repoSlug)}.`);
   const [, owner, name] = m;
+  if (/^\.+$/.test(name)) throw new Error(`Invalid repo name ${JSON.stringify(name)}.`);
   const site = `https://${owner.toLowerCase()}.github.io`;
   const userSite = name.toLowerCase() === `${owner.toLowerCase()}.github.io`;
   const base = userSite ? undefined : `/${name}`;
   return { site, base, url: `${site}${base ?? ""}/` };
 }
 
-/** Extract "owner/name" from an https or ssh GitHub remote URL, or null. */
+/** Anchored at the start: an https/ssh URL or scp-style `user@` prefix, then the github.com host itself. */
+const GITHUB_REMOTE =
+  /^(?:(?:https?|ssh|git\+ssh):\/\/(?:[^@/\s]+@)?|[^@/\s:]+@)github\.com[:/]([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/i;
+
+/** Extract "owner/name" from an https or ssh GitHub remote URL, or null (other hosts, local paths, "."/".." names). */
 export function repoFromRemote(url) {
-  const m = /github\.com[:/]([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/.exec((url ?? "").trim());
-  return m ? `${m[1]}/${m[2]}` : null;
+  const m = GITHUB_REMOTE.exec((url ?? "").trim());
+  if (!m || /^\.+$/.test(m[1]) || /^\.+$/.test(m[2])) return null;
+  return `${m[1]}/${m[2]}`;
 }
 
 const MB = 1024 * 1024;

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import { existsSync, rmSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
@@ -53,6 +54,38 @@ test("repoFromRemote handles https and ssh", () => {
     "akettmann/missouri_gov_feed",
   );
   assert.equal(repoFromRemote("https://example.com/x/y"), null);
+  assert.equal(repoFromRemote("ssh://git@github.com/a/b"), "a/b");
+  assert.equal(repoFromRemote("https://user:tok@github.com/a/b.git"), "a/b");
+});
+
+test("repoFromRemote anchors the host and rejects dot names", () => {
+  assert.equal(repoFromRemote("https://evil.example/github.com/x/y.git"), null);
+  assert.equal(repoFromRemote("C:/x/github.com/a/b"), null);
+  assert.equal(repoFromRemote("/home/me/github.com:a/b"), null);
+  assert.equal(repoFromRemote("https://evil.example/x@github.com/a/b"), null);
+  assert.equal(repoFromRemote("https://github.com/a/.."), null);
+  assert.equal(repoFromRemote("https://github.com/../b"), null);
+  assert.throws(() => pagesTarget("a/.."));
+});
+
+test("withTempDir removes the dir and exits 130 on SIGINT, unless keep", () => {
+  for (const keep of [false, true]) {
+    const proc = new EventEmitter();
+    const exits = [];
+    let made;
+    withTempDir(
+      "mogov-sigint-",
+      (dir) => {
+        made = dir;
+        proc.emit("SIGINT");
+        assert.equal(existsSync(dir), keep);
+      },
+      { keep, proc, exit: (c) => exits.push(c) },
+    );
+    assert.deepEqual(exits, [130]);
+    assert.equal(proc.listenerCount("SIGINT"), 0);
+    if (keep) rmSync(made, { recursive: true, force: true });
+  }
 });
 
 test("checkLimits flags oversize files and sites", () => {
