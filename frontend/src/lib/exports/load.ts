@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import { DONOR_GROUP_SQL } from "../rollups";
 import { exportedAt, hasExport, query } from "./db";
-import type { PayVoteRow } from "../attendancePay";
+import { payYearsProblems, type PayVoteRow } from "../attendancePay";
 import { groupPast, linkSameName, type RosterRow } from "./past";
 import { sampleDonorCycles, sampleGiftRollup, sampleTopDonors } from "./fixtures";
 import type {
@@ -533,11 +533,28 @@ async function loadAll(): Promise<OfficialBundle[]> {
     });
 }
 
+/**
+ * Fails the build when an official's pay-per-vote year rows do not add up to the dbt total, which means
+ * rpt_attendance and rpt_attendance_pay were exported from different builds: the years label would be wrong.
+ */
+function assertPayYearsConsistent(bundles: OfficialBundle[]): OfficialBundle[] {
+  const bad = payYearsProblems(bundles);
+  if (bad.length) {
+    const shown = bad.slice(0, 20).map((m) => `  ${m}`);
+    throw new Error(
+      `Pay per vote: year rows do not match the dbt total for ${bad.length} official(s); rebuild and ` +
+        `re-export rpt_attendance and rpt_attendance_pay together (mogov build, mogov export).` +
+        ["", ...shown].join("\n"),
+    );
+  }
+  return bundles;
+}
+
 let cache: Promise<OfficialBundle[]> | undefined;
 
 /** Every official's bundle; computed once per build and shared by pages and JSON endpoints. */
 export function allOfficials(): Promise<OfficialBundle[]> {
-  cache ??= loadAll();
+  cache ??= loadAll().then(assertPayYearsConsistent);
   return cache;
 }
 

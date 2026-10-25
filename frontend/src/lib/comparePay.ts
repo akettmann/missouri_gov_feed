@@ -66,3 +66,24 @@ export function payPerVote(b: OfficialBundle, hideMedium: boolean): [string, str
   }
   return [totals.join("; ") || NA, latests.join("; ") || NA];
 }
+
+/**
+ * The payroll (or statutory salary) pages behind the pay figures, one per chamber shown, labelled with the
+ * chamber when there is more than one. Chambers with no source URL are left out.
+ */
+export function payPerVoteSources(b: OfficialBundle): { text: string; href: string }[] {
+  const blocks = payPerVoteBlocks(b.voting.attendance ?? [], b.voting.attendance_pay ?? []);
+  return blocks.flatMap((block) =>
+    block.sourceUrl
+      ? [
+          {
+            text:
+              blocks.length > 1
+                ? `${CHAMBER_NAMES[block.chamber] ?? block.chamber} pay source`
+                : "pay source",
+            href: block.sourceUrl,
+          },
+        ]
+      : [],
+  );
+}
