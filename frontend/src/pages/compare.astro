@@ -2,16 +2,26 @@
 // Compare two officials side by side: the same measured numbers from each profile, in matching rows.
 // Rendered in the browser from the per-official JSON; both choices live in the URL (?a=slug&b=slug).
 import ConfidenceToggle from "../components/ConfidenceToggle.astro";
+import OfficeFilter from "../components/OfficeFilter.astro";
 import Layout from "../layouts/Layout.astro";
+import { pluralOfficeLabel } from "../lib/awardBadges";
 import { currentAwardsBySlug } from "../lib/exports/awards";
 import { officialIndex } from "../lib/exports/load";
 import { officeLine } from "../lib/format";
+import { buildOfficeGroups } from "../lib/lookback";
 import { href } from "../lib/site";
 
 const awards = await currentAwardsBySlug();
 // badges only for officials who hold awards, so the inline index stays small
-const officials = (await officialIndex()).map((o) => ({
+const current = await officialIndex();
+// the office key lets the filter bar narrow the pickers; chip labels use the shared helper because
+// office_title is circuit-specific for judges
+const groups = buildOfficeGroups(
+  current.map((o) => ({ office: o.office, office_title: pluralOfficeLabel(o.office, o.office_title) })),
+);
+const officials = current.map((o) => ({
   slug: o.slug,
+  office: o.office,
   label: `${o.full_name} — ${officeLine(o)}`,
   ...(awards.has(o.slug) && { badges: awards.get(o.slug) }),
 }));
@@ -38,6 +48,14 @@ const officials = (await officialIndex()).map((o) => ({
         <option value={o.label} />
       ))}
     </datalist>
+    <div class="office-bar">
+      <OfficeFilter groups={groups} />
+      <p class="small muted">
+        The lists above offer officials from the office you pick here. It follows your first pick; choose
+        &ldquo;All offices&rdquo; to compare across offices.
+      </p>
+      <p class="small muted" id="filter-status" role="status"></p>
+    </div>
   </form>
   <div class="small tools">
     <ConfidenceToggle />
@@ -59,9 +77,10 @@ const officials = (await officialIndex()).map((o) => ({
 <script>
   import { renderBadges, type Badge } from "../lib/awardBadges";
   import { compareRows } from "../lib/compare";
+  import { filterForOffice, filterOfficials, type OfficeFilter } from "../lib/compareFilter";
   import type { OfficialBundle } from "../lib/exports/types";
 
-  const index: { slug: string; label: string; badges?: Badge[] }[] = JSON.parse(
+  const index: { slug: string; office: string; label: string; badges?: Badge[] }[] = JSON.parse(
     document.getElementById("officials-index")!.textContent!,
   );
   const bySlug = new Map(index.map((o) => [o.slug, o.label]));
@@ -69,6 +88,10 @@ const officials = (await officialIndex()).map((o) => ({
   const byLabel = new Map(index.map((o) => [o.label, o.slug]));
   const form = document.querySelector<HTMLFormElement>("form.pickers")!;
   const status = document.getElementById("status")!;
+  const filterStatus = document.getElementById("filter-status")!;
+  const datalist = document.getElementById("officials") as HTMLDataListElement;
+  const chipSets = [...form.querySelectorAll<HTMLFieldSetElement>("fieldset.chips")];
+  const officeBySlug = new Map(index.map((o) => [o.slug, o.office]));
   const result = document.getElementById("result")!;
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   const cache = new Map<string, Promise<OfficialBundle>>();
@@ -89,11 +112,49 @@ const officials = (await officialIndex()).map((o) => ({
     return e;
   }
 
+  // the bar follows the first pick until the visitor uses it themselves
+  let touched = false;
+
+  function currentFilter(): OfficeFilter {
+    const f = new FormData(form);
+    return { group: String(f.get("group") ?? ""), office: String(f.get("office") ?? "") };
+  }
+
+  function setFilter(f: OfficeFilter) {
+    for (const r of form.querySelectorAll<HTMLInputElement>('input[name="group"], input[name="office"]')) {
+      r.checked = r.name === "group" ? r.value === f.group : r.value === f.office;
+    }
+  }
+
+  function applyFilter() {
+    const f = currentFilter();
+    for (const set of chipSets) set.hidden = set.dataset.group !== f.group;
+    const shown = filterOfficials(index, f);
+    datalist.replaceChildren(
+      ...shown.map((o) => {
+        const opt = el("option");
+        opt.value = o.label;
+        return opt;
+      }),
+    );
+    const group = form.querySelector<HTMLInputElement>('input[name="group"]:checked')?.closest("label");
+    const chip = f.office
+      ? form.querySelector<HTMLInputElement>('input[name="office"]:checked')?.closest("label")
+      : null;
+    const where = (chip ?? group)?.textContent?.trim() ?? "";
+    filterStatus.textContent = f.group
+      ? `Showing ${shown.length} officials: ${where}.`
+      : `Showing all ${shown.length} officials.`;
+  }
+
   async function render() {
     const slugs = ["a", "b"].map((k) => byLabel.get(String(new FormData(form).get(k) ?? "")));
     const chosen = slugs.filter((s): s is string => !!s);
     const params = new URLSearchParams();
     slugs.forEach((s, i) => s && params.set(i ? "b" : "a", s));
+    const f = currentFilter();
+    if (f.group) params.set("group", f.group);
+    if (f.office) params.set("office", f.office);
     history.replaceState(null, "", params.size ? `?${params}` : location.pathname);
     if (chosen.length < 2) {
       result.hidden = true;
@@ -149,6 +210,36 @@ const officials = (await officialIndex()).map((o) => ({
     const label = bySlug.get(params.get(k) ?? "");
     if (label) (form.elements.namedItem(k) as HTMLInputElement).value = label;
   }
+  if (params.has("group") || params.has("office")) {
+    touched = true;
+    setFilter({ group: params.get("group") ?? "", office: params.get("office") ?? "" });
+  } else {
+    setFilter(
+      filterForOffice(officeBySlug.get(byLabel.get(String(new FormData(form).get("a") ?? "")) ?? "")),
+    );
+  }
+  applyFilter();
+  form.addEventListener("input", (e) => {
+    const t = e.target;
+    if (!(t instanceof HTMLInputElement)) return;
+    if (t.name === "group" || t.name === "office") {
+      touched = true;
+      if (t.name === "group") {
+        // a new tile starts from all of its offices
+        setFilter({ group: t.value, office: "" });
+      }
+      applyFilter();
+      void render();
+      return;
+    }
+    if (t.name === "a" && !touched) {
+      const a = byLabel.get(t.value);
+      if (a || !t.value) {
+        setFilter(filterForOffice(a && officeBySlug.get(a)));
+        applyFilter();
+      }
+    }
+  });
   form.addEventListener("change", render);
   form.addEventListener("input", () => {
     // datalist picks fire input with a complete label; typed partial names wait for change
@@ -190,6 +281,14 @@ const officials = (await officialIndex()).map((o) => ({
     border-radius: 6px;
     background: var(--surface);
     color: var(--ink);
+  }
+  .office-bar {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 12px;
+  }
+  .office-bar p {
+    margin: 0;
   }
   .tools {
     margin: 4px 0 8px;
