@@ -48,3 +48,32 @@ export function measure(distDir, budgets = BUDGETS) {
   }
   return sizes;
 }
+
+/** MOGOV_SKIP_SIZE_BUDGET skips the budget only when it is exactly "1" (so "0" or "" still check). */
+export function skipRequested(env = process.env) {
+  return env.MOGOV_SKIP_SIZE_BUDGET === "1";
+}
+
+/** The console line for one overBudget() error: a missing file needs a BUDGETS/build fix, not a trim. */
+export function formatBudgetError(error) {
+  return /was not found in the build output/.test(error)
+    ? `MISSING FROM BUILD: ${error}. Check the build, or update BUDGETS in scripts/size-budget.mjs.`
+    : `OVER BUDGET: ${error}. Trim the payload or raise the budget in scripts/size-budget.mjs.`;
+}
+
+/** Run the budget check (scripts/export-sizes.mjs) on `cwd`'s dist/ before publishing. Returns true to go ahead. */
+export function budgetGate({ cwd, env = process.env, spawn, log = console }) {
+  if (skipRequested(env)) {
+    log.log("MOGOV_SKIP_SIZE_BUDGET=1: publishing without the size budget check.");
+    return true;
+  }
+  const r = spawn(process.execPath, [path.join(cwd, "scripts", "export-sizes.mjs")], {
+    cwd,
+    stdio: "inherit",
+  });
+  if (r.status === 0) return true;
+  log.error(
+    "Size budget check failed: not publishing (fix it, or set MOGOV_SKIP_SIZE_BUDGET=1 to publish anyway).",
+  );
+  return false;
+}

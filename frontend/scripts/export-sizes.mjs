@@ -3,11 +3,11 @@ import { readdirSync, statSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { measure, overBudget } from "./size-budget.mjs";
+import { formatBudgetError, measure, overBudget, skipRequested } from "./size-budget.mjs";
 
 // Escape hatch for builds where the budget should not gate (e.g. a throwaway local build): MOGOV_SKIP_SIZE_BUDGET=1
-if (process.env.MOGOV_SKIP_SIZE_BUDGET) {
-  console.log("MOGOV_SKIP_SIZE_BUDGET is set: skipping the size budgets.");
+if (skipRequested()) {
+  console.log("MOGOV_SKIP_SIZE_BUDGET=1: skipping the size budgets.");
   process.exit(0);
 }
 
@@ -44,6 +44,5 @@ console.log(`\n${over.length} of ${rows.length} over the ${BUDGET_GZ_KB} KB gzip
 const sizes = measure("dist");
 for (const [file, s] of Object.entries(sizes)) console.log(`${file}: ${kb(s.raw)} (${kb(s.gz)} gz)`);
 const errors = overBudget(sizes);
-for (const e of errors)
-  console.error(`OVER BUDGET: ${e}. Trim the payload or raise the budget in scripts/size-budget.mjs.`);
+for (const e of errors) console.error(formatBudgetError(e));
 process.exitCode = over.length || errors.length ? 1 : 0;
