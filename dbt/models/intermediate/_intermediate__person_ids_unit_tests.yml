@@ -206,3 +206,133 @@ unit_tests:
       rows:
         - {session_code: '171', district_number: 30, raw_person_key: 'mohouse:476', person_key: ocd-person/cierpiot}
         - {session_code: '171', district_number: 31, raw_person_key: 'mohouse:999', person_key: 'mohouse:999'}
+
+
+  - name: person_ids_ignore_spacing_inside_a_surname
+    model: int_officials__person_ids
+    description: >
+      The House roster spells Dean Van Schoiack with a space and Open States without (#228). Same seat, same years:
+      one person, and the Open States id wins over the roster fallback key.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: 'mohouse:2243', year: 2025, office: state_house, district: '9', name_key: dean van schoiack}
+          - {alias_id: 'mohouse:2243', year: 2026, office: state_house, district: '9', name_key: dean van schoiack}
+          - {alias_id: ocd-person/vanschoiack, year: 2025, office: state_house, district: '9', name_key: dean vanschoiack}
+          - {alias_id: ocd-person/vanschoiack, year: 2026, office: state_house, district: '9', name_key: dean vanschoiack}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: 'mohouse:2243', person_id: ocd-person/vanschoiack, basis: name_continuity}
+        - {alias_id: ocd-person/vanschoiack, person_id: ocd-person/vanschoiack, basis: self}
+
+  - name: person_ids_join_a_given_name_variant_across_chambers
+    model: int_officials__person_ids
+    description: >
+      Open States keeps Steve Roberts' House years (as "Steven", 2017-20) and Senate years (2021+) as two people
+      (#263). The names differ only in the given name, one starting with the other, the seats never clash and the
+      second begins the year after the first ends: one person, and the id that served last is kept.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/roberts-house, year: 2019, office: state_house, district: '77', name_key: steven roberts}
+          - {alias_id: ocd-person/roberts-house, year: 2020, office: state_house, district: '77', name_key: steven roberts}
+          - {alias_id: ocd-person/roberts-senate, year: 2021, office: state_senate, district: '5', name_key: steve roberts}
+          - {alias_id: ocd-person/roberts-senate, year: 2026, office: state_senate, district: '5', name_key: steve roberts}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/roberts-house, person_id: ocd-person/roberts-senate, basis: name_continuity}
+        - {alias_id: ocd-person/roberts-senate, person_id: ocd-person/roberts-senate, basis: self}
+
+  - name: person_ids_join_a_given_name_variant_in_the_same_seat
+    model: int_officials__person_ids
+    description: >
+      Two Open States records for the same seat in the same year under "Ken" and "Kenneth" Jamison are one person.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/jamison-ken, year: 2025, office: state_house, district: '15', name_key: ken jamison}
+          - {alias_id: ocd-person/jamison-ken, year: 2026, office: state_house, district: '15', name_key: ken jamison}
+          - {alias_id: ocd-person/jamison-kenneth, year: 2025, office: state_house, district: '15', name_key: kenneth jamison}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/jamison-ken, person_id: ocd-person/jamison-ken, basis: self}
+        - {alias_id: ocd-person/jamison-kenneth, person_id: ocd-person/jamison-ken, basis: name_continuity}
+
+  - name: person_ids_keep_given_name_variants_serving_at_once_apart
+    model: int_officials__person_ids
+    description: >
+      A Steve and a Steven Roberts who share a seat in one year but hold different seats in another (HD10 in 2024,
+      then HD10 and SD5 in 2025) are two people, not one.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/steve, year: 2024, office: state_house, district: '10', name_key: steve roberts}
+          - {alias_id: ocd-person/steve, year: 2025, office: state_house, district: '10', name_key: steve roberts}
+          - {alias_id: ocd-person/steven, year: 2024, office: state_house, district: '10', name_key: steven roberts}
+          - {alias_id: ocd-person/steven, year: 2025, office: state_senate, district: '5', name_key: steven roberts}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/steve, person_id: ocd-person/steve, basis: self}
+        - {alias_id: ocd-person/steven, person_id: ocd-person/steven, basis: self}
+
+  - name: person_ids_keep_given_name_variants_far_apart_apart
+    model: int_officials__person_ids
+    description: >
+      A Ken and a Kenneth Jamison separated by a gap of years, in different seats, are not joined on the name alone.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/ken, year: 2017, office: state_house, district: '15', name_key: ken jamison}
+          - {alias_id: ocd-person/ken, year: 2018, office: state_house, district: '15', name_key: ken jamison}
+          - {alias_id: ocd-person/kenneth, year: 2023, office: state_house, district: '40', name_key: kenneth jamison}
+          - {alias_id: ocd-person/kenneth, year: 2024, office: state_house, district: '40', name_key: kenneth jamison}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/ken, person_id: ocd-person/ken, basis: self}
+        - {alias_id: ocd-person/kenneth, person_id: ocd-person/kenneth, basis: self}
+
+  - name: person_ids_join_no_given_name_variant_with_two_candidates
+    model: int_officials__person_ids
+    description: >
+      "Sam Lee" could continue either "Samuel Lee" or "Sammy Lee": a name with more than one variant partner joins
+      nothing.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/sam, year: 2019, office: state_house, district: '1', name_key: sam lee}
+          - {alias_id: ocd-person/samuel, year: 2020, office: state_house, district: '1', name_key: samuel lee}
+          - {alias_id: ocd-person/sammy, year: 2020, office: state_house, district: '1', name_key: sammy lee}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/sam, person_id: ocd-person/sam, basis: self}
+        - {alias_id: ocd-person/samuel, person_id: ocd-person/samuel, basis: self}
+        - {alias_id: ocd-person/sammy, person_id: ocd-person/sammy, basis: self}
+
+  - name: person_ids_keep_a_signed_different_people_pair_apart_across_given_name_variants
+    model: int_officials__person_ids
+    description: >
+      A signed different_people link keeps a name out of the given-name variant rule too.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/steven, year: 2019, office: state_house, district: '77', name_key: steven roberts}
+          - {alias_id: ocd-person/steve, year: 2020, office: state_senate, district: '5', name_key: steve roberts}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: ocd-person/steven, person_id: ocd-person/steve, relation: different_people, checked_by: maintainer}
+    expect:
+      rows:
+        - {alias_id: ocd-person/steven, person_id: ocd-person/steven, basis: self}
+        - {alias_id: ocd-person/steve, person_id: ocd-person/steve, basis: self}
