@@ -15,9 +15,10 @@
 --                      fct_bias_indicators party_unity_pct sums the same counts, so the lifetime figure matches
 --                      the profile; the yearly figures appear with the award only.
 --                      Maverick (most_party_breaks) needs at least one break
--- Paired awards (the awards_pairs macro: attendance, committee money, party unity): each end takes at most
--- half of its ranked field (floor(field / 2)) so nobody is on both lists; an official the two lists would
--- still share through a tie is dropped from both
+-- Paired awards (the awards_pairs macro: attendance, party unity;
+-- each pair ranks one number over one field): each end's cutoff is at most half of its ranked field
+-- (floor(field / 2)) so nobody is on both lists; ties at the cutoff can add more. An official the two lists
+-- would still share through a tie is dropped from both
 with offices as (
     select
         official_id,
@@ -339,8 +340,9 @@ thresholds_by_award as (
 ),
 
 thresholds as (
-    -- the two ends of a pair (see the awards_pairs macro) are one ranking, so each takes at most half of its
-    -- ranked field: with a field of 6 and a cutoff of 5, nobody could sit in both top-5 lists. Ties at the cut
+    -- the two ends of a pair (see the awards_pairs macro) rank one number over one field, so each end's
+    -- cutoff is at most half of that field: with a field of 6 and a cutoff of 5, nobody could sit in both top-5
+    -- lists. Ties at the cut
     -- can still put one official in both; such an official is dropped from both (sits in the middle), see
     -- `contested`
     select

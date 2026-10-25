@@ -1,12 +1,13 @@
 {#-
-    The paired top/bottom awards of rpt_awards: each pair is two ends of one comparison (same order as
-    frontend/src/lib/exports/awardDefs.ts AWARD_PAIRS). An award in a pair takes at most half of its ranked
+    The paired top/bottom awards of rpt_awards: each pair is two ends of one ranking (same order as
+    frontend/src/lib/exports/awardDefs.ts AWARD_PAIRS, which only sets display order). Both awards of a pair must
+    rank the same number over the same field (same group_size per office and period; the singular test
+    assert_award_pairs_same_field checks it), so a pair is never a dollar award with a share award. An award in a pair takes at most half of its ranked
     field, and an official both lists would still share is dropped from both. An award in no pair is untouched.
 -#}
 {% macro awards_pairs() %}
     {{ return([
         ['lowest_attendance', 'highest_attendance'],
-        ['most_committee_money', 'least_committee_money_share'],
         ['most_party_breaks', 'most_party_loyal'],
     ]) }}
 {% endmacro %}

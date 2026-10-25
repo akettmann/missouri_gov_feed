@@ -546,7 +546,7 @@ models:
     description: >
       Number-based awards for the frontend: the top officials (ties share a rank; 5 by default, set per award
       by the awards_threshold var) on one measured number within one office, per calendar year and over all
-      loaded years ('lifetime'), each paired with its opposite: lowest/highest attendance (rpt_attendance,
+      loaded years ('lifetime'), each shown with its opposite: lowest/highest attendance (rpt_attendance,
       100+ recorded votes), most money from PACs, committees and parties / lowest share of it among officials
       raising $10,000+ (rpt_donor_rollup, medium name matches excluded; federal officials' share is per FEC
       two-year cycle, reported under the cycle's end year, over FEC total receipts from fct_federal_donor_summary,
@@ -554,7 +554,8 @@ models:
       their party (party unity from fct_party_unity_yearly, current chamber, per calendar year and lifetime, at
       least awards_min_party_line_votes party-line votes in the period (default 20); the lifetime figure equals
       the profile's party_unity_pct, the yearly figures appear with the award only). Most breaks needs at least
-      one break. The two ends of every pair each take at most half their ranked field (floor(group_size / 2)) so
+      one break. Only attendance and party unity are pairs (the two ends rank one number over one field); each end's
+      cutoff is at most half that field (floor(group_size / 2)), ties at the cutoff can add more, so
       no official is in both lists of a pair for one office and period; an official a tie at the cut would put
       in both is in neither. Only offices with awards_min_field_size
       (5) or more qualifying officials in the period. streak_years counts consecutive qualifying years. No
