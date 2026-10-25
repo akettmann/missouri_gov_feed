@@ -3,7 +3,7 @@
 // to its opposite, shows the number and what it's out of, and links to the profile with the sources.
 import Layout from "../layouts/Layout.astro";
 import { AWARD_PAIRS, AWARDS, awardLists, type AwardList } from "../lib/exports/awards";
-import { AWARD_ICONS, pluralOfficeLabel, singularOfficeLabel } from "../lib/awardBadges";
+import { AWARD_ICONS, outOfText, pluralOfficeLabel, singularOfficeLabel } from "../lib/awardBadges";
 import { count, money, pct, streakMarker } from "../lib/format";
 import { href } from "../lib/site";
 
@@ -19,14 +19,6 @@ const periods = [
 ];
 const byKey = new Map((lists ?? []).map((l) => [`${l.award}|${l.office}|${l.period}`, l]));
 const value = (award: string, v: number) => (AWARDS[award].unit === "money" ? money(v) : pct(v));
-const outOf = (award: string, n: number | null) =>
-  n == null
-    ? ""
-    : AWARDS[award].outOf === "votes"
-      ? `of ${count(n)} votes`
-      : AWARDS[award].outOf === "raised"
-        ? `of ${money(n)} raised`
-        : "";
 const defaultOffice = offices.includes("state_house") ? "state_house" : offices[0];
 ---
 
@@ -117,7 +109,7 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
                                     <span class="muted small"> {e.party ?? ""}</span>
                                     <span class="v">
                                       {value(list.award, e.metric)}{" "}
-                                      <span class="muted small">{outOf(list.award, e.sample_size)}</span>
+                                      <span class="muted small">{outOfText(list.award, e.sample_size)}</span>
                                     </span>
                                   </li>
                                 );
@@ -139,8 +131,8 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
         <p class="small muted">
           Icons beside an official's name elsewhere on the site mean they hold that award now (the lists above
           are the awards, so they leave the icons off): they rank within the award's cutoff among those with
-          the same office in the latest year loaded (party-break awards use all loaded years). X2, X3 and so
-          on is the number of qualifying years in a row. The icons are placeholders.
+          the same office in the latest year loaded. X2, X3 and so on is the number of qualifying years in a
+          row. The icons are placeholders.
         </p>
         <dl>
           {AWARD_PAIRS.flat().map((a) => (

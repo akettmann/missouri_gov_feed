@@ -81,6 +81,7 @@ package "marts" {
   [fct_lobbyist_gifts] as F_gifts
   [fct_disclosures\nfct_voluntary_disclosures] as F_disc
   [fct_bias_indicators] as F_bias
+  [fct_party_unity_yearly] as F_unity
   [fct_office_history] as F_office
   [fct_commercial_ties\nfct_family_ties] as F_ties
   [fct_legal_careers] as F_legal
@@ -128,7 +129,6 @@ L_vv --> F_votes
 L_vv --> F_bias
 I_votes --> I_party
 L_vv --> I_party
-I_party --> F_bias
 
 L_fec --> F_money
 L_tap --> I_mec
@@ -146,7 +146,9 @@ I_fd --> F_disc
 SEEDS --> F_disc
 
 L_sm --> F_bias
-F_votes --> F_bias
+F_votes --> F_unity
+I_party --> F_unity
+F_unity --> F_bias
 
 I_off --> F_office
 I_clpos --> F_office
@@ -227,7 +229,7 @@ R_subj --> EXP
 dim --> R_awards
 R_votes --> R_awards
 R_money --> R_awards
-F_bias --> R_awards
+F_unity --> R_awards
 R_awards --> EXP
 F_money --> R_size
 R_size --> EXP

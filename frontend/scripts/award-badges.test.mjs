@@ -144,6 +144,7 @@ test("metricText shows the number with what it is out of", () => {
   assert.equal(metricText("highest_attendance", 99.5, 678), "99.5% of 678 votes");
   assert.equal(metricText("most_committee_money", 50000, 80000), "$50,000 of $80,000 raised");
   assert.equal(metricText("most_party_breaks", 12.5, null), "12.5%");
+  assert.equal(metricText("most_party_breaks", 30.8, 26), "30.8% with party, of 26 party-line votes");
 });
 
 test("badge HTML: icon and X marker aria-hidden, same words as sr-only text, link to the award key", () => {
