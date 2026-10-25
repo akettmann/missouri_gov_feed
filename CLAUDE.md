@@ -14,6 +14,7 @@ DBT Core
 DuckDB backend
 Use compatible constructs from DBT to make switching backends possible
 linting: SqlFluff
+Optional inputs are gated by vars (`mec_direct`, `cl_case_bulk`): build with `mogov build`, or pass the vars when running bare `dbt` (the hook also runs for bare `dbt snapshot` / `dbt source freshness`; it fails the run if raw data exists but the var is off; opt out with `skip_optional_raw_check`)
 if useful, add dbt-utils and dbt-expectations to the DBT project
 Follow DBT's best practices https://docs.getdbt.com/best-practices?version=2
 Where possible, build tests that serve as "sanity checks". Example: We have never seen 200 roll calls in a day before, no campaign has received 1 trillion dollars

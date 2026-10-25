@@ -11,15 +11,13 @@
 --      people, while a single shared year is a hand-over between seats. A pair listed
 --      as different_people in official_id_links also keeps that whole name apart.
 --   3. otherwise the id is its own person, basis = self.
--- Among merged ids the person_id is the one serving in the latest year (so a current official keeps the id their
--- profile already has), then an Open States id over mohouse:, then the smaller id, so the choice is stable.
+-- Among merged ids the person_id is an Open States id over mohouse:, then the one whose service ends latest, then
+-- the smaller id. The choice never looks at the latest roster year, so an official's id does not change when they
+-- leave office.
+-- Curated rows (official_id_links) take effect only once a maintainer has signed them off (checked_by filled).
 -- Grain: one row per alias_id.
 with terms as (
     select * from {{ ref('int_officials__identity_terms') }}
-),
-
-latest as (
-    select max(year) as year from terms
 ),
 
 aliases as (
@@ -57,7 +55,7 @@ separated as (
     select distinct a.name_key
     from {{ ref('official_id_links') }} as l
     inner join aliases as a on l.alias_id = a.alias_id or l.person_id = a.alias_id
-    where l.relation = 'different_people'
+    where l.relation = 'different_people' and l.checked_by is not null
 ),
 
 keep_apart as (
@@ -73,13 +71,15 @@ ranked as (
         row_number() over (
             partition by a.name_key
             order by
-                case when a.last_year = l.year then 0 else 1 end,
                 a.is_openstates desc,
+                a.last_year desc,
                 a.alias_id asc
         ) as rn
     from aliases as a
-    cross join latest as l
-    where a.name_key not in (select k.name_key from keep_apart as k)
+    where not exists (
+        select 1 from keep_apart as k
+        where k.name_key = a.name_key
+    )
 ),
 
 name_person as (
@@ -95,7 +95,7 @@ same_person as (
         alias_id,
         person_id
     from {{ ref('official_id_links') }}
-    where relation = 'same_person'
+    where relation = 'same_person' and checked_by is not null
 )
 
 select

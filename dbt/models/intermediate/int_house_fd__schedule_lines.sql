@@ -46,8 +46,8 @@ select
     h.header_schedule as schedule,
     t.line_text,
     -- owner codes: SP spouse, DC dependent child, JT joint
-    {{ mogov.regex_extract('t.line_text', '(?:^| )(SP|DC|JT)(?: |$)') }} as owner_code,
-    {{ mogov.regex_extract('t.line_text', '(\\$[0-9,]+(?: - \\$[0-9,]+)?|Over \\$[0-9,]+|None)') }} as amount_range
+    {{ mogov.regex_extract('t.line_text', '(^| )(SP|DC|JT)( |$)', 2) }} as owner_code,
+    {{ mogov.regex_extract('t.line_text', '(\\$[0-9,]+( - \\$[0-9,]+)?|Over \\$[0-9,]+|None)') }} as amount_range
 from tagged as t
 inner join tagged as h on t.doc_id = h.doc_id and t.header_seq = h.seq
 where

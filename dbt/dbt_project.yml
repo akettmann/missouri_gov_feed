@@ -10,6 +10,10 @@ test-paths: ["tests"]
 target-path: "target"
 clean-targets: ["target", "dbt_packages"]
 
+# Fails a bare `dbt build` that would silently disable models whose raw data exists (macros/optional_inputs.sql).
+on-run-start:
+  - "{{ mogov.check_optional_inputs() }}"
+
 models:
   mogov:
     staging:

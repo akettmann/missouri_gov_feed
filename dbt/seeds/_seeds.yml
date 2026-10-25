@@ -173,6 +173,30 @@ seeds:
     columns:
       - name: position_title
         data_tests: [unique, not_null]
+  - name: sic_naics_sectors
+    description: >
+      Maps a SIC code prefix (1987 Standard Industrial Classification; two digits, the major group, or a longer
+      prefix where one group splits across sectors) to the first two digits of the NAICS sector it falls in, a
+      naics_sectors.naics_prefix. The longest matching prefix wins, so a 3- or 4-digit row overrides its major
+      group: 4953/4955/4959 (refuse, hazardous waste and other sanitary services) are 56 while the rest of 49 stays
+      utilities (22), including 4952 sewerage systems (NAICS 221320); 737 computer services is 54 with 7372, 7374 and
+      7375 (software, data processing, information retrieval) in 51; the 07 vet, animal and lawn/garden services, 27
+      publishing, 67 holding companies and patent lessors, 731 advertising and 735 equipment rental likewise. Rows
+      follow the Census Bureau's 1987 SIC to 2017 NAICS concordance. Major groups are coarser than NAICS industries,
+      so this gives a sector, never a NAICS code; groups that still straddle sectors (73 business services is
+      mostly 56 but also 51, 54 and 81 in places; 79 amusement, 80 health, 87 and 89 services) take the majority one. int_epa_frs__facilities uses it for sites whose FRS records carry a SIC code but no NAICS code.
+    config:
+      column_types: {sic_prefix: varchar, naics_prefix: varchar}
+    columns:
+      - name: sic_prefix
+        data_tests: [unique, not_null]
+      - name: naics_prefix
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('naics_sectors')
+                field: naics_prefix
   - name: official_id_links
     description: >
       Hand-kept links between the ids one legislator is known by (#97), applied by int_officials__person_ids on top of
@@ -180,8 +204,8 @@ seeds:
       person_id (a former legislator now a statewide officer or judge, whom the name rule leaves alone because they
       hold no legislative seat today). relation different_people: alias_id and person_id are two people who share a
       name; the name rule never merges that name, and the no-shared-name test accepts the pair. Every row records
-      its evidence. The links were made by an automated check; checked_by and checked_on stay empty until a
-      maintainer signs the row off.
+      its evidence. The links were made by an automated check and take effect only once a maintainer signs the
+      row off by filling checked_by and checked_on; unsigned rows are ignored by int_officials__person_ids.
     config:
       column_types:
         {alias_id: varchar, person_id: varchar, relation: varchar, basis: varchar, evidence: varchar,
