@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { donorEntries, donorLinkLabel, parseDonorLinks } from "../src/lib/donorLinks.ts";
+import { donorEntries, donorLinkIds, donorLinkLabel, parseDonorLinks } from "../src/lib/donorLinks.ts";
 
 const FEC = "https://www.fec.gov/data/disbursements/?committee_id=C00235739&recipient_name=C00000001";
 const MEC = "https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C221944";
@@ -58,4 +58,20 @@ test("donorEntries keeps a linked donor missing from donor_names and does not re
     { donor: "ACME", urls: [] },
     { donor: "OTHER", urls: [FEC] },
   ]);
+});
+
+test("donorLinkIds gives every link on a row, and every row, a distinct id pair", () => {
+  assert.deepEqual(donorLinkIds("site3", 1, 0), { nameId: "site3-d1-name", labelId: "site3-d1-l0" });
+  const ids = [];
+  for (const prefix of ["site0", "site1"])
+    for (let d = 0; d < 2; d++)
+      for (let u = 0; u < 2; u++) {
+        const { nameId, labelId } = donorLinkIds(prefix, d, u);
+        ids.push(labelId);
+        if (u === 0) ids.push(nameId);
+      }
+  assert.equal(new Set(ids).size, ids.length);
+  // the name id is shared by a donor's links; the label id is not
+  assert.equal(donorLinkIds("p", 0, 0).nameId, donorLinkIds("p", 0, 1).nameId);
+  assert.notEqual(donorLinkIds("p", 0, 0).labelId, donorLinkIds("p", 0, 1).labelId);
 });

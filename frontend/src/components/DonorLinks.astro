@@ -3,26 +3,38 @@
 // filed on (fct_jurisdiction_businesses.donor_links). The name is visible so sighted users can tell the links
 // apart (#248, #268); a donor with no page says "no link" instead of showing nothing.
 import SourceLink from "./SourceLink.astro";
-import { donorEntries, donorLinkLabel } from "../lib/donorLinks";
+import { donorEntries, donorLinkIds, donorLinkLabel } from "../lib/donorLinks";
 
 interface Props {
   donorNames: string | null | undefined;
   donorLinks: string | null | undefined;
+  /** unique per row on the page; builds the ids that give each link the donor's name as its accessible name */
+  idPrefix: string;
+  /** the donor's name is already shown beside this (one donor): keep it for screen readers, hide it visually */
+  hideName?: boolean;
 }
+const { idPrefix, hideName = false } = Astro.props;
 const entries = donorEntries(Astro.props.donorNames, Astro.props.donorLinks);
 ---
 
-{entries.map((e) => (
+{entries.map((e, di) => (
   <span class="donor-entry">
-    {e.donor}
-    {": "}
+    <span id={donorLinkIds(idPrefix, di, 0).nameId} class:list={{ "sr-only": hideName }}>
+      {e.donor}
+    </span>
+    {!hideName && ": "}
     {e.urls.length === 0 ? (
       <SourceLink url={null} />
     ) : (
       e.urls.map((u, i) => (
         <>
           {i > 0 && " · "}
-          <SourceLink url={u} label={donorLinkLabel(u)} />
+          <SourceLink
+            url={u}
+            label={donorLinkLabel(u)}
+            labelId={donorLinkIds(idPrefix, di, i).labelId}
+            labelledBy={`${donorLinkIds(idPrefix, di, i).nameId} ${donorLinkIds(idPrefix, di, i).labelId}`}
+          />
         </>
       ))
     )}

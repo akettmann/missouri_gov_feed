@@ -63,3 +63,16 @@ export function donorEntries(
     urls: links.filter((l) => l.donor === donor).map((l) => l.url),
   }));
 }
+
+/**
+ * DOM ids for one donor link: the donor-name span and the link-label span. The link is named by both
+ * (aria-labelledby="<nameId> <labelId>") so each reads "<donor> <label>" to a screen reader instead of every link
+ * on a multi-donor row sharing the same name (#268). `prefix` must be unique per row on the page.
+ */
+export function donorLinkIds(
+  prefix: string,
+  donorIndex: number,
+  urlIndex: number,
+): { nameId: string; labelId: string } {
+  return { nameId: `${prefix}-d${donorIndex}-name`, labelId: `${prefix}-d${donorIndex}-l${urlIndex}` };
+}
