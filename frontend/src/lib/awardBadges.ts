@@ -43,15 +43,15 @@ const orderOf = (award: string) => {
 };
 
 /**
- * What the number rests on, after the number: "of 1,203 votes", "of $5,000 raised", "on 26 party-line votes".
- * The party awards rank unity (the share cast with the official's own party), so they read "with party on".
+ * What the number rests on, after the number: "of 1,203 votes", "of $5,000 raised", "with party, of 26 party-line votes".
+ * The party awards rank unity (the share cast with the official's own party), so they read "with party, of N party-line votes".
  */
 export function outOfText(award: string, sampleSize: number | null): string {
   const outOf = AWARDS[award]?.outOf;
   if (sampleSize == null || !outOf) return "";
   if (outOf === "votes") return `of ${count(sampleSize)} votes`;
   if (outOf === "raised") return `of ${money(sampleSize)} raised`;
-  return `with party on ${count(sampleSize)} party-line votes`;
+  return `with party, of ${count(sampleSize)} party-line votes`;
 }
 
 /** "62.5% of 1,203 votes", the measured number with what it is out of. */
