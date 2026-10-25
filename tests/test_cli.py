@@ -92,3 +92,10 @@ def test_merge_user_vars_is_shallow_and_later_flag_wins():
     )
     assert rest == ["x"]
     assert merged == {"mec_direct": False, "cl_case_bulk": True, "a": 2, "n": {"q": 2}}
+
+
+def test_build_help_documents_vars_merge_semantics(monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["mogov", "build", "--help"])
+    with pytest.raises(SystemExit):
+        cli.main()
+    assert "merged (shallow)" in capsys.readouterr().out

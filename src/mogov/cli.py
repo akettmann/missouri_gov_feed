@@ -215,7 +215,8 @@ def _dump_vars(dbt_vars: dict) -> str:
     `var()` returns in dbt compared with passing the flag directly.
     """
 
-    return yaml.safe_dump(dbt_vars, default_flow_style=True, width=float("inf")).strip()
+    # width=inf keeps long values on one line; sort_keys=False keeps the user's key order
+    return yaml.safe_dump(dbt_vars, default_flow_style=True, width=float("inf"), sort_keys=False).strip()
 
 
 def run_dbt(args: list[str]) -> int:
@@ -265,11 +266,14 @@ def main() -> None:
     p_load.add_argument("sources", nargs="*")
     _shard_args(p_load)
     sub.add_parser("list", help="list loaders")
+    build_note = (
+        "A --vars YAML/JSON mapping is merged (shallow) with mogov's own mec_direct/cl_case_bulk: "
+        "your keys win, repeated --vars flags apply in order (later wins per key)"
+    )
     sub.add_parser(
         "build",
-        help="dbt build; extra arguments pass through to dbt (e.g. -s +fct_votes). "
-        "A --vars YAML/JSON mapping is merged (shallow) with mogov's own mec_direct/cl_case_bulk: "
-        "your keys win, repeated --vars flags apply in order (later wins per key)",
+        help="dbt build; extra arguments pass through to dbt (e.g. -s +fct_votes). " + build_note,
+        description="dbt build; extra arguments pass through to dbt (e.g. -s +fct_votes). " + build_note,
     )
     sub.add_parser("freshness", help="how long since each always-on loader last landed data (dbt source freshness)")
     p_export = sub.add_parser("export", help="write marts and reporting tables to data/exports/")
