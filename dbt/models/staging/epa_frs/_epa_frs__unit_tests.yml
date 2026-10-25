@@ -1,0 +1,89 @@
+# Unit tests for the U+FFFD name repair in the EPA FRS staging models (#260): fixed input rows -> exact rows.
+# Kept apart from the generated _epa_frs__models.yml so regenerating docs never touches them.
+version: 2
+
+unit_tests:
+  - name: epa_frs_facility_name_repaired_from_the_matching_alt_name
+    model: stg_epa_frs__facilities
+    description: >
+      A facility name with U+FFFD takes the one alternative name of the same registry id that equals it with each
+      run of U+FFFD standing for one character (a run of two replacement characters is still one letter). A name
+      with no U+FFFD is left alone even when its alternative names differ. Alternative names that do not fit the
+      damaged pattern (a longer name, another registry id) are not used: the U+FFFD is dropped instead. Two
+      different matching alternatives are ambiguous and repair nothing. The seed wins over an alternative name.
+      LIKE wildcards in a name match literally.
+    given:
+      - input: source('epa_frs', 'facilities')
+        format: sql
+        rows: |
+            select cast('{"REGISTRY_ID": "1", "PRIMARY_NAME": "D�COR PLUS"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "2", "PRIMARY_NAME": "MARBLE D��COR INC"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "3", "PRIMARY_NAME": "PLAIN NAME"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "4", "PRIMARY_NAME": "D�COR SHOP"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "5", "PRIMARY_NAME": "C�FE ONE"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "6", "PRIMARY_NAME": "100% �LL"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "7", "PRIMARY_NAME": "ZO� INC"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "8", "PRIMARY_NAME": "A_B �"}' as varchar) as payload, 'u' as source_url
+      - input: ref('stg_epa_frs__alt_names')
+        rows:
+          - {registry_id: '1', program_system: RCRAINFO, program_id: P1, alt_name: DECOR PLUS}
+          - {registry_id: '2', program_system: RCRAINFO, program_id: P2, alt_name: MARBLE DECOR INC}
+          - {registry_id: '3', program_system: RCRAINFO, program_id: P3, alt_name: OTHER NAME}
+          - {registry_id: '4', program_system: RCRAINFO, program_id: P4, alt_name: DECORATING SHOP}
+          - {registry_id: '4', program_system: RCRAINFO, program_id: P5, alt_name: ANOTHER SHOP}
+          - {registry_id: '5', program_system: RCRAINFO, program_id: P6, alt_name: CAFE ONE}
+          - {registry_id: '5', program_system: MO-DNR, program_id: P7, alt_name: CAFE ONE}
+          - {registry_id: '6', program_system: MO-DNR, program_id: P9, alt_name: 100% ALL}
+          - {registry_id: '7', program_system: MO-DNR, program_id: P10, alt_name: ZOE INC}
+          - {registry_id: '7', program_system: MO-DNR, program_id: P11, alt_name: ZOA INC}
+          - {registry_id: '8', program_system: MO-DNR, program_id: P12, alt_name: AXB C}
+          - {registry_id: '9', program_system: MO-DNR, program_id: P13, alt_name: DECOR SHOP}
+      - input: ref('epa_frs_name_corrections')
+        rows:
+          - {record_key: '5', field: facility_name, corrected_value: CAFE OVERRIDE, source: s}
+    expect:
+      rows:
+        - {registry_id: '1', facility_name: DECOR PLUS}
+        - {registry_id: '2', facility_name: MARBLE DECOR INC}
+        - {registry_id: '3', facility_name: PLAIN NAME}
+        - {registry_id: '4', facility_name: DCOR SHOP}
+        - {registry_id: '5', facility_name: CAFE OVERRIDE}
+        - {registry_id: '6', facility_name: 100% ALL}
+        - {registry_id: '7', facility_name: ZO INC}
+        - {registry_id: '8', facility_name: 'A_B '}
+
+  - name: epa_frs_org_name_repaired_from_the_alt_name_of_the_same_program_record
+    model: stg_epa_frs__organizations
+    description: >
+      An organization name with U+FFFD takes the alternative name on the same registry id, program system and
+      program id that fits the damaged pattern. The same text under another program record, or an alternative
+      name that does not fit the pattern, is not used: the U+FFFD is dropped instead.
+    given:
+      - input: source('epa_frs', 'organizations')
+        format: sql
+        rows: |
+            select cast('{"REGISTRY_ID": "1", "PGM_SYS_ACRNM": "RCRAINFO", "PGM_SYS_ID": "P1", "AFFILIATION_TYPE": "OWNER", "ORG_NAME": "D�COR PLUS"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "1", "PGM_SYS_ACRNM": "RCRAINFO", "PGM_SYS_ID": "P1", "AFFILIATION_TYPE": "OPERATOR", "ORG_NAME": "D�COR PLUS"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "2", "PGM_SYS_ACRNM": "RCRAINFO", "PGM_SYS_ID": "P2", "AFFILIATION_TYPE": "OWNER", "ORG_NAME": "D�COR PLUS"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "3", "PGM_SYS_ACRNM": "RCRAINFO", "PGM_SYS_ID": "P3", "AFFILIATION_TYPE": "OWNER", "ORG_NAME": "D�COR PLUS"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "4", "PGM_SYS_ACRNM": "RCRAINFO", "PGM_SYS_ID": "P4", "AFFILIATION_TYPE": "OWNER", "ORG_NAME": "ACME INC"}' as varchar) as payload, 'u' as source_url
+      - input: ref('stg_epa_frs__alt_names')
+        rows:
+          - {registry_id: '1', program_system: RCRAINFO, program_id: P1, alt_name: DECOR PLUS}
+          - {registry_id: '1', program_system: MO-DNR, program_id: P1, alt_name: DECOR PLUS WRONG}
+          - {registry_id: '2', program_system: MO-DNR, program_id: P2, alt_name: DECOR PLUS}
+          - {registry_id: '3', program_system: RCRAINFO, program_id: P3, alt_name: DECOR PLUS LLC}
+          - {registry_id: '4', program_system: RCRAINFO, program_id: P4, alt_name: ACME INCORPORATED}
+      - input: ref('epa_frs_name_corrections')
+        format: sql
+        rows: |
+            select cast(null as varchar) as record_key, cast(null as varchar) as field,
+                cast(null as varchar) as corrected_value, cast(null as varchar) as source
+            where false
+    expect:
+      rows:
+        - {registry_id: '1', program_system: RCRAINFO, program_id: P1, affiliation_type: OWNER, org_name: DECOR PLUS}
+        - {registry_id: '1', program_system: RCRAINFO, program_id: P1, affiliation_type: OPERATOR, org_name: DECOR PLUS}
+        - {registry_id: '2', program_system: RCRAINFO, program_id: P2, affiliation_type: OWNER, org_name: DCOR PLUS}
+        - {registry_id: '3', program_system: RCRAINFO, program_id: P3, affiliation_type: OWNER, org_name: DCOR PLUS}
+        - {registry_id: '4', program_system: RCRAINFO, program_id: P4, affiliation_type: OWNER, org_name: ACME INC}

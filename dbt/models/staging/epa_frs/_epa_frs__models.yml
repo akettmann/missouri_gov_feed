@@ -2,10 +2,17 @@
 # not this file, then regenerate.
 version: 2
 models:
+- name: stg_epa_frs__alt_names
+  description: 'One row per alternative name an EPA FRS program record gives a facility (MO_ALTERNATIVE_NAME_FILE):
+    the program system''s own spelling of the site name. EPA pads some names with trailing spaces; alt_name is trimmed.
+    Staging of facilities and organizations uses these to repair names where EPA''s file lost a letter to U+FFFD.
+    Malformed CSV rows (no REGISTRY_ID) and blank names are left out.'
 - name: stg_epa_frs__facilities
   description: 'One row per EPA FRS facility in Missouri: name, street address, county, coordinates (NAD83; missing
     for about a third of the sites) and the federal agency for federal sites. Malformed CSV rows (no REGISTRY_ID)
-    are left out.'
+    are left out. A name that still has U+FFFD (EPA lost a letter) is taken from the epa_frs_name_corrections seed
+    if it has a row, else from the one alternative name of the same registry id that equals it with each run of
+    U+FFFD standing for one character; failing both, the U+FFFD is dropped.'
 - name: stg_epa_frs__naics
   description: One row per NAICS code an EPA FRS program record gives a facility. is_primary marks the program's
     primary code (PRIMARY_INDICATOR); is_secondary the ones FRS calls SECONDARY; the rest are UNKNOWN. A facility
@@ -13,7 +20,10 @@ models:
 - name: stg_epa_frs__organizations
   description: 'One row per organization affiliated with an EPA FRS facility through one program record: owner,
     operator, parent company, contacts... org_type is mostly UNKNOWN; PRIVATE, MUNICIPAL, STATE, FEDERAL, DISTRICT
-    and COUNTY are the common known values. Malformed CSV rows (no REGISTRY_ID) are left out.'
+    and COUNTY are the common known values. Malformed CSV rows (no REGISTRY_ID) are left out. A name that still
+    has U+FFFD (EPA lost a letter) is taken from the epa_frs_name_corrections seed if it has a row, else from the
+    one alternative name of the same registry id and program record that equals it with each run of U+FFFD standing
+    for one character; failing both, the U+FFFD is dropped.'
 - name: stg_epa_frs__sic
   description: One row per SIC code (1987 Standard Industrial Classification, four digits) an EPA FRS program record
     gives a facility. is_primary marks the program's primary code (PRIMARY_INDICATOR); is_secondary the ones FRS
