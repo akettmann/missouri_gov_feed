@@ -177,3 +177,36 @@ test("medium years are flagged in the table and the profile has a total without 
   assert.match(section, /<ConfidenceBadge/);
   assert.match(section, /totalWithoutMedium\(/);
 });
+
+test("year rows must add up to the dbt total, else the mismatch names the official", async () => {
+  const { payYearsMismatch, payYearsProblems } = await import("../src/lib/attendancePay.ts");
+  const att = [
+    session("state_house", "2021-01-06", "2021-05-14"),
+    session("state_house", "2022-01-05", "2022-05-13"),
+  ];
+  const two = { voting_years: 2, covered_years: 2 };
+  const ok = [
+    pay("state_house", "2021"),
+    pay("state_house", "2022"),
+    pay("state_house", "covered years", two),
+  ];
+  const [block] = payPerVoteBlocks(att, ok);
+  assert.equal(payYearsMismatch(block), null);
+  // stale rpt_attendance: the chart lacks 2021, but the total still covers 2021-2022
+  const [stale] = payPerVoteBlocks([att[1]], ok);
+  assert.match(payYearsMismatch(stale), /1 year rows \(1 with pay\) but the total covers 2 of 2/);
+  // a year without pay is fine as long as the total says so
+  const gap = [
+    pay("state_house", "2021", noPay),
+    pay("state_house", "2022"),
+    pay("state_house", "covered years", { voting_years: 2, covered_years: 1 }),
+  ];
+  assert.equal(payYearsMismatch(payPerVoteBlocks(att, gap)[0]), null);
+  const bundle = (name, a) => ({
+    official: { full_name: name, official_id: "x" },
+    voting: { attendance: a, attendance_pay: ok },
+  });
+  const problems = payYearsProblems([bundle("Good Person", att), bundle("Bennie Cook", [att[1]])]);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /^Bennie Cook/);
+});
