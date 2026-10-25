@@ -201,7 +201,7 @@ const path = (polygons: Ring[][]) =>
       setMode(null);
       if (point) {
         placePin(...point);
-        status.textContent = `Restored from link. ${status.textContent}`;
+        status.textContent = `Restored from link. ${status.textContent}${/[.!?]$/.test(status.textContent ?? "") ? "" : "."}`;
       }
       showResults();
     } else if (sel.kind === "county") {
