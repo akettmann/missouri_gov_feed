@@ -397,7 +397,7 @@ models:
       - name: source_record_id
         data_type: varchar
         description: >
-          The source row's own identity, prefixed by its feed: `fec:` (FEC sub_id), `tap:` (TAP expenditure id, or for TAP contributions the staged `record_id`, TAP's own id (txn or cd1_a_id), deduplicated in staging because TAP loaded some transactions twice and exports two overlapping layouts), `mec_cd1_a:` / `mec_cd3_c:` (MEC export record ids).
+          The source row's own identity, prefixed by its feed: `fec:` (FEC sub_id), `tap_contrib:` (TAP contribution: the staged `record_id`, TAP's own id (txn or cd1_a_id), deduplicated in staging because TAP loaded some transactions twice and exports two overlapping layouts), `tap_cd3_b:` (TAP expenditure id, cd3_b_id), `mec_cd1_a:` / `mec_cd3_c:` (MEC export record ids). Contribution and expenditure ids are separate id spaces, so each gets its own prefix and a raw id can't collide across them.
         data_tests: [not_null]
       - name: counterparty_mec_committee_id
         data_type: varchar
@@ -843,7 +843,15 @@ models:
         description: Date paid, as reported.
       - name: amount
         data_type: decimal(28,6)
-        description: USD. Negative values are refunds/corrections as filed.
+        description: >
+          USD. Negative values are refunds/corrections as filed. Sanity bound: fails at $10M either way
+          (largest through 2026: $1,041,631.57; smallest $0), same bound as fct_campaign_finance.amount.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -10000000
+                max_value: 10000000
+                inclusive: false
       - name: payee_name
         data_type: varchar
         description: Who was paid (company, or person's name).
@@ -877,7 +885,7 @@ models:
       - name: source_record_id
         data_type: varchar
         description: >
-          The MEC expenditure record id (`tap:` TAP cd3_b_id, `mec_cd3_b:` MEC export). Part of the grain with official_id because a committee can be attributed to several officials.
+          The MEC expenditure record id (`tap_cd3_b:` TAP cd3_b_id, `mec_cd3_b:` MEC export). Part of the grain with official_id because a committee can be attributed to several officials.
         data_tests: [not_null]
 
   - name: fct_campaign_reports
