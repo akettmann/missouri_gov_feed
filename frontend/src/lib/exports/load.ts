@@ -288,7 +288,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
           select official_id, chamber, period, cast(calendar_year as integer) as calendar_year,
                  cast(voting_years as integer) as voting_years, cast(covered_years as integer) as covered_years,
                  cast(votes_recorded as integer) as votes_recorded, cast(votes_attended as integer) as votes_attended,
-                 cast(pay_amount as double) as pay_amount, pay_basis, pay_source_url, dollars_per_vote_attended
+                 cast(pay_amount as double) as pay_amount, pay_basis, match_confidence, pay_source_url, dollars_per_vote_attended
           from {rpt_attendance_pay} order by calendar_year`),
       )
     : null;

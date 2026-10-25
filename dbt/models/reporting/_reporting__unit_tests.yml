@@ -316,7 +316,8 @@ unit_tests:
       leadership title) are summed: $4,000 / 2 = $2,000. e: 2016 votes without pay stay out of the total,
       which covers 2017-2018 only: $3,000 / 6 attended = $500, with 2 of 3 voting years covered. f: a
       representative who became a senator the same year: each chamber's votes are paid by its own position.
-      g: a statutory salary for a year not over yet (2099) is not counted. h: pay for a position that casts
+      d's second pay row is a name-only (medium) match, so d's year and total are medium; e: 2017 is medium and
+      2018 high, so the total is medium. a, f and g stay high. g: a statutory salary for a year not over yet (2099) is not counted. h: pay for a position that casts
       no votes (a judge) is ignored.
     given:
       - input: ref('fct_votes')
@@ -349,34 +350,34 @@ unit_tests:
           - {official_id: g, chamber: us_house, session_code: '999', vote_date: 2020-02-01, vote_cast: yea}
       - input: ref('fct_salaries')
         rows:
-          - {official_id: a, calendar_year: 2021, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, pay: 5000, pay_basis: gross pay, source_url: 'https://pay.example/a'}
+          - {official_id: a, calendar_year: 2021, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, pay: 5000, pay_basis: gross pay, match_confidence: high, source_url: 'https://pay.example/a'}
           - {official_id: b, calendar_year: 2021, agency_name: LEGISLATURE, position_title: SENATOR, pay: 1000, pay_basis: gross pay}
           - {official_id: d, calendar_year: 2022, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, pay: 3000, pay_basis: gross pay}
-          - {official_id: d, calendar_year: 2022, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE-SPEAKER, pay: 1000, pay_basis: gross pay}
-          - {official_id: e, calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, pay: 1000, pay_basis: gross pay}
-          - {official_id: e, calendar_year: 2018, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, pay: 2000, pay_basis: gross pay}
+          - {official_id: d, calendar_year: 2022, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE-SPEAKER, pay: 1000, pay_basis: gross pay, match_confidence: medium}
+          - {official_id: e, calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, pay: 1000, pay_basis: gross pay, match_confidence: medium}
+          - {official_id: e, calendar_year: 2018, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, pay: 2000, pay_basis: gross pay, match_confidence: high}
           - {official_id: f, calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, pay: 1000, pay_basis: gross pay}
           - {official_id: f, calendar_year: 2023, agency_name: LEGISLATURE, position_title: SENATOR, pay: 4000, pay_basis: gross pay}
-          - {official_id: g, calendar_year: 2099, agency_name: U.S. CONGRESS, position_title: U.S. REPRESENTATIVE, pay: 174000, pay_basis: statutory salary}
-          - {official_id: g, calendar_year: 2020, agency_name: U.S. CONGRESS, position_title: U.S. REPRESENTATIVE, pay: 174000, pay_basis: statutory salary}
+          - {official_id: g, calendar_year: 2099, agency_name: U.S. CONGRESS, position_title: U.S. REPRESENTATIVE, pay: 174000, pay_basis: statutory salary, match_confidence: high}
+          - {official_id: g, calendar_year: 2020, agency_name: U.S. CONGRESS, position_title: U.S. REPRESENTATIVE, pay: 174000, pay_basis: statutory salary, match_confidence: high}
           - {official_id: h, calendar_year: 2021, agency_name: JUDICIARY, position_title: CIRCUIT JUDGE, pay: 9999, pay_basis: gross pay}
     expect:
       rows:
-        - {official_id: a, chamber: state_house, period: '2021', calendar_year: 2021, voting_years: 1, covered_years: 1, votes_recorded: 7, votes_attended: 5, pay_amount: 5000, pay_basis: gross pay, pay_source_url: 'https://pay.example/a', dollars_per_vote_attended: 1000}
-        - {official_id: a, chamber: state_house, period: covered years, calendar_year: null, voting_years: 1, covered_years: 1, votes_recorded: 7, votes_attended: 5, pay_amount: 5000, pay_basis: gross pay, pay_source_url: 'https://pay.example/a', dollars_per_vote_attended: 1000}
-        - {official_id: b, chamber: state_senate, period: '2021', calendar_year: 2021, voting_years: 1, covered_years: 1, votes_recorded: 2, votes_attended: 0, pay_amount: 1000, pay_basis: gross pay, pay_source_url: null, dollars_per_vote_attended: null}
-        - {official_id: b, chamber: state_senate, period: covered years, calendar_year: null, voting_years: 1, covered_years: 1, votes_recorded: 2, votes_attended: 0, pay_amount: 1000, pay_basis: gross pay, pay_source_url: null, dollars_per_vote_attended: null}
-        - {official_id: c, chamber: state_house, period: '2016', calendar_year: 2016, voting_years: 1, covered_years: 0, votes_recorded: 1, votes_attended: 1, pay_amount: null, pay_basis: null, pay_source_url: null, dollars_per_vote_attended: null}
-        - {official_id: d, chamber: state_house, period: '2022', calendar_year: 2022, voting_years: 1, covered_years: 1, votes_recorded: 2, votes_attended: 2, pay_amount: 4000, pay_basis: gross pay, pay_source_url: null, dollars_per_vote_attended: 2000}
-        - {official_id: d, chamber: state_house, period: covered years, calendar_year: null, voting_years: 1, covered_years: 1, votes_recorded: 2, votes_attended: 2, pay_amount: 4000, pay_basis: gross pay, pay_source_url: null, dollars_per_vote_attended: 2000}
-        - {official_id: e, chamber: state_house, period: '2016', calendar_year: 2016, voting_years: 1, covered_years: 0, votes_recorded: 3, votes_attended: 3, pay_amount: null, pay_basis: null, pay_source_url: null, dollars_per_vote_attended: null}
-        - {official_id: e, chamber: state_house, period: '2017', calendar_year: 2017, voting_years: 1, covered_years: 1, votes_recorded: 2, votes_attended: 2, pay_amount: 1000, pay_basis: gross pay, pay_source_url: null, dollars_per_vote_attended: 500}
-        - {official_id: e, chamber: state_house, period: '2018', calendar_year: 2018, voting_years: 1, covered_years: 1, votes_recorded: 4, votes_attended: 4, pay_amount: 2000, pay_basis: gross pay, pay_source_url: null, dollars_per_vote_attended: 500}
-        - {official_id: e, chamber: state_house, period: covered years, calendar_year: null, voting_years: 3, covered_years: 2, votes_recorded: 6, votes_attended: 6, pay_amount: 3000, pay_basis: gross pay, pay_source_url: null, dollars_per_vote_attended: 500}
-        - {official_id: f, chamber: state_house, period: '2023', calendar_year: 2023, voting_years: 1, covered_years: 1, votes_recorded: 2, votes_attended: 2, pay_amount: 1000, pay_basis: gross pay, pay_source_url: null, dollars_per_vote_attended: 500}
-        - {official_id: f, chamber: state_house, period: covered years, calendar_year: null, voting_years: 1, covered_years: 1, votes_recorded: 2, votes_attended: 2, pay_amount: 1000, pay_basis: gross pay, pay_source_url: null, dollars_per_vote_attended: 500}
-        - {official_id: f, chamber: state_senate, period: '2023', calendar_year: 2023, voting_years: 1, covered_years: 1, votes_recorded: 1, votes_attended: 1, pay_amount: 4000, pay_basis: gross pay, pay_source_url: null, dollars_per_vote_attended: 4000}
-        - {official_id: f, chamber: state_senate, period: covered years, calendar_year: null, voting_years: 1, covered_years: 1, votes_recorded: 1, votes_attended: 1, pay_amount: 4000, pay_basis: gross pay, pay_source_url: null, dollars_per_vote_attended: 4000}
-        - {official_id: g, chamber: us_house, period: '2020', calendar_year: 2020, voting_years: 1, covered_years: 1, votes_recorded: 1, votes_attended: 1, pay_amount: 174000, pay_basis: statutory salary, pay_source_url: null, dollars_per_vote_attended: 174000}
-        - {official_id: g, chamber: us_house, period: '2099', calendar_year: 2099, voting_years: 1, covered_years: 0, votes_recorded: 1, votes_attended: 1, pay_amount: null, pay_basis: null, pay_source_url: null, dollars_per_vote_attended: null}
-        - {official_id: g, chamber: us_house, period: covered years, calendar_year: null, voting_years: 2, covered_years: 1, votes_recorded: 1, votes_attended: 1, pay_amount: 174000, pay_basis: statutory salary, pay_source_url: null, dollars_per_vote_attended: 174000}
+        - {official_id: a, chamber: state_house, period: '2021', calendar_year: 2021, voting_years: 1, covered_years: 1, votes_recorded: 7, votes_attended: 5, pay_amount: 5000, pay_basis: gross pay, match_confidence: high, pay_source_url: 'https://pay.example/a', dollars_per_vote_attended: 1000}
+        - {official_id: a, chamber: state_house, period: covered years, calendar_year: null, voting_years: 1, covered_years: 1, votes_recorded: 7, votes_attended: 5, pay_amount: 5000, pay_basis: gross pay, match_confidence: high, pay_source_url: 'https://pay.example/a', dollars_per_vote_attended: 1000}
+        - {official_id: b, chamber: state_senate, period: '2021', calendar_year: 2021, voting_years: 1, covered_years: 1, votes_recorded: 2, votes_attended: 0, pay_amount: 1000, pay_basis: gross pay, match_confidence: high, pay_source_url: null, dollars_per_vote_attended: null}
+        - {official_id: b, chamber: state_senate, period: covered years, calendar_year: null, voting_years: 1, covered_years: 1, votes_recorded: 2, votes_attended: 0, pay_amount: 1000, pay_basis: gross pay, match_confidence: high, pay_source_url: null, dollars_per_vote_attended: null}
+        - {official_id: c, chamber: state_house, period: '2016', calendar_year: 2016, voting_years: 1, covered_years: 0, votes_recorded: 1, votes_attended: 1, pay_amount: null, pay_basis: null, match_confidence: null, pay_source_url: null, dollars_per_vote_attended: null}
+        - {official_id: d, chamber: state_house, period: '2022', calendar_year: 2022, voting_years: 1, covered_years: 1, votes_recorded: 2, votes_attended: 2, pay_amount: 4000, pay_basis: gross pay, match_confidence: medium, pay_source_url: null, dollars_per_vote_attended: 2000}
+        - {official_id: d, chamber: state_house, period: covered years, calendar_year: null, voting_years: 1, covered_years: 1, votes_recorded: 2, votes_attended: 2, pay_amount: 4000, pay_basis: gross pay, match_confidence: medium, pay_source_url: null, dollars_per_vote_attended: 2000}
+        - {official_id: e, chamber: state_house, period: '2016', calendar_year: 2016, voting_years: 1, covered_years: 0, votes_recorded: 3, votes_attended: 3, pay_amount: null, pay_basis: null, match_confidence: null, pay_source_url: null, dollars_per_vote_attended: null}
+        - {official_id: e, chamber: state_house, period: '2017', calendar_year: 2017, voting_years: 1, covered_years: 1, votes_recorded: 2, votes_attended: 2, pay_amount: 1000, pay_basis: gross pay, match_confidence: medium, pay_source_url: null, dollars_per_vote_attended: 500}
+        - {official_id: e, chamber: state_house, period: '2018', calendar_year: 2018, voting_years: 1, covered_years: 1, votes_recorded: 4, votes_attended: 4, pay_amount: 2000, pay_basis: gross pay, match_confidence: high, pay_source_url: null, dollars_per_vote_attended: 500}
+        - {official_id: e, chamber: state_house, period: covered years, calendar_year: null, voting_years: 3, covered_years: 2, votes_recorded: 6, votes_attended: 6, pay_amount: 3000, pay_basis: gross pay, match_confidence: medium, pay_source_url: null, dollars_per_vote_attended: 500}
+        - {official_id: f, chamber: state_house, period: '2023', calendar_year: 2023, voting_years: 1, covered_years: 1, votes_recorded: 2, votes_attended: 2, pay_amount: 1000, pay_basis: gross pay, match_confidence: high, pay_source_url: null, dollars_per_vote_attended: 500}
+        - {official_id: f, chamber: state_house, period: covered years, calendar_year: null, voting_years: 1, covered_years: 1, votes_recorded: 2, votes_attended: 2, pay_amount: 1000, pay_basis: gross pay, match_confidence: high, pay_source_url: null, dollars_per_vote_attended: 500}
+        - {official_id: f, chamber: state_senate, period: '2023', calendar_year: 2023, voting_years: 1, covered_years: 1, votes_recorded: 1, votes_attended: 1, pay_amount: 4000, pay_basis: gross pay, match_confidence: high, pay_source_url: null, dollars_per_vote_attended: 4000}
+        - {official_id: f, chamber: state_senate, period: covered years, calendar_year: null, voting_years: 1, covered_years: 1, votes_recorded: 1, votes_attended: 1, pay_amount: 4000, pay_basis: gross pay, match_confidence: high, pay_source_url: null, dollars_per_vote_attended: 4000}
+        - {official_id: g, chamber: us_house, period: '2020', calendar_year: 2020, voting_years: 1, covered_years: 1, votes_recorded: 1, votes_attended: 1, pay_amount: 174000, pay_basis: statutory salary, match_confidence: high, pay_source_url: null, dollars_per_vote_attended: 174000}
+        - {official_id: g, chamber: us_house, period: '2099', calendar_year: 2099, voting_years: 1, covered_years: 0, votes_recorded: 1, votes_attended: 1, pay_amount: null, pay_basis: null, match_confidence: null, pay_source_url: null, dollars_per_vote_attended: null}
+        - {official_id: g, chamber: us_house, period: covered years, calendar_year: null, voting_years: 2, covered_years: 1, votes_recorded: 1, votes_attended: 1, pay_amount: 174000, pay_basis: statutory salary, match_confidence: high, pay_source_url: null, dollars_per_vote_attended: 174000}

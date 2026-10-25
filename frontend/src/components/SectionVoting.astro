@@ -2,9 +2,16 @@
 // Section B: voting record. Party loyalty (the votes where the official broke with their own party's majority)
 // and attendance per session against the chamber. Both are counts from recorded roll calls, not judgments.
 import type { OfficialBundle } from "../lib/exports/types";
-import { coverageNote, dollars, payBasisText, payPerVoteBlocks } from "../lib/attendancePay";
+import {
+  coverageNote,
+  dollars,
+  payBasisText,
+  payPerVoteBlocks,
+  totalWithoutMedium,
+} from "../lib/attendancePay";
 import { count, sessionLabel, statusKind } from "../lib/format";
 import { href } from "../lib/site";
+import ConfidenceBadge from "./ConfidenceBadge.astro";
 import SourceLink from "./SourceLink.astro";
 import Viz from "./Viz.astro";
 
@@ -26,6 +33,8 @@ const CHAMBER_NAMES: Record<string, string> = {
 };
 // the pay table covers the same sessions as the chart above it: it is built from the chart's own rows
 const payBlocks = payPerVoteBlocks(voting.attendance ?? [], voting.attendance_pay ?? []);
+// the total again without the "possible match" years, shown instead of the full total when they are hidden
+const sure = (block: (typeof payBlocks)[number]) => totalWithoutMedium(block.years);
 const tally = (yea: number | null, nay: number | null) => (yea == null ? "—" : `${yea}–${nay ?? 0}`);
 ---
 
@@ -141,8 +150,10 @@ const tally = (yea: number | null, nay: number | null) => (yea == null ? "—" :
                     </thead>
                     <tbody>
                       {block.years.map((y) => (
-                        <tr>
-                          <td>{y.period}</td>
+                        <tr data-confidence={y.match_confidence === "medium" ? "medium" : undefined}>
+                          <td>
+                            {y.period} <ConfidenceBadge confidence={y.match_confidence} />
+                          </td>
                           <td class="num">{dollars(y.pay_amount)}</td>
                           <td class="num">{count(y.votes_attended)}</td>
                           <td class="num">
@@ -156,21 +167,47 @@ const tally = (yea: number | null, nay: number | null) => (yea == null ? "—" :
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr>
-                        <th>Years with pay and votes</th>
+                      <tr class={block.total.match_confidence === "medium" ? "total-all" : undefined}>
+                        <th>
+                          Years with pay and votes{" "}
+                          <ConfidenceBadge confidence={block.total.match_confidence} />
+                        </th>
                         <td class="num">{dollars(block.total.pay_amount)}</td>
                         <td class="num">{count(block.total.votes_attended)}</td>
                         <td class="num">
                           <strong>{dollars(block.total.dollars_per_vote_attended)}</strong>
                         </td>
                       </tr>
+                      {block.total.match_confidence === "medium" && (
+                        <tr class="total-sure">
+                          <th>Years with pay and votes, without possible matches</th>
+                          <td class="num">{dollars(sure(block).pay_amount)}</td>
+                          <td class="num">{count(sure(block).votes_attended)}</td>
+                          <td class="num">
+                            <strong>{dollars(sure(block).dollars_per_vote_attended)}</strong>
+                          </td>
+                        </tr>
+                      )}
                     </tfoot>
                   </table>
                 </div>
                 <p class="small muted">
-                  Pay is {payBasisText(block.basis)} divided by the votes in that calendar year where the
-                  official voted yea, nay or present. The total covers {coverageNote(block.total)}.{" "}
-                  <SourceLink url={block.sourceUrl} label="pay source" />�{" "}
+                  Pay per vote attended is {payBasisText(block.basis)} divided by the votes in that calendar
+                  year where the official voted yea, nay or present. The total covers{" "}
+                  <span class={block.total.match_confidence === "medium" ? "total-all" : undefined}>
+                    {coverageNote(block.total)}
+                  </span>
+                  {block.total.match_confidence === "medium" && (
+                    <span class="total-sure">{coverageNote(sure(block))}</span>
+                  )}
+                  .{" "}
+                  {block.basis === "statutory salary" && (
+                    <>
+                      A partial year of service still counts the full annual salary, which inflates that
+                      year.{" "}
+                    </>
+                  )}
+                  <SourceLink url={block.sourceUrl} label="pay source" /> ·{" "}
                   <a href={href("/methodology/#pay-per-vote")}>How pay per vote is counted</a>.
                 </p>
               </>
@@ -190,6 +227,15 @@ const tally = (yea: number | null, nay: number | null) => (yea == null ? "—" :
 </section>
 
 <style>
+  .total-sure {
+    display: none;
+  }
+  :global(html.hide-medium) .total-sure {
+    display: revert;
+  }
+  :global(html.hide-medium) .total-all {
+    display: none;
+  }
   .nowrap {
     white-space: nowrap;
   }

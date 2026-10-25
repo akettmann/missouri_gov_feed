@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { coverageNote, dollars, payBasisText, payPerVoteBlocks } from "../src/lib/attendancePay.ts";
+import {
+  coverageNote,
+  dollars,
+  payBasisText,
+  payPerVoteBlocks,
+  totalWithoutMedium,
+} from "../src/lib/attendancePay.ts";
 
 const pay = (chamber, period, extra = {}) => ({
   chamber,
@@ -14,10 +20,17 @@ const pay = (chamber, period, extra = {}) => ({
   pay_amount: 50000,
   pay_basis: "gross pay",
   pay_source_url: "https://pay.example/",
+  match_confidence: "high",
   dollars_per_vote_attended: 1000,
   ...extra,
 });
-const noPay = { pay_amount: null, pay_basis: null, pay_source_url: null, dollars_per_vote_attended: null };
+const noPay = {
+  match_confidence: null,
+  pay_amount: null,
+  pay_basis: null,
+  pay_source_url: null,
+  dollars_per_vote_attended: null,
+};
 const session = (chamber, first, last) => ({ chamber, first_vote_date: first, last_vote_date: last });
 
 test("the table covers exactly the years of the sessions the chart shows", () => {
@@ -112,4 +125,32 @@ test("the profile section renders the table from the pay rows and links the meth
   const section = readFileSync(new URL("../src/components/SectionVoting.astro", import.meta.url), "utf8");
   assert.match(section, /payPerVoteBlocks\(/);
   assert.match(section, /methodology\/#pay-per-vote/);
+});
+
+test("hiding possible matches recomputes the total from the visible years", () => {
+  const years = [
+    pay("state_house", "2019", { pay_amount: 10000, votes_attended: 10 }),
+    pay("state_house", "2020", { pay_amount: 30000, votes_attended: 10, match_confidence: "medium" }),
+    pay("state_house", "2021", { pay_amount: 6000, votes_attended: 4 }),
+    pay("state_house", "2016", noPay),
+  ];
+  const t = totalWithoutMedium(years);
+  assert.equal(t.pay_amount, 16000);
+  assert.equal(t.votes_attended, 14);
+  assert.equal(t.dollars_per_vote_attended, 1142.86);
+  // 3 visible voting years (2016, 2019, 2021), 2 of them with pay
+  assert.deepEqual([t.voting_years, t.covered_years], [3, 2]);
+});
+
+test("when every year is a possible match the hidden total has no figure", () => {
+  const t = totalWithoutMedium([pay("state_house", "2020", { match_confidence: "medium" })]);
+  assert.equal(t.pay_amount, null);
+  assert.equal(t.dollars_per_vote_attended, null);
+});
+
+test("medium years are flagged in the table and the profile has a total without them", () => {
+  const section = readFileSync(new URL("../src/components/SectionVoting.astro", import.meta.url), "utf8");
+  assert.match(section, /data-confidence=\{y\.match_confidence === "medium"/);
+  assert.match(section, /<ConfidenceBadge/);
+  assert.match(section, /totalWithoutMedium\(/);
 });

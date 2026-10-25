@@ -14,6 +14,9 @@
 -- payroll starts in 2017) has a null pay and stays out of the total, which says how many of the years it
 -- covers (covered_years of voting_years). Zero attended votes in the covered years gives a null figure, not
 -- infinity.
+-- match_confidence is the lowest of the pay rows summed into the row ('medium' = a payroll name matched
+-- by first-name prefix only, so the pay may be someone else's); null when there is no pay. The frontend flags
+-- medium rows and, when they are hidden, drops them from the total.
 with votes as (
     select
         official_id,
@@ -37,6 +40,7 @@ pay as (
         end as chamber,
         pay_basis,
         pay,
+        match_confidence,
         source_url
     from {{ ref('fct_salaries') }}
 ),
@@ -48,6 +52,9 @@ pay_by_year as (
         calendar_year,
         sum(pay) as pay_amount,
         min(pay_basis) as pay_basis,
+        -- the weakest link: one name-only payroll match makes the year's pay 'medium'
+        case when min(case when match_confidence = 'medium' then 0 else 1 end) = 0 then 'medium' else 'high' end
+            as match_confidence,
         min(source_url) as pay_source_url
     from pay
     where
@@ -67,6 +74,7 @@ yearly as (
         v.votes_attended,
         p.pay_amount,
         p.pay_basis,
+        p.match_confidence,
         p.pay_source_url
     from votes as v
     left join pay_by_year as p
@@ -88,6 +96,7 @@ year_rows as (
         votes_attended,
         pay_amount,
         pay_basis,
+        match_confidence,
         pay_source_url
     from yearly
 ),
@@ -104,6 +113,8 @@ total_rows as (
         sum(case when pay_amount is null then 0 else votes_attended end) as votes_attended,
         sum(pay_amount) as pay_amount,
         min(pay_basis) as pay_basis,
+        case when min(case when match_confidence = 'medium' then 0 else 1 end) = 0 then 'medium' else 'high' end
+            as match_confidence,
         min(pay_source_url) as pay_source_url
     from yearly
     group by official_id, chamber
@@ -127,6 +138,7 @@ select
     votes_attended,
     pay_amount,
     pay_basis,
+    match_confidence,
     pay_source_url,
     case
         when pay_amount is null or votes_attended = 0 then null

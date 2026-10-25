@@ -14,6 +14,8 @@ export interface PayVoteRow {
   pay_amount: number | null;
   pay_basis: string | null;
   pay_source_url: string | null;
+  /** lowest match_confidence of the payroll rows behind pay_amount; "medium" = matched by name only */
+  match_confidence: string | null;
   dollars_per_vote_attended: number | null;
 }
 
@@ -68,6 +70,29 @@ export function payPerVoteBlocks(
     });
   }
   return blocks;
+}
+
+/**
+ * The total again with the "possible match" years left out, for when the reader hides medium matches: the
+ * sums are recomputed from the visible year rows, never taken from the (medium-inclusive) dbt total.
+ */
+export function totalWithoutMedium(
+  years: PayVoteRow[],
+): Pick<
+  PayVoteRow,
+  "voting_years" | "covered_years" | "pay_amount" | "votes_attended" | "dollars_per_vote_attended"
+> {
+  const shown = years.filter((y) => y.match_confidence !== "medium");
+  const covered = shown.filter((y) => y.pay_amount != null);
+  const pay = covered.reduce((n, y) => n + (y.pay_amount ?? 0), 0);
+  const votes = covered.reduce((n, y) => n + y.votes_attended, 0);
+  return {
+    voting_years: shown.length,
+    covered_years: covered.length,
+    pay_amount: covered.length ? pay : null,
+    votes_attended: votes,
+    dollars_per_vote_attended: covered.length && votes > 0 ? Math.round((pay / votes) * 100) / 100 : null,
+  };
 }
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });

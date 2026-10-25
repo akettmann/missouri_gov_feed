@@ -365,6 +365,8 @@ models:
             expression: "votes_attended <= votes_recorded and covered_years <= voting_years"
       # Sanity: nobody is paid more than the top federal salary in one year, and no vote costs $20,000
       # (through 2026 the highest was $9,231: a senator who joined late in 2017 and cast one vote).
+      # Intended trip-wire: a senator in office most of a year who casts a single vote in it would exceed
+      # $20,000 per vote and fail this test; that is worth a look, not a bug in the bound.
       - dbt_utils.expression_is_true:
           arguments:
             expression: "pay_amount <= 300000 or period = 'covered years'"
@@ -404,6 +406,16 @@ models:
       - name: pay_basis
         data_type: varchar
         description: "'gross pay' (state payroll, all pay received in the year) or 'statutory salary' (Congress)."
+      - name: match_confidence
+        data_type: varchar
+        description: >
+          The lowest match_confidence of the fct_salaries rows summed into pay_amount ('medium' if any is
+          name-prefix only, else 'high'); on 'covered years', the lowest over the covered years. Null when
+          there is no pay.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [high, medium]
       - name: pay_source_url
         data_type: varchar
         description: Where the pay comes from (the state payroll site, or the page the federal salary was taken from).
