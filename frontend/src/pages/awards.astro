@@ -54,7 +54,7 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
               <option
                 value={o}
                 selected={o === defaultOffice}
-                data-cycles={officeHasCycles(o) ? "1" : undefined}
+                data-cycles={officeHasCycles(lists ?? [], o) ? "1" : undefined}
               >
                 {singular(o)}
               </option>
@@ -119,14 +119,11 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
                             <p class="what">{AWARDS[list.award].title}</p>
                             <p class="small muted">
                               Among {count(list.group_size)} {plural(list.office)}{" "}
-                              {periodWhen(period, isCycleList(list.award, list.office))}
+                              {periodWhen(period, isCycleList(list))}
                             </p>
                             <ol>
                               {list.entries.map((e) => {
-                                const marker = streakMarker(
-                                  e.streak_years,
-                                  isCycleList(list.award, list.office),
-                                );
+                                const marker = streakMarker(e.streak_years, isCycleList(list));
                                 return (
                                   <li value={e.rank}>
                                     <a href={href(`/officials/${e.slug}/`)}>{e.name}</a>

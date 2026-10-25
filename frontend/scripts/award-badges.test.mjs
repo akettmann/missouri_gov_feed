@@ -19,10 +19,18 @@ const e = (slug, rank, metric, streak_years = null, sample_size = 100) => ({
   sample_size,
   streak_years,
 });
-const list = (award, period, entries, office = "state_house", group_size = 62) => ({
+const list = (
+  award,
+  period,
+  entries,
+  office = "state_house",
+  group_size = 62,
+  period_kind = period === "lifetime" ? "lifetime" : "year",
+) => ({
   award,
   office,
   period,
+  period_kind,
   group_size,
   entries,
 });
@@ -262,7 +270,7 @@ test("buildOfficeGroups labels an unmapped office from its key words, never a ho
 
 test("federal money-share badges say the FEC cycle and count cycles, not years", () => {
   const lists = [
-    list("least_committee_money_share", "2026", [e("rep", 1, 4, 3, 900000)], "us_house", 10),
+    list("least_committee_money_share", "2026", [e("rep", 1, 4, 3, 900000)], "us_house", 10, "fec_cycle"),
     list("least_committee_money_share", "2026", [e("st", 1, 4, 3, 9000)], "state_house"),
   ];
   const awards = currentAwards(lists, (o) => o);
@@ -287,18 +295,14 @@ test("federal calendar-year awards (attendance, most money) stay in years", () =
 
 test("a federal money-share list on an odd period (stale export) fails the build with a clear message", () => {
   const ok = [
-    { award: "least_committee_money_share", office: "us_house", period: "2024" },
-    { award: "least_committee_money_share", office: "us_senate", period: "lifetime" },
-    { award: "least_committee_money_share", office: "state_house", period: "2025" },
-    { award: "highest_attendance", office: "us_house", period: "2025" },
+    { office: "us_house", period: "2024", period_kind: "fec_cycle" },
+    { office: "us_senate", period: "lifetime", period_kind: "lifetime" },
+    { office: "state_house", period: "2025", period_kind: "year" },
+    { office: "us_house", period: "2025", period_kind: "year" },
   ];
   assert.doesNotThrow(() => assertCyclePeriods(ok));
   assert.throws(
-    () =>
-      assertCyclePeriods([
-        ...ok,
-        { award: "least_committee_money_share", office: "us_house", period: "2025" },
-      ]),
+    () => assertCyclePeriods([...ok, { office: "us_house", period: "2025", period_kind: "fec_cycle" }]),
     /stale or inconsistent.*us_house 2025.*re-export/s,
   );
 });
