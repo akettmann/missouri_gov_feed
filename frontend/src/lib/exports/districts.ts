@@ -1,6 +1,7 @@
 // District boundaries for "find my officials": dim_district's TIGER GeoJSON, simplified and rounded at build
 // time so the browser can do point-in-polygon itself (no address or location ever leaves the page).
 import { hasExport, query } from "./db";
+import { countyDistricts } from "../countyDistricts";
 import { allOfficials } from "./load";
 
 /** A ring is [lon, lat, lon, lat, ...] (flat, to keep the JSON small). */
@@ -23,6 +24,8 @@ export interface DistrictData {
   statewide: string[];
   /** county outlines for the clickable map, simplified harder */
   map: { district_id: string; name: string; polygons: Ring[][] }[];
+  /** county district_id -> ids of the House, Senate and congressional districts that intersect it */
+  countyDistricts: Record<string, string[]>;
   /** ZIP (ZCTA) -> [internal point lon, lat, radius in meters of a circle with the same land area] */
   zips: Record<string, [number, number, number]>;
 }
@@ -158,6 +161,7 @@ async function load(): Promise<DistrictData | null> {
 
   return {
     zips,
+    countyDistricts: countyDistricts(shapes),
     vintage: rows.find((r) => r.vintage != null)?.vintage ?? null,
     shapes,
     officials,

@@ -59,11 +59,12 @@ test("href never carries coordinates", () => {
   assert.doesNotMatch(findHref("/", { kind: "county", fips: "29001" }), /lat|lon|\d\.\d/);
 });
 
-// L-shaped county: bbox center (1,1) is outside; the point must still be inside.
-const L = [[[0, 0, 2, 0, 2, 1, 1, 1, 1, 2, 0, 2]]];
-const inL = (_p, x, y) => (x >= 0 && x <= 2 && y >= 0 && y <= 1) || (x >= 0 && x <= 1 && y >= 0 && y <= 2);
+// C-shaped county: the bbox center (2,2) is in the notch, strictly outside, so the point must come from the scan.
+const C = [[[0, 0, 4, 0, 4, 1, 1, 1, 1, 3, 4, 3, 4, 4, 0, 4]]];
+const inC = (_p, x, y) => x >= 0 && x <= 4 && y >= 0 && y <= 4 && !(x > 1 && y > 1 && y < 3);
 test("interiorPoint lands inside a non-convex county", () => {
-  const p = interiorPoint(L, inL);
-  assert.ok(p && inL(L, p[0], p[1]));
-  assert.equal(interiorPoint([], inL), null);
+  assert.equal(inC(C, 2, 2), false); // the bbox center really is outside
+  const p = interiorPoint(C, inC);
+  assert.ok(p && inC(C, p[0], p[1]));
+  assert.equal(interiorPoint([], inC), null);
 });

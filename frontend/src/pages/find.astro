@@ -70,7 +70,7 @@ const path = (polygons: Ring[][]) =>
           data-cos={COS}
         >
           {data.map.map((c) => (
-            <path d={path(c.polygons)}>
+            <path d={path(c.polygons)} data-id={c.district_id}>
               <title>{c.name}</title>
             </path>
           ))}
@@ -83,7 +83,7 @@ const path = (polygons: Ring[][]) =>
       </div>
       <!-- hidden until the script runs, so without JavaScript the empty card never shows -->
       <div class="card results empty" id="results" hidden>
-        <h2>Your officials</h2>
+        <h2 id="results-title">Your officials</h2>
         <div id="groups">
           <p class="muted placeholder">
             Your officials will appear here once you enter a ZIP code, share your location, or click the map,
@@ -102,8 +102,8 @@ const path = (polygons: Ring[][]) =>
 </Layout>
 
 <script>
-  import { inside, lookup, lookupZip, type Lookup } from "../scripts/find";
-  import { countyDistrictId, countyFips, findHref, interiorPoint, parseFindParams } from "../lib/findUrl";
+  import { lookup, lookupCounty, lookupZip, type Lookup } from "../scripts/find";
+  import { countyDistrictId, countyFips, findHref, parseFindParams } from "../lib/findUrl";
 
   const map = document.querySelector<SVGSVGElement>("#map");
   const status = document.getElementById("status")!;
@@ -121,6 +121,18 @@ const path = (polygons: Ring[][]) =>
     const d = map.dataset;
     pin.setAttribute("cx", String((lon - Number(d.minLon)) * Number(d.cos) * Number(d.k)));
     pin.setAttribute("cy", String((Number(d.maxLat) - lat) * Number(d.k)));
+  }
+  const SHARE_NOTE = " A shared link to this page shows the whole county.";
+  /** "exact": a point or ZIP result ("Your officials"); otherwise the county view, outlined on the map. */
+  function setMode(countyId: string | null, title = "Your officials") {
+    document.getElementById("results-title")!.textContent = title;
+    map?.querySelector(".picked")?.classList.remove("picked");
+    if (countyId) {
+      if (pin) pin.setAttribute("cx", "-20");
+      [...(map?.querySelectorAll("path") ?? [])]
+        .find((p) => p.dataset.id === countyId)
+        ?.classList.add("picked");
+    }
   }
   function showResults() {
     const results = document.getElementById("results")!;
@@ -142,7 +154,13 @@ const path = (polygons: Ring[][]) =>
     status.textContent = "Looking up districts…";
     const county = lookup(await load(), lon, lat, document.getElementById("groups")!, status);
     const fips = county && countyFips(county);
-    if (fips) remember({ kind: "county", fips });
+    setMode(null);
+    if (fips) {
+      remember({ kind: "county", fips });
+      status.textContent += SHARE_NOTE;
+    } else {
+      remember({ kind: "none" });
+    }
     showResults();
   }
 
@@ -154,9 +172,13 @@ const path = (polygons: Ring[][]) =>
     }
     status.textContent = "Looking up districts…";
     const point = lookupZip(await load(), zip, document.getElementById("groups")!, status);
+    setMode(null);
     if (point) {
       placePin(...point);
       remember({ kind: "zip", zip });
+      status.textContent += SHARE_NOTE;
+    } else {
+      remember({ kind: "none" });
     }
     showResults();
   });
@@ -177,16 +199,17 @@ const path = (polygons: Ring[][]) =>
     if (sel.kind === "zip") {
       (document.getElementById("zip") as HTMLInputElement).value = sel.zip;
       const point = lookupZip(d, sel.zip, groups, status);
-      if (point) placePin(...point);
-      status.textContent = `Restored from link. ${status.textContent}`;
+      setMode(null);
+      if (point) {
+        placePin(...point);
+        status.textContent = `Restored from link. ${status.textContent}`;
+      }
       showResults();
     } else if (sel.kind === "county") {
-      const shape = d.shapes.find((s) => s.district_id === countyDistrictId(sel.fips))!;
-      const pt = interiorPoint(shape.polygons, inside);
-      if (!pt) return;
-      placePin(...pt);
-      lookup(d, pt[0], pt[1], groups, status);
-      status.textContent = `Restored from link, showing a point near the center of the county. ${status.textContent}. Click the map for an exact spot.`;
+      const title = lookupCounty(d, sel.fips, groups, status);
+      if (!title) return;
+      setMode(countyDistrictId(sel.fips), title);
+      status.textContent = `Restored from link. ${status.textContent} Click the map or enter a ZIP code for your own officials.`;
       showResults();
     }
   }
@@ -248,6 +271,11 @@ const path = (polygons: Ring[][]) =>
   }
   #map path:hover {
     fill: var(--hairline);
+  }
+  #map path.picked {
+    fill: var(--hairline);
+    stroke: var(--ink);
+    stroke-width: 2;
   }
   #pin {
     fill: var(--ink);
