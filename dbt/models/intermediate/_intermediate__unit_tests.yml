@@ -59,10 +59,10 @@ unit_tests:
           - {vote_id: v1, journal_url: j1, session_year: 2025, vote_date: '2025-03-10', senator_token: Schupp, token_name: Schupp, token_district: null, vote_cast: nay}
       - input: ref('int_mo_legislators__seats')
         rows:
-          - {openstates_id: p_brown16, chamber: upper, district_number: 16, surname_key: brown, party: Republican, start_date: '2023-01-04', end_date: '2026-12-31'}
-          - {openstates_id: p_brown26, chamber: upper, district_number: 26, surname_key: brown, party: Republican, start_date: '2023-01-04', end_date: '2026-12-31'}
-          - {openstates_id: p_eigel, chamber: upper, district_number: 23, surname_key: eigel, party: Republican, start_date: '2017-01-04', end_date: '2026-12-31'}
-          - {openstates_id: p_schupp, chamber: upper, district_number: 24, surname_key: schupp, party: Democratic, start_date: '2015-01-07', end_date: '2023-01-03'}
+          - {openstates_id: p_brown16, person_id: p_brown16, chamber: upper, district_number: 16, surname_key: brown, party: Republican, start_date: '2023-01-04', end_date: '2026-12-31'}
+          - {openstates_id: p_brown26, person_id: p_brown26, chamber: upper, district_number: 26, surname_key: brown, party: Republican, start_date: '2023-01-04', end_date: '2026-12-31'}
+          - {openstates_id: p_eigel, person_id: p_eigel, chamber: upper, district_number: 23, surname_key: eigel, party: Republican, start_date: '2017-01-04', end_date: '2026-12-31'}
+          - {openstates_id: p_schupp, person_id: p_schupp, chamber: upper, district_number: 24, surname_key: schupp, party: Democratic, start_date: '2015-01-07', end_date: '2023-01-03'}
     expect:
       rows:
         - {member_token: Brown (16), person_key: p_brown16}

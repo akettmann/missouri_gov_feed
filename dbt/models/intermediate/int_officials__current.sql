@@ -1,6 +1,7 @@
 -- Everyone currently holding a Missouri public office that we track, one row per (person, office).
 -- official_id: Open States ocd-person id when one exists, else bioguide:<id>, statewide:<office>,
--- or judge:<key> (see int_judges__current).
+-- or judge:<key> (see int_judges__current). A legislator Open States or the House roster knows under
+-- several ids gets one stable id (int_officials__person_ids); a current official keeps the id they had.
 with os_roles as (
     select *
     from {{ ref('stg_openstates__roles') }}
@@ -24,7 +25,7 @@ name_index as (
 
 senators as (
     select
-        p.openstates_id as official_id,
+        coalesce(x.person_id, p.openstates_id) as official_id,
         p.openstates_id,
         cast(null as {{ dbt.type_string() }}) as bioguide_id,
         p.full_name,
@@ -39,6 +40,7 @@ senators as (
         r.end_date as current_term_end
     from {{ ref('stg_openstates__people') }} as p
     inner join os_roles as r on p.openstates_id = r.openstates_id
+    left join {{ ref('int_officials__person_ids') }} as x on p.openstates_id = x.alias_id
     where
         p.folder = 'legislature'
         and r.role_type = 'upper'
@@ -79,7 +81,7 @@ legislators as (
 
 statewide as (
     select
-        coalesce(p.openstates_id, 'statewide:' || s.office) as official_id,
+        coalesce(x.person_id, p.openstates_id, 'statewide:' || s.office) as official_id,
         p.openstates_id,
         cast(null as {{ dbt.type_string() }}) as bioguide_id,
         s.name as full_name,
@@ -96,6 +98,7 @@ statewide as (
     -- prefer the person's own Open States record (gives their legislative career) when names match
     left join name_index as n on {{ mogov.name_key('s.name') }} = n.name_key
     left join {{ ref('stg_openstates__people') }} as p on n.openstates_id = p.openstates_id
+    left join {{ ref('int_officials__person_ids') }} as x on n.openstates_id = x.alias_id
 ),
 
 municipal as (

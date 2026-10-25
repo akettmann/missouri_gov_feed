@@ -20,7 +20,8 @@ current_officials as (
         d.office,
         d.office_title,
         d.district,
-        'dim_official' as source
+        'dim_official' as source,
+        cast(null as {{ dbt.type_string() }}) as openstates_id
     from {{ ref('dim_official') }} as d
     cross join this_year as y
 ),
@@ -35,7 +36,8 @@ past as (
         h.office,
         h.office_title,
         h.district,
-        h.source
+        h.source,
+        h.openstates_id
     from {{ ref('int_officeholders__years') }} as h
     inner join this_year as y on h.year < y.year
 ),
@@ -69,4 +71,4 @@ select
     end as source_url
 from unioned as u
 left join (select distinct official_id from {{ ref('dim_official') }}) as p on u.official_id = p.official_id
-left join {{ ref('stg_openstates__people') }} as o on u.source = 'openstates' and u.official_id = o.openstates_id
+left join {{ ref('stg_openstates__people') }} as o on u.source = 'openstates' and u.openstates_id = o.openstates_id

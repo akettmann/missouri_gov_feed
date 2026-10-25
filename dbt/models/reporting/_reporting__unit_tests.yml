@@ -183,7 +183,8 @@ unit_tests:
     description: >
       A past row links to the roster it came from: the House's session export carries the year's two-digit
       session code, an Open States senator the folder holding their file (retired or legislature), a judge their
-      own FJC page, Congress one dataset page. No current-year rows are given, so the test does not
+      own FJC page, Congress one dataset page. A senator whose official_id is the merged person_id still links
+      to the folder of the Open States record the row came from (openstates_id). No current-year rows are given, so the test does not
       depend on the build date.
     given:
       - input: ref('dim_official')
@@ -193,12 +194,14 @@ unit_tests:
         rows:
           - {openstates_id: os1, folder: retired}
           - {openstates_id: os2, folder: legislature}
+          - {openstates_id: os3-old, folder: retired}
       - input: ref('int_officeholders__years')
         rows:
           - {year: 2009, official_id: 'mohouse:1', full_name: Ann Roe, level: state, office: state_house, source: mo_house roster}
           - {year: 2019, official_id: 'mohouse:2', full_name: Bob Poe, level: state, office: state_house, source: mo_house roster}
-          - {year: 2019, official_id: os1, full_name: Cy Doe, level: state, office: state_senate, source: openstates}
-          - {year: 2019, official_id: os2, full_name: Fay Ray, level: state, office: state_senate, source: openstates}
+          - {year: 2019, official_id: os1, full_name: Cy Doe, level: state, office: state_senate, source: openstates, openstates_id: os1}
+          - {year: 2019, official_id: os2, full_name: Fay Ray, level: state, office: state_senate, source: openstates, openstates_id: os2}
+          - {year: 2019, official_id: os3-new, full_name: Gus Fox, level: state, office: state_senate, source: openstates, openstates_id: os3-old}
           - {year: 2019, official_id: 'bioguide:X', full_name: Di Lee, level: federal, office: us_house, source: congress-legislators}
           - {year: 2019, official_id: 'fjc:1', full_name: Ed Kay, level: federal, office: us_district_court, source: fjc}
     expect:
@@ -207,5 +210,6 @@ unit_tests:
         - {year: 2019, official_id: 'mohouse:2', source_url: 'https://documents.house.mo.gov/xml/191.zip'}
         - {year: 2019, official_id: os1, source_url: 'https://github.com/openstates/people/tree/main/data/mo/retired'}
         - {year: 2019, official_id: os2, source_url: 'https://github.com/openstates/people/tree/main/data/mo/legislature'}
+        - {year: 2019, official_id: os3-new, source_url: 'https://github.com/openstates/people/tree/main/data/mo/retired'}
         - {year: 2019, official_id: 'bioguide:X', source_url: 'https://github.com/unitedstates/congress-legislators'}
         - {year: 2019, official_id: 'fjc:1', source_url: 'https://www.fjc.gov/node/1'}
