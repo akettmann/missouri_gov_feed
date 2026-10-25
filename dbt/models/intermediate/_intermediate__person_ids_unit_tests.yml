@@ -250,13 +250,13 @@ unit_tests:
   - name: person_ids_join_a_given_name_variant_in_the_same_seat
     model: int_officials__person_ids
     description: >
-      Two Open States records for the same seat under "Ken" and "Kenneth" Jamison are one person: Kenneth's stub term (2025-01-01 to 2025-02-03) overlaps in time with Ken's term from 2025-01-01.
+      Two Open States records for the same seat under "Ken" and "Kenneth" Jamison are one person: Kenneth's stub term (2025-01-08 to 2025-02-03, dates as Open States gives them) overlaps in time with Ken's term from 2025-01-08.
     given:
       - input: ref('int_officials__identity_terms')
         rows:
-          - {alias_id: ocd-person/jamison-ken, year: 2025, office: state_house, district: '15', name_key: ken jamison, term_start: '2025-01-01', term_end: '9999-12-31'}
-          - {alias_id: ocd-person/jamison-ken, year: 2026, office: state_house, district: '15', name_key: ken jamison, term_start: '2025-01-01', term_end: '9999-12-31'}
-          - {alias_id: ocd-person/jamison-kenneth, year: 2025, office: state_house, district: '15', name_key: kenneth jamison, term_start: '2025-01-01', term_end: '2025-02-03'}
+          - {alias_id: ocd-person/jamison-ken, year: 2025, office: state_house, district: '15', name_key: ken jamison, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/jamison-ken, year: 2026, office: state_house, district: '15', name_key: ken jamison, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/jamison-kenneth, year: 2025, office: state_house, district: '15', name_key: kenneth jamison, term_start: '2025-01-08', term_end: '2025-02-03'}
       - input: ref('official_id_links')
         rows: []
     expect:
@@ -272,8 +272,8 @@ unit_tests:
     given:
       - input: ref('int_officials__identity_terms')
         rows:
-          - {alias_id: ocd-person/dan, year: 2018, office: state_house, district: '10', name_key: dan smith, term_start: '2018-01-01', term_end: '2019-01-09'}
-          - {alias_id: ocd-person/dan, year: 2019, office: state_house, district: '10', name_key: dan smith, term_start: '2018-01-01', term_end: '2019-01-09'}
+          - {alias_id: ocd-person/dan, year: 2018, office: state_house, district: '10', name_key: dan smith, term_start: '2017-01-04', term_end: '2019-01-09'}
+          - {alias_id: ocd-person/dan, year: 2019, office: state_house, district: '10', name_key: dan smith, term_start: '2017-01-04', term_end: '2019-01-09'}
           - {alias_id: ocd-person/danielle, year: 2019, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
           - {alias_id: ocd-person/danielle, year: 2020, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
           - {alias_id: ocd-person/danielle, year: 2021, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
@@ -429,7 +429,7 @@ unit_tests:
     given:
       - input: ref('int_officials__identity_terms')
         rows:
-          - {alias_id: ocd-person/dan, year: 2019, office: state_house, district: '10', name_key: dan smith, term_start: '2018-01-01', term_end: '2019-01-09'}
+          - {alias_id: ocd-person/dan, year: 2019, office: state_house, district: '10', name_key: dan smith, term_start: '2017-01-04', term_end: '2019-01-09'}
           - {alias_id: ocd-person/dan, year: 2020, office: state_house, district: '10', name_key: dan smith}
           - {alias_id: ocd-person/danielle, year: 2021, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
       - input: ref('official_id_links')
@@ -438,3 +438,30 @@ unit_tests:
       rows:
         - {alias_id: ocd-person/dan, person_id: ocd-person/dan, basis: self}
         - {alias_id: ocd-person/danielle, person_id: ocd-person/danielle, basis: self}
+
+  - name: identity_terms_carry_open_states_dates_untruncated
+    model: int_officials__identity_terms
+    description: >
+      A January start counts from January 1 for year membership, but term_start/term_end keep the dates Open States
+      gives (Dan Smith to 2019-01-09, Danielle Smith from 2019-01-09), so a January successor does not overlap a
+      predecessor Open States ends a few days into the month. The House roster row carries no dates.
+    given:
+      - input: ref('int_mo_house__member_seat_keys')
+        rows:
+          - {raw_person_key: 'mohouse:9', session_year: 2018, district_number: 99, full_name: Zed Zed, openstates_id: null}
+          - {raw_person_key: 'mohouse:9', session_year: 2019, district_number: 99, full_name: Zed Zed, openstates_id: null}
+          - {raw_person_key: 'mohouse:9', session_year: 2020, district_number: 99, full_name: Zed Zed, openstates_id: null}
+      - input: ref('stg_openstates__people')
+        rows: []
+      - input: ref('int_mo_legislators__seat_terms')
+        rows:
+          - {openstates_id: ocd-person/dan, chamber: lower, district_number: 10, full_name: Dan Smith, start_date: '2017-01-01', end_date: '2019-01-09', source_start_date: '2017-01-04', source_end_date: '2019-01-09'}
+          - {openstates_id: ocd-person/danielle, chamber: lower, district_number: 10, full_name: Danielle Smith, start_date: '2019-01-01', end_date: '2021-01-06', source_start_date: '2019-01-09', source_end_date: '2021-01-06'}
+    expect:
+      rows:
+        - {alias_id: 'mohouse:9', year: 2018, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: 'mohouse:9', year: 2019, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: 'mohouse:9', year: 2020, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: ocd-person/dan, year: 2018, office: state_house, district: '10', name_key: dan smith, term_start: '2017-01-04', term_end: '2019-01-09'}
+        - {alias_id: ocd-person/danielle, year: 2019, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
+        - {alias_id: ocd-person/danielle, year: 2020, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}

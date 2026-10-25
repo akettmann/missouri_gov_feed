@@ -231,9 +231,13 @@ models:
     years with a House roster, from the House''s own roster (its raw seat-matched key: an Open States id or mohouse:<House
     member id>) and from Open States seat-terms (both chambers). A term counts for a year when it runs past January
     15 of it, and terms with an undated start are left out, as in int_officeholders__years. name_key is the id''s
-    own full name. term_start/term_end are the Open States term''s dates (end 9999-12-31 while open; null for House
-    roster rows, which carry only a year), so a rule can tell overlap from succession. Grain: one row per (alias_id,
-    year, office, district). Grain: one row per (id as sourced, year, office, district).'
+    own full name. term_start/term_end are the Open States term''s dates exactly as Open States gives them (DATE;
+    end 9999-12-31 while open; null for House roster rows, which carry only a year), so a rule can tell overlap
+    from succession. They are not the January-1 adjusted dates used for the year membership above: those would make
+    a January successor (from Jan 1) overlap a predecessor Open States ends on Jan 6-9. Known edge: the min(start)/max(end)
+    collapse per (alias_id, year, office, district) spans any gap if one id holds the same seat in two separate
+    terms in a year. Grain: one row per (alias_id, year, office, district). Grain: one row per (id as sourced, year,
+    office, district).'
 - name: int_officials__name_keys
   description: 'Normalized name variants per current official, for matching sources that only carry names (MEC committees,
     lobbyist reports, Wikidata labels, ratings). One row per (official, variant). Grain: one row per (official,
