@@ -43,6 +43,22 @@ uv run mogov load mo_house mo_senate --shards 4
 uv run mogov build
 ```
 
+## When a loader fails
+
+- `mogov load` always runs every selected loader, even if one fails. It logs a `loader.summary` naming
+  the failed loaders (their raw data is stale) and exits non-zero.
+- `mogov run` is strict by default: if any loader fails, it stops before `dbt build` and exits non-zero,
+  so you never build on top of a source you know is stale.
+- To build anyway, name the loader you accept stale data from (repeatable):
+
+  ```
+  uv run mogov run --allow-failed-loader senate_efd
+  ```
+
+  It logs a `build.stale_source` warning naming each such source, builds on its previous raw data, and
+  still exits non-zero (a Cloud Run job still shows the failure). A failure in any other loader still
+  stops the run. Check `mogov freshness` to see how stale the data is.
+
 ## Moving the windows
 
 - `MOGOV_LOOKBACK_YEARS` (default 10): the years of state roll calls (House and Senate). Widening it
