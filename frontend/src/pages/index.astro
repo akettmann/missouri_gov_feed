@@ -3,6 +3,7 @@
 // in a past year's list (lookup/officeholders/<year>.json) when the year control asks for one.
 // Without JS the filter form is hidden (.js-only) and a <noscript> row of links goes to the static per-year
 // pages (years/<year>/).
+import AwardBadges from "../components/AwardBadges.astro";
 import Layout from "../layouts/Layout.astro";
 import OfficeIcon from "../components/OfficeIcon.astro";
 import { exportedAt } from "../lib/exports/db";
@@ -147,6 +148,7 @@ const groupInfo = Object.fromEntries(
           >
             <td>
               <a href={href(`/officials/${o.slug}/`)}>{o.full_name}</a>
+              <AwardBadges slug={o.slug} />
             </td>
             <td>{officeLine(o)}</td>
             <td>{o.party ?? <span class="muted">none listed</span>}</td>
@@ -162,9 +164,10 @@ const groupInfo = Object.fromEntries(
 </Layout>
 
 <script>
+  import { renderBadges, type Badge } from "../lib/awardBadges";
   import { missingOfficeLabels, pastNote } from "../lib/lookback";
 
-  type PastRow = [string, string, string, string, string, string | null, string | null, string];
+  type PastRow = [string, string, string, string, string, string | null, string | null, string, Badge[]?];
 
   const form = document.querySelector<HTMLFormElement>("form.filters")!;
   const list = document.querySelector<HTMLElement>(".list")!;
@@ -183,7 +186,7 @@ const groupInfo = Object.fromEntries(
   const defaultNote = note.textContent;
   const fold = (s: string) => s.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
-  function rowFor([name, slug, office, group, line, district, party, level]: PastRow) {
+  function rowFor([name, slug, office, group, line, district, party, level, badges]: PastRow) {
     const tr = document.createElement("tr");
     Object.assign(tr.dataset, {
       name: name.toLowerCase(),
@@ -196,6 +199,7 @@ const groupInfo = Object.fromEntries(
     a.href = `${base}/officials/${slug}/`;
     a.textContent = name;
     cell(a);
+    tr.cells[0].append(document.createRange().createContextualFragment(renderBadges(badges ?? [], base)));
     cell(line);
     if (party) cell(party);
     else {

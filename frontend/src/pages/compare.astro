@@ -3,13 +3,17 @@
 // Rendered in the browser from the per-official JSON; both choices live in the URL (?a=slug&b=slug).
 import ConfidenceToggle from "../components/ConfidenceToggle.astro";
 import Layout from "../layouts/Layout.astro";
+import { currentAwardsBySlug } from "../lib/exports/awards";
 import { officialIndex } from "../lib/exports/load";
 import { officeLine } from "../lib/format";
 import { href } from "../lib/site";
 
+const awards = await currentAwardsBySlug();
+// badges only for officials who hold awards, so the inline index stays small
 const officials = (await officialIndex()).map((o) => ({
   slug: o.slug,
   label: `${o.full_name} — ${officeLine(o)}`,
+  ...(awards.has(o.slug) && { badges: awards.get(o.slug) }),
 }));
 ---
 
@@ -53,13 +57,15 @@ const officials = (await officialIndex()).map((o) => ({
 </Layout>
 
 <script>
+  import { renderBadges, type Badge } from "../lib/awardBadges";
   import { compareRows } from "../lib/compare";
   import type { OfficialBundle } from "../lib/exports/types";
 
-  const index: { slug: string; label: string }[] = JSON.parse(
+  const index: { slug: string; label: string; badges?: Badge[] }[] = JSON.parse(
     document.getElementById("officials-index")!.textContent!,
   );
   const bySlug = new Map(index.map((o) => [o.slug, o.label]));
+  const badgesBySlug = new Map(index.map((o) => [o.slug, o.badges ?? []]));
   const byLabel = new Map(index.map((o) => [o.label, o.slug]));
   const form = document.querySelector<HTMLFormElement>("form.pickers")!;
   const status = document.getElementById("status")!;
@@ -104,6 +110,11 @@ const officials = (await officialIndex()).map((o) => ({
       const a = el("a", b.official.full_name);
       (a as HTMLAnchorElement).href = `${base}/officials/${b.official.slug}/`;
       th.append(a);
+      th.append(
+        document
+          .createRange()
+          .createContextualFragment(renderBadges(badgesBySlug.get(b.official.slug) ?? [], base)),
+      );
       head.append(th);
     }
     const thead = el("thead");
