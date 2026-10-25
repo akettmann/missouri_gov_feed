@@ -3,15 +3,13 @@
 // to its opposite, shows the number and what it's out of, and links to the profile with the sources.
 import Layout from "../layouts/Layout.astro";
 import { AWARD_PAIRS, AWARDS, awardLists, type AwardList } from "../lib/exports/awards";
-import { officialIndex } from "../lib/exports/load";
 import { AWARD_ICONS, outOfText, pluralOfficeLabel, singularOfficeLabel } from "../lib/awardBadges";
 import { count, money, pct, streakMarker } from "../lib/format";
 import { href } from "../lib/site";
 
 const lists = await awardLists();
-const titles = new Map((await officialIndex()).map((o) => [o.office, o.office_title ?? o.office]));
-const plural = (office: string) => pluralOfficeLabel(office, titles.get(office));
-const singular = (office: string) => singularOfficeLabel(office, titles.get(office));
+const plural = pluralOfficeLabel;
+const singular = singularOfficeLabel;
 const offices = [...new Set((lists ?? []).map((l) => l.office))].sort((a, b) =>
   singular(a).localeCompare(singular(b)),
 );
@@ -62,8 +60,8 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
 
       <noscript>
         <p class="card small muted">
-          The office and period pickers need JavaScript, so this shows {singular(defaultOffice)} for all
-          loaded years.
+          The office and period pickers need JavaScript, so this shows {plural(defaultOffice)} for all loaded
+          years.
         </p>
       </noscript>
 

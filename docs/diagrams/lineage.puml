@@ -93,7 +93,7 @@ package "marts" {
 
 package "reporting (frontend views)" {
   [rpt_indicator_peers] as R_peers
-  [rpt_party_breaks\nrpt_attendance] as R_votes
+  [rpt_party_breaks\nrpt_attendance\nrpt_attendance_pay] as R_votes
   [rpt_donor_rollup\nrpt_committee_donors] as R_money
   [rpt_gift_rollup] as R_gifts
   [rpt_interest_vote_overlap] as R_overlap
@@ -198,6 +198,7 @@ F_bias --> R_peers
 dim --> R_peers
 F_votes --> R_votes
 I_party --> R_votes
+F_sal --> R_votes
 F_money --> R_money
 I_mec --> R_money
 F_gifts --> R_gifts

@@ -1,14 +1,15 @@
 // Shared by the home page (build time and its year control) and the static years/<year>/ pages, so both
 // name the same offices a past year lacks.
-import { OFFICE_GROUPS, officeGroup } from "./format";
+import { pluralOfficeLabel } from "./awardBadges.ts";
+import { OFFICE_GROUPS, officeGroup } from "./format.ts";
 
 export type OfficeGroup = { key: string; label: string; offices: (readonly [string, string])[] };
 
-/** Offices of any year, bucketed into the display groups; labels fall back to the data's office title. */
+/** Offices of any year, bucketed into the display groups; labels come from the shared plural office label, which for an unmapped key uses the key's words only, never a holder's title. */
 export function buildOfficeGroups(rows: { office: string; office_title?: string | null }[]): OfficeGroup[] {
   const titles = new Map<string, string>();
   for (const o of rows) {
-    if (!titles.has(o.office)) titles.set(o.office, o.office_title ?? o.office.replaceAll("_", " "));
+    if (!titles.has(o.office)) titles.set(o.office, pluralOfficeLabel(o.office));
   }
   return [
     ...OFFICE_GROUPS,

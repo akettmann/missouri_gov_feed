@@ -4,6 +4,7 @@
 import { createHash } from "node:crypto";
 import { DONOR_GROUP_SQL } from "../rollups";
 import { exportedAt, hasExport, query } from "./db";
+import type { PayVoteRow } from "../attendancePay";
 import { groupPast, linkSameName, type RosterRow } from "./past";
 import { sampleDonorCycles, sampleGiftRollup, sampleTopDonors } from "./fixtures";
 import type {
@@ -186,9 +187,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
     Pick<CommitteeTrail, "committee_name" | "committee_total_amount" | "source_url" | "donors">
   >();
   if (hasTrails && trailRows.length > 0) {
-    const ids = [...new Set(trailRows.map((t) => t.mec_committee_id))].map(
-      (id) => `'${id.replaceAll("'", "''")}'`,
-    );
+    const ids = [...new Set(trailRows.map((t) => t.mec_committee_id))];
     for (const r of await query<
       CommitteeDonorRow & {
         mec_committee_id: string;
@@ -196,14 +195,17 @@ async function loadAll(): Promise<OfficialBundle[]> {
         committee_total_amount: number;
         source_url: string;
       }
-    >(`
+    >(
+      `
       select mec_committee_id, committee_name, cast(committee_total_amount as double) as committee_total_amount,
              source_url, cast(donor_rank as integer) as donor_rank, donor_class, donor_name,
              cast(total_amount as double) as total_amount, cast(contribution_count as integer) as contribution_count,
              first_year, last_year, trail_status, donor_mec_committee_id
       from {rpt_committee_donors}
-      where mec_committee_id in (${ids.join(", ")})
-      order by mec_committee_id, donor_rank nulls last`)) {
+      where mec_committee_id in (${ids.map(() => "?").join(", ")})
+      order by mec_committee_id, donor_rank nulls last`,
+      ids,
+    )) {
       const { mec_committee_id, committee_name, committee_total_amount, source_url, ...donor } = r;
       const entry = committeeDonors.get(mec_committee_id) ?? {
         committee_name,
@@ -278,6 +280,17 @@ async function loadAll(): Promise<OfficialBundle[]> {
                  cast(not_voting as integer) as not_voting,
                  cast(recused_from_voting as integer) as recused_from_voting, attendance_pct, chamber_attendance_pct
           from {rpt_attendance} order by first_vote_date`),
+      )
+    : null;
+
+  const attendancePay = hasExport("rpt_attendance_pay")
+    ? groupBy(
+        await query<PayVoteRow & { official_id: string }>(`
+          select official_id, chamber, period, cast(calendar_year as integer) as calendar_year,
+                 cast(voting_years as integer) as voting_years, cast(covered_years as integer) as covered_years,
+                 cast(votes_recorded as integer) as votes_recorded, cast(votes_attended as integer) as votes_attended,
+                 cast(pay_amount as double) as pay_amount, pay_basis, match_confidence, pay_source_url, dollars_per_vote_attended
+          from {rpt_attendance_pay} order by calendar_year`),
       )
     : null;
 
@@ -480,6 +493,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
           status: status("votes"),
           party_breaks: breaks ? ((breaks.get(id) ?? []) as PartyBreak[]) : null,
           attendance: attendance ? ((attendance.get(id) ?? []) as AttendanceRow[]) : null,
+          attendance_pay: attendancePay ? ((attendancePay.get(id) ?? []) as PayVoteRow[]) : null,
           by_subject: subjects ? ((subjects.get(id) ?? []) as SubjectVotes[]) : null,
         },
         overlap: hasOverlap ? ((overlap.get(id) ?? []) as InterestOverlap[]) : null,
@@ -584,6 +598,7 @@ export function freshness(): { table: string; exported_at: string | null; sample
     "rpt_indicator_peers",
     "rpt_party_breaks",
     "rpt_attendance",
+    "rpt_attendance_pay",
     "rpt_votes_by_subject",
     "rpt_interest_vote_overlap",
     "fct_jurisdiction_businesses",
