@@ -77,7 +77,7 @@ const officials = current.map((o) => ({
 <script>
   import { renderBadges, type Badge } from "../lib/awardBadges";
   import { compareRows } from "../lib/compare";
-  import { filterForOffice, filterOfficials, type OfficeFilter } from "../lib/compareFilter";
+  import { filterForOffice, filterOfficials, reconcileFilter, type OfficeFilter } from "../lib/compareFilter";
   import type { OfficialBundle } from "../lib/exports/types";
 
   const index: { slug: string; office: string; label: string; badges?: Badge[] }[] = JSON.parse(
@@ -116,14 +116,26 @@ const officials = current.map((o) => ({
   let touched = false;
 
   function currentFilter(): OfficeFilter {
-    const f = new FormData(form);
-    return { group: String(f.get("group") ?? ""), office: String(f.get("office") ?? "") };
+    const group = String(new FormData(form).get("group") ?? "");
+    // the office comes only from the visible chip set: the radios share one name, so a checked radio in a
+    // hidden set must not narrow the list
+    const office = chipSets
+      .find((s) => s.dataset.group === group)
+      ?.querySelector<HTMLInputElement>("input:checked");
+    return { group, office: office?.value ?? "" };
   }
 
   function setFilter(f: OfficeFilter) {
-    for (const r of form.querySelectorAll<HTMLInputElement>('input[name="group"], input[name="office"]')) {
-      r.checked = r.name === "group" ? r.value === f.group : r.value === f.office;
-    }
+    f = reconcileFilter(f);
+    const tiles = [...form.querySelectorAll<HTMLInputElement>('input[name="group"]')];
+    const tile = tiles.find((r) => r.value === f.group) ?? tiles.find((r) => r.value === "");
+    for (const r of tiles) r.checked = r === tile;
+    for (const r of form.querySelectorAll<HTMLInputElement>('input[name="office"]')) r.checked = false;
+    // check the chip (or "All") inside the shown group's set; the sets share one radio group
+    const set = chipSets.find((s) => s.dataset.group === tile?.value);
+    const inputs = [...(set?.querySelectorAll<HTMLInputElement>("input") ?? [])];
+    const chip = inputs.find((r) => r.value === f.office) ?? inputs.find((r) => r.value === "");
+    if (chip) chip.checked = true;
   }
 
   function applyFilter() {
@@ -139,7 +151,10 @@ const officials = current.map((o) => ({
     );
     const group = form.querySelector<HTMLInputElement>('input[name="group"]:checked')?.closest("label");
     const chip = f.office
-      ? form.querySelector<HTMLInputElement>('input[name="office"]:checked')?.closest("label")
+      ? chipSets
+          .find((s) => s.dataset.group === f.group)
+          ?.querySelector<HTMLInputElement>("input:checked")
+          ?.closest("label")
       : null;
     const where = (chip ?? group)?.textContent?.trim() ?? "";
     filterStatus.textContent = f.group
@@ -240,8 +255,16 @@ const officials = current.map((o) => ({
       }
     }
   });
-  form.addEventListener("change", render);
-  form.addEventListener("input", () => {
+  form.addEventListener("change", (e) => {
+    // the filter radios already rendered from their input event
+    const t = e.target;
+    if (t instanceof HTMLInputElement && (t.name === "group" || t.name === "office")) return;
+    void render();
+  });
+  form.addEventListener("input", (e) => {
+    // the filter radios render from their own handler above
+    if (e.target instanceof HTMLInputElement && (e.target.name === "group" || e.target.name === "office"))
+      return;
     // datalist picks fire input with a complete label; typed partial names wait for change
     const values = ["a", "b"].map((k) => String(new FormData(form).get(k) ?? ""));
     if (values.every((v) => !v || byLabel.has(v))) render();

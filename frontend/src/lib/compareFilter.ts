@@ -26,3 +26,14 @@ export function matchesOffice(office: string, f: OfficeFilter): boolean {
 export function filterOfficials<T extends { office: string }>(officials: T[], f: OfficeFilter): T[] {
   return officials.filter((o) => matchesOffice(o.office, f));
 }
+
+/**
+ * Make a filter coherent, for values that arrive from a URL. An office that does not belong to the group is
+ * dropped (the group wins, so the bar and the list agree); an office with no group names its own group.
+ */
+export function reconcileFilter(f: OfficeFilter): OfficeFilter {
+  if (!f.office) return f;
+  const g = officeGroup(f.office);
+  if (!f.group) return { group: g, office: f.office };
+  return g === f.group ? f : { group: f.group, office: "" };
+}
