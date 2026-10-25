@@ -534,6 +534,9 @@ offices, shops and most service businesses are missing.
   table from SIC major group (two digits, longer where a group splits across sectors) to NAICS sector. That gives
   a sector, not a NAICS code: `int_epa_frs__facilities.naics_code` then holds the two-digit sector prefix and
   `naics_source` is `sic`. Together they cover 56% of the geocoded sites; the rest have neither code.
+  About 10,400 of the SIC-filled facilities are SIC 1629 (heavy construction), likely construction stormwater
+  permits. The seed follows the Census 1987 SIC to 2017 NAICS concordance at 3 or 4 digits where a group splits;
+  groups still mapped to one sector despite straddling (73 business services, 79, 80, 87, 89) take the majority one.
 - `rpt_district_business_industries` counts each official's sites by NAICS sector (`naics_sectors` seed, from
   the primary NAICS code's first two digits). The profile page ships only the donor sites plus these counts: a
   U.S. House district holds up to ~10,500 sites, too many for the per-official JSON budget.

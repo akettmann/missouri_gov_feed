@@ -47,7 +47,7 @@ def read_rows(lines: Iterator[str], source: str) -> Iterator[tuple[str, dict]]:
 
 @loader("epa_frs", service="ordsext.epa.gov")
 def load(shard: db.Shard) -> dict[str, int]:
-    """Units: the three CSVs in the state zip, which is downloaded once and shared by the shards."""
+    """Units: the four CSVs in the state zip, which is downloaded once and shared by the shards."""
     mine = {table: member for table, member in FILES.items() if shard.owns(table)}
     zip_path: Path | None = (
         fetch_to_file(URL, CACHE_DIR / "epa_frs" / "state_combined_mo.zip", max_age=30 * 86400) if mine else None
