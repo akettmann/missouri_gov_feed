@@ -3,6 +3,7 @@ import { readdirSync, statSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { measure, overBudget } from "./size-budget.mjs";
 
 const dir = path.join("dist", "officials");
 const BUDGET_GZ_KB = Number(process.env.JSON_BUDGET_GZ_KB ?? 100);
@@ -33,4 +34,10 @@ for (const r of rows.toSorted((a, b) => b.json - a.json).slice(0, 5)) {
 }
 const over = rows.filter((r) => r.jsonGz > BUDGET_GZ_KB * 1024);
 console.log(`\n${over.length} of ${rows.length} over the ${BUDGET_GZ_KB} KB gzipped budget`);
-process.exitCode = over.length ? 1 : 0;
+
+const sizes = measure("dist");
+for (const [file, s] of Object.entries(sizes)) console.log(`${file}: ${kb(s.raw)} (${kb(s.gz)} gz)`);
+const errors = overBudget(sizes);
+for (const e of errors)
+  console.error(`OVER BUDGET: ${e}. Trim the payload or raise the budget in scripts/size-budget.mjs.`);
+process.exitCode = over.length || errors.length ? 1 : 0;
