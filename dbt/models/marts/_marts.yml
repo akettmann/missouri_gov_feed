@@ -1584,8 +1584,10 @@ models:
       - name: contributions_url
         data_type: varchar
         description: >
-          Where the matched contributions are filed (the receiving committee's MEC page or FEC receipts), when
-          is_donor.
+          A filing page, when is_donor. An MEC page is the committee that received the money (the committee
+          matched to the official), not filtered to the donor. An FEC page is the donor committee's
+          disbursements filtered to the receiving committee, so it lists the gifts themselves. The frontend labels
+          the link by which one it is (#236).
       - name: frs_url
         data_type: varchar
         description: The facility's EPA FRS detail report.
