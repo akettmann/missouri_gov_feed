@@ -16,9 +16,13 @@
 -- only the first, the lead bill (is_lead_bill), is the one that passed. The others stay as rows, with combined_into
 -- naming the lead, because the act did take their subjects, but they never reached the governor themselves. A bill
 -- after "&" may repeat its bill head ("H.B. 237 & H.B. 238 & H.B. 482", "H.B. 5 & S.B. 7"); a bare number takes the
--- type of the bill before it ("H.B. 69 & 179 & H.B. 669"). "and" ("H.B. 1270 and H.B. 2032") joins bills that each
--- passed on their own (the Revisor's "H.B. 1268 & 1211 and S.B. 966" is two acts, the first one combined), so a bill
--- after "and" starts its own combined group and is a lead bill.
+-- type of the bill before it ("H.B. 69 & 179 & H.B. 669"). "and" ("H.B. 1270 and H.B. 2032") is ambiguous: the
+-- Revisor uses it both for bills of one combined act (2004 "S.B. 968 and S.B. 969" is one act, lead SB 968) and for
+-- separate acts ("H.B. 1606 and S.B. 743" in 2018, SB 743 also cited alone). A bill after "and" is its own lead bill
+-- only when the same year and session cite it as the first bill of an act elsewhere (in any section's notes);
+-- otherwise it is combined like one after "&", into the lead bill of its group (every bill up to the next separate
+-- lead). The Revisor's "H.B. 1268 & 1211 and S.B. 966" is HB1211 combined into HB1268, with SB966 a lead only if
+-- 2004 cites SB 966 on its own somewhere.
 -- The older notes also list several bills of one act after commas ("A.L. 1978 H.B. 971, S.B. 628"). A piece that is
 -- only a bill ("S.B. 628", "merged with S.B. 5") continues the act before it (same year, session and change), as
 -- long as only such pieces come between (or the act is just a year, "A.L. 1985, H.B. 366"); after a page cite
@@ -227,8 +231,8 @@ merged as (
 typed as (
     select
         *,
-        -- "299 & 40 § A Revision" -> "299 & 40"; "H.B. 1270 and H.B. 2032" -> "H.B. 1270 & @H.B. 2032" (@ starts a bill
-        -- that passed on its own, not combined into the one before)
+        -- "299 & 40 § A Revision" -> "299 & 40"; "H.B. 1270 and H.B. 2032" -> "H.B. 1270 & @H.B. 2032" (@ marks a bill
+        -- after "and": a lead bill only if cited as one elsewhere, see lead_cited)
         {{ dbt.replace(
             mogov.regex_extract('ref', '^(' ~ bill_item ~ '[0-9]+( (&|and) (' ~ bill_item ~ ')?[0-9]+)*)', 1),
             "' and '",
@@ -249,7 +253,7 @@ items as (
         t.ref_index,
         s.n as item_n,
         trim({{ dbt.replace(mogov.split_part_at('t.numbers', "' & '", 's.n', max_combined), "'@'", "''") }}) as item,
-        {{ mogov.split_part_at('t.numbers', "' & '", 's.n', max_combined) }} like '@%' as starts_group
+        {{ mogov.split_part_at('t.numbers', "' & '", 's.n', max_combined) }} like '@%' as after_and
     from typed as t
     cross join spine as s
     where
@@ -265,11 +269,6 @@ item_types as (
         {{ mogov.regex_replace_all(mogov.regex_extract('item', '^(' ~ bill_item ~ ')[0-9]', 1), '[^A-Z]', '') }}
             as own_type,
         {{ mogov.regex_extract('item', '([0-9]+)$', 1) }} as number,
-        -- the item that starts this item's group of combined bills (item 1, or the one after an "and")
-        max(case when item_n = 1 or starts_group then item_n end) over (
-            partition by section_id, section_version_id, act_index, ref_index
-            order by item_n
-        ) as group_start,
         -- the nearest item at or before this one that has a bill head
         max(case when {{ mogov.regex_matches('item', bill_head ~ '[0-9]') }} then item_n end) over (
             partition by section_id, section_version_id, act_index, ref_index
@@ -292,6 +291,35 @@ item_bills as (
             and i.head_item = h.item_n
 ),
 
+-- bills cited as the first bill of an act, by year and session: the "and" bills that count as separate leads
+cited_leads as (
+    select distinct
+        act_year,
+        coalesce(extra_session, 0) as extra_session,
+        bill_type,
+        number
+    from item_bills
+    where item_n = 1
+),
+
+item_groups as (
+    select
+        b.*,
+        -- the item that starts this item's group of combined bills: item 1, or a bill after "and" that is also cited
+        -- as the first bill of an act elsewhere in its year and session
+        max(case when b.item_n = 1 or (b.after_and and c.number is not null) then b.item_n end) over (
+            partition by b.section_id, b.section_version_id, b.act_index, b.ref_index
+            order by b.item_n
+        ) as group_start
+    from item_bills as b
+    left join cited_leads as c
+        on
+            b.act_year = c.act_year
+            and coalesce(b.extra_session, 0) = c.extra_session
+            and b.bill_type = c.bill_type
+            and b.number = c.number
+),
+
 bills as (
     select
         b.section_id,
@@ -306,8 +334,8 @@ bills as (
         b.number as bill_number,
         b.item_n = b.group_start as is_lead_bill,
         l.bill_type || l.number as lead_bill
-    from item_bills as b
-    inner join item_bills as l
+    from item_groups as b
+    inner join item_groups as l
         on
             b.section_id = l.section_id
             and b.section_version_id = l.section_version_id

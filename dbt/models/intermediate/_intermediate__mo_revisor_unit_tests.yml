@@ -94,9 +94,10 @@ unit_tests:
       "H.B. 237 & H.B. 238 & H.B. 482" (RSMo 488.429) is three bills combined into the first; reading numbers only
       after the first head kept just 237. Each bill after "&" may carry its own head ("H.B. 5 & S.B. 7"), and a bare
       number takes the type of the bill before it, even after a head of another type ("S.B. 7 & 8"; "H.B. 69 & 179
-      & H.B. 669"). "and" joins bills that passed on their own: each starts a combined group of its own
-      ("H.B. 1268 & 1211 and S.B. 966" is HB1211 combined into HB1268, SB966 a lead bill), and a "§ 1" after the
-      numbers is not read as another bill.
+      & H.B. 669"). "and" is ambiguous (see the next test): with no other citation of the bill after it,
+      "H.B. 1268 & 1211 and S.B. 966" is all one act, HB1211 and SB966 combined into HB1268, and "H.B. 996 and
+      H.B. 1142 and H.B. 1201" (a real 2004 combined act) is one act led by HB996. A "§ 1" after the numbers is not
+      read as another bill.
     given:
       - input: ref('stg_mo_revisor__sections')
         format: sql
@@ -127,11 +128,56 @@ unit_tests:
         - {section_id: r.3, bill: HB669, is_lead_bill: false, combined_into: HB69}
         - {section_id: r.4, bill: HB1268, is_lead_bill: true, combined_into: }
         - {section_id: r.4, bill: HB1211, is_lead_bill: false, combined_into: HB1268}
-        - {section_id: r.4, bill: SB966, is_lead_bill: true, combined_into: }
+        - {section_id: r.4, bill: SB966, is_lead_bill: false, combined_into: HB1268}
         - {section_id: r.4, bill: HB9, is_lead_bill: true, combined_into: }
         - {section_id: r.5, bill: HB996, is_lead_bill: true, combined_into: }
-        - {section_id: r.5, bill: HB1142, is_lead_bill: true, combined_into: }
-        - {section_id: r.5, bill: HB1201, is_lead_bill: true, combined_into: }
+        - {section_id: r.5, bill: HB1142, is_lead_bill: false, combined_into: HB996}
+        - {section_id: r.5, bill: HB1201, is_lead_bill: false, combined_into: HB996}
+
+  - name: and_joined_bills_are_separate_leads_only_when_cited_as_a_lead_elsewhere
+    model: int_mo_revisor__session_law_bills
+    description: >
+      The Revisor's "and" joins the bills of one combined act (2004 "S.B. 968 and S.B. 969" is one act, lead SB 968)
+      and also separate acts (2018 "H.B. 1606 and S.B. 743", where SB 743 is also cited alone). A bill after "and"
+      is a lead bill only when the same year and session cite it as the first bill of an act elsewhere; otherwise it
+      is combined into the lead of its group. Always-lead (the old reading) makes SB969 and HB1142 leads; always-
+      combined makes SB743 (2018) combined. The citation must be in the same year: 2005's "S.B. 743" after "and" is
+      combined although 2018 cites SB 743 alone, and so is an "and" bill cited only after "&" (not as a lead).
+    given:
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 'n.1' as section_id, 'n.1/1' as section_version_id, '(A.L. 2004 S.B. 968 and S.B. 969)' as history_note union all
+            select 'n.2', 'n.2/1', '(A.L. 2018 H.B. 1606 and S.B. 743)' union all
+            select 'n.3', 'n.3/1', '(A.L. 2018 S.B. 743)' union all
+            select 'n.4', 'n.4/1', '(A.L. 2005 H.B. 1606 and S.B. 743)' union all
+            select 'n.5', 'n.5/1', '(A.L. 2004 H.B. 1 & 2 and H.B. 3 and H.B. 4)' union all
+            select 'n.6', 'n.6/1', '(A.L. 2004 H.B. 7 & 4)' union all
+            select 'n.7', 'n.7/1', '(A.L. 2004 H.B. 3)'
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select '9.010' as section_id, '9.010/3' as section_version_id, 'transferred' as change_kind, '(Transferred 1959; now 442.560 )' as note
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: n.1, bill: SB968, is_lead_bill: true, combined_into: }
+        - {section_id: n.1, bill: SB969, is_lead_bill: false, combined_into: SB968}
+        - {section_id: n.2, bill: HB1606, is_lead_bill: true, combined_into: }
+        - {section_id: n.2, bill: SB743, is_lead_bill: true, combined_into: }
+        - {section_id: n.3, bill: SB743, is_lead_bill: true, combined_into: }
+        - {section_id: n.4, bill: HB1606, is_lead_bill: true, combined_into: }
+        - {section_id: n.4, bill: SB743, is_lead_bill: false, combined_into: HB1606}
+        - {section_id: n.5, bill: HB1, is_lead_bill: true, combined_into: }
+        - {section_id: n.5, bill: HB2, is_lead_bill: false, combined_into: HB1}
+        - {section_id: n.5, bill: HB3, is_lead_bill: true, combined_into: }
+        - {section_id: n.5, bill: HB4, is_lead_bill: false, combined_into: HB3}
+        - {section_id: n.6, bill: HB7, is_lead_bill: true, combined_into: }
+        - {section_id: n.6, bill: HB4, is_lead_bill: false, combined_into: HB7}
+        - {section_id: n.7, bill: HB3, is_lead_bill: true, combined_into: }
 
   - name: bills_after_a_comma_continue_the_act_before_them
     model: int_mo_revisor__session_law_bills

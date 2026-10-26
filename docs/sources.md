@@ -312,8 +312,11 @@ Quirks:
   bills: `S.B. 299 & 40` is one substitute carrying SB 299 and SB 40; only the first, the lead bill, passed, so
   `fct_bill_statute_links.is_lead_bill` is false for the rest and `combined_into` names the lead; the House
   list shows the others as failed). A bill after `&` may repeat its head (`H.B. 237 & H.B. 238`, or another
-  type: `H.B. 5 & S.B. 7`); a bare number takes the type before it. `and` (`H.B. 1270 and H.B. 2032`) joins bills
-  that each passed on their own, so each is a lead bill. The old notes also list a second bill after a comma
+  type: `H.B. 5 & S.B. 7`); a bare number takes the type before it. `and` (`H.B. 1270 and H.B. 2032`) is ambiguous:
+  it joins the bills of one combined act (2004 `S.B. 968 and S.B. 969` is one act led by SB 968) and also separate
+  acts (2018 `H.B. 1606 and S.B. 743`, where SB 743 is also cited alone). A bill after `and` is a lead bill only
+  when the same year and session cite it as the first bill of an act elsewhere in the notes; otherwise it is
+  combined into the lead of its group like one after `&`. The old notes also list a second bill after a comma
   (`A.L. 1978 H.B. 971, S.B. 628`): that piece continues the act before it. `, et al.` belongs to the act before
   it. `S.B` sometimes lacks its last dot.
 - Extraordinary sessions: the Revisor writes "1st Ex. Sess." and counts only extraordinary sessions that passed
