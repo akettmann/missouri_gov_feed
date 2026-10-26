@@ -21,8 +21,7 @@
 --      special-election successor overlaps on paper (Silvey to 2018-12-31, Lauren Arthur from 2018-09-12, SD17). The
 --      shared-seat case also needs one term to be a stub (under 90 days) inside the other, starting within 31 days
 --      of it; equal or nested multi-year terms do not qualify (Open States' placeholder 2013-01-01 starts, #332).
---      Years
---      alone cannot decide the shared-seat case: Kenneth Jamison (2025 only) inside Ken Jamison (2025-26) is a
+--      Years alone cannot decide the shared-seat case: Kenneth Jamison (2025 only) inside Ken Jamison (2025-26) is a
 --      duplicate, but Danielle Smith (2019 only, or 2026 only after a special election) inside a Dan Smith
 --      successor's span looks the same by year. Dates tell them apart: Kenneth's term is a 26-day stub that overlaps
 --      Ken's, while a successor's term starts on or after the predecessor's ends (or is no stub). Undated

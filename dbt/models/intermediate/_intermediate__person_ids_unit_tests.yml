@@ -303,19 +303,21 @@ unit_tests:
   - name: person_ids_keep_a_same_end_later_start_successor_apart
     model: int_officials__person_ids
     description: >
-      A term that ends with the other's but starts months later is a successor that overlaps on paper, not a stub starting within 31 days of the longer term (#332).
+      Dan Kim (HD7 from 2019-01-09 to 2021-01-06) and Daniel Kim (HD7 from 2020-11-01, a 66-day term ending the same
+      day) overlap on paper and the later term is a stub under 90 days nested in the longer one, but it starts
+      almost two years after it, not within 31 days of it: a successor, not a duplicate (#332).
     given:
       - input: ref('int_officials__identity_terms')
         rows:
-          - {alias_id: ocd-person/al-kim, year: 2019, office: state_house, district: '7', name_key: al kim, term_start: '2019-01-09', term_end: '2021-01-06'}
-          - {alias_id: ocd-person/al-kim, year: 2020, office: state_house, district: '7', name_key: al kim, term_start: '2019-01-09', term_end: '2021-01-06'}
-          - {alias_id: ocd-person/alan-kim, year: 2020, office: state_house, district: '7', name_key: alan kim, term_start: '2020-09-01', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/dan-kim, year: 2019, office: state_house, district: '7', name_key: dan kim, term_start: '2019-01-09', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/dan-kim, year: 2020, office: state_house, district: '7', name_key: dan kim, term_start: '2019-01-09', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/daniel-kim, year: 2020, office: state_house, district: '7', name_key: daniel kim, term_start: '2020-11-01', term_end: '2021-01-06'}
       - input: ref('official_id_links')
         rows: []
     expect:
       rows:
-        - {alias_id: ocd-person/al-kim, person_id: ocd-person/al-kim, basis: self}
-        - {alias_id: ocd-person/alan-kim, person_id: ocd-person/alan-kim, basis: self}
+        - {alias_id: ocd-person/dan-kim, person_id: ocd-person/dan-kim, basis: self}
+        - {alias_id: ocd-person/daniel-kim, person_id: ocd-person/daniel-kim, basis: self}
 
   - name: person_ids_keep_a_same_seat_successor_with_a_hand_over_year_apart
     model: int_officials__person_ids
