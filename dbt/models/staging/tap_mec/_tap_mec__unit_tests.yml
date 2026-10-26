@@ -64,7 +64,8 @@ unit_tests:
     description: >
       In the 2020-2022 layout (no ctrb_type) a company beside a person's first / last name is the person's
       employer, so the donor is an Individual, not an Organization (#485). A company alone is still an
-      Organization, a committee wins, and the '#N/A' / 'Not applicable' filler names are not a person.
+      Organization, a committee wins, and the '#N/A' / 'Not applicable' filler names are not a person. A company
+      that repeats the person's name, or is the given name of a shifted row (surname alone), is not an employer.
     given:
       - input: source('tap_mec', 'contributions')
         format: sql
@@ -100,13 +101,15 @@ unit_tests:
               cast(null as varchar) as address_clean
           union all select null, 'C1', null, null, null, null, '', 'Acme Corp', '', '', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't2', null
           union all select null, 'C1', null, null, null, null, '', 'McDonalds', '#N/A', '#N/A', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't3', null
-          union all select null, 'C1', null, null, null, null, ' Some PAC ', 'Hotel Co', 'Jo', '', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't4', null
+          union all select null, 'C1', null, null, null, null, ' Some PAC ', 'Hotel Co', 'Jo', 'Poe', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't4', null
+          union all select null, 'C1', null, null, null, null, '', 'Dennis', 'Boling', '', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't5', null
     expect:
       rows:
-        - {record_id: t1, contributor_name: Wendi Alper-Pressman, contributor_type: Individual}
-        - {record_id: t2, contributor_name: Acme Corp, contributor_type: Organization}
-        - {record_id: t3, contributor_name: '#N/A #N/A', contributor_type: Organization}
-        - {record_id: t4, contributor_name: Some PAC, contributor_type: Committee}
+        - {record_id: t1, contributor_name: Wendi Alper-Pressman, contributor_type: Individual, contributor_company: null}
+        - {record_id: t2, contributor_name: Acme Corp, contributor_type: Organization, contributor_company: Acme Corp}
+        - {record_id: t3, contributor_name: '#N/A #N/A', contributor_type: Organization, contributor_company: McDonalds}
+        - {record_id: t4, contributor_name: Some PAC, contributor_type: Committee, contributor_company: Hotel Co}
+        - {record_id: t5, contributor_name: Boling, contributor_type: Individual, contributor_company: null}
 
   - name: tap_contributions_placeholder_names
     model: stg_tap_mec__contributions

@@ -203,7 +203,11 @@ select
         when ctrb_type = 'Committee' then ctrb_name_clean
         when ctrb_type is null then committee_clean
     end as contributor_committee_name,
-    company as contributor_company,
+    -- 2020-2022 layout only: a company that repeats the person's own name is not an employer (#485)
+    case
+        when ctrb_type is null then {{ mogov.company_unless_person_name('company', 'first_name', 'last_name') }}
+        else company
+    end as contributor_company,
     employer as contributor_employer,
     occupation as contributor_occupation,
     coalesce(city_clean, city) as contributor_city,

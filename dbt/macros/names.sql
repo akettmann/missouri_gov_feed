@@ -46,6 +46,30 @@
     )
 {%- endmacro %}
 
+{#- The company column unless it is part of the person's own name (#485): MEC filers often type the donor's name into
+    `company` as well, and that is not an employer. That is the first name, last name or both repeated, or, when
+    only one of first / last name is filled (a shifted row: surname in first_name, given name in company), the other
+    half of the name. -#}
+{% macro company_unless_person_name(company_expr, first_expr, last_expr) -%}
+    case
+        when
+            lower(trim({{ company_expr }})) in (
+                lower(trim({{ first_expr }})),
+                lower(trim({{ last_expr }})),
+                lower(trim(coalesce({{ first_expr }}, '') || ' ' || coalesce({{ last_expr }}, '')))
+            )
+            or (
+                (
+                    (nullif(trim({{ first_expr }}), '') is null and nullif(trim({{ last_expr }}), '') is not null)
+                    or (nullif(trim({{ first_expr }}), '') is not null and nullif(trim({{ last_expr }}), '') is null)
+                )
+                and {{ mogov.has_person_name(first_expr, last_expr) }}
+            )
+            then null
+        else {{ company_expr }}
+    end
+{%- endmacro %}
+
 {#- A payroll surname as a match key: name_key without the trailing generational or professional suffixes the payroll
     prints inside the surname field ("BRATTIN JR.", "HADEN DVM"), so it equals the official's family name. -#}
 {% macro surname_key(expr) -%}

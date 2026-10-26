@@ -15,7 +15,9 @@ select
     end as contributor_type,
     -- the donor committee's name as reported (no MECID: mecid is the receiving committee's)
     nullif(trim(committee), '') as contributor_committee_name,
-    coalesce(nullif(company, ''), nullif(committee, '')) as contributor_company,
+    coalesce(
+        nullif({{ mogov.company_unless_person_name('company', 'first_name', 'last_name') }}, ''), nullif(committee, '')
+    ) as contributor_company,
     employer as contributor_employer,
     occupation as contributor_occupation,
     trim(city) as contributor_city,

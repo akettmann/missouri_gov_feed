@@ -10,7 +10,9 @@ unit_tests:
     description: >
       MEC records a company next to the person's name when the person lists an employer (#485: first name
       repeated in company, a credit union's staff with the credit union as company). A company alone makes an
-      Organization; a company beside a first or last name is still an Individual. A committee wins over both,
+      Organization; a company beside a first or last name is still an Individual, and a company that only repeats
+      that name, or the given name of a shifted row (surname alone in first_name), is not an employer
+      (contributor_company is null). A committee wins over both,
       and the filler names ('#N/A', 'Not applicable') are not a person, so the company stays the donor.
     given:
       - input: source('mec', 'cd1_a')
@@ -41,11 +43,11 @@ unit_tests:
           union all select 'C1', null, 'Jane', 'Roe', '', '', null, null, null, null, '8', '1/2/2024 12:00:00 AM', null, null, 'r8'
     expect:
       rows:
-        - {record_id: r1, contributor_name: Natalie DiNicola, contributor_type: Individual}
-        - {record_id: r2, contributor_name: Mary Harmon, contributor_type: Individual}
-        - {record_id: r3, contributor_name: Boling, contributor_type: Individual}
-        - {record_id: r4, contributor_name: Acme Corp, contributor_type: Organization}
-        - {record_id: r5, contributor_name: '#N/A #N/A', contributor_type: Organization}
-        - {record_id: r6, contributor_name: Not applicable Not applicable, contributor_type: Organization}
-        - {record_id: r7, contributor_name: Some PAC, contributor_type: Committee}
-        - {record_id: r8, contributor_name: Jane Roe, contributor_type: Individual}
+        - {record_id: r1, contributor_name: Natalie DiNicola, contributor_type: Individual, contributor_company: null}
+        - {record_id: r2, contributor_name: Mary Harmon, contributor_type: Individual, contributor_company: United Consumers CU}
+        - {record_id: r3, contributor_name: Boling, contributor_type: Individual, contributor_company: null}
+        - {record_id: r4, contributor_name: Acme Corp, contributor_type: Organization, contributor_company: Acme Corp}
+        - {record_id: r5, contributor_name: '#N/A #N/A', contributor_type: Organization, contributor_company: McDonalds}
+        - {record_id: r6, contributor_name: Not applicable Not applicable, contributor_type: Organization, contributor_company: St. Clement of Rome}
+        - {record_id: r7, contributor_name: Some PAC, contributor_type: Committee, contributor_company: Some PAC}
+        - {record_id: r8, contributor_name: Jane Roe, contributor_type: Individual, contributor_company: null}
