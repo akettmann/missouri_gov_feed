@@ -85,6 +85,16 @@ Quirks:
   links none in). That found 6,449 roll calls, 1,526 on Senate measures. Misses are cached for good once
   the session's year is over and re-checked daily before that. The first probe took about 8 minutes per
   shard with 4 shards.
+- Committee posts (`fct_committee_memberships`, `fct_committee_posts`): the member XML page lists each
+  member's committees and subcommittees with a position (Chair, Vice-Chair, Co-Chair, Ranking Minority
+  Member, Member), in every session from 2017 except 253, whose pages list none. For 253 the
+  `COMMITTEELIST` list (memberships only for 231, 241, 251, 253 and 254) fills in, matched on district.
+  `COMMITTEELIST` also lists Senate members (chamber `S`) and a few `N/A` rows; only `H` is used. The
+  snapshot is end-of-session, and the dbt marts keep only people in `dim_official`, so older sessions have
+  few rows (9 officials in 2017, 151 in 2026). Committee names change between sessions. The metric counts
+  full-committee chairs separately from subcommittee chairs.
+- Bill sponsorship success (share of a member's sponsored bills that passed) is not built yet: it needs the
+  bill status from #34, which is in flight in another session.
 - PDF text extraction is cached by PDF content (`data/cache/pdftext/`). Before that, a re-run spent
   3–10 minutes per shard re-parsing PDFs that were already downloaded.
 
@@ -382,6 +392,10 @@ Quirks:
   dbt var `case_history_min_year` (default 1975).
 - In the 2026-09 snapshot, 8th Circuit (ca8) opinions stop in August 2019. The API loader covers later
   ones.
+- Time to disposition (`fct_judge_time_to_disposition`): only the federal districts (`moed`, `mowd`) have a
+  judge (`assigned_to_id`) and filing and termination dates on a docket; the state courts (`mo`, `moctapp`)
+  have none, and `ca8` has no judge. Of 173,882 district dockets with a judge, 165,797 have both dates; 93
+  of those end before they were filed (a source error) and are left out of the median.
 - The filtered CSVs are cached per snapshot (`data/cache/courtlistener/mo-*.csv`), so re-runs within
   a quarter are quick. Cases can be up to three months stale; `courtlistener_cases` tops up.
 

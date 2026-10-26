@@ -1886,3 +1886,167 @@ models:
       - name: source_url
         data_type: varchar
         description: The Grand Totals PDF the judge was read from.
+
+  - name: fct_committee_memberships
+    description: >
+      House committee and subcommittee memberships per official and session, with the member's position (Chair,
+      Vice-Chair, Co-Chair, Ranking Minority Member, Member). An end-of-session snapshot from the House member
+      pages (every session since 2017 but 253) and the COMMITTEELIST export for 253. Former members who are not
+      in dim_official are left out. Committee names change across sessions, so compare a committee by name only
+      within a session. Grain: one row per (official, session, committee).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, session_code, committee_name]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: session_year between 2017 and 2030
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests: [not_null]
+      - name: session_code
+        data_type: varchar
+        description: House session code.
+        data_tests: [not_null]
+      - name: session_year
+        data_type: integer
+        description: Calendar year of the session.
+      - name: committee_name
+        data_type: varchar
+        description: Committee name as the House lists it for that session. Subcommittees say "Subcommittee".
+        data_tests: [not_null]
+      - name: position_name
+        data_type: varchar
+        description: The member's position on the committee.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Chair', 'Vice-Chair', 'Co-Chair', 'Ranking Minority Member', 'Member']
+      - name: is_subcommittee
+        data_type: boolean
+        description: True when the committee name contains "Subcommittee".
+      - name: source
+        data_type: varchar
+        description: member_page (the member's own House page) or committee_list (the COMMITTEELIST export).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['member_page', 'committee_list']
+
+  - name: fct_committee_posts
+    description: >
+      Committee posts held per official and House session, counted from the House's own committee lists: full
+      committees served on, and the titles held on them (chair, vice-chair, co-chair, ranking minority member).
+      Subcommittees are counted apart (subcommittee_chair_posts) so chairing several subcommittees is not shown as
+      chairing several committees. A count of titles, not a score. Grain: one row per (official, session).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, session_code]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: chair_posts + vice_chair_posts + co_chair_posts + ranking_posts <= committees_held
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests: [not_null]
+      - name: session_code
+        data_type: varchar
+        description: House session code.
+      - name: session_year
+        data_type: integer
+        description: Calendar year of the session.
+      - name: committees_held
+        data_type: bigint
+        description: Full (non-sub) committees the member served on.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 25
+      - name: chair_posts
+        data_type: bigint
+        description: Full committees chaired.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 6
+      - name: vice_chair_posts
+        data_type: bigint
+        description: Full committees where the member is Vice-Chair.
+      - name: co_chair_posts
+        data_type: bigint
+        description: Full committees where the member is Co-Chair.
+      - name: ranking_posts
+        data_type: bigint
+        description: Full committees where the member is Ranking Minority Member.
+      - name: subcommittee_chair_posts
+        data_type: bigint
+        description: Subcommittees chaired.
+
+  - name: fct_judge_time_to_disposition
+    description: >
+      Median days from filing to termination of the federal district-court dockets (E.D. and W.D. Missouri)
+      assigned to each judge, from the CourtListener bulk export. Built only with the cl_case_bulk var. The state
+      courts carry no judge or dates in that export. Dockets that end before they were filed are left out of the
+      median and counted in dockets_ends_before_filed. Show dockets_measured next to the median, and
+      share_with_both_dates for how much of the judge's docket load it covers. "Assigned" is the judge on the
+      docket record, not necessarily who decided it. Includes judges who no longer sit. Grain: one row per judge.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [cl_person_id]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: dockets_measured + dockets_ends_before_filed = dockets_with_both_dates
+    columns:
+      - name: cl_person_id
+        data_type: varchar
+        description: CourtListener person id of the judge.
+        data_tests: [not_null]
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }} Null for judges not in the officials list (retired or senior)."
+      - name: judge_name
+        data_type: varchar
+        description: Name from the CourtListener judge database.
+      - name: court_id
+        data_type: varchar
+        description: moed, mowd, or moed+mowd for a judge with dockets in both districts.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['moed', 'mowd', 'moed+mowd']
+      - name: dockets_assigned
+        data_type: bigint
+        description: Dockets assigned to the judge.
+      - name: dockets_with_both_dates
+        data_type: bigint
+        description: Of those, dockets with both a filing and a termination date.
+      - name: dockets_ends_before_filed
+        data_type: bigint
+        description: Dockets with both dates where the termination is before the filing (excluded from the median).
+      - name: dockets_measured
+        data_type: bigint
+        description: Dockets behind the median (both dates, duration of zero or more days).
+      - name: share_with_both_dates
+        data_type: float
+        description: dockets_with_both_dates / dockets_assigned.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1
+      - name: median_days_to_disposition
+        data_type: float
+        description: Median days from filing to termination over the measured dockets. Null when none were measured.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 7305
