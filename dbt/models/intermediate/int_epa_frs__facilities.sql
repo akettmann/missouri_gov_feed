@@ -4,17 +4,24 @@
 -- ranking of types), then program record, so tied names pick the same row every build, #386); the NAICS
 -- code is the code the most program systems give (program_system: RCRAINFO, NPDES, AIR, ... each counts once
 -- per code however many records it has, so a duplicated NPDES permit or an air record listed twice adds nothing;
--- AIR and AIRS/AFS are different systems and count separately), taking the programs' primary
--- codes first (naics_source 'naics'), then the ones FRS leaves UNKNOWN
+-- AIR and AIRS/AFS are one program under two names (the same air permit, mirrored IDs) and count once; a
+-- 4- or 5-digit code (RCRAINFO, EIS and RMP truncate: 81232) counts for the 6-digit code at the same facility
+-- that extends it (812320), so the two forms of one code no longer split the vote, #432; a short code gives a full
+-- vote to EVERY 6-digit code it extends, so two 6-digit codes sharing a 5-digit prefix both get that vote),
+-- taking the programs'
+-- primary codes first (naics_source 'naics'), then the ones FRS leaves UNKNOWN
 -- ('naics_unknown'), then the ones it calls SECONDARY ('naics_secondary'). Only a facility with no NAICS code
 -- at all but a SIC code (a primary one before an unknown or secondary one, then the one the most program systems give)
 -- gets the NAICS sector that SIC code's major group falls in (seed sic_naics_sectors): naics_code is then the
 -- two-digit sector prefix, naics_description names the sector and the SIC code, and naics_source is 'sic'.
 -- naics_source is null when the facility has no usable code. A real NAICS code, even a non-primary one, is
 -- more precise than a two-digit SIC-derived sector, and agrees with it on the sector for about 90% of facilities.
--- Codes tied on tier and program-system count go to the one in the SIC-derived sector (NAICS 31-33 count as one
--- sector), then any other code before the construction stormwater-permit noise codes (NAICS 238910, SIC 1629;
--- a site holds that permit beside its real industry, #432), then the lowest code. The SIC sector counts only as
+-- Codes tied on tier and program-system count: any other code first, before the construction stormwater-permit
+-- noise code NAICS 238910 (a site holds that permit beside its real industry, and an MO-DNR UNKNOWN row mirrors
+-- it, which would win the all-tier count, #432); then the one more program systems give across ALL tiers (the
+-- same count over primary, unknown and secondary rows; the UNKNOWN-tier rows usually back the right code, #432),
+-- then the one in the SIC-derived sector (NAICS 31-33 count as one sector), then a 6-digit code before a shorter
+-- one, then the lowest code. The SIC sector counts only as
 -- a signal when the SIC code is not itself tied (same tier and program-system count) with a SIC code in a
 -- different sector, and is not SIC 1629 (construction stormwater-permit noise).
 -- is_government: a federal site, any owner-role organization typed as a government body
@@ -24,6 +31,8 @@
 {% set sic_description_parts = [
     "sec.sector_name", "' sector, from SIC '", "ps.sic_code", "' '", "ps.sic_description"
 ] %}
+{# FRS lists one air program under two names; count it once. #}
+{% set program_family = "case when program_system = 'AIRS/AFS' then 'AIR' else program_system end" %}
 {% set government_name = (
     '(^| )(city|town|village|county|state) of | county$|county commission'
     ~ '|school district|water district|sewer district|public works'
@@ -96,7 +105,7 @@ sic as (
         sic_code,
         max(sic_description) as sic_description,
         min(case when is_primary then 0 when is_secondary then 2 else 1 end) as rank_class,
-        count(distinct coalesce(program_system, '')) as n_program_systems
+        count(distinct coalesce({{ program_family }}, '')) as n_program_systems
     from {{ ref('stg_epa_frs__sic') }}
     where sic_code is not null
     group by registry_id, sic_code
@@ -157,16 +166,64 @@ primary_sic as (
     from sic_sectors
 ),
 
+naics_rows as (
+    select
+        registry_id,
+        naics_code,
+        naics_description,
+        coalesce({{ program_family }}, '') as program_family,
+        case when is_primary then 0 when is_secondary then 2 else 1 end as rank_class
+    from {{ ref('stg_epa_frs__naics') }}
+    where naics_code is not null
+),
+
+-- the 6-digit codes a facility has: the targets a shorter code at the same facility extends
+naics_full as (
+    select
+        registry_id,
+        naics_code,
+        max(naics_description) as naics_description
+    from naics_rows
+    where length(naics_code) = 6
+    group by registry_id, naics_code
+),
+
+-- a 4- or 5-digit code becomes (one row per) 6-digit code of the same facility it is the prefix of, and takes that
+-- code's description; with no such code it stays as it is
+naics_normalised as (
+    select
+        r.registry_id,
+        coalesce(f.naics_code, r.naics_code) as naics_code,
+        coalesce(f.naics_description, r.naics_description) as naics_description,
+        r.program_family,
+        r.rank_class
+    from naics_rows as r
+    left join naics_full as f
+        on
+            r.registry_id = f.registry_id
+            and length(r.naics_code) < 6
+            and left(f.naics_code, length(r.naics_code)) = r.naics_code
+),
+
 naics as (
     select
         registry_id,
         naics_code,
         max(naics_description) as naics_description,
-        case when is_primary then 0 when is_secondary then 2 else 1 end as rank_class,
-        count(distinct coalesce(program_system, '')) as n_program_systems
-    from {{ ref('stg_epa_frs__naics') }}
-    where naics_code is not null
-    group by registry_id, naics_code, case when is_primary then 0 when is_secondary then 2 else 1 end
+        rank_class,
+        count(distinct program_family) as n_program_systems
+    from naics_normalised
+    group by registry_id, naics_code, rank_class
+),
+
+-- program systems per code over every tier, a tie-break within a tier
+naics_all_tiers as (
+    select
+        registry_id,
+        naics_code,
+        count(distinct program_family) as n_systems_all_tiers
+    from naics_normalised
+    group by registry_id, naics_code
 ),
 
 best_naics as (
@@ -180,6 +237,10 @@ best_naics as (
             order by
                 n.rank_class asc,
                 n.n_program_systems desc,
+                -- 238910 (the construction stormwater permit) loses ties to a real industry (#432), ahead of the
+                -- all-tier count: an MO-DNR UNKNOWN row mirrors the permit and would otherwise give it more systems
+                case when n.naics_code = '238910' then 1 else 0 end asc,
+                allt.n_systems_all_tiers desc,
                 -- among tied codes, the one in the sector the facility's SIC code maps to (#181); no signal from
                 -- SIC 1629 (construction stormwater-permit noise) or a SIC code tied across sectors
                 case
@@ -190,12 +251,15 @@ best_naics as (
                         then 0
                     else 1
                 end asc,
-                -- then NAICS 238910 (site preparation, the construction stormwater permit) loses ties to a
-                -- real industry (#432); other construction codes are real industries
+                -- NAICS 238910 again (no effect after the demotion above; kept as the original tie-break). Other
+                -- construction codes are real industries
                 case when n.naics_code = '238910' then 1 else 0 end asc,
+                -- a full 6-digit code before a truncated one, then the code order
+                length(n.naics_code) desc,
                 n.naics_code asc
         ) as rn
     from naics as n
+    inner join naics_all_tiers as allt on n.registry_id = allt.registry_id and n.naics_code = allt.naics_code
     left join primary_sic as ps on n.registry_id = ps.registry_id and ps.rn = 1
     left join {{ ref('naics_sectors') }} as sc on left(n.naics_code, 2) = sc.naics_prefix
 )
