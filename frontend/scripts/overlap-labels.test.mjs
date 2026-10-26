@@ -1,0 +1,24 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { mostRecentBillsLabel, voteLinkLabel } from "../src/lib/overlapLabels.ts";
+
+test("one example reads singular, several plural", () => {
+  assert.equal(mostRecentBillsLabel(1), "1 most recent bill");
+  assert.equal(mostRecentBillsLabel(5), "5 most recent bills");
+});
+
+test("Senate journal PDFs are labeled as the day's journal, House votes as roll call", () => {
+  assert.equal(
+    voteLinkLabel("https://www.senate.mo.gov/22info/Journals/RDay45-2022.pdf#vote3"),
+    "Senate journal for that day",
+  );
+  assert.equal(
+    voteLinkLabel("https://www.senate.mo.gov/22info/Journals/RDay45-2022.pdf"),
+    "Senate journal for that day",
+  );
+  assert.equal(
+    voteLinkLabel("https://documents.house.mo.gov/billtracking/bills221/rollcalls/055.011.pdf"),
+    "roll call",
+  );
+  assert.equal(voteLinkLabel(null), "roll call");
+});

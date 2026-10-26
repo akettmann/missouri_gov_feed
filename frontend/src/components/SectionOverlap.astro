@@ -7,6 +7,7 @@ import type { OfficialBundle } from "../lib/exports/types";
 import { voteCastLabel } from "../lib/attendance";
 import { count, money } from "../lib/format";
 import { href } from "../lib/site";
+import { mostRecentBillsLabel, voteLinkLabel } from "../lib/overlapLabels";
 
 interface Props {
   bundle: OfficialBundle;
@@ -68,14 +69,14 @@ const industryLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).repl
               <td class="num">{count(o.nay)}</td>
               <td>
                 <details>
-                  <summary class="small">{o.examples.length} most recent bills</summary>
+                  <summary class="small">{mostRecentBillsLabel(o.examples.length)}</summary>
                   <ul class="ex small">
                     {o.examples.map((e) => (
                       <li>
                         {e.vote_date} · <SourceLink url={e.bill_source_url} label={e.bill} />
                         {e.short_title && <span class="muted"> {e.short_title}</span>} · voted{" "}
                         {voteCastLabel(e.vote_cast)} ·{" "}
-                        <SourceLink url={e.vote_source_url} label="roll call" />
+                        <SourceLink url={e.vote_source_url} label={voteLinkLabel(e.vote_source_url)} />
                       </li>
                     ))}
                   </ul>
