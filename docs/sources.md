@@ -239,7 +239,7 @@ Quirks:
   (who funds the PAC that funds an official, #9), `int_mec__donor_committees` matches that name to the names
   committees file under, in tiers: a curated alias (the `committee_donor_aliases` seed, e.g. HRCC, AMECPAC, MHA PAC,
   each matched to the committee's own filings and carrying its evidence; high confidence), a MECID typed into the
-  name, the same name (case, punctuation and spacing ignored), a normalized name (MO = Missouri, Assn = Association,
+  name, the same name (case ignored; punctuation and other non-alphanumeric characters turned into spaces; runs of spaces collapsed but not removed: "Health PAC" and "HealthPAC" differ, #108), a normalized name (MO = Missouri, Assn = Association,
   ...), and a core name without words like PAC, Political, Action, Committee, Fund, Account (also tried on the name
   outside parentheses, and on a filer's parenthesized short name). A match counts only if that committee was active
   within a year of the gift, and only when it is unique. Measured October 2026 over both feeds ($489M from
@@ -800,7 +800,7 @@ offices, shops and most service businesses are missing.
   `spatial` extension, which `dbt/profiles.yml` loads (downloaded on first use).
 - Donor match, two ways (`matched_by`):
   - `same name`: the donor organization's name equals the facility's, owner's or parent company's after
-    normalizing case and punctuation and dropping a leading "the" and legal-form words (Inc, LLC, Co,
+    lower-casing, turning punctuation into spaces and dropping a leading "the" and legal-form words (Inc, LLC, Co,
     Corp...).
   - `same company`: both names carry one brand from the `company_brands` seed. Corporate money mostly comes
     from PACs named after the brand ("Ameren Missouri PAC", "Spire PAC", "AT&T Missouri Employee PAC"), while

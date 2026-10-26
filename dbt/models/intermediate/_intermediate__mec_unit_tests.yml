@@ -7,7 +7,7 @@ unit_tests:
     model: int_mec__donor_committees
     description: >
       Each tier of the name match, and the active-year rule. A MECID typed into the name wins even outside the
-      committee's years; same name (case and punctuation ignored) -> high; MO/Missouri -> normalized, medium;
+      committee's years; same name (case ignored, punctuation turned into spaces) -> high; MO/Missouri -> normalized, medium;
       PAC vs Political Action Committee and a filer's parenthesized short name -> core, medium. A name reused
       by two committees resolves to the one active that year (+-1); two active ones -> ambiguous with both
       listed; a name known only from other years -> not active that year. Two committees that differ only by
@@ -70,7 +70,7 @@ unit_tests:
     model: int_mec__donor_committees
     description: >
       A curated alias (committee_donor_aliases, #33) links an acronym donor no rule can expand ("HRCC" ->
-      House Republican Campaign Committee), ignoring case and punctuation, labeled "curated alias", high.
+      House Republican Campaign Committee), ignoring case and turning punctuation into spaces, labeled "curated alias", high.
       It still needs the committee to be active that year ("not active that year" otherwise), it beats a rule
       match for the same name, and an alias naming a MECID that isn't a known committee creates no link (the
       name falls back to the rules, here an exact-name match; an acronym with only a bad alias stays "no match").
