@@ -18,15 +18,14 @@
 -- more precise than a two-digit SIC-derived sector, and agrees with it on the sector for about 90% of facilities.
 -- Codes tied on tier and program-system count: the one more program systems give across ALL tiers, not counting
 -- MO-DNR and RMP (the same count over primary, unknown and secondary rows; the UNKNOWN-tier rows usually back the
--- right code, #432; MO-DNR is a state copy of what other systems report: at most facilities where another system also
--- reports a NAICS code, its code matches (or extends or truncates) one of theirs. RMP, the facility's own Risk
--- Management Plan, does so at only about half of those facilities, so it is not a pure mirror, but it is left out on
--- purpose:
--- counted, it would let one more UNKNOWN row outvote the SIC sector (#513,
--- #520); a judgment call, not a claim that RMP duplicates another system); then the one in the SIC-derived sector
--- (NAICS 31-33 count as one sector); then any other
--- code before the construction stormwater-permit noise code NAICS 238910 (a site holds that permit beside its real
--- industry, #432), which still wins when the SIC sector is construction; then the all-tier count again with MO-DNR
+-- right code, #432). MO-DNR is a state copy of what other systems report: at most facilities where another system
+-- also reports a NAICS code, its code matches (or extends or truncates) one of theirs. RMP, the facility's own Risk
+-- Management Plan, does so at only about two-thirds of those facilities, and matches exactly at under half (it mostly
+-- files 5-digit codes), so it is not a pure mirror. It is left out on purpose: counted, it would let one more
+-- UNKNOWN row outvote the SIC sector (#513, #520); a judgment call, not a claim that RMP duplicates another system.
+-- Then the one in the SIC-derived sector (NAICS 31-33 count as one sector); then any other code before the
+-- construction stormwater-permit noise code NAICS 238910 (a site holds that permit beside its real industry,
+-- #432), which still wins when the SIC sector is construction; then the all-tier count again with MO-DNR
 -- and RMP included (they still back a code when nothing else separates them), then a 6-digit code before a
 -- shorter one, then the lowest code. The SIC sector counts only as a signal when the SIC code is not itself tied
 -- (same tier and program-system count) with a SIC code in a different sector, and is not construction
