@@ -458,6 +458,12 @@ models:
       - name: vote_date
         data_type: date
         description: Date of the vote.
+      - name: vote_description
+        data_type: varchar
+        description: >
+          What the roll call decided, as in fct_votes. Senate journal text names the question ("read the 3rd time
+          and passed", "SA 2 failed of adoption"); House roll calls carry only the calendar item, which does not
+          tell an amendment from passage. The site uses it to pick one example vote per bill.
       - name: bill
         data_type: varchar
         description: The bill voted on (fct_vote_bills).

@@ -45,7 +45,7 @@ const industryLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).repl
             <th class="num">Roll calls</th>
             <th class="num">Yea</th>
             <th class="num">Nay</th>
-            <th>Recent votes</th>
+            <th>Recent bills voted on</th>
           </tr>
         </thead>
         <tbody>
@@ -68,7 +68,7 @@ const industryLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).repl
               <td class="num">{count(o.nay)}</td>
               <td>
                 <details>
-                  <summary class="small">{o.examples.length} most recent</summary>
+                  <summary class="small">{o.examples.length} most recent bills</summary>
                   <ul class="ex small">
                     {o.examples.map((e) => (
                       <li>

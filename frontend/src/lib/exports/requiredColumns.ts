@@ -8,6 +8,7 @@
 // export lacks into the same stale-export error. Listing a column here only adds the up-front, all-at-once report.
 export const REQUIRED_COLUMNS: Record<string, readonly string[]> = {
   rpt_attendance: ["recused_from_voting"],
+  rpt_interest_vote_overlap: ["vote_description"],
   rpt_attendance_pay: ["pay_source_url", "covered_years", "voting_years"],
   fct_committee_posts: [
     "official_id",
