@@ -166,10 +166,10 @@ unit_tests:
           - {official_id: d, office: state_house}
       - input: ref('rpt_attendance')
         rows:
-          - {official_id: a, first_vote_date: 2020-03-01, votes_present: 100, votes_recorded: 100}
-          - {official_id: b, first_vote_date: 2020-03-01, votes_present: 90, votes_recorded: 100}
-          - {official_id: c, first_vote_date: 2020-03-01, votes_present: 80, votes_recorded: 100}
-          - {official_id: d, first_vote_date: 2020-03-01, votes_present: 70, votes_recorded: 100}
+          - {official_id: a, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 100, votes_recorded: 100}
+          - {official_id: b, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: c, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 80, votes_recorded: 100}
+          - {official_id: d, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 70, votes_recorded: 100}
       - input: ref('rpt_donor_rollup')
         rows: []
       - input: ref('fct_federal_donor_summary')
@@ -206,22 +206,22 @@ unit_tests:
           - {official_id: s, office: state_house}
       - input: ref('rpt_attendance')
         rows:
-          - {official_id: x, first_vote_date: 2015-03-01, votes_present: 99, votes_recorded: 100}
-          - {official_id: r, first_vote_date: 2015-03-01, votes_present: 90, votes_recorded: 100}
-          - {official_id: x, first_vote_date: 2016-03-01, votes_present: 99, votes_recorded: 100}
-          - {official_id: r, first_vote_date: 2016-03-01, votes_present: 90, votes_recorded: 100}
-          - {official_id: r, first_vote_date: 2017-03-01, votes_present: 90, votes_recorded: 100}
-          - {official_id: s, first_vote_date: 2017-03-01, votes_present: 70, votes_recorded: 100}
-          - {official_id: x, first_vote_date: 2018-03-01, votes_present: 99, votes_recorded: 100}
-          - {official_id: r, first_vote_date: 2018-03-01, votes_present: 90, votes_recorded: 100}
-          - {official_id: x, first_vote_date: 2019-03-01, votes_present: 99, votes_recorded: 100}
-          - {official_id: r, first_vote_date: 2019-03-01, votes_present: 50, votes_recorded: 50}
-          - {official_id: x, first_vote_date: 2020-03-01, votes_present: 99, votes_recorded: 100}
-          - {official_id: r, first_vote_date: 2020-03-01, votes_present: 90, votes_recorded: 100}
-          - {official_id: x, first_vote_date: 2021-03-01, votes_present: 80, votes_recorded: 100}
-          - {official_id: r, first_vote_date: 2021-03-01, votes_present: 90, votes_recorded: 100}
-          - {official_id: x, first_vote_date: 2022-03-01, votes_present: 99, votes_recorded: 100}
-          - {official_id: r, first_vote_date: 2022-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: x, chamber: state_house, first_vote_date: 2015-03-01, votes_present: 99, votes_recorded: 100}
+          - {official_id: r, chamber: state_house, first_vote_date: 2015-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: x, chamber: state_house, first_vote_date: 2016-03-01, votes_present: 99, votes_recorded: 100}
+          - {official_id: r, chamber: state_house, first_vote_date: 2016-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: r, chamber: state_house, first_vote_date: 2017-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: s, chamber: state_house, first_vote_date: 2017-03-01, votes_present: 70, votes_recorded: 100}
+          - {official_id: x, chamber: state_house, first_vote_date: 2018-03-01, votes_present: 99, votes_recorded: 100}
+          - {official_id: r, chamber: state_house, first_vote_date: 2018-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: x, chamber: state_house, first_vote_date: 2019-03-01, votes_present: 99, votes_recorded: 100}
+          - {official_id: r, chamber: state_house, first_vote_date: 2019-03-01, votes_present: 50, votes_recorded: 50}
+          - {official_id: x, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 99, votes_recorded: 100}
+          - {official_id: r, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: x, chamber: state_house, first_vote_date: 2021-03-01, votes_present: 80, votes_recorded: 100}
+          - {official_id: r, chamber: state_house, first_vote_date: 2021-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: x, chamber: state_house, first_vote_date: 2022-03-01, votes_present: 99, votes_recorded: 100}
+          - {official_id: r, chamber: state_house, first_vote_date: 2022-03-01, votes_present: 90, votes_recorded: 100}
       - input: ref('rpt_donor_rollup')
         rows: []
       - input: ref('fct_federal_donor_summary')
@@ -581,12 +581,12 @@ unit_tests:
           - {official_id: f, office: state_house}
       - input: ref('rpt_attendance')
         rows:
-          - {official_id: a, first_vote_date: 2020-03-01, votes_present: 99, votes_recorded: 100}
-          - {official_id: b, first_vote_date: 2020-03-01, votes_present: 98, votes_recorded: 100}
-          - {official_id: c, first_vote_date: 2020-03-01, votes_present: 97, votes_recorded: 100}
-          - {official_id: d, first_vote_date: 2020-03-01, votes_present: 96, votes_recorded: 100}
-          - {official_id: e, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
-          - {official_id: f, first_vote_date: 2020-03-01, votes_present: 94, votes_recorded: 100}
+          - {official_id: a, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 99, votes_recorded: 100}
+          - {official_id: b, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 98, votes_recorded: 100}
+          - {official_id: c, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 97, votes_recorded: 100}
+          - {official_id: d, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 96, votes_recorded: 100}
+          - {official_id: e, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
+          - {official_id: f, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 94, votes_recorded: 100}
       - input: ref('rpt_donor_rollup')
         rows: []
       - input: ref('fct_federal_donor_summary')
@@ -607,6 +607,56 @@ unit_tests:
         - {award: highest_attendance, period: lifetime, official_id: a, award_rank: 1, metric: 99.0, sample_size: 100, group_size: 6, streak_years: null}
         - {award: highest_attendance, period: lifetime, official_id: b, award_rank: 2, metric: 98.0, sample_size: 100, group_size: 6, streak_years: null}
         - {award: highest_attendance, period: lifetime, official_id: c, award_rank: 3, metric: 97.0, sample_size: 100, group_size: 6, streak_years: null}
+
+  - name: awards_attendance_ranks_in_the_chamber_of_the_votes
+    model: rpt_awards
+    description: >
+      m served in the state_house in 2016 and moved to the state_senate (dim_official.office) for 2018. Attendance
+      is ranked in the chamber the votes were cast in, one row per chamber (issue 436): in the 2016 House field
+      (h1, h2, h3, m) m is lowest at 70.0 and h1 highest; in the 2018 Senate field (s1, s2, s3, m) m is highest
+      at 99.0 and s3 lowest. The lifetime lists are per chamber too (m's House 70.0 and Senate 99.0 are not
+      pooled into 84.5). Ranking by the current office would put m's 2016 votes in a one-member Senate field
+      (below awards_min_field_size) and leave the House field with three, crowning h3 lowest.
+    overrides:
+      vars:
+        awards_threshold: {default: 1}
+        awards_min_field_size: 3
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: h1, office: state_house}
+          - {official_id: h2, office: state_house}
+          - {official_id: h3, office: state_house}
+          - {official_id: m, office: state_senate}
+          - {official_id: s1, office: state_senate}
+          - {official_id: s2, office: state_senate}
+          - {official_id: s3, office: state_senate}
+      - input: ref('rpt_attendance')
+        rows:
+          - {official_id: h1, chamber: state_house, first_vote_date: 2016-03-01, votes_present: 99, votes_recorded: 100}
+          - {official_id: h2, chamber: state_house, first_vote_date: 2016-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: h3, chamber: state_house, first_vote_date: 2016-03-01, votes_present: 80, votes_recorded: 100}
+          - {official_id: m, chamber: state_house, first_vote_date: 2016-03-01, votes_present: 70, votes_recorded: 100}
+          - {official_id: s1, chamber: state_senate, first_vote_date: 2018-03-01, votes_present: 95, votes_recorded: 100}
+          - {official_id: s2, chamber: state_senate, first_vote_date: 2018-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: s3, chamber: state_senate, first_vote_date: 2018-03-01, votes_present: 85, votes_recorded: 100}
+          - {official_id: m, chamber: state_senate, first_vote_date: 2018-03-01, votes_present: 99, votes_recorded: 100}
+      - input: ref('rpt_donor_rollup')
+        rows: []
+      - input: ref('fct_federal_donor_summary')
+        rows: []
+      - input: ref('fct_party_unity_yearly')
+        rows: []
+    expect:
+      rows:
+        - {award: lowest_attendance, office: state_house, period: '2016', official_id: m, award_rank: 1, metric: 70.0, group_size: 4, streak_years: 1}
+        - {award: highest_attendance, office: state_house, period: '2016', official_id: h1, award_rank: 1, metric: 99.0, group_size: 4, streak_years: 1}
+        - {award: lowest_attendance, office: state_house, period: lifetime, official_id: m, award_rank: 1, metric: 70.0, group_size: 4, streak_years: null}
+        - {award: highest_attendance, office: state_house, period: lifetime, official_id: h1, award_rank: 1, metric: 99.0, group_size: 4, streak_years: null}
+        - {award: lowest_attendance, office: state_senate, period: '2018', official_id: s3, award_rank: 1, metric: 85.0, group_size: 4, streak_years: 1}
+        - {award: highest_attendance, office: state_senate, period: '2018', official_id: m, award_rank: 1, metric: 99.0, group_size: 4, streak_years: 1}
+        - {award: lowest_attendance, office: state_senate, period: lifetime, official_id: s3, award_rank: 1, metric: 85.0, group_size: 4, streak_years: null}
+        - {award: highest_attendance, office: state_senate, period: lifetime, official_id: m, award_rank: 1, metric: 99.0, group_size: 4, streak_years: null}
 
   - name: awards_attendance_cap_is_floor_of_half_an_odd_field
     model: rpt_awards
@@ -630,13 +680,13 @@ unit_tests:
           - {official_id: h2, office: state_house}
       - input: ref('rpt_attendance')
         rows:
-          - {official_id: l1, first_vote_date: 2020-03-01, votes_present: 90, votes_recorded: 100}
-          - {official_id: l2, first_vote_date: 2020-03-01, votes_present: 91, votes_recorded: 100}
-          - {official_id: l3, first_vote_date: 2020-03-01, votes_present: 92, votes_recorded: 100}
-          - {official_id: m1, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
-          - {official_id: m2, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
-          - {official_id: h1, first_vote_date: 2020-03-01, votes_present: 98, votes_recorded: 100}
-          - {official_id: h2, first_vote_date: 2020-03-01, votes_present: 99, votes_recorded: 100}
+          - {official_id: l1, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 90, votes_recorded: 100}
+          - {official_id: l2, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 91, votes_recorded: 100}
+          - {official_id: l3, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 92, votes_recorded: 100}
+          - {official_id: m1, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
+          - {official_id: m2, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
+          - {official_id: h1, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 98, votes_recorded: 100}
+          - {official_id: h2, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 99, votes_recorded: 100}
       - input: ref('rpt_donor_rollup')
         rows: []
       - input: ref('fct_federal_donor_summary')
@@ -680,12 +730,12 @@ unit_tests:
           - {official_id: f, office: state_house}
       - input: ref('rpt_attendance')
         rows:
-          - {official_id: a, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
-          - {official_id: b, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
-          - {official_id: c, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
-          - {official_id: d, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
-          - {official_id: e, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
-          - {official_id: f, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
+          - {official_id: a, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
+          - {official_id: b, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
+          - {official_id: c, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
+          - {official_id: d, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
+          - {official_id: e, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
+          - {official_id: f, chamber: state_house, first_vote_date: 2020-03-01, votes_present: 95, votes_recorded: 100}
       - input: ref('rpt_donor_rollup')
         rows: []
       - input: ref('fct_federal_donor_summary')
