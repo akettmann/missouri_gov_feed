@@ -28,3 +28,40 @@ unit_tests:
       rows:
         - {year: 2025, official_id: 'mohouse:1', office: state_house, session_code: '251'}
         - {year: 2025, official_id: 'mohouse:2', office: state_house, session_code: '253'}
+
+  - name: officeholders_house_row_dropped_when_the_roster_outlives_the_members_last_term
+    model: int_officeholders__years
+    description: >
+      The House roster keeps listing a member after their last Open States House term ended (Rebecca Roeber, HD34,
+      died 2019-07-30 but 2020 still lists her; #152). The row counts only while the term runs past the year's
+      January 15 handover: she is listed for 2019 (term ends mid-year) and dropped for 2020, a member whose term ends
+      in 2020 stays for 2020, and a member with no Open States House term stays, and so does a row the seat match did not tie to an Open States
+      person even when that person's House term in Open States stops earlier (Lauren Arthur, 2017-2018).
+    given:
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '191', session_year: 2019, person_key: 'ocd-person/rebecca', openstates_id: 'ocd-person/rebecca', full_name: Rebecca Roeber, district_number: 34}
+          - {session_code: '201', session_year: 2020, person_key: 'ocd-person/rebecca', openstates_id: 'ocd-person/rebecca', full_name: Rebecca Roeber, district_number: 34}
+          - {session_code: '201', session_year: 2020, person_key: 'ocd-person/lee', openstates_id: 'ocd-person/lee', full_name: Ann Lee, district_number: 42}
+          - {session_code: '201', session_year: 2020, person_key: 'mohouse:7', full_name: Bob Poe, district_number: 7}
+          - {session_code: '201', session_year: 2020, person_key: 'ocd-person/arthur', full_name: Cy Arthur, district_number: 18}
+      - input: ref('stg_openstates__people')
+        rows: []
+        format: dict
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: 'ocd-person/rebecca', chamber: lower, district_number: 34, start_date: '2015-01-01', end_date: '2019-07-30'}
+          - {person_id: 'ocd-person/lee', chamber: lower, district_number: 42, start_date: '2015-01-01', end_date: '2020-12-31'}
+          - {person_id: 'ocd-person/arthur', chamber: lower, district_number: 18, start_date: '2015-01-01', end_date: '2016-12-31'}
+      - input: ref('stg_congress__terms')
+        rows: []
+        format: dict
+      - input: ref('stg_fjc__appointments')
+        rows: []
+        format: dict
+    expect:
+      rows:
+        - {year: 2019, official_id: 'ocd-person/rebecca', office: state_house, session_code: '191'}
+        - {year: 2020, official_id: 'ocd-person/lee', office: state_house, session_code: '201'}
+        - {year: 2020, official_id: 'mohouse:7', office: state_house, session_code: '201'}
+        - {year: 2020, official_id: 'ocd-person/arthur', office: state_house, session_code: '201'}

@@ -716,3 +716,27 @@ unit_tests:
         - {session_code: '201', district_number: 34, house_member_id: '1790', raw_person_key: ocd-person/rebecca}
         - {session_code: '211', district_number: 34, house_member_id: '2215', raw_person_key: ocd-person/rick}
         - {session_code: '201', district_number: 42, house_member_id: '902', raw_person_key: ocd-person/lee}
+
+  - name: house_member_with_two_given_name_anchors_keeps_the_seat_match
+    model: int_mo_house__member_seat_keys
+    description: >
+      A member id whose other sessions matched two different Open States people by given name (duplicate Open States
+      records for one person, e.g. member 2235 Cook) has no single anchor, so a session whose seat match lands on
+      someone else stays on the seat match. Loosening the anchor guard to one-or-more would pick one of the two
+      duplicates and override the seat match (#152).
+    given:
+      - input: ref('stg_mo_house__members')
+        rows:
+          - {session_code: '171', session_year: 2017, district_number: 10, house_member_id: '2235', first_name: Ann, last_name: Cook}
+          - {session_code: '191', session_year: 2019, district_number: 11, house_member_id: '2235', first_name: Ann, last_name: Cook}
+          - {session_code: '201', session_year: 2020, district_number: 12, house_member_id: '2235', first_name: Ann, last_name: Cook}
+      - input: ref('int_mo_legislators__seat_terms')
+        rows:
+          - {openstates_id: ocd-person/ann-one, chamber: lower, district_number: 10, surname_key: cook, full_name_key: ann cook, start_date: '2015-01-01', end_date: '2018-12-31'}
+          - {openstates_id: ocd-person/ann-two, chamber: lower, district_number: 11, surname_key: cook, full_name_key: ann cook, start_date: '2019-01-01', end_date: '2019-12-31'}
+          - {openstates_id: ocd-person/bob, chamber: lower, district_number: 12, surname_key: cook, full_name_key: bob cook, start_date: '2020-01-01', end_date: '2021-12-31'}
+    expect:
+      rows:
+        - {session_code: '171', district_number: 10, house_member_id: '2235', raw_person_key: ocd-person/ann-one}
+        - {session_code: '191', district_number: 11, house_member_id: '2235', raw_person_key: ocd-person/ann-two}
+        - {session_code: '201', district_number: 12, house_member_id: '2235', raw_person_key: ocd-person/bob}
