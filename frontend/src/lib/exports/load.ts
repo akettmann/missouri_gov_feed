@@ -308,7 +308,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
                  cast(democratic_yea as integer) as democratic_yea, cast(democratic_nay as integer) as democratic_nay,
                  source_url
           from {rpt_party_breaks}
-          order by official_id, vote_date desc, chamber, session_code, measure, vote_description, source_url`),
+          order by official_id, vote_date desc, chamber, session_code, vote_id, measure, vote_description, source_url`),
       )
     : null;
 
