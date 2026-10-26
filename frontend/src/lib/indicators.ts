@@ -74,19 +74,31 @@ export function indicatorMeta(key: string): IndicatorMeta {
   );
 }
 
-/** Who a peer strip counts: the Missouri officials tracked here, not the whole chamber. */
+/**
+ * Who a peer strip counts. Every peer set is current officials only (dim_official), of any office, so the state
+ * nouns name the chamber where the measurement was taken, never the office: a "Missouri House" group can
+ * include a current senator or the auditor who once served there.
+ */
 const PEER_NOUNS: Record<string, [string, string]> = {
-  state_house: ["Missouri House member", "Missouri House members"],
-  state_senate: ["Missouri Senate member", "Missouri Senate members"],
-  us_house: ["Missouri U.S. House member", "Missouri U.S. House members"],
-  us_senate: ["Missouri U.S. senator", "Missouri U.S. senators"],
+  state_house: ["current official", "current officials"],
+  state_senate: ["current official", "current officials"],
+  us_house: ["current Missouri U.S. House member", "current Missouri U.S. House members"],
+  us_senate: ["current Missouri U.S. senator", "current Missouri U.S. senators"],
+};
+
+const MEASURED_IN: Record<string, string> = {
+  state_house: "the Missouri House",
+  state_senate: "the Missouri Senate",
+  us_house: "the U.S. House",
+  us_senate: "the U.S. Senate",
 };
 
 /**
- * "Among 2 Missouri U.S. senators with a score in the 119th Congress:" lead of a peer strip's text summary.
- * `period` is a Congress number for DW-NOMINATE (the peers share that Congress) but only the last year served
- * for Shor-McCarty, whose peers are every career score in the chamber, and null for party unity (all loaded
- * votes); so only DW-NOMINATE names the period.
+ * "Among 2 current Missouri U.S. senators with a score in the 119th Congress:" lead of a peer strip's text summary.
+ * Peers are current officials grouped by the chamber of the measurement. `period` is a Congress number for
+ * DW-NOMINATE (the peers share that Congress); Shor-McCarty groups by the chamber of each official's last
+ * Shor-McCarty score (period is only the last year served), and party unity by the chamber whose loaded
+ * party-line votes they cast; so only DW-NOMINATE names the period.
  */
 export const peerStripLead = (
   peerCount: number,
@@ -95,15 +107,15 @@ export const peerStripLead = (
   period: number | null,
 ) => {
   const [one, many] = PEER_NOUNS[chamber] ?? [`${chamber} member`, `${chamber} members`];
-  const scope =
-    indicator === "dw_nominate_dim1"
-      ? period == null
-        ? "with a score"
-        : `with a score in the ${ordinal(period)} Congress`
-      : indicator === "shor_mccarty_np"
-        ? "with a career score"
-        : "with a party-unity score";
-  return `Among ${plural(peerCount, one, many)} ${scope}:`;
+  const where = MEASURED_IN[chamber] ?? chamber;
+  const who = plural(peerCount, one, many);
+  if (indicator === "dw_nominate_dim1") {
+    return `Among ${who} with a score${period == null ? "" : ` in the ${ordinal(period)} Congress`}:`;
+  }
+  if (indicator === "shor_mccarty_np") {
+    return `Among ${who} whose Shor-McCarty career score was last measured in ${where}:`;
+  }
+  return `Among ${who} who cast party-line votes in ${where}:`;
 };
 
 /** the party-line "breaks" sentence on a legislator's voting section */
