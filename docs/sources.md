@@ -789,8 +789,8 @@ offices, shops and most service businesses are missing.
 - Stray commas and tabs: EPA writes many names, addresses and cities with a trailing comma ("BUTTERBALL,",
   "900 WATSON DR,") or trailing tabs, and some owner names too. Staging (`mogov.clean_registry_text`) collapses
   whitespace runs and cuts leading/trailing commas, semicolons and whitespace from facility name, address, city and
-  organization name; "INC." and inner commas stay. Names that were only separators or empty become null (60
-  sites; the sites tables say "unnamed site"). Inner doubled commas ("LIPPERT FAMILY FARM,, LLC") are not touched (#319).
+  organization name; "INC." and single inner commas stay. Names that were only separators or empty become null (60
+  sites; the sites tables say "unnamed site"). A doubled inner comma or semicolon becomes one ("LIPPERT FAMILY FARM,, LLC" shows as "LIPPERT FAMILY FARM, LLC", "K-BAR-L ;;C" as "K-BAR-L ;C") (#381).
 - `epa_frs_sic` joined the loader after the other three. A raw directory landed before that has no SIC table;
   `mogov build` then creates an empty placeholder (like the other late-added or optional JSON tables in
   `db.OPTIONAL_JSON_TABLES`), so the SIC fallback finds no codes and those sites show no industry until the
