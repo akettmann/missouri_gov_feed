@@ -6,6 +6,7 @@ import type { GetStaticPaths } from "astro";
 import Layout from "../../layouts/Layout.astro";
 import { officialIndex, pastOfficeholders } from "../../lib/exports/load";
 import type { PastOfficeholder } from "../../lib/exports/types";
+import { plural } from "../../lib/businessCounts";
 import { LEVELS, officeLine } from "../../lib/format";
 import { buildOfficeGroups, missingOfficeLabels, pastNote } from "../../lib/lookback";
 import { href } from "../../lib/site";
@@ -51,7 +52,7 @@ const { rows, year, years, currentYear, missing } = Astro.props as {
     ))}
   </nav>
   <p class="small muted">
-    {rows.length} officeholders in {year}
+    {plural(rows.length, "officeholder", "officeholders")} in {year}
   </p>
   <div class="table-scroll card list">
     <table aria-label={`Officeholders in ${year}`}>
