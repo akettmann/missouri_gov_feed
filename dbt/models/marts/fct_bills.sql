@@ -6,6 +6,10 @@
 -- status and outcome come from the House XML's actions (int_bills__status): null for Senate bills that never
 -- reached the House, whose actions aren't loaded: every Senate bill before 2024, since the House's list of Senate
 -- bills exists only for 2024 and later.
+-- Each regular session also lists 15 to 17 relistings of the previous session's appropriation bills (status
+-- 'relisted for governor message', relisted_from_session_code naming the original's session): the House adds
+-- them only to record the governor's Art. IV, s. 27 message. They are rows here but not new bills, so count
+-- bills with status <> 'relisted for governor message'; they have no outcome, so outcome counts are unaffected.
 with subjects as (
     select
         session_code,
@@ -66,6 +70,7 @@ select
     b.last_action,
     st.status,
     st.outcome,
+    st.relisted_from_session_code,
     b.proposed_effective_date,
     b.source_url
 from bills as b

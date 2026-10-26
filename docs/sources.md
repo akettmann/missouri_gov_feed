@@ -147,7 +147,16 @@ Quirks:
   and 56 of 58 SJRs in 2026. `SenateActList` exists only for 2024 and later, so every Senate bill of 2017 to
   2023 has a null status and outcome, enacted ones included (2017 to 2023: 0 of 4,143 SBs have a status; 2024: 29
   of 796, none enacted because the list stops before the governor). Counts of failed, pending or enacted bills
-  therefore leave out Senate bills, almost all of them before 2024; House bills are complete. Loading
+  therefore leave out Senate bills, almost all of them before 2024; House bills are complete.
+  Quirk: 143 bills (15 to 17 per regular session, 2017 to 2026, none in 2021; e.g. 2024 HB 1 and HB 2) list
+  only "Message Received from the Governor, pursuant to Article IV, Section 27" as their action. They are
+  re-listings, not new bills: the House repeats the previous regular session's appropriation bills (same bill
+  number, bill string and effective date, LR numbers from 241 on; 2024 HB 1 is the FY2024 budget bill of the 2023
+  session) only to record the governor's budget/withholding message. Where the previous session is loaded (128 of
+  128) the bill string is identical and the original is already "enacted"; the 15 of 2017 repeat the unloaded
+  2016 session (161). They get status "relisted for governor message", a null outcome (it is on the original) and
+  `relisted_from_session_code` naming the original's session (null for 2017), rather than "introduced" /
+  "failed" (#396). Leave them out of per-session bill counts. Loading
   Senate-side actions is #317 (and #237).
 - `ActivitySequence` (action order) is only present from 2024. About 1,000 of 138,000 actions are repeated word
   for word under one `Guid` (mostly 2017–2018); staging keeps them once.
@@ -346,13 +355,13 @@ Quirks:
 - Committee donors on CD1_A carry only a name (`committee`); `mecid` is the receiving committee. To go one hop back
   (who funds the PAC that funds an official, #9), `int_mec__donor_committees` matches that name to the names
   committees file under, in tiers: a curated alias (the `committee_donor_aliases` seed, e.g. HRCC, AMECPAC, MHA PAC,
-  each matched to the committee's own filings and carrying its evidence; high confidence), a MECID typed into the
+  each group checked against the committee's filings or its own filed name, carrying its evidence; high confidence), a MECID typed into the
   name, the same name (case ignored; punctuation and other non-alphanumeric characters turned into spaces; runs of spaces collapsed but not removed: "Health PAC" and "HealthPAC" differ, #108), a normalized name (MO = Missouri, Assn = Association,
   ...), and a core name without words like PAC, Political, Action, Committee, Fund, Account (also tried on the name
   outside parentheses, and on a filer's parenthesized short name). A match counts only if that committee was active
-  within a year of the gift, and only when it is unique. Measured October 2026 over both feeds ($489M from
-  committees): 71% of the dollars match one committee, 1.4% are ambiguous, 27% match nothing. An exact name match
-  alone got about 46%. Most of the misses are federal and out-of-state PACs (DRIVE, AFSCME, DGA), which don't file
+  within a year of the gift, and only when it is unique. Measured October 2026 over both feeds ($417M from
+  committees): 71% of the dollars match one committee, 1.5% are ambiguous, 27% match nothing, and 0.6% name a
+  committee that was not active that year. An exact name match alone gets about 53%. Most of the misses are federal and out-of-state PACs (DRIVE, AFSCME, DGA), which don't file
   with MEC, plus acronyms that no name rule can expand (the common ones, HRCC, AMECPAC and MHA PAC, are in the alias
   seed). Distinct committees can differ only by "MO" vs "Missouri" ("MO Values PAC" and "Missouri Values PAC"), so
   the exact-name tier is tried first.

@@ -4,11 +4,12 @@ seeds:
     description: >
       Curated donor names for the committee-to-committee crosswalk (int_mec__donor_committees, #33): names
       donors type for a Missouri committee that no normalization rule can expand ("HRCC", "AMECPAC", "MHA PAC").
-      Each alias maps to one MECID, each checked by matching gifts reported under the name to the committee's own
-      filings (recipient, amount, date), with the evidence recorded. Matching ignores case and turns punctuation into spaces, so
+      Each alias maps to one MECID. Each alias group was checked against the committee's filings (gifts reported
+      under the name matched on recipient, amount, date), or against the committee's own filed name; the
+      evidence column records which, and some spellings rest on their group alone. Matching ignores case and turns punctuation into spaces, so
       list a spelling once. Matches are labeled "curated alias", high confidence, and count only in years the
       committee was active. An alias naming a MECID the committees don't have matches nothing. Add an alias only
-      after checking it against the committee's own filings; leave out ones that could be two committees.
+      after checking it against the committee's filings or its own filed name; leave out ones that could be two committees.
       The matching was done by an automated check; checked_by and checked_on stay empty until a maintainer
       signs the row off.
     config:
