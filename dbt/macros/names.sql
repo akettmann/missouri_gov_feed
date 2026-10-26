@@ -60,14 +60,14 @@
     the doubled comma goes too), and commas, semicolons and whitespace are cut from both ends, so "BUTTERBALL," and
     "900 WATSON DR,  " lose their stray comma while "ACME INC." and "SUITE 1" keep their own punctuation. Doubled
     semicolons are left alone: "K-BAR-L ;;C" is probably a shifted-hand typo for "LLC", not a separator. Null when
-    nothing is left. The ends are cut in one pass: the leading and the trailing run are separate patterns, so each
+    nothing is left. HTML entities are decoded first (decode_registry_entities, #398). The ends are cut in one pass: the leading and the trailing run are separate patterns, so each
     is a plain anchored match. #}
 {% macro clean_registry_text(expr) -%}
     nullif(
         {{ mogov.regex_replace_all(
             mogov.regex_replace_all(
                 mogov.regex_replace_all(
-                    mogov.regex_replace_all(expr, '[[:space:]]+', ' '),
+                    mogov.regex_replace_all(mogov.decode_registry_entities(expr), '[[:space:]]+', ' '),
                     ' ?,,+', ','
                 ),
                 '^[,;[:space:]]+', ''
@@ -75,5 +75,26 @@
             '[,;[:space:]]+$', ''
         ) }},
         ''
+    )
+{%- endmacro %}
+
+
+{#- The HTML entities EPA FRS writes into its text (#398), decoded: &AMP; / &amp; to '&' and the numeric &#39; &#40;
+    &#41; to ' ( ). Only the entities that occur in the files are decoded, so a bare '&' ("AT&T") and any other
+    text are left alone. '&' is decoded last, so a double-encoded "&amp;#39;" ends as "&#39;" and is not decoded
+    twice (none occur). A new entity in a later EPA file shows up in the stg_epa_frs__* no-entity tests. -#}
+{% macro decode_registry_entities(expr) -%}
+    replace(
+        replace(
+            replace(
+                replace(
+                    replace({{ expr }}, '&#39;', ''''),
+                    '&#40;', '('
+                ),
+                '&#41;', ')'
+            ),
+            '&AMP;', '&'
+        ),
+        '&amp;', '&'
     )
 {%- endmacro %}
