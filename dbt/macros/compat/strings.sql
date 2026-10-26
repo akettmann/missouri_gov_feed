@@ -132,3 +132,16 @@
 {% macro zero_pad(expr, n) -%}
     {{ dbt.right(dbt.concat(["'" ~ ('0' * n) ~ "'", dbt.safe_cast(expr, dbt.type_string())]), n) }}
 {%- endmacro %}
+
+{# The character with code point `n` (e.g. 10 for a newline). BigQuery has no CHR; everything else here does. #}
+{% macro chr(n) -%}
+    {{ return(adapter.dispatch('chr', 'mogov')(n)) }}
+{%- endmacro %}
+
+{% macro default__chr(n) -%}
+    chr({{ n }})
+{%- endmacro %}
+
+{% macro bigquery__chr(n) -%}
+    code_points_to_string([{{ n }}])
+{%- endmacro %}
