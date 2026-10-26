@@ -793,8 +793,8 @@ unit_tests:
   - name: officeholders_by_year_source_url
     model: rpt_officeholders_by_year
     description: >
-      A past row links to the roster it came from: the House's session export carries the year's two-digit
-      session code, an Open States senator the folder holding their file (retired or legislature), a judge their
+      A past row links to the roster it came from: the House's session export is the session file listing the member
+      (a special-session-only member gets 253, not the year's regular 251), an Open States senator the folder holding their file (retired or legislature), a judge their
       own FJC page, Congress one dataset page. A senator whose official_id is the merged person_id still links
       to the folder of the Open States record the row came from (openstates_id); one with no Open States record gets a null link, which the not_null test then flags, not the generic folder. No current-year rows are given, so the test does not
       depend on the build date.
@@ -809,8 +809,9 @@ unit_tests:
           - {openstates_id: os3-old, folder: retired}
       - input: ref('int_officeholders__years')
         rows:
-          - {year: 2009, official_id: 'mohouse:1', full_name: Ann Roe, level: state, office: state_house, source: mo_house roster}
-          - {year: 2019, official_id: 'mohouse:2', full_name: Bob Poe, level: state, office: state_house, source: mo_house roster}
+          - {year: 2009, official_id: 'mohouse:1', full_name: Ann Roe, level: state, office: state_house, source: mo_house roster, session_code: '091'}
+          - {year: 2019, official_id: 'mohouse:2', full_name: Bob Poe, level: state, office: state_house, source: mo_house roster, session_code: '191'}
+          - {year: 2025, official_id: 'mohouse:3', full_name: Cal Special, level: state, office: state_house, source: mo_house roster, session_code: '253'}
           - {year: 2019, official_id: os1, full_name: Cy Doe, level: state, office: state_senate, source: openstates, openstates_id: os1}
           - {year: 2019, official_id: os2, full_name: Fay Ray, level: state, office: state_senate, source: openstates, openstates_id: os2}
           - {year: 2019, official_id: os3-new, full_name: Gus Fox, level: state, office: state_senate, source: openstates, openstates_id: os3-old}
@@ -821,6 +822,7 @@ unit_tests:
       rows:
         - {year: 2009, official_id: 'mohouse:1', source_url: 'https://documents.house.mo.gov/xml/091.zip'}
         - {year: 2019, official_id: 'mohouse:2', source_url: 'https://documents.house.mo.gov/xml/191.zip'}
+        - {year: 2025, official_id: 'mohouse:3', source_url: 'https://documents.house.mo.gov/xml/253.zip'}
         - {year: 2019, official_id: os1, source_url: 'https://github.com/openstates/people/tree/main/data/mo/retired'}
         - {year: 2019, official_id: os2, source_url: 'https://github.com/openstates/people/tree/main/data/mo/legislature'}
         - {year: 2019, official_id: os3-new, source_url: 'https://github.com/openstates/people/tree/main/data/mo/retired'}

@@ -13,6 +13,7 @@ from pathlib import Path
 import yaml
 
 GRAIN = {
+    "int_bills__status": "one row per (session, bill) in the House XML export, House and Senate bills",
     "int_bills__subjects": "one row per (session, bill, subject) from one chamber's index",
     "int_bluebook__bios": "one biography per (edition, person) in the legislative/executive chapters",
     "int_bluebook__judge_bios": "one biography per judge in the judicial chapter",
@@ -39,6 +40,7 @@ GRAIN = {
     "int_mo_auditor__reports": "one row per State Auditor report, with its rating and audited entity type",
     "int_mo_house__votes": "one row per (House roll call, attributed person)",
     "int_mo_legislators__seats": "one row per Open States legislative seat-term",
+    "int_mo_revisor__session_law_bills": "one row per (RSMo section version, act, bill) a history or repeal note names",
     "int_mo_legislators__seat_terms": "one row per Open States legislative seat-term, under the id Open States gave",
     "int_mo_senate__votes": "one row per (Senate journal vote, attributed person)",
     "int_officeholders__years": "one row per (year, person, office) for offices with dated past rosters",

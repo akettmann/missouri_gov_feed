@@ -1,0 +1,30 @@
+unit_tests:
+  - name: officeholders_house_row_keeps_the_earliest_session_file_listing_the_member
+    model: int_officeholders__years
+    description: >
+      The House roster is published per session file, and 2025 has a regular session (251) and special sessions
+      (253, 254). A member in 251 and 253 is one row that keeps 251; one listed only in 253 and 254 keeps 253 (the
+      earliest file that lists them), so the link in rpt_officeholders_by_year opens a file that names them (#129).
+    given:
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '251', session_year: 2025, person_key: 'mohouse:1', full_name: Ann Roe, district_number: 1}
+          - {session_code: '253', session_year: 2025, person_key: 'mohouse:1', full_name: Ann Roe, district_number: 1}
+          - {session_code: '253', session_year: 2025, person_key: 'mohouse:2', full_name: Bob Poe, district_number: 2}
+          - {session_code: '254', session_year: 2025, person_key: 'mohouse:2', full_name: Bob Poe, district_number: 2}
+      - input: ref('stg_openstates__people')
+        rows: []
+        format: dict
+      - input: ref('int_mo_legislators__seats')
+        rows: []
+        format: dict
+      - input: ref('stg_congress__terms')
+        rows: []
+        format: dict
+      - input: ref('stg_fjc__appointments')
+        rows: []
+        format: dict
+    expect:
+      rows:
+        - {year: 2025, official_id: 'mohouse:1', office: state_house, session_code: '251'}
+        - {year: 2025, official_id: 'mohouse:2', office: state_house, session_code: '253'}
