@@ -181,3 +181,75 @@ unit_tests:
         - {rollcall_url: u1, session_code: '171', session_day: 35, rollcall_number: 8, vote_date: '2017-03-02'}
         - {rollcall_url: u3, session_code: '171', session_day: 35, rollcall_number: 10, vote_date: null}
         - {rollcall_url: u4, session_code: '173', session_day: 1, rollcall_number: 1, vote_date: '2017-09-12'}
+
+  - name: house_rollcalls_whose_header_names_another_session_are_dropped
+    model: stg_mo_house__rollcalls
+    description: >
+      The PDF header prints the General Assembly and a session label (#435). A regular session (code ending 1)
+      must print its own General Assembly and FIRST (odd year) or SECOND (even year) REGULAR SESSION; any other
+      session must print its General Assembly and an EXTRAORDINARY or SPECIAL label, whose ordinal is not
+      compared (173 prints SPECIAL, 184 prints FIRST EXTRAORDINARY). The five misfiled PDFs of the issue are
+      the "drop" rows (171 SPECIAL, 201 FIRST EXTRAORDINARY, 204 SECOND REGULAR); the wrong General Assembly
+      and the wrong regular ordinal are dropped too. A row with no header text is kept. A label that is not recognised ("VETO SESSION") is kept too, under a regular (201) or a non-regular (204) session code, so the
+      accepted_values test on header_session_label fails loudly instead of rows vanishing. Ignoring the
+      General Assembly, ignoring the label, or comparing the extraordinary ordinal fails this test.
+    given:
+      - input: source('mo_house', 'rollcalls')
+        format: sql
+        rows: |
+            select cast('{"url": "keep_171", "session_code": "171", "session_day": "1", "rollcall_number": "1", "vote_date": "1/4/2017", "text": "UNOFFICIAL COPY 99th General Assembly\n   FIRST REGULAR SESSION\n State of Missouri"}' as varchar) as payload union all
+            select '{"url": "drop_171_special", "session_code": "171", "session_day": "2", "rollcall_number": "1", "vote_date": "5/23/2017", "text": "UNOFFICIAL COPY 99th General Assembly\n   SPECIAL SESSION\n State of Missouri"}' union all
+            select '{"url": "drop_171_old_ga", "session_code": "171", "session_day": "3", "rollcall_number": "1", "vote_date": "3/2/2017", "text": "UNOFFICIAL COPY 98th General Assembly\n   FIRST REGULAR SESSION\n State of Missouri"}' union all
+            select '{"url": "keep_173_special", "session_code": "173", "session_day": "1", "rollcall_number": "1", "vote_date": "9/12/2017", "text": "UNOFFICIAL COPY 99th General Assembly\n   SPECIAL SESSION\n State of Missouri"}' union all
+            select '{"url": "keep_174_second", "session_code": "174", "session_day": "1", "rollcall_number": "1", "vote_date": "12/1/2017", "text": "UNOFFICIAL COPY 99th General Assembly\n   SECOND EXTRAORDINARY SESSION\n State of Missouri"}' union all
+            select '{"url": "keep_184_first", "session_code": "184", "session_day": "1", "rollcall_number": "1", "vote_date": "8/1/2018", "text": "UNOFFICIAL COPY 99th General Assembly\n   FIRST EXTRAORDINARY SESSION\n State of Missouri"}' union all
+            select '{"url": "keep_181", "session_code": "181", "session_day": "1", "rollcall_number": "1", "vote_date": "1/3/2018", "text": "UNOFFICIAL COPY 99th General Assembly\n   SECOND REGULAR SESSION\n State of Missouri"}' union all
+            select '{"url": "drop_181_first", "session_code": "181", "session_day": "2", "rollcall_number": "1", "vote_date": "1/4/2018", "text": "UNOFFICIAL COPY 99th General Assembly\n   FIRST REGULAR SESSION\n State of Missouri"}' union all
+            select '{"url": "drop_201_extra", "session_code": "201", "session_day": "12", "rollcall_number": "1", "vote_date": "9/16/2020", "text": "UNOFFICIAL COPY 100th General Assembly\n   FIRST EXTRAORDINARY SESSION\n State of Missouri"}' union all
+            select '{"url": "drop_204_regular", "session_code": "204", "session_day": "3", "rollcall_number": "2", "vote_date": "11/19/2020", "text": "UNOFFICIAL COPY 100th General Assembly\n   SECOND REGULAR SESSION\n State of Missouri"}' union all
+            select '{"url": "keep_204_second", "session_code": "204", "session_day": "3", "rollcall_number": "4", "vote_date": "11/10/2020", "text": "UNOFFICIAL COPY 100th General Assembly\n   SECOND EXTRAORDINARY SESSION\n State of Missouri"}' union all
+            select '{"url": "keep_unknown_label", "session_code": "201", "session_day": "13", "rollcall_number": "1", "vote_date": "9/16/2020", "text": "UNOFFICIAL COPY 100th General Assembly\n   VETO SESSION\n State of Missouri"}' union all
+            select '{"url": "keep_unknown_label_204", "session_code": "204", "session_day": "5", "rollcall_number": "1", "vote_date": "11/12/2020", "text": "UNOFFICIAL COPY 100th General Assembly\n   VETO SESSION\n State of Missouri"}' union all
+            select '{"url": "keep_no_text", "session_code": "211", "session_day": "1", "rollcall_number": "1", "vote_date": "1/6/2021"}'
+    expect:
+      rows:
+        - {rollcall_url: keep_171, header_general_assembly: 99, header_session_label: FIRST REGULAR SESSION}
+        - {rollcall_url: keep_173_special, header_general_assembly: 99, header_session_label: SPECIAL SESSION}
+        - {rollcall_url: keep_174_second, header_general_assembly: 99, header_session_label: SECOND EXTRAORDINARY SESSION}
+        - {rollcall_url: keep_184_first, header_general_assembly: 99, header_session_label: FIRST EXTRAORDINARY SESSION}
+        - {rollcall_url: keep_181, header_general_assembly: 99, header_session_label: SECOND REGULAR SESSION}
+        - {rollcall_url: keep_204_second, header_general_assembly: 100, header_session_label: SECOND EXTRAORDINARY SESSION}
+        - {rollcall_url: keep_unknown_label, header_general_assembly: 100, header_session_label: VETO SESSION}
+        - {rollcall_url: keep_unknown_label_204, header_general_assembly: 100, header_session_label: VETO SESSION}
+        - {rollcall_url: keep_no_text, header_general_assembly: null, header_session_label: null}
+
+  - name: house_rollcalls_published_twice_under_one_key_keep_one_pdf
+    model: stg_mo_house__rollcalls
+    description: >
+      The House published some roll calls twice under different file names (261: 003.001 = 003.002, 004.002 =
+      004.004, #435), so (session, day, roll-call number) repeats. One PDF per key stays: the one whose file name
+      carries the roll-call number, else the first by URL. A roll call with no roll-call number is never merged
+      with another. Keeping both copies (double-counted votes), or keeping the later file name, fails this test.
+    given:
+      - input: source('mo_house', 'rollcalls')
+        format: sql
+        rows: |
+            select cast('{"url": "https://x/bills261/rollcalls/003.002.pdf", "session_code": "261", "session_day": "3", "rollcall_number": "1", "vote_date": "1/12/2026"}' as varchar) as payload union all
+            select '{"url": "https://x/bills261/rollcalls/003.001.pdf", "session_code": "261", "session_day": "3", "rollcall_number": "1", "vote_date": "1/12/2026"}' union all
+            select '{"url": "https://x/bills261/rollcalls/004.004.pdf", "session_code": "261", "session_day": "4", "rollcall_number": "2", "vote_date": "1/13/2026"}' union all
+            select '{"url": "https://x/bills261/rollcalls/004.002.pdf", "session_code": "261", "session_day": "4", "rollcall_number": "2", "vote_date": "1/13/2026"}' union all
+            select '{"url": "https://x/bills261/rollcalls/005.009.pdf", "session_code": "261", "session_day": "5", "rollcall_number": "7", "vote_date": "1/14/2026"}' union all
+            select '{"url": "https://x/bills261/rollcalls/005.008.pdf", "session_code": "261", "session_day": "5", "rollcall_number": "7", "vote_date": "1/14/2026"}' union all
+            select '{"url": "https://x/bills261/rollcalls/006.001.pdf", "session_code": "261", "session_day": "6", "vote_date": "1/15/2026"}' union all
+            select '{"url": "https://x/bills261/rollcalls/006.002.pdf", "session_code": "261", "session_day": "6", "vote_date": "1/15/2026"}' union all
+            select '{"url": "https://x/bills261/rollcalls/007.001.pdf", "session_code": "261", "session_day": "7", "rollcall_number": "1", "vote_date": "1/16/2026"}' union all
+            select '{"url": "https://x/bills251/rollcalls/007.001.pdf", "session_code": "251", "session_day": "7", "rollcall_number": "1", "vote_date": "1/16/2025"}'
+    expect:
+      rows:
+        - {rollcall_url: https://x/bills261/rollcalls/003.001.pdf, session_code: '261', session_day: 3, rollcall_number: 1}
+        - {rollcall_url: https://x/bills261/rollcalls/004.002.pdf, session_code: '261', session_day: 4, rollcall_number: 2}
+        - {rollcall_url: https://x/bills261/rollcalls/005.008.pdf, session_code: '261', session_day: 5, rollcall_number: 7}
+        - {rollcall_url: https://x/bills261/rollcalls/006.001.pdf, session_code: '261', session_day: 6, rollcall_number: null}
+        - {rollcall_url: https://x/bills261/rollcalls/006.002.pdf, session_code: '261', session_day: 6, rollcall_number: null}
+        - {rollcall_url: https://x/bills261/rollcalls/007.001.pdf, session_code: '261', session_day: 7, rollcall_number: 1}
+        - {rollcall_url: https://x/bills251/rollcalls/007.001.pdf, session_code: '251', session_day: 7, rollcall_number: 1}
