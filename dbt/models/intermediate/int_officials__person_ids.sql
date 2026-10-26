@@ -284,6 +284,9 @@ name_person as (
     left join ranked as r on k.group_key = r.group_key and r.rn = 1
 ),
 
+-- rule 2c is a single pass, not full connected components: ids join through a member id's anchor once, so a chain
+-- across 3+ persons (A shares a member id with B, B another with C) can stay split. It never wrongly joins; the
+-- data test assert_house_member_id_one_person flags the leftovers through its shared_id branch.
 -- rule 2c. An id takes part when its roster rows carry exactly one House member id and it is not a signed
 -- different_people id. Ids that share a member id are one person: each such id's name-rule person is pulled to
 -- the smallest person any of them has, so the persons the name rules made are joined, not just the single ids.

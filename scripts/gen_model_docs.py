@@ -46,7 +46,7 @@ GRAIN = {
     "int_officeholders__years": "one row per (year, person, office) for offices with dated past rosters",
     "int_officials__bios": "one biography text per official per source",
     "int_officials__current": "one row per (person, current office)",
-    "int_officials__identity_terms": "one row per (id as sourced, year, office, district)",
+    "int_officials__identity_terms": "one row per (id as sourced, year, office, district, House member id)",
     "int_officials__name_keys": "one row per (official, normalized name variant)",
     "int_officials__person_ids": "one row per id a legislator has been given, with the stable person_id",
     "int_officials__wikidata": "one row per official with a Wikidata QID",

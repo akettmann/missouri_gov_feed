@@ -351,7 +351,7 @@ models:
     overlap from succession. They are not the January-1 adjusted dates used for the year membership above: those
     would make a January successor (from Jan 1) overlap a predecessor Open States ends on Jan 6-9. Known edge: the
     min(start)/max(end) collapse per (alias_id, year, office, district) spans any gap if one id holds the same seat
-    in two separate terms in a year. Grain: one row per (id as sourced, year, office, district).'
+    in two separate terms in a year. Grain: one row per (id as sourced, year, office, district, House member id).'
 - name: int_officials__name_keys
   description: 'Normalized name variants per current official, for matching sources that only carry names (MEC committees,
     lobbyist reports, Wikidata labels, ratings). One row per (official, variant). Grain: one row per (official,

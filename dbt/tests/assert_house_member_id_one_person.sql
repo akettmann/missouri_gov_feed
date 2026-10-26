@@ -3,6 +3,8 @@
 --   shared_id    two person_keys carry one member id, so int_officials__person_ids missed a name change. The id
 --                holder is left out when its raw key also carries a second member id (Open States' Rick Roeber
 --                holds Rebecca Roeber's 1790 through a seat-match error, #152): the person-id rule skips it.
+--   merged_two_people  one person_key holds more than one member id from more than one raw key: the rule joined
+--                two people (Rick and Rebecca Roeber, say). A name change keeps one raw key per person, or one id.
 --   two_ids_at_once  one person_key holds two member ids in one session: the rule joined two people who
 --                served at the same time (a member id reused for someone else, or a bad merge).
 with roster as (
@@ -40,8 +42,20 @@ two_ids_at_once as (
     from roster
     group by person_key, session_code
     having count(distinct house_member_id) > 1
+),
+
+merged_two_people as (
+    select
+        'merged_two_people' as problem,
+        person_key as detail,
+        count(distinct house_member_id) as n
+    from roster
+    group by person_key
+    having count(distinct house_member_id) > 1 and count(distinct raw_person_key) > 1
 )
 
 select * from shared_id
+union all
+select * from merged_two_people
 union all
 select * from two_ids_at_once
