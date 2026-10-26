@@ -190,7 +190,10 @@ select
             ctrb_type,
             case
                 when committee_clean is not null then 'Committee'
-                when company_clean is not null then 'Organization'
+                -- a company beside a person's name is the person's employer, not the donor (#485)
+                when
+                    company_clean is not null and not {{ mogov.has_person_name('first_name', 'last_name') }}
+                    then 'Organization'
                 else 'Individual'
             end
         )

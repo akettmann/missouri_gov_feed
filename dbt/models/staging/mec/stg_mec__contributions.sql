@@ -8,7 +8,9 @@ select
     ) as contributor_name,
     case
         when committee is not null and committee <> '' then 'Committee'
-        when company is not null and company <> '' then 'Organization'
+        -- a company beside a person's name is the person's employer, not the donor (#485)
+        when company is not null and company <> '' and not {{ mogov.has_person_name('first_name', 'last_name') }}
+            then 'Organization'
         else 'Individual'
     end as contributor_type,
     -- the donor committee's name as reported (no MECID: mecid is the receiving committee's)

@@ -380,6 +380,10 @@ the candidate↔committee crosswalk per election, and lobbyist expenditures.
 - Shard units: (report type, year), crosswalk years, the lobbyist export.
 
 Quirks:
+- A `company` can sit beside a person's first and last name: people who list an employer (a credit union's
+  staff with the credit union as company, or the first name repeated in `company`). A company alone makes the
+  donor an Organization; a company beside a name is still an Individual (#485). The `#N/A` and `Not
+  applicable` filler names are not a person, so the company stays the donor.
 - ASP.NET WebForms: each postback must carry the `__VIEWSTATE` of the page it came from. An export
   answers with a file, not a page. Posting from the export body used to lose the view state, so MEC
   silently returned its generic page. Every election after the first in a year then landed the site
@@ -434,6 +438,8 @@ Cleaned MEC contributions, expenditures and lobbyist expenditures from TAP's pub
 - Lands: `tap_mec_contributions`, `tap_mec_expenditures`, `tap_mec_lobbyist_expenditures`.
 
 Quirks:
+- The 2020-2022 layout types the donor by which columns are filled, as the direct MEC export does: a company
+  beside a first or last name is the person's employer, so the donor is an Individual (#485).
 - Coverage ends in 2022.
 - Column names are TAP's, not MEC's.
 - Some rows are malformed, so they're read with `ignore_errors` and without strict mode. The quote and

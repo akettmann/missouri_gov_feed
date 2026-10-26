@@ -1,0 +1,51 @@
+# Unit tests for the MEC direct contributions staging model: fixed source rows -> exact expected rows.
+# The model is gated by var mec_direct, so these tests are too (run them with `mogov build` or --vars).
+version: 2
+
+unit_tests:
+  - name: mec_contributions_company_beside_person_name
+    model: stg_mec__contributions
+    config:
+      enabled: "{{ var('mec_direct', false) }}"
+    description: >
+      MEC records a company next to the person's name when the person lists an employer (#485: first name
+      repeated in company, a credit union's staff with the credit union as company). A company alone makes an
+      Organization; a company beside a first or last name is still an Individual. A committee wins over both,
+      and the filler names ('#N/A', 'Not applicable') are not a person, so the company stays the donor.
+    given:
+      - input: source('mec', 'cd1_a')
+        format: sql
+        rows: |
+          select
+              cast('C1' as varchar) as mecid,
+              cast(null as varchar) as committee_name,
+              cast('Natalie' as varchar) as first_name,
+              cast('DiNicola' as varchar) as last_name,
+              cast('Natalie' as varchar) as company,
+              cast(null as varchar) as committee,
+              cast('retired' as varchar) as employer,
+              cast(null as varchar) as occupation,
+              cast(null as varchar) as city,
+              cast(null as varchar) as state,
+              cast('1' as varchar) as amount,
+              cast('1/2/2024 12:00:00 AM' as varchar) as date,
+              cast(null as varchar) as contribution_type,
+              cast(null as varchar) as report,
+              cast('r1' as varchar) as cd1_a_id
+          union all select 'C1', null, 'Mary', 'Harmon', 'United Consumers CU', null, 'United Consumers CU', null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r2'
+          union all select 'C1', null, 'Boling', null, 'Dennis', null, 'Self', null, null, null, '3', '1/2/2024 12:00:00 AM', null, null, 'r3'
+          union all select 'C1', null, '', '', 'Acme Corp', null, null, null, null, null, '4', '1/2/2024 12:00:00 AM', null, null, 'r4'
+          union all select 'C1', null, '#N/A', '#N/A', 'McDonalds', null, '#N/A', null, null, null, '5', '1/2/2024 12:00:00 AM', null, null, 'r5'
+          union all select 'C1', null, 'Not applicable', 'Not applicable', 'St. Clement of Rome', null, null, null, null, null, '6', '1/2/2024 12:00:00 AM', null, null, 'r6'
+          union all select 'C1', null, '', '', null, 'Some PAC', null, null, null, null, '7', '1/2/2024 12:00:00 AM', null, null, 'r7'
+          union all select 'C1', null, 'Jane', 'Roe', '', '', null, null, null, null, '8', '1/2/2024 12:00:00 AM', null, null, 'r8'
+    expect:
+      rows:
+        - {record_id: r1, contributor_name: Natalie DiNicola, contributor_type: Individual}
+        - {record_id: r2, contributor_name: Mary Harmon, contributor_type: Individual}
+        - {record_id: r3, contributor_name: Boling, contributor_type: Individual}
+        - {record_id: r4, contributor_name: Acme Corp, contributor_type: Organization}
+        - {record_id: r5, contributor_name: '#N/A #N/A', contributor_type: Organization}
+        - {record_id: r6, contributor_name: Not applicable Not applicable, contributor_type: Organization}
+        - {record_id: r7, contributor_name: Some PAC, contributor_type: Committee}
+        - {record_id: r8, contributor_name: Jane Roe, contributor_type: Individual}

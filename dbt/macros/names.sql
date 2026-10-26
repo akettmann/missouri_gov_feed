@@ -31,6 +31,21 @@
     end
 {%- endmacro %}
 
+{#- Whether a filer's first / last name columns hold a person's name (#485). MEC exports a company beside the person's
+    name for people who list an employer ("Natalie" / "DiNicola" / company "Natalie", or a credit union's staff with
+    the credit union as company), so a company alone does not make the donor an organization. Not a person: both
+    parts blank, or both a "no value" filler ('#N/A', 'Not applicable'), where the company is the real donor. -#}
+{% macro has_person_name(first_expr, last_expr) -%}
+    coalesce(
+        (nullif(trim({{ first_expr }}), '') is not null or nullif(trim({{ last_expr }}), '') is not null)
+        and not (
+            lower(trim(coalesce({{ first_expr }}, ''))) in ('#n/a', 'n/a', 'not applicable', 'none')
+            and lower(trim(coalesce({{ last_expr }}, ''))) in ('#n/a', 'n/a', 'not applicable', 'none')
+        ),
+        false
+    )
+{%- endmacro %}
+
 {#- A payroll surname as a match key: name_key without the trailing generational or professional suffixes the payroll
     prints inside the surname field ("BRATTIN JR.", "HADEN DVM"), so it equals the official's family name. -#}
 {% macro surname_key(expr) -%}

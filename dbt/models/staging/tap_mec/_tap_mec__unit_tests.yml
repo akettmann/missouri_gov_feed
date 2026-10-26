@@ -59,6 +59,55 @@ unit_tests:
         - {mec_committee_id: C2, contributor_name: Acme Corp, contributor_type: Organization, contributor_committee_name: null, amount: 20}
         - {mec_committee_id: C2, contributor_name: John Doe, contributor_type: Individual, contributor_committee_name: null, amount: 10}
 
+  - name: tap_contributions_company_beside_person_name
+    model: stg_tap_mec__contributions
+    description: >
+      In the 2020-2022 layout (no ctrb_type) a company beside a person's first / last name is the person's
+      employer, so the donor is an Individual, not an Organization (#485). A company alone is still an
+      Organization, a committee wins, and the '#N/A' / 'Not applicable' filler names are not a person.
+    given:
+      - input: source('tap_mec', 'contributions')
+        format: sql
+        rows: |
+          select
+              cast(null as varchar) as cmte_id,
+              cast('C1' as varchar) as mecid,
+              cast(null as varchar) as cmte_name,
+              cast(null as varchar) as committee_name,
+              cast(null as varchar) as ctrb_name,
+              cast(null as varchar) as ctrb_type,
+              cast(null as varchar) as committee,
+              cast('Wendi' as varchar) as company,
+              cast('Wendi' as varchar) as first_name,
+              cast('Alper-Pressman' as varchar) as last_name,
+              cast(null as varchar) as address_1,
+              cast(null as varchar) as employer,
+              cast(null as varchar) as occupation,
+              cast(null as varchar) as city_clean,
+              cast(null as varchar) as city,
+              cast(null as varchar) as state_clean,
+              cast(null as varchar) as state,
+              cast('100' as varchar) as amount,
+              cast(null as varchar) as date,
+              cast(null as varchar) as year,
+              cast(null as varchar) as cont_type,
+              cast(null as varchar) as contribution_type,
+              cast(null as varchar) as rpt_type,
+              cast(null as varchar) as report,
+              cast('FALSE' as varchar) as dupe_flag,
+              cast(null as varchar) as txn,
+              cast('t1' as varchar) as cd1_a_id,
+              cast(null as varchar) as address_clean
+          union all select null, 'C1', null, null, null, null, '', 'Acme Corp', '', '', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't2', null
+          union all select null, 'C1', null, null, null, null, '', 'McDonalds', '#N/A', '#N/A', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't3', null
+          union all select null, 'C1', null, null, null, null, ' Some PAC ', 'Hotel Co', 'Jo', '', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't4', null
+    expect:
+      rows:
+        - {record_id: t1, contributor_name: Wendi Alper-Pressman, contributor_type: Individual}
+        - {record_id: t2, contributor_name: Acme Corp, contributor_type: Organization}
+        - {record_id: t3, contributor_name: '#N/A #N/A', contributor_type: Organization}
+        - {record_id: t4, contributor_name: Some PAC, contributor_type: Committee}
+
   - name: tap_contributions_placeholder_names
     model: stg_tap_mec__contributions
     description: >
