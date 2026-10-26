@@ -264,6 +264,7 @@ export interface DistrictDonor {
   donor_links: string | null;
   sites: {
     facility_name: string | null;
+    address: string | null;
     city: string | null;
     naics_description: string | null;
     /** "same name" or "same company" (a brand from the company_brands seed) */

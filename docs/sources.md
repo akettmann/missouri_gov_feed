@@ -751,6 +751,11 @@ offices, shops and most service businesses are missing.
   directory landed before `epa_frs_alt_names` existed gets an empty placeholder from `mogov build`; the seed covers the
   known cases until `mogov load epa_frs` is re-run (a new damaged name would then lose its letter).
   `stg_epa_frs__alt_names` mirrors raw, so alternative names containing U+FFFD stay there; the repairs never use them.
+- Stray commas and tabs: EPA writes many names, addresses and cities with a trailing comma ("BUTTERBALL,",
+  "900 WATSON DR,") or trailing tabs, and some owner names too. Staging (`mogov.clean_registry_text`) collapses
+  whitespace runs and cuts leading/trailing commas, semicolons and whitespace from facility name, address, city and
+  organization name; "INC." and inner commas stay. Names that were only separators or empty become null (60
+  sites; the sites tables say "unnamed site"). Inner doubled commas ("LIPPERT FAMILY FARM,, LLC") are not touched (#319).
 - `epa_frs_sic` joined the loader after the other three. A raw directory landed before that has no SIC table;
   `mogov build` then creates an empty placeholder (like the other late-added or optional JSON tables in
   `db.OPTIONAL_JSON_TABLES`), so the SIC fallback finds no codes and those sites show no industry until the
