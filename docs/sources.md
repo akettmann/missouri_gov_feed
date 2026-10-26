@@ -49,13 +49,15 @@ the only per-member House vote record.
   it, not when the House published it), then typed tables parsed from those files by `mogov.parsers.mo_house`:
   `mo_house_xml_bills` with child tables `_bill_actions` (with printed roll-call totals), `_bill_sponsors`,
   `_bill_texts`, `_bill_amendments`, `_bill_rollcalls`, `_bill_subjects`, `_bill_hearings`, `_bill_summaries`,
-  `_bill_fiscal_notes` and `_bill_witnesses` (witness-form links only); `mo_house_xml_members` with
+  `_bill_fiscal_notes` and `_bill_witnesses` (witness-form links only; empty `<Witness/>` elements are not landed); `mo_house_xml_members` with
   `_member_committees` and `_member_counties`; `mo_house_xml_sessions`, `_committees` and `_committee_members`;
   one row per item of the BillList, MemberList, UpcomingHearingList and CalendarList files plus the lists'
   `NOTICE` text (`_list_notices`); and the SenateActList (the House's actions on Senate bills) as
   `mo_house_xml_senate_act_bills` with child tables `mo_house_xml_senate_act_` + `actions`, `texts`, `amendments`,
-  `rollcalls`, `subjects`, `hearings`, `summaries`, `fiscal_notes`, `witnesses` (each child row carries a `bill`
-  column naming its Senate bill). The roll-call PDFs land as `mo_house_rollcalls` and
+  `rollcalls`, `hearings`, `summaries`, `fiscal_notes`, `witnesses` (each child row carries a `bill`
+  column naming its Senate bill; the list has no sponsor or subject children, the sponsor is on the bill row as
+  `sponsor_name`/`sponsor_district`/`sponsor_link`). Bill, text, amendment, summary, fiscal-note and witness-form
+  links reach `marts.fct_bill_documents`. The roll-call PDFs land as `mo_house_rollcalls` and
   `mo_house_rollcall_votes`.
 - Window: `MOGOV_LOOKBACK_YEARS` (default 10). Roll-call PDFs go back to 2014.
 - Shard units: session codes (XML) and session days (roll-call PDFs).
@@ -92,6 +94,7 @@ Quirks:
   finds no other unread element; the scan script lists them by file kind.
 - The House BillList lists some bills twice (HR1 and HR2 in the odd-year sessions); the loader fetches and lands
   each linked file once.
+- `AmendmentText` is misnamed: it holds the link to the amendment's PDF (`.../bills181/amendpdf/4083H03.02H.pdf`), not text, and is filled on every amendment (8,775 House, 1,023 SenateActList). `MapLink` (the change map) is filled on only a handful, so `stg_mo_house__bill_amendments` stages `amendment_text` as `amendment_url` and `fct_bill_documents` carries both an `amendment` and an `amendment_map` kind.
 - `AmendmentSortValue` looks like `0507HH`, so `mo_house_xml_bill_amendments.sort_value` is text. A value that
   does not fit its column type (an integer or date field holding something else) becomes NULL and is logged
   (`mo_house.value_not_integer` / `mo_house.value_not_date`), and a document lxml had to repair is logged as
