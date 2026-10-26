@@ -3,6 +3,8 @@
 -- identified as duplicates (amended reports) and they're dropped.
 -- The second layout (2020-2022) has no ctrb_name / ctrb_type: a committee donor is named in `committee`, an
 -- organization in `company`, a person in first/last name (blank strings, not nulls, when absent).
+-- The placeholder-name rules below live in the shared macros in macros/names.sql (clean_name, name_part,
+-- person_name; #127).
 -- Placeholder donor names (#31): ~10k rows carry a one-character ctrb_name / committee ('C', '~', '0', '-', 'x',
 -- '_'), almost all with a person's first/last name (federal-committee filings transferred to MEC). A name shorter
 -- than 2 characters is treated as missing, so the name falls back to the person's name and the row is typed
@@ -115,14 +117,8 @@ cross_layout_unique as (
 source_rows as (
     select
         *,
-        case
-            when length(trim(ctrb_name)) >= 2 and {{ mogov.regex_matches('ctrb_name', '[A-Za-z0-9]') }}
-                then trim(ctrb_name)
-        end as ctrb_name_clean,
-        case
-            when length(trim(committee)) >= 2 and {{ mogov.regex_matches('committee', '[A-Za-z0-9]') }}
-                then trim(committee)
-        end as committee_clean,
+        {{ mogov.clean_name('ctrb_name') }} as ctrb_name_clean,
+        {{ mogov.clean_name('committee') }} as committee_clean,
         coalesce({{ mogov.regex_matches('trim(first_name)', '^[0-9]+$') }}, false) as is_shifted,
         -- rules 2-4 use anchored '^...$' patterns and rule 1 uses '.*x.*'; both mean the same whether the
         -- backend's regex match is anchored or a substring search (#69)
@@ -157,28 +153,7 @@ source_rows as (
             and {{ mogov.regex_matches('trim(first_name)', '^.*[A-Za-z].* .*[A-Za-z].*$') }},
             false
         ) as is_org_in_first_name,
-        case
-            when not coalesce({{ mogov.regex_matches('trim(first_name)', '^[0-9]+$') }}, false)
-                then nullif(
-                    trim(
-                        coalesce(
-                            case when {{ mogov.regex_matches('first_name', '[A-Za-z0-9]') }} then trim(first_name) end,
-                            ''
-                        )
-                        || ' '
-                        || coalesce(
-                            case
-                                when
-                                    {{ mogov.regex_matches('last_name', '[A-Za-z0-9]') }}
-                                    and not {{ mogov.regex_matches('trim(last_name)', '^[0-9]+$') }}
-                                    then trim(last_name)
-                            end,
-                            ''
-                        )
-                    ),
-                    ''
-                )
-        end as person_name,
+        {{ mogov.person_name('first_name', 'last_name') }} as person_name,
         case
             when
                 ctrb_type = 'Individual'
