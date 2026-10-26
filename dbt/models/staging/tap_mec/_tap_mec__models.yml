@@ -7,12 +7,13 @@ models:
     two MEC export layouts; coalesce the overlapping columns. dupe_flag marks rows TAP identified as duplicates
     (amended reports) and they''re dropped. The second layout (2020-2022) has no ctrb_name / ctrb_type: a committee
     donor is named in `committee`, an organization in `company`, a person in first/last name (blank strings, not
-    nulls, when absent). Placeholder donor names (#31): ~10k rows carry a one-character ctrb_name / committee (''C'',
-    ''~'', ''0'', ''-'', ''x'', ''_''), almost all with a person''s first/last name (federal-committee filings transferred
-    to MEC). A name shorter than 2 characters is treated as missing, so the name falls back to the person''s name
-    and the row is typed Individual. With no person''s name either, the name stays null and the reported type is
-    kept. The first/last name columns carry the same fillers (''~'' / ''~'', ''-'' / ''-'', ''?'', ''.''): a part
-    with no letter or number is dropped before the person''s name is built (not "shorter than 2": real initials
+    nulls, when absent). The placeholder-name rules below live in the shared macros in macros/names.sql (clean_name,
+    name_part, person_name; #127). Placeholder donor names (#31): ~10k rows carry a one-character ctrb_name / committee
+    (''C'', ''~'', ''0'', ''-'', ''x'', ''_''), almost all with a person''s first/last name (federal-committee filings
+    transferred to MEC). A name shorter than 2 characters is treated as missing, so the name falls back to the person''s
+    name and the row is typed Individual. With no person''s name either, the name stays null and the reported type
+    is kept. The first/last name columns carry the same fillers (''~'' / ''~'', ''-'' / ''-'', ''?'', ''.''): a
+    part with no letter or number is dropped before the person''s name is built (not "shorter than 2": real initials
     like ''R'' or ''J'' stay). Rows whose ctrb_name and both name parts are all ''~'' / ''-'' hold the real donor
     in `company`, so they fall through to it and keep the reported type (Committee) instead of becoming an Individual
     named ''~ ~''. Shifted rows (#60): 3.6k rows of one committee have the columns shifted (first_name holds a numeric
@@ -69,8 +70,8 @@ models:
     (''~'', ''-'', no letter or number) are dropped, and a whole name (company) of one character is dropped; a part
     of a person''s name keeps initials (''J Roe''). All-digit name parts are dropped. When the last name is the
     first name, or starts with the first name followed by a space (an organization typed into both boxes: ''USPS''
-    / ''USPS''), the last name alone is used. Built from the shared macros in macros/names.sql; the contributions
-    model adopting them is #127.'
+    / ''USPS''), the last name alone is used. Built from the shared macros in macros/names.sql, which stg_tap_mec__contributions
+    also uses.'
   columns:
   - name: record_id
     description: The source row's own id (cd3_b_id).

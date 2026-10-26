@@ -135,7 +135,7 @@ unit_tests:
       first_name): name kept, type stays Corporation. Look-alikes stay as reported: an ID with a digit-bearing
       address_1, a real company next to a '0' first/last name, a single-word first_name under a Corporation
       placeholder, a ctrb_name that merely ends in a real ' 0' without the '0' last_name, a '0' last_name with a real ctrb_name
-      (not ending ' 0'), and an all-digit first_name with a real company and a blank ctrb_name.
+      (not ending ' 0'), an all-digit first_name with a real company and a blank ctrb_name, and a multi-word first_name under a placeholder ctrb_name with a real company (the company is checked too).
     given:
       - input: source('tap_mec', 'contributions')
         format: sql
@@ -180,6 +180,7 @@ unit_tests:
           union all select 'C6', null, null, null, 'ROBERT 0', 'Individual', null, null, 'ROBERT', 'JONES', 'MAIN ST', null, null, null, null, null, null, '9', null, null, null, null, null, null, null, 't26', null, null
           union all select 'C7', null, null, null, 'SAM JONES', 'Individual', null, null, 'SAM', '0', 'MAIN ST', null, null, null, null, null, null, '11', null, null, null, null, null, null, null, 't27', null, null
           union all select 'C8', null, null, null, '', 'Corporation', null, 'Real Co LLC', '12345', 'ANNA', 'LEE', null, null, null, null, null, null, '12', null, null, null, null, null, null, null, 't28', null, null
+          union all select 'C9', null, null, null, '~~', 'Corporation', null, 'Real Co LLC', 'Two Words', null, null, null, null, null, null, null, null, '13', null, null, null, null, null, null, null, 't29', null, null
     expect:
       rows:
         - {mec_committee_id: C1, contributor_name: VINCENT SIEMER, contributor_type: Individual, amount: 1}
@@ -194,6 +195,7 @@ unit_tests:
         - {mec_committee_id: C6, contributor_name: ROBERT 0, contributor_type: Individual, amount: 9}
         - {mec_committee_id: C7, contributor_name: SAM JONES, contributor_type: Individual, amount: 11}
         - {mec_committee_id: C8, contributor_name: Real Co LLC, contributor_type: Corporation, amount: 12}
+        - {mec_committee_id: C9, contributor_name: Two Words, contributor_type: Individual, amount: 13}
 
   - name: tap_contributions_dedupe_double_loaded
     model: stg_tap_mec__contributions
