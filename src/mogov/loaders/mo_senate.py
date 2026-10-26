@@ -24,8 +24,11 @@ DASH = "[—–-]"
 CATEGORIES = ["YEAS", "NAYS", "Absent with leave", "Absent", "Excused from voting", "Vacancies"]
 CATEGORY = "|".join(CATEGORIES)
 # bounded so a block missing its "Vacancies" line can't swallow the rest of the journal. From 2024 the journal prints
-# "Excused from voting—Senator X—1" AFTER the Vacancies line (possibly past a page header), so a trailing one is kept.
-_PAGE_LINE = r"(?:Journal of the Senate \d+|\d+ Journal of the Senate)[ \t]*\n"
+# "Excused from voting—Senator X—1" AFTER the Vacancies line (a page break can fall between the two, leaving running
+# page-header lines in between), so a trailing one is kept.
+# running page headers: "Journal of the Senate 118", "623 Forty-Fourth Day - Thursday, April 4, 2024"
+_PAGE_ALTERNATIVES = r"Journal of the Senate \d+|\d+ Journal of the Senate|[^\n]*\bDAY\s*[—–-]\s*[A-Z]+DAY,[^\n]*"
+_PAGE_LINE = rf"(?i:{_PAGE_ALTERNATIVES})[ \t]*\n"
 BLOCK = re.compile(
     rf"YEAS{DASH}Senators?.{{0,2500}}?Vacancies{DASH}[^\n]*(?:\n(?:{_PAGE_LINE})*Excused from voting{DASH}[^\n]*)?",
     re.S,
@@ -44,10 +47,7 @@ NAME = re.compile(rf"({'|'.join(COMPOUND_SURNAMES)}|[A-Z][A-Za-z'’\-]+)(?: \((
 # Two surnames with the space lost: a capitalized word of 3+ letters running into another ("SaterSchatz"), but not
 # "Mac"/"Mc" names (McCreery has one lowercase letter before the second capital; MacDonald is excluded by name).
 RUN_TOGETHER = re.compile(r"\b(?!Mac)([A-Z][a-z]{2,})([A-Z][a-z]{2,})\b")
-# running page headers: "Journal of the Senate 118", "Sixty-Sixth Day—Thursday, April 24, 2025"
-PAGE_FURNITURE = re.compile(
-    r"^(?:Journal of the Senate \d+|\d+ Journal of the Senate|.*\bDAY\s*[—–-]\s*[A-Z]+DAY,.*)$", re.M | re.I
-)
+PAGE_FURNITURE = re.compile(rf"^(?:{_PAGE_ALTERNATIVES})$", re.M | re.I)
 DAY_HEADER = re.compile(r"([A-Z\-]+ DAY)\s*[—–-]\s*[A-Z]+DAY,\s*([A-Z]+ \d{1,2}, \d{4})")
 # veto session journals have no "...DAY—": "VETO SESSION" then "WEDNESDAY, SEPTEMBER 15, 2021"
 DATE_LINE = re.compile(r"^[A-Z]+DAY,\s*([A-Z]+ \d{1,2}, \d{4})$", re.M)
