@@ -461,9 +461,10 @@ models:
     is invented. That is enough to give the id a person_ids row and to let the name rules see its name and seat.
     An undated id has only that one year of evidence, which weakens rule 2 (a seat conflict needs more than one
     shared year) and rule 2b (the chamber-move check compares the first and last year) of int_officials__person_ids
-    (#519). Known edge: the min(start)/max(end) collapse per (alias_id, year, office, district) spans any gap if
-    one id holds the same seat in two separate terms in a year. Grain: one row per (id as sourced, year, office,
-    district, House member id).'
+    (#519). The data test assert_undated_open_states_ids_share_no_name fails if such an id ever shares a name with
+    another id, so the weakness cannot join or split wrongly unnoticed. Known edge: the min(start)/max(end) collapse
+    per (alias_id, year, office, district) spans any gap if one id holds the same seat in two separate terms in
+    a year. Grain: one row per (id as sourced, year, office, district, House member id).'
 - name: int_officials__name_keys
   description: 'Normalized name variants per current official, for matching sources that only carry names (MEC committees,
     lobbyist reports, Wikidata labels, ratings). One row per (official, variant). Grain: one row per (official,
