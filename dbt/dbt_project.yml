@@ -72,8 +72,8 @@ sources:
 
 vars:
   # stg_mo_house__rollcalls (#449): a House roll call on which fewer than this share of the listed members cast a
-  # vote is a voting-board test record and is dropped. The fewest voters on a real roll call is 83 of 162 (a quorum
-  # call, 51%); the test records have 1 to 28 voters (under 18%).
+  # vote is a voting-board test record and is dropped. The fewest voters on a real roll call is 84 of 162 (a quorum
+  # call, 52%; 83 voters occurred once, with 158 listed); the test records have 1 to 28 voters (under 18%).
   house_rollcall_min_participation: 0.25
   # assert_house_rollcalls_quorum_participation: roll call URLs allowed to fall under half the members voting
   # (genuine calls that failed to produce a quorum). None so far.

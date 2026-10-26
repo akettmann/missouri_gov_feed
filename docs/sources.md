@@ -100,9 +100,10 @@ Quirks:
   member votes fewer; the 173 attendance of 16 members moves from 80% to 100%, and the House attendance awards for
   2017, 2023 and lifetime shuffle by a rank or a tenth of a point.
 - Session 204 has only 5 roll-call PDFs, all "Session Day : 3", and that is complete (issue #449). The only House floor
-  vote that session was 2020-11-10 (HB 14 third read and passed; HR 1 was adopted without a roll call); every later House
-  action in the bill XML (2020-11-13 to 2020-12-16) is an introduction, first/second reading or committee referral on a
-  pro forma day. The loader probes days up to the last linked day plus 3 (here days 4-6, all the site's 404 page), and
+  vote that session was 2020-11-10 (HB 14 third read and passed; HR 1 was adopted without a roll call); no later House
+  action in the bill XML (2020-11-13 to 2020-12-16) is a floor roll call: they are introductions, readings, referrals,
+  HR 2's committee hearing and executive session, and the Speaker signing HB 14 and its truly agreed and finally
+  passed after Senate passage (which needs no House roll call). The loader probes days up to the last linked day plus 3 (here days 4-6, all the site's 404 page), and
   spot checks of days 7, 8, 10 and 13 also answer 404. Not a loader gap.
 - The XML is never converted on the way in: the loader gzips each file as received. The parser reads the
   gzip with lxml (hardened settings in `mogov.xmlparse`) and selects elements by local name, so namespaces,
