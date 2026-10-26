@@ -236,6 +236,8 @@ OPTIONAL_JSON_TABLES = {
     "mo_sos_election_rows": "mo_sos_elections",  # new source (#287); older raw dirs lack it
     "mo_state_expenditures": "mo_state_expenditures",
     "epa_frs_sic": "epa_frs",  # added to the EPA FRS loader after the first landings (#123); older raw dirs lack it
+    "mo_auditor_reports": "mo_auditor",  # a loader that has not run yet in this environment (#288)
+    "mo_auditor_ratings": "mo_auditor",
     "epa_frs_alt_names": "epa_frs",  # added for U+FFFD name repair (#260); older raw dirs lack it
 }
 
