@@ -24,3 +24,23 @@ unit_tests:
         - {senator_token: Schupp, vote_cast: absent}
         - {senator_token: Hoskins, vote_cast: absent with leave}
         - {senator_token: Hegeman, vote_cast: recused}
+
+  - name: senate_vacancy_count_is_carried_per_row
+    model: stg_mo_senate__votes
+    description: >
+      The block's "Vacancies—N" count arrives on every row of the vote as `vacancies` (an integer), and a row landed
+      before the count was parsed has a null one (#337).
+    given:
+      - input: source('mo_senate', 'votes')
+        format: sql
+        rows: |
+            select cast('{"url": "j1", "year": 2025, "block_index": 1, "journal_date": "March 10, 2025", "context": "SB 1", "category": "YEAS", "name": "Brown", "vacancies": 2}' as varchar) as payload union all
+            select cast('{"url": "j1", "year": 2025, "block_index": 1, "journal_date": "March 10, 2025", "context": "SB 1", "category": "NAYS", "name": "Eigel", "vacancies": 2}' as varchar) as payload union all
+            select cast('{"url": "j1", "year": 2025, "block_index": 2, "journal_date": "March 10, 2025", "context": "SB 2", "category": "YEAS", "name": "Brown", "vacancies": 0}' as varchar) as payload union all
+            select cast('{"url": "j1", "year": 2025, "block_index": 3, "journal_date": "March 10, 2025", "context": "SB 3", "category": "YEAS", "name": "Brown"}' as varchar) as payload
+    expect:
+      rows:
+        - {vote_id: "j1#vote1", senator_token: Brown, vacancies: 2}
+        - {vote_id: "j1#vote1", senator_token: Eigel, vacancies: 2}
+        - {vote_id: "j1#vote2", senator_token: Brown, vacancies: 0}
+        - {vote_id: "j1#vote3", senator_token: Brown, vacancies: null}

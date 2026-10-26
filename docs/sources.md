@@ -215,6 +215,13 @@ Quirks:
 - Names are space-separated, so a two-word surname looks like two senators. Known ones are listed in
   `COMPOUND_SURNAMES` (Holly Thompson Rehder, printed "Thompson Rehder"); dbt matches a two-word token on
   its last word. The PDF text sometimes cuts "Senator" short ("Senato"); such words are skipped.
+- The block's closing `Vacancies—None` / `Vacancies—N` lands as `vacancies` on every row of the vote
+  (`stg_mo_senate__votes.vacancies`). The `assert_senate_seats_sum_to_34` dbt test (error) checks that senators
+  listed + vacancies = 34, with one allow-listed vote: 2021-04-29, HB 574 (`RDay5804291051-1071.pdf` #4), where the
+  journal itself prints only 32 names (YEAS 23, NAYS 9) and omits Eigel and Hough. From 2024 the journal prints
+  "Excused from voting" after the Vacancies line; the parser's block includes that trailing line (until
+  October 2026 it stopped at Vacancies and dropped every 2024+ recusal). `assert_senate_vacancies_parsed`
+  fails if `vacancies` is null on every row, i.e. `mo_senate` was never reloaded after the count was added.
 - The `assert_votes_within_seats` dbt test fails if a vote lists more than 34 senators. It caught all of
   the above: 443 votes listed 35 or 36 names before the fixes.
 - PDF parsing (about 3 s per journal) dominates a cold run, so it shards well. The extracted text is

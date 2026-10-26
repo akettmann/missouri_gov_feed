@@ -6,6 +6,7 @@ with src as (
         {{ dbt.safe_cast(mogov.json_str('payload', '$.year'), dbt.type_int()) }} as session_year,
         {{ dbt.safe_cast(mogov.json_str('payload', '$.block_index'), dbt.type_int()) }} as block_index,
         {{ mogov.json_str('payload', '$.journal_date') }} as journal_date_text,
+        {{ dbt.safe_cast(mogov.json_str('payload', '$.vacancies'), dbt.type_int()) }} as vacancies,
         {{ mogov.json_str('payload', '$.context') }} as context,
         {{ mogov.json_str('payload', '$.category') }} as category,
         replace({{ mogov.json_str('payload', '$.name') }}, '’', '''') as senator_token
@@ -19,6 +20,9 @@ select
     journal_url || '#vote' || {{ dbt.safe_cast('block_index', dbt.type_string()) }} as vote_id,
     {{ mogov.parse_date(mogov.title_case('journal_date_text'), '%B %d, %Y') }} as vote_date,
     context,
+    -- the block's closing "Vacancies—N" (seats unfilled at the vote); repeated on every row of the vote, null if
+    -- the journal text was unreadable or the row was landed before the count was parsed
+    vacancies,
     trim(
         {{ mogov.regex_extract('context', '((?:SS|SCS|HCS|HS)?[ #0-9A-Z]*\\b(?:SB|HB|SJR|HJR|SR|HR|SCR|HCR) [0-9]+)') }}
     )
