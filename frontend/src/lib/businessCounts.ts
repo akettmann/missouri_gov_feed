@@ -14,9 +14,6 @@ export interface BusinessCounts {
   allHidden: boolean;
 }
 
-/** load.ts groups sites by `donor_names`, the "; "-joined set of contributors matched to one site. */
-const NAME_SEPARATOR = ";";
-
 /** null when the official has no area businesses (statewide office, judge, or the export is missing). */
 export function businessCounts(
   businesses: { donors: DistrictDonor[]; industries: DistrictIndustry[] } | null,
@@ -54,11 +51,11 @@ export function countDonors(groups: DistrictDonor[]): number {
   const sets = new Map<string, Set<string>>();
   for (const g of groups) {
     const names = new Set<string>();
-    for (const part of g.donor_names.split(NAME_SEPARATOR)) {
+    for (const part of g.donors) {
       const name = part.replace(/\s+/g, " ").trim();
       if (name) names.add(name);
     }
-    if (names.size) sets.set([...names].sort().join(";"), names);
+    if (names.size) sets.set(JSON.stringify([...names].sort()), names);
   }
   const all = [...sets.values()];
   const minimal = all.filter(

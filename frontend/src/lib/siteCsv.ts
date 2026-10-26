@@ -1,5 +1,6 @@
 // Pure helpers for the per-district EPA site list: the URL slug and the CSV download. No I/O so
 // scripts/siteCsv.test.mjs can run them on fixed inputs.
+import { donorNamesText } from "./donorLinks.ts";
 import type { SiteRow } from "./exports/types";
 
 /** URL-safe form of district_id ("state_house:135" -> "state_house-135") */
@@ -51,7 +52,7 @@ export function sitesCsv(rows: SiteRow[]): string {
       r.is_donor,
       r.match_confidence,
       r.matched_by,
-      r.donor_names,
+      donorNamesText(r.donors),
       r.donor_links,
       r.frs_url,
     ]

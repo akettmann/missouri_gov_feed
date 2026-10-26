@@ -40,7 +40,7 @@ export const REQUIRED_COLUMNS: Record<string, readonly string[]> = {
     "parent_company_name",
     "is_donor",
     "matched_by",
-    "donor_names",
+    "donor_name_list",
     "donated_amount",
     "n_contributions",
     "first_year",

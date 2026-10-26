@@ -51,7 +51,8 @@ const recordContexts = siteLinkContexts(sites);
     <p class="small muted">
       In the CSV, <code>donor_links</code> holds one line per donor and filing page inside one quoted cell,
       each as <code>&lt;url&gt; &lt;donor name&gt;</code>, separated by line breaks. A donor with no filing
-      page has no line there; <code>donor_names</code> lists every matched donor, separated by "; ".
+      page has no line there; <code>donor_names</code> lists every matched donor, separated by a "; " (a name
+      as filed can hold its own ";", so the separator is not unique).
     </p>
     <p class="small">
       <ConfidenceToggle />
@@ -86,11 +87,7 @@ const recordContexts = siteLinkContexts(sites);
               <td>
                 {s.is_donor ? (
                   <>
-                    <DonorLinks
-                      donorNames={s.donor_names}
-                      donorLinks={s.donor_links}
-                      idPrefix={`site${si}`}
-                    />{" "}
+                    <DonorLinks donors={s.donors} donorLinks={s.donor_links} idPrefix={`site${si}`} />{" "}
                     <ConfidenceBadge confidence={s.match_confidence} />
                     <span class="muted small">
                       {" "}
