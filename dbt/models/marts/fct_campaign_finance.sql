@@ -95,7 +95,7 @@ mec_received as (
         'tap_contrib:' || c.record_id as source_record_id,
         x.mec_committee_id as counterparty_mec_committee_id,
         x.match_confidence as counterparty_link_confidence
-    from {{ ref('stg_tap_mec__contributions') }} as c
+    from {{ ref('int_tap_mec__contributions') }} as c
     inner join {{ ref('int_mec__official_committees') }} as m on c.mec_committee_id = m.mec_committee_id
     left join {{ ref('int_mec__donor_committees') }} as x
         on
@@ -149,7 +149,7 @@ mec_given as (
             'mec_cd1_a:' || cast(c.record_id as {{ dbt.type_string() }}) as source_record_id,
             x.mec_committee_id as counterparty_mec_committee_id,
             x.match_confidence as counterparty_link_confidence
-        from {{ ref('stg_mec__contributions') }} as c
+        from {{ ref('int_mec__contributions_direct') }} as c
         inner join {{ ref('int_mec__official_committees') }} as m on c.mec_committee_id = m.mec_committee_id
         left join {{ ref('int_mec__donor_committees') }} as x
             on

@@ -420,6 +420,8 @@ Quirks:
   was lost, but committees first registered for a pre-2020 election are only linked to an official if
   they also filed for a later one. An offered year with no dates is still logged as
   `mec.crosswalk_no_elections` and not cached.
+- The 24-hour notices repeat here too (#156): 74 direct-export rows ($0.51M, report years 2023-26) are notice lines
+  that a full report itemizes again; `int_mec__contributions_direct` drops them (see tap_mec Quirks for the rule).
 - MEC answers in under a second (the lobbyist search takes about 13 s). The fixed `MOGOV_MEC_PAUSE`
   (3 s) between requests is most of the runtime. A cold run is about 4 requests per export year and
   3 per election date.
@@ -486,6 +488,14 @@ Quirks:
   older rows against one newer row and keep the extra older row. Gifts that differ in amount, date, committee or
   name are not matched, so some re-filed gifts may remain.
   Net effect of the dedupe: staging goes from 1,603,397 to 1,486,204 rows ($1.2487B to $1.0550B).
+- A "24 Hour" notice is also listed again, as a line of its own, in the committee's next full report, within the same
+  layout (#156). The notice (report `24 Hour Expenditure Report-...`, a gift of $5,000+) and the full report's line
+  carry the same committee, date, amount and donor. Staging keeps both; `int_tap_mec__contributions` (what committee
+  receipts, donor summaries and the campaign-finance fact read) drops the notice line when the same committee's full
+  report itemizes the same gift (donor compared by `name_key`: case, punctuation and spaces ignored), matched one-to-one,
+  so a notice with no later full-report line and two equal gifts that both appear in full reports stay. Measured
+  October 2026: 127 TAP rows, $1.30M. Gifts whose name differs more than that ("Missouri Growth PAC" against
+  "MO GROWTH PAC") are not matched.
 - A few MECIDs are lower-case (`c000525`); the intermediate models upper-case them.
 - A committee-to-committee gift names the donor committee only. `cmte_id` / `mecid` is the receiving
   committee's ID, and there is no donor MECID. The same holds for MEC's direct export (see mec below).

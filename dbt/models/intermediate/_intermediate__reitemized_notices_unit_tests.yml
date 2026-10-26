@@ -1,0 +1,105 @@
+# Unit tests for the 24-hour-notice dedupe (#156): fixed input rows -> exact expected rows.
+# Kept apart from the generated _intermediate.yml so regenerating docs never touches them.
+version: 2
+
+unit_tests:
+  - name: tap_contributions_drop_24_hour_notices_reitemized_in_full_report
+    model: int_tap_mec__contributions
+    description: >
+      A "24 Hour" notice row is dropped only when a full report of the same committee itemizes the same gift (same
+      date, amount, donor). 1: notice + 30 Day After row -> notice dropped. 2: an AMENDED notice against a quarterly
+      -> dropped. 3: donor spelled differently (case, punctuation, double space) -> dropped. 4: a notice with no
+      full-report line -> kept. 5: a notice whose full-report line differs in amount, date, committee or donor ->
+      kept. 6: two equal gifts the same day, both in full reports -> both kept. 7: two identical notices against one
+      full-report line -> one notice dropped (one-to-one). 8: a notice matched against an amended full report ->
+      dropped. 9: rows without a donor name, date or amount are never matched. 10: a full-report line alone is
+      never dropped.
+    given:
+      - input: ref('stg_tap_mec__contributions')
+        rows:
+          # 1
+          - {record_id: n1, mec_committee_id: C1, contributor_name: Pat Doe, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary'}
+          - {record_id: f1, mec_committee_id: C1, contributor_name: Pat Doe, amount: 5000, contribution_date: 2020-07-28, report: '30 Day After Primary Election-8/4/2020'}
+          # 2
+          - {record_id: n2, mec_committee_id: C2, contributor_name: Acme PAC, amount: 7000, contribution_date: 2018-03-01, report: 'AMENDED 24 Hour Expenditure Report-4/3/2018 General Municipal'}
+          - {record_id: f2, mec_committee_id: C2, contributor_name: Acme PAC, amount: 7000, contribution_date: 2018-03-01, report: April Quarterly Report}
+          # 3
+          - {record_id: n3, mec_committee_id: C3, contributor_name: 'Terry  Bloomberg', amount: 1000, contribution_date: 2014-07-25, report: '24 Hour Expenditure Report-8/5/2014 Primary'}
+          - {record_id: f3, mec_committee_id: C3, contributor_name: 'TERRY BLOOMBERG.', amount: 1000, contribution_date: 2014-07-25, report: October Quarterly Report}
+          # 4
+          - {record_id: n4, mec_committee_id: C4, contributor_name: Lone Giver, amount: 9000, contribution_date: 2022-10-30, report: '24 Hour Expenditure Report-11/8/2022 General'}
+          # 5
+          - {record_id: n5a, mec_committee_id: C5, contributor_name: Near Miss, amount: 5000, contribution_date: 2020-01-10, report: '24 Hour Expenditure Report-8/4/2020 Primary'}
+          - {record_id: f5a, mec_committee_id: C5, contributor_name: Near Miss, amount: 5001, contribution_date: 2020-01-10, report: April Quarterly Report}
+          - {record_id: n5b, mec_committee_id: C5, contributor_name: Near Miss, amount: 5000, contribution_date: 2020-01-11, report: '24 Hour Expenditure Report-8/4/2020 Primary'}
+          - {record_id: f5b, mec_committee_id: C5, contributor_name: Near Miss, amount: 5000, contribution_date: 2020-01-14, report: April Quarterly Report}
+          - {record_id: n5c, mec_committee_id: C5, contributor_name: Near Miss, amount: 5000, contribution_date: 2020-01-12, report: '24 Hour Expenditure Report-8/4/2020 Primary'}
+          - {record_id: f5c, mec_committee_id: C6, contributor_name: Near Miss, amount: 5000, contribution_date: 2020-01-12, report: April Quarterly Report}
+          - {record_id: n5d, mec_committee_id: C5, contributor_name: Near Miss, amount: 5000, contribution_date: 2020-01-13, report: '24 Hour Expenditure Report-8/4/2020 Primary'}
+          - {record_id: f5d, mec_committee_id: C5, contributor_name: Other Donor, amount: 5000, contribution_date: 2020-01-13, report: April Quarterly Report}
+          # 6
+          - {record_id: f6a, mec_committee_id: C7, contributor_name: Twice Giver, amount: 100, contribution_date: 2020-02-01, report: April Quarterly Report}
+          - {record_id: f6b, mec_committee_id: C7, contributor_name: Twice Giver, amount: 100, contribution_date: 2020-02-01, report: April Quarterly Report}
+          # 7
+          - {record_id: n7a, mec_committee_id: C8, contributor_name: Dup Notice, amount: 6000, contribution_date: 2020-03-01, report: '24 Hour Expenditure Report-4/7/2020 General Municipal'}
+          - {record_id: n7b, mec_committee_id: C8, contributor_name: Dup Notice, amount: 6000, contribution_date: 2020-03-01, report: '24 Hour Expenditure Report-4/7/2020 General Municipal'}
+          - {record_id: f7, mec_committee_id: C8, contributor_name: Dup Notice, amount: 6000, contribution_date: 2020-03-01, report: April Quarterly Report}
+          # 8
+          - {record_id: n8, mec_committee_id: C9, contributor_name: Amended Full, amount: 8000, contribution_date: 2020-04-01, report: '24 Hour Expenditure Report-4/7/2020 General Municipal'}
+          - {record_id: f8, mec_committee_id: C9, contributor_name: Amended Full, amount: 8000, contribution_date: 2020-04-01, report: AMENDED April Quarterly Report}
+          # 9
+          - {record_id: n9a, mec_committee_id: C10, contributor_name: null, amount: 5000, contribution_date: 2020-05-01, report: '24 Hour Expenditure Report-4/7/2020 General Municipal'}
+          - {record_id: f9a, mec_committee_id: C10, contributor_name: null, amount: 5000, contribution_date: 2020-05-01, report: April Quarterly Report}
+          - {record_id: n9b, mec_committee_id: C10, contributor_name: No Date, amount: 5000, contribution_date: null, report: '24 Hour Expenditure Report-4/7/2020 General Municipal'}
+          - {record_id: f9b, mec_committee_id: C10, contributor_name: No Date, amount: 5000, contribution_date: null, report: April Quarterly Report}
+          - {record_id: n9c, mec_committee_id: C10, contributor_name: No Amount, amount: null, contribution_date: 2020-05-02, report: '24 Hour Expenditure Report-4/7/2020 General Municipal'}
+          - {record_id: f9c, mec_committee_id: C10, contributor_name: No Amount, amount: null, contribution_date: 2020-05-02, report: April Quarterly Report}
+    expect:
+      rows:
+        - {record_id: f1}
+        - {record_id: f2}
+        - {record_id: f3}
+        - {record_id: n4}
+        - {record_id: n5a}
+        - {record_id: f5a}
+        - {record_id: n5b}
+        - {record_id: f5b}
+        - {record_id: n5c}
+        - {record_id: f5c}
+        - {record_id: n5d}
+        - {record_id: f5d}
+        - {record_id: f6a}
+        - {record_id: f6b}
+        - {record_id: n7b}
+        - {record_id: f7}
+        - {record_id: f8}
+        - {record_id: n9a}
+        - {record_id: f9a}
+        - {record_id: n9b}
+        - {record_id: f9b}
+        - {record_id: n9c}
+        - {record_id: f9c}
+
+  - name: direct_contributions_drop_24_hour_notices_reitemized_in_full_report
+    model: int_mec__contributions_direct
+    description: >
+      The same rule for the MEC direct export: a "24 Hour" notice is dropped when the same committee's full report
+      itemizes the same gift (donor compared by name_key); a notice with no full-report line, and two equal gifts in
+      full reports, are kept.
+    overrides:
+      vars:
+        mec_direct: true
+    given:
+      - input: ref('stg_mec__contributions')
+        rows:
+          - {record_id: n1, mec_committee_id: C1, contributor_name: Platte Rentals and Supply, amount: 4500, contribution_date: 2026-08-02, report: '24 Hour Expenditure Report-8/4/2026 Primary'}
+          - {record_id: f1, mec_committee_id: C1, contributor_name: Platte Rentals and Supply, amount: 4500, contribution_date: 2026-08-02, report: '30 Day After Primary Election-8/4/2026'}
+          - {record_id: n2, mec_committee_id: C2, contributor_name: Lone Giver, amount: 9000, contribution_date: 2026-08-02, report: '24 Hour Expenditure Report-8/4/2026 Primary'}
+          - {record_id: f3a, mec_committee_id: C3, contributor_name: Twice Giver, amount: 100, contribution_date: 2026-08-02, report: October Quarterly Report}
+          - {record_id: f3b, mec_committee_id: C3, contributor_name: Twice Giver, amount: 100, contribution_date: 2026-08-02, report: October Quarterly Report}
+    expect:
+      rows:
+        - {record_id: f1}
+        - {record_id: n2}
+        - {record_id: f3a}
+        - {record_id: f3b}
