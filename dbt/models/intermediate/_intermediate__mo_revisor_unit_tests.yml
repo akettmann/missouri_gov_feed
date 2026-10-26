@@ -354,3 +354,60 @@ unit_tests:
         - {section_id: t.1, bill: SB888, change: amended, is_lead_bill: true, combined_into: , act: A.L. 2026 S.B. 888}
         - {section_id: t.1, bill: HB2637, change: repealed, is_lead_bill: true, combined_into: , act: Repealed L. 2026 H.B. 2637 & 3155}
         - {section_id: t.1, bill: HB3155, change: repealed, is_lead_bill: false, combined_into: HB2637, act: Repealed L. 2026 H.B. 2637 & 3155}
+
+  - name: chained_repeals_all_inherit_the_repeal
+    model: int_mo_revisor__session_law_bills
+    description: >
+      "Repealed" covers the whole list in a repeal note, however long the "and L." chain: in "Repealed L. 2000 H.B. 1
+      and L. 2001 S.B. 2 and L. 2002 H.B. 3" the third act is repealed too, not enacted. Each act follows the first
+      act of its chain, not the act just before it, which may itself have inherited the change. A chain that starts
+      with an amending act ("A.L. 2000 H.B. 1 and L. 2001 S.B. 2 and L. 2002 H.B. 3") stays enacted.
+    given:
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 't.1' as section_id, 't.1/1' as section_version_id, '(A.L. 2000 H.B. 1 and L. 2001 S.B. 2 and L. 2002 H.B. 3)' as history_note
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select 'r.1' as section_id, 'r.1/1' as section_version_id, 'repealed' as change_kind, '(Repealed L. 2000 H.B. 1 and L. 2001 S.B. 2 and L. 2002 H.B. 3)' as note
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: r.1, bill: HB1, act_year: 2000, change: repealed}
+        - {section_id: r.1, bill: SB2, act_year: 2001, change: repealed}
+        - {section_id: r.1, bill: HB3, act_year: 2002, change: repealed}
+        - {section_id: t.1, bill: HB1, act_year: 2000, change: amended}
+        - {section_id: t.1, bill: SB2, act_year: 2001, change: enacted}
+        - {section_id: t.1, bill: HB3, act_year: 2002, change: enacted}
+
+  - name: continuation_pieces_after_an_and_l_act_share_its_change
+    model: int_mo_revisor__session_law_bills
+    description: >
+      A bill-only piece after an "and L." act continues that act ("Repealed L. 2000 H.B. 1 and L. 2001 S.B. 2, S.B.
+      3": SB 3 is part of the 2001 act). It must get the same change as the act it continues (repealed), not the
+      change of the act before the head.
+    given:
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 't.1' as section_id, 't.1/1' as section_version_id, '(A.L. 2000 H.B. 1 and L. 2001 S.B. 2, S.B. 3)' as history_note
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select 'r.1' as section_id, 'r.1/1' as section_version_id, 'repealed' as change_kind, '(Repealed L. 2000 H.B. 1 and L. 2001 S.B. 2, S.B. 3)' as note
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: r.1, bill: HB1, act_year: 2000, change: repealed}
+        - {section_id: r.1, bill: SB2, act_year: 2001, change: repealed}
+        - {section_id: r.1, bill: SB3, act_year: 2001, change: repealed}
+        - {section_id: t.1, bill: HB1, act_year: 2000, change: amended}
+        - {section_id: t.1, bill: SB2, act_year: 2001, change: enacted}
+        - {section_id: t.1, bill: SB3, act_year: 2001, change: enacted}
