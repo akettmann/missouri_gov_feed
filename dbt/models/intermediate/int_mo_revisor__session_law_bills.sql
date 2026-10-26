@@ -171,17 +171,32 @@ own_change as (
 ),
 
 -- a bare "L." joined with " and L." to a repealed act is repealed too: "Repealed" in a repeal note covers the list
-inherited_change as (
+-- ("Repealed L. A and L. B and L. C": B and C are repealed). An "and L." act follows the nearest act before it that
+-- was not joined that way (its anchor), not the act just before it, which may itself be an inheriting one; a
+-- continuation piece after an "and L." head ("@L. B S.B. 5, S.B. 6") shares the head's flag, so it gets the same.
+anchored as (
     select
         *,
-        case
-            when
-                after_and_l
-                and lag(change) over (partition by section_id, section_version_id order by act_index) = 'repealed'
-                then 'repealed'
-            else change
-        end as final_change
+        max(case when not after_and_l then act_index end) over (
+            partition by section_id, section_version_id
+            order by act_index
+        ) as anchor_index
     from own_change
+),
+
+inherited_change as (
+    select
+        a.*,
+        case
+            when a.after_and_l and p.change = 'repealed' then 'repealed'
+            else a.change
+        end as final_change
+    from anchored as a
+    left join own_change as p
+        on
+            a.section_id = p.section_id
+            and a.section_version_id = p.section_version_id
+            and a.anchor_index = p.act_index
 ),
 
 parsed_acts as (

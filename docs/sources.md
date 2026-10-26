@@ -372,6 +372,11 @@ Quirks:
 - Some versions are on both pages: 324.406/60569 and 324.424/60572 are listed contingent on their chapter page
   and printed on `rx.aspx` as "Repealed L. 2026 S.B. 1233" with the 2099 date. `fct_statute_sections` keeps the
   listed row and sets `repeal_pending`.
+- One bill can be both `repealed` and `amended` for the same section in `int_mo_revisor__session_law_bills` and
+  `fct_bill_statute_links`. A repeal-and-enact-in-lieu act is cited twice in the note ("A.L. 2026 S.B. 888 and
+  Repealed L. 2026 H.B. 2637 & 3155", 566.211), once as the repeal and once as the new text. Anyone counting
+  "sections a bill repealed" should expect rows for sections it also amended, and filter on `change`. In a repeal
+  note "Repealed" covers every "and L." act after it, however long the chain, and any bill-only pieces that follow.
 - Some chapters list no sections at all: every section in them was repealed or transferred.
 - History notes only cover bills that became law. A pending bill's statute targets are in its text, which
   isn't loaded yet (#175).
