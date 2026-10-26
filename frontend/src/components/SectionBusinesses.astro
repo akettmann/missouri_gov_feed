@@ -10,7 +10,7 @@ import { districtSiteLists } from "../lib/exports/districtSites";
 import DonorLinks from "./DonorLinks.astro";
 import { donorEntries } from "../lib/donorLinks";
 import { sitesText } from "../lib/businessCounts";
-import { count, money } from "../lib/format";
+import { count, money, plural } from "../lib/format";
 import { href } from "../lib/site";
 import { siteLinkContexts } from "../lib/siteLinkNames";
 
@@ -99,16 +99,13 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
                       {money(d.donated_amount)}
                       <span class="muted small">
                         {" "}
-                        ({count(d.n_contributions)}{" "}
-                        {d.n_contributions === 1 ? "contribution" : "contributions"})
+                        ({plural(d.n_contributions, "contribution", "contributions")})
                       </span>
                     </td>
                     <td class="nowrap">{years(d.first_year, d.last_year)}</td>
                     <td>
                       <details>
-                        <summary class="small">
-                          {d.sites.length} {d.sites.length === 1 ? "site" : "sites"}
-                        </summary>
+                        <summary class="small">{sitesText(d.sites.length)}</summary>
                         <ul class="sites small">
                           {d.sites.map((s) => (
                             <li>

@@ -11,6 +11,7 @@ import Layout from "../../../layouts/Layout.astro";
 import { districtSiteLists, districtSites } from "../../../lib/exports/districtSites";
 import { allOfficials } from "../../../lib/exports/load";
 import { count, officeLine } from "../../../lib/format";
+import { sitesText } from "../../../lib/businessCounts";
 import { href } from "../../../lib/site";
 import { siteLinkContexts } from "../../../lib/siteLinkNames";
 
@@ -36,7 +37,7 @@ const recordContexts = siteLinkContexts(sites);
   <div class="site-list-page">
     <h1>EPA-regulated sites in this area</h1>
     <p class="lede">
-      All {count(sites.length)} sites that EPA or a state environmental program regulates in the area
+      All {sitesText(sites.length)} that EPA or a state environmental program regulates in the area
       represented by <a href={href(`/officials/${official.slug}/`)}>{area}</a> ({official.full_name}
       <AwardBadges slug={official.slug} />
       ). The list is the same for every area: a site appears here because of where it is, not because of who

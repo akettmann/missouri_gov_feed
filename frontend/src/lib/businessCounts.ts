@@ -1,5 +1,5 @@
 // Counts for the compare page's businesses-in-their-area rows, from the per-official `businesses` block.
-// Pure and import-free so node:test can load it.
+// Pure (only imports the pure format helpers) so node:test can load it.
 import type { DistrictDonor, DistrictIndustry } from "./exports/types";
 
 export interface BusinessCounts {
@@ -68,9 +68,7 @@ export function countDonors(groups: DistrictDonor[]): number {
   return minimal.length + uncovered.size;
 }
 
-/** "1 case" / "2 cases", with thousands separators: use for any count followed by a noun. */
-export const plural = (n: number, one: string, many: string) =>
-  `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+import { plural } from "./format.ts";
 
 export const sitesText = (n: number) => plural(n, "site", "sites");
 

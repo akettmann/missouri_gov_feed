@@ -74,6 +74,7 @@ const officials = current.map((o) => ({
 <script>
   import { renderBadges, type Badge } from "../lib/awardBadges";
   import { compareRows } from "../lib/compare";
+  import { plural } from "../lib/format";
   import { valueLinkLine } from "../lib/compareLink";
   import { filterForOffice, filterOfficials, reconcileFilter, type OfficeFilter } from "../lib/compareFilter";
   import type { OfficialBundle } from "../lib/exports/types";
@@ -156,8 +157,8 @@ const officials = current.map((o) => ({
       : null;
     const where = (chip ?? group)?.textContent?.trim() ?? "";
     filterStatus.textContent = f.group
-      ? `Showing ${shown.length} officials: ${where}.`
-      : `Showing all ${shown.length} officials.`;
+      ? `Showing ${plural(shown.length, "official", "officials")}: ${where}.`
+      : `Showing all ${plural(shown.length, "official", "officials")}.`;
   }
 
   async function render() {

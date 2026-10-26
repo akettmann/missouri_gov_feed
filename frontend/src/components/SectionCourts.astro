@@ -2,8 +2,7 @@
 // Section F: court record (fct_case_history, from CourtListener): cases the official decided as a judge or
 // argued as an attorney. Facts per case only; outcomes are never tallied into win/loss statistics.
 import type { OfficialBundle } from "../lib/exports/types";
-import { plural } from "../lib/businessCounts";
-import { count, statusKind } from "../lib/format";
+import { count, plural, statusKind } from "../lib/format";
 import { daysLabel, MIN_MEASURED, timeToDispositionView } from "../lib/timeToDisposition";
 import SourceLink from "./SourceLink.astro";
 import Viz from "./Viz.astro";
@@ -38,8 +37,8 @@ const DISTRICTS: Record<string, string> = {
         </p>
       ) : (
         <p class="muted">
-          Not shown: only {count(ttdView.measured)} {ttdView.measured === 1 ? "docket" : "dockets"} with both
-          dates (the page needs at least {MIN_MEASURED} for a median).
+          Not shown: only {plural(ttdView.measured, "docket", "dockets")} with both dates (the page needs at
+          least {MIN_MEASURED} for a median).
         </p>
       )}
       <p class="small">
@@ -50,7 +49,7 @@ const DISTRICTS: Record<string, string> = {
         than civil ones. A docket counts only if CourtListener has both dates, so dockets still open are not
         counted. "Assigned" is the judge listed on the docket, not necessarily the judge who decided it.
         {ttdView.excluded > 0 &&
-          ` ${count(ttdView.excluded)} ${ttdView.excluded === 1 ? "docket" : "dockets"} that end before they were filed (a source error) ${ttdView.excluded === 1 ? "is" : "are"} left out.`}
+          ` ${plural(ttdView.excluded, "docket", "dockets")} that end before they were filed (a source error) ${ttdView.excluded === 1 ? "is" : "are"} left out.`}
       </p>
       <p class="small muted">
         {count(ttdView.measured)} of {count(ttdView.assigned)} assigned dockets measured (
