@@ -9,7 +9,8 @@ import {
   payPerVoteBlocks,
   totalWithoutMedium,
 } from "../lib/attendancePay";
-import { count, plural, sessionLabel, statusKind } from "../lib/format";
+import { count, sessionLabel, statusKind } from "../lib/format";
+import { breaksText } from "../lib/indicators";
 import { href } from "../lib/site";
 import ConfidenceBadge from "./ConfidenceBadge.astro";
 import SourceLink from "./SourceLink.astro";
@@ -57,9 +58,7 @@ const tally = (yea: number | null, nay: number | null) => (yea == null ? "—" :
                 <a href={href("/methodology/#indicators")}>party unity</a>).{" "}
               </>
             )}
-            {breaks.length === 0
-              ? "No recorded votes against their party's majority on a party-line vote."
-              : `${plural(breaks.length, "recorded vote", "recorded votes")} against their party's majority on a party-line vote.`}
+            {breaksText(breaks.length)}
           </p>
           {breaks.length > 0 && (
             <details open={breaks.length <= 8}>

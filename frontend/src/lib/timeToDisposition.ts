@@ -1,5 +1,6 @@
 // Wording and thresholds for a federal district judge's median time to disposition (fct_judge_time_to_disposition).
-// Pure (no imports) so node can test it directly. The mart carries no minimum sample size; the page applies one.
+// Pure (imports only the pure format helpers) so node can test it directly. The mart carries no minimum sample size; the page applies one.
+import { plural } from "./format.ts";
 
 /** Fewest measured dockets a median is shown for; below it the page shows the count and no median. */
 export const MIN_MEASURED = 30;
@@ -45,3 +46,10 @@ export function daysLabel(n: number): string {
   const text = Number.isInteger(n) ? String(n) : n.toFixed(1);
   return `${text} ${n === 1 ? "day" : "days"}`;
 }
+
+/** the "only N dockets with both dates" clause shown when too few were measured */
+export const measuredDocketsText = (n: number) => plural(n, "docket", "dockets");
+
+/** sentence appended when some dockets end before they were filed */
+export const excludedDocketsText = (n: number) =>
+  `${plural(n, "docket", "dockets")} that end before they were filed (a source error) ${n === 1 ? "is" : "are"} left out.`;

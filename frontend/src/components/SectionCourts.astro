@@ -3,7 +3,13 @@
 // argued as an attorney. Facts per case only; outcomes are never tallied into win/loss statistics.
 import type { OfficialBundle } from "../lib/exports/types";
 import { count, plural, statusKind } from "../lib/format";
-import { daysLabel, MIN_MEASURED, timeToDispositionView } from "../lib/timeToDisposition";
+import {
+  daysLabel,
+  excludedDocketsText,
+  measuredDocketsText,
+  MIN_MEASURED,
+  timeToDispositionView,
+} from "../lib/timeToDisposition";
 import SourceLink from "./SourceLink.astro";
 import Viz from "./Viz.astro";
 
@@ -37,8 +43,8 @@ const DISTRICTS: Record<string, string> = {
         </p>
       ) : (
         <p class="muted">
-          Not shown: only {plural(ttdView.measured, "docket", "dockets")} with both dates (the page needs at
-          least {MIN_MEASURED} for a median).
+          Not shown: only {measuredDocketsText(ttdView.measured)} with both dates (the page needs at least{" "}
+          {MIN_MEASURED} for a median).
         </p>
       )}
       <p class="small">
@@ -48,8 +54,7 @@ const DISTRICTS: Record<string, string> = {
         subpoenas) CourtListener has, in shares that differ by judge, and criminal cases tend to take longer
         than civil ones. A docket counts only if CourtListener has both dates, so dockets still open are not
         counted. "Assigned" is the judge listed on the docket, not necessarily the judge who decided it.
-        {ttdView.excluded > 0 &&
-          ` ${plural(ttdView.excluded, "docket", "dockets")} that end before they were filed (a source error) ${ttdView.excluded === 1 ? "is" : "are"} left out.`}
+        {ttdView.excluded > 0 && ` ${excludedDocketsText(ttdView.excluded)}`}
       </p>
       <p class="small muted">
         {count(ttdView.measured)} of {count(ttdView.assigned)} assigned dockets measured (

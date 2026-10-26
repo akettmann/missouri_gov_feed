@@ -1,6 +1,7 @@
 // Counts for the compare page's businesses-in-their-area rows, from the per-official `businesses` block.
 // Pure (only imports the pure format helpers) so node:test can load it.
 import type { DistrictDonor, DistrictIndustry } from "./exports/types";
+import { plural } from "./format.ts";
 
 export interface BusinessCounts {
   /** every EPA-regulated site in the official's district or city */
@@ -68,8 +69,6 @@ export function countDonors(groups: DistrictDonor[]): number {
   return minimal.length + uncovered.size;
 }
 
-import { plural } from "./format.ts";
-
 export const sitesText = (n: number) => plural(n, "site", "sites");
 
 /** compare-table cell for the donors row */
@@ -78,3 +77,10 @@ export function donorsText(x: BusinessCounts): string {
     ? "none (possible matches hidden)"
     : `${plural(x.donors, "donor", "donors")} (${sitesText(x.donorSites)})`;
 }
+
+/** "3 contributions" under a donor's total */
+export const contributionsText = (n: number) => plural(n, "contribution", "contributions");
+
+/** page description of a district's site list */
+export const sitesDescription = (n: number, area: string) =>
+  `All ${plural(n, "EPA-regulated site", "EPA-regulated sites")} in the area of ${area}.`;

@@ -10,8 +10,8 @@ import ConfidenceToggle from "../../../components/ConfidenceToggle.astro";
 import Layout from "../../../layouts/Layout.astro";
 import { districtSiteLists, districtSites } from "../../../lib/exports/districtSites";
 import { allOfficials } from "../../../lib/exports/load";
-import { count, officeLine } from "../../../lib/format";
-import { sitesText } from "../../../lib/businessCounts";
+import { officeLine } from "../../../lib/format";
+import { sitesDescription, sitesText } from "../../../lib/businessCounts";
 import { href } from "../../../lib/site";
 import { siteLinkContexts } from "../../../lib/siteLinkNames";
 
@@ -30,10 +30,7 @@ const area = officeLine(official);
 const recordContexts = siteLinkContexts(sites);
 ---
 
-<Layout
-  title={`EPA-regulated sites: ${area}`}
-  description={`All ${count(list.n_sites)} EPA-regulated sites in the area of ${area}.`}
->
+<Layout title={`EPA-regulated sites: ${area}`} description={sitesDescription(list.n_sites, area)}>
   <div class="site-list-page">
     <h1>EPA-regulated sites in this area</h1>
     <p class="lede">

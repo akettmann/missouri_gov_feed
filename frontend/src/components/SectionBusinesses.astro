@@ -9,8 +9,8 @@ import type { OfficialBundle } from "../lib/exports/types";
 import { districtSiteLists } from "../lib/exports/districtSites";
 import DonorLinks from "./DonorLinks.astro";
 import { donorEntries } from "../lib/donorLinks";
-import { sitesText } from "../lib/businessCounts";
-import { count, money, plural } from "../lib/format";
+import { contributionsText, sitesText } from "../lib/businessCounts";
+import { count, money } from "../lib/format";
 import { href } from "../lib/site";
 import { siteLinkContexts } from "../lib/siteLinkNames";
 
@@ -97,10 +97,7 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
                     </td>
                     <td class="num">
                       {money(d.donated_amount)}
-                      <span class="muted small">
-                        {" "}
-                        ({plural(d.n_contributions, "contribution", "contributions")})
-                      </span>
+                      <span class="muted small"> ({contributionsText(d.n_contributions)})</span>
                     </td>
                     <td class="nowrap">{years(d.first_year, d.last_year)}</td>
                     <td>
