@@ -10,13 +10,15 @@ test-paths: ["tests"]
 target-path: "target"
 clean-targets: ["target", "dbt_packages"]
 
-# A test that reads a model outside the selection would run against that model's stale table (#198: `-s +rpt_awards`
+# A test that reads a node outside the selection would run against that node's stale table (#198: `-s +rpt_awards`
 # ran assert_official_ids_one_per_person against an old int_officeholders__years and failed on rows a full build
-# does not produce). `buildable` runs a test only when every model it reads is selected or an ancestor of a selected
-# model; an ancestor is not rebuilt unless selected, so a test can still read a stale one. It is a complete guard only
-# for `+model` selections (the parents are rebuilt too). For `model+`, `dbt ls -s int_officeholders__years+` includes
-# assert_official_ids_one_per_person although int_officials__current, which it also reads, is not rebuilt. After
-# changing a model other tests read, build `model+` plus the parents those tests read (`+model+` or `@model`).
+# does not produce). `buildable` runs a test only when every node it depends on (models and seeds; sources always
+# pass) is selected or an ancestor of a selected node. An ancestor is not rebuilt unless selected, so a test can still
+# read a stale one. The selection is safe (never reads an un-rebuilt model) only when it includes every ancestor of
+# every selected node: `+model`, `@model` or `+test`. `+model` still skips tests that also read models outside the
+# model's ancestors. `model+` and `+model+` are NOT safe: `dbt ls -s int_officeholders__years+` (and `+...+`)
+# includes assert_official_ids_one_per_person but not int_officials__current, which it also reads. After changing a
+# model other tests read, build `@model`; for one test, `+test_name`.
 flags:
   indirect_selection: buildable
 
