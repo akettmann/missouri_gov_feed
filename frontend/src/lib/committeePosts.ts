@@ -28,6 +28,8 @@ export interface PostCounts {
   vice_chair_posts: number;
   co_chair_posts: number;
   ranking_posts: number;
+  /** the House file the rows were read from (fct_committee_posts.source_url), decided by the loader */
+  source_url: string;
 }
 
 export interface TitledMembership {
@@ -37,9 +39,6 @@ export interface TitledMembership {
   position_name: string;
   is_subcommittee: boolean;
 }
-
-/** The House's own committee list; stands in for the XML zip of a session that has none yet. */
-export const COMMITTEE_LIST_URL = "https://house.mo.gov/CommitteeList.aspx";
 
 const POSITION_ORDER = ["Chair", "Co-Chair", "Vice-Chair", "Ranking Minority Member"];
 
@@ -121,10 +120,7 @@ export function buildCommitteeSessions(
       is_latest: p.session_code === latest,
       committees_held: p.committees_held,
       titles,
-      source_url:
-        p.session_code === latest
-          ? COMMITTEE_LIST_URL
-          : `https://documents.house.mo.gov/xml/${p.session_code}.zip`,
+      source_url: p.source_url,
       note: listSessions.has(p.session_code) ? COMMITTEE_LIST_NOTE : null,
     };
     out.set(p.official_id, [...(out.get(p.official_id) ?? []), session]);

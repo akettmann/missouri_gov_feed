@@ -86,9 +86,43 @@ unit_tests:
         format: sql
         rows: |
             select cast('251' as varchar) as session_code, cast('251-COMMITTEELIST.XML' as varchar) as file_name, cast('3029' as varchar) as committee_id, cast('Peggy McGaugh' as varchar) as member_name, cast(7 as bigint) as member_district, cast(' Chair ' as varchar) as position_name, cast('H' as varchar) as chamber
+      - input: source('mo_house', 'xml_files')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-COMMITTEELIST.XML' as varchar) as file_name, cast('https://documents.house.mo.gov/xml/251.zip#251-CommitteeList.xml' as varchar) as source_url union all
+            select '241', '241-COMMITTEELIST.XML', 'https://documents.house.mo.gov/xml/241.zip#241-CommitteeList.xml'
     expect:
       rows:
-        - {session_code: '251', session_year: 2025, committee_id: '3029', committee_name: Accounts, member_name: Peggy McGaugh, district_number: 7, position_name: Chair, chamber: H}
+        - {session_code: '251', session_year: 2025, committee_id: '3029', committee_name: Accounts, member_name: Peggy McGaugh, district_number: 7, position_name: Chair, chamber: H, source_url: 'https://documents.house.mo.gov/xml/251.zip'}
+
+  - name: house_member_committees_carry_the_file_they_came_from
+    model: stg_mo_house__member_committees
+    description: >
+      A member page's committee rows take the source URL of that member's own file, joined on session and file
+      name (the same file name in another session does not bleed in), with the zip's "#member file" fragment
+      dropped and an open session's own file URL left as is. Joining on file name alone, or keeping the fragment,
+      fails this test.
+    given:
+      - input: source('mo_house', 'xml_members')
+        format: sql
+        rows: |
+            select cast('201' as varchar) as session_code, cast('201-001.XML' as varchar) as file_name, cast('https://images.house.mo.gov/MemberPhoto.aspx?id=11' as varchar) as photo_link union all
+            select '261', '261-001.XML', 'https://images.house.mo.gov/MemberPhoto.aspx?id=22'
+      - input: source('mo_house', 'xml_member_committees')
+        format: sql
+        rows: |
+            select cast('201' as varchar) as session_code, cast('201-001.XML' as varchar) as file_name, cast(' Budget ' as varchar) as committee_name, cast(' Chair ' as varchar) as committee_position union all
+            select '261', '261-001.XML', 'Rules', 'Member'
+      - input: source('mo_house', 'xml_files')
+        format: sql
+        rows: |
+            select cast('201' as varchar) as session_code, cast('201-001.XML' as varchar) as file_name, cast('https://documents.house.mo.gov/xml/201.zip#201/201-001.xml' as varchar) as source_url union all
+            select '261', '261-001.XML', 'https://documents.house.mo.gov/xml/261-001.xml' union all
+            select '261', '201-001.XML', 'https://wrong.example/bleed'
+    expect:
+      rows:
+        - {session_code: '201', session_year: 2020, house_member_id: '11', committee_name: Budget, position_name: Chair, source_url: 'https://documents.house.mo.gov/xml/201.zip'}
+        - {session_code: '261', session_year: 2026, house_member_id: '22', committee_name: Rules, position_name: Member, source_url: 'https://documents.house.mo.gov/xml/261-001.xml'}
 
   - name: senate_act_list_stages_every_senate_bill
     model: stg_mo_house__bill_actions

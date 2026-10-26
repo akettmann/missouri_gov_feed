@@ -222,7 +222,8 @@ models:
   description: 'House committee and subcommittee memberships per member and session, keyed to the person (person_key
     from int_mo_house__member_identity). The member pages (stg_mo_house__member_committees) cover every session
     but 253; for a session with no member-page rows the COMMITTEELIST export fills in (House members only, matched
-    on session + district). Grain: one row per (House session, member, committee).'
+    on session + district). source_url is the House file each row was read from. Grain: one row per (House session,
+    member, committee).'
 - name: int_mo_house__member_identity
   description: 'Identity for each MO House member per session (House XML is authoritative for the House roster).
     person_key = the stable person id (int_officials__person_ids) of the key the seat match gave: an Open States
