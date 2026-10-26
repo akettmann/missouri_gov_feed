@@ -949,7 +949,7 @@ offices, shops and most service businesses are missing.
   filtered to the receiving committee; a donor filed on both keeps both. Line breaks in a donor name become spaces so a
   line never splits; the frontend writes them as `<url> <donor name>` lines, which in the published sites.csv sit in one
   cell. A donor with no page has one row with a null `source_url`.
-- Industry: the NAICS code most of a site's programs give, taking primary codes first (`naics_source` `naics`,
+- Industry: the NAICS code the most program systems (RCRAINFO, NPDES, AIR, ...) give, one count per system however many records it has, taking primary codes first (`naics_source` `naics`,
   31% of the geocoded sites in October 2026), then codes FRS leaves UNKNOWN (`naics_unknown`, 2%), then SECONDARY
   ones (`naics_secondary`, 0.1%). A real NAICS code is more precise than a SIC-derived sector, so only a site with
   no NAICS code at all falls back to its SIC code (1987 Standard Industrial Classification, from
