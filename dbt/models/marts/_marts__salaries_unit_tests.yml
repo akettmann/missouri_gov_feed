@@ -231,7 +231,8 @@ unit_tests:
           - {person_id: p_lisa, full_name: Lisa Thomas, surname_key: thomas, chamber: lower, start_date: '2021-01-01', end_date: '2025-01-07'}
           - {person_id: p_wick, full_name: Wick Thomas, surname_key: thomas, chamber: lower, start_date: '2025-01-01', end_date: '9999-12-31'}
       - input: ref('int_mo_legislators__final_checks')
-        rows: *no_final_checks
+        rows:
+          - {calendar_year: 2025, seat_chamber: lower, employee_name: 'THOMAS, LISA A.', person_id: p_lisa}
       - input: ref('dim_official')
         rows:
           - {official_id: p_holly, office: state_house}
@@ -766,11 +767,13 @@ unit_tests:
       int_mo_legislators__final_checks). Samuel Smith is the only Smith who sits in 2023 and the final check is the
       only Smith payee, so by seat alone it would be paired with Samuel, the wrong person (#471). A final check is
       only ever set aside, and matched by name, which needs the departed member to have a row in
-      int_officials__name_keys; Neil has none, so the check stays unmatched.
+      int_officials__name_keys; Neil has none, so the check stays unmatched (Fred Jones is the full-salary payee that makes
+      1500 a small payment, as the real model needs).
     given:
       - input: ref('stg_mo_employee_pay__pay')
         rows:
           - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, NEIL I', last_name: SMITH, first_names: NEIL I, gross_pay: 1500.0}
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'JONES, FRED', last_name: JONES, first_names: FRED, gross_pay: 38000.0}
       - input: ref('mo_payroll_office_titles')
         rows:
           - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}

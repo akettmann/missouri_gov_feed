@@ -88,3 +88,123 @@ unit_tests:
     expect:
       rows:
         []
+
+  - name: final_checks_a_small_payment_to_another_surname_is_not_one
+    model: int_mo_legislators__final_checks
+    description: >
+      A small 2017 payment to "WHITE, LINDA" fits Linda Black's first name and her December departure, but not her
+      surname, so it is not hers.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'JONES, FRED', last_name: JONES, first_names: FRED, gross_pay: 36000.0}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'WHITE, LINDA', last_name: WHITE, first_names: LINDA, gross_pay: 1496.45}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_linda, full_name: Linda Black, surname_key: black, chamber: lower, end_date: '2016-12-31'}
+    expect:
+      rows:
+        []
+
+  - name: final_checks_a_december_departure_two_years_earlier_is_not_one
+    model: int_mo_legislators__final_checks
+    description: >
+      Linda Black's seat ended 2015-12-31, two Decembers before the 2017 payment, so it is not her final check.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'JONES, FRED', last_name: JONES, first_names: FRED, gross_pay: 36000.0}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, LINDA R.', last_name: BLACK, first_names: LINDA R., gross_pay: 1496.45}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_linda, full_name: Linda Black, surname_key: black, chamber: lower, end_date: '2015-12-31'}
+    expect:
+      rows:
+        []
+
+  - name: final_checks_a_departure_in_another_month_of_the_prior_year_is_not_one
+    model: int_mo_legislators__final_checks
+    description: >
+      Linda Black's seat ended 2016-06-30, not in December, so the 2017 payment is not her final check.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'JONES, FRED', last_name: JONES, first_names: FRED, gross_pay: 36000.0}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, LINDA R.', last_name: BLACK, first_names: LINDA R., gross_pay: 1496.45}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_linda, full_name: Linda Black, surname_key: black, chamber: lower, end_date: '2016-06-30'}
+    expect:
+      rows:
+        []
+
+  - name: final_checks_a_departure_later_in_the_pay_year_is_not_one
+    model: int_mo_legislators__final_checks
+    description: >
+      Linda Black's seat ended 2017-06-30, not in January, so a small 2017 payment (her last months of ordinary pay)
+      is not her final check.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'JONES, FRED', last_name: JONES, first_names: FRED, gross_pay: 36000.0}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, LINDA R.', last_name: BLACK, first_names: LINDA R., gross_pay: 1496.45}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_linda, full_name: Linda Black, surname_key: black, chamber: lower, end_date: '2017-06-30'}
+    expect:
+      rows:
+        []
+
+  - name: final_checks_a_small_payment_outside_the_legislature_is_not_one
+    model: int_mo_legislators__final_checks
+    description: >
+      A judge's small 2017 payment fits Tina Black's name and her December departure from the Senate, but a
+      payroll row of another office group is never a legislator's final check.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: COURTS, position_title: JUDGE, employee_name: 'BLACK, TINA', last_name: BLACK, first_names: TINA, gross_pay: 1496.45}
+          - {calendar_year: 2017, agency_name: COURTS, position_title: JUDGE, employee_name: 'JONES, FRED', last_name: JONES, first_names: FRED, gross_pay: 36000.0}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: COURTS, position_title: JUDGE, office_group: judiciary}
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_tina, full_name: Tina Black, surname_key: black, chamber: upper, end_date: '2016-12-31'}
+    expect:
+      rows:
+        []
+
+  - name: final_checks_a_later_seat_in_the_other_chamber_does_not_cancel_it
+    model: int_mo_legislators__final_checks
+    description: >
+      Linda Black's House seat ended 2016-12-31 and she later holds a Senate seat. She never sat in the House again,
+      so "BLACK, LINDA R." in 2017 is still her final check from the House.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'JONES, FRED', last_name: JONES, first_names: FRED, gross_pay: 36000.0}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, LINDA R.', last_name: BLACK, first_names: LINDA R., gross_pay: 1496.45}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_linda, full_name: Linda Black, surname_key: black, chamber: lower, end_date: '2016-12-31'}
+          - {person_id: p_linda, full_name: Linda Black, surname_key: black, chamber: upper, end_date: '2022-12-31'}
+    expect:
+      rows:
+        - {calendar_year: 2017, seat_chamber: lower, employee_name: 'BLACK, LINDA R.', person_id: p_linda}

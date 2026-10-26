@@ -50,8 +50,7 @@ with pay as (
         {{ dbt.replace(mogov.surname_key('p.last_name'), "' '", "''") }} as last_flat,
         {{ mogov.name_key(dbt.split_part('p.first_names', "' '", 1)) }} as first_key,
         {{ mogov.name_key('p.first_names') }} as first_all_key,
-        {{ mogov.name_key(dbt.split_part('p.first_names', "' '", 2)) }} as middle_key,
-        max(p.gross_pay) over (partition by p.calendar_year, p.position_title) as top_pay
+        {{ mogov.name_key(dbt.split_part('p.first_names', "' '", 2)) }} as middle_key
     from {{ ref('stg_mo_employee_pay__pay') }} as p
     inner join {{ ref('mo_payroll_office_titles') }} as t
         on p.agency_name = t.agency_name and p.position_title = t.position_title
