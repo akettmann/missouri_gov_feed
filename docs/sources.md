@@ -148,11 +148,15 @@ Quirks:
   2023 has a null status and outcome, enacted ones included (2017 to 2023: 0 of 4,143 SBs have a status; 2024: 29
   of 796, none enacted because the list stops before the governor). Counts of failed, pending or enacted bills
   therefore leave out Senate bills, almost all of them before 2024; House bills are complete.
-  Quirk: 143 appropriation bills (15 to 17 per regular session, 2017 to 2026; e.g. 2024 HB 1 and HB 2) list only
-  "Message Received from the Governor, pursuant to Article IV, Section 27" (the governor's budget/withholding
-  message, dated before the session opens) as their action list, although their bill record shows conference
-  substitutes (`CCS SCS HCS HB 2`) and a full title. The export cut their real history, so they get status
-  "governor message only" and a null outcome rather than "introduced" / "failed" (#396). Loading
+  Quirk: 143 bills (15 to 17 per regular session, 2017 to 2026, none in 2021; e.g. 2024 HB 1 and HB 2) list
+  only "Message Received from the Governor, pursuant to Article IV, Section 27" as their action. They are
+  re-listings, not new bills: the House repeats the previous regular session's appropriation bills (same bill
+  number, bill string and effective date, LR numbers from 241 on; 2024 HB 1 is the FY2024 budget bill of the 2023
+  session) only to record the governor's budget/withholding message. Where the previous session is loaded (128 of
+  128) the bill string is identical and the original is already "enacted"; the 15 of 2017 repeat the unloaded
+  2016 session (161). They get status "relisted for governor message", a null outcome (it is on the original) and
+  `relisted_from_session_code` naming the original's session (null for 2017), rather than "introduced" /
+  "failed" (#396). Leave them out of per-session bill counts. Loading
   Senate-side actions is #317 (and #237).
 - `ActivitySequence` (action order) is only present from 2024. About 1,000 of 138,000 actions are repeated word
   for word under one `Guid` (mostly 2017–2018); staging keeps them once.

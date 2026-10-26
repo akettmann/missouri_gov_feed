@@ -1282,6 +1282,8 @@ models:
       Missouri bills and resolutions per session. House bills from the House XML export (titles, current version,
       last action); Senate bills from the Senate topical index (its one-line description as short_title; the other
       House-only columns are null). `subjects` holds the subject index terms, "; "-separated (fct_bill_subjects).
+      Each regular session also has 15 to 17 relistings of the previous session's appropriation bills (status
+      "relisted for governor message"): not new bills, so leave them out of per-session bill counts.
       Grain: one row per (session, bill).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
@@ -1318,27 +1320,36 @@ models:
           The furthest stage the House XML's actions record (int_bills__status): introduced, in committee, reported
           do pass, perfected, passed one chamber, passed both chambers, truly agreed, signed, signed with line-item
           vetoes, vetoed, veto overridden; adopted for resolutions; withdrawn or defeated when the bill stopped
-          there. governor message only: the only recorded action is the governor's Art. IV, s. 27 message (about 15
-          to 17 appropriation bills per regular session, e.g. 2024 HB 1 and HB 2); the export dropped their real
-          history, so how far they got is unknown and outcome is null. Null for Senate bills that never reached the
-          House, which means every Senate bill before 2024: the House's Senate-bill list (SENATEACTLIST) exists only for 2024 and later.
+          there. relisted for governor message: a re-listing, not a new bill. The House relists the previous
+          regular session's appropriation bills (same number and bill string, e.g. 2024 HB 1, the FY2024 budget
+          bill of the 2023 session) only to record the governor's Art. IV, s. 27 message, which is their only
+          action; 15 to 17 per regular session, 2017 to 2026 (143 in all), none in 2021. Their outcome is null: it
+          is on the original row (relisted_from_session_code). Null for Senate bills that never reached the
+          House, which means every Senate bill before 2024: the House's Senate-bill list (SENATEACTLIST) exists
+          only for 2024 and later.
         data_tests:
           - accepted_values:
               arguments:
                 values: [introduced, in committee, reported do pass, perfected, passed one chamber,
                   passed both chambers, truly agreed, signed, signed with line-item vetoes, vetoed, veto overridden,
-                  adopted, withdrawn, defeated, governor message only]
+                  adopted, withdrawn, defeated, relisted for governor message]
       - name: outcome
         data_type: varchar
         description: >
           enacted, vetoed, sent to voters (joint resolutions), adopted (resolutions), awaiting governor, no governor
           action recorded (truly agreed, but the export stops before the governor), pending (session still open),
-          failed (session over without passing). Null with status, and for governor message only bills.
+          failed (session over without passing). Null with status, and for relisted bills (read the original's).
         data_tests:
           - accepted_values:
               arguments:
                 values: [enacted, vetoed, sent to voters, adopted, awaiting governor, no governor action recorded,
                   pending, failed]
+      - name: relisted_from_session_code
+        data_type: varchar
+        description: >
+          For a relisted bill, the previous regular session code (e.g. 231 for 241) whose bill with the same number and
+          bill string it repeats; the original's status and outcome are on that row. Null for every other bill, and
+          for relistings whose original session isn't loaded (2017's 15 repeat 161).
       - name: proposed_effective_date
         data_type: date
         description: Proposed effective date.
