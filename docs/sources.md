@@ -61,6 +61,12 @@ the only per-member House vote record.
 - Shard units: session codes (XML) and session days (roll-call PDFs).
 
 Quirks:
+- `bills171/rollcalls/` still holds the 2016 session's roll-call PDFs (numbered by 2016 session day, header
+  "98th General Assembly, Second Regular Session"). The probe walks past the last 2017 roll call of a day, so
+  it lands them under session 171: 415 roll calls dated 2016 (45 session days, 1/13/2016 to 5/13/2016,
+  interleaved with 663 real 2017 ones), none linked from the bill XML. Raw keeps them as served;
+  `stg_mo_house__rollcalls` drops roll calls dated outside their session code's year (2016's session, 161, is
+  not loaded). Issue #430.
 - The XML is never converted on the way in: the loader gzips each file as received. The parser reads the
   gzip with lxml (hardened settings in `mogov.xmlparse`) and selects elements by local name, so namespaces,
   attributes, entities and CDATA are the parser's problem, not a regex's. The links that drive crawling

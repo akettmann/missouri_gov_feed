@@ -37,7 +37,11 @@ models:
     "FOUNTAIN HENDERS" (truncated to ~16 chars), "MR SPEAKER".'
 - name: stg_mo_house__rollcalls
   description: 'One row per MO House roll call (parsed PDF header). The line after "Roll Call : N" names the measure
-    (e.g. "HCS HB 10"); the next lines carry the sponsor and a description.'
+    (e.g. "HCS HB 10"); the next lines carry the sponsor and a description. Roll calls dated outside their session''s
+    year are dropped (#430): the House leaves the previous session''s PDFs in the bills171/rollcalls directory (the
+    2016 session''s, numbered by 2016 session day), and the loader''s probe runs on past the last 2017 roll call
+    of a day into them. 415 votes dated 2016 sat under session 171, none linked from the bill XML. They belong to
+    session 161, which is not loaded. Raw keeps them.'
   columns:
   - name: session_day
     description: Legislative day of the session (highest seen through 2026 is 79).
