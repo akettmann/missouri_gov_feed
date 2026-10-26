@@ -657,3 +657,35 @@ unit_tests:
       rows:
         - {alias_id: 'mohouse:5', person_id: 'mohouse:5', basis: self}
         - {alias_id: ocd-person/new, person_id: ocd-person/new, basis: self}
+
+  - name: house_seat_match_breaks_same_surname_ties_on_given_name
+    model: int_mo_house__member_seat_keys
+    description: >
+      Two Open States terms cover the seat with the same surname, one undated (a relative, #136). The seat alone
+      is ambiguous, so the House member's given name picks the term (Joe Don McGaugh vs Peggy McGaugh, HD39).
+      Two same-surname terms with no given-name match, or a given name matching both, stay unmatched (mohouse:
+      key); a lone surname match needs no given name.
+    given:
+      - input: ref('stg_mo_house__members')
+        rows:
+          - {session_code: '171', session_year: 2017, district_number: 39, house_member_id: '658', first_name: Joe Don, last_name: McGaugh}
+          - {session_code: '181', session_year: 2021, district_number: 39, house_member_id: '2019', first_name: Peggy, last_name: McGaugh}
+          - {session_code: '171', session_year: 2017, district_number: 40, house_member_id: '900', first_name: Zed, last_name: Smith}
+          - {session_code: '171', session_year: 2017, district_number: 41, house_member_id: '901', first_name: Ann, last_name: Jones}
+          - {session_code: '171', session_year: 2017, district_number: 42, house_member_id: '902', first_name: Ann, last_name: Lee}
+      - input: ref('int_mo_legislators__seat_terms')
+        rows:
+          - {openstates_id: ocd-person/joedon, chamber: lower, district_number: 39, surname_key: mcgaugh, full_name_key: joe don mcgaugh, start_date: '2013-01-01', end_date: '2018-12-31'}
+          - {openstates_id: ocd-person/peggy, chamber: lower, district_number: 39, surname_key: mcgaugh, full_name_key: peggy mcgaugh, start_date: '1900-01-01', end_date: '2023-01-03'}
+          - {openstates_id: ocd-person/smith-a, chamber: lower, district_number: 40, surname_key: smith, full_name_key: alan smith, start_date: '2015-01-01', end_date: '2020-12-31'}
+          - {openstates_id: ocd-person/smith-b, chamber: lower, district_number: 40, surname_key: smith, full_name_key: bob smith, start_date: '1900-01-01', end_date: '2020-12-31'}
+          - {openstates_id: ocd-person/jones-a, chamber: lower, district_number: 41, surname_key: jones, full_name_key: ann jones, start_date: '2015-01-01', end_date: '2020-12-31'}
+          - {openstates_id: ocd-person/jones-b, chamber: lower, district_number: 41, surname_key: jones, full_name_key: ann jones, start_date: '1900-01-01', end_date: '2020-12-31'}
+          - {openstates_id: ocd-person/lee, chamber: lower, district_number: 42, surname_key: lee, full_name_key: bo lee, start_date: '2015-01-01', end_date: '2020-12-31'}
+    expect:
+      rows:
+        - {session_code: '171', district_number: 39, house_member_id: '658', raw_person_key: ocd-person/joedon}
+        - {session_code: '181', district_number: 39, house_member_id: '2019', raw_person_key: ocd-person/peggy}
+        - {session_code: '171', district_number: 40, house_member_id: '900', raw_person_key: 'mohouse:900'}
+        - {session_code: '171', district_number: 41, house_member_id: '901', raw_person_key: 'mohouse:901'}
+        - {session_code: '171', district_number: 42, house_member_id: '902', raw_person_key: ocd-person/lee}

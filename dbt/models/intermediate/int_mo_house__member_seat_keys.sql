@@ -1,20 +1,24 @@
 -- Seat-matched key for each MO House member per session (House XML is authoritative for the House roster).
--- raw_person_key = Open States id when the seat (district + date + surname) matches one person, otherwise
+-- raw_person_key = Open States id when the seat (district + date + surname) matches one person (or, among several
+-- same-surname terms, one whose name also starts with the member's given name), otherwise
 -- mohouse:<House member id>, so people missing from Open States still get a key. One person can end up with
 -- several raw keys across sessions (see int_officials__person_ids); int_mo_house__member_identity applies that.
 with members as (
     select
         *,
         {{ mogov.name_key('last_name') }} as surname_key,
+        {{ mogov.name_key('first_name') }} as first_name_key,
         {{ dbt.safe_cast(dbt.concat(['session_year', "'-03-01'"]), 'date') }} as session_date
     from {{ ref('stg_mo_house__members') }}
 ),
 
-seat_match as (
+candidates as (
     select
         m.session_code,
         m.district_number,
-        max(s.openstates_id) as openstates_id
+        s.openstates_id,
+        -- the Open States name starts with the House member's given name ("joe don mcgaugh" for "Joe Don")
+        case when s.full_name_key like m.first_name_key || ' %' then 1 else 0 end as given_name_match
     from members as m
     inner join {{ ref('int_mo_legislators__seat_terms') }} as s
         on
@@ -26,8 +30,23 @@ seat_match as (
                 or m.surname_key like '%' || s.surname_key
                 or s.full_name_key like '%' || m.surname_key
             )
+),
+
+-- one Open States person matches the seat, or (same-surname terms overlapping, e.g. a relative whose term has no
+-- start date) exactly one of them also matches the given name; otherwise no match
+seat_match as (
+    select
+        session_code,
+        district_number,
+        case
+            when count(distinct openstates_id) = 1 then max(openstates_id)
+            else max(case when given_name_match = 1 then openstates_id end)
+        end as openstates_id
+    from candidates
     group by 1, 2
-    having count(distinct s.openstates_id) = 1
+    having
+        count(distinct openstates_id) = 1
+        or count(distinct case when given_name_match = 1 then openstates_id end) = 1
 )
 
 select

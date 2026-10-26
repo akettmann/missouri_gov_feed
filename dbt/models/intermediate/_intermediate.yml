@@ -287,10 +287,11 @@ models:
     the key before that. Grain: one row per (House session, member) with a person_key.'
 - name: int_mo_house__member_seat_keys
   description: 'Seat-matched key for each MO House member per session (House XML is authoritative for the House
-    roster). raw_person_key = Open States id when the seat (district + date + surname) matches one person, otherwise
-    mohouse:<House member id>, so people missing from Open States still get a key. One person can end up with several
-    raw keys across sessions (see int_officials__person_ids); int_mo_house__member_identity applies that. Grain:
-    one row per (House session, member) with the seat-matched raw_person_key.'
+    roster). raw_person_key = Open States id when the seat (district + date + surname) matches one person (or, among
+    several same-surname terms, one whose name also starts with the member''s given name), otherwise mohouse:<House
+    member id>, so people missing from Open States still get a key. One person can end up with several raw keys
+    across sessions (see int_officials__person_ids); int_mo_house__member_identity applies that. Grain: one row
+    per (House session, member) with the seat-matched raw_person_key.'
 - name: int_mo_house__votes
   description: 'MO House roll-call votes attributed to people. A PDF token ("SMITH 46", "FOUNTAIN HENDERS", "MR
     SPEAKER") is matched against that session''s House member list: same surname (prefix match for names the PDF
