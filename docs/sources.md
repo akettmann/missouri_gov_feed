@@ -628,8 +628,8 @@ Quirks:
   these dockets) and from the number itself otherwise. Of the 173,882 dockets: civil 164,058 (`cv` 164,027,
   `md` multidistrict 31), criminal 3,776 (`cr`), miscellaneous 5,967 (`mc` 5,082, `mj` 646, `sw` 194, `wi` 30,
   `sm` 13, `pr` 2: warrants, subpoenas, complaints, not cases; left out) and 81 other (`fp` 76, `cn` 2, `sc` 2
-  and one with a date in the docket-number field; left out, pending #465). Only 2,149 of the 3,776 criminal
-  dockets have both dates, so criminal coverage is thin. One docket (`1:00-cr-00008`) has a `cr` number but is
+  and one with a date in the docket-number field; left out, pending #465). Only 2,152 of the 3,776 criminal
+  dockets have both dates (2,149 are measured: 3 end before they were filed), so criminal coverage is thin. One docket (`1:00-cr-00008`) has a `cr` number but is
   a civil suit; CourtListener's own type (`cv`) wins.
 - The filtered CSVs are cached per snapshot (`data/cache/courtlistener/mo-*.csv`), so re-runs within
   a quarter are quick. Cases can be up to three months stale; `courtlistener_cases` tops up.

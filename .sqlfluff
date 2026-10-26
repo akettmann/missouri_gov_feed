@@ -17,6 +17,12 @@ profiles_dir = dbt
 # In-memory DuckDB target (dbt/profiles.yml): linting must not need data/mogov.duckdb to exist.
 target = lint
 
+# Models gated by vars (enabled=var('mec_direct', false) ...) are skipped by the dbt templater unless the vars
+# are on, so lint with every optional input enabled. Lint compiles only; it reads no raw data.
+[sqlfluff:templater:dbt:context]
+mec_direct = true
+cl_case_bulk = true
+
 [sqlfluff:indentation]
 tab_space_size = 4
 indent_unit = space

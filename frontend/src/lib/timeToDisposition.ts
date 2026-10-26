@@ -64,9 +64,28 @@ export const federalDocketsText = (n: number, type: CaseType) =>
 /** heading for one case type's median */
 export const caseTypeHeading = (type: CaseType) => `Median time to disposition: ${type} cases`;
 
-/** "only N civil dockets with both dates" clause shown when too few were measured */
+/** "N civil dockets" clause for the count shown when too few were measured */
 export const measuredTypedDocketsText = (n: number, type: CaseType) =>
   plural(n, `${type} docket`, `${type} dockets`);
+
+/** Why no median is shown. "Measured" is what dockets_measured counts: both dates, and the end not before the filing. */
+export const hiddenMedianText = (measured: number, type: CaseType) =>
+  `Not shown: only ${measuredTypedDocketsText(measured, type)} could be measured, and the page needs at least ${MIN_MEASURED} for a median. A docket is measured when CourtListener has both its filing date and its termination date and it did not end before it was filed.`;
+
+/** Every case type gets a block, in this order, so a judge with none of a type says so instead of going quiet. */
+export const CASE_TYPES: readonly CaseType[] = ["civil", "criminal"];
+
+/** Shown in place of a block when the judge has no docket of that type in the mart. */
+export const noDocketsText = (type: CaseType) =>
+  `No ${type} dockets assigned to this judge in CourtListener.`;
+
+/** Which types have no row, in display order (a judge with no rows at all gets no time-to-disposition section). */
+export const missingCaseTypes = (present: readonly (CaseType | undefined)[]): CaseType[] =>
+  present.length === 0 ? [] : CASE_TYPES.filter((t) => !present.includes(t));
+
+/** Closing note: the dockets in neither median. The count of 'other' dockets lives in docs/sources.md (#465). */
+export const EXCLUDED_TYPES_TEXT =
+  "Miscellaneous dockets (warrants, subpoenas, complaints) and dockets of other or unclassified types are in neither.";
 
 /** "M of N assigned civil dockets measured" coverage line */
 export const coverageText = (measured: number, assigned: number, type: CaseType) =>
