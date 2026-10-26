@@ -1,4 +1,9 @@
+import itertools
+import subprocess
+import sys
+import threading
 from pathlib import Path
+from typing import ClassVar
 
 import httpx
 import pytest
@@ -122,3 +127,128 @@ def test_speeding_warning_backs_off_and_retries(tmp_path, monkeypatch):
     assert mo_revisor._get("https://revisor.mo.gov/main/OneChapter.aspx", {"chapter": "1"}) == answers[1]
     assert len(calls) == 2
     assert sleeps == [7]
+
+
+class FakeClock:
+    """A shared wall clock that only moves when someone sleeps; sleeping is serialised like the real thing."""
+
+    def __init__(self):
+        self.now = 1000.0
+        self.lock = threading.Lock()
+
+    def time(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        with self.lock:
+            self.now += seconds
+
+
+def test_throttle_keeps_requests_an_interval_apart_across_threads(tmp_path, monkeypatch):
+    # two "shards" (each with its own loop) share the cache dir; on a fixed clock no two requests may start
+    # closer than the interval, however they interleave
+    monkeypatch.setattr(http, "CACHE_DIR", tmp_path)
+    clock = FakeClock()
+    starts, interval = [], 2.0
+
+    def shard():
+        for _ in range(6):
+            with http.host_throttle("revisor.mo.gov", interval, clock=clock.time, sleep=clock.sleep):
+                starts.append(clock.time())
+
+    threads = [threading.Thread(target=shard) for _ in range(3)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    starts.sort()
+    assert len(starts) == 18
+    gaps = [b - a for a, b in itertools.pairwise(starts)]
+    assert min(gaps) >= interval
+    assert starts[-1] - starts[0] == pytest.approx(interval * 17)  # and no slower than the interval either
+
+
+def test_throttle_stamp_in_the_future_waits_at_most_one_interval(tmp_path, monkeypatch):
+    monkeypatch.setattr(http, "CACHE_DIR", tmp_path)
+    (tmp_path / ".throttle-h.last").write_text("9999999999.0")
+    clock = FakeClock()
+    with http.host_throttle("h", 2.0, clock=clock.time, sleep=clock.sleep):
+        assert clock.time() == 1002.0
+
+
+def test_throttle_across_real_processes(tmp_path):
+    # three separate interpreters sharing a cache dir, real clock, short interval
+    script = (
+        "import sys, time\n"
+        "from pathlib import Path\n"
+        "from mogov import http\n"
+        "http.CACHE_DIR = Path(sys.argv[1])\n"
+        "for _ in range(4):\n"
+        "    with http.host_throttle('h', 0.3):\n"
+        "        print(time.time(), flush=True)\n"
+    )
+    procs = [
+        subprocess.Popen([sys.executable, "-c", script, str(tmp_path)], stdout=subprocess.PIPE, text=True)
+        for _ in range(3)
+    ]
+    starts = sorted(float(line) for p in procs for line in p.communicate()[0].split())
+    assert len(starts) == 12
+    assert min(b - a for a, b in itertools.pairwise(starts)) >= 0.29
+
+
+def _loader_pages(monkeypatch, refused: set[str]):
+    """Run mo_revisor.load on one chapter with sections 1.010, 1.020, ...; pages in `refused` get the warning."""
+    sections = [(f"1.0{i}0", i) for i in range(1, 6)]
+    added, fetched = [], []
+
+    class Sink:
+        counts: ClassVar[dict] = {}
+
+        def __init__(self, *a, **k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def add(self, table, key, payload, **k):
+            added.append((table, key))
+
+    def fake_get(url, params=None, *, max_age=None, backoff=None):
+        if params and "section" in params:
+            fetched.append(params["section"])
+            if params["section"] in refused:
+                raise mo_revisor.Warned("warning page")
+        return "page"
+
+    monkeypatch.setattr(mo_revisor.db, "JsonSink", Sink)
+    monkeypatch.setattr(mo_revisor, "_get", fake_get)
+    monkeypatch.setattr(mo_revisor, "parse_toc", lambda page: [{"title": "I", "chapter": "1", "chapter_name": "x"}])
+    monkeypatch.setattr(mo_revisor, "parse_repeals", lambda page: [])
+    monkeypatch.setattr(mo_revisor, "parse_chapter", lambda page: sections)
+    monkeypatch.setattr(mo_revisor, "parse_section", lambda page: {"html": "h"})
+    monkeypatch.delenv("CLOUD_RUN_TASK_COUNT", raising=False)
+    return added, fetched
+
+
+def test_a_section_page_that_stays_refused_is_skipped_not_fatal(monkeypatch):
+    added, fetched = _loader_pages(monkeypatch, refused={"1.020"})
+    mo_revisor.load(mo_revisor.db.UNSHARDED)
+    assert fetched == ["1.010", "1.020", "1.030", "1.040", "1.050"]
+    assert [k for t, k in added if t == "mo_revisor_sections"] == ["1.010/1", "1.030/3", "1.040/4", "1.050/5"]
+
+
+def test_consecutive_refused_section_pages_stop_the_load(monkeypatch):
+    _added, fetched = _loader_pages(monkeypatch, refused={"1.020", "1.030", "1.040"})
+    with pytest.raises(mo_revisor.Warned):
+        mo_revisor.load(mo_revisor.db.UNSHARDED)
+    assert fetched == ["1.010", "1.020", "1.030", "1.040"]
+
+
+def test_more_than_one_cloud_run_task_is_refused(monkeypatch):
+    _loader_pages(monkeypatch, refused=set())
+    monkeypatch.setenv("CLOUD_RUN_TASK_COUNT", "3")
+    with pytest.raises(RuntimeError, match="Cloud Run tasks"):
+        mo_revisor.load(mo_revisor.db.UNSHARDED)

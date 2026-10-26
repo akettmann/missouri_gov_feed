@@ -4,7 +4,8 @@
 --   Senate bills the Senate topical index (regular sessions): its one-line description as the short
 --                title; Senate bills filed under no keyword aren't listed there and are missing
 -- status and outcome come from the House XML's actions (int_bills__status): null for Senate bills that never
--- reached the House, whose actions aren't loaded.
+-- reached the House, whose actions aren't loaded: every Senate bill before 2024, since the House's list of Senate
+-- bills exists only for 2024 and later.
 with subjects as (
     select
         session_code,

@@ -87,6 +87,55 @@ def _single_flight(path: Path) -> Iterator[Path]:
         lock.unlink(missing_ok=True)
 
 
+# A throttle lock is held across one sleep (the interval) plus one request (timeout 120 s), so a lock this old
+# belongs to a process that died.
+THROTTLE_LOCK_STALE_S = 300
+
+
+@contextlib.contextmanager
+def host_throttle(
+    host: str,
+    interval: float,
+    *,
+    clock: Callable[[], float] = time.time,
+    sleep: Callable[[float], None] = time.sleep,
+) -> Iterator[None]:
+    """Hold the host's lock across a request that starts at least `interval` seconds after the last one any
+    process on this machine started.
+
+    Processes share two files in CACHE_DIR: a lock and the time the last request started. The holder sleeps out
+    the rest of the interval, stamps the new start time and yields, so every process (shards of one run, two runs,
+    a shard and a re-run) serialises its requests to the host. The wall clock is used because processes cannot
+    compare monotonic clocks. This needs a shared filesystem: Cloud Run tasks don't share one, so a source that
+    depends on it must not be split over several tasks.
+    """
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    lock = CACHE_DIR / f".throttle-{host}.lock"
+    stamp = CACHE_DIR / f".throttle-{host}.last"
+    while True:
+        try:
+            os.close(os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            break
+        except (FileExistsError, PermissionError):  # PermissionError: Windows, a peer's unlink is pending
+            with contextlib.suppress(FileNotFoundError, PermissionError):
+                if time.time() - lock.stat().st_mtime > THROTTLE_LOCK_STALE_S:
+                    lock.unlink(missing_ok=True)
+            time.sleep(0.02)
+    try:
+        try:
+            last = float(stamp.read_text())
+        except (FileNotFoundError, ValueError):
+            last = float("-inf")
+        # a stamp in the future (clock set back) must not stall the run for longer than one interval
+        wait = min(last + interval - clock(), interval)
+        if wait > 0:
+            sleep(wait)
+        write_atomic(stamp, repr(clock()).encode())
+        yield
+    finally:
+        lock.unlink(missing_ok=True)
+
+
 def _record(host: str, resp: httpx.Response, started: float) -> None:
     obs.http_duration.record(time.perf_counter() - started, {"host": host, "status": resp.status_code})
     obs.http_bytes.add(len(resp.content), {"host": host})
@@ -121,11 +170,14 @@ def fetch(
     delay: float = 0.0,
     cache_only: bool = False,
     check: Callable[[httpx.Response], None] | None = None,
+    min_interval: float = 0.0,
 ) -> bytes:
     """GET url, returning bytes. Responses younger than max_age seconds come from cache (None = always cache).
 
     delay: seconds to sleep before a network request (not on cache hits), to stay polite to small state sites.
     cache_only: never touch the network; return any cached copy regardless of age, else raise CacheMiss.
+    min_interval: requests to this host from every process sharing CACHE_DIR start at least this many seconds apart
+    (host_throttle), unlike `delay`, which each process counts on its own clock.
     check: called with each successful response before it is cached; raise to reject it (e.g. a block page
     served with 200 after a redirect), so it is never cached.
     """
@@ -140,7 +192,17 @@ def fetch(
         if _fresh(path, max_age):  # another shard fetched it while we waited
             obs.http_requests.add(1, {"host": host, "cache_hit": True})
             return path.read_bytes()
-        return _get(url, params, path, host, retries=retries, headers=headers, delay=delay, check=check)
+        return _get(
+            url,
+            params,
+            path,
+            host,
+            retries=retries,
+            headers=headers,
+            delay=delay,
+            check=check,
+            min_interval=min_interval,
+        )
 
 
 def _get(
@@ -153,13 +215,15 @@ def _get(
     headers: dict | None,
     delay: float,
     check: Callable[[httpx.Response], None] | None = None,
+    min_interval: float = 0.0,
 ):
     if delay:
         time.sleep(delay)
     obs.http_requests.add(1, {"host": host, "cache_hit": False})
     for attempt in range(retries):
-        started = time.perf_counter()
-        resp = client().get(url, params=params, headers=headers)
+        with host_throttle(host, min_interval) if min_interval else contextlib.nullcontext():
+            started = time.perf_counter()
+            resp = client().get(url, params=params, headers=headers)
         _record(host, resp, started)
         if resp.status_code == 429:
             wait = _retry_after(resp)

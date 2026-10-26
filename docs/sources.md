@@ -108,8 +108,11 @@ Quirks:
   actions. In 2024 it stops at the speaker's signature for 15 of its 38 bills: 2024 SB 727 was signed into law, yet the list ends at
   "Signed by House Speaker". Such bills get the outcome "no governor action recorded", not "failed". Senate bills
   that never reached the House have no actions in any source we load, so their status is null: 906 of 972 SBs
-  and 56 of 58 SJRs in 2026. Counts of failed or pending bills therefore leave out most Senate bills; enacted
-  counts are complete. Loading Senate-side actions is #317.
+  and 56 of 58 SJRs in 2026. `SenateActList` exists only for 2024 and later, so every Senate bill of 2017 to
+  2023 has a null status and outcome, enacted ones included (2017 to 2023: 0 of 3,743 SBs have a status; 2024: 29
+  of 796, none enacted because the list stops before the governor). Counts of failed, pending or enacted bills
+  therefore leave out Senate bills, almost all of them before 2024; House bills are complete. Loading
+  Senate-side actions is #317 (and #237).
 - `ActivitySequence` (action order) is only present from 2024. About 1,000 of 138,000 actions are repeated word
   for word under one `Guid` (mostly 2017–2018); staging keeps them once.
 - Session codes: 1 is the regular session and 2–4 are special sessions, in order. Code 2 doesn't appear in
@@ -211,8 +214,20 @@ Quirks:
   ever cached. A warning backs off 1, 5 and then 15 minutes and retries: at 1.5 s apart, one shard still drew a
   warning after ~600 pages, since other traffic from the same IP counts too. The load stops with `Blocked` on
   a fourth warning or on `Block.aspx`. A cold load reads ~30,500 section-version pages (October 2026), so it
-  takes about 17 hours.
-- Several versions of one section can be in force side by side: a later version with a future effective date
+  takes about 17 hours. A full load has not completed yet (the first runs were stopped at about 380 of 445
+  chapters). Nothing lands until a run finishes, but every page fetched stays in the HTTP cache (`data/cache`:
+  section pages 180 days, lists 7 days), so re-running reads the cached pages without touching the site and
+  continues with the rest.
+- **Pacing across shards.** Requests to the host take turns through a lock file and a last-request time in
+  `data/cache` (`http.host_throttle`, held across the 2 s wait and the request), so shards and separate runs
+  on one machine never send two requests less than 2 s apart; more shards add no speed. (The earlier pacing
+  had each shard sleep 2 s × the shard count on its own clock, which let two shards' requests land under a second
+  apart, 400 to 520 times an hour with 2 to 4 shards.) The lock needs a shared filesystem. Cloud Run tasks have
+  none, so the loader refuses to start when `CLOUD_RUN_TASK_COUNT` is above 1: run it as a single task
+  (`--tasks 1`); shards inside that task are fine.
+- A section page that answers with the warning twice, a minute apart, is taken for a page that doesn't exist
+  and is skipped (logged as `mo_revisor.section_page_refused`; a re-run tries it again). Three skipped in a row
+  stop the load, since that is a real warning.- Several versions of one section can be in force side by side: a later version with a future effective date
   (27.117 has one effective 28 Aug 2026 and one effective 1 Jul 2027), or conflicting enactments of the same
   year (`MultiEnact.aspx`). `fct_statute_sections.is_current` marks the in-force version with the latest
   effective date.
@@ -223,12 +238,16 @@ Quirks:
 - History notes have several act forms: `L.` (enacted), `A.L.` (amended), `A.` (amended, in the 1949 revision's
   notes), and `Repealed L.` in repeal notes. Older acts are cited by session-law page (`p. 1428`) and name no
   bill. Bills are joined by `merged with` (several bills changed the section in one session) and `&` (combined
-  bills: `S.B. 299 & 40` is SB 299 and SB 40). `, et al.` belongs to the act before it. `S.B` sometimes lacks
+  bills: `S.B. 299 & 40` is one substitute carrying SB 299 and SB 40; only the first, the lead bill, passed, so
+  `fct_bill_statute_links.is_lead_bill` is false for the rest and `combined_into` names the lead; the House
+  list shows the others as failed). `, et al.` belongs to the act before it. `S.B` sometimes lacks
   its last dot.
 - Extraordinary sessions: the Revisor writes "1st Ex. Sess." and counts only extraordinary sessions that passed
   bills. The House numbers every special session, so 2018's legislature-called impeachment session (House 183,
-  resolutions only) makes the Revisor's 2018 "1st Ex. Sess." House session 184. Staging maps the Nth
-  extraordinary session to the year's Nth House special-session code that has House bills.
+  resolutions only) makes the Revisor's 2018 "1st Ex. Sess." House session 184. The Revisor also
+  prints "2d", "3d", "4th", "1st." and "Ex. Sess" (no final period) and, once, "lst"; all are read. The model maps
+  the Nth extraordinary session to the House session named "Nth Extraordinary Session" (`stg_mo_house__sessions`),
+  and assumes N + 2 for years that list lacks.
 - A repeal or a new version that waits on a contingency is dated 1 Jan 2099 (repeals by 2026 SB 1233; section
   44.098). Staging keeps it as `is_contingent` with no date; the mart's status is `contingent`.
 - A version a court held unconstitutional is marked "(all or part is unconstitutional)" in its effective line,
@@ -238,6 +257,9 @@ Quirks:
 - `rx.aspx` also lists repealed constitution sections (`V Section 25`); staging leaves them out (the
   constitution is #224). One of them prints the year as "L. 1076" (for 1976).
 - Transfer notes read "(Transferred 2013; now 29.351)" or "(Transferred 1978 to 565.004; repealed 1983)".
+- Some versions are on both pages: 324.406/60569 and 324.424/60572 are listed contingent on their chapter page
+  and printed on `rx.aspx` as "Repealed L. 2026 S.B. 1233" with the 2099 date. `fct_statute_sections` keeps the
+  listed row and sets `repeal_pending`.
 - Some chapters list no sections at all: every section in them was repealed or transferred.
 - History notes only cover bills that became law. A pending bill's statute targets are in its text, which
   isn't loaded yet (#175).

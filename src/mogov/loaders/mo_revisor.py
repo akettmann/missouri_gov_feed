@@ -14,6 +14,7 @@ Each section version lands as the page's content block, verbatim, plus its text 
 parses dates, status and the history citations. Units: chapters, plus rx.aspx (owned by one shard).
 """
 
+import os
 import re
 import time
 
@@ -30,11 +31,19 @@ BASE = "https://revisor.mo.gov/main"
 # The site's rule: requests from one IP less than a second apart, several times in 30 seconds, get a warning page
 # (served with 200 in place of the page asked for); keep going and every request from that IP, browsers included,
 # redirects to Block.aspx. ~10 requests/s from three shards got an IP blocked within two minutes on 2026-10-25.
-# Each shard waits POLITE_DELAY x the shard count between requests, so all shards together from one IP stay under
-# one request per POLITE_DELAY. Even at 1.5 s a single shard drew one warning after ~600 pages (other traffic from
-# the same IP counts too), so a warning backs off and retries; only repeated warnings or a block stop the load.
+# Requests are paced by a lock shared by every process on the machine (http.host_throttle): each starts at least
+# POLITE_DELAY after the last, whichever shard sent it, so shards add no speed. (Per-shard sleeps of delay x shards
+# let two shards' requests land less than a second apart: ~400-520 such gaps an hour with 2-4 shards.) Cloud Run
+# tasks don't share a filesystem, so the loader refuses to run as more than one task. Even at 1.5 s a single shard
+# drew one warning after ~600 pages (other traffic from the same IP counts too), so a warning backs off and
+# retries; only repeated warnings or a block stop the load.
 POLITE_DELAY = 2.0
 WARNING_BACKOFF = (60, 300, 900)
+# The warning page is also what a section page that doesn't exist returns. For those, one retry after a minute tells
+# the two apart (a real too-fast warning has cleared by then); a page still refused is skipped and logged, and
+# several skipped in a row stop the load (the IP is being warned for real).
+SECTION_WARNING_BACKOFF = (60,)
+MAX_CONSECUTIVE_SKIPS = 3
 REFUSED_MARKER = b"Recent accesses are tracked over a thirty second interval"
 # A new enactment or amendment is a new version with its own bid (a new URL), found through the chapter lists,
 # which are re-read weekly. A version's page only changes with annotations, so it is re-read twice a year.
@@ -63,10 +72,12 @@ def _not_blocked(resp: httpx.Response) -> None:
         raise Warned(f"revisor.mo.gov answered with its too-fast / no-such-page warning for {resp.url}")
 
 
-def _get(url: str, params: dict | None = None, *, max_age: float = LIST_MAX_AGE, shards: int = 1) -> str:
-    for wait in (*WARNING_BACKOFF, None):
+def _get(
+    url: str, params: dict | None = None, *, max_age: float = LIST_MAX_AGE, backoff: tuple[float, ...] | None = None
+) -> str:
+    for wait in (*(WARNING_BACKOFF if backoff is None else backoff), None):
         try:
-            page = fetch(url, params, max_age=max_age, delay=POLITE_DELAY * shards, check=_not_blocked)
+            page = fetch(url, params, max_age=max_age, min_interval=POLITE_DELAY, check=_not_blocked)
             return page.decode("utf-8", "replace")
         except Warned:
             if wait is None:
@@ -178,8 +189,15 @@ def parse_repeals(page: str) -> list[dict]:
 @loader("mo_revisor", service="revisor.mo.gov", slow=True)
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: chapters (their section pages), plus the repeals page."""
+    tasks = int(os.environ.get("CLOUD_RUN_TASK_COUNT") or 1)
+    if tasks > 1:
+        raise RuntimeError(
+            f"mo_revisor can't run as {tasks} Cloud Run tasks: tasks don't share a filesystem, so their requests to "
+            "revisor.mo.gov can't be paced together and the site blocks the IP. Run it as one task "
+            "(--tasks 1; use --shards for processes inside that task)."
+        )
     toc_url = f"{BASE}/Home.aspx"
-    toc = parse_toc(_get(toc_url, shards=shard.count))
+    toc = parse_toc(_get(toc_url))
     if not toc:
         raise RuntimeError("revisor table of contents lists no chapters; the page layout may have changed")
     chapters = shard.take(toc, key=lambda c: c["chapter"])
@@ -188,18 +206,30 @@ def load(shard: db.Shard) -> dict[str, int]:
             sink.add("mo_revisor_chapters", c["chapter"], c)
         if shard.owns(REPEALS_UNIT):
             rx_url = f"{BASE}/rx.aspx"
-            for r in parse_repeals(_get(rx_url, shards=shard.count)):
+            for r in parse_repeals(_get(rx_url)):
                 sink.add("mo_revisor_repeals", f"{r['section']}/{r['bid']}", r, source_url=rx_url)
         versions = []
         for c in chapters:
-            listed = parse_chapter(_get(f"{BASE}/OneChapter.aspx", {"chapter": c["chapter"]}, shards=shard.count))
+            listed = parse_chapter(_get(f"{BASE}/OneChapter.aspx", {"chapter": c["chapter"]}))
             if not listed:  # every section of the chapter repealed or transferred
                 log.info("mo_revisor.empty_chapter", chapter=c["chapter"])
             versions += [(c["chapter"], section, bid) for section, bid in listed]
         progress = obs.Progress("section versions", len(versions), log)
         url = f"{BASE}/OneSection.aspx"
+        skipped = 0
         for chapter, section, bid in versions:
-            page = _get(url, {"section": section, "bid": bid}, max_age=SECTION_MAX_AGE, shards=shard.count)
+            try:
+                page = _get(
+                    url, {"section": section, "bid": bid}, max_age=SECTION_MAX_AGE, backoff=SECTION_WARNING_BACKOFF
+                )
+            except Warned:
+                skipped += 1
+                log.warning("mo_revisor.section_page_refused", section=section, bid=bid, consecutive=skipped)
+                if skipped >= MAX_CONSECUTIVE_SKIPS:
+                    raise
+                progress.tick()
+                continue
+            skipped = 0
             try:
                 parsed = parse_section(page)
             except ValueError as e:
