@@ -6,17 +6,22 @@
 -- per code however many records it has, so a duplicated NPDES permit or an air record listed twice adds nothing;
 -- AIR and AIRS/AFS are one program under two names (the same air permit, mirrored IDs) and count once; a
 -- 4- or 5-digit code (RCRAINFO, EIS and RMP truncate: 81232) counts for the 6-digit code at the same facility
--- that extends it (812320), so the two forms of one code no longer split the vote, #432), taking the programs' primary
--- codes first (naics_source 'naics'), then the ones FRS leaves UNKNOWN
+-- that extends it (812320), so the two forms of one code no longer split the vote, #432; a short code gives a full
+-- vote to EVERY 6-digit code it extends, so two 6-digit codes sharing a 5-digit prefix both get that vote),
+-- taking the programs'
+-- primary codes first (naics_source 'naics'), then the ones FRS leaves UNKNOWN
 -- ('naics_unknown'), then the ones it calls SECONDARY ('naics_secondary'). Only a facility with no NAICS code
 -- at all but a SIC code (a primary one before an unknown or secondary one, then the one the most program systems give)
 -- gets the NAICS sector that SIC code's major group falls in (seed sic_naics_sectors): naics_code is then the
 -- two-digit sector prefix, naics_description names the sector and the SIC code, and naics_source is 'sic'.
 -- naics_source is null when the facility has no usable code. A real NAICS code, even a non-primary one, is
 -- more precise than a two-digit SIC-derived sector, and agrees with it on the sector for about 90% of facilities.
--- Codes tied on tier and program-system count go to the one in the SIC-derived sector (NAICS 31-33 count as one
+-- Codes tied on tier and program-system count go to the one more program systems give across ALL tiers (the
+-- same count over primary, unknown and secondary rows; the UNKNOWN-tier rows usually back the right code, #432),
+-- then the one in the SIC-derived sector (NAICS 31-33 count as one
 -- sector), then any other code before the construction stormwater-permit noise codes (NAICS 238910, SIC 1629;
--- a site holds that permit beside its real industry, #432), then the lowest code. The SIC sector counts only as
+-- a site holds that permit beside its real industry, #432), then a 6-digit code before a shorter one, then the
+-- lowest code. The SIC sector counts only as
 -- a signal when the SIC code is not itself tied (same tier and program-system count) with a SIC code in a
 -- different sector, and is not SIC 1629 (construction stormwater-permit noise).
 -- is_government: a federal site, any owner-role organization typed as a government body
@@ -211,6 +216,16 @@ naics as (
     group by registry_id, naics_code, rank_class
 ),
 
+-- program systems per code over every tier, a tie-break within a tier
+naics_all_tiers as (
+    select
+        registry_id,
+        naics_code,
+        count(distinct program_family) as n_systems_all_tiers
+    from naics_normalised
+    group by registry_id, naics_code
+),
+
 best_naics as (
     select
         n.registry_id,
@@ -222,6 +237,7 @@ best_naics as (
             order by
                 n.rank_class asc,
                 n.n_program_systems desc,
+                allt.n_systems_all_tiers desc,
                 -- among tied codes, the one in the sector the facility's SIC code maps to (#181); no signal from
                 -- SIC 1629 (construction stormwater-permit noise) or a SIC code tied across sectors
                 case
@@ -235,9 +251,12 @@ best_naics as (
                 -- then NAICS 238910 (site preparation, the construction stormwater permit) loses ties to a
                 -- real industry (#432); other construction codes are real industries
                 case when n.naics_code = '238910' then 1 else 0 end asc,
+                -- a full 6-digit code before a truncated one, then the code order
+                length(n.naics_code) desc,
                 n.naics_code asc
         ) as rn
     from naics as n
+    inner join naics_all_tiers as allt on n.registry_id = allt.registry_id and n.naics_code = allt.naics_code
     left join primary_sic as ps on n.registry_id = ps.registry_id and ps.rn = 1
     left join {{ ref('naics_sectors') }} as sc on left(n.naics_code, 2) = sc.naics_prefix
 )

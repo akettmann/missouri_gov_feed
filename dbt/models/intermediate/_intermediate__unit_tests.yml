@@ -548,6 +548,44 @@ unit_tests:
         - {registry_id: p3, naics_code: '56291', naics_description: Remediation, naics_source: naics}
         - {registry_id: p4, naics_code: '22', naics_description: "Utilities sector, from SIC 4952 SEWERAGE SYSTEMS", naics_source: sic}
 
+  - name: epa_frs_facility_naics_within_tier_ties
+    model: int_epa_frs__facilities
+    description: >
+      Codes tied on tier and program-system count break the tie in order (#432). q1 (all tiers): 311111 and 311119
+      each have one primary system, but 311119 also has an UNKNOWN-tier system, so it wins (lowest code would pick
+      311111). q2 (short code, full vote): EIS's 32541 gives a full vote to both 325411 and 325412 (it extends both): 325411 has RCRAINFO and EIS (two systems), 325412 has NPDES, AIR and EIS (three) and wins. If the short code voted for just one of them (the lowest) they would tie at two systems each and the lowest, 325411, would win. q3 (length): 5-digit 32222 and 6-digit 327320 are
+      unrelated codes with one primary system each; the 6-digit code wins (lowest code would pick 32222).
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: q1, facility_name: All tiers, latitude: 38.5, longitude: -92.1}
+          - {registry_id: q2, facility_name: Short code votes for both, latitude: 38.5, longitude: -92.1}
+          - {registry_id: q3, facility_name: Length, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows: []
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: q1, program_system: NPDES, naics_code: '311111', naics_description: Dog food, is_primary: true, is_secondary: false}
+          - {registry_id: q1, program_system: NPDES, naics_code: '311119', naics_description: Other animal food, is_primary: true, is_secondary: false}
+          - {registry_id: q1, program_system: RCRAINFO, naics_code: '311119', naics_description: Other animal food, is_primary: false, is_secondary: false}
+          - {registry_id: q2, program_system: EIS, naics_code: '32541', naics_description: Pharma (short), is_primary: true, is_secondary: false}
+          - {registry_id: q2, program_system: RCRAINFO, naics_code: '325411', naics_description: Medicinal, is_primary: true, is_secondary: false}
+          - {registry_id: q2, program_system: NPDES, naics_code: '325412', naics_description: Preparations, is_primary: true, is_secondary: false}
+          - {registry_id: q2, program_system: AIR, naics_code: '325412', naics_description: Preparations, is_primary: true, is_secondary: false}
+          - {registry_id: q3, program_system: NPDES, naics_code: '32222', naics_description: Paper (short), is_primary: true, is_secondary: false}
+          - {registry_id: q3, program_system: NPDES, naics_code: '327320', naics_description: Ready-mix, is_primary: true, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows: []
+      - input: ref('sic_naics_sectors')
+        rows: []
+      - input: ref('naics_sectors')
+        rows: []
+    expect:
+      rows:
+        - {registry_id: q1, naics_code: '311119', naics_source: naics}
+        - {registry_id: q2, naics_code: '325412', naics_source: naics}
+        - {registry_id: q3, naics_code: '327320', naics_source: naics}
+
   - name: epa_frs_facility_naics_tie_sic_sector_merges_31_33
     model: int_epa_frs__facilities
     description: >
