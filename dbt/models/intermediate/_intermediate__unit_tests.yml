@@ -103,6 +103,71 @@ unit_tests:
         - {official_id: o_ann_smith, mec_committee_id: C4, confidence: high}
         - {official_id: o_riggs, mec_committee_id: C7, confidence: medium}
 
+  - name: official_people_commission_fallback_links_only_unambiguous_federal_judges
+    model: int_courtlistener__official_people
+    description: >
+      A federal judge whose CourtListener person has no fjc_id links by exact first+last name + same court +
+      judgeship start equal to the FJC commission date (fjc:1 Pitlyk). Never linked: a different start date (fjc:2),
+      two CourtListener people fitting one judge (fjc:3), two judges fitting one person (fjc:4, fjc:5), a person who
+      carries a different fjc_id (fjc:6), a different court (fjc:7), a magistrate position (fjc:8). fjc:9 still links
+      by fjc_id.
+    given:
+      - input: ref('int_judges__federal')
+        rows:
+          - {official_id: 'fjc:1', fjc_nid: '1'}
+          - {official_id: 'fjc:2', fjc_nid: '2'}
+          - {official_id: 'fjc:3', fjc_nid: '3'}
+          - {official_id: 'fjc:4', fjc_nid: '4'}
+          - {official_id: 'fjc:5', fjc_nid: '5'}
+          - {official_id: 'fjc:6', fjc_nid: '6'}
+          - {official_id: 'fjc:7', fjc_nid: '7'}
+          - {official_id: 'fjc:8', fjc_nid: '8'}
+          - {official_id: 'fjc:9', fjc_nid: '9'}
+      - input: ref('stg_fjc__appointments')
+        rows:
+          - {fjc_nid: '1', fjc_jid: '1', appointment_number: 1, given_name: Sarah, family_name: Pitlyk, court_name: U.S. District Court for the Eastern District of Missouri, commission_date: '2019-12-05'}
+          - {fjc_nid: '2', fjc_jid: '2', appointment_number: 1, given_name: Pat, family_name: Lee, court_name: U.S. District Court for the Eastern District of Missouri, commission_date: '2020-01-01'}
+          - {fjc_nid: '3', fjc_jid: '3', appointment_number: 1, given_name: Ann, family_name: Roe, court_name: U.S. District Court for the Western District of Missouri, commission_date: '2020-02-02'}
+          - {fjc_nid: '4', fjc_jid: '4', appointment_number: 1, given_name: Sam, family_name: Poe, court_name: U.S. District Court for the Eastern District of Missouri, commission_date: '2021-01-01'}
+          - {fjc_nid: '5', fjc_jid: '5', appointment_number: 1, given_name: Sam, family_name: Poe, court_name: U.S. District Court for the Eastern District of Missouri, commission_date: '2021-01-01'}
+          - {fjc_nid: '6', fjc_jid: '6', appointment_number: 1, given_name: Tom, family_name: Gray, court_name: U.S. District Court for the Eastern District of Missouri, commission_date: '2021-02-02'}
+          - {fjc_nid: '7', fjc_jid: '7', appointment_number: 1, given_name: Kim, family_name: Fox, court_name: U.S. District Court for the Eastern District of Missouri, commission_date: '2021-03-03'}
+          - {fjc_nid: '8', fjc_jid: '8', appointment_number: 1, given_name: Lou, family_name: Ray, court_name: U.S. District Court for the Eastern District of Missouri, commission_date: '2021-04-04'}
+          - {fjc_nid: '9', fjc_jid: '9', appointment_number: 1, given_name: Ida, family_name: Kay, court_name: U.S. District Court for the Western District of Missouri, commission_date: '2021-05-05'}
+      - input: ref('stg_courtlistener__people')
+        rows:
+          - {cl_person_id: '101', fjc_id: null, name_first: Sarah, name_last: Pitlyk}
+          - {cl_person_id: '102', fjc_id: null, name_first: Pat, name_last: Lee}
+          - {cl_person_id: '103', fjc_id: null, name_first: Ann, name_last: Roe}
+          - {cl_person_id: '104', fjc_id: null, name_first: Ann, name_last: Roe}
+          - {cl_person_id: '105', fjc_id: null, name_first: Sam, name_last: Poe}
+          - {cl_person_id: '106', fjc_id: '999', name_first: Tom, name_last: Gray}
+          - {cl_person_id: '107', fjc_id: null, name_first: Kim, name_last: Fox}
+          - {cl_person_id: '108', fjc_id: null, name_first: Lou, name_last: Ray}
+          - {cl_person_id: '109', fjc_id: '9', name_first: Ida, name_last: Kay}
+      - input: ref('stg_courtlistener__positions')
+        rows:
+          - {cl_person_id: '101', court_id: moed, position_type: jud, start_date: '2019-12-05'}
+          - {cl_person_id: '102', court_id: moed, position_type: jud, start_date: '2019-01-01'}
+          - {cl_person_id: '103', court_id: mowd, position_type: jud, start_date: '2020-02-02'}
+          - {cl_person_id: '104', court_id: mowd, position_type: jud, start_date: '2020-02-02'}
+          - {cl_person_id: '105', court_id: moed, position_type: jud, start_date: '2021-01-01'}
+          - {cl_person_id: '106', court_id: moed, position_type: jud, start_date: '2021-02-02'}
+          - {cl_person_id: '107', court_id: mowd, position_type: jud, start_date: '2021-03-03'}
+          - {cl_person_id: '108', court_id: moed, position_type: mag, start_date: '2021-04-04'}
+          - {cl_person_id: '109', court_id: mowd, position_type: jud, start_date: '2021-05-05'}
+      - input: ref('mo_courts')
+        rows:
+          - {court_id: moed, office: us_district_court}
+          - {court_id: mowd, office: us_district_court}
+      - input: ref('int_officials__current')
+        rows:
+          - {official_id: 'x:1', office: us_district_court, given_name: Nobody, family_name: Here}
+    expect:
+      rows:
+        - {official_id: 'fjc:1', cl_person_id: '101'}
+        - {official_id: 'fjc:9', cl_person_id: '109'}
+
   - name: bulk_case_matches_respect_courts_tenure_and_whole_words
     model: int_courtlistener__bulk_case_matches
     description: >
