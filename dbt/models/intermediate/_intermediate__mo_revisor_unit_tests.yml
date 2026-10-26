@@ -411,3 +411,82 @@ unit_tests:
         - {section_id: t.1, bill: HB1, act_year: 2000, change: amended}
         - {section_id: t.1, bill: SB2, act_year: 2001, change: enacted}
         - {section_id: t.1, bill: SB3, act_year: 2001, change: enacted}
+
+  - name: history_and_repeal_notes_on_one_section_version_are_parsed_apart
+    model: int_mo_revisor__session_law_bills
+    description: >
+      A contingent repeal puts a history note and a repeal note on the same section version (324.406/60569 is on both
+      Revisor pages). Each note is parsed on its own: the acts of one never take the other's act_index, so "and L."
+      inherits "repealed" only inside the repeal note and a continuation piece joins only its own note's act.
+    given:
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 'c.1' as section_id, 'c.1/1' as section_version_id, '(A.L. 2000 H.B. 1 and L. 2001 S.B. 2, S.B. 3)' as history_note
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select 'c.1' as section_id, 'c.1/1' as section_version_id, 'repealed' as change_kind, '(Repealed L. 2005 H.B. 5 and L. 2006 S.B. 6, S.B. 7)' as note
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: c.1, bill: HB1, act_year: 2000, change: amended}
+        - {section_id: c.1, bill: SB2, act_year: 2001, change: enacted}
+        - {section_id: c.1, bill: SB3, act_year: 2001, change: enacted}
+        - {section_id: c.1, bill: HB5, act_year: 2005, change: repealed}
+        - {section_id: c.1, bill: SB6, act_year: 2006, change: repealed}
+        - {section_id: c.1, bill: SB7, act_year: 2006, change: repealed}
+
+  - name: note_kind_keeps_history_and_repeal_notes_apart_in_every_step
+    model: int_mo_revisor__session_law_bills
+    description: >
+      One fixed case per step that keys on note_kind, each putting a history note and a repeal note on one section
+      version, so dropping note_kind from any single step (the anchor window, the last_break self-join, the item_types
+      head window, the item_bills join, the item_groups window, the final bills join) changes a row. d.1: the repeal's
+      "and L." must not inherit the history's amended/enacted anchor, and the history's must not turn repealed. d.2:
+      the continuation "S.B. 17" joins the repeal's own act, not the history's. d.3: "& 26" takes the repeal note's
+      head "S.B.", not the history's "H.B.". d.4 and d.5: the repeal's "S.B. 36" is combined into S.B. 35, not made a
+      lead bill by the history note's grouping or by another section's citation of H.B. 32.
+    given:
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 'd.1' as section_id, 'd.1/1' as section_version_id, '(L. 2000 H.B. 1, A.L. 2001 H.B. 2)' as history_note
+            union all select 'd.2', 'd.2/1', '(A.L. 2000 H.B. 11, A.L. 2001 H.B. 12)'
+            union all select 'd.3', 'd.3/1', '(A.L. 2000 H.B. 21 & H.B. 22)'
+            union all select 'd.4', 'd.4/1', '(A.L. 2002 H.B. 31 and H.B. 32)'
+            union all select 'd.5', 'd.5/1', '(A.L. 2002 H.B. 32)'
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select 'd.1' as section_id, 'd.1/1' as section_version_id, 'repealed' as change_kind, '(Repealed L. 2005 H.B. 5 and L. 2006 S.B. 6)' as note
+            union all select 'd.2', 'd.2/1', 'repealed', '(Repealed L. 2005 H.B. 15, S.B. 16, S.B. 17)'
+            union all select 'd.3', 'd.3/1', 'repealed', '(Repealed L. 2005 S.B. 25 & 26)'
+            union all select 'd.4', 'd.4/1', 'repealed', '(Repealed L. 2007 S.B. 35 & 36)'
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: d.1, bill: HB1, act_year: 2000, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: d.1, bill: HB2, act_year: 2001, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: d.1, bill: HB5, act_year: 2005, change: repealed, is_lead_bill: true, combined_into: }
+        - {section_id: d.1, bill: SB6, act_year: 2006, change: repealed, is_lead_bill: true, combined_into: }
+        - {section_id: d.2, bill: HB11, act_year: 2000, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: d.2, bill: HB12, act_year: 2001, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: d.2, bill: HB15, act_year: 2005, change: repealed, is_lead_bill: true, combined_into: }
+        - {section_id: d.2, bill: SB16, act_year: 2005, change: repealed, is_lead_bill: true, combined_into: }
+        - {section_id: d.2, bill: SB17, act_year: 2005, change: repealed, is_lead_bill: true, combined_into: }
+        - {section_id: d.3, bill: HB21, act_year: 2000, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: d.3, bill: HB22, act_year: 2000, change: amended, is_lead_bill: false, combined_into: HB21}
+        - {section_id: d.3, bill: SB25, act_year: 2005, change: repealed, is_lead_bill: true, combined_into: }
+        - {section_id: d.3, bill: SB26, act_year: 2005, change: repealed, is_lead_bill: false, combined_into: SB25}
+        - {section_id: d.4, bill: HB31, act_year: 2002, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: d.4, bill: HB32, act_year: 2002, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: d.4, bill: SB35, act_year: 2007, change: repealed, is_lead_bill: true, combined_into: }
+        - {section_id: d.4, bill: SB36, act_year: 2007, change: repealed, is_lead_bill: false, combined_into: SB35}
+        - {section_id: d.5, bill: HB32, act_year: 2002, change: amended, is_lead_bill: true, combined_into: }
