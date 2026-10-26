@@ -2,11 +2,13 @@
 -- of titles held on them (chair, vice-chair, co-chair, ranking minority member), counted from the House's own
 -- lists. Subcommittees (including joint-committee subcommittees) are counted apart so a member who chairs three
 -- subcommittees is not shown as chairing three committees. A count of titles, not a score. Grain: one row per
--- (official, session).
+-- (person, session). Former members are kept (is_current_official).
 select
     official_id,
     session_code,
     session_year,
+    max(case when is_current_official then 1 else 0 end) = 1 as is_current_official,
+    max(source_url) as source_url,
     cast(sum(case when is_subcommittee then 0 else 1 end) as {{ dbt.type_bigint() }}) as committees_held,
     cast(
         sum(case when not is_subcommittee and position_name = 'Chair' then 1 else 0 end)

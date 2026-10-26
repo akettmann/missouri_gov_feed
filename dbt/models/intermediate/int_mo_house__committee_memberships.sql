@@ -1,14 +1,15 @@
 -- House committee and subcommittee memberships per member and session, keyed to the person (person_key from
 -- int_mo_house__member_identity). The member pages (stg_mo_house__member_committees) cover every session but
 -- 253; for a session with no member-page rows the COMMITTEELIST export fills in (House members only, matched
--- on session + district).
+-- on session + district). source_url is the House file each row was read from.
 with member_pages as (
     select
         c.session_code,
         i.person_key,
         c.committee_name,
         c.position_name,
-        'member_page' as source
+        'member_page' as source,
+        c.source_url
     from {{ ref('stg_mo_house__member_committees') }} as c
     inner join {{ ref('int_mo_house__member_identity') }} as i
         on c.session_code = i.session_code and c.house_member_id = i.house_member_id
@@ -20,7 +21,8 @@ list_rows as (
         i.person_key,
         l.committee_name,
         l.position_name,
-        'committee_list' as source
+        'committee_list' as source,
+        l.source_url
     from {{ ref('stg_mo_house__committee_list_members') }} as l
     inner join {{ ref('int_mo_house__member_identity') }} as i
         on l.session_code = i.session_code and l.district_number = i.district_number
@@ -42,5 +44,6 @@ select
     committee_name,
     position_name,
     source,
+    source_url,
     committee_name like '%Subcommittee%' as is_subcommittee
 from unioned

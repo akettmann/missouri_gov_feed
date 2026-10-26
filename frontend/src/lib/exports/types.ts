@@ -40,6 +40,8 @@ export interface Indicator {
   /** party unity only: the official's own first and last year with a party-line vote in the chamber */
   first_vote_year: number | null;
   last_vote_year: number | null;
+  /** party unity only: the first year we hold any party-line vote for that chamber (any official) */
+  chamber_data_start_year: number | null;
 }
 
 /** rpt_donor_rollup summed per election cycle x donor group (medium matches kept apart for the toggle). */
@@ -91,7 +93,7 @@ export interface CommitteeTrail {
   first_year: number;
   last_year: number;
   /**
-   * high = curated alias (a curated alias list, each alias matched against the committee's own filings), committee
+   * high = curated alias (a curated alias list, each alias group checked against the committee's filings or its own filed name), committee
    * ID written into the name, or the same name; medium = looser name (abbreviations spelled out,
    * PAC/Fund etc. dropped, or a filer's parenthesized short name)
    */
