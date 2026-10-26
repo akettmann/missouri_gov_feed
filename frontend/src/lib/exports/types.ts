@@ -304,7 +304,7 @@ export interface OfficialBundle {
     /** null when the rpt_* export is missing (section says so instead of showing nothing) */
     party_breaks: PartyBreak[] | null;
     attendance: AttendanceRow[] | null;
-    /** rpt_attendance_pay: pay per vote attended by year and in total; null when the export is missing or empty (state expenditures not loaded) */
+    /** rpt_attendance_pay: pay per vote attended by year and in total; null when the export is missing */
     attendance_pay: PayVoteRow[] | null;
     /** the subjects with the most roll calls (top 20) */
     by_subject: SubjectVotes[] | null;
@@ -317,7 +317,7 @@ export interface OfficialBundle {
     status: string;
     /** federal district judges only (fct_judge_time_to_disposition); null for everyone else or when the export is missing */
     time_to_disposition: TimeToDisposition | null;
-    /** cases per filing year and role; null when the export is missing or empty (state expenditures not loaded) */
+    /** cases per filing year and role; null when the export is missing */
     by_year: { year: number; role: string; cases: number }[] | null;
     total: number;
     /** the most recent cases (all of them are in the CourtListener links) */
@@ -327,7 +327,7 @@ export interface OfficialBundle {
     status: string;
     federal: FederalDonorRow[];
     cycles: Dataset<DonorCycleRow>;
-    /** employers of individual donors (rpt_donor_employers, top 20); null when the export is missing or empty (state expenditures not loaded) */
+    /** employers of individual donors (rpt_donor_employers, top 20); null when the export is missing */
     employers:
       | {
           employer: string;
@@ -339,10 +339,10 @@ export interface OfficialBundle {
           source_url: string | null;
         }[]
       | null;
-    /** state officials' individual contributions by size (rpt_donor_size); null when the export is missing or empty (state expenditures not loaded) */
+    /** state officials' individual contributions by size (rpt_donor_size); null when the export is missing */
     size: { cycle: number; band_floor: number; match_confidence: string; total_amount: number }[] | null;
     top_donors: Dataset<TopDonorRow>;
-    /** committee donors followed one hop back (rpt_committee_donors); null when the export is missing or empty (state expenditures not loaded) */
+    /** committee donors followed one hop back (rpt_committee_donors); null when the export is missing */
     committee_trails: CommitteeTrail[] | null;
   };
   gifts: Dataset<GiftRollupRow>;
