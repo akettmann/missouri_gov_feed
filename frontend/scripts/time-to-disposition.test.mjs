@@ -21,7 +21,7 @@ test("a long-serving judge gets the median with its n", () => {
     median: 238,
     measured: 7793,
     assigned: 7796,
-    coveragePct: 100,
+    coveragePct: 99.9,
     lowCoverage: false,
     excluded: 3,
   });
@@ -43,12 +43,33 @@ test("a zero-day median is a real number, not a missing one", () => {
   assert.equal(timeToDispositionView(row({ median_days_to_disposition: 0 })).median, 0);
 });
 
-test("low date coverage flags below the threshold only", () => {
+test("low coverage is measured / assigned, flagged below the threshold only", () => {
   assert.equal(LOW_COVERAGE_SHARE, 0.8);
-  assert.equal(timeToDispositionView(row({ share_with_both_dates: 0.8 })).lowCoverage, false);
-  const v = timeToDispositionView(row({ share_with_both_dates: 0.4653 }));
+  const edge = timeToDispositionView(row({ dockets_assigned: 100, dockets_measured: 80 }));
+  assert.equal(edge.lowCoverage, false);
+  assert.equal(edge.coveragePct, 80);
+  const v = timeToDispositionView(row({ dockets_assigned: 1000, dockets_measured: 465 }));
   assert.equal(v.lowCoverage, true);
-  assert.equal(v.coveragePct, 47);
+  assert.equal(v.coveragePct, 46.5);
+});
+
+test("the percent follows the counts, not the mart's share (which includes ends-before-filed)", () => {
+  const v = timeToDispositionView(
+    row({
+      dockets_assigned: 1000,
+      dockets_measured: 790,
+      dockets_ends_before_filed: 10,
+      share_with_both_dates: 0.8,
+    }),
+  );
+  assert.equal(v.coveragePct, 79);
+  assert.equal(v.lowCoverage, true);
+});
+
+test("no assigned dockets: no division by zero", () => {
+  const v = timeToDispositionView(row({ dockets_assigned: 0, dockets_measured: 0 }));
+  assert.equal(v.coveragePct, 0);
+  assert.equal(v.lowCoverage, false);
 });
 
 test("daysLabel: singular, plural, half days", () => {

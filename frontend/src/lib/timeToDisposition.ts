@@ -19,7 +19,7 @@ export interface TimeToDispositionView {
   median: number | null;
   measured: number;
   assigned: number;
-  /** % of assigned dockets that have both dates, rounded to a whole percent */
+  /** measured / assigned, as a percent rounded down to one decimal (so 7,793 of 7,796 reads 99.9, never 100) */
   coveragePct: number;
   lowCoverage: boolean;
   /** dockets left out because they end before they were filed */
@@ -27,13 +27,15 @@ export interface TimeToDispositionView {
 }
 
 export function timeToDispositionView(r: TimeToDispositionInput): TimeToDispositionView {
+  // Derived from the counts shown on the page, not the mart's share (which also counts dockets that end before filing).
+  const share = r.dockets_assigned > 0 ? r.dockets_measured / r.dockets_assigned : null;
   const enough = r.dockets_measured >= MIN_MEASURED && r.median_days_to_disposition != null;
   return {
     median: enough ? r.median_days_to_disposition : null,
     measured: r.dockets_measured,
     assigned: r.dockets_assigned,
-    coveragePct: Math.round(r.share_with_both_dates * 100),
-    lowCoverage: r.share_with_both_dates < LOW_COVERAGE_SHARE,
+    coveragePct: share === null ? 0 : Math.floor(share * 1000) / 10,
+    lowCoverage: share !== null && share < LOW_COVERAGE_SHARE,
     excluded: r.dockets_ends_before_filed,
   };
 }
