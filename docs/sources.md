@@ -311,12 +311,16 @@ Quirks:
   bill. Bills are joined by `merged with` (several bills changed the section in one session) and `&` (combined
   bills: `S.B. 299 & 40` is one substitute carrying SB 299 and SB 40; only the first, the lead bill, passed, so
   `fct_bill_statute_links.is_lead_bill` is false for the rest and `combined_into` names the lead; the House
-  list shows the others as failed). `, et al.` belongs to the act before it. `S.B` sometimes lacks
-  its last dot.
+  list shows the others as failed). A bill after `&` may repeat its head (`H.B. 237 & H.B. 238`, or another
+  type: `H.B. 5 & S.B. 7`); a bare number takes the type before it. `and` (`H.B. 1270 and H.B. 2032`) joins bills
+  that each passed on their own, so each is a lead bill. The old notes also list a second bill after a comma
+  (`A.L. 1978 H.B. 971, S.B. 628`): that piece continues the act before it. `, et al.` belongs to the act before
+  it. `S.B` sometimes lacks its last dot.
 - Extraordinary sessions: the Revisor writes "1st Ex. Sess." and counts only extraordinary sessions that passed
   bills. The House numbers every special session, so 2018's legislature-called impeachment session (House 183,
   resolutions only) makes the Revisor's 2018 "1st Ex. Sess." House session 184. The Revisor also
-  prints "2d", "3d", "4th", "1st." and "Ex. Sess" (no final period) and, once, "lst"; all are read. The model maps
+  prints "2d", "3d", "4th", "1st.", "First", "Ex. Sess" (no final period), "Extraordinary Session" (1997, no
+  number: read as the year's only numbered session, the 2d) and, once, "lst"; all are read. The model maps
   the Nth extraordinary session to the House session named "Nth Extraordinary Session" (`stg_mo_house__sessions`),
   and assumes N + 2 for years that list lacks.
 - A repeal or a new version that waits on a contingency is dated 1 Jan 2099 (repeals by 2026 SB 1233; section
