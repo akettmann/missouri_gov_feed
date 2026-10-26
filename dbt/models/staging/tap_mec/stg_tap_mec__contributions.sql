@@ -144,11 +144,8 @@ source_rows as (
         coalesce(
             ctrb_type = 'Corporation'
             and ctrb_name is not null
-            and (length(trim(ctrb_name)) < 2 or not {{ mogov.regex_matches('ctrb_name', '.*[A-Za-z0-9].*') }})
-            and (
-                coalesce(length(trim(company)), 0) < 2
-                or not coalesce({{ mogov.regex_matches('company', '.*[A-Za-z0-9].*') }}, false)
-            )
+            and {{ mogov.clean_name('ctrb_name') }} is null
+            and {{ mogov.clean_name('company') }} is null
             and nullif(trim(last_name), '') is null
             and {{ mogov.regex_matches('trim(first_name)', '^.*[A-Za-z].* .*[A-Za-z].*$') }},
             false

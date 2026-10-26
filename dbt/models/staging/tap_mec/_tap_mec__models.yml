@@ -70,8 +70,8 @@ models:
     (''~'', ''-'', no letter or number) are dropped, and a whole name (company) of one character is dropped; a part
     of a person''s name keeps initials (''J Roe''). All-digit name parts are dropped. When the last name is the
     first name, or starts with the first name followed by a space (an organization typed into both boxes: ''USPS''
-    / ''USPS''), the last name alone is used. Built from the shared macros in macros/names.sql; the contributions
-    model adopting them is #127.'
+    / ''USPS''), the last name alone is used. Built from the shared macros in macros/names.sql, which stg_tap_mec__contributions
+    also uses.'
   columns:
   - name: record_id
     description: The source row's own id (cd3_b_id).
