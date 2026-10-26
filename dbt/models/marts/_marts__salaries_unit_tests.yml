@@ -716,3 +716,42 @@ unit_tests:
       rows:
         - {official_id: p_cody, calendar_year: 2023, employee_name: 'SMITH, DAVID C', match_confidence: medium}
         - {official_id: p_david, calendar_year: 2023, employee_name: 'SMITH, DAVID T', match_confidence: medium}
+
+  - name: salaries_a_january_final_check_without_a_name_key_row_stays_unmatched
+    model: fct_salaries
+    description: >
+      A January final check is taken out of seat pairing and can only be matched by name (#471), which needs the
+      departed member to have a row in int_officials__name_keys. Neil Smith's seat ended 2023-01-03 and "SMITH, NEIL I"
+      in 2023 is his small final check, but he has no name-key row: the check stays unmatched. It is not paired to the
+      other Smith ("SMITH, DAVID T" is David's), and not given to Neil by seat.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, DAVID T', last_name: SMITH, first_names: DAVID T, gross_pay: 38385.46}
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, NEIL I', last_name: SMITH, first_names: NEIL I, gross_pay: 1500.0}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_david, full_name: David Smith, surname_key: smith, chamber: lower, start_date: '2019-01-01', end_date: '9999-12-31'}
+          - {person_id: p_neil, full_name: Neil Smith, surname_key: smith, chamber: lower, start_date: '2019-01-01', end_date: '2023-01-03'}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p_david, office: state_house}
+          - {official_id: p_neil, office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: p_david, level: state, office: state_house, family_key: smith, given_key: david}
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows:
+          - {year: 2023, official_id: p_david, office: state_house}
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: p_david, calendar_year: 2023, employee_name: 'SMITH, DAVID T', match_confidence: high}

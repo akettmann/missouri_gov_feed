@@ -18,6 +18,12 @@
 --                A seat counts from the member's first roster year in that chamber (House and Senate each) when Open
 --                States has no start date (#227). A small payment that fits a member whose seat ended the December
 --                before, or that January, is that member's final check and is left out of 1 to 4 (#250).
+--                A final check is only ever set aside, never paired by seat: a December one is matched by name as
+--                well, and so is a January one (#269). Both depend on the departed member having a row in
+--                int_officials__name_keys and on the by-name checks passing (exactly one matching official, one row);
+--                without them the final check stays unmatched rather than mis-paired (#471). A payee set aside
+--                who is paid in the same chamber in a later year is suspect (a mid-year special-election successor
+--                with a similar name): tests/assert_salaries_final_checks_not_paid_again_later flags it.
 --   by name      payroll "LAST, FIRST" against the official's name variants within the same group of
 --                offices, first names that fit (see mogov.first_name_fit): statewide officials, judges, and
 --                legislator rows the seat match leaves open (members without an Open States seat), and only in
