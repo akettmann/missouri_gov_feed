@@ -42,12 +42,47 @@ Flow: [diagrams/sources/mo_house.svg](diagrams/sources/mo_house.svg)
 documents.house.mo.gov XML exports (members, bills, actions) plus one PDF per roll call. The PDFs are
 the only per-member House vote record.
 
-- Lands: `mo_house_members`, `mo_house_bills`, `mo_house_lists`, `mo_house_rollcalls`,
+- Lands: every `.xml` file of a session zip (and of the open session's walk), whatever its kind, unchanged as
+  gzip (`<raw dir>/mo_house_xml/<session>/<FILE>.XML.gz`) with one state row per file in `mo_house_xml_files`
+  (kind `member`, `bill`, `list` or `other`; path, source URL, size, sha256, `landed_at` = when this run wrote
+  it, not when the House published it), then typed tables parsed from those files by `mogov.parsers.mo_house`:
+  `mo_house_xml_bills` with child tables `_bill_actions` (with printed roll-call totals), `_bill_sponsors`,
+  `_bill_texts`, `_bill_amendments`, `_bill_rollcalls`, `_bill_subjects`, `_bill_hearings`, `_bill_summaries`,
+  `_bill_fiscal_notes` and `_bill_witnesses` (witness-form links only); `mo_house_xml_members` with
+  `_member_committees` and `_member_counties`; `mo_house_xml_sessions`, `_committees` and `_committee_members`;
+  one row per item of the BillList, MemberList, UpcomingHearingList and CalendarList files plus the lists'
+  `NOTICE` text (`_list_notices`); and the SenateActList (the House's actions on Senate bills) as
+  `mo_house_xml_senate_act_bills` with child tables `mo_house_xml_senate_act_` + `actions`, `texts`, `amendments`,
+  `rollcalls`, `subjects`, `hearings`, `summaries`, `fiscal_notes`, `witnesses` (each child row carries a `bill`
+  column naming its Senate bill). The roll-call PDFs land as `mo_house_rollcalls` and
   `mo_house_rollcall_votes`.
 - Window: `MOGOV_LOOKBACK_YEARS` (default 10). Roll-call PDFs go back to 2014.
 - Shard units: session codes (XML) and session days (roll-call PDFs).
 
 Quirks:
+- The XML is never converted on the way in: the loader gzips each file as received. The parser reads the
+  gzip with lxml (hardened settings in `mogov.xmlparse`) and selects elements by local name, so namespaces,
+  attributes, entities and CDATA are the parser's problem, not a regex's. The links that drive crawling
+  (`RollCallPDF`, `BillXMLLink`, `RepresentativeXMLLink`) come from the same parsed tree. Re-run the parser
+  alone, with no fetching, via `python -m mogov.parsers.mo_house [--shards N --shard I]`.
+- Landed but not parsed into rows (only in the gzip): the odd `GRP*` files (e.g. `191-GRP1.XML`: three group
+  documents in the shape of a bill that are not House bills; kind `other`, never read by the parser), a member's
+  `RepresentativeLegislation` lists (`SponsoredBill`, `CoSponsoredBill`, `SponsoredAmendment`: a per-member view
+  of what the bill documents' sponsor and amendment rows already say) and a member's contact details
+  (`EmailAddress`, `PhoneNumber`, `CapitolAddress`, `LegislativeAssistant`), which the project keeps out of
+  everything but the raw file. Witness forms (which name citizens) are linked, never fetched.
+- Coverage: a scan of every cached House XML file (20,327 files, 2016 to 2026) against the paths the parser reads
+  finds no other unread element; the scan script lists them by file kind.
+- The House BillList lists some bills twice (HR1 and HR2 in the odd-year sessions); the loader fetches and lands
+  each linked file once.
+- `AmendmentSortValue` looks like `0507HH`, so `mo_house_xml_bill_amendments.sort_value` is text. A value that
+  does not fit its column type (an integer or date field holding something else) becomes NULL and is logged
+  (`mo_house.value_not_integer` / `mo_house.value_not_date`), and a document lxml had to repair is logged as
+  `mo_house.xml_recovered` with its file name.
+- The raw dir must be writable from the loader: locally `data/raw`, on Cloud Run the mounted bucket named by
+  `MOGOV_RAW_DIR`. The gzip files are written atomically and with a fixed header, so a re-run of an unchanged
+  file rewrites nothing.
+- Empty XML elements are NULL in the typed tables (the old JSON landing held empty strings).
 - Session codes are two-digit year plus type: `1` regular, `2`–`4` extraordinary. Unknown codes return
   HTTP 200 with an HTML page, not a 404. The loader probes all four types per year and treats HTML as
   "no such session".
@@ -73,7 +108,7 @@ Quirks:
   bills have no subjects in `fct_bill_subjects`. Older sessions would need another source (Open States'
   bills API needs a key).
 - Each bill's roll calls are nested under the bill text version voted on
-  (`BillText[].RollCalls[].RollCall[].RollCallPDF`). The PDF URL is the House `vote_id`, so
+  (`mo_house_xml_bill_rollcalls`, `parent_kind = 'text'`). The PDF URL is the House `vote_id`, so
   `fct_vote_bills` links House votes to bills exactly. Roll calls the XML doesn't nest (all House votes on
   Senate bills, some on House bills) are linked by the lead bill of the measure printed on the PDF
   (`matched_by = 'measure text'`). In October 2026 5,274 of 6,449 roll calls were linked; most of the rest
@@ -751,6 +786,11 @@ offices, shops and most service businesses are missing.
   directory landed before `epa_frs_alt_names` existed gets an empty placeholder from `mogov build`; the seed covers the
   known cases until `mogov load epa_frs` is re-run (a new damaged name would then lose its letter).
   `stg_epa_frs__alt_names` mirrors raw, so alternative names containing U+FFFD stay there; the repairs never use them.
+- Stray commas and tabs: EPA writes many names, addresses and cities with a trailing comma ("BUTTERBALL,",
+  "900 WATSON DR,") or trailing tabs, and some owner names too. Staging (`mogov.clean_registry_text`) collapses
+  whitespace runs and cuts leading/trailing commas, semicolons and whitespace from facility name, address, city and
+  organization name; "INC." and inner commas stay. Names that were only separators or empty become null (60
+  sites; the sites tables say "unnamed site"). Inner doubled commas ("LIPPERT FAMILY FARM,, LLC") are not touched (#319).
 - `epa_frs_sic` joined the loader after the other three. A raw directory landed before that has no SIC table;
   `mogov build` then creates an empty placeholder (like the other late-added or optional JSON tables in
   `db.OPTIONAL_JSON_TABLES`), so the SIC fallback finds no codes and those sites show no industry until the

@@ -25,6 +25,16 @@ export function statusKind(status: string): "available" | "none" | "not-public" 
   return "none";
 }
 
+/** 1st, 2nd, 3rd, 4th, 11th, 22nd. */
+export function ordinal(n: number): string {
+  const tail = n % 100;
+  const suffix =
+    tail >= 11 && tail <= 13
+      ? "th"
+      : (({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th");
+  return `${n}${suffix}`;
+}
+
 /**
  * The one session label. A House session is named by the House itself (dim_house_session: "2025 1st
  * Extraordinary Session", "2018 Special Session"), because the numbering of its extraordinary sessions is
@@ -32,7 +42,7 @@ export function statusKind(status: string): "available" | "none" | "not-public" 
  * rather than guessing a number. The Senate's session is its year; Congress its number.
  */
 export function sessionLabel(chamber: string, code: string, houseName?: string | null): string {
-  if (chamber.startsWith("us_")) return `${code}th Congress`;
+  if (chamber.startsWith("us_")) return `${ordinal(Number(code))} Congress`;
   if (chamber === "state_house") return houseName || `session code ${code}`;
   return code;
 }
