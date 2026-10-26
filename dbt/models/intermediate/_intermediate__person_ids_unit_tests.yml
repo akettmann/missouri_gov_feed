@@ -264,6 +264,61 @@ unit_tests:
         - {alias_id: ocd-person/jamison-ken, person_id: ocd-person/jamison-ken, basis: self}
         - {alias_id: ocd-person/jamison-kenneth, person_id: ocd-person/jamison-ken, basis: name_continuity}
 
+  - name: person_ids_keep_placeholder_start_same_span_given_name_variants_apart
+    model: int_officials__person_ids
+    description: >
+      Open States gives some pre-2015 terms a placeholder 2013-01-01 start, so two different people can hold the identical 2013-01-01 to 2014-12-31 term in one seat (Jason Smith and Shawn Sisco, HD120, shown here with variant names). Equal multi-year terms are not a stub, so they are not joined (#332).
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/jon-smith, year: 2013, office: state_house, district: '120', name_key: jon smith, term_start: '2013-01-01', term_end: '2014-12-31'}
+          - {alias_id: ocd-person/jon-smith, year: 2014, office: state_house, district: '120', name_key: jon smith, term_start: '2013-01-01', term_end: '2014-12-31'}
+          - {alias_id: ocd-person/jonathan-smith, year: 2013, office: state_house, district: '120', name_key: jonathan smith, term_start: '2013-01-01', term_end: '2014-12-31'}
+          - {alias_id: ocd-person/jonathan-smith, year: 2014, office: state_house, district: '120', name_key: jonathan smith, term_start: '2013-01-01', term_end: '2014-12-31'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/jon-smith, person_id: ocd-person/jon-smith, basis: self}
+        - {alias_id: ocd-person/jonathan-smith, person_id: ocd-person/jonathan-smith, basis: self}
+
+  - name: person_ids_keep_a_long_term_nested_in_a_longer_one_given_name_variants_apart
+    model: int_officials__person_ids
+    description: >
+      A multi-year term nested in a longer one (Fowler 2013-2014 inside Hubrecht 2013-2018, HD151, shown with variant names) is a genuine long overlap on paper but not a stub, so the names are not joined (#332).
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/greg-lee, year: 2013, office: state_house, district: '151', name_key: greg lee, term_start: '2013-01-01', term_end: '2018-12-31'}
+          - {alias_id: ocd-person/greg-lee, year: 2014, office: state_house, district: '151', name_key: greg lee, term_start: '2013-01-01', term_end: '2018-12-31'}
+          - {alias_id: ocd-person/gregory-lee, year: 2013, office: state_house, district: '151', name_key: gregory lee, term_start: '2013-01-01', term_end: '2014-12-31'}
+          - {alias_id: ocd-person/gregory-lee, year: 2014, office: state_house, district: '151', name_key: gregory lee, term_start: '2013-01-01', term_end: '2014-12-31'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/greg-lee, person_id: ocd-person/greg-lee, basis: self}
+        - {alias_id: ocd-person/gregory-lee, person_id: ocd-person/gregory-lee, basis: self}
+
+  - name: person_ids_keep_a_same_end_later_start_successor_apart
+    model: int_officials__person_ids
+    description: >
+      Dan Kim (HD7 from 2019-01-09 to 2021-01-06) and Daniel Kim (HD7 from 2020-11-01, a 66-day term ending the same
+      day) overlap on paper and the later term is a stub under 90 days nested in the longer one, but it starts
+      almost two years after it, not within 31 days of it: a successor, not a duplicate (#332).
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/dan-kim, year: 2019, office: state_house, district: '7', name_key: dan kim, term_start: '2019-01-09', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/dan-kim, year: 2020, office: state_house, district: '7', name_key: dan kim, term_start: '2019-01-09', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/daniel-kim, year: 2020, office: state_house, district: '7', name_key: daniel kim, term_start: '2020-11-01', term_end: '2021-01-06'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/dan-kim, person_id: ocd-person/dan-kim, basis: self}
+        - {alias_id: ocd-person/daniel-kim, person_id: ocd-person/daniel-kim, basis: self}
+
   - name: person_ids_keep_a_same_seat_successor_with_a_hand_over_year_apart
     model: int_officials__person_ids
     description: >

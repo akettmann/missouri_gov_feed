@@ -338,16 +338,18 @@ models:
     or follow each other within a year in a different chamber (a move, as Roberts went House to Senate). Overlap
     alone is not enough: Open States often leaves a member who left mid-term with the normal term end, so a special-election
     successor overlaps on paper (Silvey to 2018-12-31, Lauren Arthur from 2018-09-12, SD17). The shared-seat case
-    also needs one term to sit inside the other, or both to start the same day. Years alone cannot decide the shared-seat
-    case: Kenneth Jamison (2025 only) inside Ken Jamison (2025-26) is a duplicate, but Danielle Smith (2019 only,
-    or 2026 only after a special election) inside a Dan Smith successor''s span looks the same by year. Dates tell
-    them apart: Kenneth''s term is a stub that overlaps Ken''s, while a successor''s term starts on or after the
-    predecessor''s ends. Undated House-roster rows prove no overlap. A name left with more than one partner (a chain
-    or a fork) is ambiguous and joins nothing. 3. otherwise the id is its own person, basis = self. Among merged
-    ids the person_id is an Open States id over mohouse:, then the one whose service ends latest, then the smaller
-    id. The choice never looks at the latest roster year, so an official''s id does not change when they leave office.
-    Curated rows (official_id_links) take effect only once a maintainer has signed them off (checked_by filled).
-    Grain: one row per id a legislator has been given, with the stable person_id.'
+    also needs one term to be a stub (under 90 days) inside the other, starting within 31 days of it; equal or nested
+    multi-year terms do not qualify (Open States'' placeholder 2013-01-01 starts, #332). Years alone cannot decide
+    the shared-seat case: Kenneth Jamison (2025 only) inside Ken Jamison (2025-26) is a duplicate, but Danielle
+    Smith (2019 only, or 2026 only after a special election) inside a Dan Smith successor''s span looks the same
+    by year. Dates tell them apart: Kenneth''s term is a 26-day stub that overlaps Ken''s, while a successor''s
+    term starts on or after the predecessor''s ends (or is no stub). Undated House-roster rows prove no overlap.
+    A name left with more than one partner (a chain or a fork) is ambiguous and joins nothing. 3. otherwise the
+    id is its own person, basis = self. Among merged ids the person_id is an Open States id over mohouse:, then
+    the one whose service ends latest, then the smaller id. The choice never looks at the latest roster year, so
+    an official''s id does not change when they leave office. Curated rows (official_id_links) take effect only
+    once a maintainer has signed them off (checked_by filled). Grain: one row per id a legislator has been given,
+    with the stable person_id.'
 - name: int_officials__wikidata
   description: 'Wikidata QID per official: from roster cross-references when present, else a unique exact name match
     against living Missouri officeholders on Wikidata. Grain: one row per official with a Wikidata QID.'
