@@ -7,6 +7,8 @@ with typed as (
         {{ dbt.safe_cast('icpsr', dbt.type_int()) }} as icpsr,
         {{ dbt.safe_cast('cast_code', dbt.type_int()) }} as cast_code
     from {{ source('voteview', 'votes') }}
+    -- House and Senate only; any other chamber value is dropped here (the source accepted_values test flags it)
+    where chamber in ('House', 'Senate')
 )
 
 select

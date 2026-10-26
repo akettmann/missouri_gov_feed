@@ -15,3 +15,5 @@ select
     {{ dbt.safe_cast('nokken_poole_dim1', dbt.type_float()) }} as nokken_poole_dim1,
     {{ dbt.safe_cast('nokken_poole_dim2', dbt.type_float()) }} as nokken_poole_dim2
 from {{ source('voteview', 'members') }}
+-- House and Senate only: the members file also lists the President, who has no chamber of his own
+where chamber in ('House', 'Senate')

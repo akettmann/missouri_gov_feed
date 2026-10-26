@@ -13,3 +13,5 @@ select
     vote_question,
     dtl_desc
 from {{ source('voteview', 'rollcalls') }}
+-- House and Senate only: the members file also lists the President, who has no chamber of his own
+where chamber in ('House', 'Senate')
