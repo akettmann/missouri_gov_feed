@@ -50,6 +50,7 @@ select
     c.contest_title,
     c.office,
     c.district,
+    c.has_party_totals,
     case
         when n.choice_kind = 'candidate' then 'candidate'
         when coalesce(n.cell_name, n.yes_name) = c.contest_title then 'ballot_issue'

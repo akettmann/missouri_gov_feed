@@ -1,7 +1,8 @@
 -- One row per judge on a retention ballot in Missouri's official returns (general and primary elections, 2012 on):
--- Yes and No votes and the printed Yes share. A judge is retained with a majority of Yes votes. Where the PDF
--- loses the No line (a few 2016 rows), no_votes is null. judge_official_id is set when the judge is a current
--- Supreme Court or Court of Appeals judge (same name and office); circuit judges are not linked.
+-- Yes and No votes and the printed Yes share. A judge is retained with more Yes than No votes. Where the PDF
+-- loses the No line (a few 2016 rows), no_votes is null and the printed Yes share above 50 decides. judge_official_id
+-- is set when the judge is a current Supreme Court or Court of Appeals judge (same name and
+-- office); circuit judges are not linked.
 with picks as (
     select
         *,
@@ -65,7 +66,7 @@ select
     cast(j.no_votes as {{ dbt.type_bigint() }}) as no_votes,
     cast(j.yes_pct as decimal(5, 1)) as yes_pct,
     cast(j.no_pct as decimal(5, 1)) as no_pct,
-    j.yes_pct > 50 as is_retained,
+    coalesce(j.yes_votes > j.no_votes, j.yes_pct > 50) as is_retained,
     j.precincts_reported,
     j.precincts_total,
     l.judge_official_id,

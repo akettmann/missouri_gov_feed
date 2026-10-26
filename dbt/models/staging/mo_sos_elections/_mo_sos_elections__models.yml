@@ -6,7 +6,8 @@ models:
   description: 'Missouri Secretary of State official returns: one row per contest as titled in the PDF (a header
     line such as "State Representative - District 34 (11 of 11 Precincts Reported)"), with the office, the district
     number when the title has one, and the precinct counts. A retention block holding several judges is one contest
-    here.'
+    here. has_party_totals: the contest prints "Party Total" lines, i.e. it is a primary split into one ballot per
+    party (a special election held on primary day prints none and is one race across all parties).'
   data_tests:
   - dbt_utils.unique_combination_of_columns:
       arguments:
@@ -15,6 +16,11 @@ models:
         - contest_seq
   columns:
   - name: office
+    data_tests:
+    - not_null
+  - name: has_party_totals
+    description: True when the contest prints Party Total lines (a primary split into one ballot per party); a special
+      election held on primary day prints none.
     data_tests:
     - not_null
   - name: precincts_total

@@ -1866,7 +1866,7 @@ models:
                 max_value: 100
       - name: is_retained
         data_type: boolean
-        description: Yes share above 50%, the retention rule.
+        description: More Yes than No votes (the printed Yes share above 50% when the No line is lost).
       - name: precincts_reported
         data_type: integer
         description: Precincts reported, from the contest header.

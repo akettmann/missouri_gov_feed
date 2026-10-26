@@ -630,7 +630,7 @@ Quirks:
   ballot. Races whose only entries are write-ins are dropped. Winner is the top vote getter; the PDFs do not print the
   number of seats, so a vote-for-two race would show its second seat as the runner-up.
 - Margin is winner minus runner-up (write-ins excluded) in votes and in points of the race's total votes
-  (`margin_pct`), null when uncontested. Retention is `is_retained` when Yes is above 50%.
+  (`margin_pct`), null when uncontested. Retention is `is_retained` when Yes votes exceed No votes (the printed Yes share above 50 where the No line is lost).
 - Links to officials: `winner_official_id` / `judge_official_id` are set only when the winner is a current official
   with the same name in the same office and district (suffixes ignored, Supreme Court and Court of Appeals judges by
   name); losers, former officials and circuit judges are unlinked. Officials who moved districts after redistricting
@@ -638,6 +638,17 @@ Quirks:
 - Checks: contest vote sums equal the PDF's printed totals where a total exists (3,481 of 3,486 contests and judges),
   printed percentages sum to 100 within rounding, and figures copied from the 2024 general PDF (Governor, U.S.
   Senator, State Representative districts 33 and 34, Broniec 63.1% and Gooch 62.2%) are asserted exactly.
+- Special elections on primary day: the 2014-08-05 primary PDF also holds three special elections for unexpired terms
+  (State Representative districts 67, 120 and 151, titled "..., unexpired"). They print no "Party Total" lines and
+  their percentages sum to 100 across the whole contest, so they are one race across parties (`race_party` is null),
+  not one uncontested race per party. A primary contest is split by party only when it prints Party Total lines
+  (`stg_mo_sos_elections__contests.has_party_totals`).
+- The 2020 general PDF's header reads "Unofficial Election Returns" even though it is the Secretary of State's
+  Grand Totals file for that election; the loader does not rely on the header.
+- A candidate or contest name that wraps onto a second PDF line can be cut off at the first line (the second line
+  is not rejoined). Examples: 2018 primary "William Christopher (Chris) McDonough", 2018 general "Martin Luther
+  Dzerzhinsky Lindstedt", and the 2020 header "Associate Circuit Judge - Circuit 22 - Div 24 & 29".
+
 ## mo_state_expenditures: Missouri state expenditures
 
 Flow: [diagrams/sources/mo_state_expenditures.svg](diagrams/sources/mo_state_expenditures.svg)

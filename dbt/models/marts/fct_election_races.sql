@@ -1,10 +1,11 @@
 -- One row per race in Missouri's official returns (general and primary elections, 2012 on): the winner, the
--- runner-up, the margin and whether the winner had no opponent. A primary race is one party's ballot.
+-- runner-up, the margin and whether the winner had no opponent. A primary race is one party's ballot, except a
+-- special election held on primary day (no "Party Total" lines), which is one race across all parties.
 -- winner_official_id is set when the winner is a current official (same name, same office, same district).
 with candidates as (
     select
         *,
-        case when election_type = 'primary' then party end as race_party
+        case when election_type = 'primary' and has_party_totals then party end as race_party
     from {{ ref('stg_mo_sos_elections__results') }}
     where contest_kind = 'candidate'
 ),
