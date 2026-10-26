@@ -77,4 +77,7 @@ test("daysLabel: singular, plural, half days", () => {
   assert.equal(daysLabel(238), "238 days");
   assert.equal(daysLabel(276.5), "276.5 days");
   assert.equal(daysLabel(0), "0 days");
+  assert.equal(daysLabel(2), "2 days");
+  assert.equal(daysLabel(1234), "1,234 days");
+  assert.equal(daysLabel(1234.5), "1,234.5 days");
 });
