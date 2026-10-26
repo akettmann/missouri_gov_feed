@@ -1,0 +1,53 @@
+version: 2
+
+unit_tests:
+  - name: bills_include_house_listed_senate_bills
+    model: fct_bills
+    description: >
+      Senate bills the House XML lists as reaching the House (SenateActList) are bills even when the Senate
+      topical index does not list them: 253 SB1 (a special session, which the index never covers) gets a row with
+      its session year and status from the actions and no titles. 251 SB5 is in both the index and the House
+      list and stays one row, keeping the index's short title; House bill 253 HB1 is unaffected, and a House bill
+      listed under a Senate-only bill number never creates a Senate row.
+    given:
+      - input: ref('stg_mo_house__bills')
+        format: sql
+        rows: |
+            select
+                '253' as session_code,
+                2025 as session_year,
+                'HB1' as bill,
+                'HB1' as current_bill_string,
+                'TITLE' as short_title,
+                cast(null as varchar) as long_title,
+                cast(null as varchar) as last_action,
+                cast(null as date) as proposed_effective_date,
+                cast(null as varchar) as source_url
+      - input: ref('stg_mo_senate__bill_topics')
+        format: sql
+        rows: |
+            select '251' as session_code, 2025 as session_year, 'SB5' as bill, 'INDEX TITLE' as description,
+                'http://index/sb5' as bill_url
+      - input: ref('stg_mo_house__bill_actions')
+        format: sql
+        rows: |
+            select '253' as session_code, 'SB1' as bill, 'senate_act_list' as listed_in union all
+            select '253', 'SB1', 'senate_act_list' union all
+            select '251', 'SB5', 'senate_act_list' union all
+            select '253', 'HB1', 'house_bill_list'
+      - input: ref('int_bills__subjects')
+        format: sql
+        rows: |
+            select cast(null as varchar) as session_code, cast(null as varchar) as bill,
+                cast(null as varchar) as subject_name
+            where 1 = 0
+      - input: ref('int_bills__status')
+        format: sql
+        rows: |
+            select '253' as session_code, 'SB1' as bill, 'truly agreed' as status, 'enacted' as outcome,
+                cast(null as varchar) as relisted_from_session_code
+    expect:
+      rows:
+        - {session_code: '251', session_year: 2025, bill: SB5, short_title: INDEX TITLE, status: null}
+        - {session_code: '253', session_year: 2025, bill: HB1, short_title: TITLE, status: null}
+        - {session_code: '253', session_year: 2025, bill: SB1, short_title: null, status: truly agreed}
