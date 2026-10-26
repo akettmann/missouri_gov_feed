@@ -54,7 +54,7 @@ acts as (
         o.section_id,
         o.section_version_id,
         s.n as act_index,
-        trim({{ dbt.split_part('o.note', "', '", 's.n') }}) as act
+        trim({{ mogov.split_part_at('o.note', "', '", 's.n', 40) }}) as act
     from normalized as o
     cross join spine as s
     where s.n <= {{ dbt.length('o.note') }} - {{ dbt.length(dbt.replace('o.note', "','", "''")) }} + 1
@@ -95,12 +95,12 @@ merged as (
         a.act_year,
         a.extra_session,
         s.n as ref_index,
-        trim({{ dbt.split_part('a.refs', "' merged with '", 's.n') }}) as ref
+        trim({{ mogov.split_part_at('a.refs', "' merged with '", 's.n', 10) }}) as ref
     from parsed_acts as a
     cross join spine as s
     where
         s.n <= 10
-        and {{ dbt.split_part('a.refs', "' merged with '", 's.n') }} <> ''
+        and {{ mogov.split_part_at('a.refs', "' merged with '", 's.n', 10) }} <> ''
 ),
 
 typed as (
@@ -125,7 +125,7 @@ bills as (
         t.extra_session,
         t.ref_index,
         t.bill_type,
-        trim({{ dbt.split_part('t.numbers', "' & '", 's.n') }}) as bill_number,
+        trim({{ mogov.split_part_at('t.numbers', "' & '", 's.n', 6) }}) as bill_number,
         trim({{ dbt.split_part('t.numbers', "' & '", 1) }}) as lead_number,
         s.n = 1 as is_lead_bill
     from typed as t
@@ -133,7 +133,7 @@ bills as (
     where
         t.bill_type is not null
         and s.n <= 6
-        and {{ dbt.split_part('t.numbers', "' & '", 's.n') }} <> ''
+        and {{ mogov.split_part_at('t.numbers', "' & '", 's.n', 6) }} <> ''
 ),
 
 -- "1st Extraordinary Session" -> 1; the House's "Special Session" (2018's resolutions-only one) isn't counted
