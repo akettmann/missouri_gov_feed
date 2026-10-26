@@ -1,0 +1,94 @@
+---
+// Missouri House committee posts (fct_committee_posts + fct_committee_memberships, from the House's own member
+// pages and committee lists): per session, how many full committees the member served on and which chair,
+// co-chair, vice-chair and ranking-minority-member titles they held. A count of titles from the House's lists,
+// not a measure of influence. Shown to House members, and to anyone else who has rows.
+import type { OfficialBundle } from "../lib/exports/types";
+import { positionLabel } from "../lib/committeePosts";
+import SourceLink from "./SourceLink.astro";
+
+interface Props {
+  bundle: OfficialBundle;
+}
+const { bundle } = Astro.props;
+const sessions = bundle.committees;
+const isHouse = bundle.official.office === "state_house";
+const show = isHouse || (sessions?.length ?? 0) > 0;
+---
+
+{show && (
+  <section class="card" id="committees" aria-labelledby="committees-h">
+    <h2 id="committees-h">House committee posts</h2>
+    <p class="lede">
+      Missouri House committees {isHouse ? "this member" : "this official"} served on in each session, and the
+      chair, co-chair, vice-chair and ranking minority member titles held, as the House lists them. Our data
+      starts with the 2017 session, so earlier House service does not appear here. Subcommittee titles are
+      marked and are not counted in the committee total.
+      {!isHouse &&
+        " These are past posts from when this official served in the House; they hold no House committee seat now."}
+    </p>
+    {sessions === null ? (
+      <p class="muted small">Not available yet (the fct_committee_posts export is missing).</p>
+    ) : sessions.length === 0 ? (
+      <p class="muted">No House committee records for this member in the sessions we hold.</p>
+    ) : (
+      <div class="table-scroll">
+        <table>
+          <caption class="sr-only">House committees and titles by session, newest first</caption>
+          <thead>
+            <tr>
+              <th scope="col">Session</th>
+              <th scope="col">
+                Committees served on (incl. special, joint and conference committees; excl. subcommittees)
+              </th>
+              <th scope="col">Titles held</th>
+              <th scope="col">Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sessions.map((s) => (
+              <tr>
+                <th scope="row" class="what">
+                  {s.label}
+                  {s.is_latest && <span class="muted small"> (newest session loaded)</span>}
+                </th>
+                <td>{s.committees_held}</td>
+                <td class="what">
+                  {s.titles.length === 0 ? (
+                    <span class="muted">none (member only)</span>
+                  ) : (
+                    <ul class="titles">
+                      {s.titles.map((t) => (
+                        <li>
+                          {positionLabel(t.position)}: {t.committee}
+                          {t.subcommittee && !/subcommittee/i.test(t.committee) && (
+                            <span class="muted small"> (subcommittee)</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </td>
+                <td>
+                  <SourceLink url={s.source_url} context={`for ${s.label}`} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </section>
+)}
+
+<style>
+  .what {
+    max-width: 52ch;
+    text-align: left;
+    font-weight: normal;
+  }
+  .titles {
+    margin: 0;
+    padding-left: 1.1em;
+  }
+</style>

@@ -1,0 +1,106 @@
+# Unit tests for the SoS returns staging: fixed PDF lines -> exact expected rows. Broken logic must fail these.
+version: 2
+
+unit_tests:
+  - name: sos_lines_parse_numbers_and_cells
+    model: stg_mo_sos_elections__lines
+    description: >
+      The loader lands every line as JSON; votes lose their thousands commas, the percentage loses its percent
+      sign, an empty cell is null, and the election date becomes a date.
+    given:
+      - input: source('mo_sos_elections', 'rows')
+        format: sql
+        rows: |
+            select '2024-11-05-general#001.0007' as record_key, cast('{"election_key": "2024-11-05-general", "election_type": "general", "election_date": "2024-11-05", "pdf_url": "https://example.test/a.pdf", "page": 1, "line": 7, "contest_seq": 1, "kind": "candidate", "text": "Mike Kehoe Republican 1,750,802 59.1%", "cells": {"name": "Mike Kehoe", "party": "Republican", "votes": "1,750,802", "pct": "59.1%"}}' as varchar) as payload union all
+            select '2024-11-05-general#001.0011' as record_key, cast('{"election_key": "2024-11-05-general", "election_type": "general", "election_date": "2024-11-05", "pdf_url": "https://example.test/a.pdf", "page": 1, "line": 11, "contest_seq": 1, "kind": "candidate", "text": "No Votes 954,663 36.9%", "cells": {"name": "", "party": "No Votes", "votes": "954,663", "pct": "36.9%"}}' as varchar) as payload union all
+            select '2024-11-05-general#001.0012' as record_key, cast('{"election_key": "2024-11-05-general", "election_type": "general", "election_date": "2024-11-05", "pdf_url": "https://example.test/a.pdf", "page": 1, "line": 12, "contest_seq": 1, "kind": "total", "text": "Total Votes 2,960,266"}' as varchar) as payload
+    expect:
+      format: csv
+      rows: |
+        line_key,election_key,election_type,election_date,page,line,contest_seq,kind,cell_name,cell_party,cell_votes,cell_pct
+        2024-11-05-general#001.0007,2024-11-05-general,general,2024-11-05,1,7,1,candidate,Mike Kehoe,Republican,1750802,59.1
+        2024-11-05-general#001.0011,2024-11-05-general,general,2024-11-05,1,11,1,candidate,,No Votes,954663,36.9
+        2024-11-05-general#001.0012,2024-11-05-general,general,2024-11-05,1,12,1,total,,,,
+
+  - name: sos_contests_title_office_district_and_precincts
+    model: stg_mo_sos_elections__contests
+    description: >
+      The precinct count is split off the title; "U. S. Senator" (2016) and "U.S. Senator" are one office; the
+      office is the title before " - " and the district number is read from "District n" only. has_party_totals is
+      true for a contest with Party Total lines (once, however many lines).
+    given:
+      - input: ref('stg_mo_sos_elections__lines')
+        rows:
+          - {election_key: 2016-11-08-general, election_type: general, election_date: '2016-11-08', pdf_url: u, page: 1, line: 5, contest_seq: 1, kind: header, line_text: 'U. S. Senator (3238 of 3238 Precincts Reported)'}
+          - {election_key: 2016-11-08-general, election_type: general, election_date: '2016-11-08', pdf_url: u, page: 1, line: 20, contest_seq: 2, kind: header, line_text: 'State Representative - District 34 (11 of 12 Precincts Reported)'}
+          - {election_key: 2016-11-08-general, election_type: general, election_date: '2016-11-08', pdf_url: u, page: 2, line: 3, contest_seq: 3, kind: header, line_text: 'Circuit Judge - Circuit 16 - Div 10 (563 of 563 Precincts Reported)'}
+          - {election_key: 2016-11-08-general, election_type: general, election_date: '2016-11-08', pdf_url: u, page: 2, line: 4, contest_seq: 3, kind: candidate, line_text: 'Not a header 1 of 2 Precincts Reported'}
+          - {election_key: 2016-11-08-general, election_type: general, election_date: '2016-11-08', pdf_url: u, page: 2, line: 30, contest_seq: 2, kind: party_total, line_text: 'Party Total 1'}
+          - {election_key: 2016-11-08-general, election_type: general, election_date: '2016-11-08', pdf_url: u, page: 2, line: 31, contest_seq: 2, kind: party_total, line_text: 'Party Total 2'}
+    expect:
+      format: csv
+      rows: |
+        contest_seq,contest_title,office,district,precincts_reported,precincts_total,has_party_totals
+        1,U.S. Senator,U.S. Senator,,3238,3238,false
+        2,State Representative - District 34,State Representative,34,11,12,true
+        3,Circuit Judge - Circuit 16 - Div 10,Circuit Judge,,563,563,false
+
+  - name: sos_results_split_retention_block_and_classify_contests
+    model: stg_mo_sos_elections__results
+    description: >
+      A Court of Appeals header lists several judges: each Yes row starts a judge (subcontest_seq counts them),
+      and the unnamed No row takes the name of the Yes row above it. A Yes/No pair named like the contest title
+      is a ballot measure, not a retention. Write-in is flagged from the party, which is null for Yes/No rows.
+    given:
+      - input: ref('stg_mo_sos_elections__lines')
+        rows:
+          - {line_key: k1, election_key: e, election_type: general, election_date: '2022-11-08', pdf_url: u, page: 1, line: 2, contest_seq: 1, kind: candidate, cell_name: Alok Ahuja, cell_party: Yes Votes, cell_votes: 414478, cell_pct: 67.6}
+          - {line_key: k2, election_key: e, election_type: general, election_date: '2022-11-08', pdf_url: u, page: 1, line: 3, contest_seq: 1, kind: candidate, cell_name: null, cell_party: No Votes, cell_votes: 198954, cell_pct: 32.4}
+          - {line_key: k3, election_key: e, election_type: general, election_date: '2022-11-08', pdf_url: u, page: 1, line: 4, contest_seq: 1, kind: candidate, cell_name: Karen King Mitchell, cell_party: Yes Votes, cell_votes: 409806, cell_pct: 67.2}
+          - {line_key: k4, election_key: e, election_type: general, election_date: '2022-11-08', pdf_url: u, page: 1, line: 5, contest_seq: 1, kind: candidate, cell_name: null, cell_party: No Votes, cell_votes: 199938, cell_pct: 32.8}
+          - {line_key: k5, election_key: e, election_type: general, election_date: '2022-11-08', pdf_url: u, page: 1, line: 7, contest_seq: 2, kind: candidate, cell_name: Amendment 1, cell_party: Yes Votes, cell_votes: 100, cell_pct: 60.0}
+          - {line_key: k6, election_key: e, election_type: general, election_date: '2022-11-08', pdf_url: u, page: 1, line: 8, contest_seq: 2, kind: candidate, cell_name: null, cell_party: No Votes, cell_votes: 66, cell_pct: 40.0}
+          - {line_key: k7, election_key: e, election_type: general, election_date: '2022-11-08', pdf_url: u, page: 1, line: 10, contest_seq: 3, kind: candidate, cell_name: Pat Doe, cell_party: Republican, cell_votes: 90, cell_pct: 90.0}
+          - {line_key: k8, election_key: e, election_type: general, election_date: '2022-11-08', pdf_url: u, page: 1, line: 11, contest_seq: 3, kind: candidate, cell_name: Sam Roe, cell_party: Write-in, cell_votes: 10, cell_pct: 10.0}
+          - {line_key: k9, election_key: e, election_type: general, election_date: '2022-11-08', pdf_url: u, page: 1, line: 12, contest_seq: 3, kind: total, cell_name: null, cell_party: null, cell_votes: null, cell_pct: null}
+      - input: ref('stg_mo_sos_elections__contests')
+        rows:
+          - {election_key: e, contest_seq: 1, contest_title: Court of Appeals - Western District, office: Court of Appeals, district: null, precincts_reported: 919, precincts_total: 919}
+          - {election_key: e, contest_seq: 2, contest_title: Amendment 1, office: Amendment 1, district: null, precincts_reported: 5, precincts_total: 5}
+          - {election_key: e, contest_seq: 3, contest_title: State Senator - District 2, office: State Senator, district: '2', precincts_reported: 5, precincts_total: 5}
+    expect:
+      format: csv
+      rows: |
+        line_key,contest_seq,subcontest_seq,contest_kind,choice_kind,choice_name,party,is_write_in,votes,district
+        k1,1,1,retention,yes,Alok Ahuja,,false,414478,
+        k2,1,1,retention,no,Alok Ahuja,,false,198954,
+        k3,1,2,retention,yes,Karen King Mitchell,,false,409806,
+        k4,1,2,retention,no,Karen King Mitchell,,false,199938,
+        k5,2,1,ballot_issue,yes,Amendment 1,,false,100,
+        k6,2,1,ballot_issue,no,Amendment 1,,false,66,
+        k7,3,0,candidate,candidate,Pat Doe,Republican,false,90,2
+        k8,3,0,candidate,candidate,Sam Roe,Write-in,true,10,2
+
+  - name: sos_printed_totals_follow_the_judge_they_close
+    model: stg_mo_sos_elections__printed_totals
+    description: >
+      A Total Votes line belongs to the judge (Yes row) above it, so each total of a multi-judge block lines up
+      with its judge's subcontest_seq; a plain contest's total is subcontest 0.
+    given:
+      - input: ref('stg_mo_sos_elections__lines')
+        rows:
+          - {election_key: e, contest_seq: 1, pdf_url: u, page: 1, line: 2, kind: candidate, cell_party: Yes Votes, line_text: Judge A Yes Votes 5 50.0%}
+          - {election_key: e, contest_seq: 1, pdf_url: u, page: 1, line: 3, kind: candidate, cell_party: No Votes, line_text: No Votes 5 50.0%}
+          - {election_key: e, contest_seq: 1, pdf_url: u, page: 1, line: 4, kind: total, line_text: 'Total Votes 10'}
+          - {election_key: e, contest_seq: 1, pdf_url: u, page: 2, line: 2, kind: candidate, cell_party: Yes Votes, line_text: Judge B Yes Votes 6 60.0%}
+          - {election_key: e, contest_seq: 1, pdf_url: u, page: 2, line: 3, kind: candidate, cell_party: No Votes, line_text: No Votes 4 40.0%}
+          - {election_key: e, contest_seq: 1, pdf_url: u, page: 2, line: 4, kind: total, line_text: 'Total Votes 10'}
+          - {election_key: e, contest_seq: 2, pdf_url: u, page: 2, line: 6, kind: candidate, cell_party: Republican, line_text: 'A Republican 1,200 100.0%'}
+          - {election_key: e, contest_seq: 2, pdf_url: u, page: 2, line: 7, kind: total, line_text: 'Total Votes 1,200'}
+    expect:
+      format: csv
+      rows: |
+        contest_seq,subcontest_seq,printed_total_votes,page
+        1,1,10,1
+        1,2,10,2
+        2,0,1200,2

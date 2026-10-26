@@ -35,6 +35,9 @@ package "Boundaries" {
   [census_tiger] as L_tiger
   [census_zcta] as L_zcta
 }
+package "Elections" {
+  [mo_sos_elections] as L_sos
+}
 package "Businesses" {
   [epa_frs] as L_epa
 }
@@ -79,6 +82,7 @@ package "intermediate (identity resolution)" {
 package "marts" {
   [dim_official] as dim
   [fct_salaries] as F_sal
+  [fct_election_races\nfct_judicial_retention] as F_elect
   [fct_legislator_expenses] as F_exp
   [fct_bills\nfct_bill_subjects\nfct_bill_sponsors\nfct_vote_bills] as F_bills
   [dim_district\nfct_official_districts] as D_dist
@@ -185,6 +189,8 @@ F_cases --> profile
 L_tiger --> D_dist
 L_zcta --> D_zcta
 L_pay --> F_sal
+L_sos --> F_elect
+I_off --> F_elect
 L_exp --> F_exp
 F_sal --> F_exp
 I_seats --> F_sal
