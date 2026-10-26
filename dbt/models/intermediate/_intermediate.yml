@@ -241,7 +241,9 @@ models:
     mayors and state judges have no dated past rosters here. person keys match dim_official.official_id, so a past
     holder who serves today links to their profile. official_id is the stable person id; openstates_id is the Open
     States record the senate row came from (null for other sources), kept so rpt_officeholders_by_year can find
-    that record''s folder. Grain: one row per (year, person, office) for offices with dated past rosters.'
+    that record''s folder. session_code is the House session file (e.g. 251, 253) listing the member, the earliest
+    one in the year; null for other sources. Grain: one row per (year, person, office) for offices with dated past
+    rosters.'
 - name: int_officials__bios
   description: 'One biography text per current official where a source has one: Official Manual (legislators), MO
     House XML (representatives), FJC professional career (federal judges), Open States (others). Grain: one biography
