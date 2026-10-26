@@ -14,6 +14,8 @@ import {
   MIN_MEASURED,
   daysLabel,
   timeToDispositionView,
+  caseTypeBlocks,
+  districtText,
 } from "../src/lib/timeToDisposition.ts";
 
 const row = (extra = {}) => ({
@@ -105,11 +107,11 @@ test("a hidden median says what was counted: measured dockets, the minimum, and 
   const t = hiddenMedianText(12, "criminal");
   assert.match(
     t,
-    /^Not shown: only 12 criminal dockets could be measured, and the page needs at least 30 for a median\./,
+    /^Not shown: only 12 criminal dockets were measured, and the page needs at least 30 for a median\./,
   );
   assert.match(t, /both its filing date and its termination date/);
   assert.match(t, /did not end before it was filed/);
-  assert.match(hiddenMedianText(1, "civil"), /only 1 civil docket could be measured/);
+  assert.match(hiddenMedianText(1, "civil"), /only 1 civil docket was measured/);
   // it never promises a median or a method for a number that is not shown
   assert.doesNotMatch(t, /median days|may understate/i);
 });
@@ -120,11 +122,74 @@ test("a judge with only civil dockets is told there are no criminal ones; one wi
   assert.deepEqual(missingCaseTypes(["criminal"]), ["civil"]);
   assert.deepEqual(missingCaseTypes(["civil", "criminal"]), []);
   assert.deepEqual(missingCaseTypes([]), []);
-  assert.equal(noDocketsText("criminal"), "No criminal dockets assigned to this judge in CourtListener.");
+  assert.equal(
+    noDocketsText("criminal"),
+    "No criminal dockets are assigned to this judge in CourtListener's Missouri federal district dockets (CourtListener has few criminal dockets, so this does not mean the judge heard none).",
+  );
+  assert.equal(
+    noDocketsText("civil"),
+    "No civil dockets are assigned to this judge in CourtListener's Missouri federal district dockets.",
+  );
 });
 
 test("the note on what is in neither median names miscellaneous and other dockets", () => {
   assert.match(EXCLUDED_TYPES_TEXT, /Miscellaneous dockets \(warrants, subpoenas, complaints\)/);
   assert.match(EXCLUDED_TYPES_TEXT, /other or unclassified types/);
   assert.match(EXCLUDED_TYPES_TEXT, /in neither\.$/);
+});
+
+test("a hidden median keeps the district and the ends-before-filed count", () => {
+  const t = hiddenMedianText(12, "criminal", 2, "moed");
+  assert.match(t, /only 12 criminal dockets in the Eastern District of Missouri were measured/);
+  assert.match(t, /2 dockets that end before they were filed \(a source error\) are left out\.$/);
+  assert.doesNotMatch(hiddenMedianText(12, "criminal", 0, "mowd"), /left out/);
+  assert.doesNotMatch(hiddenMedianText(12, "criminal"), /District/);
+  assert.equal(districtText("moed+mowd"), "the Eastern and Western Districts of Missouri");
+  assert.equal(districtText("xyz"), "xyz");
+});
+
+const full = (case_type, extra = {}) => ({ case_type, court_id: "moed", ...row(), ...extra });
+
+test("blocks follow CASE_TYPES order whichever rows exist, with a none block for a missing type", () => {
+  const onlyCriminal = caseTypeBlocks([full("criminal")]);
+  assert.deepEqual(
+    onlyCriminal.map((b) => [b.type, b.kind]),
+    [
+      ["civil", "none"],
+      ["criminal", "data"],
+    ],
+  );
+  const reversed = caseTypeBlocks([full("criminal"), full("civil")]);
+  assert.deepEqual(
+    reversed.map((b) => b.type),
+    ["civil", "criminal"],
+  );
+  assert.deepEqual(caseTypeBlocks([]), []);
+});
+
+test("the median and method note show only with a median; the low-coverage note only with a median and low coverage", () => {
+  const [civil] = caseTypeBlocks([full("civil")]);
+  assert.equal(civil.showMedian, true);
+  assert.equal(civil.showLowCoverageNote, false);
+  assert.equal(civil.hiddenText, null);
+
+  const [low] = caseTypeBlocks([full("civil", { dockets_assigned: 1000, dockets_measured: 465 })]);
+  assert.equal(low.showMedian, true);
+  assert.equal(low.showLowCoverageNote, true);
+
+  // thin and low coverage: no median, so no method line and no "this median may understate" note
+  const [thin] = caseTypeBlocks([
+    full("civil", { dockets_assigned: 100, dockets_measured: 12, dockets_ends_before_filed: 1 }),
+  ]);
+  assert.equal(thin.showMedian, false);
+  assert.equal(thin.showLowCoverageNote, false);
+  assert.equal(thin.view.lowCoverage, true);
+  assert.match(thin.hiddenText, /only 12 civil dockets in the Eastern District of Missouri were measured/);
+  assert.match(thin.hiddenText, /1 docket that ends before it was filed/);
+
+  // enough dockets but the export has no median
+  const [noMedian] = caseTypeBlocks([full("civil", { median_days_to_disposition: null })]);
+  assert.equal(noMedian.showMedian, false);
+  assert.equal(noMedian.showLowCoverageNote, false);
+  assert.ok(noMedian.hiddenText);
 });

@@ -68,16 +68,27 @@ export const caseTypeHeading = (type: CaseType) => `Median time to disposition: 
 export const measuredTypedDocketsText = (n: number, type: CaseType) =>
   plural(n, `${type} docket`, `${type} dockets`);
 
-/** Why no median is shown. "Measured" is what dockets_measured counts: both dates, and the end not before the filing. */
-export const hiddenMedianText = (measured: number, type: CaseType) =>
-  `Not shown: only ${measuredTypedDocketsText(measured, type)} could be measured, and the page needs at least ${MIN_MEASURED} for a median. A docket is measured when CourtListener has both its filing date and its termination date and it did not end before it was filed.`;
+/** Court ids the mart carries, as the page words them. An unknown id is shown as is. */
+const DISTRICTS: Record<string, string> = {
+  moed: "the Eastern District of Missouri",
+  mowd: "the Western District of Missouri",
+  "moed+mowd": "the Eastern and Western Districts of Missouri",
+};
+export const districtText = (courtId: string) => DISTRICTS[courtId] ?? courtId;
+
+/**
+ * Why no median is shown. "Measured" is what dockets_measured counts: both dates, and the end not before the filing.
+ * Names the district and the dockets left out for ending before they were filed, as the method note does for a shown median.
+ */
+export const hiddenMedianText = (measured: number, type: CaseType, excluded = 0, courtId?: string) =>
+  `Not shown: only ${measuredTypedDocketsText(measured, type)}${courtId ? ` in ${districtText(courtId)}` : ""} ${measured === 1 ? "was" : "were"} measured, and the page needs at least ${MIN_MEASURED} for a median. A docket is measured when CourtListener has both its filing date and its termination date and it did not end before it was filed.${excluded > 0 ? ` ${excludedDocketsText(excluded)}` : ""}`;
 
 /** Every case type gets a block, in this order, so a judge with none of a type says so instead of going quiet. */
 export const CASE_TYPES: readonly CaseType[] = ["civil", "criminal"];
 
 /** Shown in place of a block when the judge has no docket of that type in the mart. */
 export const noDocketsText = (type: CaseType) =>
-  `No ${type} dockets assigned to this judge in CourtListener.`;
+  `No ${type} dockets are assigned to this judge in CourtListener's Missouri federal district dockets${type === "criminal" ? " (CourtListener has few criminal dockets, so this does not mean the judge heard none)" : ""}.`;
 
 /** Which types have no row, in display order (a judge with no rows at all gets no time-to-disposition section). */
 export const missingCaseTypes = (present: readonly (CaseType | undefined)[]): CaseType[] =>
@@ -90,3 +101,44 @@ export const EXCLUDED_TYPES_TEXT =
 /** "M of N assigned civil dockets measured" coverage line */
 export const coverageText = (measured: number, assigned: number, type: CaseType) =>
   `${count(measured)} of ${plural(assigned, `assigned ${type} docket`, `assigned ${type} dockets`)} measured`;
+
+/** One case type's block on the page, in CASE_TYPES order: its median, or a line saying the judge has none of that type. */
+export type CaseTypeBlock<T extends TimeToDispositionInput & { court_id: string }> =
+  | {
+      type: CaseType;
+      kind: "data";
+      ttd: T;
+      view: TimeToDispositionView;
+      /** the median and the method note under it (only when a median is shown) */
+      showMedian: boolean;
+      /** the "Fewer than 80% are measured ... may understate" note: needs a shown median and low coverage */
+      showLowCoverageNote: boolean;
+      /** the text in place of the median, when it is hidden */
+      hiddenText: string | null;
+    }
+  | { type: CaseType; kind: "none" };
+
+/**
+ * Decides what the courts section shows for each case type, so the page only renders it.
+ * A judge with no rows at all gets no blocks (no time-to-disposition section).
+ */
+export function caseTypeBlocks<T extends TimeToDispositionInput & { court_id: string }>(
+  rows: readonly T[],
+): CaseTypeBlock<T>[] {
+  if (rows.length === 0) return [];
+  return CASE_TYPES.map((type): CaseTypeBlock<T> => {
+    const ttd = rows.find((r) => r.case_type === type);
+    if (!ttd) return { type, kind: "none" };
+    const view = timeToDispositionView(ttd);
+    const showMedian = view.median != null;
+    return {
+      type,
+      kind: "data",
+      ttd,
+      view,
+      showMedian,
+      showLowCoverageNote: showMedian && view.lowCoverage,
+      hiddenText: showMedian ? null : hiddenMedianText(view.measured, type, view.excluded, ttd.court_id),
+    };
+  });
+}
