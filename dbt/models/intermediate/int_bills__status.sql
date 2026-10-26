@@ -4,12 +4,21 @@
 --   status   the furthest stage the actions record: introduced, in committee, reported do pass, perfected, passed
 --            one chamber, passed both chambers, truly agreed, then signed / signed with line-item vetoes / vetoed /
 --            veto overridden; resolutions: adopted. withdrawn and defeated when the bill stopped there.
---   outcome  enacted (signed, line-item vetoed, veto overridden, or truly agreed and delivered to the Secretary of
---            State without a signature), vetoed, sent to voters (truly agreed joint resolutions), adopted
+--            relisted for governor message when every recorded action is the governor's Art. IV, s. 27 message
+--            (the budget/withholding message). These are not new bills: the House relists the previous regular
+--            session's appropriation bills (same bill number, bill string and effective date; LR numbers from 241
+--            on) under the new session, only to record that message. The real history, and the outcome, live on
+--            the original row; relisted_from_session_code names its session.
+--   outcome  null for relisted for governor message; otherwise enacted (signed, line-item vetoed, veto overridden, or
+--            truly agreed and delivered to the Secretary of State without a signature), vetoed,
+--            sent to voters (truly agreed joint resolutions), adopted
 --            (resolutions), awaiting governor (truly agreed this year, no governor action yet), no governor action
 --            recorded (truly agreed in an earlier year, but the export lists no governor action; Senate bills'
 --            lists can stop at the speaker's signature), pending (session still open), failed (session over
 --            without passing).
+--   relisted_from_session_code  for a relisting, the previous regular session whose bill (same number and bill
+--            string) it repeats; null for other bills, and for a relisting whose original isn't loaded
+--            (2017's 15 repeat the 2016 session, 161).
 -- A session is over once its year has ended; a regular session also once June starts (it adjourns in mid-May) and
 -- an extraordinary session 30 days after its last action. var as_of_date pins "today" (unit tests).
 {% set as_of = "cast('" ~ var('as_of_date') ~ "' as date)" if var('as_of_date', none) else 'current_date' %}
@@ -30,6 +39,12 @@ flags as (
         bill,
         max(case when listed_in = 'senate_act_list' then 1 else 0 end) as reached_house_from_senate,
         max(action_date) as last_action_date,
+        count(*) as action_count,
+        sum(case
+            when description like 'Message Received from the Governor, pursuant to Article IV, Section 27%'
+                then 1
+            else 0
+        end) as governor_message_count,
         max(case when description like 'Referred:%' or description like '%read and referred%' then 1 else 0 end)
             as referred,
         max(case when description like '%Reported Do Pass%' or description like '%Voted Do Pass%' then 1 else 0 end)
@@ -75,6 +90,7 @@ staged_status as (
     select
         *,
         case
+            when governor_message_count = action_count then 'relisted for governor message'
             when veto_overridden = 1 then 'veto overridden'
             when vetoed_in_part = 1 then 'signed with line-item vetoes'
             when approved = 1 then 'signed'
@@ -96,27 +112,49 @@ staged_status as (
             else last_action_date < {{ dbt.dateadd('day', -30, as_of) }}
         end as is_session_over
     from staged
+),
+
+-- A relisting repeats the previous regular session's bill: same number, same bill string. Regular sessions
+-- end in 1 (251 is 2025's, 241 is 2024's), so the prior one is the year before with the same suffix.
+relisting_links as (
+    select
+        r.session_code,
+        r.bill,
+        orig.session_code as relisted_from_session_code
+    from staged_status as r
+    inner join {{ ref('stg_mo_house__bills') }} as cur
+        on r.session_code = cur.session_code and r.bill = cur.bill
+    inner join {{ ref('stg_mo_house__bills') }} as orig
+        on
+            orig.session_code = {{ dbt.concat([dbt.safe_cast('r.session_year - 2001', dbt.type_string()), "'1'"]) }}
+            and r.bill = orig.bill
+            and cur.current_bill_string = orig.current_bill_string
+    where r.status = 'relisted for governor message' and right(r.session_code, 1) = '1'
 )
 
 select
-    session_code,
-    session_year,
-    bill,
-    bill_type,
-    status,
+    s.session_code,
+    s.session_year,
+    s.bill,
+    s.bill_type,
+    s.status,
     case
-        when status in ('signed', 'signed with line-item vetoes', 'veto overridden') then 'enacted'
-        when status = 'vetoed' then 'vetoed'
-        when truly_agreed = 1 and bill_type in ('HJR', 'SJR') then 'sent to voters'
-        when truly_agreed = 1 and bill_type in ('HCR', 'SCR') then 'adopted'
-        when status = 'adopted' then 'adopted'
-        when truly_agreed = 1 and delivered_to_sos = 1 then 'enacted'
-        when truly_agreed = 1 and session_year = extract(year from {{ as_of }}) then 'awaiting governor'
+        -- the outcome belongs to the original bill in the previous session; don't call the relisting failed
+        when s.status = 'relisted for governor message' then cast(null as {{ dbt.type_string() }})
+        when s.status in ('signed', 'signed with line-item vetoes', 'veto overridden') then 'enacted'
+        when s.status = 'vetoed' then 'vetoed'
+        when s.truly_agreed = 1 and s.bill_type in ('HJR', 'SJR') then 'sent to voters'
+        when s.truly_agreed = 1 and s.bill_type in ('HCR', 'SCR') then 'adopted'
+        when s.status = 'adopted' then 'adopted'
+        when s.truly_agreed = 1 and s.delivered_to_sos = 1 then 'enacted'
+        when s.truly_agreed = 1 and s.session_year = extract(year from {{ as_of }}) then 'awaiting governor'
         -- the House's list of Senate bills can stop at the speaker's signature (2024 SB 727, signed into law)
-        when truly_agreed = 1 then 'no governor action recorded'
-        when not is_session_over then 'pending'
+        when s.truly_agreed = 1 then 'no governor action recorded'
+        when not s.is_session_over then 'pending'
         else 'failed'
     end as outcome,
-    is_session_over,
-    last_action_date
-from staged_status
+    s.is_session_over,
+    s.last_action_date,
+    l.relisted_from_session_code
+from staged_status as s
+left join relisting_links as l on s.session_code = l.session_code and s.bill = l.bill
