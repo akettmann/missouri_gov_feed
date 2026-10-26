@@ -84,14 +84,14 @@ async function loadAll(): Promise<OfficialBundle[]> {
            d.image_url, d.hometown, d.email, p.is_judge_or_lawyer,
            p.* exclude (official_id, full_name, party, level, office, office_title, district, is_judge_or_lawyer)
     from {dim_official} d join {official_profile} p using (official_id)
-    order by d.level, d.office, try_cast(d.district as integer), d.district, d.full_name`);
+    order by d.level, d.office, try_cast(d.district as integer), d.district, d.full_name, d.official_id`);
 
   const indicators = groupBy(
     await query<Indicator & { official_id: string }>(`
       select official_id, indicator, value, period, detail, source_url,
              cast(first_vote_year as integer) as first_vote_year, cast(last_vote_year as integer) as last_vote_year,
              cast(chamber_data_start_year as integer) as chamber_data_start_year
-      from {fct_bias_indicators} order by indicator, period`),
+      from {fct_bias_indicators} order by official_id, indicator, period, detail`),
   );
 
   // by_employer is ~2.8k rows of individual donors' employers; not used by the MVP pages
@@ -103,26 +103,29 @@ async function loadAll(): Promise<OfficialBundle[]> {
              cast(sum(total) as double) as total, cast(sum(contribution_count) as integer) as contribution_count
       from {fct_federal_donor_summary}
       where aggregate_kind <> 'by_employer'
-      group by all order by cycle, aggregate_kind, bucket`),
+      group by all order by official_id, cycle, aggregate_kind, bucket`),
   );
 
   const ties = groupBy(
     await query<CommercialTie & { official_id: string }>(`
       select official_id, tie_kind, whose, detail, as_of_year, source, source_url
-      from {fct_commercial_ties} where is_latest_report order by tie_kind, whose, detail`),
+      from {fct_commercial_ties} where is_latest_report
+      order by official_id, tie_kind, whose, detail, as_of_year, source, source_url, source_item_id`),
   );
 
   const family = groupBy(
     await query<FamilyTie & { official_id: string }>(`
       select official_id, relation, relative_name, role, organization, source, source_url
-      from {fct_family_ties} order by relation, organization`),
+      from {fct_family_ties}
+      order by official_id, relation, organization, relative_name, role, source, source_url`),
   );
 
   const filings = groupBy(
     await query<DisclosureFiling & { official_id: string }>(`
       select official_id, disclosure_type, filing_kind, report_year,
              cast(filing_date as varchar) as filing_date, document_url, cast(count(*) as integer) as n_items
-      from {fct_disclosures} group by all order by report_year desc nulls last, filing_date desc nulls last`),
+      from {fct_disclosures} group by all
+      order by official_id, report_year desc nulls last, filing_date desc nulls last, disclosure_type, filing_kind, document_url`),
   );
 
   // rpt_donor_rollup is up to ~7k rows per official (one per donor-year), too big for a page; ship the
@@ -136,7 +139,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
                  cast(sum(total_amount) as double) as total_amount,
                  cast(sum(contribution_count) as integer) as contribution_count
           from {rpt_donor_rollup}
-          group by all order by cycle`),
+          group by all order by official_id, cycle, donor_group, match_confidence`),
       )
     : null;
   // individuals are excluded: their donor_name is an employer, and values like 'none' / 'retired' would
@@ -153,7 +156,10 @@ async function loadAll(): Promise<OfficialBundle[]> {
                    cast(sum(contribution_count) as integer) as contribution_count,
                    cast(min(transaction_year) as integer) as first_year,
                    cast(max(transaction_year) as integer) as last_year,
-                   row_number() over (partition by official_id order by sum(total_amount) desc) as rank
+                   row_number() over (
+                     partition by official_id
+                     order by sum(total_amount) desc, donor_name, donor_class, match_confidence
+                   ) as rank
             from {rpt_donor_rollup}
             where donor_class <> 'individual'
             group by official_id, donor_name, donor_class, match_confidence
@@ -182,7 +188,9 @@ async function loadAll(): Promise<OfficialBundle[]> {
                  cast(max(transaction_year) as integer) as last_year,
                  -- 'high' < 'medium': the weakest link among the rows shown
                  max(donor_link_confidence) as link_confidence,
-                 row_number() over (partition by official_id order by sum(total_amount) desc) as rank
+                 row_number() over (
+                   partition by official_id order by sum(total_amount) desc, donor_mec_committee_id
+                 ) as rank
           from {rpt_donor_rollup}
           where donor_mec_committee_id is not null
           group by official_id, donor_mec_committee_id
@@ -240,7 +248,8 @@ async function loadAll(): Promise<OfficialBundle[]> {
                  expenditure_category, match_confidence, source, source_url,
                  cast(total_amount as double) as total_amount, cast(gift_count as integer) as gift_count,
                  cast(lobbyist_count as integer) as lobbyist_count
-          from {rpt_gift_rollup} order by year`),
+          from {rpt_gift_rollup}
+          order by official_id, year, lobbyist_principal, expenditure_category, match_confidence, source`),
       )
     : null;
 
@@ -250,7 +259,8 @@ async function loadAll(): Promise<OfficialBundle[]> {
     ? await query<PeerRow>(`
         select official_id, party, indicator, peer_group, chamber, period, detail, value,
                cast(peer_count as integer) as peer_count, peer_median, republican_median, democratic_median
-        from {rpt_indicator_peers} where value is not null`)
+        from {rpt_indicator_peers} where value is not null
+        order by official_id, indicator, period, detail`)
     : [];
   const peerValues = new Map<string, { value: number; party: string | null }[]>();
   for (const r of peerRows) {
@@ -258,6 +268,10 @@ async function loadAll(): Promise<OfficialBundle[]> {
       ...(peerValues.get(r.peer_group) ?? []),
       { value: r.value, party: r.party },
     ]);
+  }
+  // every strip must draw the same dots in the same order on every build (the dot jitter follows list order)
+  for (const list of peerValues.values()) {
+    list.sort((a, b) => a.value - b.value || (a.party ?? "").localeCompare(b.party ?? ""));
   }
   const peers = groupBy(
     // the row's own party only feeds peerValues; a strip carries party solely inside its peers list
@@ -293,7 +307,8 @@ async function loadAll(): Promise<OfficialBundle[]> {
                  cast(republican_yea as integer) as republican_yea, cast(republican_nay as integer) as republican_nay,
                  cast(democratic_yea as integer) as democratic_yea, cast(democratic_nay as integer) as democratic_nay,
                  source_url
-          from {rpt_party_breaks} order by vote_date desc`),
+          from {rpt_party_breaks}
+          order by official_id, vote_date desc, chamber, session_code, measure, vote_description, source_url`),
       )
     : null;
 
@@ -307,7 +322,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
                  cast(absent as integer) as absent, cast(absent_with_leave as integer) as absent_with_leave,
                  cast(not_voting as integer) as not_voting,
                  cast(recused_from_voting as integer) as recused_from_voting, attendance_pct, chamber_attendance_pct
-          from {rpt_attendance} order by first_vote_date`),
+          from {rpt_attendance} order by official_id, first_vote_date, chamber, session_code`),
       )
     : null;
 
@@ -318,7 +333,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
                  cast(voting_years as integer) as voting_years, cast(covered_years as integer) as covered_years,
                  cast(votes_recorded as integer) as votes_recorded, cast(votes_attended as integer) as votes_attended,
                  cast(pay_amount as double) as pay_amount, pay_basis, match_confidence, pay_source_url, dollars_per_vote_attended
-          from {rpt_attendance_pay} order by calendar_year`),
+          from {rpt_attendance_pay} order by official_id, calendar_year, chamber, period`),
       )
     : null;
 
@@ -329,7 +344,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
           select official_id, employer, match_confidence, cast(donor_count as integer) as donor_count,
                  cast(total_amount as double) as total_amount, first_year, last_year, source_url
           from (
-            select *, row_number() over (partition by official_id order by total_amount desc, employer) as rank
+            select *, row_number() over (partition by official_id order by total_amount desc, employer, match_confidence) as rank
             from {rpt_donor_employers}
           ) ranked
           where rank <= 20 order by official_id, rank`),
@@ -342,7 +357,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
         await query<SizeRow[number] & { official_id: string }>(`
           select official_id, election_cycle as cycle, band_floor, match_confidence,
                  cast(total_amount as double) as total_amount
-          from {rpt_donor_size} order by cycle, band_floor`),
+          from {rpt_donor_size} order by official_id, cycle, band_floor, match_confidence`),
       )
     : null;
 
@@ -354,7 +369,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
                  cast(roll_calls as integer) as roll_calls, cast(yea as integer) as yea,
                  cast(nay as integer) as nay, cast(other as integer) as other, cast(bills as integer) as bills
           from (
-            select *, row_number() over (partition by official_id order by roll_calls desc, subject_name) as rank
+            select *, row_number() over (partition by official_id order by roll_calls desc, subject_name, chamber, subject_source) as rank
             from {rpt_votes_by_subject}
           ) ranked
           where rank <= 20 order by official_id, rank`),
@@ -380,7 +395,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
                cast(count(distinct bill) as integer) as bills
         from {rpt_interest_vote_overlap}
         group by official_id, industry
-        order by official_id, max(contributions_amount) + max(gifts_amount) desc`)
+        order by official_id, max(contributions_amount) + max(gifts_amount) desc, industry`)
     : [];
   const examples = new Map<string, InterestOverlap["examples"]>();
   if (hasOverlap) {
@@ -390,10 +405,11 @@ async function loadAll(): Promise<OfficialBundle[]> {
       select official_id, industry, cast(vote_date as varchar) as vote_date, bill, short_title, vote_cast,
              vote_source_url, bill_source_url
       from (
-        select *, row_number() over (partition by official_id, industry order by vote_date desc, bill) as rank
+        select *, row_number() over (partition by official_id, industry order by vote_date desc, bill, vote_id, chamber) as rank
         from {rpt_interest_vote_overlap}
       ) ranked
-      where rank <= 5`)) {
+      where rank <= 5
+      order by official_id, industry, rank`)) {
       const { official_id, industry, ...ex } = r;
       const key = `${official_id}|${industry}`;
       examples.set(key, [...(examples.get(key) ?? []), ex]);
@@ -445,7 +461,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
           select official_id, sector_code, sector_name, cast(n_sites as integer) as n_sites,
                  cast(n_donor_sites as integer) as n_donor_sites
           from {rpt_district_business_industries}
-          order by official_id, sector_code is null, n_sites desc, sector_name`),
+          order by official_id, sector_code is null, n_sites desc, sector_name, sector_code`),
       )
     : null;
 
@@ -485,7 +501,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
           select official_id, cast(extract(year from date_filed) as integer) as year, role,
                  cast(count(*) as integer) as cases
           from {fct_case_history} where date_filed is not null
-          group by all order by year`),
+          group by all order by official_id, year, role`),
       )
     : null;
   const caseTotals = hasCases
@@ -502,7 +518,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
           select official_id, role, case_name, court, docket_number, cast(date_filed as varchar) as date_filed,
                  disposition, publication_status, source_url
           from (
-            select *, row_number() over (partition by official_id order by date_filed desc nulls last) as rank
+            select *, row_number() over (partition by official_id order by date_filed desc nulls last, court, docket_number, source_url, role) as rank
             from {fct_case_history}
           ) ranked
           where rank <= ${RECENT_CASES} order by official_id, rank`),
@@ -520,7 +536,8 @@ async function loadAll(): Promise<OfficialBundle[]> {
                    cast(dockets_ends_before_filed as integer) as dockets_ends_before_filed,
                    cast(dockets_measured as integer) as dockets_measured,
                    share_with_both_dates, median_days_to_disposition
-            from {fct_judge_time_to_disposition} where official_id is not null`)
+            from {fct_judge_time_to_disposition} where official_id is not null
+            order by official_id, cl_person_id, court_id`)
         ).map((r) => [r.official_id, r]),
       )
     : new Map<string, TimeToDisposition>();

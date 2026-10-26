@@ -13,6 +13,8 @@ clean-targets: ["target", "dbt_packages"]
 # A test that reads a model outside the selection would run against that model's stale table (#198: `-s +rpt_awards`
 # ran assert_official_ids_one_per_person against an old int_officeholders__years and failed on rows a full build
 # does not produce). `buildable` runs a test only when every model it reads is selected or upstream of the selection.
+# That is a complete guard only for `+model` selections: with `model+` a downstream test can still read a stale table
+# (after changing dim_official, build `dim_official+`; docs/dbt_best_practices.md).
 flags:
   indirect_selection: buildable
 

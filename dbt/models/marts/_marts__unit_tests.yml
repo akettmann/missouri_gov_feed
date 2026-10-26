@@ -541,3 +541,96 @@ unit_tests:
         - {official_id: o1, indicator: party_unity_pct, period: null, detail: 'state_house: 1011 party-line votes', first_vote_year: 2020, last_vote_year: 2021, chamber_data_start_year: 2019}
         - {official_id: o9, indicator: party_unity_pct, period: null, detail: 'state_house: 3 party-line votes', first_vote_year: 2019, last_vote_year: 2019, chamber_data_start_year: 2019}
         - {official_id: o9, indicator: party_unity_pct, period: null, detail: 'state_senate: 3 party-line votes', first_vote_year: 2022, last_vote_year: 2022, chamber_data_start_year: 2022}
+
+  - name: office_history_tied_sources_pick_the_same_row_whatever_the_input_order
+    model: fct_office_history
+    description: >
+      Three CourtListener position rows per official, title and start date (so the same source rank) differ only in
+      end date. The kept row must be the same on every build, not whichever the engine happens to read first (#226):
+      the earliest end date. The inputs list the rows in descending or mixed order, so a pick by row order fails.
+    given:
+      - input: ref('int_officials__current')
+        rows: []
+      - input: ref('stg_openstates__roles')
+        rows: []
+      - input: ref('int_officials__person_ids')
+        rows: []
+      - input: ref('stg_congress__terms')
+        rows: []
+      - input: ref('statewide_officials')
+        rows: []
+      - input: ref('stg_fjc__appointments')
+        rows: []
+      - input: ref('int_officials__wikidata')
+        rows: []
+      - input: ref('stg_wikidata__facts')
+        rows: []
+      - input: ref('int_officials__bios')
+        rows: []
+      - input: ref('int_courtlistener__official_positions')
+        rows:
+          - {official_id: judge1, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2020-01-01'}
+          - {official_id: judge1, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2019-01-01'}
+          - {official_id: judge1, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2018-01-01'}
+          - {official_id: judge2, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2019-01-01'}
+          - {official_id: judge2, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2020-01-01'}
+          - {official_id: judge2, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2018-01-01'}
+          - {official_id: judge3, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2020-01-01'}
+          - {official_id: judge3, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2019-01-01'}
+          - {official_id: judge3, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2018-01-01'}
+          - {official_id: judge4, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2019-01-01'}
+          - {official_id: judge4, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2020-01-01'}
+          - {official_id: judge4, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2018-01-01'}
+          - {official_id: judge5, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2020-01-01'}
+          - {official_id: judge5, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2019-01-01'}
+          - {official_id: judge5, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2018-01-01'}
+          - {official_id: judge6, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2019-01-01'}
+          - {official_id: judge6, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2020-01-01'}
+          - {official_id: judge6, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2018-01-01'}
+    expect:
+      rows:
+        - {official_id: judge1, office_title: Judge, start_date: '2010-01-01', end_date: '2018-01-01', source: courtlistener}
+        - {official_id: judge2, office_title: Judge, start_date: '2010-01-01', end_date: '2018-01-01', source: courtlistener}
+        - {official_id: judge3, office_title: Judge, start_date: '2010-01-01', end_date: '2018-01-01', source: courtlistener}
+        - {official_id: judge4, office_title: Judge, start_date: '2010-01-01', end_date: '2018-01-01', source: courtlistener}
+        - {official_id: judge5, office_title: Judge, start_date: '2010-01-01', end_date: '2018-01-01', source: courtlistener}
+        - {official_id: judge6, office_title: Judge, start_date: '2010-01-01', end_date: '2018-01-01', source: courtlistener}
+
+  - name: case_history_tied_duplicates_pick_the_same_row_whatever_the_input_order
+    model: fct_case_history
+    description: >
+      Three API rows per cluster carry no outcome data, so they tie. The kept row is the one with the smallest
+      source_url on every build (#226). The inputs list each cluster's rows in a different order (mostly
+      descending), so a pick by row order fails some cluster.
+    overrides:
+      vars:
+        cl_case_bulk: false
+    given:
+      - input: ref('stg_courtlistener__api_cases')
+        rows:
+          - {official_id: judge1, role: judge, cluster_id: 1, case_name: Case 1, source_url: 'https://x/1c', opinion_tail: null, disposition: null}
+          - {official_id: judge1, role: judge, cluster_id: 1, case_name: Case 1, source_url: 'https://x/1b', opinion_tail: null, disposition: null}
+          - {official_id: judge1, role: judge, cluster_id: 1, case_name: Case 1, source_url: 'https://x/1a', opinion_tail: null, disposition: null}
+          - {official_id: judge1, role: judge, cluster_id: 2, case_name: Case 2, source_url: 'https://x/2b', opinion_tail: null, disposition: null}
+          - {official_id: judge1, role: judge, cluster_id: 2, case_name: Case 2, source_url: 'https://x/2c', opinion_tail: null, disposition: null}
+          - {official_id: judge1, role: judge, cluster_id: 2, case_name: Case 2, source_url: 'https://x/2a', opinion_tail: null, disposition: null}
+          - {official_id: judge1, role: judge, cluster_id: 3, case_name: Case 3, source_url: 'https://x/3c', opinion_tail: null, disposition: null}
+          - {official_id: judge1, role: judge, cluster_id: 3, case_name: Case 3, source_url: 'https://x/3b', opinion_tail: null, disposition: null}
+          - {official_id: judge1, role: judge, cluster_id: 3, case_name: Case 3, source_url: 'https://x/3a', opinion_tail: null, disposition: null}
+          - {official_id: judge1, role: judge, cluster_id: 4, case_name: Case 4, source_url: 'https://x/4b', opinion_tail: null, disposition: null}
+          - {official_id: judge1, role: judge, cluster_id: 4, case_name: Case 4, source_url: 'https://x/4c', opinion_tail: null, disposition: null}
+          - {official_id: judge1, role: judge, cluster_id: 4, case_name: Case 4, source_url: 'https://x/4a', opinion_tail: null, disposition: null}
+          - {official_id: judge1, role: judge, cluster_id: 5, case_name: Case 5, source_url: 'https://x/5c', opinion_tail: null, disposition: null}
+          - {official_id: judge1, role: judge, cluster_id: 5, case_name: Case 5, source_url: 'https://x/5b', opinion_tail: null, disposition: null}
+          - {official_id: judge1, role: judge, cluster_id: 5, case_name: Case 5, source_url: 'https://x/5a', opinion_tail: null, disposition: null}
+          - {official_id: judge1, role: judge, cluster_id: 6, case_name: Case 6, source_url: 'https://x/6b', opinion_tail: null, disposition: null}
+          - {official_id: judge1, role: judge, cluster_id: 6, case_name: Case 6, source_url: 'https://x/6c', opinion_tail: null, disposition: null}
+          - {official_id: judge1, role: judge, cluster_id: 6, case_name: Case 6, source_url: 'https://x/6a', opinion_tail: null, disposition: null}
+    expect:
+      rows:
+        - {official_id: judge1, role: judge, case_name: Case 1, source_url: 'https://x/1a'}
+        - {official_id: judge1, role: judge, case_name: Case 2, source_url: 'https://x/2a'}
+        - {official_id: judge1, role: judge, case_name: Case 3, source_url: 'https://x/3a'}
+        - {official_id: judge1, role: judge, case_name: Case 4, source_url: 'https://x/4a'}
+        - {official_id: judge1, role: judge, case_name: Case 5, source_url: 'https://x/5a'}
+        - {official_id: judge1, role: judge, case_name: Case 6, source_url: 'https://x/6a'}

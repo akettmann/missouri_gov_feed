@@ -150,7 +150,7 @@ ranked as (
         *,
         row_number() over (
             partition by official_id, office_title, start_date
-            order by source_rank
+            order by source_rank, source, end_date, district, jurisdiction
         ) as rn
     from all_terms
 )

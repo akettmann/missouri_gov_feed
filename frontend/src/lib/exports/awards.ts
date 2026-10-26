@@ -79,7 +79,7 @@ async function load(): Promise<AwardList[] | null> {
     select award, office, period, ${hasKind ? "period_kind" : "cast(null as varchar) as period_kind"}, cast(award_rank as integer) as award_rank, official_id,
            cast(metric as double) as metric, cast(sample_size as double) as sample_size,
            cast(group_size as integer) as group_size, cast(streak_years as integer) as streak_years
-    from {rpt_awards} order by award, office, period, award_rank`);
+    from {rpt_awards} order by award, office, period, award_rank, official_id`);
   const lists = new Map<string, AwardList>();
   for (const r of rows) {
     const o = officials.get(r.official_id);
@@ -105,6 +105,9 @@ async function load(): Promise<AwardList[] | null> {
     });
     lists.set(key, list);
   }
+  // officials tied on a rank list in name order, then slug, so no two builds order them differently
+  for (const l of lists.values())
+    l.entries.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name) || a.slug.localeCompare(b.slug));
   const out = [...lists.values()];
   assertKnownPeriodKinds(out);
   awardCyclesGate(out, process.env, console.warn);
