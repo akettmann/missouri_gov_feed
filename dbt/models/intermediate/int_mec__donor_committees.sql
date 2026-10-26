@@ -1,10 +1,10 @@
 -- Name -> MECID crosswalk for committee donors. MEC records a committee-to-committee gift with the donor's
 -- name only (the row's MECID is the receiving committee), so the donor's own MECID is found by matching that
 -- name to the names committees file under (int_mec__committee_names), in tiers:
---   curated alias      a curated donor name -> MECID list (committee_donor_aliases seed), each alias checked
---                      against the committee's own filings, for acronym and shortened names no rule can expand
---                      ("HRCC", "AMECPAC", "MHA PAC", #33); each row cites its evidence. Tried first, but only
---                      counts when that committee was active that year
+--   curated alias      a curated donor name -> MECID list (committee_donor_aliases seed), each alias group checked
+--                      against the committee's filings or its own filed name, for acronym and shortened
+--                      names no rule can expand ("HRCC", "AMECPAC", "MHA PAC", #33); each row cites its
+--                      evidence. Tried first, but only counts when that committee was active that year
 --   0 mecid in name    the filer typed the donor's MECID into the name ("... (MEC ID# C221962)") and it's a
 --                      known committee; taken whatever its active years
 --   1 same name        name_key: case ignored; punctuation and other non-alphanumeric characters turned
