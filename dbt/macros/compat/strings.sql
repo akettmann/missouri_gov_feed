@@ -146,3 +146,17 @@
 {% macro bigquery__chr(n) -%}
     code_points_to_string([{{ n }}])
 {%- endmacro %}
+
+
+{#
+  The Nth part of a delimited string, N a column or expression. dbt.split_part needs a literal part number on
+  some backends (BigQuery's SPLIT(...)[SAFE_OFFSET(n)]), so a CASE picks among literal-index calls: parts past
+  max_parts are NULL. `delim` is a SQL literal, e.g. "', '".
+#}
+{% macro split_part_at(expr, delim, n, max_parts) -%}
+    case {{ n }}
+        {%- for i in range(1, max_parts + 1) %}
+        when {{ i }} then {{ dbt.split_part(expr, delim, i) }}
+        {%- endfor %}
+    end
+{%- endmacro %}
