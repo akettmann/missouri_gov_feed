@@ -38,6 +38,8 @@ LAST_YEAR = int(os.environ.get("MOGOV_AUDITOR_TO_YEAR", str(date.today().year)))
 # the rating scale starts in 2011 and the earliest summaries in the list are from 2012
 FIRST_RATED_YEAR = 2012
 SCAN_PAGES = 4  # the summary sits on page 1-2 of a full report (page 1 is a cover)
+# Minimum seconds between two requests to auditor.mo.gov from ALL shards on this machine (http.host_throttle), so
+# --shards N still sends about 1 request a second in total
 DELAY = float(os.environ.get("MOGOV_AUDITOR_DELAY", "1.0"))
 
 TABLES = ["mo_auditor_reports", "mo_auditor_ratings"]
@@ -52,8 +54,8 @@ RATING_SENTENCE = re.compile(
 )
 # Titles of filings that carry no rating: checked against the 2012-2026 reports that have a summary
 NOT_RATED = re.compile(
-    r"financial statements|monthly report|follow[\s-]*up|annual report|compilation|property tax|"
-    r"fire protection|forfeiture|working capital revolving",
+    r"financial statements?|monthly report|follow[\s-]*up|annual report|compilation|property tax|"
+    r"county fire protection districts?|independent audits of fire protection|forfeiture|working capital revolving",
     re.I,
 )
 
@@ -99,7 +101,7 @@ def list_year(year: int) -> list[dict]:
         SEARCH_URL,
         {"SearchYearStart": year, "SearchYearEnd": year, "page": 0, "size": 1000},
         max_age=max_age,
-        delay=DELAY,
+        min_interval=DELAY,
     )
     doc = json.loads(body)
     rows = doc["data"]
@@ -111,7 +113,7 @@ def list_year(year: int) -> list[dict]:
 def read_rating(kind: str, url: str) -> dict:
     row = {"source_kind": kind, "pdf_url": url}
     try:
-        pdf = fetch(url, max_age=None, delay=DELAY)
+        pdf = fetch(url, max_age=None, min_interval=DELAY)
         pages = pdftext.page_texts(pdf, max_pages=SCAN_PAGES)
     except httpx.HTTPStatusError as e:
         return {**row, "status": f"http_{e.response.status_code}", **extract_rating([])}
