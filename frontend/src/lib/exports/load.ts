@@ -4,6 +4,7 @@
 import { createHash } from "node:crypto";
 import { DONOR_GROUP_SQL } from "../rollups";
 import { exportedAt, hasExport, query } from "./db";
+import { buildCommitteeSessions, type PostCounts, type TitledMembership } from "../committeePosts";
 import { payYearsGate, type PayVoteRow } from "../attendancePay";
 import { loadLegislatorExpenses } from "./legislatorExpenses";
 import { groupPast, linkSameName, type RosterRow } from "./past";
@@ -33,6 +34,7 @@ import type {
   PastPerson,
   PeerStrip,
   SubjectVotes,
+  TimeToDisposition,
   TopDonorRow,
 } from "./types";
 
@@ -412,6 +414,24 @@ async function loadAll(): Promise<OfficialBundle[]> {
       )
     : null;
 
+  // House committee posts: counts from fct_committee_posts, committee names from the titled memberships only
+  const committeeSessions =
+    hasExport("fct_committee_posts") && hasExport("fct_committee_memberships")
+      ? buildCommitteeSessions(
+          await query<PostCounts>(`
+            select official_id, session_code, cast(session_year as integer) as session_year,
+                   cast(committees_held as integer) as committees_held, cast(chair_posts as integer) as chair_posts,
+                   cast(vice_chair_posts as integer) as vice_chair_posts,
+                   cast(co_chair_posts as integer) as co_chair_posts, cast(ranking_posts as integer) as ranking_posts
+            from {fct_committee_posts}`),
+          await query<TitledMembership>(`
+            select official_id, session_code, committee_name, position_name, is_subcommittee
+            from {fct_committee_memberships} where position_name <> 'Member'`),
+          process.env,
+          console.warn,
+        )
+      : null;
+
   // a federal appellate judge has ~6k cases: ship yearly counts plus the most recent ones
   const RECENT_CASES = 50;
   const hasCases = hasExport("fct_case_history");
@@ -446,6 +466,20 @@ async function loadAll(): Promise<OfficialBundle[]> {
     : null;
 
   const expenses = await loadLegislatorExpenses();
+  // federal district judges: one row per CourtListener judge, joined to the official by official_id
+  const dispositions = hasExport("fct_judge_time_to_disposition")
+    ? new Map(
+        (
+          await query<TimeToDisposition & { official_id: string }>(`
+            select official_id, cl_person_id, court_id, cast(dockets_assigned as integer) as dockets_assigned,
+                   cast(dockets_with_both_dates as integer) as dockets_with_both_dates,
+                   cast(dockets_ends_before_filed as integer) as dockets_ends_before_filed,
+                   cast(dockets_measured as integer) as dockets_measured,
+                   share_with_both_dates, median_days_to_disposition
+            from {fct_judge_time_to_disposition} where official_id is not null`)
+        ).map((r) => [r.official_id, r]),
+      )
+    : new Map<string, TimeToDisposition>();
 
   return profiles
     .sort((a, b) => (SORT_LEVEL[a.level] ?? 9) - (SORT_LEVEL[b.level] ?? 9))
@@ -500,8 +534,10 @@ async function loadAll(): Promise<OfficialBundle[]> {
           by_subject: subjects ? ((subjects.get(id) ?? []) as SubjectVotes[]) : null,
         },
         overlap: hasOverlap ? ((overlap.get(id) ?? []) as InterestOverlap[]) : null,
+        committees: committeeSessions ? (committeeSessions.get(id) ?? []) : null,
         courts: {
           status: status("cases"),
+          time_to_disposition: dispositions.get(id) ?? null,
           by_year: caseYears
             ? ((caseYears.get(id) ?? []) as { year: number; role: string; cases: number }[])
             : null,
@@ -619,6 +655,8 @@ export function freshness(): { table: string; exported_at: string | null; sample
     "rpt_gift_rollup",
     "rpt_indicator_peers",
     "rpt_party_breaks",
+    "fct_committee_posts",
+    "fct_committee_memberships",
     "rpt_attendance",
     "rpt_attendance_pay",
     "rpt_votes_by_subject",

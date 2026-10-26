@@ -3,6 +3,7 @@
 
 import type { PayVoteRow } from "../attendancePay";
 import type { LegislatorExpenseRow } from "../legislatorExpenses";
+import type { CommitteeSession } from "../committeePosts";
 
 export type Confidence = string; // 'exact id' | 'exact (MEC crosswalk)' | 'high' | 'medium' | ...
 
@@ -281,6 +282,18 @@ export interface Dataset<T> {
   rows: T[];
 }
 
+/** One fct_judge_time_to_disposition row: median days from filing to termination of the dockets assigned to a judge. */
+export interface TimeToDisposition {
+  cl_person_id: string;
+  court_id: string;
+  dockets_assigned: number;
+  dockets_with_both_dates: number;
+  dockets_ends_before_filed: number;
+  dockets_measured: number;
+  share_with_both_dates: number;
+  median_days_to_disposition: number | null;
+}
+
 export interface OfficialBundle {
   official: Official;
   coverage: CoverageItem[];
@@ -291,16 +304,20 @@ export interface OfficialBundle {
     /** null when the rpt_* export is missing (section says so instead of showing nothing) */
     party_breaks: PartyBreak[] | null;
     attendance: AttendanceRow[] | null;
-    /** rpt_attendance_pay: pay per vote attended by year and in total; null when the export is missing */
+    /** rpt_attendance_pay: pay per vote attended by year and in total; null when the export is missing or empty (state expenditures not loaded) */
     attendance_pay: PayVoteRow[] | null;
     /** the subjects with the most roll calls (top 20) */
     by_subject: SubjectVotes[] | null;
   };
   /** null when the rpt_interest_vote_overlap export is missing */
   overlap: InterestOverlap[] | null;
+  /** House committee posts by session, newest first; null when either committee export is missing */
+  committees: CommitteeSession[] | null;
   courts: {
     status: string;
-    /** cases per filing year and role; null when the export is missing */
+    /** federal district judges only (fct_judge_time_to_disposition); null for everyone else or when the export is missing */
+    time_to_disposition: TimeToDisposition | null;
+    /** cases per filing year and role; null when the export is missing or empty (state expenditures not loaded) */
     by_year: { year: number; role: string; cases: number }[] | null;
     total: number;
     /** the most recent cases (all of them are in the CourtListener links) */
@@ -310,7 +327,7 @@ export interface OfficialBundle {
     status: string;
     federal: FederalDonorRow[];
     cycles: Dataset<DonorCycleRow>;
-    /** employers of individual donors (rpt_donor_employers, top 20); null when the export is missing */
+    /** employers of individual donors (rpt_donor_employers, top 20); null when the export is missing or empty (state expenditures not loaded) */
     employers:
       | {
           employer: string;
@@ -322,14 +339,14 @@ export interface OfficialBundle {
           source_url: string | null;
         }[]
       | null;
-    /** state officials' individual contributions by size (rpt_donor_size); null when the export is missing */
+    /** state officials' individual contributions by size (rpt_donor_size); null when the export is missing or empty (state expenditures not loaded) */
     size: { cycle: number; band_floor: number; match_confidence: string; total_amount: number }[] | null;
     top_donors: Dataset<TopDonorRow>;
-    /** committee donors followed one hop back (rpt_committee_donors); null when the export is missing */
+    /** committee donors followed one hop back (rpt_committee_donors); null when the export is missing or empty (state expenditures not loaded) */
     committee_trails: CommitteeTrail[] | null;
   };
   gifts: Dataset<GiftRollupRow>;
-  /** per diem and mileage by state fiscal year (fct_legislator_expenses); null when the export is missing */
+  /** per diem and mileage by state fiscal year (fct_legislator_expenses); null when the export is missing or empty (state expenditures not loaded) */
   expenses: LegislatorExpenseRow[] | null;
   /**
    * Businesses in the official's district or city; null when either export is missing. Officials elected

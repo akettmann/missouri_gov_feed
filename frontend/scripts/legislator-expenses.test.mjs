@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { expenseYears, fiscalYearLabel, gapYears, showsExpenses } from "../src/lib/legislatorExpenses.ts";
+import {
+  expenseYears,
+  fiscalYearLabel,
+  gapYears,
+  groupExpenses,
+  showsExpenses,
+} from "../src/lib/legislatorExpenses.ts";
 
 const row = (fiscal_year, expense_type, amount, extra = {}) => ({
   fiscal_year,
@@ -72,8 +78,17 @@ test("the footer carries the state's required data-policy disclaimer", () => {
     "THE STATE OF MISSOURI MAKES NO REPRESENTATIONS OR WARRANTY AS TO THE COMPLETENESS, ACCURACY, TIMELINESS, OR CONTENT OF ANY DATA MADE AVAILABLE THROUGH THIS SITE",
     "EXPRESSLY DISCLAIMS ALL WARRANTIES, WHETHER EXPRESS OR IMPLIED, INCLUDING ANY IMPLIED WARRANTIES OF MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE",
     "The data is subject to change as modifications and updates are complete",
-    "being used at one's own risk",
+    "being used at one’s own risk",
   ]) {
     assert.ok(layout.includes(phrase), phrase);
   }
+});
+
+test("an empty export is 'not loaded' (null), not an official with no rows", () => {
+  assert.equal(groupExpenses([]), null);
+  const grouped = groupExpenses([{ official_id: "a", ...row(2026, "per diem", 100) }]);
+  assert.ok(grouped instanceof Map);
+  assert.equal(grouped.get("b"), undefined); // loaded, but this official has no matched row
+  assert.equal(grouped.get("a").length, 1);
+  assert.equal("official_id" in grouped.get("a")[0], false);
 });

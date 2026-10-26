@@ -31,6 +31,7 @@ uv run mogov run --shards 4
 | wikidata (stage 2)            | continuously                                 | 7 days                                                                     | weekly                                                |
 | shor_mccarty                  | yearly release                               | 90 days                                                                    | quarterly                                             |
 | mo_employee_pay               | yearly (each January)                        | current and previous year 7 days, older 30 days                            | monthly                                               |
+| mo_sos_elections              | after each canvass (about 4 weeks after an election) | PDFs forever once 4 months old; the results page and newest PDFs daily | after each election, or monthly                       |
 | mo_state_expenditures         | per fiscal year, republished by the state    | current and previous year 7 days, older 30 days                            | monthly                                               |
 | census_tiger                  | yearly vintage (each autumn); redistricting  | listings 7 days; shapefiles forever                                        | monthly                                               |
 | epa_frs                       | state file refreshed every few months        | 30 days                                                                    | monthly                                               |
@@ -104,6 +105,8 @@ Set `MOGOV_SKIP_SIZE_BUDGET=1` (exactly `1`) to skip the check; `pnpm deploy:pag
 Separately, the build fails if the pay-per-vote year rows (`rpt_attendance_pay`) do not add up to their dbt total for any official, which means `rpt_attendance` and `rpt_attendance_pay` were exported from different builds; re-run `mogov build` and `mogov export` together. `MOGOV_SKIP_PAY_YEARS_CHECK=1` (exactly `1`) skips that check and logs that it did.
 
 The frontend words award periods from `rpt_awards.period_kind` (`year`, `fec_cycle`, `lifetime`); the build fails when the export has no such column or when a `fec_cycle` list has an odd period (a stale export); re-run `uv run mogov build` and `uv run mogov export`. `MOGOV_SKIP_AWARD_CYCLES_CHECK=1` (exactly `1`) skips the odd-period guard and also lets a stale export without `period_kind` build, inferring the kind from award and office (federal `least_committee_money_share` is a cycle) with a warning (re-export to stop inferring).
+
+Every frontend export read also checks the columns declared in `frontend/src/lib/exports/requiredColumns.ts`; an export that lacks one fails the build with `stale export: <table> lacks <columns>` and the re-export commands (`uv run mogov build`, then `uv run mogov export --format parquet`). Add a table's new column to that file when the site starts selecting it.
 
 ## Checking a sync
 

@@ -27,12 +27,15 @@ const gaps = [...new Set([...gapYears(perDiem), ...gapYears(mileage)])].sort((a,
       in-state mileage, from the state's expenditure records, per state fiscal year (July to June).
     </p>
     {expenses === null ? (
-      <p class="muted small">Not available yet (the fct_legislator_expenses export is missing).</p>
+      <p class="muted small">
+        The state expenditures data has not been loaded for this build, so per diem and mileage cannot be
+        shown yet.
+      </p>
     ) : expenses.length === 0 ? (
       <p class="muted small">
         No per diem or mileage payment is matched to this official. Payees are matched to current legislators
-        through the state payroll; a payee whose name fits more than one legislator is left out, and former
-        legislators are not matched yet. This does not mean nothing was paid.
+        through the state payroll, and only people who hold an office on this site today are matched; a payee
+        whose name fits more than one legislator is left out. This does not mean nothing was paid.
       </p>
     ) : (
       <>
@@ -118,16 +121,17 @@ const gaps = [...new Set([...gapYears(perDiem), ...gapYears(mileage)])].sort((a,
     <p class="small muted">
       Amounts are what the state paid, not what was claimed, and each is the payee's total for the fiscal
       year, not one payment. The state's records carry legal names, so payees are matched to officials through
-      the state payroll; "possible match" rows are matched on a looser name fit and can be hidden above.
+      the state payroll; "possible match" rows are matched on a looser fit (a nickname fit, or a surname
+      shared with another legislator) and can be hidden above.
       {gaps.length > 0 && (
         <>
           {" "}
           No row for {gaps.map((g) => `FY${g}`).join(", ")}: the payee was not paid or could not be matched.
         </>
       )}{" "}
-      Only current legislators are matched so far, so a legislator who has since left is missing. Source:
-      Missouri Accountability Portal "State Expenditures" on data.mo.gov, agency LEGISLATURE; see the State of
-      Missouri notice at the foot of this page.{" "}
+      Only people who hold an office on this site today are matched, so a former legislator who holds none is
+      missing. Source: Missouri Accountability Portal "State Expenditures" on data.mo.gov, agency LEGISLATURE;
+      see the State of Missouri notice at the foot of this page.{" "}
       <a href={href("/methodology/#per-diem-mileage")}>How this is counted</a>.
     </p>
   </section>

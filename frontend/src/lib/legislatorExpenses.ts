@@ -46,3 +46,20 @@ export function gapYears(years: LegislatorExpenseRow[]): number[] {
   for (let y = first + 1; y < last; y++) if (!have.has(y)) gaps.push(y);
   return gaps;
 }
+
+/**
+ * Group the whole export's rows by official. Null when the export holds no rows at all: that means the state
+ * expenditures data was not loaded for this build, which is different from one official having no matched row.
+ */
+export function groupExpenses<T extends { official_id: string }>(
+  rows: T[],
+): Map<string, Omit<T, "official_id">[]> | null {
+  if (rows.length === 0) return null;
+  const byOfficial = new Map<string, Omit<T, "official_id">[]>();
+  for (const { official_id, ...row } of rows) {
+    const mine = byOfficial.get(official_id) ?? [];
+    mine.push(row);
+    byOfficial.set(official_id, mine);
+  }
+  return byOfficial;
+}

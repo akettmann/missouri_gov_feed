@@ -1,0 +1,135 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_mo_sos_elections__contests
+  description: 'Missouri Secretary of State official returns: one row per contest as titled in the PDF (a header
+    line such as "State Representative - District 34 (11 of 11 Precincts Reported)"), with the office, the district
+    number when the title has one, and the precinct counts. A retention block holding several judges is one contest
+    here. has_party_totals: the contest prints "Party Total" lines, i.e. it is a primary split into one ballot per
+    party (a special election held on primary day prints none and is one race across all parties).'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - election_key
+        - contest_seq
+  columns:
+  - name: office
+    data_tests:
+    - not_null
+  - name: has_party_totals
+    description: True when the contest prints Party Total lines (a primary split into one ballot per party); a special
+      election held on primary day prints none.
+    data_tests:
+    - not_null
+  - name: precincts_total
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 1
+          max_value: 4000
+- name: stg_mo_sos_elections__lines
+  description: 'Missouri Secretary of State official returns: one row per printed PDF line (as the loader split
+    it), with the election, the contest sequence number within the PDF, and the cells of candidate rows. Numbers
+    are parsed here.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - election_key
+        - page
+        - line
+  columns:
+  - name: line_key
+    data_tests:
+    - unique
+    - not_null
+  - name: kind
+    data_tests:
+    - accepted_values:
+        arguments:
+          values:
+          - header
+          - candidate
+          - total
+          - party_total
+          - other
+  - name: election_type
+    data_tests:
+    - accepted_values:
+        arguments:
+          values:
+          - general
+          - primary
+  - name: election_date
+    data_tests:
+    - not_null
+- name: stg_mo_sos_elections__printed_totals
+  description: 'Missouri Secretary of State official returns: the "Total Votes" line printed under each contest
+    (or under each judge of a retention block, matched by subcontest_seq), kept to reconcile the candidate rows
+    against.'
+  columns:
+  - name: printed_total_votes
+    data_tests:
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 0
+          max_value: 6000000
+- name: stg_mo_sos_elections__results
+  description: 'Missouri Secretary of State official returns: one row per contest x candidate or ballot choice x
+    election, with votes, party, the printed percentage and a write-in flag. A retention judge has a "Yes Votes"
+    and a "No Votes" row; a block of several judges under one header is split with subcontest_seq (it counts the
+    Yes rows so far). contest_kind: candidate, retention (judge Yes/No), ballot_issue (Yes/No on a measure whose
+    name is the contest title). Rows in layouts the loader doesn''t split into cells (older "Ballot Issue Yes: n"
+    lines) are not here.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - election_key
+        - page
+        - line
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: precincts_reported <= precincts_total
+  columns:
+  - name: votes
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 0
+          max_value: 6000000
+  - name: pct_printed
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 0
+          max_value: 100
+  - name: party
+    data_tests:
+    - accepted_values:
+        arguments:
+          values:
+          - Republican
+          - Democratic
+          - Libertarian
+          - Green
+          - Constitution
+          - Independent
+          - Better
+          - Write-in
+  - name: choice_name
+    data_tests:
+    - not_null
+  - name: contest_kind
+    data_tests:
+    - accepted_values:
+        arguments:
+          values:
+          - candidate
+          - retention
+          - ballot_issue

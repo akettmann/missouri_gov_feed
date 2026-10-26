@@ -1,0 +1,19 @@
+@startuml mo_sos_elections
+title mo_sos_elections: Missouri SoS official election returns (PDFs)
+start
+:Results page sos.mo.gov/elections/results:
+every "Grand Totals" link under a General or Primary
+Election heading (Aug 2012 on);
+note right: one shard unit per election (one PDF)
+:fetch one PDF at a time (2 s delay, cached);
+:pdfplumber words -> lines (by top edge);
+:structure only: contest header (contest_seq),
+candidate row cells (name | party | votes | %) by column x,
+total / party total lines;
+note right: every line lands, with pdf_url, page and line
+:mo_sos_election_rows;
+:dbt staging: lines -> contests, results, printed_totals;
+:dbt marts: fct_election_races (margin, uncontested)
+and fct_judicial_retention (Yes %);
+stop
+@enduml

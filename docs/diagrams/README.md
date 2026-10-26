@@ -124,6 +124,12 @@ Missouri state payroll from data.mo.gov. Source: [sources/mo_employee_pay.puml](
 
 ![mo_employee_pay](sources/mo_employee_pay.svg)
 
+### mo_sos_elections
+
+Missouri Secretary of State official election returns: race results, margins, uncontested races and judicial retention. Source: [sources/mo_sos_elections.puml](sources/mo_sos_elections.puml)
+
+![mo_sos_elections](sources/mo_sos_elections.svg)
+
 ### mo_house
 
 Missouri House XML exports and roll-call PDFs. Source: [sources/mo_house.puml](sources/mo_house.puml)
