@@ -1,0 +1,54 @@
+unit_tests:
+  - name: senate_seat_terms_dated_from_the_journal_roll_calls_per_term
+    model: int_mo_legislators__seats
+    description: >
+      Senate seat-terms are re-dated from the journal roll calls where Open States cannot (#516, #522), term by
+      term. The journals begin 2017-01-04. a01: an undated start becomes the term's first vote. a02: Open States
+      ends the term 2018-12-31 but the last vote was 2017-09-13, over a year earlier, so the term ends there.
+      a03: a senator who resigned January 16 and voted last January 13 keeps the Open States date (within a
+      year of the last vote). a04: an open term is never cut. a05: a closed term running into the journal years
+      with no vote, which started before them, ends the day before the journals begin. a06: the same with an
+      undated start is dropped. a07: the same with a start inside the journal years is dropped. a08: a term that
+      ended before the journals begin keeps its dates. a09: a term with no vote but an open end is kept as it is.
+      a10 has two terms: the first is capped by its own last vote, not by the person's later votes in the second
+      term, and the second keeps its dated start. House terms keep Open States' dates, undated or not.
+    given:
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {openstates_id: a01, person_id: a01, chamber: upper, district_number: 1, start_date: '1900-01-01', end_date: '2020-12-31'}
+          - {openstates_id: a02, person_id: a02, chamber: upper, district_number: 2, start_date: '2011-01-01', end_date: '2018-12-31'}
+          - {openstates_id: a03, person_id: a03, chamber: upper, district_number: 3, start_date: '2017-01-01', end_date: '2018-01-16'}
+          - {openstates_id: a04, person_id: a04, chamber: upper, district_number: 4, start_date: '2017-01-01', end_date: '9999-12-31'}
+          - {openstates_id: a05, person_id: a05, chamber: upper, district_number: 5, start_date: '2011-01-01', end_date: '2018-12-31'}
+          - {openstates_id: a06, person_id: a06, chamber: upper, district_number: 6, start_date: '1900-01-01', end_date: '2018-12-31'}
+          - {openstates_id: a07, person_id: a07, chamber: upper, district_number: 7, start_date: '2017-02-01', end_date: '2018-12-31'}
+          - {openstates_id: a08, person_id: a08, chamber: upper, district_number: 8, start_date: '2009-01-01', end_date: '2016-12-31'}
+          - {openstates_id: a09, person_id: a09, chamber: upper, district_number: 9, start_date: '2017-02-01', end_date: '9999-12-31'}
+          - {openstates_id: a10, person_id: a10, chamber: upper, district_number: 10, start_date: '2011-01-01', end_date: '2018-12-31'}
+          - {openstates_id: a10b, person_id: a10, chamber: upper, district_number: 10, start_date: '2019-01-01', end_date: '9999-12-31'}
+          - {openstates_id: h01, person_id: h01, chamber: lower, district_number: 1, start_date: '1900-01-01', end_date: '2018-12-31'}
+      - input: ref('int_mo_senate__votes')
+        rows:
+          - {person_key: a01, vote_date: '2017-01-04'}
+          - {person_key: a01, vote_date: '2020-12-02'}
+          - {person_key: a02, vote_date: '2017-01-04'}
+          - {person_key: a02, vote_date: '2017-09-13'}
+          - {person_key: a03, vote_date: '2017-02-01'}
+          - {person_key: a03, vote_date: '2018-01-13'}
+          - {person_key: a04, vote_date: '2017-02-01'}
+          - {person_key: a10, vote_date: '2017-01-04'}
+          - {person_key: a10, vote_date: '2017-09-13'}
+          - {person_key: a10, vote_date: '2019-01-09'}
+          - {person_key: a10, vote_date: '2026-05-15'}
+    expect:
+      rows:
+        - {openstates_id: a01, district_number: 1, start_date: '2017-01-04', end_date: '2020-12-31'}
+        - {openstates_id: a02, district_number: 2, start_date: '2011-01-01', end_date: '2017-09-13'}
+        - {openstates_id: a03, district_number: 3, start_date: '2017-01-01', end_date: '2018-01-16'}
+        - {openstates_id: a04, district_number: 4, start_date: '2017-01-01', end_date: '9999-12-31'}
+        - {openstates_id: a05, district_number: 5, start_date: '2011-01-01', end_date: '2017-01-03'}
+        - {openstates_id: a08, district_number: 8, start_date: '2009-01-01', end_date: '2016-12-31'}
+        - {openstates_id: a09, district_number: 9, start_date: '2017-02-01', end_date: '9999-12-31'}
+        - {openstates_id: a10, district_number: 10, start_date: '2011-01-01', end_date: '2017-09-13'}
+        - {openstates_id: a10b, district_number: 10, start_date: '2019-01-01', end_date: '9999-12-31'}
+        - {openstates_id: h01, district_number: 1, start_date: '1900-01-01', end_date: '2018-12-31'}

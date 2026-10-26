@@ -1,6 +1,7 @@
 -- MO Senate journal votes attributed to people: the senator serving on the vote date with a matching
--- surname (and district, when the journal adds one to disambiguate). Ambiguous tokens stay unattributed.
--- A two-word token ("Thompson Rehder") also matches a senator whose recorded surname is its last word.
+-- surname (and district, when the journal adds one to disambiguate), by the dates Open States gives the seat
+-- (int_mo_legislators__seats_as_given; int_mo_legislators__seats re-dates Senate terms from these votes). Ambiguous
+-- tokens stay unattributed.
 with votes as (
     select
         *,
@@ -15,7 +16,7 @@ candidates as (
         seat.person_id as person_key,
         seat.party
     from votes as v
-    inner join {{ ref('int_mo_legislators__seats') }} as seat
+    inner join {{ ref('int_mo_legislators__seats_as_given') }} as seat
         on
             seat.chamber = 'upper'
             and v.vote_date between seat.start_date and seat.end_date
