@@ -8,7 +8,8 @@
 --                does not list them: the special-session Senate bills (the index covers regular sessions only), with
 --                the titles, version, last action and effective date the XML gives. Senate bills of older special
 --                sessions are missing (#237).
--- A column a source does not give is null.
+-- source_url is the Senate index's bill link, else the bill's page on house.mo.gov from the House XML (House bills and
+-- the House-listed Senate bills). A column a source does not give is null.
 with senate_index_bills as (
     select
         session_code,
@@ -58,7 +59,7 @@ select
     a.long_title,
     a.last_action,
     a.proposed_effective_date,
-    cast(null as {{ dbt.type_string() }}) as source_url
+    a.source_url
 from {{ ref('stg_mo_house__senate_act_bills') }} as a
 left join senate_index_bills as t on a.session_code = t.session_code and a.bill = t.bill
 where t.bill is null

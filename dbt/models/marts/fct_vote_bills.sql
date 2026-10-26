@@ -32,7 +32,6 @@ bills as (
     from {{ ref('int_bills__list') }} as l
     left join relisted as rl on l.session_code = rl.session_code and l.bill = rl.bill
     where rl.bill is null
-    group by l.session_code, l.bill
 ),
 
 bill_keys as (

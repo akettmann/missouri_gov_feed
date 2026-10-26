@@ -158,6 +158,34 @@ unit_tests:
         - {session_code: '261', bill: SB834, listed_in: senate_act_list, action_seq: 1, action_date: 2026-03-25, description: 'Reported to the House and First Read (H)', action_guid: '2'}
         - {session_code: '261', bill: SB999, listed_in: senate_act_list, action_seq: 2, action_date: 2026-05-14, description: 'Truly Agreed To and Finally Passed', action_guid: '3'}
 
+  - name: senate_act_bills_take_their_link_from_the_first_listed_action
+    model: stg_mo_house__senate_act_bills
+    description: >
+      The SenateActList has no bill-page link of its own; the first action of each Senate bill (action_index 1)
+      carries it, as for House bills. SB1 has two actions and takes the first's link, not the second's; SB2 has
+      the same bill name in another session and does not take that session's link; SB3 has no action and gets a
+      null link instead of dropping out. Taking the last action, joining on bill alone or an inner join fails this
+      test.
+    given:
+      - input: source('mo_house', 'xml_senate_act_bills')
+        format: sql
+        rows: |
+            select cast('253' as varchar) as session_code, cast('SB1' as varchar) as bill, cast('SS SB 1' as varchar) as current_bill_string, cast('T1' as varchar) as short_title, cast(null as varchar) as long_title, cast(null as varchar) as last_action, cast(null as date) as proposed_effective_date, cast('Hough' as varchar) as sponsor_name union all
+            select '251', 'SB2', 'SB 2', 'T2', null, null, null, 'Y' union all
+            select '253', 'SB3', 'SB 3', 'T3', null, null, null, 'Z'
+      - input: source('mo_house', 'xml_senate_act_actions')
+        format: sql
+        rows: |
+            select cast('253' as varchar) as session_code, cast('SB1' as varchar) as bill, cast(2 as bigint) as action_index, cast('http://house/sb1-second' as varchar) as link union all
+            select '253', 'SB1', 1, 'http://house/sb1-first' union all
+            select '251', 'SB2', 1, 'http://house/251-sb2' union all
+            select '253', 'SB2', 1, 'http://house/253-sb2-other-session'
+    expect:
+      rows:
+        - {session_code: '253', session_year: 2025, bill: SB1, current_bill_string: SS SB 1, short_title: T1, long_title: null, last_action: null, proposed_effective_date: null, sponsor_name: Hough, source_url: 'http://house/sb1-first'}
+        - {session_code: '251', session_year: 2025, bill: SB2, current_bill_string: SB 2, short_title: T2, long_title: null, last_action: null, proposed_effective_date: null, sponsor_name: Y, source_url: 'http://house/251-sb2'}
+        - {session_code: '253', session_year: 2025, bill: SB3, current_bill_string: SB 3, short_title: T3, long_title: null, last_action: null, proposed_effective_date: null, sponsor_name: Z, source_url: null}
+
   - name: house_rollcalls_dated_outside_their_sessions_year_are_dropped
     model: stg_mo_house__rollcalls
     description: >
