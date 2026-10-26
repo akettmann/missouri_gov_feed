@@ -87,3 +87,133 @@ unit_tests:
         - {section_id: a.5, bill: SB3, session_code: '974'}
         - {section_id: a.6, bill: HB2, session_code: '184'}
         - {section_id: a.7, bill: HB20, session_code: '171'}
+
+  - name: combined_bills_may_repeat_the_bill_head_after_and_or_ampersand
+    model: int_mo_revisor__session_law_bills
+    description: >
+      "H.B. 237 & H.B. 238 & H.B. 482" (RSMo 488.429) is three bills combined into the first; reading numbers only
+      after the first head kept just 237. Each bill after "&" may carry its own head ("H.B. 5 & S.B. 7"), and a bare
+      number takes the type of the bill before it, even after a head of another type ("S.B. 7 & 8"; "H.B. 69 & 179
+      & H.B. 669"). "and" joins bills that passed on their own: each starts a combined group of its own
+      ("H.B. 1268 & 1211 and S.B. 966" is HB1211 combined into HB1268, SB966 a lead bill), and a "§ 1" after the
+      numbers is not read as another bill.
+    given:
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 'r.1' as section_id, 'r.1/1' as section_version_id, '(A.L. 2009 H.B. 237 & H.B. 238 & H.B. 482)' as history_note union all
+            select 'r.2', 'r.2/1', '(A.L. 2010 H.B. 5 & S.B. 7 & 8)' union all
+            select 'r.3', 'r.3/1', '(A.L. 1997 H.B. 69 & 179 & H.B. 669)' union all
+            select 'r.4', 'r.4/1', '(A.L. 2004 H.B. 1268 & 1211 and S.B. 966 § 1 merged with H.B. 9)' union all
+            select 'r.5', 'r.5/1', '(A.L. 2004 H.B. 996 and H.B. 1142 and H.B. 1201)'
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select '9.010' as section_id, '9.010/3' as section_version_id, 'transferred' as change_kind, '(Transferred 1959; now 442.560 )' as note
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: r.1, bill: HB237, is_lead_bill: true, combined_into: }
+        - {section_id: r.1, bill: HB238, is_lead_bill: false, combined_into: HB237}
+        - {section_id: r.1, bill: HB482, is_lead_bill: false, combined_into: HB237}
+        - {section_id: r.2, bill: HB5, is_lead_bill: true, combined_into: }
+        - {section_id: r.2, bill: SB7, is_lead_bill: false, combined_into: HB5}
+        - {section_id: r.2, bill: SB8, is_lead_bill: false, combined_into: HB5}
+        - {section_id: r.3, bill: HB69, is_lead_bill: true, combined_into: }
+        - {section_id: r.3, bill: HB179, is_lead_bill: false, combined_into: HB69}
+        - {section_id: r.3, bill: HB669, is_lead_bill: false, combined_into: HB69}
+        - {section_id: r.4, bill: HB1268, is_lead_bill: true, combined_into: }
+        - {section_id: r.4, bill: HB1211, is_lead_bill: false, combined_into: HB1268}
+        - {section_id: r.4, bill: SB966, is_lead_bill: true, combined_into: }
+        - {section_id: r.4, bill: HB9, is_lead_bill: true, combined_into: }
+        - {section_id: r.5, bill: HB996, is_lead_bill: true, combined_into: }
+        - {section_id: r.5, bill: HB1142, is_lead_bill: true, combined_into: }
+        - {section_id: r.5, bill: HB1201, is_lead_bill: true, combined_into: }
+
+  - name: bills_after_a_comma_continue_the_act_before_them
+    model: int_mo_revisor__session_law_bills
+    description: >
+      The older notes list several bills of one act after commas ("A.L. 1978 H.B. 971, S.B. 628"); the second bill
+      is a piece with no "A.L. 1978" of its own, and used to be dropped (129 pieces of the 8,517 the parser skips
+      are bills). It takes the year, session and change of the act before it, and each such bill is a lead bill (it
+      passed on its own). A piece that is only a bill continues an act only when nothing but such pieces lies
+      between: after a page cite ("A.L. 1965 p. 509, S.B. 9") or an RSMo piece it stays dropped, as do date and
+      Proposition pieces ("November 4, 2008", "Proposition A"). "A.L. 1985, H.B. 366" (a stray comma after the
+      year) and "merged with" as its own piece are read too, and the session and the change carry over
+      ("Repealed L. 1989 1st Ex. Sess. H.B. 3, S.B. 4").
+    given:
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 'c.1' as section_id, 'c.1/1' as section_version_id, '(L. 1947 V. I p. 432 § 2, A.L. 1969 H.B. 322, A.L. 1978 H.B. 971, S.B. 628, H.B. 1634, A.L. 1979 S.B. 236)' as history_note union all
+            select 'c.2', 'c.2/1', '(RSMo 1939 § 645, S.B. 5, A.L. 1965 p. 509, S.B. 9)' union all
+            select 'c.3', 'c.3/1', '(L. 2008 Adopted by Initiative, Proposition A, § 3, November 4, 2008, A.L. 2010 H.B. 5)' union all
+            select 'c.4', 'c.4/1', '(A.L. 1985, H.B. 366 et al., A.L. 2005 H.B. 58, merged with S.B. 210)' union all
+            select 'c.5', 'c.5/1', '(A.L. 1989 1st Ex. Sess. H.B. 3, S.B. 4, A.L. 1990 H.B. 7 & 8, S.B. 862)'
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select 'c.6' as section_id, 'c.6/1' as section_version_id, 'repealed' as change_kind, '(Repealed L. 1989 1st Ex. Sess. H.B. 3, S.B. 4)' as note
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: c.1, bill: HB322, change: amended, session_code: '691', is_lead_bill: true}
+        - {section_id: c.1, bill: HB971, change: amended, session_code: '781', is_lead_bill: true}
+        - {section_id: c.1, bill: SB628, change: amended, session_code: '781', is_lead_bill: true}
+        - {section_id: c.1, bill: HB1634, change: amended, session_code: '781', is_lead_bill: true}
+        - {section_id: c.1, bill: SB236, change: amended, session_code: '791', is_lead_bill: true}
+        - {section_id: c.3, bill: HB5, change: amended, session_code: '101', is_lead_bill: true}
+        - {section_id: c.4, bill: HB366, change: amended, session_code: '851', is_lead_bill: true}
+        - {section_id: c.4, bill: HB58, change: amended, session_code: '051', is_lead_bill: true}
+        - {section_id: c.4, bill: SB210, change: amended, session_code: '051', is_lead_bill: true}
+        - {section_id: c.5, bill: HB3, change: amended, session_code: '893', is_lead_bill: true}
+        - {section_id: c.5, bill: SB4, change: amended, session_code: '893', is_lead_bill: true}
+        - {section_id: c.5, bill: HB7, change: amended, session_code: '901', is_lead_bill: true}
+        - {section_id: c.5, bill: HB8, change: amended, session_code: '901', is_lead_bill: false}
+        - {section_id: c.5, bill: SB862, change: amended, session_code: '901', is_lead_bill: true}
+        - {section_id: c.6, bill: HB3, change: repealed, session_code: '893', is_lead_bill: true}
+        - {section_id: c.6, bill: SB4, change: repealed, session_code: '893', is_lead_bill: true}
+
+  - name: extraordinary_session_without_a_number_or_spelled_out
+    model: int_mo_revisor__session_law_bills
+    description: >
+      The Revisor also writes the ordinal out ("Repealed L. 1989 First Ex. Sess. H.B. 3" is the 1st, House 893) and
+      sometimes leaves it off ("Repealed L. 1997 Extraordinary Session S.B. 1"). A year whose other notes name just
+      one numbered session (1997: "2d") gives the unnumbered one that number (974); a year with none or several
+      reads it as the 1st (2003 names both "1st" and "2nd", so it is ambiguous; 2011 names none). Before the fix
+      these spellings parsed as no bill at all.
+    given:
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 'e.1' as section_id, 'e.1/1' as section_version_id, '(A.L. 1997 2d Ex. Sess. H.B. 3)' as history_note union all
+            select 'e.2', 'e.2/1', '(A.L. 2003 1st Ex. Sess. S.B. 2, A.L. 2003 2nd Ex. Sess. S.B. 3)'
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select 'e.3' as section_id, 'e.3/1' as section_version_id, 'repealed' as change_kind, '(Repealed L. 1997 Extraordinary Session SB 1)' as note union all
+            select 'e.4', 'e.4/1', 'repealed', '(Repealed L. 1989 First Ex. Sess. H.B. 3)' union all
+            select 'e.5', 'e.5/1', 'repealed', '(Repealed L. 2003 Extraordinary Session H.B. 7)' union all
+            select 'e.6', 'e.6/1', 'repealed', '(Repealed L. 2011 Extraordinary Session H.B. 8)' union all
+            select 'e.7', 'e.7/1', 'repealed', '(Repealed L. 1958 Ex. Sess. p. 29 § 1)'
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2003 as session_year, '033' as session_code, '1st Extraordinary Session' as session_of_general_assembly union all
+            select 2003, '034', '2nd Extraordinary Session' union all
+            select 2011, '113', '1st Extraordinary Session'
+    expect:
+      rows:
+        - {section_id: e.1, bill: HB3, session_code: '974'}
+        - {section_id: e.2, bill: SB2, session_code: '033'}
+        - {section_id: e.2, bill: SB3, session_code: '034'}
+        - {section_id: e.3, bill: SB1, session_code: '974'}
+        - {section_id: e.4, bill: HB3, session_code: '893'}
+        - {section_id: e.5, bill: HB7, session_code: '033'}
+        - {section_id: e.6, bill: HB8, session_code: '113'}

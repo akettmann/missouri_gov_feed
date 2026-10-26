@@ -2,27 +2,42 @@
 -- note, split into one row per (section version, act, bill). A history note lists the acts that made the section:
 -- "(L. 1945 p. 1428 § 48, A.L. 2003 S.B. 299 & 40)" is enacted in 1945 (session-law page, no bill number) and
 -- amended in 2003 by SB 299 and SB 40 (combined); "merged with" joins bills that changed the same section in one
--- session; "1st Ex. Sess." names an extraordinary session (the Revisor also prints "2d", "3d", "4th", "1st.", "lst"
--- and "Ex. Sess" without its last period). change is enacted (L.), amended (A.L., or "A." in the
--- 1949 revision's notes) or repealed ("Repealed L."). Acts cited by page ("p. 1428") name no bill and are left out.
+-- session; "1st Ex. Sess." names an extraordinary session (the Revisor also prints "2d", "3d", "4th", "1st.", "lst",
+-- "First" ... "Fourth", and "Ex. Sess" without its last period). change is enacted (L.), amended (A.L., or "A." in
+-- the 1949 revision's notes) or repealed ("Repealed L."). Acts cited by page ("p. 1428") name no bill and are left out.
 -- session_code follows the House XML codes: two-digit year, then 1 for the regular session. The House numbers every
 -- special session (codes 2-4, in order), but the Revisor counts only extraordinary sessions that passed bills: 2018's
 -- legislature-called impeachment session (183, resolutions only) isn't one, so the Revisor's 2018 "1st Ex. Sess." is
 -- House 184. So the Nth extraordinary session is the House's session named "Nth Extraordinary Session"
--- (stg_mo_house__sessions); for years the House's list lacks, N + 2 is assumed.
+-- (stg_mo_house__sessions); for years the House's list lacks, N + 2 is assumed. "Extraordinary Session" with no
+-- number (1997's three "Repealed L." notes) is the year's only numbered session if the other notes name just one
+-- (1997: "2d"), else the 1st.
 -- A combined act ("H.B. 115 & 99": one substitute that carries several bills' subjects) names the bills after "&";
 -- only the first, the lead bill (is_lead_bill), is the one that passed. The others stay as rows, with combined_into
--- naming the lead, because the act did take their subjects, but they never reached the governor themselves.
+-- naming the lead, because the act did take their subjects, but they never reached the governor themselves. A bill
+-- after "&" may repeat its bill head ("H.B. 237 & H.B. 238 & H.B. 482", "H.B. 5 & S.B. 7"); a bare number takes the
+-- type of the bill before it ("H.B. 69 & 179 & H.B. 669"). "and" ("H.B. 1270 and H.B. 2032") joins bills that each
+-- passed on their own (the Revisor's "H.B. 1268 & 1211 and S.B. 966" is two acts, the first one combined), so a bill
+-- after "and" starts its own combined group and is a lead bill.
+-- The older notes also list several bills of one act after commas ("A.L. 1978 H.B. 971, S.B. 628"). A piece that is
+-- only a bill ("S.B. 628", "merged with S.B. 5") continues the act before it (same year, session and change), as
+-- long as only such pieces come between (or the act is just a year, "A.L. 1985, H.B. 366"); after a page cite
+-- ("p. 509") or an RSMo piece there is no act to continue.
 -- Parse bounds (macros/session_law_bounds.sql): a note is read up to 60 acts (longest real note: 43, RSMo 301.010), an
--- act up to 10 "merged with" bills (longest: 6) and 6 "&" bills (longest: 3). Parts past a bound would be dropped
+-- act up to 10 "merged with" bills (longest: 6) and 6 "&"/"and" bills (longest: 4). Parts past a bound would be dropped
 -- silently, and notes list acts oldest first, so the newest acts would go; assert_session_law_bounds_not_exceeded
 -- fails the build when real data needs more.
 {# act: "Repealed L. 2018 ...", "A.L. 2003 ...", "L. 1945 ...", "A. 1949 ..."; bill: "H.B.", "S.B", "S.J.R.", "SJR" #}
 {% set act_head = '^(Repealed )?(A\\.L\\.|L\\.|A\\.) ' %}
-{% set bill_head = '^[HS]\\.? ?[BJC]\\.? ?R?\\.?' %}
+{% set bill_item = '[HS]\\.? ?[BJC]\\.? ?R?\\.? ?' %}
+{% set bill_head = '^' ~ bill_item %}
+{# extraordinary session: "1st", "2nd", "2d", "3d", "4th", "1st.", the OCR "lst", or "First" ... "Fourth"; the ordinal
+   is optional ("Extraordinary Session", "Ex. Sess.") #}
+{% set ex_ord = '([1-9l](st|nd|rd|d|th)\\.?|First|Second|Third|Fourth)' %}
+{% set ex_sess = '((' ~ ex_ord ~ ' )?(Ex\\. ?Sess\\.?|Extraordinary Session))' %}
 {# Parse bounds (macros/session_law_bounds.sql): split_part_at drops parts past its maximum, so a guard test fails the
    build when real data needs more. Today: 60 acts per note (longest real note: 43), 10 "merged with" bills per act
-   (longest: 6), 6 "&" bills per act (longest: 3). #}
+   (longest: 6), 6 "&"/"and" bills per act (longest: 4). #}
 {% set bounds = mogov.session_law_bounds() %}
 {% set max_acts = bounds.max_acts %}
 {% set max_merged = bounds.max_merged %}
@@ -71,6 +86,62 @@ acts as (
     where s.n <= {{ dbt.length('o.note') }} - {{ dbt.length(dbt.replace('o.note', "','", "''")) }} + 1
 ),
 
+acts_flagged as (
+    select
+        *,
+        {{ mogov.regex_matches('act', act_head ~ '[0-9]{4}') }} as is_head,
+        {{ mogov.regex_matches('act', '^(merged with )?' ~ bill_item ~ '[0-9]') }} as is_continuation
+    from acts
+),
+
+-- the last piece before each continuation that isn't itself a continuation: the act it continues, if that is an act
+-- that names a bill ("A.L. 1978 H.B. 971, S.B. 628")
+last_break as (
+    select
+        c.section_id,
+        c.section_version_id,
+        c.act_index,
+        max(b.act_index) as break_index
+    from acts_flagged as c
+    inner join acts_flagged as b
+        on
+            c.section_version_id = b.section_version_id
+            and c.act_index > b.act_index
+            and not b.is_continuation
+    where c.is_continuation
+    group by c.section_id, c.section_version_id, c.act_index
+),
+
+acts_resolved as (
+    select
+        section_id,
+        section_version_id,
+        act_index,
+        act
+    from acts_flagged
+    where is_head
+
+    union all
+
+    select
+        c.section_id,
+        c.section_version_id,
+        c.act_index,
+        -- the head's "A.L. 1978" (and session), then the continuing piece
+        {{ mogov.regex_extract('h.act', '^((Repealed )?(A\\.L\\.|L\\.|A\\.) [0-9]{4}( ' ~ ex_sess ~ ')?)( |$)', 1) }}
+        || ' ' || {{ mogov.regex_replace_all('c.act', '^merged with ', '') }} as act
+    from acts_flagged as c
+    inner join last_break as l
+        on c.section_version_id = l.section_version_id and c.act_index = l.act_index
+    inner join acts_flagged as h
+        on l.section_version_id = h.section_version_id and l.break_index = h.act_index
+    where
+        c.is_continuation
+        and h.is_head
+        -- an act that names a bill, or a year alone ("A.L. 1985, H.B. 366": a stray comma after the year)
+        and {{ mogov.regex_matches('h.act', act_head ~ '[0-9]{4}( ' ~ ex_sess ~ ')?( ' ~ bill_item ~ '[0-9]|$)') }}
+),
+
 parsed_acts as (
     select
         section_id,
@@ -83,17 +154,56 @@ parsed_acts as (
             else 'enacted'
         end as change,
         {{ dbt.safe_cast(mogov.regex_extract('act', act_head ~ '([0-9]{4})', 3), dbt.type_int()) }} as act_year,
-        {#- "1st", "2nd", "2d", "3d", "4th", "1st." and the OCR "lst" -#}
-        {{ dbt.safe_cast(
-            dbt.replace(mogov.regex_extract('act', '([1-9l])(st|nd|rd|d|th)\\.? Ex\\. ?Sess\\.?', 1), "'l'", "'1'"),
-            dbt.type_int()
-        ) }} as extra_session,
+        {{ mogov.regex_extract('act', act_head ~ '[0-9]{4} ' ~ ex_ord ~ ' (Ex\\.|Extraordinary)', 3) }} as ex_ordinal,
+        {{ mogov.regex_matches('act', act_head ~ '[0-9]{4} ' ~ ex_sess ~ ' ') }} as is_extra,
         {#- what follows the year (and the session): the bill references #}
         {{ mogov.regex_replace_all(
-            mogov.regex_replace_all('act', act_head ~ '[0-9]{4} ', ''), '^[1-9l](st|nd|rd|d|th)\\.? Ex\\. ?Sess\\.? ', ''
+            mogov.regex_replace_all('act', act_head ~ '[0-9]{4} ', ''), '^' ~ ex_sess ~ ' ', ''
         ) }} as refs
-    from acts
-    where {{ mogov.regex_matches('act', act_head ~ '[0-9]{4}') }}
+    from acts_resolved
+),
+
+numbered as (
+    select
+        *,
+        case
+            when ex_ordinal = 'First' then 1
+            when ex_ordinal = 'Second' then 2
+            when ex_ordinal = 'Third' then 3
+            when ex_ordinal = 'Fourth' then 4
+            else {{ dbt.safe_cast(
+                dbt.replace(mogov.regex_extract('ex_ordinal', '^([1-9l])', 1), "'l'", "'1'"), dbt.type_int()
+            ) }}
+        end as ordinal_number
+    from parsed_acts
+),
+
+-- a year whose notes all name the same extraordinary session number: "Extraordinary Session" without one is that
+year_ordinals as (
+    select
+        act_year,
+        min(ordinal_number) as ordinal_number
+    from numbered
+    where ordinal_number is not null
+    group by act_year
+    having count(distinct ordinal_number) = 1
+),
+
+sessioned as (
+    select
+        n.section_id,
+        n.section_version_id,
+        n.act_index,
+        n.act,
+        n.change,
+        n.act_year,
+        case
+            when not n.is_extra then null
+            else coalesce(n.ordinal_number, y.ordinal_number, 1)
+        end as extra_session,
+        n.refs
+    from numbered as n
+    left join year_ordinals as y on n.act_year = y.act_year
 ),
 
 merged as (
@@ -107,7 +217,7 @@ merged as (
         a.extra_session,
         s.n as ref_index,
         trim({{ mogov.split_part_at('a.refs', "' merged with '", 's.n', max_merged) }}) as ref
-    from parsed_acts as a
+    from sessioned as a
     cross join spine as s
     where
         s.n <= {{ max_merged }}
@@ -117,15 +227,17 @@ merged as (
 typed as (
     select
         *,
-        -- "H.B.", "S.B", "S.J.R.", "SJR" -> HB, SB, SJR
-        {{ mogov.regex_replace_all(mogov.regex_extract('ref', '(' ~ bill_head ~ ') ?[0-9]', 1), '[^A-Z]', '') }}
-            as bill_type,
-        -- "299 & 40 § A Revision" -> "299 & 40"
-        {{ mogov.regex_extract('ref', bill_head ~ ' ?([0-9]+( & [0-9]+)*)', 1) }} as numbers
+        -- "299 & 40 § A Revision" -> "299 & 40"; "H.B. 1270 and H.B. 2032" -> "H.B. 1270 & @H.B. 2032" (@ starts a bill
+        -- that passed on its own, not combined into the one before)
+        {{ dbt.replace(
+            mogov.regex_extract('ref', '^(' ~ bill_item ~ '[0-9]+( (&|and) (' ~ bill_item ~ ')?[0-9]+)*)', 1),
+            "' and '",
+            "' & @'"
+        ) }} as numbers
     from merged
 ),
 
-bills as (
+items as (
     select
         t.section_id,
         t.section_version_id,
@@ -135,16 +247,73 @@ bills as (
         t.act_year,
         t.extra_session,
         t.ref_index,
-        t.bill_type,
-        trim({{ mogov.split_part_at('t.numbers', "' & '", 's.n', max_combined) }}) as bill_number,
-        trim({{ dbt.split_part('t.numbers', "' & '", 1) }}) as lead_number,
-        s.n = 1 as is_lead_bill
+        s.n as item_n,
+        trim({{ dbt.replace(mogov.split_part_at('t.numbers', "' & '", 's.n', max_combined), "'@'", "''") }}) as item,
+        {{ mogov.split_part_at('t.numbers', "' & '", 's.n', max_combined) }} like '@%' as starts_group
     from typed as t
     cross join spine as s
     where
-        t.bill_type is not null
+        t.numbers is not null
         and s.n <= {{ max_combined }}
         and {{ mogov.split_part_at('t.numbers', "' & '", 's.n', max_combined) }} <> ''
+),
+
+item_types as (
+    select
+        *,
+        -- "H.B.", "S.B", "S.J.R.", "SJR" -> HB, SB, SJR; a bare number ("& 179") has no head of its own
+        {{ mogov.regex_replace_all(mogov.regex_extract('item', '^(' ~ bill_item ~ ')[0-9]', 1), '[^A-Z]', '') }}
+            as own_type,
+        {{ mogov.regex_extract('item', '([0-9]+)$', 1) }} as number,
+        -- the item that starts this item's group of combined bills (item 1, or the one after an "and")
+        max(case when item_n = 1 or starts_group then item_n end) over (
+            partition by section_id, section_version_id, act_index, ref_index
+            order by item_n
+        ) as group_start,
+        -- the nearest item at or before this one that has a bill head
+        max(case when {{ mogov.regex_matches('item', bill_head ~ '[0-9]') }} then item_n end) over (
+            partition by section_id, section_version_id, act_index, ref_index
+            order by item_n
+        ) as head_item
+    from items
+),
+
+item_bills as (
+    select
+        i.*,
+        h.own_type as bill_type
+    from item_types as i
+    inner join item_types as h
+        on
+            i.section_id = h.section_id
+            and i.section_version_id = h.section_version_id
+            and i.act_index = h.act_index
+            and i.ref_index = h.ref_index
+            and i.head_item = h.item_n
+),
+
+bills as (
+    select
+        b.section_id,
+        b.section_version_id,
+        b.act_index,
+        b.act,
+        b.change,
+        b.act_year,
+        b.extra_session,
+        b.ref_index,
+        b.bill_type,
+        b.number as bill_number,
+        b.item_n = b.group_start as is_lead_bill,
+        l.bill_type || l.number as lead_bill
+    from item_bills as b
+    inner join item_bills as l
+        on
+            b.section_id = l.section_id
+            and b.section_version_id = l.section_version_id
+            and b.act_index = l.act_index
+            and b.ref_index = l.ref_index
+            and b.group_start = l.item_n
 ),
 
 -- "1st Extraordinary Session" -> 1; the House's "Special Session" (2018's resolutions-only one) isn't counted
@@ -175,7 +344,7 @@ select distinct
     end as session_code,
     b.bill_type || b.bill_number as bill,
     b.is_lead_bill,
-    case when b.is_lead_bill then null else b.bill_type || b.lead_number end as combined_into,
+    case when b.is_lead_bill then null else b.lead_bill end as combined_into,
     b.act
 from bills as b
 left join extra_sessions as x on b.act_year = x.session_year and b.extra_session = x.ordinal
