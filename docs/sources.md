@@ -673,7 +673,8 @@ pairs the legislators with officials.
   include" its disclaimer: "The data made available here has been modified for use from its original source,
   which is the State of Missouri. THE STATE OF MISSOURI MAKES NO REPRESENTATIONS OR WARRANTY AS TO THE
   COMPLETENESS, ACCURACY, TIMELINESS, OR CONTENT OF ANY DATA MADE AVAILABLE THROUGH THIS SITE..." (full text on
-  that page). The site that shows this data, and the State Employee Pay data above, must carry that notice.
+  that page). The site that shows this data, and the State Employee Pay data above, must carry that notice;
+  the frontend footer (`Layout.astro`) carries it on every page.
 
 Quirks:
 - A row is one payee's annual total for one agency and detail line, not one payment. FY2023 `LEGISLATURE` has
