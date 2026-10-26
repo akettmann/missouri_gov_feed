@@ -42,3 +42,32 @@ test("unique sites do not get a registry id; missing parts are skipped", () => {
     "for B, Joplin",
   ]);
 });
+
+test("names differing only by internal spacing or case count as duplicates", () => {
+  const out = siteLinkContexts([
+    site("ACME", "1  Main", "Joplin", "11"),
+    site("acme", "1 Main", "Joplin", "22"),
+  ]);
+  assert.equal(new Set(out).size, 2);
+  assert.match(out[0], /registry ID 11$/);
+  assert.match(out[1], /registry ID 22$/);
+  assert.ok(out.every((n) => !/\s{2}/.test(n)));
+});
+
+test("stray commas and whitespace are trimmed from each part", () => {
+  assert.deepEqual(siteLinkContexts([site("BUTTERBALL,", " 28802 HWY 43 ", "BRONAUGH", "1")]), [
+    "for BUTTERBALL, 28802 HWY 43, BRONAUGH",
+  ]);
+});
+
+test("duplicates without a usable registry id fall back to record N of M", () => {
+  const out = siteLinkContexts([
+    { facility_name: "ACME", city: "Joplin", frs_url: null },
+    { facility_name: "ACME", city: "Joplin", frs_url: null },
+    site("ACME", null, "Joplin", "9"),
+    site("ACME", null, "Joplin", "9"),
+  ]);
+  assert.equal(new Set(out).size, 4);
+  assert.match(out[0], /record 1 of 4$/);
+  assert.match(out[1], /record 2 of 4$/);
+});
