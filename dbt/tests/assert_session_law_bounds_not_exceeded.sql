@@ -2,7 +2,7 @@
 -- (macros/session_law_bounds.sql). split_part_at silently drops parts past its maximum, and notes list acts oldest
 -- first, so an exceeded bound would lose the newest acts (a 43-act note once lost 3 of them under a bound of 40).
 -- Raise the bound (cheap) when this fails. Counts are upper bounds: commas + 1 acts per note, "merged with" and "&"
--- separators + 1 per act.
+-- separators (" & " and " and ") + 1 per act.
 {% set bounds = mogov.session_law_bounds() %}
 with notes as (
     select
@@ -57,11 +57,17 @@ where
 union all
 
 select
-    'bills joined by & in one act' as what,
+    'bills joined by & or and in one act' as what,
     section_version_id,
     ({{ dbt.length('act') }} - {{ dbt.length(dbt.replace('act', "' & '", "''")) }})
-    / {{ dbt.length("' & '") }} + 1 as n
+    / {{ dbt.length("' & '") }}
+    + ({{ dbt.length('act') }} - {{ dbt.length(dbt.replace('act', "' and '", "''")) }})
+    / {{ dbt.length("' and '") }}
+    + 1 as n
 from acts
 where
     ({{ dbt.length('act') }} - {{ dbt.length(dbt.replace('act', "' & '", "''")) }})
-    / {{ dbt.length("' & '") }} + 1 > {{ bounds.max_combined }}
+    / {{ dbt.length("' & '") }}
+    + ({{ dbt.length('act') }} - {{ dbt.length(dbt.replace('act', "' and '", "''")) }})
+    / {{ dbt.length("' and '") }}
+    + 1 > {{ bounds.max_combined }}
