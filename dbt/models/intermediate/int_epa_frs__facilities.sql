@@ -13,11 +13,10 @@
 -- naics_source is null when the facility has no usable code. A real NAICS code, even a non-primary one, is
 -- more precise than a two-digit SIC-derived sector, and agrees with it on the sector for about 90% of facilities.
 -- Codes tied on tier and program-system count go to the one in the SIC-derived sector (NAICS 31-33 count as one
--- sector), then a non-construction code before a construction one (NAICS 23, SIC 15-17; in practice SIC 1629 and
--- NAICS 238910, the construction stormwater permit that a site holds beside its real industry, #432), then the
--- lowest code. The SIC sector counts only as a signal when the SIC code is not itself tied
--- (same tier and program-system count) with a SIC code in a different sector, and is not SIC 1629 (construction
--- stormwater-permit noise).
+-- sector), then any other code before the construction stormwater-permit noise codes (NAICS 238910, SIC 1629;
+-- a site holds that permit beside its real industry, #432), then the lowest code. The SIC sector counts only as
+-- a signal when the SIC code is not itself tied (same tier and program-system count) with a SIC code in a
+-- different sector, and is not SIC 1629 (construction stormwater-permit noise).
 -- is_government: a federal site, any owner-role organization typed as a government body
 -- (municipal, county, state, federal, district, tribal), or a facility or owner named like one ("City of ...",
 -- "... County", "... School District"; most organizations are typed UNKNOWN). The *_key columns are
@@ -148,9 +147,9 @@ primary_sic as (
             order by
                 rank_class asc,
                 n_program_systems desc,
-                -- construction (SIC 15-17: mostly 1629, the construction stormwater permit) loses ties to a
-                -- real industry (#432), then the lowest code
-                case when left(sic_code, 2) in ('15', '16', '17') then 1 else 0 end asc,
+                -- SIC 1629 (the construction stormwater permit) loses ties to a real industry (#432), then the
+                -- lowest code; other construction codes (1521, 1794, ...) are real industries and keep their place
+                case when sic_code = '1629' then 1 else 0 end asc,
                 sic_code asc
         ) as rn
     from sic_sectors
@@ -189,9 +188,9 @@ best_naics as (
                         then 0
                     else 1
                 end asc,
-                -- then construction (NAICS 23: mostly 238910 site preparation, the construction stormwater
-                -- permit) loses ties to a real industry (#432)
-                case when left(n.naics_code, 2) = '23' then 1 else 0 end asc,
+                -- then NAICS 238910 (site preparation, the construction stormwater permit) loses ties to a
+                -- real industry (#432); other construction codes are real industries
+                case when n.naics_code = '238910' then 1 else 0 end asc,
                 n.naics_code asc
         ) as rn
     from naics as n

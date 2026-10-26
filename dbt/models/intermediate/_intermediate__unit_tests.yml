@@ -441,12 +441,15 @@ unit_tests:
   - name: epa_frs_facility_industry_construction_loses_ties
     model: int_epa_frs__facilities
     description: >
-      A construction code (NAICS 23, SIC 15-17: the construction stormwater permit a site holds beside its real
-      industry) loses a tie on tier and program-system count to any other code, even though its code is lower (#432).
+      The construction stormwater-permit noise codes (NAICS 238910, SIC 1629: a permit a site holds beside its real
+      industry) lose a tie on tier and program-system count to any other code, even though the code is lower (#432).
+      Other construction codes are real industries and are not demoted (c6, c7).
       c1: NAICS 238910 and 311111 are each given by one system, so 311111 wins, not the lower 238910; c2: 238910 given
       by two systems still beats 311111 given by one (count comes first); c3: SIC 1629 and 4952 tie with no NAICS
       code, so the sector of 4952 (22 utilities) wins, not the 23 of the lower 1629; c4: a facility whose only code is
-      238910 keeps it; c5: SIC 1629 given by two systems still beats 4952 given by one.
+      238910 keeps it; c5: SIC 1629 given by two systems still beats 4952 given by one;
+      c6: NAICS 237310 (highway construction) ties 311111 and wins on the lowest code; c7: SIC 1623 ties 4952 and
+      its sector 23 wins on the lowest code.
     given:
       - input: ref('stg_epa_frs__facilities')
         rows:
@@ -455,6 +458,8 @@ unit_tests:
           - {registry_id: c3, facility_name: Construction loses SIC tie, latitude: 38.5, longitude: -92.1}
           - {registry_id: c4, facility_name: Only construction, latitude: 38.5, longitude: -92.1}
           - {registry_id: c5, facility_name: Construction wins SIC on count, latitude: 38.5, longitude: -92.1}
+          - {registry_id: c6, facility_name: Real construction NAICS keeps tie, latitude: 38.5, longitude: -92.1}
+          - {registry_id: c7, facility_name: Real construction SIC keeps tie, latitude: 38.5, longitude: -92.1}
       - input: ref('stg_epa_frs__organizations')
         rows: []
       - input: ref('stg_epa_frs__naics')
@@ -465,6 +470,8 @@ unit_tests:
           - {registry_id: c2, program_system: MO-DNR, naics_code: '238910', naics_description: Site preparation, is_primary: true, is_secondary: false}
           - {registry_id: c2, program_system: RCRAINFO, naics_code: '311111', naics_description: Dog food, is_primary: true, is_secondary: false}
           - {registry_id: c4, program_system: NPDES, naics_code: '238910', naics_description: Site preparation, is_primary: true, is_secondary: false}
+          - {registry_id: c6, program_system: NPDES, naics_code: '237310', naics_description: Highway construction, is_primary: true, is_secondary: false}
+          - {registry_id: c6, program_system: RCRAINFO, naics_code: '311111', naics_description: Dog food, is_primary: true, is_secondary: false}
       - input: ref('stg_epa_frs__sic')
         rows:
           - {registry_id: c3, program_system: NPDES, sic_code: '1629', sic_description: HEAVY CONSTRUCTION NEC, is_primary: true, is_secondary: false}
@@ -472,6 +479,8 @@ unit_tests:
           - {registry_id: c5, program_system: NPDES, sic_code: '1629', sic_description: HEAVY CONSTRUCTION NEC, is_primary: true, is_secondary: false}
           - {registry_id: c5, program_system: MO-DNR, sic_code: '1629', sic_description: HEAVY CONSTRUCTION NEC, is_primary: true, is_secondary: false}
           - {registry_id: c5, program_system: NPDES, sic_code: '4952', sic_description: SEWERAGE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: c7, program_system: NPDES, sic_code: '1623', sic_description: WATER SEWER PIPELINE, is_primary: true, is_secondary: false}
+          - {registry_id: c7, program_system: RCRAINFO, sic_code: '4952', sic_description: SEWERAGE SYSTEMS, is_primary: true, is_secondary: false}
       - input: ref('sic_naics_sectors')
         rows:
           - {sic_prefix: '16', naics_prefix: '23'}
@@ -487,6 +496,8 @@ unit_tests:
         - {registry_id: c3, naics_code: '22', naics_source: sic}
         - {registry_id: c4, naics_code: '238910', naics_source: naics}
         - {registry_id: c5, naics_code: '23', naics_source: sic}
+        - {registry_id: c6, naics_code: '237310', naics_source: naics}
+        - {registry_id: c7, naics_code: '23', naics_source: sic}
 
   - name: epa_frs_facility_naics_tie_sic_sector_merges_31_33
     model: int_epa_frs__facilities
@@ -591,8 +602,8 @@ unit_tests:
     model: int_epa_frs__facilities
     description: >
       SIC 1629 is mostly construction stormwater-permit noise, so it gives no signal. c1: SIC 1629 (sector 23)
-      with tied 111998 and 238910 goes to the lowest, 111998; c2: the same facility with SIC 1623 (23) still
-      pulls 238910.
+      with tied 111998 and 236220 (a real construction code, not demoted) goes to the lowest, 111998, not
+      the code in the SIC sector; c2: the same facility with SIC 1623 (23) still pulls 236220.
     given:
       - input: ref('stg_epa_frs__facilities')
         rows:
@@ -603,9 +614,9 @@ unit_tests:
       - input: ref('stg_epa_frs__naics')
         rows:
           - {registry_id: c1, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
-          - {registry_id: c1, naics_code: '238910', naics_description: Site preparation, is_primary: true, is_secondary: false}
+          - {registry_id: c1, naics_code: '236220', naics_description: Commercial building construction, is_primary: true, is_secondary: false}
           - {registry_id: c2, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
-          - {registry_id: c2, naics_code: '238910', naics_description: Site preparation, is_primary: true, is_secondary: false}
+          - {registry_id: c2, naics_code: '236220', naics_description: Commercial building construction, is_primary: true, is_secondary: false}
       - input: ref('stg_epa_frs__sic')
         rows:
           - {registry_id: c1, sic_code: '1629', sic_description: HEAVY CONSTRUCTION NEC, is_primary: true, is_secondary: false}
@@ -625,7 +636,7 @@ unit_tests:
     expect:
       rows:
         - {registry_id: c1, naics_code: '111998', naics_source: naics}
-        - {registry_id: c2, naics_code: '238910', naics_source: naics}
+        - {registry_id: c2, naics_code: '236220', naics_source: naics}
 
   - name: epa_frs_facility_owner_tie_is_deterministic
     model: int_epa_frs__facilities

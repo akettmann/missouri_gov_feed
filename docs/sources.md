@@ -967,8 +967,10 @@ offices, shops and most service businesses are missing.
   across sectors) to NAICS sector. That gives a sector, not a NAICS code: `int_epa_frs__facilities.naics_code`
   then holds the two-digit sector prefix and `naics_source` is `sic` (23%). Together they cover 56% of the
   geocoded sites; the rest have neither code. Where a site has both, the non-primary NAICS code and the SIC
-  sector agree on the sector for about 90% of sites; among codes tied on tier and program count, the one in the SIC sector (NAICS 31-33 count as one sector) wins.
-  The SIC sector is ignored for that tie-break when the site's SIC code is itself tied on tier and program count
+  sector agree on the sector for about 90% of sites. Among codes tied on tier and program systems, the tie-break
+  runs in order: the code in the SIC sector (NAICS 31-33 count as one sector) wins; then NAICS 238910 and SIC 1629
+  (construction stormwater permits) lose to any other code; then the lowest code.
+  The SIC sector is ignored for that tie-break when the site's SIC code is itself tied on tier and program systems
   with a SIC code in another sector (the lowest code was picked arbitrarily), and for SIC 1629. This changes the
   NAICS code of 56 facilities against the lowest-code rule.
   About 10,400 of the SIC-filled facilities are SIC 1629 (heavy construction), likely construction stormwater

@@ -706,8 +706,8 @@ models:
     description: >
       EPA-regulated business sites (fct_jurisdiction_businesses) in each district-elected official's area,
       counted by NAICS sector (naics_sectors seed, matched on the first two digits of the site's naics_code), with
-      how many are tied to a donor. The code is the NAICS code the most EPA program systems give (a construction code loses ties) or, for a site
-      with no NAICS code, the sector its SIC code maps to (int_epa_frs__facilities). The donor sites themselves
+      how many are tied to a donor. The code is the NAICS code the most EPA program systems give (the stormwater
+      permit code 238910 loses ties) or, for a site with no NAICS code, the sector its SIC code maps to (int_epa_frs__facilities). The donor sites themselves
       are listed in fct_jurisdiction_businesses (is_donor). EPA FRS covers regulated sites only (factories, fuel
       stations, shops with permits), and about 45% of (official, site) rows have neither a NAICS nor a SIC code;
       those are counted under sector_name "No industry code" with a null sector_code. Grain: one row per
