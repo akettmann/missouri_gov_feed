@@ -44,12 +44,16 @@ unit_tests:
             select 'rc2', '171', 'HCS HB 2003' union all
             select 'rc3', '171', 'HCS HB 2009' union all
             select 'rc4', '171', 'HB 2'
+      - input: ref('stg_mo_house__bill_actions')
+        format: sql
+        rows: |
+            select '184' as session_code, 'HB2' as bill, cast('2018-09-14' as date) as action_date
       - input: ref('int_mo_senate__votes')
         format: sql
         rows: |
-            select 'sv1' as vote_id, 'HB 2' as measure, cast('2018-05-10' as date) as vote_date union all
-            select 'sv2', 'HB 3', cast('2018-05-10' as date) union all
-            select 'sv3', 'SB 5', cast('2018-05-10' as date)
+            select 'sv1' as vote_id, 'HB 2' as measure, cast('2018-05-10' as date) as vote_date, 'https://www.senate.mo.gov/18info/Journals/RDay01.pdf' as source_url union all
+            select 'sv2', 'HB 3', cast('2018-05-10' as date), 'https://www.senate.mo.gov/18info/Journals/RDay01.pdf' union all
+            select 'sv3', 'SB 5', cast('2018-05-10' as date), 'https://www.senate.mo.gov/18info/Journals/RDay01.pdf'
     expect:
       format: sql
       rows: |
@@ -57,6 +61,96 @@ unit_tests:
           select 'state_house', 'rc4', '171', 'HB2', cast(null as varchar), 'measure text' union all
           select 'state_senate', 'sv2', '181', 'HB3', cast(null as varchar), 'measure text' union all
           select 'state_senate', 'sv3', '181', 'SB5', cast(null as varchar), 'measure text'
+
+  - name: vote_bills_senate_special_session_journals
+    model: fct_vote_bills
+    description: >
+      Senate journal votes from regular (R) and veto (V) journals link to the year's regular session (181); votes
+      from extraordinary-session journals (S1/S2/T1/T2) link to the year's 3 or 4 session where the bill has an
+      action on the vote date, whatever the prefix. 2018 T1 "HB 2" links to 184 (not the regular session's
+      same-numbered 181 HB2); the veto-session "HB 3" still links to 181. A special-session Senate bill with only
+      House-side actions (253 SB1, first acted on June 9 and absent from the bill list, as in the XML) links when the vote (June 5) precedes that action;
+      SB2 has no special-session bill and links to nothing, as does "HB 9" (acted on a different date) and
+      the 2019 "HB 1", which is in both 193 and 194 on the vote date and so ambiguous. The Senate-bill fallback
+      only applies in the special session the vote belongs to (the one whose action-date span holds the vote date):
+      the 2020-08-07 "SB 1" links to 203 SB1 although 204 also has an SB1 first acted on later, and the
+      2020-08-07 "SB 2", which has no 203 bill and only a later 204 SB2, links to nothing. A vote inside the
+      overlap of two special sessions' action spans (2017: 173 runs 05-22..06-19, 174 06-12..06-30) belongs to
+      neither, so the 06-15 "SB 5", first acted on in 174 on 06-25, links to nothing; a Senate-bill vote dated
+      after the bill's first House action, on a day with no action (2021-07-10 "SB 7", first acted on 07-01),
+      also links to nothing.
+    given:
+      - input: ref('int_bills__status')
+        format: sql
+        rows: |
+            select '181' as session_code, 'HB2' as bill, 'signed' as status
+      - input: ref('stg_mo_house__bills')
+        format: sql
+        rows: |
+            select '181' as session_code, 'HB2' as bill union all
+            select '181', 'HB3' union all
+            select '184', 'HB2' union all
+            select '184', 'HB9' union all
+            select '191', 'HB1' union all
+            select '193', 'HB1' union all
+            select '194', 'HB1' union all
+            select '251', 'SB1' union all
+            select '251', 'SB2'
+      - input: ref('stg_mo_senate__bill_topics')
+        format: sql
+        rows: |
+            select '251' as session_code, 'SB2' as bill
+      - input: ref('stg_mo_house__bill_rollcalls')
+        format: sql
+        rows: |
+            select '181' as session_code, 'HB2' as bill, 'Perfected' as bill_version, cast(null as varchar) as rollcall_url where false
+      - input: ref('stg_mo_house__rollcalls')
+        format: sql
+        rows: |
+            select 'rc1' as rollcall_url, '181' as session_code, 'HB 2' as measure where false
+      - input: ref('stg_mo_house__bill_actions')
+        format: sql
+        rows: |
+            select '184' as session_code, 'HB2' as bill, cast('2018-09-14' as date) as action_date union all
+            select '184', 'HB9', cast('2018-09-20' as date) union all
+            select '193', 'HB1', cast('2019-09-13' as date) union all
+            select '194', 'HB1', cast('2019-09-13' as date) union all
+            select '253', 'SB1', cast('2025-06-09' as date) union all
+            select '253', 'SB1', cast('2025-06-16' as date) union all
+            select '203', 'HB1', cast('2020-07-27' as date) union all
+            select '203', 'SB1', cast('2020-08-10' as date) union all
+            select '204', 'HB1', cast('2020-11-05' as date) union all
+            select '204', 'SB1', cast('2020-11-20' as date) union all
+            select '204', 'SB2', cast('2020-11-20' as date) union all
+            select '173', 'HB1', cast('2017-05-22' as date) union all
+            select '173', 'HB1', cast('2017-06-19' as date) union all
+            select '174', 'HB1', cast('2017-06-12' as date) union all
+            select '174', 'SB5', cast('2017-06-25' as date) union all
+            select '174', 'HB1', cast('2017-06-30' as date) union all
+            select '213', 'SB7', cast('2021-07-01' as date) union all
+            select '213', 'SB7', cast('2021-07-20' as date)
+      - input: ref('int_mo_senate__votes')
+        format: sql
+        rows: |
+            select 'regular' as vote_id, 'HB 3' as measure, cast('2018-05-10' as date) as vote_date, 'https://www.senate.mo.gov/18info/Journals/RDay01.pdf' as source_url union all
+            select 'veto', 'HB 3', cast('2018-09-12' as date), 'https://www.senate.mo.gov/18info/Journals/VDay01.pdf' union all
+            select 'special', 'HB 2', cast('2018-09-14' as date), 'https://www.senate.mo.gov/18info/Journals/T1Day05.pdf' union all
+            select 'special_wrong_day', 'HB 9', cast('2018-09-14' as date), 'https://www.senate.mo.gov/18info/Journals/T1Day05.pdf' union all
+            select 'ambiguous', 'HB 1', cast('2019-09-13' as date), 'https://www.senate.mo.gov/19info/Journals/T1Day05.pdf' union all
+            select 'senate_bill', 'SB 1', cast('2025-06-05' as date), 'https://www.senate.mo.gov/25info/Journals/T1Day04.pdf' union all
+            select 'senate_bill_unfiled', 'SB 2', cast('2025-06-05' as date), 'https://www.senate.mo.gov/25info/Journals/T1Day04.pdf' union all
+            select 'two_sessions_same_bill', 'SB 1', cast('2020-08-07' as date), 'https://www.senate.mo.gov/20info/Journals/T1Day02.pdf' union all
+            select 'never_reached_house', 'SB 2', cast('2020-08-07' as date), 'https://www.senate.mo.gov/20info/Journals/T1Day02.pdf' union all
+            select 'overlapping_spans', 'SB 5', cast('2017-06-15' as date), 'https://www.senate.mo.gov/17info/Journals/T1Day03.pdf' union all
+            select 'after_first_action', 'SB 7', cast('2021-07-10' as date), 'https://www.senate.mo.gov/21info/Journals/T1Day03.pdf'
+    expect:
+      format: sql
+      rows: |
+          select 'state_senate' as chamber, 'regular' as vote_id, '181' as session_code, 'HB3' as bill, cast(null as varchar) as bill_version, 'measure text' as matched_by union all
+          select 'state_senate', 'veto', '181', 'HB3', cast(null as varchar), 'measure text' union all
+          select 'state_senate', 'special', '184', 'HB2', cast(null as varchar), 'measure text' union all
+          select 'state_senate', 'senate_bill', '253', 'SB1', cast(null as varchar), 'measure text' union all
+          select 'state_senate', 'two_sessions_same_bill', '203', 'SB1', cast(null as varchar), 'measure text'
 
   - name: bill_sponsors_skip_relisted_bills
     model: fct_bill_sponsors
