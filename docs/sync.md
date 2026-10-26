@@ -105,6 +105,8 @@ Separately, the build fails if the pay-per-vote year rows (`rpt_attendance_pay`)
 
 The frontend words award periods from `rpt_awards.period_kind` (`year`, `fec_cycle`, `lifetime`); the build fails when the export has no such column or when a `fec_cycle` list has an odd period (a stale export); re-run `uv run mogov build` and `uv run mogov export`. `MOGOV_SKIP_AWARD_CYCLES_CHECK=1` (exactly `1`) skips the odd-period guard and also lets a stale export without `period_kind` build, inferring the kind from award and office (federal `least_committee_money_share` is a cycle) with a warning (re-export to stop inferring).
 
+Every frontend export read also checks the columns declared in `frontend/src/lib/exports/requiredColumns.ts`; an export that lacks one fails the build with `stale export: <table> lacks <columns>` and the re-export commands (`uv run mogov build`, then `uv run mogov export --format parquet`). Add a table's new column to that file when the site starts selecting it.
+
 ## Checking a sync
 
 - `uv run mogov freshness` reports how long ago each always-on loader last landed its tables. It warns
