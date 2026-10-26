@@ -9,8 +9,10 @@ const site = {
   matched_by: "same name",
   frs_url: null,
 };
-const donor = (donor_names, match_confidence, nSites) => ({
-  donor_names,
+const SEP = "\u001f";
+// `names` is written SEP-joined for brevity; the export carries an array
+const donor = (names, match_confidence, nSites) => ({
+  donors: names.split(SEP),
   donated_amount: 100,
   n_contributions: 1,
   first_year: 2020,
@@ -29,7 +31,7 @@ const counts = (groups, hide = false) => businessCounts({ donors: groups, indust
 // matches two donors yields a combined group alongside each donor's own group.
 const biz = {
   donors: [
-    donor("AMEREN CORPORATION; AT&T INC.", "high", 1),
+    donor("AMEREN CORPORATION" + SEP + "AT&T INC.", "high", 1),
     donor("AMEREN CORPORATION", "high", 2),
     donor("AT&T INC.", "high", 1),
     donor("ACME CO", "medium", 1),
@@ -56,11 +58,11 @@ test("businessCounts drops possible-match donors when hidden but keeps the site 
 });
 
 test("one donor's brand variants in a single group count once", () => {
-  assert.equal(counts([donor("SPIRE PAC; SPIRE POLITICAL ACTION COMMITTEE", "high", 1)]).donors, 1);
+  assert.equal(counts([donor("SPIRE PAC" + SEP + "SPIRE POLITICAL ACTION COMMITTEE", "high", 1)]).donors, 1);
   assert.equal(
     counts([
-      donor("AMEREN MO PAC; AMEREN MISSOURI PAC", "high", 3),
-      donor("SPIRE PAC; SPIRE POLITICAL ACTION COMMITTEE", "high", 1),
+      donor("AMEREN MO PAC" + SEP + "AMEREN MISSOURI PAC", "high", 3),
+      donor("SPIRE PAC" + SEP + "SPIRE POLITICAL ACTION COMMITTEE", "high", 1),
     ]).donors,
     2,
   );
@@ -68,7 +70,7 @@ test("one donor's brand variants in a single group count once", () => {
 
 test("a combined group beside its separate groups is not a third donor", () => {
   const groups = [
-    donor("AMEREN CORPORATION; AT&T INC.", "high", 1),
+    donor("AMEREN CORPORATION" + SEP + "AT&T INC.", "high", 1),
     donor("AMEREN CORPORATION", "high", 1),
     donor("AT&T INC.", "high", 1),
   ];
@@ -76,19 +78,26 @@ test("a combined group beside its separate groups is not a third donor", () => {
 });
 
 test("a name covered only by a non-minimal group still counts", () => {
-  assert.equal(counts([donor("ACME CO; BETA LLC", "high", 1), donor("ACME CO", "high", 1)]).donors, 2);
+  assert.equal(
+    counts([donor("ACME CO" + SEP + "BETA LLC", "high", 1), donor("ACME CO", "high", 1)]).donors,
+    2,
+  );
 });
 
 test("identical name sets and whitespace differences collapse to one group", () => {
   assert.equal(
-    counts([donor("A CO; B CO", "high", 1), donor("B CO;  A  CO", "high", 1), donor("", "high", 1)]).donors,
+    counts([
+      donor("A CO" + SEP + "B CO", "high", 1),
+      donor("B CO" + SEP + " A  CO", "high", 1),
+      donor("", "high", 1),
+    ]).donors,
     1,
   );
 });
 
 test("the toggle removes the only group naming a donor", () => {
   const groups = [
-    donor("ACME CO; BETA LLC", "medium", 1),
+    donor("ACME CO" + SEP + "BETA LLC", "medium", 1),
     donor("ACME CO", "high", 1),
     donor("BETA LLC", "medium", 1),
   ];
@@ -113,4 +122,12 @@ test("donors cell says none (possible matches hidden) when every donor is a poss
 test("businessCounts is null when not applicable or missing", () => {
   assert.equal(businessCounts(null, false), null);
   assert.equal(businessCounts({ donors: [], industries: [] }, false), null);
+});
+
+test("countDonors does not split a donor name that holds a ';' (#350)", () => {
+  assert.equal(counts([donor("Missouri and Kansas Laborers; PAC", "high", 1)]).donors, 1);
+  assert.equal(
+    counts([donor("Laborers; PAC" + SEP + "Laborers", "high", 1), donor("Laborers", "high", 1)]).donors,
+    2,
+  );
 });
