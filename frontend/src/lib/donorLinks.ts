@@ -68,7 +68,10 @@ export interface DonorEntry {
  * One entry per donor, in donor_names order (names are joined by "; "), each with its filing-page urls from
  * donor_links. A donor named in donor_names with no link line has an empty list, so the page can say "no link"
  * instead of showing the name bare (#268). A link whose donor is not in donor_names is kept, after the others.
- * Donors whose pages are exactly the same collapse into one entry whose `donor` joins their names with "; ".
+ * Donors whose gifts are filed on the same pages collapse into one entry whose `donor` joins their names with
+ * "; ": exactly equal page sets, or a donor whose pages are all among another donor's (never partial overlap).
+ * Sharing a page is not proof of one organisation: an MEC page is the official's own committee, so it is shared
+ * by every donor to that official. The merge only avoids repeating a link; the page still names no more than it did.
  * donor_names itself never holds a "; " inside a name: fct_jurisdiction_businesses turns each ";" into a comma (#276).
  */
 export function donorEntries(
@@ -82,23 +85,52 @@ export function donorEntries(
     if (name && !order.includes(name)) order.push(name);
   }
   for (const l of links) if (!order.includes(l.donor)) order.push(l.donor);
-  const entries: DonorEntry[] = [];
-  const byPages = new Map<string, DonorEntry>();
-  for (const donor of order) {
+  // Group donors whose pages are exactly the same: name variants of one committee (one per spelling it filed
+  // under) link the same pages, so show those pages once under all the names (#276). A donor with no page is
+  // never merged, so "no link" stays attached to its own name.
+  interface Group {
+    names: { name: string; at: number }[];
+    urls: string[];
+  }
+  const groups: Group[] = [];
+  const byPages = new Map<string, Group>();
+  order.forEach((donor, at) => {
     const urls = [...new Set(links.filter((l) => l.donor === donor).map((l) => l.url))];
-    // Name variants of one committee (one per spelling it filed under) all link the same pages: show those
-    // pages once, under all the names, instead of the same link once per variant (#276). A donor with no
-    // page is never merged, so "no link" stays attached to its own name.
     const key = urls.slice().sort().join(" ");
     const same = urls.length ? byPages.get(key) : undefined;
     if (same) {
-      same.donor += `; ${donor}`;
-      continue;
+      same.names.push({ name: donor, at });
+      return;
     }
-    const entry = { donor, urls };
-    entries.push(entry);
-    if (urls.length) byPages.set(key, entry);
+    const group = { names: [{ name: donor, at }], urls };
+    groups.push(group);
+    if (urls.length) byPages.set(key, group);
+  });
+  // Then fold a group whose pages are a strict subset of another group's into it, so no filing page is
+  // repeated on a row (#342). Subset only, never partial overlap: two donors that each have a page the other
+  // lacks stay apart, and so do chains (A shares a page with B, B shares another with C: A and C are not
+  // joined). A group folds only when exactly one maximal group contains it; if two incomparable groups both
+  // do, which donor it belongs to is a guess, so it stays alone.
+  const contains = (big: Group, small: Group) =>
+    big.urls.length > small.urls.length && small.urls.every((u) => big.urls.includes(u));
+  const maximal = groups.filter((g) => g.urls.length && !groups.some((o) => contains(o, g)));
+  const folded = new Set<Group>();
+  for (const g of groups) {
+    if (!g.urls.length || maximal.includes(g)) continue;
+    const homes = maximal.filter((m) => contains(m, g));
+    if (homes.length !== 1) continue;
+    homes[0].names.push(...g.names);
+    folded.add(g);
   }
+  const entries: DonorEntry[] = groups
+    .filter((g) => !folded.has(g))
+    .map((g) => ({
+      donor: g.names
+        .sort((x, y) => x.at - y.at)
+        .map((n) => n.name)
+        .join("; "),
+      urls: g.urls,
+    }));
   return entries;
 }
 
