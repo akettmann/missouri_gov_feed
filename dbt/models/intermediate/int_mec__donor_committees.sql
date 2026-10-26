@@ -20,8 +20,9 @@
 -- are "not active that year" (usually an older or newer committee under the same name), the rest "no match"
 -- (mostly federal and out-of-state PACs, which don't file with MEC). One-character names ("C", "~") are
 -- placeholders (#31): "placeholder name", never matched.
--- match_confidence: high for curated aliases and tiers 0-1 (the alias was matched to the committee's own
--- filings, or the name is the committee's own), medium for the looser tiers; either way it rests on the name.
+-- match_confidence: high for curated aliases and tiers 0-1 (each alias group was checked against the
+-- committee's filings or its own filed name; some spellings rest on their group), medium for the looser
+-- tiers; either way it rests on the name.
 with donations as (
     select
         contributor_committee_name as donor_committee_name,
