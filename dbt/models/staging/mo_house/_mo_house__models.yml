@@ -10,9 +10,12 @@ models:
     repeats some actions word for word under one Guid (about 1,000 of 138,000, mostly 2017-2018); they are kept
     once.'
 - name: stg_mo_house__bill_amendments
-  description: Amendments offered to a bill, for House bills and for the Senate bills the House acted on (SenateActList).
-    One row per amendment. amendment_url is the amendment's PDF (the XML's AmendmentText, which holds a link, not
-    text); map_url is the amendment's change map PDF, present on very few.
+  description: 'Amendments offered to a bill, for House bills and for the Senate bills the House acted on (SenateActList).
+    One row per amendment listing in the XML, not per amendment: the XML lists 112 amendments twice (adjacent amendment_index,
+    same amendment_url, lr_number, description and status; only sponsor differs), so the real key is (session_code,
+    bill, amendment_url). amendment_url is the amendment''s PDF (the XML''s AmendmentText, which holds a link, not
+    text); map_url is the amendment''s change map PDF, present on very few. The raw sort_value is not staged: it
+    only restates lr_number (see docs/sources.md).'
   data_tests:
   - dbt_utils.unique_combination_of_columns:
       arguments:
