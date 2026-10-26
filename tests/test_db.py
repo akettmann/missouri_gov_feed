@@ -46,7 +46,9 @@ def test_new_shard_count_drops_old_parts(raw_dir):
     for i in range(3):
         db.replace_json("t", [(f"old{i}", {})], shard=db.Shard(i, 3))
     db.replace_json("t", [("new", {})])
-    assert sorted(p.name for p in (raw_dir / "t").iterdir()) == ["part-000-of-001.parquet"]
+    names = sorted(p.name for p in (raw_dir / "t").iterdir())
+    assert [n for n in names if n.endswith(".parquet")] == ["part-000-of-001.parquet"]
+    assert names == ["part-000-of-001.parquet"] or names == [".part-000-of-001.parquet.lock", "part-000-of-001.parquet"]
 
 
 def test_sink_publishes_declared_empty_tables_and_nothing_on_error():
@@ -127,4 +129,75 @@ def test_sink_removes_scratch_files_left_by_killed_runs(raw_dir, sink_type):
     else:
         with db.TableSink(shard, tables=[Row]) as sink:
             sink.add(Row("v"))
-    assert sorted(p.name for p in folder.iterdir()) == sorted([published.name, other_shard.name])
+    assert sorted(p.name for p in folder.iterdir() if p.suffix != ".lock") == sorted([published.name, other_shard.name])
+
+
+@pytest.mark.parametrize("sink_type", ["json", "table"])
+def test_second_run_of_same_shard_fails_fast_and_leaves_first_run_alone(raw_dir, sink_type):
+    import dataclasses
+
+    @dataclasses.dataclass
+    class Row:
+        TABLE = "t"
+        x: str
+
+    def open_sink(shard):
+        return db.JsonSink(shard, tables=["t"]) if sink_type == "json" else db.TableSink(shard, tables=[Row])
+
+    def add(sink, v):
+        sink.add("t", v, {"v": v}) if sink_type == "json" else sink.add(Row(v))
+
+    with open_sink(db.Shard(0, 2)) as first:
+        add(first, "a")
+        with pytest.raises(db.ShardBusyError, match="another run is already writing t shard 0 of 2"):
+            open_sink(db.Shard(0, 2))
+        with open_sink(db.Shard(1, 2)) as other:  # a different shard is not blocked
+            add(other, "b")
+        add(first, "c")  # first run's scratch file survived the rejected second run
+    assert db.table_dir("t").joinpath(db.Shard(0, 2).part_name).exists()
+    assert db.table_dir("t").joinpath(db.Shard(1, 2).part_name).exists()
+    with open_sink(db.Shard(0, 2)):  # lock released on exit: the shard can run again
+        pass
+
+
+def test_failed_run_releases_the_shard_lock(raw_dir):
+    with pytest.raises(RuntimeError, match="boom"), db.JsonSink(tables=["t"]):
+        raise RuntimeError("boom")
+    with db.JsonSink(tables=["t"]):
+        pass
+
+
+def test_partial_open_releases_locks_already_taken(raw_dir):
+    with db.JsonSink(db.Shard(0, 1), tables=["b"]):
+        with pytest.raises(db.ShardBusyError):
+            db.JsonSink(db.Shard(0, 1), tables=["a", "b"])
+        with db.JsonSink(db.Shard(0, 1), tables=["a"]):  # "a" was locked then released by the failed open
+            pass
+
+
+def test_killed_holder_leaves_no_stale_lock(raw_dir):
+    """A run killed mid-write (no cleanup at all) must not block the next run of its shard."""
+    import subprocess
+    import sys
+    import textwrap
+
+    code = textwrap.dedent(
+        """
+        import os, sys
+        from pathlib import Path
+        from mogov import db
+        db.RAW_DIR = Path(sys.argv[1])
+        sink = db.JsonSink(db.Shard(0, 2), tables=["t"])
+        sink.add("t", "k", {"v": 1})
+        print("ready", flush=True)
+        os._exit(1)  # killed: no __exit__, no unlink, lock file and scratch left behind
+        """
+    )
+    proc = subprocess.run([sys.executable, "-c", code, str(raw_dir)], capture_output=True, text=True, check=False)
+    assert "ready" in proc.stdout, proc.stderr
+    folder = db.table_dir("t")
+    assert list(folder.glob(".*.jsonl")), "the killed run left its scratch file"
+    with db.JsonSink(db.Shard(0, 2), tables=["t"]) as sink:
+        sink.add("t", "k2", {"v": 2})
+    assert [r[0] for r in _rows("t")] == ["k2"]
+    assert not list(folder.glob(".*.jsonl"))

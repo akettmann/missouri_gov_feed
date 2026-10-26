@@ -12,8 +12,10 @@ changing the shard count, run every shard before the next dbt build.
 
 import contextlib
 import dataclasses
+import errno
 import json
 import os
+import sys
 import typing
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -22,8 +24,11 @@ from pathlib import Path
 from zlib import crc32
 
 import duckdb
+import structlog
 
 from mogov.config import RAW_DIR
+
+log = structlog.get_logger()
 
 
 @dataclass(frozen=True)
@@ -108,6 +113,74 @@ def _publish(con: duckdb.DuckDBPyConnection, select_sql: str, table: str, shard:
     return con.execute(f"select count(*) from read_parquet('{dest.as_posix()}')").fetchone()[0]
 
 
+class ShardBusyError(RuntimeError):
+    """Another run is already writing this (table, shard)."""
+
+
+class _ShardLock:
+    """Exclusive OS lock on `<table>/.<part>.lock`, held for a sink's life, so a second run of the same shard
+    fails fast instead of deleting the first run's scratch files. The OS drops the lock when the process
+    exits (even killed), so a crash never leaves a stale lock; the lock file itself is left in place (deleting
+    it would race with a waiting run) and is harmless: dbt reads only `*.parquet`.
+
+    The lock is local to the filesystem the raw dir is on (one machine, or a filesystem with working
+    flock/fcntl locks). If the filesystem can't lock at all (some network or FUSE mounts), it logs a warning
+    and carries on unlocked rather than blocking the load."""
+
+    def __init__(self, table: str, shard: Shard):
+        self.table, self.shard = table, shard
+        self.path = table_dir(table) / f".{shard.part_name}.lock"
+        self._fh = None
+
+    def acquire(self) -> None:
+        fh = self.path.open("ab")
+        try:
+            _lock_fd(fh.fileno())
+        except BlockingIOError:
+            fh.close()
+            raise ShardBusyError(
+                f"another run is already writing {self.table} shard {self.shard.index} of {self.shard.count} "
+                f"(lock held on {self.path}); wait for it to finish, or run a different shard"
+            ) from None
+        except OSError as e:
+            log.warning("shard_lock_unsupported", path=str(self.path), error=str(e))
+            fh.close()
+            return
+        self._fh = fh
+
+    def release(self) -> None:
+        if self._fh is not None:
+            try:
+                _unlock_fd(self._fh.fileno())
+            finally:
+                self._fh.close()
+                self._fh = None
+
+
+if sys.platform == "win32":
+    import msvcrt
+
+    def _lock_fd(fd: int) -> None:
+        try:
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        except OSError as e:
+            if e.errno in (errno.EACCES, errno.EDEADLK):  # held by another handle
+                raise BlockingIOError from e
+            raise
+
+    def _unlock_fd(fd: int) -> None:
+        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+
+else:
+    import fcntl
+
+    def _lock_fd(fd: int) -> None:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)  # raises BlockingIOError when held
+
+    def _unlock_fd(fd: int) -> None:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+
+
 def _clear_stale_scratch(table: str, shard: Shard) -> None:
     """Delete this shard's scratch files for <table> left by runs that were killed before they could clean up
     (they are named .<part>.<pid>.jsonl / .<part>.<pid>.part, so each is one dead run's). A shard is a single
@@ -122,6 +195,8 @@ def _drop_other_shard_counts(folder: Path, shard: Shard) -> None:
     for old in folder.glob("part-*-of-*.parquet"):
         if not old.name.endswith(f"-of-{shard.count:03d}.parquet"):
             old.unlink(missing_ok=True)
+            with contextlib.suppress(OSError):  # its lock file; skip if a run of that old count still holds it
+                (folder / f".{old.name}.lock").unlink(missing_ok=True)
 
 
 def remove_part(table: str, shard: Shard = UNSHARDED) -> None:
@@ -129,6 +204,25 @@ def remove_part(table: str, shard: Shard = UNSHARDED) -> None:
     Parts from a previous shard count stay until the shard that now owns the data replaces them, so the
     table is never left empty mid-run."""
     (table_dir(table) / shard.part_name).unlink(missing_ok=True)
+
+
+def _lock_shard(locks: dict[str, _ShardLock], table: str, shard: Shard) -> None:
+    lock = _ShardLock(table, shard)
+    lock.acquire()
+    locks[table] = lock
+
+
+def _close_sink(files: dict, locks: dict) -> None:
+    """Close scratch files, delete them, then release the shard locks (scratch is gone before another run
+    may start)."""
+    try:
+        for path, fh in files.values():
+            fh.close()
+            path.unlink(missing_ok=True)
+    finally:
+        for lock in locks.values():
+            lock.release()
+        locks.clear()
 
 
 class JsonSink:
@@ -148,11 +242,17 @@ class JsonSink:
         self.shard, self.source_url = shard, source_url
         self.counts: dict[str, int] = {}
         self._files: dict[str, tuple[Path, object]] = {}
-        for table in tables:
-            self._file(table)
+        self._locks: dict[str, _ShardLock] = {}
+        try:
+            for table in tables:
+                self._file(table)
+        except BaseException:
+            self._close()
+            raise
 
     def _file(self, table: str):
         if table not in self._files:
+            _lock_shard(self._locks, table, self.shard)
             _clear_stale_scratch(table, self.shard)
             path = table_dir(table) / f".{self.shard.part_name}.{os.getpid()}.jsonl"
             self._files[table] = (path, path.open("w", encoding="utf-8"))
@@ -170,6 +270,9 @@ class JsonSink:
         for key, payload in records:
             self.add(table, key, payload)
 
+    def _close(self) -> None:
+        _close_sink(self._files, self._locks)
+
     def __enter__(self) -> "JsonSink":
         return self
 
@@ -183,8 +286,7 @@ class JsonSink:
                     for table, (path, _) in self._files.items():
                         self.counts[table] = _publish(con, _jsonl_select(path), table, self.shard, [loaded_at])
         finally:
-            for path, _ in self._files.values():
-                path.unlink(missing_ok=True)
+            self._close()
 
 
 _DUCKDB_TYPES = {str: "varchar", int: "bigint", float: "double", bool: "boolean", date: "date", datetime: "timestamptz"}
@@ -214,12 +316,18 @@ class TableSink:
         self.counts: dict[str, int] = {}
         self._types: dict[str, type] = {}
         self._files: dict[str, tuple[Path, object]] = {}
-        for row_type in tables:
-            self._file(row_type)
+        self._locks: dict[str, _ShardLock] = {}
+        try:
+            for row_type in tables:
+                self._file(row_type)
+        except BaseException:
+            self._close()
+            raise
 
     def _file(self, row_type: type):
         table = row_type.TABLE
         if table not in self._files:
+            _lock_shard(self._locks, table, self.shard)
             _clear_stale_scratch(table, self.shard)
             path = table_dir(table) / f".{self.shard.part_name}.{os.getpid()}.jsonl"
             self._types[table] = row_type
@@ -228,6 +336,9 @@ class TableSink:
 
     def add(self, row) -> None:
         self._file(type(row)).write(json.dumps(dataclasses.asdict(row), default=str) + "\n")
+
+    def _close(self) -> None:
+        _close_sink(self._files, self._locks)
 
     def __enter__(self) -> "TableSink":
         return self
@@ -249,8 +360,7 @@ class TableSink:
                         )
                         self.counts[table] = _publish(con, select, table, self.shard, [loaded_at])
         finally:
-            for path, _ in self._files.values():
-                path.unlink(missing_ok=True)
+            self._close()
 
 
 def _jsonl_select(path: Path) -> str:
