@@ -13,9 +13,20 @@
 -- A combined act ("H.B. 115 & 99": one substitute that carries several bills' subjects) names the bills after "&";
 -- only the first, the lead bill (is_lead_bill), is the one that passed. The others stay as rows, with combined_into
 -- naming the lead, because the act did take their subjects, but they never reached the governor themselves.
+-- Parse bounds (macros/session_law_bounds.sql): a note is read up to 60 acts (longest real note: 43, RSMo 301.010), an
+-- act up to 10 "merged with" bills (longest: 6) and 6 "&" bills (longest: 3). Parts past a bound would be dropped
+-- silently, and notes list acts oldest first, so the newest acts would go; assert_session_law_bounds_not_exceeded
+-- fails the build when real data needs more.
 {# act: "Repealed L. 2018 ...", "A.L. 2003 ...", "L. 1945 ...", "A. 1949 ..."; bill: "H.B.", "S.B", "S.J.R.", "SJR" #}
 {% set act_head = '^(Repealed )?(A\\.L\\.|L\\.|A\\.) ' %}
 {% set bill_head = '^[HS]\\.? ?[BJC]\\.? ?R?\\.?' %}
+{# Parse bounds (macros/session_law_bounds.sql): split_part_at drops parts past its maximum, so a guard test fails the
+   build when real data needs more. Today: 60 acts per note (longest real note: 43), 10 "merged with" bills per act
+   (longest: 6), 6 "&" bills per act (longest: 3). #}
+{% set bounds = mogov.session_law_bounds() %}
+{% set max_acts = bounds.max_acts %}
+{% set max_merged = bounds.max_merged %}
+{% set max_combined = bounds.max_combined %}
 
 with notes as (
     select
@@ -40,13 +51,13 @@ normalized as (
         section_id,
         section_version_id,
         -- one separator between acts; "et al." belongs to the act before it
-        replace(replace(replace(replace(note, '(', ''), ')', ''), '; ', ', '), ', et al.', ' et al.') as note
+        {{ mogov.normalize_session_law_note('note') }} as note
     from notes
 ),
 
 spine as (
     select cast(generated_number as {{ dbt.type_int() }}) as n
-    from ({{ dbt_utils.generate_series(40) }}) as s
+    from ({{ dbt_utils.generate_series(max_acts) }}) as s
 ),
 
 acts as (
@@ -54,7 +65,7 @@ acts as (
         o.section_id,
         o.section_version_id,
         s.n as act_index,
-        trim({{ mogov.split_part_at('o.note', "', '", 's.n', 40) }}) as act
+        trim({{ mogov.split_part_at('o.note', "', '", 's.n', max_acts) }}) as act
     from normalized as o
     cross join spine as s
     where s.n <= {{ dbt.length('o.note') }} - {{ dbt.length(dbt.replace('o.note', "','", "''")) }} + 1
@@ -95,12 +106,12 @@ merged as (
         a.act_year,
         a.extra_session,
         s.n as ref_index,
-        trim({{ mogov.split_part_at('a.refs', "' merged with '", 's.n', 10) }}) as ref
+        trim({{ mogov.split_part_at('a.refs', "' merged with '", 's.n', max_merged) }}) as ref
     from parsed_acts as a
     cross join spine as s
     where
-        s.n <= 10
-        and {{ mogov.split_part_at('a.refs', "' merged with '", 's.n', 10) }} <> ''
+        s.n <= {{ max_merged }}
+        and {{ mogov.split_part_at('a.refs', "' merged with '", 's.n', max_merged) }} <> ''
 ),
 
 typed as (
@@ -125,15 +136,15 @@ bills as (
         t.extra_session,
         t.ref_index,
         t.bill_type,
-        trim({{ mogov.split_part_at('t.numbers', "' & '", 's.n', 6) }}) as bill_number,
+        trim({{ mogov.split_part_at('t.numbers', "' & '", 's.n', max_combined) }}) as bill_number,
         trim({{ dbt.split_part('t.numbers', "' & '", 1) }}) as lead_number,
         s.n = 1 as is_lead_bill
     from typed as t
     cross join spine as s
     where
         t.bill_type is not null
-        and s.n <= 6
-        and {{ mogov.split_part_at('t.numbers', "' & '", 's.n', 6) }} <> ''
+        and s.n <= {{ max_combined }}
+        and {{ mogov.split_part_at('t.numbers', "' & '", 's.n', max_combined) }} <> ''
 ),
 
 -- "1st Extraordinary Session" -> 1; the House's "Special Session" (2018's resolutions-only one) isn't counted
