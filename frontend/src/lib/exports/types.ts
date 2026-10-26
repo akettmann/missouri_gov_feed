@@ -37,6 +37,9 @@ export interface Indicator {
   period: number | null;
   detail: string | null;
   source_url: string | null;
+  /** party unity only: the official's own first and last year with a party-line vote in the chamber */
+  first_vote_year: number | null;
+  last_vote_year: number | null;
 }
 
 /** rpt_donor_rollup summed per election cycle x donor group (medium matches kept apart for the toggle). */

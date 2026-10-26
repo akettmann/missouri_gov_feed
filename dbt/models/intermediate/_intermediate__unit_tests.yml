@@ -446,3 +446,57 @@ unit_tests:
       rows:
         - {registry_id: c1, naics_code: '111998', naics_source: naics}
         - {registry_id: c2, naics_code: '238910', naics_source: naics}
+
+  - name: epa_frs_facility_owner_tie_is_deterministic
+    model: int_epa_frs__facilities
+    description: >
+      Two owner rows with the same name and the same affiliation rank but different org_type (#386) must pick
+      the same owner_type whatever order the rows arrive in. The tie goes to the alphabetically first org_type
+      (a neutral stable key, not a ranking of types). Each pair is given in both input orders (o1/o2: STATE and
+      FEDERAL; o3/o4: MUNICIPAL and COUNTY), o5 is a three-way tie, o6 shows the tie-break only applies to equal
+      names (the name sorts first), and o7 that a known type still beats UNKNOWN before the tie-break. Without the
+      tie-break the pick follows the input order, so one of each pair fails.
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: o1, facility_name: STATE first, latitude: 38.5, longitude: -92.1}
+          - {registry_id: o2, facility_name: FEDERAL first, latitude: 38.5, longitude: -92.1}
+          - {registry_id: o3, facility_name: MUNICIPAL first, latitude: 38.5, longitude: -92.1}
+          - {registry_id: o4, facility_name: COUNTY first, latitude: 38.5, longitude: -92.1}
+          - {registry_id: o5, facility_name: Three-way tie, latitude: 38.5, longitude: -92.1}
+          - {registry_id: o6, facility_name: Name sorts before type, latitude: 38.5, longitude: -92.1}
+          - {registry_id: o7, facility_name: Known type beats unknown, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows:
+          - {registry_id: o1, program_system: P, program_id: '1', org_name: Lindenwood, org_type: STATE, affiliation_type: OWNER}
+          - {registry_id: o1, program_system: P, program_id: '2', org_name: Lindenwood, org_type: FEDERAL, affiliation_type: OWNER}
+          - {registry_id: o2, program_system: P, program_id: '1', org_name: Lindenwood, org_type: FEDERAL, affiliation_type: OWNER}
+          - {registry_id: o2, program_system: P, program_id: '2', org_name: Lindenwood, org_type: STATE, affiliation_type: OWNER}
+          - {registry_id: o3, program_system: P, program_id: '1', org_name: Boone Utility, org_type: MUNICIPAL, affiliation_type: OWNER}
+          - {registry_id: o3, program_system: P, program_id: '2', org_name: Boone Utility, org_type: COUNTY, affiliation_type: OWNER}
+          - {registry_id: o4, program_system: P, program_id: '1', org_name: Boone Utility, org_type: COUNTY, affiliation_type: OWNER}
+          - {registry_id: o4, program_system: P, program_id: '2', org_name: Boone Utility, org_type: MUNICIPAL, affiliation_type: OWNER}
+          - {registry_id: o5, program_system: P, program_id: '1', org_name: Three Rivers, org_type: STATE, affiliation_type: OWNER}
+          - {registry_id: o5, program_system: P, program_id: '2', org_name: Three Rivers, org_type: PRIVATE, affiliation_type: OWNER}
+          - {registry_id: o5, program_system: P, program_id: '3', org_name: Three Rivers, org_type: FEDERAL, affiliation_type: OWNER}
+          - {registry_id: o6, program_system: P, program_id: '1', org_name: Zeta, org_type: COUNTY, affiliation_type: OWNER}
+          - {registry_id: o6, program_system: P, program_id: '2', org_name: Alpha, org_type: STATE, affiliation_type: OWNER}
+          - {registry_id: o7, program_system: P, program_id: '1', org_name: Same Name, org_type: UNKNOWN, affiliation_type: OWNER}
+          - {registry_id: o7, program_system: P, program_id: '2', org_name: Same Name, org_type: STATE, affiliation_type: OWNER}
+      - input: ref('stg_epa_frs__naics')
+        rows: []
+      - input: ref('stg_epa_frs__sic')
+        rows: []
+      - input: ref('sic_naics_sectors')
+        rows: []
+      - input: ref('naics_sectors')
+        rows: []
+    expect:
+      rows:
+        - {registry_id: o1, owner_name: Lindenwood, owner_type: FEDERAL}
+        - {registry_id: o2, owner_name: Lindenwood, owner_type: FEDERAL}
+        - {registry_id: o3, owner_name: Boone Utility, owner_type: COUNTY}
+        - {registry_id: o4, owner_name: Boone Utility, owner_type: COUNTY}
+        - {registry_id: o5, owner_name: Three Rivers, owner_type: FEDERAL}
+        - {registry_id: o6, owner_name: Alpha, owner_type: STATE}
+        - {registry_id: o7, owner_name: Same Name, owner_type: STATE}

@@ -134,18 +134,27 @@ const CHAMBER_NAMES: Record<string, string> = {
 /**
  * Reader-facing text for a fct_bias_indicators `detail`. The raw detail stays the internal match key (peer strips,
  * current-chamber ordering); only display goes through here. Handles every shape the mart emits:
- *   "state_house: 1006 party-line votes"                      -> "Based on 1,006 votes this official cast on party-line roll calls in the Missouri House"
+ *   "state_house: 1006 party-line votes"                      -> "Based on 1,006 votes this official cast on party-line roll calls in the Missouri House, 2017–2026"
+ *                                                               (years come from first_vote_year / last_vote_year, the official's own span; omitted if missing)
  *   "Voteview DW-NOMINATE, House 119th Congress"              -> "Voteview DW-NOMINATE, U.S. House, 119th Congress"
  *   "Shor-McCarty ...; in the Shor-McCarty data 2009-2022 (data ends 2022)" -> en dash in the range
  * The Congress ordinal is taken as written (never re-derived), so "121st" survives. Unknown shapes pass through.
  */
-export function indicatorDetailText(detail: string | null | undefined): string {
+export function indicatorDetailText(
+  detail: string | null | undefined,
+  years?: { first_vote_year?: number | null; last_vote_year?: number | null } | null,
+): string {
   if (!detail) return "";
   const unity = /^(\w+): (\d+) party-line votes?$/.exec(detail);
   if (unity) {
     const n = Number(unity[2]);
     const where = CHAMBER_NAMES[unity[1]] ?? unity[1];
-    return `Based on ${plural(n, "vote", "votes")} this official cast on party-line roll calls in the ${where}`;
+    const first = years?.first_vote_year;
+    const last = years?.last_vote_year;
+    // The official's own first and last year with a party-line vote in that chamber, not the chamber's loaded range.
+    const span =
+      first == null || last == null ? "" : first === last ? `, ${first}` : `, ${first}\u2013${last}`;
+    return `Based on ${plural(n, "vote", "votes")} this official cast on party-line roll calls in the ${where}${span}`;
   }
   const dw = /^(.*DW-NOMINATE), (House|Senate) (\S+ Congress)$/.exec(detail);
   if (dw) return `${dw[1]}, U.S. ${dw[2]}, ${dw[3]}`;
