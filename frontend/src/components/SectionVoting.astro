@@ -2,8 +2,16 @@
 // Section B: voting record. Party loyalty (the votes where the official broke with their own party's majority)
 // and attendance per session against the chamber. Both are counts from recorded roll calls, not judgments.
 import type { OfficialBundle } from "../lib/exports/types";
+import {
+  coverageNote,
+  dollars,
+  payBasisText,
+  payPerVoteBlocks,
+  totalWithoutMedium,
+} from "../lib/attendancePay";
 import { count, sessionLabel, statusKind } from "../lib/format";
 import { href } from "../lib/site";
+import ConfidenceBadge from "./ConfidenceBadge.astro";
 import SourceLink from "./SourceLink.astro";
 import Viz from "./Viz.astro";
 
@@ -17,6 +25,16 @@ const unityRows = bundle.indicators.filter((i) => i.indicator === "party_unity_p
 const unity = unityRows.find((i) => i.detail?.startsWith(`${bundle.official.office}:`)) ?? unityRows[0];
 const breaks = voting.party_breaks ?? [];
 const BREAKS_SHOWN = 25;
+const CHAMBER_NAMES: Record<string, string> = {
+  state_house: "Missouri House",
+  state_senate: "Missouri Senate",
+  us_house: "U.S. House",
+  us_senate: "U.S. Senate",
+};
+// the pay table covers the same sessions as the chart above it: it is built from the chart's own rows
+const payBlocks = payPerVoteBlocks(voting.attendance ?? [], voting.attendance_pay ?? []);
+// the total again without the "possible match" years, shown instead of the full total when they are hidden
+const sure = (block: (typeof payBlocks)[number]) => totalWithoutMedium(block.years);
 const tally = (yea: number | null, nay: number | null) => (yea == null ? "—" : `${yea}–${nay ?? 0}`);
 ---
 
@@ -69,7 +87,10 @@ const tally = (yea: number | null, nay: number | null) => (yea == null ? "—" :
                           {v.measure && <strong>{v.measure}</strong>}
                           {v.measure && v.vote_description && " · "}
                           {v.vote_description}
-                          <span class="muted small"> ({sessionLabel(v.chamber, v.session_code)})</span>
+                          <span class="muted small">
+                            {" "}
+                            ({sessionLabel(v.chamber, v.session_code, v.session_name)})
+                          </span>
                         </td>
                         <td>{v.vote_cast}</td>
                         <td>{v.party_position}</td>
@@ -101,7 +122,101 @@ const tally = (yea: number | null, nay: number | null) => (yea == null ? "—" :
       ) : voting.attendance.length === 0 ? (
         <p class="muted small">No session with recorded votes for this official.</p>
       ) : (
-        <Viz id="attendance" bundle={bundle} />
+        <>
+          <Viz id="attendance" bundle={bundle} />
+          <p class="small muted">
+            <a href={href("/methodology/#attendance")}>How attendance is counted</a>.
+          </p>
+          {voting.attendance_pay === null ? (
+            <p class="muted small">Not available yet (the rpt_attendance_pay export is missing).</p>
+          ) : payBlocks.length === 0 ? (
+            <p class="muted small">
+              Pay per vote attended: no pay is matched to this official for the sessions above (the state
+              payroll starts in 2017, and a payroll row is used only when its name matches one official).
+            </p>
+          ) : (
+            payBlocks.map((block) => (
+              <>
+                <h4>
+                  Pay per vote attended
+                  {payBlocks.length > 1 ? ` (${CHAMBER_NAMES[block.chamber] ?? block.chamber})` : ""}
+                </h4>
+                <div class="table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Calendar year</th>
+                        <th class="num">Pay</th>
+                        <th class="num">Votes attended</th>
+                        <th class="num">Pay per vote attended</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {block.years.map((y) => (
+                        <tr data-confidence={y.match_confidence === "medium" ? "medium" : undefined}>
+                          <td>
+                            {y.period} <ConfidenceBadge confidence={y.match_confidence} />
+                          </td>
+                          <td class="num">{dollars(y.pay_amount)}</td>
+                          <td class="num">{count(y.votes_attended)}</td>
+                          <td class="num">
+                            {y.pay_amount == null ? (
+                              <span class="muted">no pay counted</span>
+                            ) : (
+                              dollars(y.dollars_per_vote_attended)
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr class={block.total.match_confidence === "medium" ? "total-all" : undefined}>
+                        <th>
+                          Years with pay and votes{" "}
+                          <ConfidenceBadge confidence={block.total.match_confidence} />
+                        </th>
+                        <td class="num">{dollars(block.total.pay_amount)}</td>
+                        <td class="num">{count(block.total.votes_attended)}</td>
+                        <td class="num">
+                          <strong>{dollars(block.total.dollars_per_vote_attended)}</strong>
+                        </td>
+                      </tr>
+                      {block.total.match_confidence === "medium" && (
+                        <tr class="total-sure">
+                          <th>Years with pay and votes, without possible matches</th>
+                          <td class="num">{dollars(sure(block).pay_amount)}</td>
+                          <td class="num">{count(sure(block).votes_attended)}</td>
+                          <td class="num">
+                            <strong>{dollars(sure(block).dollars_per_vote_attended)}</strong>
+                          </td>
+                        </tr>
+                      )}
+                    </tfoot>
+                  </table>
+                </div>
+                <p class="small muted">
+                  Pay per vote attended is {payBasisText(block.basis)} divided by the votes in that calendar
+                  year where the official voted yea, nay or present. The total covers{" "}
+                  <span class={block.total.match_confidence === "medium" ? "total-all" : undefined}>
+                    {coverageNote(block.total)}
+                  </span>
+                  {block.total.match_confidence === "medium" && (
+                    <span class="total-sure">{coverageNote(sure(block), true)}</span>
+                  )}
+                  .{" "}
+                  {block.basis === "statutory salary" && (
+                    <>
+                      A partial year of service still counts the full annual salary, which inflates that
+                      year.{" "}
+                    </>
+                  )}
+                  <SourceLink url={block.sourceUrl} label="pay source" /> ·{" "}
+                  <a href={href("/methodology/#pay-per-vote")}>How pay per vote is counted</a>.
+                </p>
+              </>
+            ))
+          )}
+        </>
       )}
 
       {voting.by_subject && voting.by_subject.length > 0 && (
@@ -115,10 +230,26 @@ const tally = (yea: number | null, nay: number | null) => (yea == null ? "—" :
 </section>
 
 <style>
+  .total-sure {
+    display: none;
+  }
+  :global(html.hide-medium) .total-sure {
+    display: revert;
+  }
+  :global(html.hide-medium) .total-all {
+    display: none;
+  }
   .nowrap {
     white-space: nowrap;
   }
   .what {
     max-width: 52ch;
+  }
+  h4 {
+    margin: 16px 0 4px;
+    font-size: 0.9375rem;
+  }
+  tfoot th {
+    text-align: left;
   }
 </style>

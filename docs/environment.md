@@ -23,12 +23,22 @@ Diagrams: [pipeline](diagrams/pipeline.svg), [lineage](diagrams/lineage.svg),
    ```
    See the configuration table in the [README](../README.md#configuration-env-gitignored) for the rest.
 4. First full load and build:
+
    ```
    uv run mogov run --shards 4      # stage-1 loaders (concurrent, 4 shards) -> dbt build -> stage 2 -> dbt build
    ```
+
+   `run` is strict: if any loader fails it stops before `dbt build`, logs `build.skipped` naming the failed
+   loaders, and exits non-zero. Fix the cause and re-run (loaders are idempotent), or, for a known-flaky
+   source, build on its last landed data with `uv run mogov run --allow-failed-loader <source>` or
+   `MOGOV_ALLOW_FAILED_LOADERS=<source>[,<source>]` (env var form for compose / Cloud Run, where the args are
+   fixed). Until [#161](https://github.com/akettmann/missouri_gov_feed/issues/161) lands, if you opted in to
+   `senate_efd` (`MOGOV_ACCEPT_SENATE_EFD_TERMS=1`) you will need `MOGOV_ALLOW_FAILED_LOADERS=senate_efd`.
+
    The first run is the slow one: it downloads several GB (FEC, CourtListener bulk) and parses about
    ten years of House roll-call PDFs and Senate journals. Everything fetched is cached under
    `data/cache`, so later runs are much faster.
+
 5. Check the result: `uv run mogov build` should end with `ERROR=0`. Run `uv run mogov export` to write
    the marts and reporting tables to `data/exports/` as parquet (the default; the frontend reads only
    parquet. `--format csv` is for other tools). If you use the site, run `pnpm build` in `frontend/`
@@ -36,12 +46,12 @@ Diagrams: [pipeline](diagrams/pipeline.svg), [lineage](diagrams/lineage.svg),
 
 Layout under `data/` (override the root with `MOGOV_DATA_DIR`):
 
-| Path | Contents |
-|---|---|
-| `data/cache/` | HTTP cache (one file per request, keyed by URL + params) and large downloads |
-| `data/raw/<table>/part-<i>-of-<N>.parquet` | Raw landings, one part per loader shard (`MOGOV_RAW_DIR`) |
-| `data/mogov.duckdb` | dbt warehouse (`MOGOV_DB`) |
-| `data/exports/` | `mogov export` output |
+| Path                                       | Contents                                                                     |
+| ------------------------------------------ | ---------------------------------------------------------------------------- |
+| `data/cache/`                              | HTTP cache (one file per request, keyed by URL + params) and large downloads |
+| `data/raw/<table>/part-<i>-of-<N>.parquet` | Raw landings, one part per loader shard (`MOGOV_RAW_DIR`)                    |
+| `data/mogov.duckdb`                        | dbt warehouse (`MOGOV_DB`)                                                   |
+| `data/exports/`                            | `mogov export` output                                                        |
 
 A `data/raw/<table>.parquet` file from before sharding existed is moved into
 `<table>/part-000-of-001.parquet` the next time any loader runs.
@@ -50,11 +60,11 @@ A `data/raw/<table>.parquet` file from before sharding existed is moved into
 
 Everything under `data/` can be regenerated. What you delete decides how long the rebuild takes:
 
-| Delete | Effect |
-|---|---|
-| `data/mogov.duckdb` | dbt rebuilds every model from the raw parts (under a minute). |
-| `data/raw/` | Every loader lands its tables again, from the cache where it can. |
-| `data/exports/` | Rewritten by the next `mogov export`. |
+| Delete                   | Effect                                                                                                                       |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `data/mogov.duckdb`      | dbt rebuilds every model from the raw parts (under a minute).                                                                |
+| `data/raw/`              | Every loader lands its tables again, from the cache where it can.                                                            |
+| `data/exports/`          | Rewritten by the next `mogov export`.                                                                                        |
 | `data/cache/` (optional) | Everything is downloaded and parsed again. About 10 GB as of October 2026. Keep it unless you suspect a bad cached response. |
 
 1. Stop anything using `data/` (a running `mogov`, a DuckDB shell, `dbt docs serve`). On Windows an open
@@ -79,6 +89,7 @@ Everything under `data/` can be regenerated. What you delete decides how long th
    and for `cl_cases` in the first dbt build (it is a stage-2 table).
 
 How long it takes (October 2026, one Windows desktop, `--shards 4`):
+
 - **Warm cache** (only raw and the warehouse deleted): the October 2026 full run took about 75 minutes,
   most of it filtering the CourtListener bulk files (about 50 minutes, one process) and parsing roll-call
   PDFs. A re-run 20 minutes later took about 20 minutes, still mostly PDF parsing. PDF text is now cached
@@ -89,6 +100,7 @@ How long it takes (October 2026, one Windows desktop, `--shards 4`):
 
 With Docker the steps are the same, against the host folder the container mounts (`./data`, or
 `MOGOV_HOST_DATA`):
+
 ```
 rm -rf data/raw data/mogov.duckdb data/exports
 docker compose up
@@ -113,9 +125,9 @@ entirely from the parquet exports; there is no server. Data flow:
    ```
    cd frontend
    pnpm install
-   pnpm build          # dist/: one page + one JSON per official, browse page, methodology
+   pnpm build          # dist/: one page + one JSON per official, browse page, methodology; then runs the size budgets (exits 1 if over; MOGOV_SKIP_SIZE_BUDGET=1 skips them); loading the exports also fails the build if `rpt_attendance_pay` year rows do not match `rpt_attendance` (exports from different builds; `MOGOV_SKIP_PAY_YEARS_CHECK=1`, exactly `1`, skips that check and logs it); the frontend reads `rpt_awards.period_kind` (`year` / `fec_cycle` / `lifetime`) and fails if the export has no such column (re-export) or if a `fec_cycle` list has an odd period; `MOGOV_SKIP_AWARD_CYCLES_CHECK=1` (exactly `1`) skips the odd-period guard and also lets a stale export without `period_kind` build, inferring the kind from award and office (federal `least_committee_money_share` is a cycle) with a warning
    pnpm preview        # http://localhost:4321
-   pnpm sizes          # per-official payload sizes; exits 1 if any JSON is over budget (100 KB gzipped)
+   pnpm sizes          # the same check on its own: per-official payload sizes (exits 1 if any JSON is over 100 KB gzipped) and the lookup/districts.json and /awards budgets in scripts/size-budget.mjs
    ```
    If any parquet file is older than `data/mogov.duckdb` (or `MOGOV_DB`), the build warns that you
    skipped `uv run mogov export`; it never fails the build, and stays silent if the DuckDB file is absent.
@@ -144,7 +156,33 @@ Without JavaScript, the home page's `<noscript>` block links to those static `/y
 year, rendered from the same rows. The year control's error message also links to the matching static page when
 the JSON fetch fails.
 
-Optional build-time environment: `PUBLIC_SITE_URL` (canonical site URL), `PUBLIC_REPORT_ERROR_URL`
+Every name on a year page or in the year JSON links somewhere. People serving now link to their full profile; past
+officeholders without one get a small page (name, offices held with years, party, district, roster source, links to
+the year pages) at the same `/officials/<slug>/` path, with `slug = slugFor(name, official_id)` for both kinds.
+`pastOfficeholders()` in `frontend/src/lib/exports/load.ts` assigns the slugs, so the static year pages and the
+JSON cannot disagree, and the build fails on a slug collision (profile slugs included). The slug hash comes from
+`official_id`, so a past page's path becomes the full profile only where the roster id equals the `dim_official` id
+(Senate/Open States, Congress bioguide, federal judges `fjc`). House, statewide and state-judge ids may differ
+between the roster and `dim_official` (issue #97), so those paths are not guaranteed stable. Because the same person
+can therefore appear as a past entry and a current profile, a past page whose normalized full name equals a current
+profile's (or another past entry's) shows a neutral "same name" cross-link; names are never merged.
+
+The businesses section of a profile carries only the donor-tied sites and counts by industry (a U.S. House
+district holds about 10,000 EPA-regulated sites). The full list per district or city is built from
+`fct_jurisdiction_businesses` into `dist/districts/<district>/sites/index.html` (a plain table, no JavaScript
+needed) and `dist/districts/<district>/sites.csv`, 201 districts in all; `<district>` is the `district_id` with
+`:` replaced by `-` (`state_house-135`). Donor-tied rows name the donor, link to where the contributions are filed
+and carry the "possible match" badge, so the "Hide possible matches" toggle applies; the CSV has the same columns.
+`lib/exports/districtSites.ts` reads the table once (one query, grouped in memory) and fails the build if a
+district maps to several officials or an official to several districts. Measured on this machine against main
+(about 218k site rows, 402 extra routes): `dist/` 64 MB to 174 MB; peak node memory about 0.6-0.7 GB to about
+1.0 GB; build time 100-121 s on main vs 78-113 s with the pages (three runs; machine load varied more than the
+difference, so no measurable cost). An earlier per-route query version took about 70 s more and ran out of memory
+in 2 of 5 builds.
+Without the export no site pages are built and the section shows no link.
+
+Optional build-time environment: `PUBLIC_SITE_URL` (canonical site URL), `PUBLIC_BASE_PATH` (path prefix such as `/missouri_gov_feed`; unset =
+site at the root, set by `deploy:pages`), `PUBLIC_REPORT_ERROR_URL`
 (where "Report an error" goes; default: a prefilled GitHub issue on this repo).
 
 ### Publishing to Google Cloud Storage
@@ -158,7 +196,7 @@ The build is plain static files, so any static host works; the repo ships a scri
    gcloud storage buckets add-iam-policy-binding gs://BUCKET --member=allUsers --role=roles/storage.objectViewer
    gcloud storage buckets update gs://BUCKET --web-main-page-suffix=index.html --web-error-page=404.html
    ```
-2. Each release, after `pnpm build` (and `pnpm sizes`):
+2. Each release, after `pnpm build`:
    ```
    gcloud auth login
    MOGOV_SITE_BUCKET=BUCKET pnpm deploy:gcs --dry-run   # see what would change
@@ -167,6 +205,64 @@ The build is plain static files, so any static host works; the repo ships a scri
    The bucket mirrors `dist/` (files no longer built are deleted). Hashed assets (`_astro/`) are cached for a
    year; pages for 5 minutes and JSON for an hour, so a data refresh shows up quickly. Set `PUBLIC_SITE_URL` at
    build time to the public address.
+
+### Publishing to GitHub Pages (free stopgap)
+
+GCS (above) stays the end goal; Pages is a free stopgap while traffic is tiny. The site is built **locally** (CI has no data) and pushed to an
+orphan `gh-pages` branch; `main` history is never touched.
+
+Findings (checked against the ~200 MB `dist/`, 1052 pages):
+
+- Limits: a published Pages site must be <= 1 GB, each file < 100 MB (git push limit), and the soft bandwidth cap is
+  100 GB/month. Our `dist/` is about 200 MB, the largest file is a 4.4 MB HTML page, so it fits comfortably.
+  `deploy:pages` refuses to push if either limit would be broken.
+- Method (a), orphan `gh-pages` branch from a temp dir, was chosen over (b) `workflow_dispatch` +
+  `upload-pages-artifact`: (b) needs the built site inside CI, and CI has no data, so we would have to upload 200 MB
+  from a laptop anyway. (a) is one command, needs no workflow, and force-pushing the orphan branch replaces history
+  so snapshots do not accumulate.
+- Project sites are served under `/missouri_gov_feed/`, so the build sets Astro `base` from `PUBLIC_BASE_PATH`.
+  Every internal link goes through `href()` (`src/lib/site.ts`); the default (GCS) build has no base and is
+  unchanged. `scripts/link-check.mjs` verifies a built `dist/` (every root-relative reference resolves under the base).
+
+Differences from GCS to keep in mind: Pages sends no custom `Cache-Control` headers (a fixed short cache; our
+year-long `_astro/` caching and 5-minute page caching do not apply), infers content types from file extensions,
+serves `404.html` for unknown paths, and 301-redirects a directory URL without a trailing slash to the slash form.
+The Pages build and the GCS build differ (base path), so **rebuild before `deploy:gcs`**: it refuses a dist built
+for Pages (link check at the root), and `deploy:pages` rebuilds with the Pages base itself.
+
+```sh
+pnpm deploy:pages --dry-run   # build with the Pages base, stale check, link check, size check; pushes nothing
+pnpm deploy:pages             # the same, then force-push ONLY the gh-pages branch
+```
+
+One-time setup, in the repo on GitHub: Settings -> Pages -> Build and deployment -> Source "Deploy from a branch",
+Branch `gh-pages`, folder `/ (root)`. The site then appears at https://akettmann.github.io/missouri_gov_feed/ a minute
+after each push. Note that Pages sites from a public repo are public; use `--allow-stale` only deliberately.
+On Windows Git Bash never set `PUBLIC_BASE_PATH=/x` by hand (MSYS rewrites it to a `C:/Program Files/Git/...` path;
+the build now rejects that); the script sets it for you.
+
+The deploy only ever writes the `gh-pages` branch (there is no `--branch` flag), pushing to
+`https://github.com/<owner>/<name>.git` for the repo of the `origin` remote (`--remote NAME` picks another remote
+to read the repo from). It refuses to run with uncommitted changes under `frontend/` (`--allow-dirty` overrides)
+and removes its ~200 MB temp repo on every exit, dry runs and failures included (`--keep` leaves it for
+inspection). It can be started from any directory. It runs the size budget check (as `pnpm build` does) before publishing, including with `--skip-build`; `MOGOV_SKIP_SIZE_BUDGET=1` skips it, as it does for `pnpm deploy:gcs`. If deleting the temp repo fails (for example EBUSY) during an interrupt, the interrupt result stays (exit 130) and the left-over directory is named in an extra warning.
+
+A Ctrl+C before the push starts stops it. What happens depends on the stage:
+
+| Stage                                       | Ctrl+C result                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm build`                                | Node's default handler (no listener is installed yet) kills the script and the build; no temp dir exists yet; exit code is the signal's (on Windows typically `0xC000013A`).                                                                                                                                                                                                                 |
+| `pnpm build` / link check                   | Same as the build: no listener is installed yet, so Node's default handler kills the script (the link check is a child process); no temp dir exists yet.                                                                                                                                                                                                                                     |
+| Copy of `dist/` and size scan               | The first Ctrl+C deletes the temp repo (unless `--keep`) and exits 130 ("Interrupted; nothing was pushed.").                                                                                                                                                                                                                                                                                 |
+| `git init` / `add` / `commit` / `rev-parse` | These run as asynchronous child processes, so the same listener handles the signal: temp repo deleted, exit 130. If git itself dies from the Ctrl+C first (status 130 or `0xC000013A`), that is reported as "Interrupted; nothing was pushed.", also exit 130. An interrupt flag is also checked (after yielding to the event loop) before every git step and immediately before `git push`. |
+| `git push`                                  | If Ctrl+C arrives after the push has started the script exits 130 with "the push may or may not have completed"; check the `gh-pages` branch.                                                                                                                                                                                                                                                |
+
+A second Ctrl+C while the temp repo is being deleted is ignored until the deletion finishes, so no ~200 MB directory is
+left in the temp folder.
+
+The repo is always taken from a GitHub remote URL (`https://github.com/o/n`, `git@github.com:o/n`, or
+`ssh://git@github.com/o/n`). Explicit ports, `ssh.github.com:443` and SSH host aliases are not recognised; use a
+plain github.com URL for the remote, or point `--remote` at a remote that has one.
 
 ## Local, in Docker (Compose)
 
@@ -184,18 +280,23 @@ docker compose --profile docs up docs               # dbt docs (every model/colu
 Set `MOGOV_HOST_DATA` to use a data folder other than `./data`. On Linux, files the container writes are
 owned by root.
 
+`docker compose up` runs `mogov run`, which is strict: if any loader fails it stops before `dbt build` and
+exits non-zero. To build anyway on the last landed raw data of a known-flaky source, set
+`MOGOV_ALLOW_FAILED_LOADERS=<source>[,<source>]` (shell or `.env`; compose passes it through). The exit code
+stays non-zero.
+
 ## Sharding
 
 Every loader splits its work into units (PDFs, files, people, report years...). A shard owns the units
 where `crc32(key) % shards == shard`, so the split depends only on the keys. It doesn't depend on
 listing order or on which other shards run.
 
-| Invocation | Effect |
-|---|---|
-| `mogov load mo_house` | one process, all units (`part-000-of-001`) |
-| `mogov load mo_house --shards 4` | all 4 shards, in a pool of worker processes |
-| `mogov load mo_house --shards 4 --shard 2` | only shard 2 of 4 (for one container of a job) |
-| Cloud Run job with `--tasks 4` | same as the line above, taken from `CLOUD_RUN_TASK_COUNT` / `CLOUD_RUN_TASK_INDEX` |
+| Invocation                                 | Effect                                                                             |
+| ------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `mogov load mo_house`                      | one process, all units (`part-000-of-001`)                                         |
+| `mogov load mo_house --shards 4`           | all 4 shards, in a pool of worker processes                                        |
+| `mogov load mo_house --shards 4 --shard 2` | only shard 2 of 4 (for one container of a job)                                     |
+| Cloud Run job with `--tasks 4`             | same as the line above, taken from `CLOUD_RUN_TASK_COUNT` / `CLOUD_RUN_TASK_INDEX` |
 
 Loaders that talk to different services run at the same time. Each loader names its upstream service
 (`mogov list` shows it), and the work is split into jobs of (one service's loaders, one shard). A pool of
@@ -223,6 +324,9 @@ cached PDF sources.
 The image (`Dockerfile`) runs `mogov` as its entrypoint. Logs go to stderr as JSON with
 `severity`/`message` keys whenever `CLOUD_RUN_JOB` is set. A failing loader makes the task exit
 non-zero. SIGTERM exits cleanly: temp files are removed and metrics are flushed.
+The jobs below chain `load` and `build` as separate jobs, so a failed load job already stops the chain. If you
+instead run `mogov run` as a job, it is strict by default; set `MOGOV_ALLOW_FAILED_LOADERS=<source>` (via
+`--set-env-vars`) to tolerate a known-flaky source.
 
 > This setup follows the Cloud Run container contract but has not been deployed yet. Treat it as a
 > starting point.

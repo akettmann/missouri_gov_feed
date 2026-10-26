@@ -82,9 +82,15 @@ Case history from the CourtListener API, for officials found in stage 1. Source:
 
 ![courtlistener_cases](sources/courtlistener_cases.svg)
 
+### mo_state_expenditures
+
+Missouri State Expenditures, one dataset per fiscal year: legislator per diem and mileage, and vendor payments. Source: [sources/mo_state_expenditures.puml](sources/mo_state_expenditures.puml)
+
+![mo_state_expenditures](sources/mo_state_expenditures.svg)
+
 ### epa_frs
 
-EPA Facility Registry Service, Missouri state file: facilities, owners and NAICS codes. Source: [sources/epa_frs.puml](sources/epa_frs.puml)
+EPA Facility Registry Service, Missouri state file: facilities, owners, and NAICS and SIC codes. Source: [sources/epa_frs.puml](sources/epa_frs.puml)
 
 ![epa_frs](sources/epa_frs.svg)
 
@@ -112,11 +118,23 @@ Missouri Ethics Commission exports (opt-in). Source: [sources/mec.puml](sources/
 
 ![mec](sources/mec.svg)
 
+### mo_auditor
+
+Missouri State Auditor audit reports and the performance rating printed in each report. Source: [sources/mo_auditor.puml](sources/mo_auditor.puml)
+
+![mo_auditor](sources/mo_auditor.svg)
+
 ### mo_employee_pay
 
 Missouri state payroll from data.mo.gov. Source: [sources/mo_employee_pay.puml](sources/mo_employee_pay.puml)
 
 ![mo_employee_pay](sources/mo_employee_pay.svg)
+
+### mo_sos_elections
+
+Missouri Secretary of State official election returns: race results, margins, uncontested races and judicial retention. Source: [sources/mo_sos_elections.puml](sources/mo_sos_elections.puml)
+
+![mo_sos_elections](sources/mo_sos_elections.svg)
 
 ### mo_house
 

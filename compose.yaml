@@ -9,6 +9,10 @@
 #   docker compose --profile docs up docs               dbt docs (model/column definitions) on :8080
 #
 # Keys and opt-ins come from .env (see README), passed into the container.
+#
+# `mogov run` is strict by default: if any loader fails it stops before dbt build and exits non-zero.
+# To build anyway on the last landed raw data of a known-flaky source, set (shell or .env), comma-separated:
+#   MOGOV_ALLOW_FAILED_LOADERS=<source>[,<source>]
 
 x-mogov: &mogov
   build: .
@@ -23,6 +27,8 @@ services:
   mogov:
     <<: *mogov
     command: ["run", "--shards", "${MOGOV_SHARDS:-4}"]
+    environment:
+      MOGOV_ALLOW_FAILED_LOADERS: ${MOGOV_ALLOW_FAILED_LOADERS:-}
 
   docs:
     <<: *mogov

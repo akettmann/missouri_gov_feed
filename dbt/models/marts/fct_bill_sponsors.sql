@@ -34,7 +34,7 @@ senate_match as (
         s.bill,
         s.sponsor_type,
         s.sponsor_name,
-        max(seat.openstates_id) as person_key
+        max(seat.person_id) as person_key
     from sponsors as s
     inner join {{ ref('int_mo_legislators__seats') }} as seat
         on
@@ -44,7 +44,7 @@ senate_match as (
             and ' ' || s.sponsor_key || ' ' like '% ' || seat.surname_key || ' %'
     where s.sponsor_chamber = 'state_senate'
     group by s.session_code, s.bill, s.sponsor_type, s.sponsor_name
-    having count(distinct seat.openstates_id) = 1
+    having count(distinct seat.person_id) = 1
 ),
 
 matches as (

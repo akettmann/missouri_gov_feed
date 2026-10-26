@@ -225,6 +225,96 @@ models:
         data_type: varchar
         description: Which source this row came from (openstates, congress-legislators, fjc, wikidata, courtlistener, statewide_officials seed, Missouri Official Manual <edition>).
 
+  - name: fct_audit_reports
+    description: >
+      Missouri State Auditor reports (1999 to now) with the performance rating the Auditor printed in the report's
+      Citizens Summary: "In the areas audited, the overall performance of this entity was Good." The rating
+      covers only the areas audited, not the whole operation of the entity. Ratings exist from 2012 and only
+      for audits the Auditor rates (not performance audits, financial statements or follow-ups); rating_status says why a
+      row has none. Grain: one row per report. The officeholder is filled only for audits of a statewide office,
+      and is whoever held it on the release date (the audit may cover a predecessor's term). A county audit is never linked
+      to a person: the Auditor says a county's rating does not indicate the performance of any one elected official.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [report_number]
+    columns:
+      - name: report_number
+        data_type: varchar
+        description: Compact report number, year then sequence ("2018063").
+        data_tests: [not_null]
+      - name: report_number_display
+        data_type: varchar
+        description: Report number as the Auditor prints it ("2018-063").
+      - name: report_year
+        data_type: integer
+        description: Year in the report number.
+      - name: release_date
+        data_type: date
+        description: Date the report was released.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: "'1999-01-01'"
+                max_value: "current_date"
+      - name: title
+        data_type: varchar
+        description: Audited entity or subject, as the Auditor titles the report ("Scott County", "Office of State Treasurer").
+      - name: entity_type
+        data_type: varchar
+        description: "`statewide_office` (the audit of a statewide elected office), `county`, or `other` (state agencies, cities, courts, schools, statewide reports)."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [statewide_office, county, other]
+      - name: office
+        data_type: varchar
+        description: Key of the statewide office (as in statewide_officials) for `statewide_office` audits; null otherwise.
+      - name: rating
+        data_type: varchar
+        description: "Excellent, Good, Fair or Poor, as printed; null when the report has no rating."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [Excellent, Good, Fair, Poor]
+      - name: rating_level
+        data_type: integer
+        description: "Excellent 4, Good 3, Fair 2, Poor 1: orders the ratings. Null without a rating."
+      - name: rating_status
+        data_type: varchar
+        description: >
+          `ok` (rating read), `no_rating_sentence` (the PDF was read and the Auditor gave no rating, as in performance
+          audits), `not_read` (the loader opened no PDF: financial statements, monthly reports, follow-ups, reports
+          before 2012), `http_<code>` or `unreadable` (the PDF could not be fetched or parsed).
+        data_tests: [not_null]
+      - name: rating_sentence
+        data_type: varchar
+        description: The sentence the rating was read from, as extracted from the PDF text.
+      - name: rating_page
+        data_type: integer
+        description: Page of the PDF that sentence is on (1-based).
+      - name: rating_pdf_url
+        data_type: varchar
+        description: The PDF the rating was read from (Citizens Summary, or the full report where there is no summary).
+      - name: full_report_url
+        data_type: varchar
+        description: The full report PDF.
+      - name: citizens_summary_url
+        data_type: varchar
+        description: The one-page Citizens Summary PDF, where the Auditor published one.
+      - name: officeholder_at_release_id
+        data_type: varchar
+        description: "{{ doc('official_id') }} Holder of the audited statewide office on the release date, when a current official; null for any other audit."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: officeholder_at_release_name
+        data_type: varchar
+        description: full_name of that official.
+
   - name: fct_votes
     description: >
       Roll-call votes by current officials, including votes cast in earlier offices (e.g. a state senator's
@@ -267,7 +357,7 @@ models:
         data_tests:
           - accepted_values:
               arguments:
-                values: ['yea', 'nay', 'present', 'absent', 'absent with leave', 'not voting']
+                values: ['yea', 'nay', 'present', 'absent', 'absent with leave', 'not voting', 'recused']
       - name: party_at_vote
         data_type: varchar
         description: Party of the official when the vote was cast (state) or current party (federal), normalized as in dim_official.party.
@@ -335,7 +425,12 @@ models:
       for every FEC candidate id the official has used, plus their leadership PACs. State: MEC itemized
       contributions for committees attributed to the official (int_mec__official_committees) - the TAP
       mirror for report years through 2022, MEC's own exports for 2023+. Individual federal donors are
-      summarized in fct_federal_donor_summary instead of listed. Grain: one itemized transaction.
+      summarized in fct_federal_donor_summary instead of listed. Grain: (official_id, direction, source_record_id),
+      one itemized transaction per official and direction.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, direction, source_record_id]
     columns:
       - name: official_id
         data_type: varchar
@@ -389,6 +484,11 @@ models:
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"
+      - name: source_record_id
+        data_type: varchar
+        description: >
+          The source row's own identity, prefixed by its feed: `fec:` (FEC sub_id), `tap_contrib:` (TAP contribution: the staged `record_id`, TAP's own id (txn or cd1_a_id), deduplicated in staging because TAP loaded some transactions twice and exports two overlapping layouts), `tap_cd3_b:` (TAP expenditure id, cd3_b_id), `mec_cd1_a:` / `mec_cd3_c:` (MEC export record ids). Contribution and expenditure ids are separate id spaces, so each gets its own prefix and a raw id can't collide across them.
+        data_tests: [not_null]
       - name: counterparty_mec_committee_id
         data_type: varchar
         description: >
@@ -444,8 +544,12 @@ models:
     description: >
       Lobbyist expenditures on current state officials (meals, tickets, travel, gifts) from MEC lobbyist
       reports: the TAP mirror for 2004-2018 and, with the MEC loader, MEC's export for 2019+. Missouri's
-      Amendment 1 (Dec 2018) banned most gifts over $5, so volumes drop sharply after 2018. Grain: one
-      reported expenditure; rows whose recipient name fits more than one official are dropped.
+      Amendment 1 (Dec 2018) banned most gifts over $5, so volumes drop sharply after 2018. Grain:
+      (official_id, gift_key), one reported expenditure; rows whose recipient name fits more than one official are dropped.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, gift_key]
     columns:
       - name: official_id
         data_type: varchar
@@ -490,14 +594,23 @@ models:
       - name: source
         data_type: varchar
         description: "`MEC lobbyist reports` or `MEC lobbyist reports (via Accountability Project)`."
+      - name: gift_key
+        data_type: varchar
+        description: >
+          Surrogate key: hash of every reported field plus the occurrence number among identical rows. The lobbyist reports carry no per-row id, and identical entries (two same-day $25 meals) are real, distinct expenditures.
+        data_tests: [not_null]
 
   - name: fct_disclosures
     description: >
       Mandatory financial disclosure line items: U.S. House Clerk annual reports and periodic transaction
       reports (PDF text, tagged by schedule), Senate eFD reports (structured tables), and federal judges'
       AO-10 reports via CourtListener (mostly 2020 and earlier). Missouri state officials' and judges'
-      personal financial disclosures are not online (see official_profile.disclosures_status). Grain: one
-      disclosed item; scanned filings appear once with section "document (not text-extractable...)".
+      personal financial disclosures are not online (see official_profile.disclosures_status). Grain:
+      (official_id, disclosure_item_id), one disclosed item; scanned filings appear once with section "document (not text-extractable...)".
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, disclosure_item_id]
     columns:
       - name: official_id
         data_type: varchar
@@ -537,12 +650,31 @@ models:
           fct_family_ties. Investments are never flagged; always false for House and Senate rows (not checked).
         data_tests:
           - not_null
+      - name: disclosure_item_id
+        data_type: varchar
+        description: >
+          The source item's own identity: `house:` filing id + PDF page + line (or filing id alone for an unparsed scan), `senate:` eFD table row, `courtlistener:` AO-10 table + row id. Identical-looking items on one report are distinct source rows.
+        data_tests: [not_null]
+      - name: report_version
+        data_type: integer
+        description: >
+          0 for an original report, N for amendment N (Senate "(amendment N)"; a House "amended report" is 1; an AO-10 pdf named `..._1.pdf` is 1).
+        data_tests: [not_null]
+      - name: is_latest_version
+        data_type: boolean
+        description: >
+          True when this row's report is the newest version of its report: same filer, source and report year, an annual report or one of its amendments, preferring a readable version over a scan with no extractable text, then the highest report_version, then the latest filing_date. Periodic transaction reports, candidate reports (Senate ones carry no report year to match on) and extension requests are separate filings, so each is its own latest. Filter on it for any item count or sum; leave it off to list every filing. Assumes an amendment restates the whole report.
+        data_tests: [not_null]
 
   - name: fct_voluntary_disclosures
     description: >
       Voluntary disclosures (financial statements, conflict-of-interest or recusal notices) officials
       published without being required to. No feed exists, so they're hand-curated in
-      seeds/voluntary_disclosures.csv and matched by name. Grain: one disclosure.
+      seeds/voluntary_disclosures.csv and matched by name. Grain: (official_id, disclosure_date, kind, source_url), one disclosure.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, disclosure_date, kind, source_url]
     columns:
       - name: official_id
         data_type: varchar
@@ -559,6 +691,51 @@ models:
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"
+
+  - name: fct_party_unity_yearly
+    description: >
+      Party-line votes per official, chamber and calendar year of the vote: how many they cast (yea or nay,
+      where the Republican and Democratic majorities from int_votes__party_positions took opposite sides) and
+      how many went with their own party's majority. The party is the one held at the vote, so a member who
+      switched parties counts each vote under the party then held. Summed by fct_bias_indicators into the
+      lifetime party_unity_pct and read by rpt_awards for the yearly Maverick and Team Player awards. Votes with
+      no date have a null vote_year. Grain: one row per (official, chamber, vote year).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, chamber, vote_year]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: with_party_votes between 0 and party_line_votes
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests: [not_null]
+      - name: chamber
+        data_type: varchar
+        description: Chamber whose votes were counted.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['state_house', 'state_senate', 'us_house', 'us_senate']
+      - name: vote_year
+        data_type: bigint
+        description: Calendar year of the vote; null when the vote has no date.
+      - name: party_line_votes
+        data_type: bigint
+        description: >
+          Yea or nay votes cast on party-line votes. Sanity bound: the busiest official-year loaded has about 600,
+          and no chamber has ever held 2,000 party-line votes in a year.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 2000
+      - name: with_party_votes
+        data_type: bigint
+        description: Of those, how many matched the majority position of the party held at the vote.
 
   - name: fct_bias_indicators
     description: >
@@ -619,7 +796,11 @@ models:
       Commercial ventures and relationships: positions held in businesses and organizations, earned-income
       sources, compensation over $5,000 from one source, and agreements (future employment, leave,
       continuing payments) from mandatory disclosures, plus employers and organizations the official leads
-      per Wikidata. Personal holdings (stocks, funds) stay in fct_disclosures. Grain: one tie as disclosed.
+      per Wikidata. Personal holdings (stocks, funds) stay in fct_disclosures. Grain: (official_id, source_item_id), one tie as disclosed.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, source_item_id]
     columns:
       - name: official_id
         data_type: varchar
@@ -645,13 +826,22 @@ models:
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"
+      - name: source_item_id
+        data_type: varchar
+        description: >
+          Identity of the underlying fact: the fct_disclosures `disclosure_item_id`, or `wikidata:` + QID + fact kind + value.
+        data_tests: [not_null]
 
   - name: fct_family_ties
     description: >
       Family members and their roles, especially leadership of companies and organizations: Wikidata
       relatives (with organizations they lead and offices they hold), and spouse/dependent positions,
       income and compensation from the latest mandatory disclosure. Missouri's business registry would
-      extend this but is not machine-accessible. Grain: one (relative, role) as reported.
+      extend this but is not machine-accessible. Grain: one (relative, role, organization) per source, i.e. all columns together (each branch is `select distinct`).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, relation, relative_name, role, organization, source, source_url]
     columns:
       - name: official_id
         data_type: varchar
@@ -767,8 +957,12 @@ models:
       How each official's state campaign committees spent their money: itemized expenditures with payee,
       purpose and amount. TAP mirror for report years through 2022, MEC's own export (CD3 Part B, items
       over $100) for 2023+ when the MEC loader has run. Committees are attributed as in
-      fct_campaign_finance. Grain: one itemized expenditure as filed. TAP rows include contributions to
+      fct_campaign_finance. Grain: (official_id, source_record_id), one itemized expenditure as filed. TAP rows include contributions to
       other committees, which fct_campaign_finance also lists as `given`.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, source_record_id]
     columns:
       - name: official_id
         data_type: varchar
@@ -784,7 +978,15 @@ models:
         description: Date paid, as reported.
       - name: amount
         data_type: decimal(28,6)
-        description: USD. Negative values are refunds/corrections as filed.
+        description: >
+          USD. Negative values are refunds/corrections as filed. Sanity bound: fails at $10M either way
+          (largest through 2026: $1,041,631.57; smallest $0), same bound as fct_campaign_finance.amount.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -10000000
+                max_value: 10000000
+                inclusive: false
       - name: payee_name
         data_type: varchar
         description: Who was paid (company, or person's name).
@@ -815,6 +1017,11 @@ models:
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"
+      - name: source_record_id
+        data_type: varchar
+        description: >
+          The MEC expenditure record id (`tap_cd3_b:` TAP cd3_b_id, `mec_cd3_b:` MEC export). Part of the grain with official_id because a committee can be attributed to several officials.
+        data_tests: [not_null]
 
   - name: fct_campaign_reports
     description: >
@@ -1235,6 +1442,121 @@ models:
         data_type: varchar
         description: The Missouri Accountability Portal's employee pay search, or the federal pay table.
 
+  - name: fct_legislator_expenses
+    description: >
+      Per diem (legislative daily expense allowance) and in-state mileage the state paid each legislator, per fiscal
+      year (July to June), from the state expenditures (data.mo.gov "State Expenditures", agency LEGISLATURE). Each
+      amount is the payee's annual total for that line, not one payment; negative totals are refunds and stay.
+      Payees are paired with officials through the state payroll (fct_salaries), by legal name and year; a payee
+      with no fitting payroll name, or whose fit is shared, is left out, so a legislator can be missing for a year.
+      Per diem is claimed by days attended and mileage follows distance, so neither is a measure of performance.
+      Grain: one row per (official, fiscal year, expense type).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, fiscal_year, expense_type]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: fiscal_year
+        data_type: integer
+        description: State fiscal year, July of the year before through June (fiscal year 2023 is July 2022 to June 2023).
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 2000
+                max_value: 2100
+      - name: expense_type
+        data_type: varchar
+        description: "'per diem' (LEGISLATIVE DAILY EXPENSE ALLOWANCE) or 'mileage' (IN-STATE MILEAGE)."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['per diem', 'mileage']
+      - name: payee_name
+        data_type: varchar
+        description: Payee as the expenditures print it ("LAST, FIRST MIDDLE", legal name), so a reader can check the match.
+      - name: amount
+        data_type: decimal(38,2)
+        description: >
+          Dollars paid to the payee for the fiscal year on this line. Sanity bounds: a legislator's annual per
+          diem has never been near $30,000 and a year of mileage is far under $20,000.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 30000
+      - name: match_confidence
+        data_type: varchar
+        description: "{{ doc('match_confidence') }}"
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['high', 'medium']
+      - name: source_url
+        data_type: varchar
+        description: The Socrata dataset the fiscal year's rows come from.
+
+  - name: fct_county_districts
+    description: >
+      The current state house, state senate and congressional districts that reach each county, from the full
+      unsimplified TIGER boundaries (the shipped map shapes are simplified to 50 m and open hairline gaps along
+      shared edges, so they cannot answer this). A pair counts only when the overlap exceeds 0.1 km2 (about 25
+      acres) and the overlap survives an inward buffer of 120 m (it erodes 120 m east-west and about 152 m
+      north-south, so a kept overlap contains a circle of at least 120 m radius and is more than 240 m wide in
+      every direction; real overlaps here are at least about 1.7 km wide); two boundaries that merely share an
+      edge intersect with zero area and are dropped, and so are long thin slivers along a county line where two
+      TIGER vintages disagree (Pulaski/CD 3 is 0.36 km2 but about 72 m wide). Also holds the
+      cities (places) whose boundary covers at least 99% of the county, which is how St. Louis city (a county
+      and a city at once) gets its mayor into the county view. Areas are planar lon/lat areas scaled by
+      cos(latitude), accurate to a few tenths of a percent here. Grain: one row per (county, district).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [county_id, district_id]
+    columns:
+      - name: county_id
+        data_type: varchar
+        description: The county (dim_district).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_district')
+                field: district_id
+      - name: district_id
+        data_type: varchar
+        description: The district or city (dim_district) that overlaps the county.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_district')
+                field: district_id
+      - name: district_type
+        data_type: varchar
+        description: state_house, state_senate, us_house, or place.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [state_house, state_senate, us_house, place]
+      - name: overlap_km2
+        data_type: double
+        description: Area of the county that lies in the district, in square kilometers.
+        data_tests: [not_null]
+      - name: share_of_county
+        data_type: double
+        description: Fraction of the county's area that lies in the district (1 means the district covers the county).
+        data_tests: [not_null]
+
   - name: fct_district_facilities
     description: >
       EPA-regulated facilities (EPA Facility Registry Service) inside each current area of dim_district: state
@@ -1286,10 +1608,16 @@ models:
         description: A parent company a program lists, when any does.
       - name: naics_code
         data_type: varchar
-        description: The primary NAICS industry code most of the facility's programs give.
+        description: >
+          The NAICS code most of the facility's programs give, primary codes before UNKNOWN or SECONDARY ones
+          (int_epa_frs__facilities naics_source). A facility with no NAICS code but a SIC code instead gets the
+          two-digit NAICS sector prefix its SIC code maps to (seed sic_naics_sectors), so a two-character
+          value is a sector, not a full code. Null when the facility has neither.
       - name: naics_description
         data_type: varchar
-        description: The NAICS code's title, as FRS writes it.
+        description: >
+          The NAICS code's title, as FRS writes it. For a SIC-derived sector, the sector name and the SIC code,
+          e.g. "Construction sector, from SIC 1629 HEAVY CONSTRUCTION, NOT ELSEWHERE CLASSIFIED".
       - name: is_government
         data_type: boolean
         description: A federal site, or an owner or operator is a government body (municipal, county, state, federal, district, tribal).
@@ -1316,7 +1644,7 @@ models:
       subsidiaries: "Spire PAC" and "LACLEDE GAS CO"). A company not in the seed that gives under another name
       is missed. Statewide officials have no rows (they serve every area). Grain: one row per (official,
       facility); district_id is the area that puts the facility in the official's jurisdiction. The donor
-      columns (donor_names through contributions_url) are filled only when is_donor.
+      columns (donor_names through donor_links) are filled only when is_donor.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -1359,10 +1687,13 @@ models:
         description: A parent company a program lists, when any does.
       - name: naics_code
         data_type: varchar
-        description: Primary NAICS industry code.
+        description: >
+          NAICS code most of the facility's programs give (primary before UNKNOWN or SECONDARY), or, for a
+          facility with only a SIC code, the two-digit NAICS sector prefix its SIC major group maps to. Null when
+          the facility has neither. See int_epa_frs__facilities.
       - name: naics_description
         data_type: varchar
-        description: The NAICS code's title.
+        description: The NAICS code's title, or the sector name and SIC code for a SIC-derived sector.
       - name: is_donor
         data_type: boolean
         description: The official received campaign contributions from this facility, its owner or its parent company.
@@ -1379,7 +1710,9 @@ models:
                 values: ['same name', 'same company']
       - name: donor_names
         data_type: varchar
-        description: The matched contributors as filed, separated by "; ", when is_donor.
+        description: >
+          The matched contributors as filed, separated by "; ", when is_donor. A ";" inside a filed name becomes a
+          comma, so "; " only ever separates two donors (#276).
       - name: donated_amount
         data_type: decimal(38,6)
         description: >
@@ -1404,11 +1737,447 @@ models:
           - accepted_values:
               arguments:
                 values: ['high', 'medium']
-      - name: contributions_url
+      - name: donor_links
         data_type: varchar
         description: >
-          Where the matched contributions are filed (the receiving committee's MEC page or FEC receipts), when
-          is_donor.
+          One filing-page link per matched donor and page, when is_donor: lines of `<url> <donor name>` joined by a
+          newline (a url never contains a space), ordered by donor name then url. A donor gets a line for every
+          distinct page its gifts to the official are filed on, so a donor that gave through an MEC and an FEC
+          committee keeps both links. An MEC page is the committee that received the money (the committee
+          matched to the official), not filtered to the donor. An FEC page is the donor committee's
+          disbursements filtered to the receiving committee, so it lists the gifts themselves. The frontend labels
+          each link by which one it is (#236, #248). Null when no matched gift has a url.
       - name: frs_url
         data_type: varchar
         description: The facility's EPA FRS detail report.
+
+  - name: fct_election_races
+    description: >
+      One row per race in the Missouri Secretary of State's official election returns (statewide Grand Totals
+      PDFs for the general and primary elections of 2012 on): office, winner, runner-up, margin, and whether the
+      winner had no opponent. A primary race is one party's ballot (race_party), so a contested primary has one
+      row per party. Candidates are counted without write-ins; a race whose only entries are write-ins is not
+      listed. Winner is the candidate with the most votes (single-seat races; the PDFs do not print the number
+      of seats). Keyed by election and contest, not by official: former officials and losing candidates are
+      here too. Grain: one row per (election, contest, race party).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [election_key, contest_seq, race_party]
+    columns:
+      - name: election_key
+        data_type: varchar
+        description: "`<yyyy-mm-dd>-general` or `<yyyy-mm-dd>-primary`."
+        data_tests: [not_null]
+      - name: election_type
+        data_type: varchar
+        description: general or primary.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [general, primary]
+      - name: election_date
+        data_type: date
+        description: Election day.
+        data_tests: [not_null]
+      - name: contest_seq
+        data_type: integer
+        description: Position of the contest in its PDF (1 = first); with election_key it identifies the contest.
+      - name: race_party
+        data_type: varchar
+        description: The party whose primary ballot this is; null in general elections.
+      - name: contest_title
+        data_type: varchar
+        description: Contest as printed, without the precinct count, e.g. "State Representative - District 34".
+      - name: office
+        data_type: varchar
+        description: The title before the first " - " ("State Representative", "U.S. Senator", "Circuit Judge"...).
+        data_tests: [not_null]
+      - name: district
+        data_type: varchar
+        description: District number when the title has "District n"; null for statewide offices and judicial circuits.
+      - name: candidates
+        data_type: integer
+        description: Candidates on the ballot, write-ins not counted.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 30
+      - name: is_uncontested
+        data_type: boolean
+        description: >
+          Exactly one candidate on the ballot, write-ins not counted (a write-in with votes does not make a race
+          contested). In a primary this is per party ballot.
+        data_tests: [not_null]
+      - name: total_votes
+        data_type: bigint
+        description: Votes for all candidates including write-ins; the PDF's "Total Votes" (checked against it in a test).
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 6000000
+      - name: write_in_votes
+        data_type: bigint
+        description: Votes for the write-in candidates the SoS lists.
+      - name: write_in_share
+        data_type: decimal(5,2)
+        description: write_in_votes as a percentage of total_votes (points).
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: winner_name
+        data_type: varchar
+        description: Candidate with the most votes (write-ins excluded), as printed.
+        data_tests: [not_null]
+      - name: winner_party
+        data_type: varchar
+        description: Winner's party as printed.
+      - name: winner_votes
+        data_type: bigint
+        description: Winner's votes.
+      - name: winner_share
+        data_type: decimal(5,2)
+        description: Winner's votes as a percentage of total_votes (points).
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: runner_up_name
+        data_type: varchar
+        description: Candidate with the second most votes (write-ins excluded); null when uncontested.
+      - name: runner_up_party
+        data_type: varchar
+        description: Runner-up's party as printed.
+      - name: runner_up_votes
+        data_type: bigint
+        description: Runner-up's votes.
+      - name: margin_votes
+        data_type: bigint
+        description: winner_votes minus runner_up_votes; null when uncontested.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: margin_pct
+        data_type: decimal(5,2)
+        description: (winner_votes minus runner_up_votes) as a percentage of total_votes, in points; null when uncontested.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: precincts_reported
+        data_type: integer
+        description: Precincts reported, from the contest header.
+      - name: precincts_total
+        data_type: integer
+        description: Precincts in the contest.
+      - name: winner_official_id
+        data_type: varchar
+        description: >
+          The winner's official_id when the winner is a current official with the same name (suffixes ignored) in
+          the same office and district; null otherwise (former officials, losers, offices not tracked).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: source_url
+        data_type: varchar
+        description: The Grand Totals PDF the race was read from.
+
+  - name: fct_judicial_retention
+    description: >
+      One row per judge on a retention ballot in the Secretary of State's official returns (Supreme Court, Court
+      of Appeals, and the circuit and associate circuit judges under the nonpartisan plan; elections of 2012 on):
+      Yes and No votes and the printed Yes share. A judge is retained with a majority of Yes votes. Keyed by
+      election and contest. Grain: one row per (election, contest, judge).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [election_key, contest_seq, subcontest_seq]
+    columns:
+      - name: election_key
+        data_type: varchar
+        description: "`<yyyy-mm-dd>-general` or `<yyyy-mm-dd>-primary`."
+        data_tests: [not_null]
+      - name: election_type
+        data_type: varchar
+        description: general or primary.
+      - name: election_date
+        data_type: date
+        description: Election day.
+      - name: contest_seq
+        data_type: integer
+        description: Position of the contest header in its PDF.
+      - name: subcontest_seq
+        data_type: integer
+        description: Which judge under that header (1 = first); a Court of Appeals header lists several judges.
+      - name: contest_title
+        data_type: varchar
+        description: Contest as printed, e.g. "Court of Appeals - Western District".
+      - name: office
+        data_type: varchar
+        description: The title before the first " - " ("Missouri Supreme Court", "Court of Appeals", "Circuit Judge"...).
+      - name: judge_name
+        data_type: varchar
+        description: Judge as printed.
+        data_tests: [not_null]
+      - name: yes_votes
+        data_type: bigint
+        description: Votes to retain.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 6000000
+      - name: no_votes
+        data_type: bigint
+        description: Votes against; null where the PDF's No line lost its vote count (2016 only).
+      - name: yes_pct
+        data_type: decimal(5,1)
+        description: The printed percentage of Yes votes (points), the official figure.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: no_pct
+        data_type: decimal(5,1)
+        description: The printed percentage of No votes (points).
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: is_retained
+        data_type: boolean
+        description: More Yes than No votes (the printed Yes share above 50% when the No line is lost).
+      - name: precincts_reported
+        data_type: integer
+        description: Precincts reported, from the contest header.
+      - name: precincts_total
+        data_type: integer
+        description: Precincts in the contest.
+      - name: judge_official_id
+        data_type: varchar
+        description: >
+          The judge's official_id when they are a current Supreme Court or Court of Appeals judge with the same
+          name; null for circuit judges and former judges.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: source_url
+        data_type: varchar
+        description: The Grand Totals PDF the judge was read from.
+
+  - name: fct_committee_memberships
+    description: >
+      House committee and subcommittee memberships per official and session, with the member's position (Chair,
+      Vice-Chair, Co-Chair, Ranking Minority Member, Member). An end-of-session snapshot from the House member
+      pages (every session since 2017 but 253) and the COMMITTEELIST export for 253. Former members who are not
+      in dim_official are left out. Committee names change across sessions, so compare a committee by name only
+      within a session. Grain: one row per (official, session, committee).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, session_code, committee_name]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: session_year between 2017 and 2030
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests: [not_null]
+      - name: session_code
+        data_type: varchar
+        description: House session code.
+        data_tests: [not_null]
+      - name: session_year
+        data_type: integer
+        description: Calendar year of the session.
+      - name: committee_name
+        data_type: varchar
+        description: Committee name as the House lists it for that session. Subcommittees say "Subcommittee".
+        data_tests: [not_null]
+      - name: position_name
+        data_type: varchar
+        description: The member's position on the committee.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Chair', 'Vice-Chair', 'Co-Chair', 'Ranking Minority Member', 'Member']
+      - name: is_subcommittee
+        data_type: boolean
+        description: True when the committee name contains "Subcommittee".
+      - name: source
+        data_type: varchar
+        description: member_page (the member's own House page) or committee_list (the COMMITTEELIST export).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['member_page', 'committee_list']
+
+  - name: dim_house_session
+    description: >
+      The House's own names for its legislative sessions ("2025 1st Extraordinary Session", "2018 Special
+      Session"), from the SESSIONLIST file in every House session zip. The code's last digit does not say which
+      extraordinary session it is, so the frontend labels sessions from this table. A session the House has not
+      listed yet (the open one before its first list is loaded) is absent: show the code, never guess a name.
+      Grain: one row per session.
+    columns:
+      - name: session_code
+        data_type: varchar
+        description: House session code (two-digit year plus a type digit), the key the other House models carry.
+        data_tests: [unique, not_null]
+      - name: session_name
+        data_type: varchar
+        description: The House's name for the session.
+        data_tests: [not_null]
+      - name: session_year
+        data_type: integer
+        description: Calendar year of the session.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 2000
+                max_value: 2100
+      - name: session_type
+        data_type: varchar
+        description: The House's type code (R regular, S1, S2 later sessions of the year).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['R', 'S1', 'S2', 'S3']
+      - name: general_assembly
+        data_type: varchar
+        description: General Assembly the session belongs to ("103rd General Assembly").
+      - name: session_of_general_assembly
+        data_type: varchar
+        description: Which session of that assembly it is ("1st Regular Session", "1st Special Session").
+
+  - name: fct_committee_posts
+    description: >
+      Committee posts held per official and House session, counted from the House's own committee lists: full
+      committees served on, and the titles held on them (chair, vice-chair, co-chair, ranking minority member).
+      Subcommittees are counted apart (subcommittee_chair_posts) so chairing several subcommittees is not shown as
+      chairing several committees. A count of titles, not a score. Grain: one row per (official, session).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, session_code]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: chair_posts + vice_chair_posts + co_chair_posts + ranking_posts <= committees_held
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests: [not_null]
+      - name: session_code
+        data_type: varchar
+        description: House session code.
+      - name: session_year
+        data_type: integer
+        description: Calendar year of the session.
+      - name: committees_held
+        data_type: bigint
+        description: Full (non-sub) committees the member served on.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 25
+      - name: chair_posts
+        data_type: bigint
+        description: Full committees chaired.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 6
+      - name: vice_chair_posts
+        data_type: bigint
+        description: Full committees where the member is Vice-Chair.
+      - name: co_chair_posts
+        data_type: bigint
+        description: Full committees where the member is Co-Chair.
+      - name: ranking_posts
+        data_type: bigint
+        description: Full committees where the member is Ranking Minority Member.
+      - name: subcommittee_chair_posts
+        data_type: bigint
+        description: Subcommittees chaired.
+
+  - name: fct_judge_time_to_disposition
+    description: >
+      Median days from filing to termination of the federal district-court dockets (E.D. and W.D. Missouri)
+      assigned to each judge, from the CourtListener bulk export. Built only with the cl_case_bulk var. The state
+      courts carry no judge or dates in that export. Dockets that end before they were filed are left out of the
+      median and counted in dockets_ends_before_filed. Show dockets_measured next to the median, and
+      share_with_both_dates for how much of the judge's docket load it covers. "Assigned" is the judge on the
+      docket record, not necessarily who decided it. Includes judges who no longer sit. Grain: one row per judge.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [cl_person_id]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: dockets_measured + dockets_ends_before_filed = dockets_with_both_dates
+    columns:
+      - name: cl_person_id
+        data_type: varchar
+        description: CourtListener person id of the judge.
+        data_tests: [not_null]
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }} Null for judges not in the officials list (retired or senior)."
+      - name: judge_name
+        data_type: varchar
+        description: Name from the CourtListener judge database.
+      - name: court_id
+        data_type: varchar
+        description: moed, mowd, or moed+mowd for a judge with dockets in both districts.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['moed', 'mowd', 'moed+mowd']
+      - name: dockets_assigned
+        data_type: bigint
+        description: Dockets assigned to the judge.
+      - name: dockets_with_both_dates
+        data_type: bigint
+        description: Of those, dockets with both a filing and a termination date.
+      - name: dockets_ends_before_filed
+        data_type: bigint
+        description: Dockets with both dates where the termination is before the filing (excluded from the median).
+      - name: dockets_measured
+        data_type: bigint
+        description: Dockets behind the median (both dates, duration of zero or more days).
+      - name: share_with_both_dates
+        data_type: float
+        description: dockets_with_both_dates / dockets_assigned.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1
+      - name: median_days_to_disposition
+        data_type: float
+        description: Median days from filing to termination over the measured dockets. Null when none were measured.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 7305

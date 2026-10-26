@@ -9,11 +9,13 @@ testing: Pytest
 linting: Ruff
 logging: Structlog
 metrics: Opentelemetry
+XML parsing: an XML parser (lxml), never regex or `mogov.xmljson`
 ## ETL
 DBT Core
 DuckDB backend
 Use compatible constructs from DBT to make switching backends possible
 linting: SqlFluff
+Optional inputs are gated by vars (`mec_direct`, `cl_case_bulk`): build with `mogov build`, or pass the vars when running bare `dbt` (the hook also runs for bare `dbt snapshot` / `dbt source freshness`; it fails the run if raw data exists but the var is off; opt out with `skip_optional_raw_check`)
 if useful, add dbt-utils and dbt-expectations to the DBT project
 Follow DBT's best practices https://docs.getdbt.com/best-practices?version=2
 Where possible, build tests that serve as "sanity checks". Example: We have never seen 200 roll calls in a day before, no campaign has received 1 trillion dollars
@@ -24,6 +26,7 @@ They will be:
 * Idempotent
 * Streaming
 * Make as few changes to the raw data as possible when writing it to the raw storage
+* XML sources: store each raw XML file unchanged in raw storage, and parse it (with an XML parser) into rows of the entities it contains, e.g. a document listing laws emits one row per law with that law's fields/attributes as columns
 * emit progress when reasonably knowable (don't add a lot of extra work here. Ask if you are unsure.)
 * be shardable, can spawn workers in parallel that split up the work independently (ensure the split mechanism is idempotent). Ideally use options `--shards` to indicate the max number of shards, and `--shard` to indicate that process's shard. If `--shards` is provided and `--shard` is not provided, the process should run a processpool of `--shards` number of workers
   * If it would require every worker to download the same file, don't use multiple workers until you have downloaded the file once, if the file then needs to be split, we can use multiple processes on that machine
@@ -52,8 +55,10 @@ Acceptable labels:
   `source: house_fd`, `source: senate_efd`, `source: courtlistener_bulk`, `source: courtlistener_case_bulk`,
   `source: courtlistener_cases`, `source: bluebook`, `source: openstates_people`, `source: congress_legislators`,
   `source: fjc_judges`, `source: wikidata`, `source: shor_mccarty`, `source: census_tiger`, `source: census_zcta`,
-  `source: mo_employee_pay`, `source: epa_frs`
+  `source: mo_employee_pay`, `source: epa_frs`, `source: mo_auditor`
 * Candidate sources (not loaded yet): `source: legiscan`, `source: followthemoney`, `source: osha_ita`,
-  `source: mo_sos_business`. When a candidate gets a loader, keep the label and update its description.
+  `source: mo_sos_business`, `source: mo_state_expenditures`, `source: govinfo_billstatus`, `source: house_sod`,
+  `source: house_cpf`, `source: mo_sos_elections`, `source: census_acs`,
+  `source: uscourts_caseload`. When a candidate gets a loader, keep the label and update its description.
 
 Frontend issues follow the rules in docs/frontend_principles.md.

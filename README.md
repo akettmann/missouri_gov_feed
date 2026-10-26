@@ -12,6 +12,8 @@ uv run mogov export       # marts + reporting -> data/exports/*.parquet (--forma
 
 Or with Docker only: `docker compose up` (see [docs/environment.md](docs/environment.md#local-in-docker-compose)).
 
+If a loader fails, `mogov load` still runs the rest and exits non-zero; `mogov run` stops before `dbt build` unless you pass `--allow-failed-loader <source>` (stale data is warned about by name; exit stays non-zero). Fixed-arg runtimes (compose, Cloud Run) can set `MOGOV_ALLOW_FAILED_LOADERS=<source>[,<source>]` instead. Until #161 lands, `MOGOV_ACCEPT_SENATE_EFD_TERMS=1` users need `MOGOV_ALLOW_FAILED_LOADERS=senate_efd`.
+
 Other commands: `mogov list` (loaders), `mogov freshness`, `mogov load <loader> ...`, `mogov build [dbt args]` (for example `-s +fct_votes`).
 `load` and `run` take `--shards N` (every shard) or `--shards N --shard i` (one shard, as in a Cloud Run task), and `--workers N` (processes; loaders of different services run concurrently).
 
@@ -30,6 +32,7 @@ Docs: [building an environment](docs/environment.md) (local and Cloud Run), [kee
 | Family in company leadership | `fct_family_ties` | Wikidata relatives and the organizations they lead; spouse/dependent items on disclosures |
 | Districts (find my officials) | `dim_district`, `fct_official_districts` | Census TIGER/Line boundaries; Official Manual county→circuit table; `mo_county_courts` seed (appellate and federal districts) |
 | Companies operating in their district | `fct_district_facilities`, `fct_jurisdiction_businesses` (flags the ones that gave to the official) | EPA Facility Registry Service (regulated sites only); campaign finance above |
+| Election results (margins, uncontested races, judicial retention) | `fct_election_races`, `fct_judicial_retention` | Missouri Secretary of State official returns PDFs (general and primary elections, 2012+) |
 | Salaries | `fct_salaries` | Missouri state payroll (data.mo.gov), 2017+; `federal_salaries` seed (statutory pay for Congress and federal judges) |
 | Bills and their subjects | `fct_bills`, `fct_bill_subjects`, `fct_bill_sponsors`, `fct_vote_bills` | MO House bill XML (subjects from 2024); MO Senate topical index (Senate bills, and subjects for earlier House bills that reached the Senate); Senate votes linked through the journal's measure |
 | Voting history | `fct_votes` | MO House roll-call PDFs, MO Senate journals (last 10 years by default), Voteview (Congress) |
@@ -44,6 +47,7 @@ The `reporting` schema reshapes these for the frontend (one model per view, same
 | `rpt_indicator_peers` | each bias indicator with its chamber peers' median/range and the party medians |
 | `rpt_party_breaks` | party-line votes where the official voted against their party's majority |
 | `rpt_attendance` | attendance % per official, chamber and session, next to the whole chamber's rate |
+| `rpt_attendance_pay` | dollars paid per vote attended per official, chamber and calendar year, and over the years with both pay and votes |
 | `rpt_donor_rollup` | money received per donor, donor class (PAC, individual, ...) and year |
 | `rpt_gift_rollup` | lobbyist gifts per principal, category and year |
 | `rpt_interest_vote_overlap` | legislators' votes on bills whose subjects touch an industry that gave them money (co-occurrence, not causation; industries from the `interest_keywords` and `industry_subjects` seeds) |

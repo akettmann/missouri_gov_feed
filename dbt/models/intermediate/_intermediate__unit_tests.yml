@@ -59,10 +59,10 @@ unit_tests:
           - {vote_id: v1, journal_url: j1, session_year: 2025, vote_date: '2025-03-10', senator_token: Schupp, token_name: Schupp, token_district: null, vote_cast: nay}
       - input: ref('int_mo_legislators__seats')
         rows:
-          - {openstates_id: p_brown16, chamber: upper, district_number: 16, surname_key: brown, party: Republican, start_date: '2023-01-04', end_date: '2026-12-31'}
-          - {openstates_id: p_brown26, chamber: upper, district_number: 26, surname_key: brown, party: Republican, start_date: '2023-01-04', end_date: '2026-12-31'}
-          - {openstates_id: p_eigel, chamber: upper, district_number: 23, surname_key: eigel, party: Republican, start_date: '2017-01-04', end_date: '2026-12-31'}
-          - {openstates_id: p_schupp, chamber: upper, district_number: 24, surname_key: schupp, party: Democratic, start_date: '2015-01-07', end_date: '2023-01-03'}
+          - {openstates_id: p_brown16, person_id: p_brown16, chamber: upper, district_number: 16, surname_key: brown, party: Republican, start_date: '2023-01-04', end_date: '2026-12-31'}
+          - {openstates_id: p_brown26, person_id: p_brown26, chamber: upper, district_number: 26, surname_key: brown, party: Republican, start_date: '2023-01-04', end_date: '2026-12-31'}
+          - {openstates_id: p_eigel, person_id: p_eigel, chamber: upper, district_number: 23, surname_key: eigel, party: Republican, start_date: '2017-01-04', end_date: '2026-12-31'}
+          - {openstates_id: p_schupp, person_id: p_schupp, chamber: upper, district_number: 24, surname_key: schupp, party: Democratic, start_date: '2015-01-07', end_date: '2023-01-03'}
     expect:
       rows:
         - {member_token: Brown (16), person_key: p_brown16}
@@ -151,3 +151,298 @@ unit_tests:
         - {official_id: j_hall, role: judge, cluster_id: c1, matched_by: judges text}
         - {official_id: j_smith, role: judge, cluster_id: c4, matched_by: panel}
         - {official_id: l_doe, role: attorney, cluster_id: c5, matched_by: attorneys text}
+
+  - name: epa_frs_facility_industry_prefers_naics_over_sic_sector
+    model: int_epa_frs__facilities
+    description: >
+      A facility's industry is its primary NAICS code when it has one, else an UNKNOWN-type NAICS code, else a
+      SECONDARY one (f7 and f10-f12: a real NAICS code beats the SIC-derived sector even when it is not primary;
+      f9: a primary code beats an UNKNOWN one that more programs give; f10: UNKNOWN beats SECONDARY; f13: a NULL
+      code never counts). Only with no NAICS code at all are its SIC codes mapped to a NAICS sector through the sic_naics_sectors seed: a primary SIC code before an unknown one before a secondary
+      one, and the longest matching prefix wins (4953 refuse systems matches its own row -> sector 56, but 4952 sewerage
+      systems has no longer row and stays under 49 -> utilities; 4922 natural gas transmission, 6798 REITs and 7384
+      photofinishing likewise override their groups 49 -> utilities, 67 -> finance and 73 -> administrative services
+      with sectors 48, 53 and 81). A facility with no codes, or only a SIC code the seed does not cover, keeps a null industry.
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: f1, facility_name: Has NAICS, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f2, facility_name: Primary SIC wins, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f3, facility_name: Longest prefix, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f4, facility_name: No codes, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f5, facility_name: Unknown beats secondary, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f6, facility_name: Uncovered SIC, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f7, facility_name: Non-primary NAICS only, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f8, facility_name: Sewerage stays utilities, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f9, facility_name: Primary beats more common unknown, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f10, facility_name: Unknown beats secondary and SIC, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f11, facility_name: Secondary beats SIC, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f12, facility_name: Unknown NAICS without SIC, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f13, facility_name: Null code ignored, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f14, facility_name: Gas pipeline is transportation, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f15, facility_name: REIT is real estate, latitude: 38.5, longitude: -92.1}
+          - {registry_id: f16, facility_name: Photofinishing is other services, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows:
+          - {registry_id: f1, org_name: Acme, org_type: PRIVATE, affiliation_type: OWNER}
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: f1, naics_code: '311111', naics_description: Dog food, is_primary: true}
+          - {registry_id: f7, naics_code: '722511', naics_description: Restaurants, is_primary: false, is_secondary: false}
+          - {registry_id: f9, naics_code: '311111', naics_description: Dog food, is_primary: true, is_secondary: false}
+          - {registry_id: f9, naics_code: '722511', naics_description: Restaurants, is_primary: false, is_secondary: false}
+          - {registry_id: f9, naics_code: '722511', naics_description: Restaurants, is_primary: false, is_secondary: false}
+          - {registry_id: f10, naics_code: '311111', naics_description: Dog food, is_primary: false, is_secondary: true}
+          - {registry_id: f10, naics_code: '722511', naics_description: Restaurants, is_primary: false, is_secondary: false}
+          - {registry_id: f11, naics_code: '311111', naics_description: Dog food, is_primary: false, is_secondary: true}
+          - {registry_id: f12, naics_code: '722511', naics_description: Restaurants, is_primary: false, is_secondary: false}
+          - {registry_id: f13, naics_code: null, naics_description: null, is_primary: true, is_secondary: false}
+          - {registry_id: f13, naics_code: '722511', naics_description: Restaurants, is_primary: false, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows:
+          - {registry_id: f1, sic_code: '5812', sic_description: EATING PLACES, is_primary: true, is_secondary: false}
+          - {registry_id: f2, sic_code: '5812', sic_description: EATING PLACES, is_primary: false, is_secondary: false}
+          - {registry_id: f2, sic_code: '3714', sic_description: MOTOR VEHICLE PARTS, is_primary: true, is_secondary: false}
+          - {registry_id: f3, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: f5, sic_code: '3714', sic_description: MOTOR VEHICLE PARTS, is_primary: false, is_secondary: true}
+          - {registry_id: f5, sic_code: '5812', sic_description: EATING PLACES, is_primary: false, is_secondary: false}
+          - {registry_id: f6, sic_code: '9999', sic_description: NONCLASSIFIABLE, is_primary: true, is_secondary: false}
+          - {registry_id: f7, sic_code: '4911', sic_description: ELECTRIC SERVICES, is_primary: true, is_secondary: false}
+          - {registry_id: f8, sic_code: '4952', sic_description: SEWERAGE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: f10, sic_code: '4911', sic_description: ELECTRIC SERVICES, is_primary: true, is_secondary: false}
+          - {registry_id: f11, sic_code: '4911', sic_description: ELECTRIC SERVICES, is_primary: true, is_secondary: false}
+          - {registry_id: f14, sic_code: '4922', sic_description: NATURAL GAS TRANSMISSION, is_primary: true, is_secondary: false}
+          - {registry_id: f15, sic_code: '6798', sic_description: REAL ESTATE INVESTMENT TRUSTS, is_primary: true, is_secondary: false}
+          - {registry_id: f16, sic_code: '7384', sic_description: PHOTOFINISHING LABORATORIES, is_primary: true, is_secondary: false}
+      - input: ref('sic_naics_sectors')
+        rows:
+          - {sic_prefix: '37', naics_prefix: '31'}
+          - {sic_prefix: '58', naics_prefix: '72'}
+          - {sic_prefix: '49', naics_prefix: '22'}
+          - {sic_prefix: '4922', naics_prefix: '48'}
+          - {sic_prefix: '4953', naics_prefix: '56'}
+          - {sic_prefix: '67', naics_prefix: '52'}
+          - {sic_prefix: '6798', naics_prefix: '53'}
+          - {sic_prefix: '73', naics_prefix: '56'}
+          - {sic_prefix: '7384', naics_prefix: '81'}
+      - input: ref('naics_sectors')
+        rows:
+          - {naics_prefix: '22', sector_code: '22', sector_name: Utilities}
+          - {naics_prefix: '31', sector_code: 31-33, sector_name: Manufacturing}
+          - {naics_prefix: '48', sector_code: 48-49, sector_name: Transportation and Warehousing}
+          - {naics_prefix: '52', sector_code: '52', sector_name: Finance and Insurance}
+          - {naics_prefix: '53', sector_code: '53', sector_name: Real Estate and Rental and Leasing}
+          - {naics_prefix: '56', sector_code: '56', sector_name: Waste Management}
+          - {naics_prefix: '72', sector_code: '72', sector_name: Food Services}
+          - {naics_prefix: '81', sector_code: '81', sector_name: Other Services}
+    expect:
+      rows:
+        - {registry_id: f1, naics_code: '311111', naics_description: Dog food, naics_source: naics}
+        - {registry_id: f2, naics_code: '31', naics_description: "Manufacturing sector, from SIC 3714 MOTOR VEHICLE PARTS", naics_source: sic}
+        - {registry_id: f3, naics_code: '56', naics_description: "Waste Management sector, from SIC 4953 REFUSE SYSTEMS", naics_source: sic}
+        - {registry_id: f4, naics_code: null, naics_description: null, naics_source: null}
+        - {registry_id: f5, naics_code: '72', naics_description: "Food Services sector, from SIC 5812 EATING PLACES", naics_source: sic}
+        - {registry_id: f6, naics_code: null, naics_description: null, naics_source: null}
+        - {registry_id: f7, naics_code: '722511', naics_description: Restaurants, naics_source: naics_unknown}
+        - {registry_id: f8, naics_code: '22', naics_description: "Utilities sector, from SIC 4952 SEWERAGE SYSTEMS", naics_source: sic}
+        - {registry_id: f9, naics_code: '311111', naics_description: Dog food, naics_source: naics}
+        - {registry_id: f10, naics_code: '722511', naics_description: Restaurants, naics_source: naics_unknown}
+        - {registry_id: f11, naics_code: '311111', naics_description: Dog food, naics_source: naics_secondary}
+        - {registry_id: f12, naics_code: '722511', naics_description: Restaurants, naics_source: naics_unknown}
+        - {registry_id: f13, naics_code: '722511', naics_description: Restaurants, naics_source: naics_unknown}
+        - {registry_id: f14, naics_code: '48', naics_description: "Transportation and Warehousing sector, from SIC 4922 NATURAL GAS TRANSMISSION", naics_source: sic}
+        - {registry_id: f15, naics_code: '53', naics_description: "Real Estate and Rental and Leasing sector, from SIC 6798 REAL ESTATE INVESTMENT TRUSTS", naics_source: sic}
+        - {registry_id: f16, naics_code: '81', naics_description: "Other Services sector, from SIC 7384 PHOTOFINISHING LABORATORIES", naics_source: sic}
+
+  - name: epa_frs_facility_naics_tie_prefers_sic_sector
+    model: int_epa_frs__facilities
+    description: >
+      Codes tied on tier and program count go to the one whose two-digit sector agrees with the sector of the
+      facility's SIC code, then to the lowest code (#181). t1: primary codes 111998 and 424510 tie, SIC 5191
+      maps to wholesale (42), so 424510 beats the lower 111998; t2: UNKNOWN-type tie, same rule; t3: neither
+      tied code agrees with the SIC sector, so the lowest wins; t4: no SIC code, lowest wins; t5: the SIC
+      sector never beats a code that more programs give (111998 has two programs) or a better tier.
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: t1, facility_name: Primary tie, latitude: 38.5, longitude: -92.1}
+          - {registry_id: t2, facility_name: Unknown tie, latitude: 38.5, longitude: -92.1}
+          - {registry_id: t3, facility_name: No agreeing code, latitude: 38.5, longitude: -92.1}
+          - {registry_id: t4, facility_name: No SIC, latitude: 38.5, longitude: -92.1}
+          - {registry_id: t5, facility_name: Program count wins, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows: []
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: t1, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: t1, naics_code: '424510', naics_description: Grain wholesale, is_primary: true, is_secondary: false}
+          - {registry_id: t2, naics_code: '111998', naics_description: Crop farming, is_primary: false, is_secondary: false}
+          - {registry_id: t2, naics_code: '424510', naics_description: Grain wholesale, is_primary: false, is_secondary: false}
+          - {registry_id: t3, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: t3, naics_code: '424510', naics_description: Grain wholesale, is_primary: true, is_secondary: false}
+          - {registry_id: t4, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: t4, naics_code: '424510', naics_description: Grain wholesale, is_primary: true, is_secondary: false}
+          - {registry_id: t5, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: t5, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: t5, naics_code: '424510', naics_description: Grain wholesale, is_primary: true, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows:
+          - {registry_id: t1, sic_code: '5191', sic_description: FARM SUPPLIES, is_primary: true, is_secondary: false}
+          - {registry_id: t2, sic_code: '5191', sic_description: FARM SUPPLIES, is_primary: true, is_secondary: false}
+          - {registry_id: t3, sic_code: '4911', sic_description: ELECTRIC SERVICES, is_primary: true, is_secondary: false}
+          - {registry_id: t5, sic_code: '5191', sic_description: FARM SUPPLIES, is_primary: true, is_secondary: false}
+      - input: ref('sic_naics_sectors')
+        rows:
+          - {sic_prefix: '51', naics_prefix: '42'}
+          - {sic_prefix: '49', naics_prefix: '22'}
+      - input: ref('naics_sectors')
+        rows:
+          - {naics_prefix: '11', sector_code: '11', sector_name: Agriculture}
+          - {naics_prefix: '22', sector_code: '22', sector_name: Utilities}
+          - {naics_prefix: '42', sector_code: '42', sector_name: Wholesale Trade}
+    expect:
+      rows:
+        - {registry_id: t1, naics_code: '424510', naics_source: naics}
+        - {registry_id: t2, naics_code: '424510', naics_source: naics_unknown}
+        - {registry_id: t3, naics_code: '111998', naics_source: naics}
+        - {registry_id: t4, naics_code: '111998', naics_source: naics}
+        - {registry_id: t5, naics_code: '111998', naics_source: naics}
+
+  - name: epa_frs_facility_naics_tie_sic_sector_merges_31_33
+    model: int_epa_frs__facilities
+    description: >
+      NAICS 31, 32 and 33 are one sector (Manufacturing), so a SIC 2xxx facility (sic prefix 20 maps to 31) agrees
+      with a tied 33xxxx code. m1: tied 238910 (construction) and 332812 (33) go to 332812, not the lower 238910;
+      m2: tied 238910 and 311111 (31) go to 311111. A plain two-digit compare would pick 238910 for m1.
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: m1, facility_name: Sector 31 vs 33, latitude: 38.5, longitude: -92.1}
+          - {registry_id: m2, facility_name: Sector 31 vs 31, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows: []
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: m1, naics_code: '238910', naics_description: Site preparation, is_primary: true, is_secondary: false}
+          - {registry_id: m1, naics_code: '332812', naics_description: Metal coating, is_primary: true, is_secondary: false}
+          - {registry_id: m2, naics_code: '238910', naics_description: Site preparation, is_primary: true, is_secondary: false}
+          - {registry_id: m2, naics_code: '311111', naics_description: Dog and cat food, is_primary: true, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows:
+          - {registry_id: m1, sic_code: '2011', sic_description: MEAT PACKING, is_primary: true, is_secondary: false}
+          - {registry_id: m2, sic_code: '2011', sic_description: MEAT PACKING, is_primary: true, is_secondary: false}
+      - input: ref('sic_naics_sectors')
+        rows:
+          - {sic_prefix: '20', naics_prefix: '31'}
+      - input: ref('naics_sectors')
+        rows:
+          - {naics_prefix: '11', sector_code: '11', sector_name: Agriculture}
+          - {naics_prefix: '23', sector_code: '23', sector_name: Construction}
+          - {naics_prefix: '31', sector_code: '31-33', sector_name: Manufacturing}
+          - {naics_prefix: '32', sector_code: '31-33', sector_name: Manufacturing}
+          - {naics_prefix: '33', sector_code: '31-33', sector_name: Manufacturing}
+          - {naics_prefix: '42', sector_code: '42', sector_name: Wholesale Trade}
+          - {naics_prefix: '56', sector_code: '56', sector_name: Administrative and Waste Services}
+    expect:
+      rows:
+        - {registry_id: m1, naics_code: '332812', naics_source: naics}
+        - {registry_id: m2, naics_code: '311111', naics_source: naics}
+
+  - name: epa_frs_facility_naics_tie_ignores_sic_tied_across_sectors
+    model: int_epa_frs__facilities
+    description: >
+      When the facility's chosen SIC code is itself tied (same tier and program count) with a SIC code in another
+      sector, the lowest-code tie-break chose it and its sector is no signal. s1: SIC 4953 (sector 56) ties
+      SIC 5015 (42), so the tied NAICS codes 111998 and 561990 go to the lowest, 111998, not the 56 code;
+      s2: SIC 4953 alone (no tie) still pulls 561990;
+      s3: SIC 4953 on two program records beats SIC 5015 (42) on one, so it is not tied (same tier, more programs)
+      and still pulls 561990; s4: SIC 4953 primary beats SIC 5015 (42) secondary, same program count (better tier),
+      so it still pulls 561990. s3 and s4 pin the partition to registry, tier and program count.
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: s1, facility_name: SIC tied across sectors, latitude: 38.5, longitude: -92.1}
+          - {registry_id: s2, facility_name: SIC not tied, latitude: 38.5, longitude: -92.1}
+          - {registry_id: s3, facility_name: SIC wins on program count, latitude: 38.5, longitude: -92.1}
+          - {registry_id: s4, facility_name: SIC wins on tier, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows: []
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: s1, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: s1, naics_code: '561990', naics_description: Other support, is_primary: true, is_secondary: false}
+          - {registry_id: s2, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: s2, naics_code: '561990', naics_description: Other support, is_primary: true, is_secondary: false}
+          - {registry_id: s3, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: s3, naics_code: '561990', naics_description: Other support, is_primary: true, is_secondary: false}
+          - {registry_id: s4, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: s4, naics_code: '561990', naics_description: Other support, is_primary: true, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows:
+          - {registry_id: s1, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: s1, sic_code: '5015', sic_description: MOTOR VEHICLE PARTS USED, is_primary: true, is_secondary: false}
+          - {registry_id: s2, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: s3, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: s3, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: s3, sic_code: '5015', sic_description: MOTOR VEHICLE PARTS USED, is_primary: true, is_secondary: false}
+          - {registry_id: s4, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: s4, sic_code: '5015', sic_description: MOTOR VEHICLE PARTS USED, is_primary: false, is_secondary: true}
+      - input: ref('sic_naics_sectors')
+        rows:
+          - {sic_prefix: '4953', naics_prefix: '56'}
+          - {sic_prefix: '5015', naics_prefix: '42'}
+      - input: ref('naics_sectors')
+        rows:
+          - {naics_prefix: '11', sector_code: '11', sector_name: Agriculture}
+          - {naics_prefix: '23', sector_code: '23', sector_name: Construction}
+          - {naics_prefix: '31', sector_code: '31-33', sector_name: Manufacturing}
+          - {naics_prefix: '32', sector_code: '31-33', sector_name: Manufacturing}
+          - {naics_prefix: '33', sector_code: '31-33', sector_name: Manufacturing}
+          - {naics_prefix: '42', sector_code: '42', sector_name: Wholesale Trade}
+          - {naics_prefix: '56', sector_code: '56', sector_name: Administrative and Waste Services}
+    expect:
+      rows:
+        - {registry_id: s1, naics_code: '111998', naics_source: naics}
+        - {registry_id: s2, naics_code: '561990', naics_source: naics}
+        - {registry_id: s3, naics_code: '561990', naics_source: naics}
+        - {registry_id: s4, naics_code: '561990', naics_source: naics}
+
+  - name: epa_frs_facility_naics_tie_ignores_sic_1629
+    model: int_epa_frs__facilities
+    description: >
+      SIC 1629 is mostly construction stormwater-permit noise, so it gives no signal. c1: SIC 1629 (sector 23)
+      with tied 111998 and 238910 goes to the lowest, 111998; c2: the same facility with SIC 1623 (23) still
+      pulls 238910.
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: c1, facility_name: SIC 1629, latitude: 38.5, longitude: -92.1}
+          - {registry_id: c2, facility_name: SIC 1623, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows: []
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: c1, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: c1, naics_code: '238910', naics_description: Site preparation, is_primary: true, is_secondary: false}
+          - {registry_id: c2, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: c2, naics_code: '238910', naics_description: Site preparation, is_primary: true, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows:
+          - {registry_id: c1, sic_code: '1629', sic_description: HEAVY CONSTRUCTION NEC, is_primary: true, is_secondary: false}
+          - {registry_id: c2, sic_code: '1623', sic_description: WATER SEWER PIPELINE, is_primary: true, is_secondary: false}
+      - input: ref('sic_naics_sectors')
+        rows:
+          - {sic_prefix: '16', naics_prefix: '23'}
+      - input: ref('naics_sectors')
+        rows:
+          - {naics_prefix: '11', sector_code: '11', sector_name: Agriculture}
+          - {naics_prefix: '23', sector_code: '23', sector_name: Construction}
+          - {naics_prefix: '31', sector_code: '31-33', sector_name: Manufacturing}
+          - {naics_prefix: '32', sector_code: '31-33', sector_name: Manufacturing}
+          - {naics_prefix: '33', sector_code: '31-33', sector_name: Manufacturing}
+          - {naics_prefix: '42', sector_code: '42', sector_name: Wholesale Trade}
+          - {naics_prefix: '56', sector_code: '56', sector_name: Administrative and Waste Services}
+    expect:
+      rows:
+        - {registry_id: c1, naics_code: '111998', naics_source: naics}
+        - {registry_id: c2, naics_code: '238910', naics_source: naics}

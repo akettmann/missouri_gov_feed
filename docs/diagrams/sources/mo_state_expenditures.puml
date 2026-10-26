@@ -1,0 +1,14 @@
+@startuml mo_state_expenditures
+title mo_state_expenditures: Missouri state expenditures (data.mo.gov)
+start
+:Socrata catalog: "<year> State Expenditures" dataset ids;
+:for each fiscal year in MOGOV_LOOKBACK_YEARS (one shard unit each):
+row count, then pages of 50,000 rows ordered by :id
+(short page = failure, nothing published);
+note right: rows verbatim, every agency and payee
+:mo_state_expenditures;
+:dbt: LEGISLATURE per diem and in-state mileage payees
+paired with payroll names (fct_salaries) by surname,
+first name, middle initial and year -> fct_legislator_expenses;
+stop
+@enduml

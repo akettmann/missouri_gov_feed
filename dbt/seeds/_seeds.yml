@@ -196,6 +196,17 @@ seeds:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [industry, subject_name]
+  - name: election_office_keys
+    description: >
+      Maps an office as titled in the Secretary of State's election returns (the part of a contest title before
+      " - ", as fct_election_races.office) to the dim_official office of the same elected position, so a winner
+      can be linked to the current official. Judges are linked only for the Supreme Court and Court of Appeals.
+      Add a title if the returns rename one (the 2012-2018 files print "Lt. Governor" and "Treasurer").
+    columns:
+      - name: office
+        data_tests: [unique, not_null]
+      - name: official_office
+        data_tests: [not_null]
   - name: mo_payroll_office_titles
     description: >
       The position titles on Missouri's state payroll (mo_employee_pay) that are elected or judicial offices,
@@ -204,3 +215,126 @@ seeds:
     columns:
       - name: position_title
         data_tests: [unique, not_null]
+  - name: sic_naics_sectors
+    description: >
+      Maps a SIC code prefix (1987 Standard Industrial Classification; two digits, the major group, or a longer
+      prefix where one group splits across sectors) to the first two digits of the NAICS sector it falls in, a
+      naics_sectors.naics_prefix. The longest matching prefix wins, so a 3- or 4-digit row overrides its major
+      group: 4953/4959 (refuse systems and other sanitary services) are 56 while the rest of 49 stays
+      utilities (22), including 4952 sewerage systems (NAICS 221320) while 4922 and 4923 gas transmission are pipeline transportation (48); 737 computer services is 54 with 7372, 7374 and
+      7375 (software, data processing, information retrieval) in 51; the 07 vet, animal and lawn/garden services, 27
+      publishing, 67 holding companies and patent lessors (6798 REITs are 53), 731 advertising and 735 equipment
+      rental likewise; 73 business services is 56 but 7331, 7335, 7336 are 54, 7383 is 51 and 7384 is 81, and a
+      few other 4-digit codes the concordance puts in one sector other than their group's (4493 marinas, 6552 land
+      subdividers 23, 7514 car rental 53, 8399 81 ...) have rows. Every row was checked in October 2026 against
+      the Census Bureau's 1987 SIC to 2002 NAICS concordance carried forward through its 2002-2007, 2007-2012,
+      2012-2017 and 2017-2022 NAICS concordances (census.gov/naics). SIC 4955 is not in that concordance and has no row. Major groups are coarser than NAICS industries,
+      so this gives a sector, never a NAICS code; groups that still straddle sectors (73 business services is
+      mostly 56 but also 51, 54 and 81 in places; 79 amusement, 80 health, 87 and 89 services) take the majority one.
+      Ties between two sectors: 0752 animal specialty services (11 or 81; kept 81, pet care), 4923 gas transmission
+      and distribution (22 or 48; set 48 with 4922), 7331 (51 or 54), 7335 (48 or 54), 7383 (51 or 71) and 7378 (44
+      or 81; kept 81), and 89 services not elsewhere classified (51 or 54; kept 54). Also left in their group
+      although the concordance splits them: 1389, 2771 greeting cards (31 or 51), 3295, 5099, 5171, 5441, 5699, 5712, 7353. Majorities and ties are judged by concordance row count, with judgement overrides where rows are slices of one niche activity: 8741 management services has 10 construction-management rows (one per construction industry, sector 23) but is set 56 for the one general row (561110), which is the bulk of the code. int_epa_frs__facilities uses it for sites whose FRS records carry a SIC code but no NAICS code.
+    config:
+      column_types: {sic_prefix: varchar, naics_prefix: varchar}
+    columns:
+      - name: sic_prefix
+        data_tests: [unique, not_null]
+      - name: naics_prefix
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('naics_sectors')
+                field: naics_prefix
+  - name: official_id_links
+    description: >
+      Hand-kept links between the ids one legislator is known by (#97), applied by int_officials__person_ids on top of
+      its same-exact-name rule. relation same_person: alias_id is another id of the person whose current id is
+      person_id (a former legislator now a statewide officer or judge, whom the name rule leaves alone because they
+      hold no legislative seat today). relation different_people: alias_id and person_id are two people who share a
+      name; the name rule never merges that name, and the no-shared-name test accepts the pair. Every row records
+      its evidence. The links were made by an automated check and take effect only once a maintainer signs the
+      row off by filling checked_by and checked_on; unsigned rows are ignored by int_officials__person_ids.
+    config:
+      column_types:
+        {alias_id: varchar, person_id: varchar, relation: varchar, basis: varchar, evidence: varchar,
+         checked_by: varchar, checked_on: date}
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [alias_id, person_id, relation]
+    columns:
+      - name: alias_id
+        data_tests: [not_null]
+      - name: person_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('int_officials__current')
+                field: official_id
+              config:
+                where: "relation = 'same_person'"
+      - name: relation
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [same_person, different_people]
+      - name: evidence
+        data_tests: [not_null]
+      - name: checked_by
+        description: Maintainer who reviewed the row; empty until reviewed.
+      - name: checked_on
+        description: Date the maintainer reviewed the row; empty until reviewed.
+  - name: epa_frs_name_corrections
+    description: >
+      Maintainer overrides for EPA FRS names whose raw text contains U+FFFD (EPA's file lost a non-ASCII letter).
+      Staging repairs these by itself from the MO_ALTERNATIVE_NAME_FILE (stg_epa_frs__alt_names: the one alternative
+      name that equals the damaged name with each run of U+FFFD standing for one character), which covers the three
+      names seen so far (DECOR PLUS twice, MARBLE DECOR INC). The seed still holds those three cases so a raw
+      directory landed before the alternative-name table existed (mogov build gives it an empty placeholder) repairs
+      them too; once alternative names are loaded the rows are redundant (they agree with the alternative names) and
+      can be retired. Add a row only when the alternative names cannot repair a name (none, or two different
+      matches); a row wins over the alternative name.
+      Every row cites the EPA record that attests the value, never a guess. Applied in stg_epa_frs__facilities
+      (record_key = registry_id) and stg_epa_frs__organizations (record_key = registry_id|program_system|program_id)
+      only while the raw text still contains U+FFFD, and to every organization row on that key, so a row must not be
+      used where two affiliations on one program record have different names. Any other U+FFFD is dropped.
+    config:
+      column_types: {record_key: varchar, field: varchar, corrected_value: varchar, source: varchar}
+    columns:
+      - name: record_key
+        data_tests: [unique, not_null]
+      - name: field
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [facility_name, org_name]
+      - name: corrected_value
+        data_tests: [not_null]
+      - name: source
+        data_tests: [not_null]
+  - name: mo_auditor_statewide_entities
+    description: >
+      Audit report titles that audit a statewide elected office, matched as a case-insensitive prefix of the
+      Auditor's report title (titles vary by year: "Office of State Treasurer", "Office of the State Treasurer/
+      Year Ended June 30, 2011", "State Treasurer's Office"). `office` is the key in statewide_officials. Only
+      these audits are linked to an officeholder (fct_audit_reports); a county audit never is, because the
+      Auditor's summary says the rating "does not indicate the performance of any one elected official".
+      Add a prefix when a new title form appears (assert_audit_statewide_titles_map_to_one_office checks that
+      none matches two offices).
+    config:
+      column_types: {title_prefix: varchar, office: varchar}
+    columns:
+      - name: title_prefix
+        data_tests: [unique, not_null]
+      - name: office
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('statewide_officials')
+                field: office

@@ -4,6 +4,7 @@
 import ConfidenceBadge from "./ConfidenceBadge.astro";
 import SourceLink from "./SourceLink.astro";
 import type { OfficialBundle } from "../lib/exports/types";
+import { voteCastLabel } from "../lib/attendance";
 import { count, money } from "../lib/format";
 import { href } from "../lib/site";
 
@@ -21,7 +22,10 @@ const industryLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).repl
     industry.
     <strong>This shows co-occurrence, not cause:</strong> officials often get money from groups that already
     agree with them, and most bills pass with wide support.{" "}
-    <a href={href("/methodology/#interest-votes")}>How it's matched</a>.
+    <a href={href("/methodology/#interest-votes")}>
+      How it's matched<span class="sr-only"> for industry votes</span>
+    </a>
+    .
   </p>
   {overlap === null ? (
     <p class="muted small">Not available yet (the rpt_interest_vote_overlap export is missing).</p>
@@ -69,7 +73,8 @@ const industryLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).repl
                     {o.examples.map((e) => (
                       <li>
                         {e.vote_date} · <SourceLink url={e.bill_source_url} label={e.bill} />
-                        {e.short_title && <span class="muted"> {e.short_title}</span>} · voted {e.vote_cast} ·{" "}
+                        {e.short_title && <span class="muted"> {e.short_title}</span>} · voted{" "}
+                        {voteCastLabel(e.vote_cast)} ·{" "}
                         <SourceLink url={e.vote_source_url} label="roll call" />
                       </li>
                     ))}

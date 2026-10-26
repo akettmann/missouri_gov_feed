@@ -1,0 +1,26 @@
+# Unit tests for the MO Senate votes staging model: fixed source rows -> exact expected rows.
+version: 2
+
+unit_tests:
+  - name: senate_excused_from_voting_is_a_recusal
+    model: stg_mo_senate__votes
+    description: >
+      Every journal vote category maps to a vote_cast. "Excused from voting" is a Senate Rule 91 recusal by a
+      member on the floor: it maps to its own `recused`, not `absent with leave` (an absence) or `not voting`
+      (Congress; counted as unexcused) (#113).
+    given:
+      - input: source('mo_senate', 'votes')
+        format: sql
+        rows: |
+            select cast('{"url": "j1", "year": 2025, "block_index": 1, "journal_date": "March 10, 2025", "context": "SB 1", "category": "YEAS", "name": "Brown"}' as varchar) as payload union all
+            select cast('{"url": "j1", "year": 2025, "block_index": 1, "journal_date": "March 10, 2025", "context": "SB 1", "category": "NAYS", "name": "Eigel"}' as varchar) as payload union all
+            select cast('{"url": "j1", "year": 2025, "block_index": 1, "journal_date": "March 10, 2025", "context": "SB 1", "category": "Absent", "name": "Schupp"}' as varchar) as payload union all
+            select cast('{"url": "j1", "year": 2025, "block_index": 1, "journal_date": "March 10, 2025", "context": "SB 1", "category": "Absent with leave", "name": "Hoskins"}' as varchar) as payload union all
+            select cast('{"url": "j1", "year": 2025, "block_index": 1, "journal_date": "March 10, 2025", "context": "SB 1", "category": "Excused from voting", "name": "Hegeman"}' as varchar) as payload
+    expect:
+      rows:
+        - {senator_token: Brown, vote_cast: yea}
+        - {senator_token: Eigel, vote_cast: nay}
+        - {senator_token: Schupp, vote_cast: absent}
+        - {senator_token: Hoskins, vote_cast: absent with leave}
+        - {senator_token: Hegeman, vote_cast: recused}

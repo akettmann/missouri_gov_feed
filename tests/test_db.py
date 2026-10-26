@@ -82,3 +82,23 @@ def test_shard_with_nothing_keeps_previous_count_parts(raw_dir):
     assert [k for k, _ in _rows("t")] == ["old"]
     db.replace_json("t", [("new", {})], shard=db.Shard(0, 2))
     assert [k for k, _ in _rows("t")] == ["new"]
+
+
+def test_ensure_optional_tables_creates_missing_epa_frs_sic_placeholder():
+    # Raw dirs landed before the SIC file joined the EPA FRS loader (#155) must still build.
+    assert "epa_frs_sic" in db.ensure_optional_tables()
+    assert _rows("epa_frs_sic") == []
+    assert "epa_frs_sic" not in db.ensure_optional_tables()  # idempotent; a landed table is left alone
+
+
+def test_ensure_optional_tables_leaves_landed_rows_alone():
+    db.replace_json("epa_frs_sic", [("k1", {"sic": "1"})])
+    assert "epa_frs_sic" not in db.ensure_optional_tables()
+    assert [k for k, _ in _rows("epa_frs_sic")] == ["k1"]  # the real row survived; no placeholder overwrote it
+
+
+def test_optional_json_tables_map_to_registered_loaders():
+    from mogov.loaders import REGISTRY, load_all_modules
+
+    load_all_modules()
+    assert set(db.OPTIONAL_JSON_TABLES.values()) <= set(REGISTRY)

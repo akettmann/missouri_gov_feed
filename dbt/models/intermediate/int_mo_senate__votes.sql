@@ -12,7 +12,7 @@ candidates as (
     select
         v.vote_id,
         v.senator_token,
-        seat.openstates_id as person_key,
+        seat.person_id as person_key,
         seat.party
     from votes as v
     inner join {{ ref('int_mo_legislators__seats') }} as seat

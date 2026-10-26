@@ -1,6 +1,14 @@
 // rpt_awards for the awards page: each award ranks one measured number within one office, paired with its
 // opposite. The ranking itself is done in dbt; this only attaches names and links.
+import {
+  assertKnownPeriodKinds,
+  assertPeriodKindColumn,
+  awardCyclesGate,
+  legacyPeriodKind,
+  type PeriodKind,
+} from "./awardDefs";
 import { hasExport, query } from "./db";
+import { currentAwards, pluralOfficeLabel, type Badge } from "../awardBadges";
 import { allOfficials } from "./load";
 
 export interface AwardEntry {
@@ -10,62 +18,32 @@ export interface AwardEntry {
   party: string | null;
   metric: number;
   sample_size: number | null;
+  /** Consecutive yearly periods qualified, up to this one; null for the lifetime period. */
+  streak_years: number | null;
 }
 export interface AwardList {
   award: string;
   office: string;
   period: string;
+  /** From rpt_awards.period_kind: a calendar year, a two-year FEC cycle (even end year) or lifetime. */
+  period_kind: PeriodKind;
   group_size: number;
   entries: AwardEntry[];
 }
 
-/** Display order and pairing: each pair is [the award, its positive opposite]. */
-export const AWARD_PAIRS: [string, string][] = [
-  ["lowest_attendance", "highest_attendance"],
-  ["most_committee_money", "least_committee_money_share"],
-  ["most_party_breaks", "most_party_loyal"],
-];
-
-/** `name` is the award's nickname (the heading); `title` says plainly what is measured, shown under it. */
-export const AWARDS: Record<
-  string,
-  { name: string; title: string; unit: "pct" | "money"; outOf?: "votes" | "raised" }
-> = {
-  lowest_attendance: {
-    name: "The “Where Do I Work Again?” Award",
-    title: "Lowest attendance",
-    unit: "pct",
-    outOf: "votes",
-  },
-  highest_attendance: {
-    name: "The “Never Misses a Vote” Award",
-    title: "Highest attendance",
-    unit: "pct",
-    outOf: "votes",
-  },
-  most_committee_money: {
-    name: "The “PAC Magnet” Award",
-    title: "Most money from PACs, committees & parties",
-    unit: "money",
-    outOf: "raised",
-  },
-  least_committee_money_share: {
-    name: "The “Grassroots Funded” Award",
-    title: "Least reliant on PACs, committees & parties",
-    unit: "pct",
-    outOf: "raised",
-  },
-  most_party_breaks: {
-    name: "The “Maverick” Award",
-    title: "Breaks with their party most often",
-    unit: "pct",
-  },
-  most_party_loyal: {
-    name: "The “Team Player” Award",
-    title: "Votes with their party most often",
-    unit: "pct",
-  },
-};
+export {
+  AWARD_PAIRS,
+  AWARDS,
+  assertCyclePeriods,
+  assertKnownPeriodKinds,
+  assertPeriodKindColumn,
+  awardCyclesGate,
+  skipAwardCyclesCheck,
+  cycleLabel,
+  isCycleList,
+  officeHasCycles,
+  periodWhen,
+} from "./awardDefs";
 
 let cache: Promise<AwardList[] | null> | undefined;
 
@@ -77,30 +55,42 @@ export function awardLists(): Promise<AwardList[] | null> {
 
 async function load(): Promise<AwardList[] | null> {
   if (!hasExport("rpt_awards")) return null;
+  const columns = await query<{ column_name: string }>(
+    "select column_name from (describe select * from {rpt_awards})",
+  );
+  const hasKind = assertPeriodKindColumn(
+    columns.map((c) => c.column_name),
+    process.env,
+    console.warn,
+  );
   const officials = new Map((await allOfficials()).map((b) => [b.official.official_id, b.official]));
   const rows = await query<{
     award: string;
     office: string;
     period: string;
+    period_kind: PeriodKind;
     award_rank: number;
     official_id: string;
     metric: number;
     sample_size: number | null;
     group_size: number;
+    streak_years: number | null;
   }>(`
-    select award, office, period, cast(award_rank as integer) as award_rank, official_id,
+    select award, office, period, ${hasKind ? "period_kind" : "cast(null as varchar) as period_kind"}, cast(award_rank as integer) as award_rank, official_id,
            cast(metric as double) as metric, cast(sample_size as double) as sample_size,
-           cast(group_size as integer) as group_size
+           cast(group_size as integer) as group_size, cast(streak_years as integer) as streak_years
     from {rpt_awards} order by award, office, period, award_rank`);
   const lists = new Map<string, AwardList>();
   for (const r of rows) {
     const o = officials.get(r.official_id);
     if (!o) continue;
     const key = `${r.award}|${r.office}|${r.period}`;
+    const kind = hasKind ? r.period_kind : legacyPeriodKind(r.award, r.office, r.period);
     const list = lists.get(key) ?? {
       award: r.award,
       office: r.office,
       period: r.period,
+      period_kind: kind,
       group_size: r.group_size,
       entries: [],
     };
@@ -111,8 +101,20 @@ async function load(): Promise<AwardList[] | null> {
       party: o.party,
       metric: r.metric,
       sample_size: r.sample_size,
+      streak_years: r.streak_years,
     });
     lists.set(key, list);
   }
-  return [...lists.values()];
+  const out = [...lists.values()];
+  assertKnownPeriodKinds(out);
+  awardCyclesGate(out, process.env, console.warn);
+  return out;
+}
+
+let currentCache: Promise<Map<string, Badge[]>> | undefined;
+
+/** slug -> the awards that official holds now (empty map when the export is missing). */
+export function currentAwardsBySlug(): Promise<Map<string, Badge[]>> {
+  currentCache ??= awardLists().then((lists) => currentAwards(lists ?? [], pluralOfficeLabel));
+  return currentCache;
 }

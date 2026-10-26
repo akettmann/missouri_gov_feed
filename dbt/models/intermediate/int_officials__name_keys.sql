@@ -3,6 +3,7 @@
 with base as (
     select
         official_id,
+        openstates_id,
         level,
         office,
         full_name,
@@ -26,7 +27,7 @@ variants as (
         b.official_id,
         n.alt_name as variant
     from base as b
-    inner join {{ ref('stg_openstates__other_names') }} as n on b.official_id = n.openstates_id
+    inner join {{ ref('stg_openstates__other_names') }} as n on b.openstates_id = n.openstates_id
     where n.alt_name not like '%,%'
 )
 

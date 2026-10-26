@@ -5,8 +5,12 @@ const num = new Intl.NumberFormat("en-US");
 export const money = (n: number) => (Math.abs(n) >= 1000 ? usd0 : usd2).format(n);
 export const count = (n: number) => num.format(n);
 
+/** Federal courts: `district` holds a court key (moed, mowd, ca8), and the title already names the court. */
+const COURT_OFFICES = ["us_district_court", "us_court_of_appeals"];
+
 export function officeLine(o: { office_title: string | null; office: string; district: string | null }) {
   const title = o.office_title ?? o.office.replaceAll("_", " ");
+  if (COURT_OFFICES.includes(o.office)) return title;
   return o.district && !title.includes(o.district) ? `${title}, district ${o.district}` : title;
 }
 
@@ -18,13 +22,15 @@ export function statusKind(status: string): "available" | "none" | "not-public" 
   return "none";
 }
 
-/** MO House codes are two-digit year + type (1 regular, 2-4 extraordinary); Senate uses the year; Congress its number. */
-export function sessionLabel(chamber: string, code: string): string {
+/**
+ * The one session label. A House session is named by the House itself (dim_house_session: "2025 1st
+ * Extraordinary Session", "2018 Special Session"), because the numbering of its extraordinary sessions is
+ * irregular and no rule on the code works. When the name is missing the label says so ("session code 261")
+ * rather than guessing a number. The Senate's session is its year; Congress its number.
+ */
+export function sessionLabel(chamber: string, code: string, houseName?: string | null): string {
   if (chamber.startsWith("us_")) return `${code}th Congress`;
-  if (chamber === "state_house" && /^\d{3}$/.test(code)) {
-    const year = `20${code.slice(0, 2)}`;
-    return code[2] === "1" ? `${year} regular` : `${year} extraordinary ${Number(code[2]) - 1}`;
-  }
+  if (chamber === "state_house") return houseName || `session code ${code}`;
   return code;
 }
 
@@ -87,3 +93,44 @@ export const OFFICE_GROUPS: { key: string; label: string; offices: Record<string
 ];
 
 export const officeGroup = (office: string) => OFFICE_GROUPS.find((g) => office in g.offices)?.key ?? "other";
+
+/** [2017, 2018, 2020] -> "2017–2018, 2020": consecutive years collapse into a range. */
+export function yearRanges(years: number[]): string {
+  const out: string[] = [];
+  const sorted = [...new Set(years)].sort((a, b) => a - b);
+  for (let i = 0; i < sorted.length;) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) j++;
+    out.push(j > i ? `${sorted[i]}–${sorted[j]}` : String(sorted[i]));
+    i = j + 1;
+  }
+  return out.join(", ");
+}
+
+/**
+ * Streak marker for an award: "X3" with a spoken label "3 qualifying years in a row" (or "3 qualifying cycles
+ * in a row" when the streak counts two-year FEC cycles); null below 2 (no marker).
+ */
+export function streakMarker(
+  years: number | null | undefined,
+  cycles = false,
+): { text: string; label: string } | null {
+  if (years == null || years < 2) return null;
+  return { text: `X${years}`, label: `${years} qualifying ${cycles ? "cycles" : "years"} in a row` };
+}
+
+/** Plain names for the roster sources behind rpt_officeholders_by_year; unknown values show as given. */
+export const ROSTER_SOURCES: Record<string, string> = {
+  "mo_house roster": "Missouri House roster",
+  openstates: "Open States people data",
+  "congress-legislators": "congress-legislators (U.S. Congress)",
+  fjc: "Federal Judicial Center biographical directory",
+};
+
+/** Roster links that download a file rather than open a page, so the reader is told before clicking. */
+export function rosterDownloadNote(source: string, links: number): string | null {
+  if (source !== "mo_house roster") return null;
+  return links > 1
+    ? "each year is a ZIP download (2-3 MB) of that session's XML"
+    : "the link is a ZIP download (2-3 MB) of that session's XML";
+}

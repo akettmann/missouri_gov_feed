@@ -1,10 +1,12 @@
 ---
 // One past year of the browse list as a plain page, so the look-back works without JavaScript.
 // The home page links here inside <noscript>; the same rows feed lookup/officeholders/<year>.json.
+import AwardBadges from "../../components/AwardBadges.astro";
 import type { GetStaticPaths } from "astro";
 import Layout from "../../layouts/Layout.astro";
 import { officialIndex, pastOfficeholders } from "../../lib/exports/load";
 import type { PastOfficeholder } from "../../lib/exports/types";
+import { plural } from "../../lib/businessCounts";
 import { LEVELS, officeLine } from "../../lib/format";
 import { buildOfficeGroups, missingOfficeLabels, pastNote } from "../../lib/lookback";
 import { href } from "../../lib/site";
@@ -50,7 +52,7 @@ const { rows, year, years, currentYear, missing } = Astro.props as {
     ))}
   </nav>
   <p class="small muted">
-    {rows.length} officeholders in {year}
+    {plural(rows.length, "officeholder", "officeholders")} in {year}
   </p>
   <div class="table-scroll card list">
     <table aria-label={`Officeholders in ${year}`}>
@@ -65,7 +67,10 @@ const { rows, year, years, currentYear, missing } = Astro.props as {
       <tbody>
         {rows.map((o) => (
           <tr>
-            <td>{o.slug ? <a href={href(`/officials/${o.slug}/`)}>{o.full_name}</a> : o.full_name}</td>
+            <td>
+              <a href={href(`/officials/${o.slug}/`)}>{o.full_name}</a>
+              <AwardBadges slug={o.slug} />
+            </td>
             <td>{officeLine(o)}</td>
             <td>{o.party ?? <span class="muted">none listed</span>}</td>
             <td>{LEVELS[o.level] ?? o.level}</td>

@@ -6,7 +6,12 @@
 -- Individual federal donors are summarized in fct_federal_donor_summary rather than listed.
 -- A Missouri committee donor's own MECID (counterparty_mec_committee_id) comes from the name crosswalk
 -- int_mec__donor_committees, unique matches only; it's how the profile goes one hop back (rpt_committee_donors).
-with fec_ids as (
+-- Grain: (official_id, direction, source_record_id). source_record_id is the source row's own identity: FEC
+-- sub_id, TAP contribution (record_id: txn or cd1_a_id, deduplicated in staging, #82/#83) or expenditure id, or
+-- MEC export record id.
+with
+
+fec_ids as (
     select
         o.official_id,
         f.fec_candidate_id
@@ -35,7 +40,11 @@ fec_received as (
         c.transaction_kind as kind,
         'FEC' as source,
         'exact id' as match_confidence,
-        'https://www.fec.gov/data/receipts/?committee_id=' || c.giving_committee_id as source_url
+        -- the donor committee's disbursements narrowed to this recipient with fec.gov's recipient_name filter,
+        -- which full-text matches committee ids (its receipts page would not show the gift)
+        'https://www.fec.gov/data/disbursements/?committee_id=' || c.giving_committee_id
+        || '&recipient_name=' || c.recipient_committee_id as source_url,
+        'fec:' || cast(c.sub_id as {{ dbt.type_string() }}) as source_record_id
     from {{ ref('stg_fec__committee_contributions') }} as c
     inner join fec_ids as i on c.candidate_id = i.fec_candidate_id
     left join {{ ref('stg_fec__committees') }} as g on c.giving_committee_id = g.committee_id
@@ -56,7 +65,10 @@ fec_given as (
         c.transaction_kind || coalesce(' (from ' || g.committee_name || ')', '') as kind,
         'FEC' as source,
         'exact id' as match_confidence,
-        'https://www.fec.gov/data/disbursements/?committee_id=' || c.giving_committee_id as source_url
+        -- the official's committee's disbursements narrowed to this recipient (recipient_name matches committee ids)
+        'https://www.fec.gov/data/disbursements/?committee_id=' || c.giving_committee_id
+        || '&recipient_name=' || c.recipient_committee_id as source_url,
+        'fec:' || cast(c.sub_id as {{ dbt.type_string() }}) as source_record_id
     from {{ ref('stg_fec__committee_contributions') }} as c
     inner join fec_committees as fc on c.giving_committee_id = fc.committee_id
     left join {{ ref('stg_fec__committees') }} as g on c.giving_committee_id = g.committee_id
@@ -80,6 +92,7 @@ mec_received as (
         'MEC (via Accountability Project)' as source,
         m.confidence as match_confidence,
         'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url,
+        'tap_contrib:' || c.record_id as source_record_id,
         x.mec_committee_id as counterparty_mec_committee_id,
         x.match_confidence as counterparty_link_confidence
     from {{ ref('stg_tap_mec__contributions') }} as c
@@ -106,7 +119,8 @@ mec_given as (
         lower(e.purpose) || ' from ' || m.committee_name as kind,
         'MEC (via Accountability Project)' as source,
         m.confidence as match_confidence,
-        'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url
+        'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url,
+        'tap_cd3_b:' || cast(e.record_id as {{ dbt.type_string() }}) as source_record_id
     from {{ ref('stg_tap_mec__expenditures') }} as e
     inner join {{ ref('int_mec__official_committees') }} as m on e.mec_committee_id = m.mec_committee_id
     where
@@ -131,6 +145,7 @@ mec_direct_received as (
         'MEC' as source,
         m.confidence as match_confidence,
         'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url,
+        'mec_cd1_a:' || cast(c.record_id as {{ dbt.type_string() }}) as source_record_id,
         x.mec_committee_id as counterparty_mec_committee_id,
         x.match_confidence as counterparty_link_confidence
     from {{ ref('stg_mec__contributions') }} as c
@@ -155,14 +170,15 @@ mec_direct_given as (
         lower(c.contribution_kind) || ' contribution from ' || m.committee_name as kind,
         'MEC' as source,
         m.confidence as match_confidence,
-        'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url
+        'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url,
+        'mec_cd3_c:' || cast(c.record_id as {{ dbt.type_string() }}) as source_record_id
     from {{ ref('stg_mec__contributions_made') }} as c
     inner join {{ ref('int_mec__official_committees') }} as m on c.mec_committee_id = m.mec_committee_id
 )
 {% endif %}
 
 {% set cols = 'official_id, direction, level, transaction_date, amount, counterparty, counterparty_organization,
-    counterparty_type, kind, source, match_confidence, source_url' %}
+    counterparty_type, kind, source, match_confidence, source_url, source_record_id' %}
 {% set link = 'counterparty_mec_committee_id, counterparty_link_confidence' %}
 {% set no_link = 'cast(null as ' ~ dbt.type_string() ~ ') as counterparty_mec_committee_id, cast(null as '
     ~ dbt.type_string() ~ ') as counterparty_link_confidence' %}

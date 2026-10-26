@@ -6,13 +6,20 @@
 import ConfidenceBadge from "./ConfidenceBadge.astro";
 import SourceLink from "./SourceLink.astro";
 import type { OfficialBundle } from "../lib/exports/types";
+import { districtSiteLists } from "../lib/exports/districtSites";
+import DonorLinks from "./DonorLinks.astro";
+import { donorEntries } from "../lib/donorLinks";
+import { sitesText } from "../lib/businessCounts";
 import { count, money } from "../lib/format";
 import { href } from "../lib/site";
+import { siteLinkContexts } from "../lib/siteLinkNames";
 
 interface Props {
   bundle: OfficialBundle;
 }
 const { businesses } = Astro.props.bundle;
+// the full per-district list lives on its own page (and CSV) so the per-official JSON stays small
+const siteList = (await districtSiteLists())?.get(Astro.props.bundle.official.official_id);
 const industries = businesses?.industries ?? [];
 const totalSites = industries.reduce((n, i) => n + i.n_sites, 0);
 // bars compare the coded sectors; the uncoded group is usually most of the sites and would flatten them
@@ -20,6 +27,9 @@ const maxSites = Math.max(1, ...industries.filter((i) => i.sector_code).map((i) 
 // when every donor is a possible match, "Hide possible matches" would leave a bare table header
 const allPossible =
   (businesses?.donors.length ?? 0) > 0 && businesses?.donors.every((d) => d.match_confidence === "medium");
+// one distinct screen-reader name per EPA record link across the whole section
+const donorSites = (businesses?.donors ?? []).flatMap((d) => d.sites);
+const siteContext = new Map(siteLinkContexts(donorSites).map((c, i) => [donorSites[i], c] as const));
 const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : `${a}–${b}`);
 ---
 
@@ -30,7 +40,10 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
     represents, with the companies among them that gave this official campaign money listed first.{" "}
     <strong>This shows co-occurrence, not influence:</strong> companies often give to the officials who
     represent the places they operate.{" "}
-    <a href={href("/methodology/#district-businesses")}>How it's matched</a>.
+    <a href={href("/methodology/#district-businesses")}>
+      How it's matched<span class="sr-only"> for businesses in their area</span>
+    </a>
+    .
   </p>
   {businesses === null ? (
     <p class="muted small">
@@ -55,7 +68,7 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
       <h3>Companies here that gave to this official</h3>
       {businesses.donors.length === 0 ? (
         <p class="muted small">
-          None of the {count(totalSites)} sites matched a donor to this official by name or listed brand.
+          None of the {sitesText(totalSites)} matched a donor to this official by name or listed brand.
         </p>
       ) : (
         <>
@@ -77,7 +90,7 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
                 </tr>
               </thead>
               <tbody>
-                {businesses.donors.map((d) => (
+                {businesses.donors.map((d, ri) => (
                   <tr data-confidence={d.match_confidence === "medium" ? "medium" : undefined}>
                     <td>
                       {d.donor_names} <ConfidenceBadge confidence={d.match_confidence} />
@@ -110,14 +123,19 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
                                   same brand
                                 </span>
                               )}{" "}
-                              · <SourceLink url={s.frs_url} label="EPA record" />
+                              · <SourceLink url={s.frs_url} label="EPA record" context={siteContext.get(s)} />
                             </li>
                           ))}
                         </ul>
                       </details>
                     </td>
                     <td>
-                      <SourceLink url={d.contributions_url} label="reports" />
+                      <DonorLinks
+                        donorNames={d.donor_names}
+                        donorLinks={d.donor_links}
+                        idPrefix={`biz${ri}`}
+                        hideName={donorEntries(d.donor_names, d.donor_links).length === 1}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -126,10 +144,17 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
           </div>
         </>
       )}
-      <h3>All {count(totalSites)} sites by industry</h3>
+      <h3>All {sitesText(totalSites)} by industry</h3>
+      {siteList && (
+        <p class="small">
+          <a href={href(`/districts/${siteList.slug}/sites/`)}>See all {sitesText(siteList.n_sites)}</a> (one
+          page) or <a href={href(`/districts/${siteList.slug}/sites.csv`)}>download them as CSV</a>.
+        </p>
+      )}
       <p class="small muted">
-        NAICS sector of each site's main industry code. Most FRS sites carry no code, so the largest group is
-        often "No industry code".
+        NAICS sector of each site's main industry code. Where a site has no NAICS code, its older SIC code is
+        used to pick the sector. About 4 in 10 sites have neither, so the largest group is usually "No
+        industry code".
       </p>
       <div class="table-scroll">
         <table class="industries">

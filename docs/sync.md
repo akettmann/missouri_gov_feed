@@ -10,30 +10,33 @@ uv run mogov run --shards 4
 
 ## How often each source changes (and how long it's cached)
 
-| Loader | Upstream changes | Cache policy | Suggested run |
-|---|---|---|---|
-| mo_house | daily in session (Jan–May), rarely otherwise | session zips weekly (current year), monthly (past); roll-call PDFs forever | daily in session, weekly otherwise |
-| mo_senate | daily in session | current-year listing daily, past monthly; journal PDFs forever | daily in session, weekly otherwise |
-| mo_senate_topics | daily in session (new bills indexed) | current year daily, past years monthly | daily in session, weekly otherwise |
-| mec (opt-in) | continuously | exports: current year weekly, past years monthly | weekly |
-| tap_mec | frozen (ends 2022) | 30 days | monthly |
-| fec | weekly bulk refresh | bulk zips daily; sponsor lookups 30 days | weekly |
-| voteview | after each roll call | daily | weekly |
-| house_fd | as filed | current + previous year index daily; PDFs forever | weekly |
-| senate_efd (opt-in) | as filed | not cached (search + reports fetched each run) | weekly |
-| courtlistener_bulk | quarterly snapshot | per snapshot, forever | monthly (picks up new snapshots) |
-| courtlistener_case_bulk | quarterly snapshot | downloads + filtered CSVs per snapshot, forever | monthly (picks up new snapshots) |
-| courtlistener_cases (stage 2) | daily | searches 30 days; case details forever | weekly; token quota ~125 req/day, resumes from cache |
-| bluebook | every two years | forever per edition | when a new edition is out (`MOGOV_BLUEBOOK_EDITIONS`) |
-| openstates_people | as edited | daily | weekly |
-| congress_legislators | as edited | daily | weekly |
-| fjc_judges | as appointed | 30 days | monthly |
-| wikidata (stage 2) | continuously | 7 days | weekly |
-| shor_mccarty | yearly release | 90 days | quarterly |
-| mo_employee_pay | yearly (each January) | current and previous year 7 days, older 30 days | monthly |
-| census_tiger | yearly vintage (each autumn); redistricting | listings 7 days; shapefiles forever | monthly |
-| epa_frs | state file refreshed every few months | 30 days | monthly |
-| census_zcta | yearly vintage | forever per vintage | monthly (picks up a new vintage) |
+| Loader                        | Upstream changes                             | Cache policy                                                               | Suggested run                                         |
+| ----------------------------- | -------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------- |
+| mo_house                      | daily in session (Jan–May), rarely otherwise | session zips weekly (current year), monthly (past); roll-call PDFs forever | daily in session, weekly otherwise                    |
+| mo_senate                     | daily in session                             | current-year listing daily, past monthly; journal PDFs forever             | daily in session, weekly otherwise                    |
+| mo_senate_topics              | daily in session (new bills indexed)         | current year daily, past years monthly                                     | daily in session, weekly otherwise                    |
+| mec (opt-in)                  | continuously                                 | exports: current year weekly, past years monthly                           | weekly                                                |
+| tap_mec                       | frozen (ends 2022)                           | 30 days                                                                    | monthly                                               |
+| fec                           | weekly bulk refresh                          | bulk zips daily; sponsor lookups 30 days                                   | weekly                                                |
+| voteview                      | after each roll call                         | daily                                                                      | weekly                                                |
+| house_fd                      | as filed                                     | current + previous year index daily; PDFs forever                          | weekly                                                |
+| senate_efd (opt-in)           | as filed                                     | not cached (search + reports fetched each run)                             | weekly                                                |
+| courtlistener_bulk            | quarterly snapshot                           | per snapshot, forever                                                      | monthly (picks up new snapshots)                      |
+| courtlistener_case_bulk       | quarterly snapshot                           | downloads + filtered CSVs per snapshot, forever                            | monthly (picks up new snapshots)                      |
+| courtlistener_cases (stage 2) | daily                                        | searches 30 days; case details forever                                     | weekly; token quota ~125 req/day, resumes from cache  |
+| bluebook                      | every two years                              | forever per edition                                                        | when a new edition is out (`MOGOV_BLUEBOOK_EDITIONS`) |
+| openstates_people             | as edited                                    | daily                                                                      | weekly                                                |
+| congress_legislators          | as edited                                    | daily                                                                      | weekly                                                |
+| fjc_judges                    | as appointed                                 | 30 days                                                                    | monthly                                               |
+| wikidata (stage 2)            | continuously                                 | 7 days                                                                     | weekly                                                |
+| shor_mccarty                  | yearly release                               | 90 days                                                                    | quarterly                                             |
+| mo_employee_pay               | yearly (each January)                        | current and previous year 7 days, older 30 days                            | monthly                                               |
+| mo_sos_elections              | after each canvass (about 4 weeks after an election) | PDFs forever once 4 months old; the results page and newest PDFs daily | after each election, or monthly                       |
+| mo_state_expenditures         | per fiscal year, republished by the state    | current and previous year 7 days, older 30 days                            | monthly                                               |
+| census_tiger                  | yearly vintage (each autumn); redistricting  | listings 7 days; shapefiles forever                                        | monthly                                               |
+| epa_frs                       | state file refreshed every few months        | 30 days                                                                    | monthly                                               |
+| mo_auditor                    | reports most weeks                           | current-year list 6 hours, past years 7 days; PDFs forever                 | weekly                                                |
+| census_zcta                   | yearly vintage                               | forever per vintage                                                        | monthly (picks up a new vintage)                      |
 
 Run a subset with `mogov load <loader ...>` followed by `mogov build`. For example, daily during
 session:
@@ -42,6 +45,24 @@ session:
 uv run mogov load mo_house mo_senate --shards 4
 uv run mogov build
 ```
+
+## When a loader fails
+
+- `mogov load` always runs every selected loader, even if one fails. It logs a `loader.summary` naming
+  the failed loaders (their raw data is stale) and exits non-zero.
+- `mogov run` is strict by default: if any loader fails, it stops before `dbt build` and exits non-zero,
+  so you never build on top of a source you know is stale.
+- To build anyway, name the loader you accept stale data from (repeatable), or set
+  `MOGOV_ALLOW_FAILED_LOADERS=senate_efd,...` (comma-separated, merged with the flags; for compose and
+  Cloud Run, where the args are fixed). Unknown names are rejected before anything loads:
+
+  ```
+  uv run mogov run --allow-failed-loader senate_efd
+  ```
+
+  It logs a `build.stale_source` warning naming each such source, builds on its previous raw data, and
+  still exits non-zero (a Cloud Run job still shows the failure). A failure in any other loader still
+  stops the run. Check `mogov freshness` to see how stale the data is.
 
 ## Moving the windows
 
@@ -55,6 +76,7 @@ uv run mogov build
 ## Yearly hand-maintained seeds
 
 Each January:
+
 - `federal_salaries`: add the new year's pay rates for Congress (senate.gov) and federal judges
   (uscourts.gov), with their sources. Until then `fct_salaries` has no federal rows for the new year.
 - `legislator_seat_corrections`: check `int_mo_senate__votes` for tokens with no `person_key`. A new
@@ -73,13 +95,19 @@ The site is a static snapshot of the exports. After a sync:
 
 ```
 uv run mogov export --format parquet
-cd frontend && pnpm build && pnpm sizes
+cd frontend && pnpm build
 ```
 
 `pnpm build` reads the new parquet files and regenerates every page and per-official JSON, and prints a warning (and still succeeds) if any parquet file is older than `data/mogov.duckdb`
 (or `MOGOV_DB`), meaning you built but forgot to re-export; the fix is the two commands above. The
-methodology page's "data freshness" table shows each export's timestamp. Run `pnpm sizes` after
-each refresh: a new source can push one official's JSON over the per-page budget.
+methodology page's "data freshness" table shows each export's timestamp. `pnpm build` finishes by running the size budgets (`pnpm sizes`) and exits non-zero if a payload is over
+budget or a budgeted file is missing from the output, because a new source can push one official's JSON over the per-page budget.
+Set `MOGOV_SKIP_SIZE_BUDGET=1` (exactly `1`) to skip the check; `pnpm deploy:pages` and `pnpm deploy:gcs` run the same check before publishing and honour the same variable (the budgets are still enforced by a plain `pnpm sizes` unless it is set there too).
+Separately, the build fails if the pay-per-vote year rows (`rpt_attendance_pay`) do not add up to their dbt total for any official, which means `rpt_attendance` and `rpt_attendance_pay` were exported from different builds; re-run `mogov build` and `mogov export` together. `MOGOV_SKIP_PAY_YEARS_CHECK=1` (exactly `1`) skips that check and logs that it did.
+
+The frontend words award periods from `rpt_awards.period_kind` (`year`, `fec_cycle`, `lifetime`); the build fails when the export has no such column or when a `fec_cycle` list has an odd period (a stale export); re-run `uv run mogov build` and `uv run mogov export`. `MOGOV_SKIP_AWARD_CYCLES_CHECK=1` (exactly `1`) skips the odd-period guard and also lets a stale export without `period_kind` build, inferring the kind from award and office (federal `least_committee_money_share` is a cycle) with a warning (re-export to stop inferring).
+
+Every frontend export read also checks the columns declared in `frontend/src/lib/exports/requiredColumns.ts`; an export that lacks one fails the build with `stale export: <table> lacks <columns>` and the re-export commands (`uv run mogov build`, then `uv run mogov export --format parquet`). Add a table's new column to that file when the site starts selecting it.
 
 ## Checking a sync
 

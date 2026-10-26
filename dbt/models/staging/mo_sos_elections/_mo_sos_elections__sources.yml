@@ -1,0 +1,13 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. No freshness: a new PDF appears only after each canvass.
+version: 2
+sources:
+- name: mo_sos_elections
+  description: Missouri Secretary of State official election returns (Grand Totals PDFs).
+  tables:
+  - name: rows
+    identifier: mo_sos_election_rows
+    description: >
+      Every printed line of each general and primary election Grand Totals PDF (Feb 2012 on), with the PDF url,
+      page and line, the contest it belongs to and the table cells of candidate rows. A missing landing is
+      created empty by `mogov build` (db.OPTIONAL_JSON_TABLES).

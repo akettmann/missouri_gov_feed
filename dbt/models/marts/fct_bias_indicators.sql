@@ -39,34 +39,22 @@ shor as (
             and seat.surname_key = {{ mogov.name_key('s.family_name') }}
             and extract(year from seat.start_date) <= s.last_year
             and extract(year from seat.end_date) >= s.last_year
-    inner join {{ ref('dim_official') }} as o on seat.openstates_id = o.official_id
+    inner join {{ ref('dim_official') }} as o on seat.person_id = o.official_id
 ),
 
--- party unity: party majorities come from every member who voted (int_votes__party_positions) ----------
+-- party unity: summed from the per-year party-line counts (fct_party_unity_yearly), lifetime only here ----------
 unity as (
     select
-        v.official_id,
+        y.official_id,
         'party_unity_pct' as indicator,
-        v.chamber,
-        round(100.0 * sum(
-            case
-                when
-                    v.vote_cast
-                    = case v.party_at_vote when 'Republican' then p.republican_position else p.democratic_position end
-                    then 1
-                else 0
-            end
-        ) / count(*), 1) as value,
+        y.chamber,
+        round(100.0 * sum(y.with_party_votes) / sum(y.party_line_votes), 1) as value,
         cast(null as {{ dbt.type_int() }}) as period,
-        v.chamber || ': ' || {{ dbt.safe_cast('count(*)', dbt.type_string()) }} || ' party-line votes' as detail,
+        y.chamber || ': ' || {{ dbt.safe_cast('sum(y.party_line_votes)', dbt.type_string()) }}
+        || ' party-line votes' as detail,
         cast(null as {{ dbt.type_string() }}) as source_url
-    from {{ ref('fct_votes') }} as v
-    inner join {{ ref('int_votes__party_positions') }} as p on v.chamber = p.chamber and v.vote_id = p.vote_id
-    where
-        p.is_party_line
-        and v.vote_cast in ('yea', 'nay')
-        and v.party_at_vote in ('Republican', 'Democratic')
-    group by v.official_id, v.chamber
+    from {{ ref('fct_party_unity_yearly') }} as y
+    group by y.official_id, y.chamber
 )
 
 {% set cols = 'official_id, indicator, chamber, value, period, detail, source_url' %}

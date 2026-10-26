@@ -14,6 +14,7 @@ folder "data/exports" as exports {
 package "frontend/ (pnpm build, Node + @duckdb/node-api)" {
   [lib/exports/load.ts\nselect rows per official] as load
   [lib/exports/fixtures.ts\nSAMPLE rpt_* fallback] as fixtures
+  [lib/exports/districtSites.ts\nselect fct_jurisdiction_businesses once] as dsites
   [lib/viz.ts\nchart + table specs] as viz
 }
 
@@ -22,7 +23,9 @@ folder "frontend/dist (static)" as dist {
   [lookup/officeholders/<year>.json\npast years of the browse list] as yearjson
   [years/<year>/index.html\nstatic past year (no JS)] as yearpage
   [officials/<slug>/index.html\nprofile + tables] as page
+  [officials/<slug>/index.html\nsmall past-officeholder page] as pastpage
   [officials/<slug>.json\nper-official bundle] as json
+  [districts/<district>/sites/index.html\n+ sites.csv] as sites
   [methodology/index.html] as meth
 }
 
@@ -36,9 +39,16 @@ load --> idx
 load --> yearjson : rpt_officeholders_by_year
 idx --> yearjson : fetch when a\npast year is picked
 load --> yearpage : rpt_officeholders_by_year
+load --> pastpage : rpt_officeholders_by_year
+yearpage --> pastpage : name links
+yearjson --> pastpage : name links
 idx --> yearpage : noscript links
 load --> page
 load --> json
+pq --> dsites : read_parquet (one query)
+dsites --> sites : plain table + CSV per district
+page --> sites : "See all sites" link
+dsites ..> page : district list (link)
 load --> meth : export timestamps
 viz --> page : server-rendered tables
 voter --> page : open profile

@@ -275,6 +275,9 @@ models:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [official_id, chamber, session_code]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "votes_present + absent + absent_with_leave + not_voting + recused_from_voting = votes_recorded"
     columns:
       - name: official_id
         data_type: varchar
@@ -308,13 +311,21 @@ models:
         description: Listed as absent.
       - name: absent_with_leave
         data_type: hugeint
-        description: Listed as absent with leave (excused; MO Senate journals).
+        description: Listed as absent with leave (an excused absence; MO Senate journals).
       - name: not_voting
         data_type: hugeint
-        description: Listed as not voting (Congress) or excused from voting (MO Senate journals).
+        description: Listed as not voting (Congress, Voteview code 9; the source does not say whether it was excused).
+      - name: recused_from_voting
+        data_type: hugeint
+        description: >
+          Recused: "Excused from voting" in the MO Senate journals, a Senate Rule 91 recusal by a member present on the
+          floor. Only the MO Senate records this (0 elsewhere does not mean never recused). votes_present + absent +
+          absent_with_leave + not_voting + recused_from_voting = votes_recorded.
       - name: attendance_pct
         data_type: double
-        description: 100 * votes_present / votes_recorded.
+        description: >
+          100 * votes_present / votes_recorded. A recusal counts as not present here; whether it should count as
+          attended is an open decision (#135).
         data_tests:
           - dbt_utils.accepted_range:
               arguments:
@@ -328,6 +339,89 @@ models:
               arguments:
                 min_value: 0
                 max_value: 100
+
+  - name: rpt_attendance_pay
+    description: >
+      Dollars paid per vote attended, to show next to rpt_attendance. Pay is per calendar year (fct_salaries), so
+      votes are counted per calendar year of the vote date and the two cover the same period; sessions sharing a
+      year (a regular and an extraordinary House session) are one year row. Attended = yea, nay or present, the
+      numerator of attendance_pct; a recusal (MO Senate Rule 91, open decision #135) is not attended. Pay =
+      the sum of the official's pay rows in that chamber's own positions for the year: gross pay from the state
+      payroll (everything paid that calendar year, not the base salary) or, for Congress, the statutory salary
+      of the office. Two kinds of row, told apart by period: a calendar year ('2021'), and 'covered years', the
+      official's total over the years where both pay and votes exist (a year with votes but no pay row, e.g.
+      before the payroll starts in 2017, stays out of the total; voting_years vs covered_years says how many
+      years that left out). Zero attended votes gives a null figure. Grain: one row per (official, chamber,
+      period).
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, chamber, period]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "votes_attended <= votes_recorded and covered_years <= voting_years"
+      # Sanity: nobody is paid more than the top federal salary in one year, and no vote costs $20,000
+      # (through 2026 the highest was $9,231: a senator who joined late in 2017 and cast one vote).
+      # Intended trip-wire: a senator in office most of a year who casts a single vote in it would exceed
+      # $20,000 per vote and fail this test; that is worth a look, not a bug in the bound.
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "pay_amount <= 300000 or period = 'covered years'"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "dollars_per_vote_attended is null or dollars_per_vote_attended between 1 and 20000"
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests: [not_null]
+      - name: chamber
+        data_type: varchar
+        description: state_house, state_senate, us_house or us_senate (as rpt_attendance).
+      - name: period
+        data_type: varchar
+        description: A calendar year such as '2021', or 'covered years' for the total over years with both pay and votes.
+        data_tests: [not_null]
+      - name: calendar_year
+        data_type: bigint
+        description: The year of a yearly row; null on 'covered years'.
+      - name: voting_years
+        data_type: bigint
+        description: Calendar years in which the official has recorded votes in this chamber (1 on a yearly row).
+      - name: covered_years
+        data_type: hugeint
+        description: Of those, years with a pay row (the payroll starts in 2017). Only these count in 'covered years'.
+      - name: votes_recorded
+        data_type: hugeint
+        description: Votes on which the official was listed in the period; on 'covered years', only in covered years.
+      - name: votes_attended
+        data_type: hugeint
+        description: Of those, votes where they voted yea, nay or present.
+      - name: pay_amount
+        data_type: decimal(38,2)
+        description: Dollars paid in the period (see pay_basis); null when no pay row exists for the year.
+      - name: pay_basis
+        data_type: varchar
+        description: "'gross pay' (state payroll, all pay received in the year) or 'statutory salary' (Congress)."
+      - name: match_confidence
+        data_type: varchar
+        description: >
+          The lowest match_confidence of the fct_salaries rows summed into pay_amount ('medium' if any is
+          name-prefix only, else 'high'); on 'covered years', the lowest over the covered years. Null when
+          there is no pay.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [high, medium]
+      - name: pay_source_url
+        data_type: varchar
+        description: Where the pay comes from (the state payroll site, or the page the federal salary was taken from).
+      - name: dollars_per_vote_attended
+        data_type: double
+        description: pay_amount / votes_attended, in dollars; null when there is no pay or no attended vote.
 
   - name: rpt_interest_vote_overlap
     description: >
@@ -450,13 +544,22 @@ models:
 
   - name: rpt_awards
     description: >
-      Number-based awards for the frontend: the top 5 officials (ties share a rank) on one measured number
-      within one office, per calendar year and over all loaded years ('lifetime'), each paired with its
-      opposite: lowest/highest attendance (rpt_attendance, 100+ recorded votes), most money from PACs,
-      committees and parties / lowest share of it among officials raising $10,000+ (rpt_donor_rollup, medium
-      name matches excluded), most breaks with / most loyal to their party (party_unity_pct, current chamber,
-      lifetime only). Only offices with 5+ qualifying officials in the period. No composite scores. Grain:
-      one row per (award, office, period, official).
+      Number-based awards for the frontend: the top officials (ties share a rank; 5 by default, set per award
+      by the awards_threshold var) on one measured number within one office, per calendar year and over all
+      loaded years ('lifetime'), each shown with its opposite: lowest/highest attendance (rpt_attendance,
+      100+ recorded votes), most money from PACs, committees and parties / lowest share of it among officials
+      raising $10,000+ (rpt_donor_rollup, medium name matches excluded; federal officials' share is per FEC
+      two-year cycle, reported under the cycle's end year, over FEC total receipts from fct_federal_donor_summary,
+      since the rollup holds only their committee receipts), most breaks with / most loyal to
+      their party (party unity from fct_party_unity_yearly, current chamber, per calendar year and lifetime, at
+      least awards_min_party_line_votes party-line votes in the period (default 20); the lifetime figure equals
+      the profile's party_unity_pct, the yearly figures appear with the award only). Most breaks needs at least
+      one break. Only attendance and party unity are pairs (the two ends rank one number over one field); each end's
+      cutoff is at most half that field (floor(group_size / 2)), ties at the cutoff can add more, so
+      no official is in both lists of a pair for one office and period; an official a tie at the cut would put
+      in both is in neither. Only offices with awards_min_field_size
+      (5) or more qualifying officials in the period. streak_years counts consecutive qualifying years. No
+      composite scores. Grain: one row per (award, office, period, official).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -478,7 +581,20 @@ models:
         description: The comparison group (dim_official.office); officials are ranked only against their office.
       - name: period
         data_type: varchar
-        description: Calendar year, or 'lifetime' for all loaded years.
+        description: >
+          Calendar year, the even end year of a two-year FEC cycle (period_kind = 'fec_cycle'), or 'lifetime' for
+          all loaded years.
+      - name: period_kind
+        data_type: varchar
+        description: >
+          What the period is: 'year' (calendar year), 'fec_cycle' (two-year FEC cycle named by its even end
+          year; federal officials' least_committee_money_share) or 'lifetime' (all loaded years). The
+          frontend words the period from this instead of guessing from the award and office.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['year', 'fec_cycle', 'lifetime']
       - name: award_rank
         data_type: bigint
         description: 1 = the official the award describes most strongly; ties share a rank.
@@ -493,10 +609,21 @@ models:
           unity %.
       - name: sample_size
         data_type: decimal(28,6)
-        description: What the metric is out of (recorded votes, or total dollars raised); null for party unity.
+        description: What the metric is out of (recorded votes, total dollars raised, or party-line votes cast).
       - name: group_size
         data_type: bigint
-        description: How many officials in the office qualified for this award and period.
+        description: >
+          How many officials in the office qualified for this award and period. For the party awards, the whole
+          ranked field (including officials with no break, who are left out of most_party_breaks).
+      - name: streak_years
+        data_type: bigint
+        description: >
+          Yearly periods only (null for 'lifetime'): how many qualifying yearly periods in a row, up to this
+          one, the official qualified for this award in this office. Years the official wasn't ranked for that
+          award (in another office, not eligible for the measure, or too few officials to rank, i.e. below
+          awards_min_field_size) are skipped: they neither add to nor break the streak, so a streak can span
+          more calendar years than its count. A year ranked outside the threshold breaks it. 1 = qualified
+          this year only.
 
   - name: rpt_donor_size
     description: >
@@ -540,6 +667,10 @@ models:
       placeholder answer (donor_employer_placeholders seed: retired, none, self-employed, bare occupations), are
       left out. Spelling variants are not merged. State money only. Grain: one row per (official, lower-cased
       employer, match confidence).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, employer, match_confidence]
     columns:
       - name: official_id
         data_type: varchar
@@ -574,9 +705,11 @@ models:
   - name: rpt_district_business_industries
     description: >
       EPA-regulated business sites (fct_jurisdiction_businesses) in each district-elected official's area,
-      counted by NAICS sector (naics_sectors seed, from the site's primary NAICS code), with how many are tied to
-      a donor. The donor sites themselves are listed in fct_jurisdiction_businesses (is_donor). EPA FRS covers
-      regulated sites only (factories, fuel stations, shops with permits), and most sites carry no NAICS code;
+      counted by NAICS sector (naics_sectors seed, matched on the first two digits of the site's naics_code), with
+      how many are tied to a donor. The code is the NAICS code most of the site's programs give or, for a site
+      with no NAICS code, the sector its SIC code maps to (int_epa_frs__facilities). The donor sites themselves
+      are listed in fct_jurisdiction_businesses (is_donor). EPA FRS covers regulated sites only (factories, fuel
+      stations, shops with permits), and about 45% of (official, site) rows have neither a NAICS nor a SIC code;
       those are counted under sector_name "No industry code" with a null sector_code. Grain: one row per
       (official, sector).
     data_tests:
@@ -598,7 +731,7 @@ models:
                 field: official_id
       - name: sector_code
         data_type: varchar
-        description: NAICS sector code (`31-33` for manufacturing); null for sites with no NAICS code.
+        description: NAICS sector code (`31-33` for manufacturing); null for sites with neither a NAICS nor a SIC code.
       - name: sector_name
         data_type: varchar
         description: NAICS sector title, or "No industry code".
@@ -680,6 +813,17 @@ models:
         description: >
           Where the row comes from - dim_official (current year), mo_house roster, openstates,
           congress-legislators or fjc.
+      - name: source_url
+        data_type: varchar
+        description: >
+          Link to the roster behind a past-year row: the House's session XML export (a zip download) for that
+          year (mo_house roster), the Open States people folder holding the person's file (retired or
+          legislature; openstates), the congress-legislators repository, or the judge's own FJC page (fjc).
+          Null for the current year (source dim_official).
+        data_tests:
+          - not_null:
+              config:
+                where: "source <> 'dim_official'"
   - name: rpt_committee_donors
     description: >
       One hop back from an official's donors: for each Missouri committee that gave to an official (a

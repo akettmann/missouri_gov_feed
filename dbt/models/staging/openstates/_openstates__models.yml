@@ -8,5 +8,11 @@ models:
   description: Alternate spellings Open States has seen for each person; used to match people in other sources.
 - name: stg_openstates__people
   description: One row per Missouri person in Open States (excludes the committees folder).
+  columns:
+  - name: openstates_id
+    description: Open States person id; rpt_officeholders_by_year joins on it to find the person's folder.
+    data_tests:
+    - not_null
+    - unique
 - name: stg_openstates__roles
   description: 'Every role (office) each Open States person has held: the state-level past-offices history.'

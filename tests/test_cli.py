@@ -1,3 +1,8 @@
+import datetime
+
+import pytest
+import yaml
+
 from mogov import cli
 
 
@@ -30,3 +35,80 @@ def test_export_defaults_to_parquet(monkeypatch):
     monkeypatch.setattr("sys.argv", ["mogov", "export", "--format", "csv"])
     cli.main()
     assert seen == ["parquet", "csv"]
+
+
+def _dbt_cmd(monkeypatch, args):
+    calls = []
+    monkeypatch.setattr(cli.db, "ensure_optional_tables", lambda: [])
+    monkeypatch.setattr(cli.db, "raw_exists", lambda _name: False)
+    monkeypatch.setattr(cli.subprocess, "call", lambda cmd, **_kw: calls.append(cmd) or 0)
+    monkeypatch.setattr(cli.subprocess, "check_call", lambda *_a, **_kw: 0)
+    assert cli.run_dbt(args) == 0
+    return calls[0]
+
+
+@pytest.mark.parametrize(
+    "user_args",
+    [
+        ["--vars", '{"mec_direct": true, "x": 1}'],
+        ['--vars={"mec_direct": true, "x": 1}'],
+        ["--vars", "{mec_direct: true, x: 1}"],  # dbt parses YAML
+        ["--vars", "mec_direct: true\nx: 1"],
+    ],
+)
+def test_run_dbt_merges_user_vars_with_user_winning(monkeypatch, user_args):
+    cmd = _dbt_cmd(monkeypatch, ["build", "--select", "m", *user_args])
+    assert sum(a == "--vars" or a.startswith("--vars=") for a in cmd) == 1
+    assert yaml.safe_load(cmd[cmd.index("--vars") + 1]) == {"mec_direct": True, "cl_case_bulk": False, "x": 1}
+    assert cmd[cmd.index("build") : cmd.index("build") + 3] == ["build", "--select", "m"]
+
+
+def test_run_dbt_without_user_vars_passes_only_mogov_vars(monkeypatch):
+    cmd = _dbt_cmd(monkeypatch, ["build"])
+    assert yaml.safe_load(cmd[cmd.index("--vars") + 1]) == {"mec_direct": False, "cl_case_bulk": False}
+
+
+@pytest.mark.parametrize("bad", [["--vars"], ["--vars", "{a: [}"], ["--vars", "[1, 2]"], ["--vars=just a string"]])
+def test_run_dbt_rejects_malformed_user_vars(monkeypatch, bad):
+    with pytest.raises(SystemExit) as exc:
+        _dbt_cmd(monkeypatch, ["build", *bad])
+    assert "--vars" in str(exc.value)
+
+
+def test_run_dbt_keeps_yaml_dates_typed(monkeypatch):
+    cmd = _dbt_cmd(monkeypatch, ["build", "--vars", "{since: 2024-01-01, at: 2024-01-01 10:30:00, s: '2024-01-01'}"])
+    # dbt parses the flag as YAML: it must read the same types as when the user passes the flag directly.
+    got = yaml.safe_load(cmd[cmd.index("--vars") + 1])
+    assert got["since"] == datetime.date(2024, 1, 1)
+    assert got["at"] == datetime.datetime(2024, 1, 1, 10, 30)
+    assert got["s"] == "2024-01-01"
+    assert got["mec_direct"] is False
+
+
+def test_merge_user_vars_is_shallow_and_later_flag_wins():
+    rest, merged = cli._merge_user_vars(
+        ["x", "--vars", "{a: 1, n: {p: 1}}", "--vars={a: 2, n: {q: 2}, mec_direct: false}"],
+        {"mec_direct": True, "cl_case_bulk": True},
+    )
+    assert rest == ["x"]
+    assert merged == {"mec_direct": False, "cl_case_bulk": True, "a": 2, "n": {"q": 2}}
+
+
+def test_build_help_documents_vars_merge_semantics(monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["mogov", "build", "--help"])
+    with pytest.raises(SystemExit):
+        cli.main()
+    assert "merged (shallow)" in capsys.readouterr().out
+
+
+def test_run_dbt_placeholder_warning_names_the_loader_to_run(monkeypatch):
+    import structlog.testing
+
+    _dbt_cmd(monkeypatch, ["build"])  # wires the subprocess/raw_exists stubs
+    monkeypatch.setattr(cli.db, "ensure_optional_tables", lambda: ["epa_frs_sic"])
+    with structlog.testing.capture_logs() as logs:
+        assert cli.run_dbt(["build"]) == 0
+    (warning,) = [e for e in logs if e["event"] == "dbt.placeholder"]
+    assert warning["table"] == "raw.epa_frs_sic"
+    assert warning["loader"] == "epa_frs"
+    assert "mogov load epa_frs" in warning["reason"]
