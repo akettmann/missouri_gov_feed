@@ -166,6 +166,8 @@ export interface PeerStrip {
 export interface PartyBreak {
   chamber: string;
   session_code: string;
+  /** the House's name for the session (dim_house_session); null for other chambers or an unlisted session */
+  session_name: string | null;
   vote_date: string;
   measure: string | null;
   vote_description: string | null;
@@ -183,6 +185,8 @@ export interface PartyBreak {
 export interface AttendanceRow {
   chamber: string;
   session_code: string;
+  /** the House's name for the session (dim_house_session); null for other chambers or an unlisted session */
+  session_name: string | null;
   first_vote_date: string | null;
   last_vote_date: string | null;
   votes_recorded: number;
