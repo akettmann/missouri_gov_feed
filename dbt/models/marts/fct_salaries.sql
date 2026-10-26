@@ -17,7 +17,7 @@
 --                     JONES, MICHAEL J after Holly Jones)
 --                A seat counts from the member's first roster year in that chamber (House and Senate each) when Open
 --                States has no start date (#227). A small payment that fits a member whose seat ended the December
---                before is that member's final check and is left out of 1 to 4 (#250).
+--                before, or that January, is that member's final check and is left out of 1 to 4 (#250).
 --   by name      payroll "LAST, FIRST" against the official's name variants within the same group of
 --                offices, first names that fit (see mogov.first_name_fit): statewide officials, judges, and
 --                legislator rows the seat match leaves open (members without an Open States seat), and only in
@@ -94,18 +94,25 @@ service_years as (
 
 -- A final check: a payee whose first name fits a member of the chamber whose seat ended the December before,
 -- and who was paid well under a full year's salary (under half of the year's highest pay for the position).
--- It is that departed member's last pay, so it must not compete for the seats held now ("BLACK, LINDA R."
--- 2017 is Linda Black's, not a second claimant to Rusty Black's seat, whose middle initial it shares, #250).
+-- It is that departed member's last pay (unless the member later held a seat in the chamber again), so neither
+-- it nor the member competes for the seats held now ("BLACK, LINDA R." 2017 is Linda Black's, not a second
+-- claimant to Rusty Black's seat, whose middle initial it shares, #250).
 final_checks as (
     select distinct
         p.calendar_year,
         p.seat_chamber,
-        p.employee_name
+        p.employee_name,
+        d.person_id
     from pay as p
     inner join {{ ref('int_mo_legislators__seats') }} as d
         on
             p.seat_chamber = d.chamber
-            and extract(year from d.end_date) = p.calendar_year - 1
+            -- the seat ended in December of the year before, or in January of this year (Open States ends the
+            -- 2022 and 2024 departures on 2023-01-03 and 2025-01-07)
+            and (
+                (extract(year from d.end_date) = p.calendar_year - 1 and extract(month from d.end_date) = 12)
+                or (extract(year from d.end_date) = p.calendar_year and extract(month from d.end_date) = 1)
+            )
             and {{ dbt.replace('d.surname_key', "' '", "''") }} = p.last_flat
             and {{
                 mogov.first_name_fit(
@@ -123,7 +130,7 @@ final_checks as (
             where
                 later.person_id = d.person_id
                 and later.chamber = d.chamber
-                and extract(year from later.end_date) >= p.calendar_year
+                and later.end_date > d.end_date
         )
 ),
 
@@ -152,7 +159,10 @@ seat_pairs_raw as (
             and (p.last_flat = s.surname_flat or p.last_key like '% ' || s.surname_key)
     left join final_checks as f
         on p.calendar_year = f.calendar_year and p.seat_chamber = f.seat_chamber and p.employee_name = f.employee_name
-    where p.office_group = 'legislature' and f.employee_name is null
+    -- a member who left in January and was paid that final check is no claimant to the year's pay either
+    left join final_checks as fm
+        on s.calendar_year = fm.calendar_year and s.chamber = fm.seat_chamber and s.person_id = fm.person_id
+    where p.office_group = 'legislature' and f.employee_name is null and fm.person_id is null
 ),
 
 -- a member can hold two seat rows in a year under name spellings that differ ("Ken"/"Kenneth" Jamison, one person
