@@ -9,6 +9,7 @@ testing: Pytest
 linting: Ruff
 logging: Structlog
 metrics: Opentelemetry
+XML parsing: an XML parser (lxml), never regex or `mogov.xmljson`
 ## ETL
 DBT Core
 DuckDB backend
@@ -25,6 +26,7 @@ They will be:
 * Idempotent
 * Streaming
 * Make as few changes to the raw data as possible when writing it to the raw storage
+* XML sources: store each raw XML file unchanged in raw storage, and parse it (with an XML parser) into rows of the entities it contains, e.g. a document listing laws emits one row per law with that law's fields/attributes as columns
 * emit progress when reasonably knowable (don't add a lot of extra work here. Ask if you are unsure.)
 * be shardable, can spawn workers in parallel that split up the work independently (ensure the split mechanism is idempotent). Ideally use options `--shards` to indicate the max number of shards, and `--shard` to indicate that process's shard. If `--shards` is provided and `--shard` is not provided, the process should run a processpool of `--shards` number of workers
   * If it would require every worker to download the same file, don't use multiple workers until you have downloaded the file once, if the file then needs to be split, we can use multiple processes on that machine
