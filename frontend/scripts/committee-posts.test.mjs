@@ -39,12 +39,13 @@ test("ranking minority member reads as words, the others as listed", () => {
 test("titles are ordered chair, co-chair, vice-chair, ranking; subcommittees last; sessions newest first", () => {
   const posts = [
     post("a", "251", { chair_posts: 1 }),
-    post("a", "261", { vice_chair_posts: 1, ranking_posts: 1, co_chair_posts: 1 }),
+    post("a", "261", { chair_posts: 1, vice_chair_posts: 1, ranking_posts: 1, co_chair_posts: 1 }),
     post("b", "261"),
   ];
   const memberships = [
     mem("a", "251", "Budget", "Chair"),
     mem("a", "261", "Rules", "Ranking Minority Member"),
+    mem("a", "261", "Appropriations", "Chair"),
     mem("a", "261", "Elections", "Vice-Chair"),
     mem("a", "261", "Joint Panel", "Co-Chair"),
     mem("a", "261", "Budget Subcommittee on X", "Chair", true),
@@ -58,6 +59,7 @@ test("titles are ordered chair, co-chair, vice-chair, ranking; subcommittees las
   assert.deepEqual(
     a[0].titles.map((t) => `${t.position}|${t.committee}|${t.subcommittee}`),
     [
+      "Chair|Appropriations|false",
       "Co-Chair|Joint Panel|false",
       "Vice-Chair|Elections|false",
       "Ranking Minority Member|Rules|false",

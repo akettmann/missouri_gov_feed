@@ -12,7 +12,7 @@ interface Props {
 }
 const { bundle } = Astro.props;
 const sessions = bundle.committees;
-const isHouse = bundle.official.office === "mo_house";
+const isHouse = bundle.official.office === "state_house";
 const show = isHouse || (sessions?.length ?? 0) > 0;
 ---
 
@@ -23,6 +23,8 @@ const show = isHouse || (sessions?.length ?? 0) > 0;
       Missouri House committees this member served on in each session, and the chair, co-chair, vice-chair and
       ranking minority member titles they held, as the House lists them (end-of-session lists; the newest
       session may still change). Subcommittee titles are marked and are not counted as committees.
+      {!isHouse &&
+        " These are past posts from when this official served in the House; they hold no House committee seat now."}
     </p>
     {sessions === null ? (
       <p class="muted small">Not available yet (the fct_committee_posts export is missing).</p>
