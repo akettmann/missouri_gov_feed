@@ -6,7 +6,15 @@
     {{ return({'max_acts': 60, 'max_merged': 10, 'max_combined': 6}) }}
 {%- endmacro %}
 
-{# The history or repeal note with one separator (", ") between acts and "et al." attached to the act before it. #}
+{# The history or repeal note with one separator (", ") between acts and "et al." attached to the act before it. A
+   trailing act joined with "and" ("H.B. 1489 and A.L. 2004 S.B. 1233 et al.") is an act of its own, so it gets the
+   same separator. #}
 {% macro normalize_session_law_note(expr) -%}
-    replace(replace(replace(replace({{ expr }}, '(', ''), ')', ''), '; ', ', '), ', et al.', ' et al.')
+    replace(
+        replace(
+            replace(replace(replace(replace({{ expr }}, '(', ''), ')', ''), '; ', ', '), ' and A.L. ', ', A.L. '),
+            ' and L. ', ', L. '
+        ),
+        ', et al.', ' et al.'
+    )
 {%- endmacro %}

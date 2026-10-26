@@ -270,3 +270,32 @@ unit_tests:
         - {section_id: e.4, bill: HB3, session_code: '893'}
         - {section_id: e.5, bill: HB7, session_code: '033'}
         - {section_id: e.6, bill: HB8, session_code: '113'}
+
+  - name: trailing_and_act_citation_is_an_act_of_its_own
+    model: int_mo_revisor__session_law_bills
+    description: >
+      A history note can join a later act to the bills before it with "and A.L." or "and L." ("H.B. 996 and H.B.
+      1489 and A.L. 2004 S.B. 1233 et al."). The trailing act is its own act: SB 1233 is a bill of the section, not
+      lost and not combined into the bills before it; the "and" inside the first act still joins its bills.
+    given:
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 't.1' as section_id, 't.1/1' as section_version_id, '(A.L. 2004 H.B. 996 and H.B. 1489 and A.L. 2004 S.B. 1233 et al.)' as history_note union all
+            select 't.2', 't.2/1', '(L. 1990 H.B. 5 and L. 1991 S.B. 7, A.L. 1995 H.B. 9)'
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select '9.010' as section_id, '9.010/3' as section_version_id, 'transferred' as change_kind, '(Transferred 1959; now 442.560 )' as note
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: t.1, bill: HB996, act_year: 2004, is_lead_bill: true, combined_into: }
+        - {section_id: t.1, bill: HB1489, act_year: 2004, is_lead_bill: false, combined_into: HB996}
+        - {section_id: t.1, bill: SB1233, act_year: 2004, is_lead_bill: true, combined_into: }
+        - {section_id: t.2, bill: HB5, act_year: 1990, is_lead_bill: true, combined_into: }
+        - {section_id: t.2, bill: SB7, act_year: 1991, is_lead_bill: true, combined_into: }
+        - {section_id: t.2, bill: HB9, act_year: 1995, is_lead_bill: true, combined_into: }
