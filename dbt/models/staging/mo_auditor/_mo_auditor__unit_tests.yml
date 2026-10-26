@@ -1,0 +1,39 @@
+# Unit tests for the State Auditor staging models: fixed source rows -> exact expected rows.
+version: 2
+
+unit_tests:
+  - name: auditor_reports_keep_dates_and_resolve_links
+    model: stg_mo_auditor__reports
+    description: >
+      rpt_number and the printed number arrive padded with spaces. The release timestamp is cut to its date (no
+      zone is given). A report with a summary id links CitzSummaryDirect; the full report's "~/Repository/..."
+      path resolves against auditor.mo.gov, while an absolute link is left alone, and a report with no summary
+      has no summary link.
+    given:
+      - input: source('mo_auditor', 'reports')
+        format: sql
+        rows: |
+            select cast('{"search_year": 2018, "rpt_number": "2018063   ", "ReportNumberDisplay": "2018-063   ", "release_datetime": "2018-08-28T10:00:00", "title": "Scott County ", "citz_sum_fk": 676, "full_rpt_link": "~/Repository/Press/2018063.pdf", "FullReportLinkExternal": "https://auditor.mo.gov/AuditReport/ViewReport?report=2018063"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"search_year": 2019, "rpt_number": "2019130   ", "ReportNumberDisplay": "2019-130   ", "release_datetime": "2019-12-31T23:59:00", "title": "Office of State Treasurer", "citz_sum_fk": null, "full_rpt_link": "https://example.org/x.pdf"}' as varchar) as payload, 'u' as source_url
+    expect:
+      rows:
+        - {report_number: '2018063', report_number_display: '2018-063', report_year: 2018, search_year: 2018, release_date: '2018-08-28', title: Scott County, citizens_summary_id: 676, citizens_summary_url: 'https://auditor.mo.gov/AuditReport/CitzSummaryDirect?id=676', full_report_url: 'https://auditor.mo.gov/Repository/Press/2018063.pdf'}
+        - {report_number: '2019130', report_number_display: '2019-130', report_year: 2019, search_year: 2019, release_date: '2019-12-31', title: Office of State Treasurer, citizens_summary_id: null, citizens_summary_url: null, full_report_url: 'https://example.org/x.pdf'}
+
+  - name: auditor_rating_word_is_title_cased
+    model: stg_mo_auditor__ratings
+    description: >
+      The rating word lands as the loader read it from the sentence; staging title-cases it so "GOOD" and "Good"
+      count as one level. A PDF with no rating sentence keeps its row with a null rating, and so does a template left unfilled ("was XXXX"), with status placeholder_rating.
+    given:
+      - input: source('mo_auditor', 'ratings')
+        format: sql
+        rows: |
+            select cast('{"report_number": "2018063", "source_kind": "citizens_summary", "pdf_url": "p1", "status": "ok", "rating_sentence": "In the areas audited, the overall performance of this entity was GOOD.", "rating_word": "GOOD", "page": 1, "n_sentences": 1}' as varchar) as payload union all
+            select cast('{"report_number": "2018001", "source_kind": "citizens_summary", "pdf_url": "p2", "status": "no_rating_sentence", "rating_sentence": null, "rating_word": null, "page": null, "n_sentences": 0}' as varchar) as payload union all
+            select cast('{"report_number": "2012021", "source_kind": "citizens_summary", "pdf_url": "p3", "status": "ok", "rating_sentence": "In the areas audited, the overall performance of this entity was XXXX.", "rating_word": "XXXX", "page": 1, "n_sentences": 1}' as varchar) as payload
+    expect:
+      rows:
+        - {report_number: '2018063', rating: Good, extraction_status: ok, page: 1, pdf_url: p1}
+        - {report_number: '2018001', rating: null, extraction_status: no_rating_sentence, page: null, pdf_url: p2}
+        - {report_number: '2012021', rating: null, extraction_status: placeholder_rating, page: 1, pdf_url: p3}

@@ -6,6 +6,7 @@ import { DONOR_GROUP_SQL } from "../rollups";
 import { exportedAt, hasExport, query } from "./db";
 import { buildCommitteeSessions, type PostCounts, type TitledMembership } from "../committeePosts";
 import { payYearsGate, type PayVoteRow } from "../attendancePay";
+import { loadLegislatorExpenses } from "./legislatorExpenses";
 import { groupPast, linkSameName, type RosterRow } from "./past";
 import { sampleDonorCycles, sampleGiftRollup, sampleTopDonors } from "./fixtures";
 import type {
@@ -493,6 +494,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
       )
     : null;
 
+  const expenses = await loadLegislatorExpenses();
   // federal district judges: one row per CourtListener judge, joined to the official by official_id
   const dispositions = hasExport("fct_judge_time_to_disposition")
     ? new Map(
@@ -581,6 +583,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
           committee_trails: trails ? ((trails.get(id) ?? []) as CommitteeTrail[]) : null,
         },
         gifts,
+        expenses: expenses ? (expenses.get(id) ?? []) : null,
         businesses: districtIndustries
           ? {
               donors: districtDonors.get(id) ?? [],

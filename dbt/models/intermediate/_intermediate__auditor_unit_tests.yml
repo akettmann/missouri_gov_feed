@@ -1,0 +1,42 @@
+# Unit tests for int_mo_auditor__reports: fixed rows -> exact expected rows.
+version: 2
+
+unit_tests:
+  - name: auditor_reports_classify_entity_and_order_ratings
+    model: int_mo_auditor__reports
+    description: >
+      A title that starts with a seed prefix (any case, "Office of the State Treasurer/ Year Ended ...") is a
+      statewide office; a title ending in " County" is a county; a city or a "County Financial Statements"
+      report is other. Ratings map to Excellent 4, Good 3, Fair 2, Poor 1. A report with no ratings row is
+      `not_read`; one whose PDF had no sentence keeps that status and no rating. A title that merely contains
+      "Treasurer" without the prefix (the City of St. Louis Treasurer) is not a statewide office.
+    given:
+      - input: ref('stg_mo_auditor__reports')
+        rows:
+          - {report_number: '1', title: 'Office of the State Treasurer/ Year Ended June 30, 2012', release_date: '2013-02-01'}
+          - {report_number: '2', title: Scott County, release_date: '2018-08-28'}
+          - {report_number: '3', title: Reynolds County Financial Statements, release_date: '2026-09-01'}
+          - {report_number: '4', title: "City of St. Louis Treasurer's Office", release_date: '2020-01-01'}
+          - {report_number: '5', title: Timeliness of Income Tax Refund Issuance, release_date: '2018-01-08'}
+          - {report_number: '6', title: Stoddard County, release_date: '2018-03-01'}
+          - {report_number: '7', title: Adair County, release_date: '2018-05-01'}
+      - input: ref('stg_mo_auditor__ratings')
+        rows:
+          - {report_number: '1', rating: Excellent, extraction_status: ok}
+          - {report_number: '2', rating: Poor, extraction_status: ok}
+          - {report_number: '5', rating: null, extraction_status: no_rating_sentence}
+          - {report_number: '6', rating: Fair, extraction_status: ok}
+          - {report_number: '7', rating: Good, extraction_status: ok}
+      - input: ref('mo_auditor_statewide_entities')
+        rows:
+          - {title_prefix: office of the state treasurer, office: state_treasurer}
+          - {title_prefix: "state treasurer's office", office: state_treasurer}
+    expect:
+      rows:
+        - {report_number: '1', entity_type: statewide_office, office: state_treasurer, rating: Excellent, rating_level: 4, rating_status: ok}
+        - {report_number: '2', entity_type: county, office: null, rating: Poor, rating_level: 1, rating_status: ok}
+        - {report_number: '3', entity_type: other, office: null, rating: null, rating_level: null, rating_status: not_read}
+        - {report_number: '4', entity_type: other, office: null, rating: null, rating_level: null, rating_status: not_read}
+        - {report_number: '5', entity_type: other, office: null, rating: null, rating_level: null, rating_status: no_rating_sentence}
+        - {report_number: '6', entity_type: county, office: null, rating: Fair, rating_level: 2, rating_status: ok}
+        - {report_number: '7', entity_type: county, office: null, rating: Good, rating_level: 3, rating_status: ok}

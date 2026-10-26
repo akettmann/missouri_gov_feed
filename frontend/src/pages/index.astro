@@ -8,6 +8,7 @@ import Layout from "../layouts/Layout.astro";
 import OfficeFilter from "../components/OfficeFilter.astro";
 import { exportedAt } from "../lib/exports/db";
 import { officialIndex, pastOfficeholders } from "../lib/exports/load";
+import { plural } from "../lib/businessCounts";
 import { LEVELS, officeGroup, officeLine } from "../lib/format";
 import { buildOfficeGroups } from "../lib/lookback";
 import { href } from "../lib/site";
@@ -84,7 +85,7 @@ const groupInfo = Object.fromEntries(
     {pastYears.length > 0 && <span class="js-only"> Pick a year to see who held these offices before.</span>}
   </p>
   <p class="small muted" aria-live="polite" id="result-count">
-    {officials.length} officials
+    {plural(officials.length, "official", "officials")}
   </p>
   <div
     class="table-scroll card list"

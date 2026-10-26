@@ -399,3 +399,29 @@ unit_tests:
       rows:
         - {registry_id: F1, is_donor: true, donor_names: AMEREN CORPORATION, donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 AMEREN CORPORATION"}
         - {registry_id: F2, is_donor: false, donor_names: null, donor_links: null}
+
+  - name: jurisdiction_businesses_donor_names_hold_no_semicolons
+    model: fct_jurisdiction_businesses
+    description: >
+      donor_names is '; '-joined and the frontend splits it back, so a raw donor name with a ';' in it would show
+      as two donors. The model turns each ';' into a comma (#276). Two donors still join with '; '.
+    given:
+      - input: ref('fct_official_districts')
+        rows:
+          - {official_id: o1, district_id: 'state_house:1', relation: elected from}
+      - input: ref('fct_district_facilities')
+        rows:
+          - {district_id: 'state_house:1', registry_id: F1, facility_name: Plant One, is_government: false}
+      - input: ref('int_epa_frs__facilities')
+        rows:
+          - {registry_id: F1, facility_key: plant one, owner_key: ameren corporation the, parent_company_key: acme holdings}
+      - input: ref('company_brands')
+        rows:
+          - {keyword: unusedbrand, brand: unusedbrand}
+      - input: ref('fct_campaign_finance')
+        rows:
+          - {official_id: o1, direction: received, counterparty: x, counterparty_organization: 'AMEREN CORPORATION; THE', counterparty_type: committee, amount: 100, transaction_date: '2020-03-01', match_confidence: high, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9'}
+          - {official_id: o1, direction: received, counterparty: x, counterparty_organization: ACME HOLDINGS INC, counterparty_type: committee, amount: 70, transaction_date: '2022-03-01', match_confidence: high, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9'}
+    expect:
+      rows:
+        - {registry_id: F1, donor_names: 'ACME HOLDINGS INC; AMEREN CORPORATION, THE', donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9 ACME HOLDINGS INC\nhttps://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 AMEREN CORPORATION, THE"}
