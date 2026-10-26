@@ -52,10 +52,12 @@ RATING_SENTENCE = re.compile(
     + r"\s*([A-Za-z][A-Za-z ]{1,14}?)\s*[.*]",
     re.I,
 )
-# Titles of filings that carry no rating: checked against the 2012-2026 reports that have a summary
+# Titles of filings that carry no rating: checked against the 2012-2026 reports that have a summary. The county-wide
+# fire-district reviews are anchored to Greene / St. Louis so a single '<X> County Fire Protection District' is read
 NOT_RATED = re.compile(
     r"financial statements?|monthly report|follow[\s-]*up|annual report|compilation|property tax|"
-    r"county fire protection districts?|independent audits of fire protection|forfeiture|working capital revolving",
+    r"^(?:greene|st\.? louis) county fire protection districts?\b|independent audits of fire protection|"
+    r"forfeiture|working capital revolving",
     re.I,
 )
 

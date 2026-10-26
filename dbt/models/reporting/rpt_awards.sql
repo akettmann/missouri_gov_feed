@@ -2,7 +2,8 @@
 -- number, within one office (House members against House members), per calendar year and over all loaded
 -- years, each paired with its opposite. streak_years counts consecutive qualifying yearly periods.
 -- Every award ranks a single measured figure; nothing is combined into a score.
---   attendance:        rpt_attendance, present / recorded votes, at least 100 recorded votes in the period
+--   attendance:        rpt_attendance, present / recorded votes, at least 100 recorded votes in the period, ranked
+--                      in the chamber the votes were cast in (an official who served in both is ranked in each)
 --   committee money:   rpt_donor_rollup from PACs, committees and parties (medium name matches left out);
 --                      the opposite ranks the lowest share of such money among officials raising $10,000+.
 --                      The rollup holds only committee receipts for federal officials (FEC individual donors
@@ -30,16 +31,18 @@ with offices as (
 attendance_years as (
     select
         official_id,
+        chamber,
         cast(extract(year from first_vote_date) as {{ dbt.type_string() }}) as period,
         sum(votes_present) as present,
         sum(votes_recorded) as recorded
     from {{ ref('rpt_attendance') }}
-    group by official_id, cast(extract(year from first_vote_date) as {{ dbt.type_string() }})
+    group by official_id, chamber, cast(extract(year from first_vote_date) as {{ dbt.type_string() }})
 ),
 
 attendance as (
     select
         official_id,
+        chamber,
         period,
         present,
         recorded
@@ -47,17 +50,20 @@ attendance as (
     union all
     select
         official_id,
+        chamber,
         'lifetime' as period,
         sum(present) as present,
         sum(recorded) as recorded
     from attendance_years
-    group by official_id
+    group by official_id, chamber
 ),
 
 attendance_rates as (
     select
         a.official_id,
-        o.office,
+        -- the chamber the votes were cast in, not the official's current office: a senator's House years are
+        -- ranked among House members (the same rule as party unity)
+        a.chamber as office,
         a.period,
         round(100.0 * a.present / a.recorded, 1) as metric,
         a.recorded as sample_size

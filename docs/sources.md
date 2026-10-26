@@ -979,8 +979,10 @@ offices, shops and most service businesses are missing.
   across sectors) to NAICS sector. That gives a sector, not a NAICS code: `int_epa_frs__facilities.naics_code`
   then holds the two-digit sector prefix and `naics_source` is `sic` (23%). Together they cover 56% of the
   geocoded sites; the rest have neither code. Where a site has both, the non-primary NAICS code and the SIC
-  sector agree on the sector for about 90% of sites; among codes tied on tier and program count, the one in the SIC sector (NAICS 31-33 count as one sector) wins.
-  The SIC sector is ignored for that tie-break when the site's SIC code is itself tied on tier and program count
+  sector agree on the sector for about 90% of sites. Among codes tied on tier and program systems, the tie-break
+  runs in order: the code in the SIC sector (NAICS 31-33 count as one sector) wins; then NAICS 238910 and SIC 1629
+  (construction stormwater permits) lose to any other code; then the lowest code.
+  The SIC sector is ignored for that tie-break when the site's SIC code is itself tied on tier and program systems
   with a SIC code in another sector (the lowest code was picked arbitrarily), and for SIC 1629. This changes the
   NAICS code of 56 facilities against the lowest-code rule.
   About 10,400 of the SIC-filled facilities are SIC 1629 (heavy construction), likely construction stormwater
@@ -1025,7 +1027,7 @@ Flow: [diagrams/sources/mo_auditor.svg](diagrams/sources/mo_auditor.svg)
 - Site: https://auditor.mo.gov/AuditReport/Reports, backed by the JSON list `/AuditReport/SearchAudits`. No auth. The loader
   keeps to about 1 request a second in total: the throttle is shared by every shard on the machine (`http.host_throttle`).
 - Lands: `mo_auditor_reports` (the list rows verbatim plus `search_year`) and `mo_auditor_ratings` (the rating sentence read
-  from a PDF, with its url, page and extraction status). First full run: 3,494 reports (1999 to 2026), 1,125 PDFs read,
+  from a PDF, with its url, page and extraction status). First full run: 3,494 reports (1999 to 2026), 1,124 PDFs read (the first run read 1,125 before #439 narrowed the unrated-title pattern),
   about 30 minutes.
 - Quirks:
   - An unfiltered list call returns only the newest 1,000 rows, so the loader asks one year at a time and fails loudly if a
