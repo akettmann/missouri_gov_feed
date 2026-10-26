@@ -111,7 +111,8 @@
 {%- endmacro %}
 
 
-{# Normalize a person/org name for matching: lower-case, letters/digits/spaces only, single spaces. #}
+{# Normalize a person/org name for matching: lower-case, letters/digits/spaces only, runs of spaces collapsed to one
+   (spaces are kept, not removed: "Health PAC" and "HealthPAC" differ, #108; callers split on them). #}
 {% macro name_key(expr) -%}
     trim({{ mogov.regex_replace_all(mogov.regex_replace_all('lower(' ~ expr ~ ')', '[^a-z0-9 ]', ' '), ' +', ' ') }})
 {%- endmacro %}
