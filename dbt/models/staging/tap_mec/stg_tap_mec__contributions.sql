@@ -27,6 +27,10 @@
 --   * a Corporation whose ctrb_name and company are placeholders, last_name is blank and first_name is a
 --     multi-word name (C000642 / C081050, 8 rows): the organization sits in first_name; the name is kept and
 --     the reported type stays Corporation rather than becoming Individual.
+-- The un-shift signature and the final company fallback use the same clean_name test as the other names (#472): a
+-- '~~' / '--' placeholder counts as missing and is never emitted as the donor, and a one-character company no longer
+-- types a row Organization. No row of the current TAP files carries a placeholder of two or more characters there, so
+-- only 3 one-character-company rows change type (Organization to Individual).
 -- Not handled (left as reported): addresses typed into ctrb_name, and surnames repeated in first_name.
 -- The model exposes no address columns, so only name and type are repaired.
 -- Identity and double loading (#82, #75, #83): record_id is the source row's own id, txn in the older export layout
@@ -119,6 +123,7 @@ source_rows as (
         *,
         {{ mogov.clean_name('ctrb_name') }} as ctrb_name_clean,
         {{ mogov.clean_name('committee') }} as committee_clean,
+        {{ mogov.clean_name('company') }} as company_clean,
         coalesce({{ mogov.regex_matches('trim(first_name)', '^[0-9]+$') }}, false) as is_shifted,
         -- rules 2-4 use anchored '^...$' patterns and rule 1 uses '.*x.*'; both mean the same whether the
         -- backend's regex match is anchored or a substring search (#69)
@@ -128,9 +133,9 @@ source_rows as (
             and not {{ mogov.regex_matches('trim(last_name)', '^[0-9]+$') }}
             and {{ mogov.regex_matches('address_1', '.*[A-Za-z].*') }}
             and not {{ mogov.regex_matches('address_1', '.*[0-9].*') }}
-            and coalesce(length(trim(ctrb_name)), 0) < 2
-            and coalesce(length(trim(committee)), 0) < 2
-            and coalesce(length(trim(company)), 0) < 2,
+            and {{ mogov.clean_name('ctrb_name') }} is null
+            and {{ mogov.clean_name('committee') }} is null
+            and {{ mogov.clean_name('company') }} is null,
             false
         ) as is_id_shifted_person,
         coalesce(
@@ -175,7 +180,7 @@ select
         ctrb_name_clean,
         committee_clean,
         person_name,
-        case when not is_shifted or length(trim(company)) >= 2 then nullif(trim(company), '') end
+        company_clean
     ) as contributor_name,
     case
         when is_id_shifted_person or is_zero_last_person then 'Individual'
@@ -185,7 +190,7 @@ select
             ctrb_type,
             case
                 when committee_clean is not null then 'Committee'
-                when nullif(trim(company), '') is not null then 'Organization'
+                when company_clean is not null then 'Organization'
                 else 'Individual'
             end
         )
