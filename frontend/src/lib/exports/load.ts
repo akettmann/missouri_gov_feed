@@ -456,18 +456,19 @@ async function loadAll(): Promise<OfficialBundle[]> {
             select official_id, session_code, cast(session_year as integer) as session_year,
                    cast(committees_held as integer) as committees_held, cast(chair_posts as integer) as chair_posts,
                    cast(vice_chair_posts as integer) as vice_chair_posts,
-                   cast(co_chair_posts as integer) as co_chair_posts, cast(ranking_posts as integer) as ranking_posts
-            from {fct_committee_posts}`),
+                   cast(co_chair_posts as integer) as co_chair_posts, cast(ranking_posts as integer) as ranking_posts,
+                   source_url
+            from {fct_committee_posts} where is_current_official`),
           await query<TitledMembership>(`
             select official_id, session_code, committee_name, position_name, is_subcommittee
-            from {fct_committee_memberships} where position_name <> 'Member'`),
+            from {fct_committee_memberships} where position_name <> 'Member' and is_current_official`),
           process.env,
           console.warn,
           houseSessionNames,
           new Set(
             (
               await query<{ session_code: string }>(
-                `select distinct session_code from {fct_committee_memberships} where source = 'committee_list'`,
+                `select distinct session_code from {fct_committee_memberships} where source = 'committee_list' and is_current_official`,
               )
             ).map((r) => r.session_code),
           ),

@@ -1,12 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { sessionLabel } from "../src/lib/format.ts";
-import {
-  COMMITTEE_LIST_NOTE,
-  COMMITTEE_LIST_URL,
-  buildCommitteeSessions,
-  positionLabel,
-} from "../src/lib/committeePosts.ts";
+import { COMMITTEE_LIST_NOTE, buildCommitteeSessions, positionLabel } from "../src/lib/committeePosts.ts";
 
 const post = (official_id, session_code, extra = {}) => ({
   official_id,
@@ -17,6 +12,7 @@ const post = (official_id, session_code, extra = {}) => ({
   vice_chair_posts: 0,
   co_chair_posts: 0,
   ranking_posts: 0,
+  source_url: `https://documents.house.mo.gov/xml/${session_code}.zip`,
   ...extra,
 });
 const mem = (official_id, session_code, committee_name, position_name, is_subcommittee = false) => ({
@@ -99,13 +95,17 @@ test("titles are ordered chair, co-chair, vice-chair, ranking; subcommittees las
   assert.deepEqual(out.get("b")[0].titles, []);
 });
 
-test("the newest session links the committee list (no zip yet); older ones link their session zip", () => {
-  const out = buildCommitteeSessions([post("a", "251"), post("a", "261")], []);
+test("each session links the House file its row names, not a guess from the newest session", () => {
+  const own = "https://documents.house.mo.gov/xml/261-072.xml";
+  const out = buildCommitteeSessions([post("a", "251"), post("a", "261", { source_url: own })], []);
   const [newest, older] = out.get("a");
   assert.equal(newest.is_latest, true);
-  assert.equal(newest.source_url, COMMITTEE_LIST_URL);
+  assert.equal(newest.source_url, own);
   assert.equal(older.is_latest, false);
   assert.equal(older.source_url, "https://documents.house.mo.gov/xml/251.zip");
+  // a newer extraordinary session does not change what the 261 row links
+  const later = buildCommitteeSessions([post("a", "261", { source_url: own }), post("a", "263")], []);
+  assert.equal(later.get("a").find((x) => x.session_code === "261").source_url, own);
 });
 
 test("subcommittee titles do not count toward the committee totals check", () => {
