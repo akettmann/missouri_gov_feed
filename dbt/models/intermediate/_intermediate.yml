@@ -70,21 +70,22 @@ models:
 - name: int_epa_frs__facilities
   description: 'EPA FRS facilities in Missouri that have coordinates, with one owner, one parent company and one
     primary NAICS code each. The owner is the first owner-role organization (owner/operator, owner, operator, permittee;
-    a known org_type before UNKNOWN); the NAICS code is the code most of the facility''s programs give, taking the
-    programs'' primary codes first (naics_source ''naics''), then the ones FRS leaves UNKNOWN (''naics_unknown''),
-    then the ones it calls SECONDARY (''naics_secondary''). Only a facility with no NAICS code at all but a SIC
-    code (a primary one before an unknown or secondary one, then the one most programs give) gets the NAICS sector
-    that SIC code''s major group falls in (seed sic_naics_sectors): naics_code is then the two-digit sector prefix,
-    naics_description names the sector and the SIC code, and naics_source is ''sic''. naics_source is null when
-    the facility has no usable code. A real NAICS code, even a non-primary one, is more precise than a two-digit
-    SIC-derived sector, and agrees with it on the sector for about 90% of facilities. Codes tied on tier and program
-    count go to the one in the SIC-derived sector (NAICS 31-33 count as one sector), then the lowest code. The SIC
-    sector counts only as a signal when the SIC code is not itself tied (same tier and program count) with a SIC
-    code in a different sector, and is not SIC 1629 (construction stormwater-permit noise). is_government: a federal
-    site, any owner-role organization typed as a government body (municipal, county, state, federal, district, tribal),
-    or a facility or owner named like one ("City of ...", "... County", "... School District"; most organizations
-    are typed UNKNOWN). The *_key columns are company_key names for matching donors. Grain: one row per geocoded
-    EPA FRS facility.'
+    a known org_type before UNKNOWN, then name, then org_type alphabetically (a stable key, not a ranking of types),
+    then program record, so tied names pick the same row every build, #386); the NAICS code is the code most of
+    the facility''s programs give, taking the programs'' primary codes first (naics_source ''naics''), then the
+    ones FRS leaves UNKNOWN (''naics_unknown''), then the ones it calls SECONDARY (''naics_secondary''). Only a
+    facility with no NAICS code at all but a SIC code (a primary one before an unknown or secondary one, then the
+    one most programs give) gets the NAICS sector that SIC code''s major group falls in (seed sic_naics_sectors):
+    naics_code is then the two-digit sector prefix, naics_description names the sector and the SIC code, and naics_source
+    is ''sic''. naics_source is null when the facility has no usable code. A real NAICS code, even a non-primary
+    one, is more precise than a two-digit SIC-derived sector, and agrees with it on the sector for about 90% of
+    facilities. Codes tied on tier and program count go to the one in the SIC-derived sector (NAICS 31-33 count
+    as one sector), then the lowest code. The SIC sector counts only as a signal when the SIC code is not itself
+    tied (same tier and program count) with a SIC code in a different sector, and is not SIC 1629 (construction
+    stormwater-permit noise). is_government: a federal site, any owner-role organization typed as a government body
+    (municipal, county, state, federal, district, tribal), or a facility or owner named like one ("City of ...",
+    "... County", "... School District"; most organizations are typed UNKNOWN). The *_key columns are company_key
+    names for matching donors. Grain: one row per geocoded EPA FRS facility.'
 - name: int_house_fd__schedule_lines
   description: 'House disclosure PDF text, each line tagged with the schedule it falls under (the nearest preceding
     "Schedule X:" header in the same document). Column-header rows, "None disclosed." and boilerplate drop out.
@@ -134,9 +135,10 @@ models:
     for acronym and shortened names no rule can expand ("HRCC", "AMECPAC", "MHA PAC", #33); each row cites its evidence.
     Tried first, but only counts when that committee was active that year 0 mecid in name    the filer typed the
     donor''s MECID into the name ("... (MEC ID# C221962)") and it''s a known committee; taken whatever its active
-    years 1 same name       name_key: case, punctuation and spacing ignored 2 normalized name  committee_key: abbreviations
-    spelled out (MO, Assn, Cmte...), "the/of/for/inc" dropped 3 core name        committee_core_key: also without
-    words like PAC, Political, Action, Committee, Fund, Account, at least 4 characters; also tried on the name outside
+    years 1 same name        name_key: case ignored; punctuation and other non-alphanumeric characters turned into
+    spaces; runs of spaces collapsed, not removed (#108) 2 normalized name  committee_key: abbreviations spelled
+    out (MO, Assn, Cmte...), "the/of/for/inc" dropped 3 core name        committee_core_key: also without words
+    like PAC, Political, Action, Committee, Fund, Account, at least 4 characters; also tried on the name outside
     parentheses, and against a filer''s own parenthesized short name ("Carpenters Help in the Political Process
     (CHIPP)" -> CHIPP) A candidate counts only if it was active within a year of the gift (first_active_year - 1
     .. last_active_year + 1). The lowest tier with an active candidate decides: one candidate -> matched, several
@@ -270,7 +272,9 @@ models:
     mayors and state judges have no dated past rosters here. person keys match dim_official.official_id, so a past
     holder who serves today links to their profile. official_id is the stable person id; openstates_id is the Open
     States record the senate row came from (null for other sources), kept so rpt_officeholders_by_year can find
-    that record''s folder. Grain: one row per (year, person, office) for offices with dated past rosters.'
+    that record''s folder. session_code is the House session file (e.g. 251, 253) listing the member, the earliest
+    one in the year; null for other sources. Grain: one row per (year, person, office) for offices with dated past
+    rosters.'
 - name: int_officials__bios
   description: 'One biography text per current official where a source has one: Official Manual (legislators), MO
     House XML (representatives), FJC professional career (federal judges), Open States (others). Grain: one biography

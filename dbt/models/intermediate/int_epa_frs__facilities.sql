@@ -1,6 +1,8 @@
 -- EPA FRS facilities in Missouri that have coordinates, with one owner, one parent company and one primary
 -- NAICS code each. The owner is the first owner-role organization (owner/operator, owner, operator,
--- permittee; a known org_type before UNKNOWN); the NAICS code is the code most of the facility's programs give,
+-- permittee; a known org_type before UNKNOWN, then name, then org_type alphabetically (a stable key, not a
+-- ranking of types), then program record, so tied names pick the same row every build, #386); the NAICS
+-- code is the code most of the facility's programs give,
 -- taking the programs' primary codes first (naics_source 'naics'), then the ones FRS leaves UNKNOWN
 -- ('naics_unknown'), then the ones it calls SECONDARY ('naics_secondary'). Only a facility with no NAICS code
 -- at all but a SIC code (a primary one before an unknown or secondary one, then the one most programs give)
@@ -29,6 +31,8 @@ with orgs as (
         registry_id,
         org_name,
         org_type,
+        program_system,
+        program_id,
         case
             when affiliation_type = 'OWNER/OPERATOR' then 1
             when affiliation_type = 'OWNER' then 2
@@ -51,7 +55,16 @@ owners as (
         org_type as owner_type,
         row_number() over (
             partition by registry_id
-            order by owner_rank, case when coalesce(org_type, 'UNKNOWN') = 'UNKNOWN' then 1 else 0 end, org_name
+            order by
+                owner_rank,
+                case when coalesce(org_type, 'UNKNOWN') = 'UNKNOWN' then 1 else 0 end,
+                org_name,
+                -- same name on two owner rows (#386): a neutral stable key, not a ranking of types, so the pick
+                -- no longer depends on row order. owner_type is the alphabetically first org_type, then the
+                -- program record that carries it
+                coalesce(org_type, ''),
+                program_system,
+                program_id
         ) as rn
     from orgs
     where owner_rank is not null
@@ -69,7 +82,7 @@ parents as (
     select
         registry_id,
         org_name as parent_company_name,
-        row_number() over (partition by registry_id order by org_name) as rn
+        row_number() over (partition by registry_id order by org_name, program_system, program_id) as rn
     from orgs
     where is_parent
 ),
