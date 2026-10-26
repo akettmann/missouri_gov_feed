@@ -626,6 +626,10 @@ Quirks:
   measures use an older layout ("Constitutional Amendment 1 Ballot Issue Yes: 499,581 Yes: 50.1%", then "No: 497,091
   No: 49.9%"). The loader lands those lines unsplit (`kind = other`); `stg_mo_sos_elections__lines` recognises them and
   gives them the same cells as the other years (#331).
+- 2014 primary Constitutional Amendment 1 (right to farm): the printed Yes 499,581 / No 497,091 lines are pre-recount
+  and uncertified. The certified recount gave Yes 499,963 / No 497,588, and the printed Total Votes 997,551 is the
+  recount total. A ballot-measure mart must not treat the staged Yes/No rows as certified for this measure. Amendment 9
+  on the same page (729,750 + 246,515 = 976,265, printed 976,267) is a 2-vote inconsistency in the PDF itself.
 - Candidate-less ballots: a Yes/No pair named like the contest title is a ballot measure (staged as
   `contest_kind = 'ballot_issue'`, not in a mart); otherwise it is retention.
 - Uncontested means exactly one candidate on the ballot, write-ins not counted (a write-in with 19 votes does not

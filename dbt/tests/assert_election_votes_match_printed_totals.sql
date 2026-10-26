@@ -2,9 +2,10 @@
 -- under it. Skipped where the PDF prints no total for the contest, or one total for a block of several judges
 -- (2022 Court of Appeals, Western District prints the first judge's total once), and in primaries, whose total
 -- spans every party's ballot (the sum over the whole contest is compared there too).
--- Known PDF mismatches (the PDF's own Yes + No disagrees with its printed total; the printed percentages follow the
--- Yes + No sum, so the total line is the suspect): 2014-08-05 primary Constitutional Amendment 1
--- (499,581 + 497,091 = 996,672, total printed 997,551) and Amendment 9 (729,750 + 246,515 = 976,265, printed 976,267).
+-- Known PDF mismatches. 2014-08-05 primary Constitutional Amendment 1 (499,581 + 497,091 = 996,672, total printed
+-- 997,551): the printed Yes/No lines are the pre-recount, uncertified figures; the printed total is the certified
+-- post-recount one (the September 2014 recount gave Yes 499,963 + No 497,588 = 997,551). Amendment 9 (729,750 +
+-- 246,515 = 976,265, printed 976,267) is a genuine 2-vote inconsistency within the PDF.
 with known_pdf_mismatches as (
     select
         '2014-08-05-primary' as election_key,
