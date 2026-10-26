@@ -63,34 +63,63 @@ unit_tests:
   - name: committee_donors_rank_ties_break_on_donor_class
     model: rpt_committee_donors
     description: >
-      The same donor name gave the same total as a committee and as a business (different donor_class, so two
-      rows). Equal amounts and names must still get a strict, repeatable rank 1 and 2: donor_class is the final
-      tie-break (business or organization before committee). Two pairs, one fed committee-first and one
-      business-first, so neither input order can decide the result; without the tie-break the order is left to
-      the engine's scan and the ranks can flip between builds.
+      Eight tied pairs across two committees: the same donor name gave the same total as a committee and as a
+      business (different donor_class, so two rows). Equal amounts and names must still get a strict, repeatable
+      rank (2n-1 and 2n): donor_class is the final tie-break (business or organization before committee; the
+      order is alphabetical and only has to be stable, it carries no meaning). Which class is fed first
+      alternates between pairs and committees, so no single input order can decide the result; without the
+      tie-break the order is left to the engine's scan and at least one of the eight pairs is very likely to flip.
     given:
       - input: ref('fct_campaign_finance')
         rows:
           - {official_id: o1, direction: received, counterparty_mec_committee_id: C000100}
+          - {official_id: o2, direction: received, counterparty_mec_committee_id: C000200}
       - input: ref('int_mec__committee_names')
         rows:
-          - {mec_committee_id: C000100, committee_name: Tie PAC, last_year_under_name: 2022}
+          - {mec_committee_id: C000100, committee_name: Tie PAC One, last_year_under_name: 2022}
+          - {mec_committee_id: C000200, committee_name: Tie PAC Two, last_year_under_name: 2022}
       - input: ref('int_mec__contributions_received')
         rows:
-          - {mec_committee_id: C000100, contributor_type: Committee, contributor_name: Boilermakers 83, contributor_committee_name: Boilermakers 83, amount: 250, contribution_year: 2020}
-          - {mec_committee_id: C000100, contributor_type: Corporation, contributor_name: Boilermakers 83, contributor_committee_name: null, amount: 250, contribution_year: 2020}
-          - {mec_committee_id: C000100, contributor_type: Corporation, contributor_name: Zeta Group, contributor_committee_name: null, amount: 100, contribution_year: 2020}
-          - {mec_committee_id: C000100, contributor_type: Committee, contributor_name: Zeta Group, contributor_committee_name: Zeta Group, amount: 100, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Committee, contributor_name: Boilermakers 83, contributor_committee_name: Boilermakers 83, amount: 400, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Corporation, contributor_name: Boilermakers 83, contributor_committee_name: null, amount: 400, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Corporation, contributor_name: Zeta Group, contributor_committee_name: null, amount: 300, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Committee, contributor_name: Zeta Group, contributor_committee_name: Zeta Group, amount: 300, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Committee, contributor_name: Alpha Union, contributor_committee_name: Alpha Union, amount: 200, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Corporation, contributor_name: Alpha Union, contributor_committee_name: null, amount: 200, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Corporation, contributor_name: Midwest Trades, contributor_committee_name: null, amount: 100, contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_type: Committee, contributor_name: Midwest Trades, contributor_committee_name: Midwest Trades, amount: 100, contribution_year: 2020}
+          - {mec_committee_id: C000200, contributor_type: Corporation, contributor_name: Boilermakers 83, contributor_committee_name: null, amount: 400, contribution_year: 2020}
+          - {mec_committee_id: C000200, contributor_type: Committee, contributor_name: Boilermakers 83, contributor_committee_name: Boilermakers 83, amount: 400, contribution_year: 2020}
+          - {mec_committee_id: C000200, contributor_type: Committee, contributor_name: Zeta Group, contributor_committee_name: Zeta Group, amount: 300, contribution_year: 2020}
+          - {mec_committee_id: C000200, contributor_type: Corporation, contributor_name: Zeta Group, contributor_committee_name: null, amount: 300, contribution_year: 2020}
+          - {mec_committee_id: C000200, contributor_type: Corporation, contributor_name: Alpha Union, contributor_committee_name: null, amount: 200, contribution_year: 2020}
+          - {mec_committee_id: C000200, contributor_type: Committee, contributor_name: Alpha Union, contributor_committee_name: Alpha Union, amount: 200, contribution_year: 2020}
+          - {mec_committee_id: C000200, contributor_type: Committee, contributor_name: Midwest Trades, contributor_committee_name: Midwest Trades, amount: 100, contribution_year: 2020}
+          - {mec_committee_id: C000200, contributor_type: Corporation, contributor_name: Midwest Trades, contributor_committee_name: null, amount: 100, contribution_year: 2020}
       - input: ref('int_mec__donor_committees')
         rows:
           - {donor_committee_name: Boilermakers 83, contribution_year: 2020, mec_committee_id: null, match_status: no match, match_confidence: null}
           - {donor_committee_name: Zeta Group, contribution_year: 2020, mec_committee_id: null, match_status: no match, match_confidence: null}
+          - {donor_committee_name: Alpha Union, contribution_year: 2020, mec_committee_id: null, match_status: no match, match_confidence: null}
+          - {donor_committee_name: Midwest Trades, contribution_year: 2020, mec_committee_id: null, match_status: no match, match_confidence: null}
     expect:
       rows:
-        - {mec_committee_id: C000100, donor_rank: 1, donor_class: business or organization, donor_name: Boilermakers 83, total_amount: 250}
-        - {mec_committee_id: C000100, donor_rank: 2, donor_class: committee, donor_name: Boilermakers 83, total_amount: 250}
-        - {mec_committee_id: C000100, donor_rank: 3, donor_class: business or organization, donor_name: Zeta Group, total_amount: 100}
-        - {mec_committee_id: C000100, donor_rank: 4, donor_class: committee, donor_name: Zeta Group, total_amount: 100}
+        - {mec_committee_id: C000100, donor_rank: 1, donor_class: business or organization, donor_name: Boilermakers 83, total_amount: 400}
+        - {mec_committee_id: C000100, donor_rank: 2, donor_class: committee, donor_name: Boilermakers 83, total_amount: 400}
+        - {mec_committee_id: C000100, donor_rank: 3, donor_class: business or organization, donor_name: Zeta Group, total_amount: 300}
+        - {mec_committee_id: C000100, donor_rank: 4, donor_class: committee, donor_name: Zeta Group, total_amount: 300}
+        - {mec_committee_id: C000100, donor_rank: 5, donor_class: business or organization, donor_name: Alpha Union, total_amount: 200}
+        - {mec_committee_id: C000100, donor_rank: 6, donor_class: committee, donor_name: Alpha Union, total_amount: 200}
+        - {mec_committee_id: C000100, donor_rank: 7, donor_class: business or organization, donor_name: Midwest Trades, total_amount: 100}
+        - {mec_committee_id: C000100, donor_rank: 8, donor_class: committee, donor_name: Midwest Trades, total_amount: 100}
+        - {mec_committee_id: C000200, donor_rank: 1, donor_class: business or organization, donor_name: Boilermakers 83, total_amount: 400}
+        - {mec_committee_id: C000200, donor_rank: 2, donor_class: committee, donor_name: Boilermakers 83, total_amount: 400}
+        - {mec_committee_id: C000200, donor_rank: 3, donor_class: business or organization, donor_name: Zeta Group, total_amount: 300}
+        - {mec_committee_id: C000200, donor_rank: 4, donor_class: committee, donor_name: Zeta Group, total_amount: 300}
+        - {mec_committee_id: C000200, donor_rank: 5, donor_class: business or organization, donor_name: Alpha Union, total_amount: 200}
+        - {mec_committee_id: C000200, donor_rank: 6, donor_class: committee, donor_name: Alpha Union, total_amount: 200}
+        - {mec_committee_id: C000200, donor_rank: 7, donor_class: business or organization, donor_name: Midwest Trades, total_amount: 100}
+        - {mec_committee_id: C000200, donor_rank: 8, donor_class: committee, donor_name: Midwest Trades, total_amount: 100}
 
   - name: committee_donors_name_with_unknown_year_ranks_last
     model: rpt_committee_donors
