@@ -32,7 +32,12 @@ def _macros(adapter: str):
         def __getattr__(self, name):
             return getattr(holder["module"], name)
 
-    env.globals.update(adapter=Adapter, mogov=Mogov(), **{"return": lambda value: value})
+    class Dbt:  # split_part_at calls dbt.split_part; DuckDB's is split_part(string, delimiter, index)
+        @staticmethod
+        def split_part(expr, delim, i):
+            return f"split_part({expr}, {delim}, {i})"
+
+    env.globals.update(adapter=Adapter, mogov=Mogov(), dbt=Dbt(), **{"return": lambda value: value})
     holder["module"] = env.from_string(MACROS.read_text(encoding="utf-8")).module
     module = holder["module"]
     return module
@@ -62,3 +67,22 @@ def test_snowflake_replace_and_extract_use_escaped_literals():
 def test_duckdb_rendering_keeps_the_literal_dot(text, expected):
     sql = str(_macros("duckdb").regex_matches("lower(?)", DOTS))
     assert duckdb.connect().execute("select " + sql, [text]).fetchone()[0] is expected
+
+
+@pytest.mark.parametrize(
+    ("n", "expected"),
+    [
+        (1, "a"),  # first part
+        (3, "c"),  # last part
+        (4, ""),  # past the actual parts but within max_parts: DuckDB split_part gives ''
+        (5, None),  # beyond max_parts: the CASE has no branch, so NULL (parts are dropped, not an error)
+    ],
+)
+def test_split_part_at_picks_nth_part_and_nulls_beyond_max_parts(n, expected):
+    sql = str(_macros("duckdb").split_part_at("'a, b, c'", "', '", str(n), 4))
+    # the part numbers are literals in the rendered SQL, whatever n is
+    assert "when 4 then split_part('a, b, c', ', ', 4)" in sql
+    assert "when 5" not in sql
+    sql = sql
+    [(got,)] = duckdb.connect().execute(f"select trim({sql})").fetchall()
+    assert got == expected
