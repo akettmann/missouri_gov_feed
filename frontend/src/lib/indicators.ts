@@ -123,3 +123,33 @@ export const breaksText = (n: number) =>
   n === 0
     ? "No recorded votes against their party's majority on a party-line vote."
     : `${plural(n, "recorded vote", "recorded votes")} against their party's majority on a party-line vote.`;
+
+const CHAMBER_NAMES: Record<string, string> = {
+  state_house: "Missouri House",
+  state_senate: "Missouri Senate",
+  us_house: "U.S. House",
+  us_senate: "U.S. Senate",
+};
+
+/**
+ * Reader-facing text for a fct_bias_indicators `detail`. The raw detail stays the internal match key (peer strips,
+ * current-chamber ordering); only display goes through here. Handles every shape the mart emits:
+ *   "state_house: 1006 party-line votes"                      -> "1,006 party-line votes cast in the Missouri House"
+ *   "Voteview DW-NOMINATE, House 119th Congress"              -> "Voteview DW-NOMINATE, U.S. House, 119th Congress"
+ *   "Shor-McCarty career ideal point; served 2009-2022"       -> "... served 2009–2022"
+ * The Congress ordinal is taken as written (never re-derived), so "121st" survives. Unknown shapes pass through.
+ */
+export function indicatorDetailText(detail: string | null | undefined): string {
+  if (!detail) return "";
+  const unity = /^(\w+): (\d+) party-line votes?$/.exec(detail);
+  if (unity) {
+    const n = Number(unity[2]);
+    const where = CHAMBER_NAMES[unity[1]] ?? unity[1];
+    return `${plural(n, "party-line vote", "party-line votes")} cast in the ${where}`;
+  }
+  const dw = /^(.*DW-NOMINATE), (House|Senate) (\S+ Congress)$/.exec(detail);
+  if (dw) return `${dw[1]}, U.S. ${dw[2]}, ${dw[3]}`;
+  const sm = /^(.*; served )(\d{4})-(\d{4})$/.exec(detail);
+  if (sm) return `${sm[1]}${sm[2]}–${sm[3]}`;
+  return detail;
+}
