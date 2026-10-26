@@ -23,8 +23,13 @@ BASE = "https://www.senate.mo.gov"
 DASH = "[—–-]"
 CATEGORIES = ["YEAS", "NAYS", "Absent with leave", "Absent", "Excused from voting", "Vacancies"]
 CATEGORY = "|".join(CATEGORIES)
-# bounded so a block missing its "Vacancies" line can't swallow the rest of the journal
-BLOCK = re.compile(rf"YEAS{DASH}Senators?.{{0,2500}}?Vacancies{DASH}[^\n]*", re.S)
+# bounded so a block missing its "Vacancies" line can't swallow the rest of the journal. From 2024 the journal prints
+# "Excused from voting—Senator X—1" AFTER the Vacancies line (possibly past a page header), so a trailing one is kept.
+_PAGE_LINE = r"(?:Journal of the Senate \d+|\d+ Journal of the Senate)[ \t]*\n"
+BLOCK = re.compile(
+    rf"YEAS{DASH}Senators?.{{0,2500}}?Vacancies{DASH}[^\n]*(?:\n(?:{_PAGE_LINE})*Excused from voting{DASH}[^\n]*)?",
+    re.S,
+)
 # A section's names end at its "—N" total, "None", or the next section. Some journals print the total
 # before the names ("Absent with leave—Senators—2 Eigel Gannon"); that leading number is the total.
 SECTION = re.compile(
@@ -62,10 +67,13 @@ def _vacancies(block: str) -> int | None:
     m = re.search(rf"Vacancies{DASH}([^\n]*)", block)
     if not m:
         return None
-    rest = m.group(1)
-    if number := re.search(r"\d+", rest):
-        return int(number.group())
-    return 0 if re.search(r"\bNone\b", rest, re.I) else None
+    # only the first token counts: "None", or "N" / "Senator—N", never a digit further along the line
+    rest = m.group(1).strip()
+    if re.match(r"None\b", rest, re.I):
+        return 0
+    if number := re.match(rf"(?:Senators?{DASH}?)?\s*(\d+)", rest):
+        return int(number.group(1))
+    return None
 
 
 def parse_journal(text: str) -> list[dict]:

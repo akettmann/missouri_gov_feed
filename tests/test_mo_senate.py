@@ -110,3 +110,34 @@ def test_vacancy_count_forms():
     for printed, expected in [("Vacancies—Senator—2", 2), ("Vacancies-3", 3), ("Vacancies—None", 0)]:
         rows = parse_journal(base.replace("Vacancies—None", printed, 1))
         assert {r["vacancies"] for r in rows if r["block_index"] == 0} == {expected}, printed
+
+
+# 2024+ order: "Excused from voting" is printed AFTER "Vacancies", possibly past a page header
+EXCUSED_AFTER_VACANCIES = """HB 1 was read the 3rd time and passed by the following vote:
+YEAS—Senators
+Bean Beck Bernskoetter Brattin Brown Burlison Cierpiot
+Crawford Eslinger Gannon Hoskins Hough Koenig Luetkemeyer
+May O'Laughlin Onder Razer Riddle Rizzo Roberts
+Rowden Schatz Thompson Rehder Washington White Wieland—27
+NAYS—Senators
+Arthur Moon Mosley Schupp—4
+Absent—Senators—None
+Absent with leave—Senators—2
+Eigel Gannon
+Vacancies—None
+Journal of the Senate 2308
+Excused from voting—Senator Williams—1
+"""
+
+
+def test_excused_printed_after_vacancies_is_kept():
+    rows = parse_journal(EXCUSED_AFTER_VACANCIES)
+    excused = [r for r in rows if r["category"] == "Excused from voting"]
+    assert [(r["name"], r["declared_count"], r["vacancies"]) for r in excused] == [("Williams", 1, 0)]
+
+
+def test_vacancies_reads_the_first_token_only():
+    base = BLOCKS_2022
+    assert {r["vacancies"] for r in parse_journal(base) if r["block_index"] == 0} == {0}
+    text = base.replace("Vacancies—None", "Vacancies—None 5", 1)
+    assert {r["vacancies"] for r in parse_journal(text) if r["block_index"] == 0} == {0}

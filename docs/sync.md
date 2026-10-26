@@ -17,6 +17,10 @@ Existing environments: `mo_house` used to land JSON tables. Run `uv run mogov lo
 `data/raw/mo_house_bills`, `data/raw/mo_house_lists` and `data/raw/mo_house_members` are no longer read by
 anything and can be deleted.
 
+`mo_senate` now lands each vote's `Vacancies—N` count and the 2024+ "Excused from voting" lines that follow it. Run
+`uv run mogov load mo_senate` once (journal PDFs and their extracted text are cached, so it takes seconds) before the
+next `mogov build`. Until then `assert_senate_vacancies_parsed` fails and 2024+ recusals are missing.
+
 ## How often each source changes (and how long it's cached)
 
 | Loader                        | Upstream changes                             | Cache policy                                                               | Suggested run                                         |
