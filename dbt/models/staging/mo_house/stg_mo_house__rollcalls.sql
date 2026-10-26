@@ -1,9 +1,28 @@
 -- One row per MO House roll call (parsed PDF header). The line after "Roll Call : N" names the measure
 -- (e.g. "HCS HB 10"); the next lines carry the sponsor and a description.
--- Roll calls dated outside their session's year are dropped (#430): the House leaves the previous session's
--- PDFs in the bills171/rollcalls directory (the 2016 session's, numbered by 2016 session day), and the loader's
--- probe runs on past the last 2017 roll call of a day into them. 415 votes dated 2016 sat under session 171,
--- none linked from the bill XML. They belong to session 161, which is not loaded. Raw keeps them.
+-- The House's rollcalls directory for a session holds PDFs that belong to other sessions; three rules drop them.
+-- 1. Dated outside the session's year (#430): bills171 holds the 2016 session's PDFs (415 votes dated 2016, none
+--    linked from the bill XML; they belong to session 161, which is not loaded).
+-- 2. Header names another session (#435): the PDF header carries the General Assembly ("99th") and a session label
+--    ("FIRST REGULAR SESSION", "SPECIAL SESSION", "SECOND EXTRAORDINARY SESSION"). A regular session (code ending
+--    in 1) must show its General Assembly and the label FIRST in odd years, SECOND in even years; an extraordinary
+--    or special session (any other last digit) must show its General Assembly and an EXTRAORDINARY or SPECIAL
+--    label. The House numbers extraordinary sessions irregularly (173 prints SPECIAL, 184 prints FIRST
+--    EXTRAORDINARY, 174 prints SECOND), so those labels are not checked against the code's ordinal. Drops 5 PDFs:
+--    171 002.001/002.002 (SPECIAL SESSION, the 173 session of 2017-05-23), 201 012.001 (FIRST EXTRAORDINARY, a copy
+--    of 203's 012.001) and 204 003.002/003.003 (dated 2020-11-19, SECOND REGULAR SESSION: technical-session votes
+--    on HB 2315 of the 2020 regular session; 204's House journal pages run unbroken from 2020-11-10 to 2020-11-20,
+--    so there was no 204 sitting on the 19th, and the header is right, not a typo). A header that does not parse
+--    (no PDF text) is kept.
+-- 3. The same (session, day, roll-call number) published under two file names (#435): 261 has 003.001 = 003.002,
+--    004.002 = 004.004 and 004.003 = 004.005, byte-identical headers and totals. The roll-call number printed in
+--    the PDF is the key; the file whose name carries that number (else the first by URL) is kept.
+-- Raw keeps everything.
+{#- the file name that carries the roll call's own number, e.g. '%/003.001.pdf' -#}
+{% set file_name_like = dbt.concat([
+    "'%/'", mogov.zero_pad('session_day', 3), "'.'", mogov.zero_pad('rollcall_number', 3), "'.pdf'"
+]) %}
+
 with src as (
     select
         {{ mogov.json_str('payload', '$.url') }} as rollcall_url,
@@ -25,18 +44,83 @@ parsed as (
         {{ dbt.safe_cast('session_day', dbt.type_int()) }} as session_day,
         {{ dbt.safe_cast('rollcall_number', dbt.type_int()) }} as rollcall_number,
         {{ mogov.parse_date('vote_date_text', '%m/%d/%Y') }} as vote_date,
+        {{ dbt.safe_cast(mogov.regex_extract('header_text', '([0-9]+)(st|nd|rd|th) General Assembly'),
+            dbt.type_int()) }} as header_general_assembly,
+        trim({{ mogov.regex_extract('header_text', 'General Assembly[ \n]+([A-Z][A-Z ]*SESSION)') }})
+            as header_session_label,
         trim({{ mogov.regex_extract('header_text', 'Session Day *: *[0-9]+ +([A-Z][^\n]*?) +Date') }}) as calendar_item,
         trim({{ mogov.regex_extract('header_text', 'Roll Call *: *[0-9]+ +([^\n]+)') }}) as measure,
         trim({{ mogov.regex_extract('header_text', '\n *([A-Z][A-Z .\'-]+ \\([0-9]{3}\\)) *\n') }}) as sponsor,
         {{ dbt.safe_cast('total_yes', dbt.type_int()) }} as total_yes,
-        {{ dbt.safe_cast('total_no', dbt.type_int()) }} as total_no
+        {{ dbt.safe_cast('total_no', dbt.type_int()) }} as total_no,
+        2000 + {{ dbt.safe_cast("substring(session_code, 1, 2)", dbt.type_int()) }} as session_year,
+        substring(session_code, 3, 1) = '1' as is_regular_session
     from src
     where load_error is null
+),
+
+checked as (
+    select
+        *,
+        -- the General Assembly sitting in the session's year: 99th = 2017-2018, 100th = 2019-2020, ...
+        (session_year - 1819 - mod(session_year - 1819, 2)) / 2 as session_general_assembly
+    from parsed
+),
+
+in_session as (
+    select *
+    from checked
+    -- a roll call whose date didn't parse is kept (null passes)
+    where
+        (vote_date is null or extract(year from vote_date) = session_year)
+        -- a header that didn't parse is kept (null passes)
+        and (header_general_assembly is null or header_general_assembly = session_general_assembly)
+        and (
+            header_session_label is null
+            or case
+                when
+                    is_regular_session
+                    then
+                        header_session_label
+                        = case when mod(session_year, 2) = 1 then 'FIRST' else 'SECOND' end || ' REGULAR SESSION'
+                else {{ mogov.regex_matches('header_session_label', '(EXTRAORDINARY|SPECIAL) SESSION$') }}
+            end
+        )
+),
+
+deduped as (
+    select
+        *,
+        row_number() over (
+            partition by
+                session_code,
+                session_day,
+                rollcall_number,
+                -- a roll call missing a key part stays on its own
+                case when session_day is null or rollcall_number is null then rollcall_url end
+            order by
+                case
+                    when rollcall_url like {{ file_name_like }}
+                        then 0
+                    else 1
+                end,
+                rollcall_url
+        ) as key_rank
+    from in_session
 )
 
-select *
-from parsed
--- a roll call whose date didn't parse is kept (null passes); session_code's first two digits are the year
-where
-    vote_date is null
-    or extract(year from vote_date) = 2000 + {{ dbt.safe_cast("substring(session_code, 1, 2)", dbt.type_int()) }}
+select
+    rollcall_url,
+    session_code,
+    session_day,
+    rollcall_number,
+    vote_date,
+    header_general_assembly,
+    header_session_label,
+    calendar_item,
+    measure,
+    sponsor,
+    total_yes,
+    total_no
+from deduped
+where key_rank = 1

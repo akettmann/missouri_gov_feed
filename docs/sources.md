@@ -67,6 +67,14 @@ Quirks:
   interleaved with 663 real 2017 ones), none linked from the bill XML. Raw keeps them as served;
   `stg_mo_house__rollcalls` drops roll calls dated outside their session code's year (2016's session, 161, is
   not loaded). Issue #430.
+- Other sessions' PDFs also sit in a session's directory (issue #435). `stg_mo_house__rollcalls` checks the header's
+  General Assembly and session label against the session code (regular sessions: FIRST in odd years, SECOND in
+  even; extraordinary and special sessions: any EXTRAORDINARY or SPECIAL label, since 173 prints SPECIAL, 184
+  FIRST EXTRAORDINARY and 174 SECOND EXTRAORDINARY). Dropped: `bills171/rollcalls/002.001`, `002.002` (the 2017
+  special session), `bills201/rollcalls/012.001` (a copy of 203's), `bills204/rollcalls/003.002`, `003.003`
+  (2020-11-19 technical-session votes on a 2020 regular-session bill; 204 did not sit that day). The House also
+  publishes some roll calls twice under two file names (261: `003.001`/`003.002`, `004.002`/`004.004`,
+  `004.003`/`004.005`, identical content); the file whose name carries the printed roll-call number is kept.
 - The XML is never converted on the way in: the loader gzips each file as received. The parser reads the
   gzip with lxml (hardened settings in `mogov.xmlparse`) and selects elements by local name, so namespaces,
   attributes, entities and CDATA are the parser's problem, not a regex's. The links that drive crawling
