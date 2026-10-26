@@ -140,15 +140,16 @@ export interface VoteYears {
 /**
  * The years a party-unity figure rests on, tied to the votes: "from 2016 to 2026" or "in 2023", plus a note when the
  * first year is where our records for that chamber begin (the range then starts at our data, not at the official's
- * service): "(our records for this chamber begin in 2016)". Empty when the years are missing (older export).
+ * service): "from 2016 (when our records for this chamber begin) to 2026". Empty when the years are missing (older export).
  */
 export function voteYearsText(years?: VoteYears | null): string {
   const first = years?.first_vote_year;
   const last = years?.last_vote_year;
   if (first == null || last == null) return "";
-  const span = first === last ? `in ${first}` : `from ${first} to ${last}`;
-  const start = years?.chamber_data_start_year;
-  return start != null && first === start ? `${span} (our records for this chamber begin in ${start})` : span;
+  const note = " (when our records for this chamber begin)";
+  const atStart = years?.chamber_data_start_year != null && first === years.chamber_data_start_year;
+  if (first === last) return `in ${first}${atStart ? note : ""}`;
+  return `from ${first}${atStart ? note : ""} to ${last}`;
 }
 
 /**

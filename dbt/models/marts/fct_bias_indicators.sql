@@ -14,7 +14,8 @@
 -- year with a dated party-line vote in `chamber`; the frontend puts them in the caption, never in the match key.
 -- chamber_data_start_year (party unity only, else null) is the first calendar year with any dated party-line vote
 -- for `chamber` in our loaded data (any official); when first_vote_year equals it, the caption says the range
--- starts where our records begin, not where the official's service did.
+-- starts where our records begin, not where the official's service did. The chamber start comes from the party-line
+-- votes of tracked officials (fct_party_unity_yearly), which matches the first roll call in the chamber today.
 with nominate as (
     select
         o.official_id,

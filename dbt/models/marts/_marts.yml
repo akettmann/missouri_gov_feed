@@ -830,6 +830,11 @@ models:
                 expression: "<= first_vote_year"
               config:
                 where: "indicator = 'party_unity_pct'"
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "is not null"
+              config:
+                where: "indicator = 'party_unity_pct'"
 
   - name: fct_commercial_ties
     description: >

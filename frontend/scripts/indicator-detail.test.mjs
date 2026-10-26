@@ -54,11 +54,11 @@ test("a range that starts where our records begin says so", () => {
       last_vote_year: 2026,
       chamber_data_start_year: 2016,
     }),
-    "Based on 1,006 votes this official cast on party-line roll calls in the Missouri House from 2016 to 2026 (our records for this chamber begin in 2016)",
+    "Based on 1,006 votes this official cast on party-line roll calls in the Missouri House from 2016 (when our records for this chamber begin) to 2026",
   );
   assert.equal(
     voteYearsText({ first_vote_year: 2021, last_vote_year: 2021, chamber_data_start_year: 2021 }),
-    "in 2021 (our records for this chamber begin in 2021)",
+    "in 2021 (when our records for this chamber begin)",
   );
   // the official's first year is later than the data start: no note
   assert.equal(
@@ -71,6 +71,9 @@ test("a range that starts where our records begin says so", () => {
 test("SectionVoting shows the same range beside the party-unity percentage", () => {
   const src = readFileSync(new URL("../src/components/SectionVoting.astro", import.meta.url), "utf8");
   assert.match(src, /voteYearsText\(unity\)/);
+  // years sit between the votes and the "(party unity)" link
+  assert.ok(src.indexOf("party-line votes") < src.indexOf("voteYearsText(unity)"));
+  assert.ok(src.indexOf("voteYearsText(unity)") < src.indexOf("party unity</a>"));
 });
 
 test("DW-NOMINATE keeps the Congress ordinal as written", () => {

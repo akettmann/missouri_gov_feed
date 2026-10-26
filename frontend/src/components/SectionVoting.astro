@@ -54,9 +54,9 @@ const tally = (yea: number | null, nay: number | null) => (yea == null ? "—" :
           <p class="small">
             {unity && (
               <>
-                Voted with their party on <strong>{unity.value!.toFixed(1)}%</strong> of party-line votes (
-                <a href={href("/methodology/#indicators")}>party unity</a>)
-                {voteYearsText(unity) && ` ${voteYearsText(unity)}`}.{" "}
+                Voted with their party on <strong>{unity.value!.toFixed(1)}%</strong> of party-line votes
+                {voteYearsText(unity) && ` ${voteYearsText(unity)}`} (
+                <a href={href("/methodology/#indicators")}>party unity</a>).{" "}
               </>
             )}
             {breaksText(breaks.length)}
