@@ -1409,6 +1409,13 @@ models:
           - not_null:
               config:
                 where: "status in ('in force', 'not yet effective')"
+      - name: repeal_pending
+        data_type: boolean
+        description: >
+          The Revisor's repeals page also lists this listed version with a repeal that has not taken effect (the
+          2026 acts that repeal 324.406 and 324.424 on a contingency, dated 1 Jan 2099). The row stays the listed
+          version, in force or contingent; the repeals page's duplicate row is dropped, so section_version_id stays
+          unique.
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"

@@ -1,0 +1,35 @@
+# Unit tests for the RSMo marts: fixed Revisor rows -> exact expected rows.
+version: 2
+
+unit_tests:
+  - name: statute_version_on_both_pages_stays_one_row_flagged_repeal_pending
+    model: fct_statute_sections
+    description: >
+      324.406/60569 is listed contingent on its chapter page and also printed on the repeals page as "Repealed L.
+      2026 S.B. 1233" with the 2099 contingent date. It must be one row (the listed one), flagged repeal_pending,
+      so section_version_id stays unique. A repeal whose version is not listed stays as its own row, unflagged.
+      Keeping both rows (the old logic) fails this test.
+    overrides:
+      vars:
+        as_of_date: '2026-10-25'
+    given:
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select '324.406' as section_id, 60569 as bid, '324.406/60569' as section_version_id, '324' as chapter, 'Heading' as heading, false as is_historical, true as is_contingent, cast(null as date) as effective_date, false as held_unconstitutional, '(L. 2020 S.B. 1)' as history_note, 'text' as section_text, 'u1' as source_url union all
+            select '1.010', 42, '1.010/42', '1', 'Common law', false, false, cast('2015-08-28' as date), false, '(L. 2015 S.B. 239)', 'text', 'u2'
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select '324.406' as section_id, 60569 as bid, '324.406/60569' as section_version_id, '324' as chapter, 'repealed' as change_kind, cast(null as date) as action_date, cast(null as varchar) as transferred_to, '(Repealed L. 2026 S.B. 1233)' as note, 'r1' as source_url union all
+            select '85.270', 1, '85.270/1', '85', 'repealed', cast('1983-08-13' as date), cast(null as varchar), '(Repealed L. 1983 H.B. 68 § 1)', 'r2'
+      - input: ref('stg_mo_revisor__chapters')
+        format: sql
+        rows: |
+            select '324' as chapter, 'Professions' as chapter_name, 'XXII' as title_numeral, 'T' as title_name union all
+            select '1', 'Laws', 'I', 'T'
+    expect:
+      rows:
+        - {section_version_id: '324.406/60569', status: contingent, is_current: false, repeal_pending: true}
+        - {section_version_id: '1.010/42', status: in force, is_current: true, repeal_pending: false}
+        - {section_version_id: '85.270/1', status: repealed, is_current: false, repeal_pending: false}
