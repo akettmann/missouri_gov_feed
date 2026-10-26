@@ -3,7 +3,8 @@ import { test } from "node:test";
 import { contributionsText, sitesDescription, sitesText } from "../src/lib/businessCounts.ts";
 import { filterStatusText } from "../src/lib/compareFilter.ts";
 import { plural } from "../src/lib/format.ts";
-import { breaksText } from "../src/lib/indicators.ts";
+import { breaksText, peerStripLead } from "../src/lib/indicators.ts";
+import { metricText } from "../src/lib/awardBadges.ts";
 import {
   coverageText,
   excludedDocketsText,
@@ -16,6 +17,20 @@ test("plural uses the singular for exactly 1", () => {
   assert.equal(plural(0, "case", "cases"), "0 cases");
   assert.equal(plural(2, "case", "cases"), "2 cases");
   assert.equal(plural(1234, "case", "cases"), "1,234 cases");
+});
+
+test("peer strip lead", () => {
+  assert.equal(peerStripLead(1, "U.S. Senate", "2025"), "Among 1 U.S. Senate member (2025):");
+  assert.equal(peerStripLead(2, "U.S. Senate", null), "Among 2 U.S. Senate members:");
+  assert.equal(peerStripLead(1234, "Missouri House", "2025"), "Among 1,234 Missouri House members (2025):");
+});
+
+test("award badge sample sizes", () => {
+  assert.equal(metricText("highest_attendance", 100, 1), "100.0% of 1 vote");
+  assert.equal(metricText("highest_attendance", 99.5, 2), "99.5% of 2 votes");
+  assert.equal(metricText("highest_attendance", 99.5, 1203), "99.5% of 1,203 votes");
+  assert.equal(metricText("most_party_loyal", 90, 1), "90.0% with party, of 1 party-line vote");
+  assert.equal(metricText("most_party_loyal", 90, 20), "90.0% with party, of 20 party-line votes");
 });
 
 test("voting breaks sentence", () => {

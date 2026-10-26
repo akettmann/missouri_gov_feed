@@ -2,7 +2,7 @@
 // rows (already ranked and streak-counted in dbt); every page and browser script draws them with
 // renderBadges, so the icon, the link and the accessible text are the same everywhere.
 import { AWARD_PAIRS, AWARDS, isCycleList, periodWhen, type PeriodKind } from "./exports/awardDefs.ts";
-import { count, money, pct, streakMarker } from "./format.ts";
+import { count, money, pct, plural, streakMarker } from "./format.ts";
 
 /**
  * One award an official holds now: [award key, consecutive-period streak or null, plain-language detail,
@@ -53,9 +53,9 @@ const orderOf = (award: string) => {
 export function outOfText(award: string, sampleSize: number | null): string {
   const outOf = AWARDS[award]?.outOf;
   if (sampleSize == null || !outOf) return "";
-  if (outOf === "votes") return `of ${count(sampleSize)} votes`;
+  if (outOf === "votes") return `of ${plural(sampleSize, "vote", "votes")}`;
   if (outOf === "raised") return `of ${money(sampleSize)} raised`;
-  return `with party, of ${count(sampleSize)} party-line votes`;
+  return `with party, of ${plural(sampleSize, "party-line vote", "party-line votes")}`;
 }
 
 /** "62.5% of 1,203 votes", the measured number with what it is out of. */
