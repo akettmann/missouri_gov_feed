@@ -71,6 +71,7 @@ package "intermediate (identity resolution)" {
   [int_mec__official_committees\nint_mec__contributions_received\nint_mec__committee_names\nint_mec__donor_committees] as I_mec
   [int_bills__subjects] as I_subj
   [int_interests__industry_money] as I_interest
+  [int_jurisdiction_business_donor_matches] as I_bizm
   [int_house_fd__schedule_lines\nint_courtlistener__judge_disclosure_items] as I_fd
   [int_courtlistener__official_people\nint_courtlistener__official_positions] as I_clpos
   [int_courtlistener__mo_cases\nint_courtlistener__bulk_case_matches] as I_cases
@@ -257,18 +258,23 @@ R_emp --> EXP
 L_epa --> I_frs
 I_frs --> F_fac
 D_dist --> F_fac
-I_frs --> F_biz
+I_frs --> I_bizm
+F_fac --> I_bizm
 F_fac --> F_biz
 L_aud --> I_aud
 S_aud --> I_aud
 I_aud --> F_aud
 F_office --> F_aud
+D_dist --> I_bizm
 D_dist --> F_biz
-F_money --> F_biz
-S_brands --> F_biz
+F_money --> I_bizm
+S_brands --> I_bizm
+I_bizm --> F_biz
+I_bizm --> F_bizd
+F_money --> F_bizd
 F_biz --> R_ind
-F_biz --> F_bizd
 S_naics --> R_ind
 F_biz --> EXP
+F_bizd --> EXP
 R_ind --> EXP
 @enduml

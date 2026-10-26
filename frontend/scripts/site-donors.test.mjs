@@ -96,3 +96,14 @@ test("groupBySiteDonors keeps officials apart", () => {
   assert.equal(out.get("o1").length, 1);
   assert.equal(out.get("o2").length, 1);
 });
+
+test("groupBySiteDonors: a name holding the old separator cannot merge two different donor sets", () => {
+  const out = group([fac("F1", 10), fac("F2", 10)], { F1: ["ab"], F2: ["a", "b"] });
+  assert.deepEqual(
+    out.get("o1").map((g) => [g.donors, g.sites]),
+    [
+      [["a", "b"], ["F2"]],
+      [["ab"], ["F1"]],
+    ],
+  );
+});

@@ -120,3 +120,8 @@ export function assertNoMissingColumns(
       `Re-export: ${REEXPORT_COMMANDS}.`,
   );
 }
+
+/** The error for a table the SQL needs that has no export file: build first, since an old export may predate the model. */
+export function missingExportMessage(file: string): string {
+  return `missing export ${file}; the export may predate this table. Re-export: ${REEXPORT_COMMANDS}.`;
+}

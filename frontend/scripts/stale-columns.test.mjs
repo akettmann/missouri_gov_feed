@@ -9,6 +9,7 @@ import {
   assertNoMissingColumns,
   assertNoMissingTables,
   missingColumns,
+  missingExportMessage,
   missingTables,
 } from "../src/lib/exports/requiredColumns.ts";
 
@@ -188,3 +189,10 @@ test("query() rethrows a genuine SQL error on a current export unchanged", () =>
       (e) => /Binder Error/.test(e.message) && !/stale export/.test(e.message),
     );
   }));
+
+test("a missing export file says to build first, then export", () => {
+  const msg = missingExportMessage("/x/fct_jurisdiction_business_donors.parquet");
+  assert.match(msg, /missing export \/x\/fct_jurisdiction_business_donors\.parquet/);
+  assert.ok(msg.includes("uv run mogov build"));
+  assert.ok(msg.includes("uv run mogov export --format parquet"));
+});

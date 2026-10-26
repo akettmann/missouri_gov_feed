@@ -5,6 +5,7 @@ import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
 import {
   assertNoMissingColumns,
   assertNoMissingTables,
+  missingExportMessage,
   REEXPORT_COMMANDS,
   REQUIRED_COLUMNS,
 } from "./requiredColumns.ts";
@@ -71,7 +72,7 @@ export async function query<T>(sql: string, params?: (string | number)[]): Promi
   await assertExportsCurrent(used);
   const resolved = sql.replace(/\{(\w+)\}/g, (_, t: string) => {
     if (!hasExport(t)) {
-      throw new Error(`missing export ${exportPath(t)}; run \`uv run mogov export --format parquet\``);
+      throw new Error(missingExportMessage(exportPath(t)));
     }
     return `read_parquet('${exportPath(t)}')`;
   });

@@ -54,9 +54,9 @@ export interface DonorGroupInput {
 
 /**
  * Group an official's donor-tied facilities by their set of donors, in the order a page lists them: largest
- * total first, then by the donors' names. Sorting by name compares the names joined with "\u001f", which sorts
- * the way the old chr(31)-joined column did, so a name that is a prefix of another comes first. `make` builds a
- * group from its first facility; `add` adds each facility to its group. The separator only exists here.
+ * total first, then by the donors' names, compared name by name (a set that is a prefix of another comes
+ * first). The sets are keyed on the JSON of the names array, so no name, whatever characters it holds, can make
+ * two different sets collide. `make` builds a group from its first facility; `add` adds each facility to its group.
  */
 export function groupBySiteDonors<Row extends DonorGroupInput, Group extends { donated_amount: number }>(
   rows: readonly Row[],
@@ -64,15 +64,14 @@ export function groupBySiteDonors<Row extends DonorGroupInput, Group extends { d
   make: (row: Row, donors: string[]) => Group,
   add: (group: Group, row: Row) => void,
 ): Map<string, Group[]> {
-  const byKey = new Map<string, { group: Group; names: string }>();
-  const perOfficial = new Map<string, { group: Group; names: string }[]>();
+  const byKey = new Map<string, { group: Group; names: string[] }>();
+  const perOfficial = new Map<string, { group: Group; names: string[] }[]>();
   for (const row of rows) {
     const donors = [...donorsOf(row)];
-    const names = donors.join("\u001f");
-    const key = `${row.official_id}|${names}`;
+    const key = JSON.stringify([row.official_id, donors]);
     let entry = byKey.get(key);
     if (!entry) {
-      entry = { group: make(row, donors), names };
+      entry = { group: make(row, donors), names: donors };
       byKey.set(key, entry);
       const list = perOfficial.get(row.official_id);
       if (list) list.push(entry);
@@ -82,15 +81,19 @@ export function groupBySiteDonors<Row extends DonorGroupInput, Group extends { d
   }
   const out = new Map<string, Group[]>();
   for (const [official, list] of perOfficial) {
-    list.sort(
-      (a, b) =>
-        b.group.donated_amount - a.group.donated_amount ||
-        (a.names < b.names ? -1 : a.names > b.names ? 1 : 0),
-    );
+    list.sort((a, b) => b.group.donated_amount - a.group.donated_amount || compareNames(a.names, b.names));
     out.set(
       official,
       list.map((e) => e.group),
     );
   }
   return out;
+}
+
+/** Name-by-name order; a list that is a prefix of another comes first. */
+function compareNames(a: readonly string[], b: readonly string[]): number {
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1;
+  }
+  return a.length - b.length;
 }

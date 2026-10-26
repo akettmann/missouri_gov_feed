@@ -334,8 +334,8 @@ unit_tests:
       A donor has one row per distinct filing page, so each page is its own row: a donor filed on both an MEC and an
       FEC page keeps both, and no single url is picked by min(), which would silently prefer fec.gov over
       mec.mo.gov (#248). The same page repeated across gifts is one row. A donor with no url keeps one row with a
-      null source_url, and a donor's pages are matched on the donor key, so another donor's pages never attach to
-      it. Gifts from individuals add no rows. A donor matched to two facilities has its rows on both (#370).
+      null source_url, and a donor's pages are matched on the donor key and the official, so another donor's pages, or another
+      official's pages for the same donor, never attach to it. Gifts from individuals add no rows. A donor matched to two facilities has its rows on both (#370).
     given:
       - input: ref('int_jurisdiction_business_donor_matches')
         rows:
@@ -343,6 +343,7 @@ unit_tests:
           - {official_id: o1, registry_id: F1, donor_key: acme holdings, donor_name: ACME HOLDINGS INC}
           - {official_id: o1, registry_id: F1, donor_key: nolink, donor_name: NO LINK CO}
           - {official_id: o1, registry_id: F3, donor_key: ameren, donor_name: AMEREN CORPORATION}
+          - {official_id: o2, registry_id: F1, donor_key: ameren, donor_name: AMEREN CORPORATION}
       - input: ref('fct_campaign_finance')
         rows:
           - {official_id: o1, direction: received, counterparty: Ameren Corp PAC, counterparty_organization: AMEREN CORPORATION, counterparty_type: committee, amount: 100, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9'}
@@ -351,12 +352,14 @@ unit_tests:
           - {official_id: o1, direction: received, counterparty: Acme Holdings PAC, counterparty_organization: ACME HOLDINGS INC, counterparty_type: committee, amount: 70, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9'}
           - {official_id: o1, direction: received, counterparty: Pat Doe, counterparty_organization: AMEREN CORPORATION, counterparty_type: individual, amount: 900, source_url: 'https://example.test/individual'}
           - {official_id: o1, direction: received, counterparty: No Link Co, counterparty_organization: NO LINK CO, counterparty_type: committee, amount: 10, source_url: null}
+          - {official_id: o2, direction: received, counterparty: Ameren Corp PAC, counterparty_organization: AMEREN CORPORATION, counterparty_type: committee, amount: 40, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C7&recipient_name=C8'}
     expect:
       rows:
         - {official_id: o1, registry_id: F1, donor_name: AMEREN CORPORATION, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9'}
         - {official_id: o1, registry_id: F1, donor_name: AMEREN CORPORATION, source_url: 'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C221944'}
         - {official_id: o1, registry_id: F1, donor_name: ACME HOLDINGS INC, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9'}
         - {official_id: o1, registry_id: F1, donor_name: NO LINK CO, source_url: null}
+        - {official_id: o2, registry_id: F1, donor_name: AMEREN CORPORATION, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C7&recipient_name=C8'}
         - {official_id: o1, registry_id: F3, donor_name: AMEREN CORPORATION, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9'}
         - {official_id: o1, registry_id: F3, donor_name: AMEREN CORPORATION, source_url: 'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C221944'}
 

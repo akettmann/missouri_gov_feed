@@ -17,7 +17,7 @@ with donor_urls as (
         and source_url is not null
 )
 
-select distinct
+select
     m.official_id,
     m.registry_id,
     m.donor_name,
