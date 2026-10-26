@@ -758,6 +758,94 @@ unit_tests:
       rows:
         - {registry_id: r1, naics_code: '482111', naics_source: naics}
 
+  - name: epa_frs_facility_naics_mirror_rows_do_not_outvote_sic_sector
+    model: int_epa_frs__facilities
+    description: >
+      Modeled on Clark Printing (#513). r1: AIR gives 323111 and RCRAINFO gives 81232, which extends the 812320 an
+      MO-DNR UNKNOWN row lists, so over all tiers 812320 has two systems against 323111's one. The MO-DNR row only
+      copies what another system reports, so it must not outvote the SIC sector: the SIC code (AIR, 2752 printing)
+      sits in manufacturing and 323111 wins. r2 (Dairy Farmers): the SIC sector does not separate the codes (both
+      manufacturing), so the RMP copy still backs 312111 over 311422 as the last all-tier tie-break.
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: r1, facility_name: Site r1, latitude: 38.5, longitude: -92.1}
+          - {registry_id: r2, facility_name: Site r2, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows: []
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: r1, program_system: AIR, naics_code: '323111', naics_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r1, program_system: RCRAINFO, naics_code: '81232', naics_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r1, program_system: MO-DNR, naics_code: '812320', naics_description: d, is_primary: false, is_secondary: false}
+          - {registry_id: r2, program_system: AIR, naics_code: '311422', naics_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r2, program_system: RCRAINFO, naics_code: '312111', naics_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r2, program_system: RMP, naics_code: '312111', naics_description: d, is_primary: false, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows:
+          - {registry_id: r1, program_system: AIR, sic_code: '2752', sic_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r2, program_system: AIR, sic_code: '2032', sic_description: d, is_primary: true, is_secondary: false}
+      - input: ref('sic_naics_sectors')
+        rows:
+          - {sic_prefix: '27', naics_prefix: '32'}
+          - {sic_prefix: '20', naics_prefix: '31'}
+      - input: ref('naics_sectors')
+        rows:
+          - {naics_prefix: '31', sector_code: '31-33', sector_name: Manufacturing}
+          - {naics_prefix: '32', sector_code: '31-33', sector_name: Manufacturing}
+          - {naics_prefix: '81', sector_code: '81', sector_name: Other Services}
+    expect:
+      rows:
+        - {registry_id: r1, naics_code: '323111', naics_source: naics}
+        - {registry_id: r2, naics_code: '312111', naics_source: naics}
+
+  - name: epa_frs_facility_naics_construction_sic_noise_only_from_npdes
+    model: int_epa_frs__facilities
+    description: >
+      Modeled on D&S Hauling and the other facilities that left 238910 in #509 (#513). A construction SIC code (1541,
+      1542, 1611) that only NPDES gives is the stormwater permit and says nothing about the sector; one another
+      program gives is a real industry. r1: AIR gives 238910 and SIC 1795 (demolition), RCRAINFO gives 56291, so
+      the SIC sector picks 238910 even though 238910 is the permit code. r2: only NPDES gives SIC 1541, so there is
+      no sector signal, 238910 loses to a real code and 311111 wins. r3: AIR also gives SIC 1541, so the signal
+      holds and 236220 wins over the lower code 111110.
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: r1, facility_name: Site r1, latitude: 38.5, longitude: -92.1}
+          - {registry_id: r2, facility_name: Site r2, latitude: 38.5, longitude: -92.1}
+          - {registry_id: r3, facility_name: Site r3, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows: []
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: r1, program_system: AIR, naics_code: '238910', naics_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r1, program_system: RCRAINFO, naics_code: '56291', naics_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r2, program_system: NPDES, naics_code: '238910', naics_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r2, program_system: RCRAINFO, naics_code: '311111', naics_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r3, program_system: AIR, naics_code: '236220', naics_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r3, program_system: RCRAINFO, naics_code: '111110', naics_description: d, is_primary: true, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows:
+          - {registry_id: r1, program_system: AIR, sic_code: '1795', sic_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r2, program_system: NPDES, sic_code: '1541', sic_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r3, program_system: NPDES, sic_code: '1541', sic_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r3, program_system: AIR, sic_code: '1541', sic_description: d, is_primary: true, is_secondary: false}
+      - input: ref('sic_naics_sectors')
+        rows:
+          - {sic_prefix: '15', naics_prefix: '23'}
+          - {sic_prefix: '17', naics_prefix: '23'}
+      - input: ref('naics_sectors')
+        rows:
+          - {naics_prefix: '23', sector_code: '23', sector_name: Construction}
+          - {naics_prefix: '31', sector_code: '31-33', sector_name: Manufacturing}
+          - {naics_prefix: '56', sector_code: '56', sector_name: Administrative and Support}
+          - {naics_prefix: '11', sector_code: '11', sector_name: Agriculture}
+    expect:
+      rows:
+        - {registry_id: r1, naics_code: '238910', naics_source: naics}
+        - {registry_id: r2, naics_code: '311111', naics_source: naics}
+        - {registry_id: r3, naics_code: '236220', naics_source: naics}
+
   - name: epa_frs_facility_owner_tie_is_deterministic
     model: int_epa_frs__facilities
     description: >
