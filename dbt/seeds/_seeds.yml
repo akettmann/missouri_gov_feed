@@ -11,7 +11,8 @@ seeds:
       committee was active. An alias naming a MECID the committees don't have matches nothing. Add an alias only
       after checking it against the committee's filings or its own filed name; leave out ones that could be two committees.
       The matching was done by an automated check; checked_by and checked_on stay empty until a maintainer
-      signs the row off.
+      signs the row off; until then assert_committee_donor_aliases_signed_off warns on every build (the aliases still
+      match at high confidence).
     config:
       column_types:
         {alias: varchar, mec_committee_id: varchar, committee_name: varchar, evidence: varchar,
