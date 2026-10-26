@@ -901,6 +901,10 @@ offices, shops and most service businesses are missing.
   sites; the sites tables say "unnamed site"). A doubled inner comma becomes one
   ("LIPPERT FAMILY FARM,, LLC" shows as "LIPPERT FAMILY FARM, LLC") (#381). "K-BAR-L ;;C" (facility 110013336416) is
   left as is: it is likely a shifted-hand typo for "K-BAR-L LLC", not a separator, so it is not rewritten.
+- HTML entities: a few names and addresses carry entities ("D&AMP;A BARRACKS", "HOLCIM &#40;US&#41; INC",
+  "LEE&#39;S SUMMIT"; 8 facilities and 1 organization name in the Oct 2026 file). `mogov.clean_registry_text` decodes `&AMP;`,
+  `&amp;`, `&#39;`, `&#40;` and `&#41;`; a bare "&" ("AT&T") is untouched. `assert_epa_frs_text_has_no_html_entities`
+  fails if another entity shows up (#398).
 - `epa_frs_sic` joined the loader after the other three. A raw directory landed before that has no SIC table;
   `mogov build` then creates an empty placeholder (like the other late-added or optional JSON tables in
   `db.OPTIONAL_JSON_TABLES`), so the SIC fallback finds no codes and those sites show no industry until the

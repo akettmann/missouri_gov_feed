@@ -1,0 +1,20 @@
+version: 2
+
+unit_tests:
+  - name: voteview_staging_keeps_only_house_and_senate
+    description: >
+      Voteview's members file also lists the President (chamber 'President'). Downstream models map the chamber
+      with an explicit House -> us_house / Senate -> us_senate, so staging must drop any other chamber rather
+      than letting it be read as a Senate member.
+    model: stg_voteview__members
+    given:
+      - input: source('voteview', 'members')
+        format: sql
+        rows: |
+            select '118' as congress, 'House' as chamber, '1' as icpsr, 'MO' as state_abbrev, '1' as district_code, '100' as party_code, 'A' as bioname, 'B1' as bioguide_id, '0.1' as nominate_dim1, '0' as nominate_dim2, '5' as nominate_number_of_votes, '0' as nokken_poole_dim1, '0' as nokken_poole_dim2 union all
+            select '118', 'Senate', '2', 'MO', '0', '200', 'B', 'B2', '0.2', '0', '5', '0', '0' union all
+            select '118', 'President', '99912', 'USA', '0', '100', 'C', null, null, null, null, null, null
+    expect:
+      rows:
+        - {congress: 118, chamber: House, icpsr: 1, bioguide_id: B1}
+        - {congress: 118, chamber: Senate, icpsr: 2, bioguide_id: B2}
