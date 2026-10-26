@@ -8,8 +8,10 @@
 --                  Eighth Circuit judges whose FJC career mentions Missouri (as int_judges__federal)
 -- A term counts for a year when it runs past January 15 of it, so a hand-over in the first days of January
 -- (Congress turns over on January 3) doesn't list both the outgoing and the incoming holder.
--- Years are those with a House roster. Statewide officers, mayors and state judges have no dated past rosters
--- here. person keys match dim_official.official_id, so a past holder who serves today links to their profile.
+-- Years are those with a House roster. A roster row is dropped when its person's last Open States House term ended
+-- before the year's handover (the roster outlived the member), when the seat match tied the row to that person.
+-- Statewide officers, mayors and state judges have no dated past rosters here.
+-- person keys match dim_official.official_id, so a past holder who serves today links to their profile.
 -- official_id is the stable person id; openstates_id is the Open States record the senate row came from (null for
 -- other sources), kept so rpt_officeholders_by_year can find that record's folder. session_code is the House
 -- session file (e.g. 251, 253) listing the member, the earliest one in the year; null for other sources.
@@ -21,6 +23,20 @@ with years as (
         {{ dbt.safe_cast(dbt.concat([dbt.safe_cast('session_year', dbt.type_string()), "'-12-31'"]), 'date') }}
             as year_end
     from {{ ref('int_mo_house__member_identity') }}
+),
+
+-- the end of each person's last Open States House term. A House roster can keep listing a member after they left
+-- (Rebecca Roeber, HD34, died 2019-07-30 yet the 2020 sessions still list her; the seat sat vacant until January
+-- 2021, #152), so a roster row counts only while that term runs past the year's handover, the rule the other
+-- offices use. Only rows the seat match tied to an Open States person: a row matched by member id alone (Lauren
+-- Arthur, 2017-2018, whose Open States House term stops in 2016) has no term to hold it to.
+last_house_term as (
+    select
+        person_id,
+        max(end_date) as last_end_date
+    from {{ ref('int_mo_legislators__seats') }}
+    where chamber = 'lower'
+    group by person_id
 ),
 
 house as (
@@ -38,6 +54,9 @@ house as (
         m.session_code
     from {{ ref('int_mo_house__member_identity') }} as m
     left join {{ ref('stg_openstates__people') }} as p on m.openstates_id = p.openstates_id
+    inner join years as y on m.session_year = y.year
+    left join last_house_term as t on m.person_key = t.person_id
+    where m.openstates_id is null or t.last_end_date is null or t.last_end_date > y.handover_date
 ),
 
 senate_terms as (

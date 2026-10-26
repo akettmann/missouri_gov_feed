@@ -63,6 +63,16 @@ the only per-member House vote record.
 - Shard units: session codes (XML) and session days (roll-call PDFs).
 
 Quirks:
+- The member roster can keep listing a member after they left. Rebecca Roeber (member 1790, HD34) died 2019-07-30, yet
+  the 2019 veto session (193, September 2019) and all three 2020 sessions (201, 203, 204) still list her, and the
+  member XML for 181-204 looks like a stale snapshot (later files do use `vacant_name='Vacant'`). Her House roll-call
+  PDFs carry no ROEBER token after about day 38 of session 191, and Open States ends her term 2019-07-30. Rick Roeber
+  (member 2215, elected November 2020, expelled April 2021) is the next holder, so HD34 was vacant for all of 2020,
+  from 2019-07-30 until January 2021, and the 2020 rows carry no votes. The seat match lands on Rick, so
+  `int_mo_house__member_seat_keys` keeps a member id on the person its other sessions matched by given name (only when
+  exactly one person matches; member ids with two Open States duplicates keep the seat match), and
+  `int_officeholders__years` drops a roster row whose matched person's last Open States House term ended before the
+  year's January 15 handover, so HD34 has no 2020 officeholder. Raw keeps the roster as served. Issue #152.
 - `bills171/rollcalls/` still holds the 2016 session's roll-call PDFs (numbered by 2016 session day, header
   "98th General Assembly, Second Regular Session"). The probe walks past the last 2017 roll call of a day, so
   it lands them under session 171: 415 roll calls dated 2016 (45 session days, 1/13/2016 to 5/13/2016,

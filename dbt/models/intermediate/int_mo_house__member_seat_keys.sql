@@ -47,6 +47,46 @@ seat_match as (
     having
         count(distinct openstates_id) = 1
         or count(distinct case when given_name_match = 1 then openstates_id end) = 1
+),
+
+seat_names as (
+    select distinct
+        openstates_id,
+        full_name_key
+    from {{ ref('int_mo_legislators__seat_terms') }}
+),
+
+-- the House lists a departed member in a later session's roster (Rebecca Roeber, HD34, is still listed in 2020
+-- though her term ended in 2019 and the seat was vacant until Rick Roeber, #152), so the seat match lands on the
+-- successor. A member id whose other sessions matched exactly one Open States person by given name keeps that person
+-- where the seat match found someone else (that match cannot also carry the given name: it would be a second anchor).
+name_anchors as (
+    select
+        m.house_member_id,
+        max(sm.openstates_id) as openstates_id
+    from members as m
+    inner join seat_match as sm on m.session_code = sm.session_code and m.district_number = sm.district_number
+    inner join seat_names as n on sm.openstates_id = n.openstates_id
+    where n.full_name_key like m.first_name_key || ' %'
+    group by 1
+    having count(distinct sm.openstates_id) = 1
+),
+
+resolved as (
+    select
+        m.session_code,
+        m.house_member_id,
+        case
+            when
+                sm.openstates_id is not null
+                and a.openstates_id is not null
+                and sm.openstates_id != a.openstates_id
+                then a.openstates_id
+            else sm.openstates_id
+        end as openstates_id
+    from members as m
+    left join seat_match as sm on m.session_code = sm.session_code and m.district_number = sm.district_number
+    left join name_anchors as a on m.house_member_id = a.house_member_id
 )
 
 select
@@ -63,7 +103,7 @@ select
     m.hometown,
     m.year_elected,
     m.biography,
-    sm.openstates_id,
-    coalesce(sm.openstates_id, 'mohouse:' || m.house_member_id) as raw_person_key
+    r.openstates_id,
+    coalesce(r.openstates_id, 'mohouse:' || m.house_member_id) as raw_person_key
 from members as m
-left join seat_match as sm on m.session_code = sm.session_code and m.district_number = sm.district_number
+left join resolved as r on m.session_code = r.session_code and m.house_member_id = r.house_member_id
