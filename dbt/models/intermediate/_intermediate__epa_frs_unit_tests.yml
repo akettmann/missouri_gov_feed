@@ -1,0 +1,55 @@
+unit_tests:
+  - name: epa_frs_facility_rmp_and_modnr_paths
+    model: int_epa_frs__facilities
+    description: >
+      Pins the RMP and MO-DNR choices in the FRS tie-break (#513, #520). r1: codes 111998 and 424510 tie on tier and
+      on program systems in the primary tier; 111998 also has an RMP UNKNOWN row and 424510 an NPDES one, and the
+      SIC sector favours 111998. RMP is not counted as an independent system, so 424510 (two independent systems)
+      wins; counting RMP would tie them and hand it to 111998 through the SIC sector.
+      m1: SIC 1611 (construction, sector 23) given by NPDES and its MO-DNR copy is stormwater-permit noise, so it
+      gives no sector signal and the lowest code 111998 wins over 237310; m2: the same SIC 1611 also given by
+      RCRAINFO is a real signal, so 237310 wins; m3: SIC 1611 given only by MO-DNR, no NPDES row, is noise too.
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: r1, facility_name: RMP is not independent, latitude: 38.5, longitude: -92.1}
+          - {registry_id: m1, facility_name: NPDES and MO-DNR SIC is noise, latitude: 38.5, longitude: -92.1}
+          - {registry_id: m2, facility_name: Real system backs the SIC, latitude: 38.5, longitude: -92.1}
+          - {registry_id: m3, facility_name: MO-DNR only SIC is noise, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows: []
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: r1, program_system: RCRAINFO, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: r1, program_system: RMP, naics_code: '111998', naics_description: Crop farming, is_primary: false, is_secondary: false}
+          - {registry_id: r1, program_system: EIS, naics_code: '424510', naics_description: Grain wholesale, is_primary: true, is_secondary: false}
+          - {registry_id: r1, program_system: NPDES, naics_code: '424510', naics_description: Grain wholesale, is_primary: false, is_secondary: false}
+          - {registry_id: m1, program_system: RCRAINFO, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: m1, program_system: EIS, naics_code: '237310', naics_description: Highway construction, is_primary: true, is_secondary: false}
+          - {registry_id: m2, program_system: RCRAINFO, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: m2, program_system: EIS, naics_code: '237310', naics_description: Highway construction, is_primary: true, is_secondary: false}
+          - {registry_id: m3, program_system: RCRAINFO, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: m3, program_system: EIS, naics_code: '237310', naics_description: Highway construction, is_primary: true, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows:
+          - {registry_id: r1, program_system: RCRAINFO, sic_code: '0111', sic_description: WHEAT, is_primary: true, is_secondary: false}
+          - {registry_id: m1, program_system: NPDES, sic_code: '1611', sic_description: HIGHWAY CONSTRUCTION, is_primary: true, is_secondary: false}
+          - {registry_id: m1, program_system: MO-DNR, sic_code: '1611', sic_description: HIGHWAY CONSTRUCTION, is_primary: true, is_secondary: false}
+          - {registry_id: m2, program_system: NPDES, sic_code: '1611', sic_description: HIGHWAY CONSTRUCTION, is_primary: true, is_secondary: false}
+          - {registry_id: m2, program_system: RCRAINFO, sic_code: '1611', sic_description: HIGHWAY CONSTRUCTION, is_primary: true, is_secondary: false}
+          - {registry_id: m3, program_system: MO-DNR, sic_code: '1611', sic_description: HIGHWAY CONSTRUCTION, is_primary: true, is_secondary: false}
+      - input: ref('sic_naics_sectors')
+        rows:
+          - {sic_prefix: '01', naics_prefix: '11'}
+          - {sic_prefix: '16', naics_prefix: '23'}
+      - input: ref('naics_sectors')
+        rows:
+          - {naics_prefix: '11', sector_code: '11', sector_name: Agriculture}
+          - {naics_prefix: '23', sector_code: '23', sector_name: Construction}
+          - {naics_prefix: '42', sector_code: '42', sector_name: Wholesale Trade}
+    expect:
+      rows:
+        - {registry_id: r1, naics_code: '424510', naics_source: naics}
+        - {registry_id: m1, naics_code: '111998', naics_source: naics}
+        - {registry_id: m2, naics_code: '237310', naics_source: naics}
+        - {registry_id: m3, naics_code: '111998', naics_source: naics}
