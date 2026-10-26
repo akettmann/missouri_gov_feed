@@ -85,7 +85,7 @@ export function payYearsMismatch(block: PayVoteBlock): string | null {
   if (block.years.length === block.total.voting_years && withPay === block.total.covered_years) return null;
   return (
     `${block.chamber}: ${block.years.length} year rows (${withPay} with pay) but the total covers ` +
-    `${block.total.covered_years} of ${block.total.voting_years} years`
+    `${block.total.covered_years} of ${plural(block.total.voting_years, "year", "years")}`
   );
 }
 
