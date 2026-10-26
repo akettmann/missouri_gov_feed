@@ -315,6 +315,15 @@ it lands a table, so lower that or `--workers` on a small machine.
 Each shard replaces only its own part. If you change the shard count, run every shard before the next
 `dbt build`. Parts left by the old count are deleted as the new shards write theirs.
 
+Only one run may write a given table's shard at a time. A sink takes an exclusive OS lock on
+`data/raw/<table>/.part-<i>-of-<N>.parquet.lock` when it opens and holds it until it finishes. A second
+`mogov load` of the same shard fails at once with `ShardBusyError: another run is already writing <table>
+shard i of N`, and the first run is untouched. Different shards don't conflict. The OS drops the lock when the
+process exits, even if it was killed, so a crash never leaves a lock that blocks the next run (the empty
+`.lock` files are harmless; dbt reads only `*.parquet`). The lock covers one machine or any filesystem with
+working file locks. On a mount without them (some network or FUSE volumes) the sink logs
+`shard_lock_unsupported` and runs unlocked, so on Cloud Run keep one task per shard (the default).
+
 Shards on one machine share `data/cache`. When several need the same URL (every `mo_house` shard reads
 every session zip, for example), the first takes a lock file next to the cache entry
 (`.<entry>.lock`) and downloads it; the others wait and read its copy. A lock untouched for 5 minutes
