@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { DONOR_GROUP_SQL } from "../rollups";
 import { groupBySiteDonors, siteKey } from "../siteDonors";
 import { siteDonors } from "./businessDonors";
+import { trailRowsSql } from "./trailQuery";
 import { exportedAt, hasExport, query } from "./db";
 import { buildCommitteeSessions, type PostCounts, type TitledMembership } from "../committeePosts";
 import { payYearsGate, type PayVoteRow } from "../attendancePay";
@@ -178,28 +179,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
     official_id: string;
   };
   const trailRows = hasTrails
-    ? await query<TrailRow>(`
-        select official_id, mec_committee_id, donor_names, gave_official, first_year, last_year, link_confidence
-        from (
-          select official_id, donor_mec_committee_id as mec_committee_id,
-                 string_agg(distinct donor_name, '; ' order by donor_name) as donor_names,
-                 cast(sum(total_amount) as double) as gave_official,
-                 cast(min(transaction_year) as integer) as first_year,
-                 cast(max(transaction_year) as integer) as last_year,
-                 -- 'high' < 'medium': the weakest link among the rows shown
-                 max(donor_link_confidence) as link_confidence,
-                 row_number() over (
-                   partition by official_id order by sum(total_amount) desc, donor_mec_committee_id
-                 ) as rank
-          from {rpt_donor_rollup}
-          where donor_mec_committee_id is not null
-            -- rank only committees that have a donor list to show, so the top ${TRAILS} are all displayable
-            and exists (
-              select 1 from {rpt_committee_donors} as cd where cd.mec_committee_id = donor_mec_committee_id
-            )
-          group by official_id, donor_mec_committee_id
-        ) ranked
-        where rank <= ${TRAILS} order by official_id, rank`)
+    ? await query<TrailRow>(trailRowsSql(TRAILS, "{rpt_donor_rollup}", "{rpt_committee_donors}"))
     : [];
   const committeeDonors = new Map<
     string,
@@ -530,21 +510,21 @@ async function loadAll(): Promise<OfficialBundle[]> {
     : null;
 
   const expenses = await loadLegislatorExpenses();
-  // federal district judges: one row per CourtListener judge, joined to the official by official_id
-  const dispositions = hasExport("fct_judge_time_to_disposition")
-    ? new Map(
-        (
-          await query<TimeToDisposition & { official_id: string }>(`
-            select official_id, cl_person_id, court_id, cast(dockets_assigned as integer) as dockets_assigned,
+  // federal district judges: one row per CourtListener judge and case type, joined to the official by official_id
+  const dispositionRows = hasExport("fct_judge_time_to_disposition")
+    ? await query<TimeToDisposition & { official_id: string }>(`
+            select official_id, cl_person_id, case_type, court_id, cast(dockets_assigned as integer) as dockets_assigned,
                    cast(dockets_with_both_dates as integer) as dockets_with_both_dates,
                    cast(dockets_ends_before_filed as integer) as dockets_ends_before_filed,
                    cast(dockets_measured as integer) as dockets_measured,
                    share_with_both_dates, median_days_to_disposition
             from {fct_judge_time_to_disposition} where official_id is not null
-            order by official_id, cl_person_id, court_id`)
-        ).map((r) => [r.official_id, r]),
-      )
-    : new Map<string, TimeToDisposition>();
+            order by official_id, case_type`)
+    : [];
+  // "civil" sorts before "criminal", so each judge's entries are civil first
+  const dispositions = new Map<string, TimeToDisposition[]>();
+  for (const r of dispositionRows)
+    dispositions.set(r.official_id, [...(dispositions.get(r.official_id) ?? []), r]);
 
   return profiles
     .sort((a, b) => (SORT_LEVEL[a.level] ?? 9) - (SORT_LEVEL[b.level] ?? 9))

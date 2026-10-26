@@ -615,6 +615,15 @@ Quirks:
   judge (`assigned_to_id`) and filing and termination dates on a docket; the state courts (`mo`, `moctapp`)
   have none, and `ca8` has no judge. Of 173,882 district dockets with a judge, 165,797 have both dates; 93
   of those end before they were filed (a source error) and are left out of the median.
+  The median is per case type, civil and criminal apart: criminal medians run about twice civil ones
+  (Stephen R. Clark: civil 165 days, criminal 462) and the mix differs by judge. Case type is the docket-number
+  type (`4:25-cr-00236` is `cr`), taken from `federal_dn_case_type` where CourtListener parsed it (about 16% of
+  these dockets) and from the number itself otherwise. Of the 173,882 dockets: civil 164,058 (`cv` 164,027,
+  `md` multidistrict 31), criminal 3,776 (`cr`), miscellaneous 5,967 (`mc` 5,082, `mj` 646, `sw` 194, `wi` 30,
+  `sm` 13, `pr` 2: warrants, subpoenas, complaints, not cases; left out) and 81 other (`fp` 76, `cn` 2, `sc` 2
+  and one with a date in the docket-number field; left out, pending #465). Only 2,149 of the 3,776 criminal
+  dockets have both dates, so criminal coverage is thin. One docket (`1:00-cr-00008`) has a `cr` number but is
+  a civil suit; CourtListener's own type (`cv`) wins.
 - The filtered CSVs are cached per snapshot (`data/cache/courtlistener/mo-*.csv`), so re-runs within
   a quarter are quick. Cases can be up to three months stale; `courtlistener_cases` tops up.
 
@@ -787,15 +796,15 @@ Quirks:
   left over once the others are paired also pair, at `medium` (Mike Jones = "JONES, MICHAEL J"). A payee also pairs, at `medium`, with the member whose usual
   name is the payee's middle initial when nobody else fits that way: "SMITH, DAVID C" is David Cody Smith, known as
   Cody Smith (R, HD163), and "SMITH, DAVID T" is David (Tyson) Smith (D, HD45 then HD46, from 2021). Others are
-  matched by name. Open States gives some seats no start date (stored as
-  1900-01-01), so a seat counts from the member's first roster year in that chamber (House or Senate, each on its own) instead, and a by-name match of
-  legislator pay is held to the years the member sat, unless nobody else holds the surname that year (a final
-  check after a term, or earlier service Open States records as another person: Steve Roberts' 2017-20 House
-  pay stays his because the "Steven" and "Steve" Roberts records are now one person, #263). A payee whose
-  first name fits a member whose seat ended the December before, and who earned under half the year's top pay, is
-  that member's final check and does not compete for the seats held now ("BLACK, LINDA R." 2017 beside Rusty
-  Black's "BLACK, JAMES R"). In October 2026, 2025 pay
-  matched all 155 representatives and all 33 senators.
+  matched by name. Open States gives some seats no start date (stored as 1900-01-01), so a seat counts from the
+  member's first roster year in that chamber (House or Senate, each on its own) instead, and a by-name match of
+  legislator pay is held to the years the member sat, unless nobody else holds the surname that year (a final check
+  after a term, or earlier service Open States records as another person: Steve Roberts' 2017-20 House pay stays his
+  because the "Steven" and "Steve" Roberts records are now one person, #263). A payee whose first name fits a member
+  whose seat ended the December before, or that January (Open States ends the 2022 and 2024 departures in January),
+  and who earned under half the year's top pay, is that member's final check (unless the member held a later seat in
+  the chamber), and neither it nor the member competes for the seats held now ("BLACK, LINDA R." 2017 beside Rusty
+  Black's "BLACK, JAMES R"). In October 2026, 2025 pay matched all 155 representatives and all 33 senators.
 - The current year's dataset appears in January of the following year.
 - Federal officials (Congress, federal judges) are paid by the U.S. and are not in this source.
 

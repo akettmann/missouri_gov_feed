@@ -57,7 +57,9 @@ def main() -> int:
     if not args.exports.is_dir() or not any(args.exports.glob("*.parquet")):
         sys.exit(f"no exports (*.parquet) in {args.exports}; run `mogov export` first, or pass --exports DIR")
     if not (args.exports / "dim_official.parquet").exists():
-        sys.exit(f"{args.exports} looks stale or partial (no dim_official.parquet); re-run `mogov export`")
+        sys.exit(
+            f"{args.exports} is missing dim_official.parquet (a partial or incomplete export); re-run `mogov export`"
+        )
     with tempfile.TemporaryDirectory(prefix="mogov_det_") as tmp:
         tmp_dir = Path(tmp)
         second_exports = args.exports

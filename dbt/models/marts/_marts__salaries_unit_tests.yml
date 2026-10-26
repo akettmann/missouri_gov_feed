@@ -199,7 +199,9 @@ unit_tests:
       Holly Jones pairs with her payroll row exactly; that leaves one member (Mike Jones) and one payee ("JONES,
       MICHAEL J") of the chamber that year with nobody else to pair with, so they pair, medium, though Mike and
       MICHAEL share only two letters. In Thomas' year only a lone leftover pairs: here two unmatched payees compete
-      for one leftover member, so neither is guessed. A Jones staffer with a staff title never matches.
+      for one leftover member, so neither is guessed. Lisa Thomas' 2025 seat ended on 2025-01-07, so her small
+      "THOMAS, LISA A." payment is her final check: it does not compete for the seat, and is matched to her by
+      name. A Jones staffer with a staff title never matches.
     given:
       - input: ref('stg_mo_employee_pay__pay')
         rows:
@@ -225,7 +227,8 @@ unit_tests:
           - {official_id: p_lisa, office: state_house}
           - {official_id: p_wick, office: state_house}
       - input: ref('int_officials__name_keys')
-        rows: *no_name_keys
+        rows:
+          - {official_id: p_lisa, level: state, office: state_house, family_key: thomas, given_key: lisa}
       - input: ref('int_officials__current')
         rows: *no_current
       - input: ref('stg_congress__terms')
@@ -450,7 +453,8 @@ unit_tests:
     description: >
       Steve Roberts sits from 2021 (Open States keeps his 2017-20 House years under a separate "Steven Roberts"
       record, who is no current official and so has no dim_official row). "ROBERTS, STEVEN" in 2018 is paid
-      outside Steve's years, but the other seat-holder's first name fits his, so the pay stays Steve's. His own 2021 pay is the control that gives him service years.
+      outside Steve's years, but the other seat-holder's first name fits his, so the pay stays Steve's. His own
+      2021 pay is the control that gives him service years.
     given:
       - input: ref('stg_mo_employee_pay__pay')
         rows:
@@ -592,3 +596,123 @@ unit_tests:
     expect:
       rows:
         []
+
+  - name: salaries_a_departed_member_with_a_later_seat_is_not_a_final_check
+    model: fct_salaries
+    description: >
+      Linda Black's first seat ended 2016-12-31, but she holds another House seat from 2019, so "BLACK, LINDA R."
+      in 2017 (a small payment) is not her final check: she is not the member who left. Two payees then compete
+      for Rusty Black's one seat and neither is given to him. Without the later-seat guard the small payment would
+      be set aside as a final check and "BLACK, JAMES R" would be paired with Rusty.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, JAMES R', last_name: BLACK, first_names: JAMES R, gross_pay: 34418.35}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, LINDA R.', last_name: BLACK, first_names: LINDA R., gross_pay: 1496.45}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_rusty, full_name: Rusty Black, surname_key: black, chamber: lower, start_date: '2017-01-01', end_date: '9999-12-31'}
+          - {person_id: p_linda, full_name: Linda Black, surname_key: black, chamber: lower, start_date: '2013-01-01', end_date: '2016-12-31'}
+          - {person_id: p_linda, full_name: Linda Black, surname_key: black, chamber: lower, start_date: '2019-01-01', end_date: '2020-12-31'}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p_rusty, office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: p_rusty, level: state, office: state_house, family_key: black, given_key: rusty}
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows:
+          - {year: 2017, official_id: p_rusty, office: state_house}
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        []
+
+  - name: salaries_a_january_seat_end_makes_a_final_check_not_a_claim_on_the_seat
+    model: fct_salaries
+    description: >
+      Open States ends the 2022 departures on 2023-01-03. One Linda Black's seat ended then, so "BLACK, LINDA R."
+      in 2023 (a small final check) is hers; another Linda Black sits from 2023-01-04 and "BLACK, LINDA M" is hers.
+      Without the January window both payees fit both members equally and neither is given to anyone.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, LINDA M', last_name: BLACK, first_names: LINDA M, gross_pay: 34418.35}
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, LINDA R.', last_name: BLACK, first_names: LINDA R., gross_pay: 1496.45}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_linda_new, full_name: Linda Black, surname_key: black, chamber: lower, start_date: '2023-01-04', end_date: '9999-12-31'}
+          - {person_id: p_linda_old, full_name: Linda Black, surname_key: black, chamber: lower, start_date: '2019-01-01', end_date: '2023-01-03'}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p_linda_new, office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: p_linda_new, level: state, office: state_house, family_key: black, given_key: linda}
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows:
+          - {year: 2023, official_id: p_linda_new, office: state_house}
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: p_linda_new, calendar_year: 2023, employee_name: 'BLACK, LINDA M', match_confidence: high}
+
+  - name: salaries_a_january_final_check_takes_the_departed_member_out_of_the_pairing
+    model: fct_salaries
+    description: >
+      Neil Smith's seat ended 2023-01-03 and "SMITH, NEIL I" in 2023 is his small final check, so neither the
+      payee nor the member competes for the seats held now. Without removing the member, Neil would still be a
+      second seat for "SMITH, DAVID T" to be unsure about, and David Smith's 2023 pay (matched on what is left
+      once Cody Smith is paired by the middle initial) would go unmatched.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, DAVID C', last_name: SMITH, first_names: DAVID C, gross_pay: 38385.46}
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, DAVID T', last_name: SMITH, first_names: DAVID T, gross_pay: 38385.46}
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, NEIL I', last_name: SMITH, first_names: NEIL I, gross_pay: 1500.0}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_cody, full_name: Cody Smith, surname_key: smith, chamber: lower, start_date: '2019-01-01', end_date: '9999-12-31'}
+          - {person_id: p_david, full_name: David Smith, surname_key: smith, chamber: lower, start_date: '2019-01-01', end_date: '9999-12-31'}
+          - {person_id: p_neil, full_name: Neil Smith, surname_key: smith, chamber: lower, start_date: '2019-01-01', end_date: '2023-01-03'}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p_cody, office: state_house}
+          - {official_id: p_david, office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: p_cody, level: state, office: state_house, family_key: smith, given_key: cody}
+          - {official_id: p_david, level: state, office: state_house, family_key: smith, given_key: david}
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows:
+          - {year: 2023, official_id: p_cody, office: state_house}
+          - {year: 2023, official_id: p_david, office: state_house}
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: p_cody, calendar_year: 2023, employee_name: 'SMITH, DAVID C', match_confidence: medium}
+        - {official_id: p_david, calendar_year: 2023, employee_name: 'SMITH, DAVID T', match_confidence: medium}

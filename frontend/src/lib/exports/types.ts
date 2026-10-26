@@ -293,9 +293,10 @@ export interface Dataset<T> {
   rows: T[];
 }
 
-/** One fct_judge_time_to_disposition row: median days from filing to termination of the dockets assigned to a judge. */
+/** One fct_judge_time_to_disposition row: median days from filing to termination of the civil or criminal dockets assigned to a judge. */
 export interface TimeToDisposition {
   cl_person_id: string;
+  case_type: "civil" | "criminal";
   court_id: string;
   dockets_assigned: number;
   dockets_with_both_dates: number;
@@ -326,8 +327,8 @@ export interface OfficialBundle {
   committees: CommitteeSession[] | null;
   courts: {
     status: string;
-    /** federal district judges only (fct_judge_time_to_disposition); null for everyone else or when the export is missing */
-    time_to_disposition: TimeToDisposition | null;
+    /** federal district judges only (fct_judge_time_to_disposition): one entry per case type the judge has dockets of, civil first; null for everyone else or when the export is missing */
+    time_to_disposition: TimeToDisposition[] | null;
     /** cases per filing year and role; null when the export is missing */
     by_year: { year: number; role: string; cases: number }[] | null;
     total: number;
