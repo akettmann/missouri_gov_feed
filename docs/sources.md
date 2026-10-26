@@ -202,6 +202,10 @@ Quirks:
 - Names are space-separated, so a two-word surname looks like two senators. Known ones are listed in
   `COMPOUND_SURNAMES` (Holly Thompson Rehder, printed "Thompson Rehder"); dbt matches a two-word token on
   its last word. The PDF text sometimes cuts "Senator" short ("Senato"); such words are skipped.
+- The block's closing `Vacancies—None` / `Vacancies—N` lands as `vacancies` on every row of the vote
+  (`stg_mo_senate__votes.vacancies`). The `assert_senate_seats_sum_to_34` dbt test (warn) checks that senators
+  listed + vacancies = 34. Of 2,261 votes (2017-2026), 30 miss by 1-2 seats (2021: 1, 2024: 7, 2025: 7, 2026: 15);
+  the parsed names match the journal's own printed totals, so the journal under-reports, not the parser.
 - The `assert_votes_within_seats` dbt test fails if a vote lists more than 34 senators. It caught all of
   the above: 443 votes listed 35 or 36 names before the fixes.
 - PDF parsing (about 3 s per journal) dominates a cold run, so it shards well. The extracted text is

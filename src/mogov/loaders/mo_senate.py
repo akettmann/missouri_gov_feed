@@ -57,12 +57,24 @@ def _journal_day(text: str) -> tuple[str | None, str | None]:
     return None, None
 
 
+def _vacancies(block: str) -> int | None:
+    """The block's closing "Vacancies—None" / "Vacancies—1" / "Vacancies—Senator—1" as a count."""
+    m = re.search(rf"Vacancies{DASH}([^\n]*)", block)
+    if not m:
+        return None
+    rest = m.group(1)
+    if number := re.search(r"\d+", rest):
+        return int(number.group())
+    return 0 if re.search(r"\bNone\b", rest, re.I) else None
+
+
 def parse_journal(text: str) -> list[dict]:
-    """All recorded votes in a journal's text -> [{context, category, name, declared_count, block_index}]."""
+    """All recorded votes in a journal's text -> [{context, category, name, declared_count, vacancies, block_index}]."""
     journal_day, journal_date = _journal_day(text)
     rows = []
     for i, m in enumerate(BLOCK.finditer(text)):
         block = PAGE_FURNITURE.sub("", m.group(0))
+        vacancies = _vacancies(block)
         before = text[max(0, m.start() - 600) : m.start()]
         context = re.split(r"(?<=[.:])\s*\n", before.strip())[-1].replace("\n", " ").strip()
         for section in SECTION.finditer(block.replace("\n", " ")):
@@ -88,6 +100,7 @@ def parse_journal(text: str) -> list[dict]:
                         "category": category,
                         "name": name,
                         "declared_count": int(count.group(1)) if count else None,
+                        "vacancies": vacancies,
                     }
                 )
     return rows

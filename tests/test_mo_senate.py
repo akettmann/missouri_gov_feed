@@ -93,3 +93,20 @@ def test_vote_blocks_parse_and_counts_match_declared_totals():
     for (block, cat), n in Counter((r["block_index"], r["category"]) for r in rows).items():
         declared = next(r["declared_count"] for r in rows if r["block_index"] == block and r["category"] == cat)
         assert declared is None or declared == n, (block, cat, n, declared)
+
+
+def test_vacancy_count_lands_on_every_row_of_its_block():
+    rows = parse_journal(BLOCKS_2022)
+    assert {r["vacancies"] for r in rows} == {0}
+    # "Vacancies—None" is zero; a printed number is that many
+    text = BLOCKS_2022.replace("Vacancies—None", "Vacancies—1", 1)
+    rows = parse_journal(text)
+    assert {r["vacancies"] for r in rows if r["block_index"] == 0} == {1}
+    assert {r["vacancies"] for r in rows if r["block_index"] == 1} == {0}
+
+
+def test_vacancy_count_forms():
+    base = BLOCKS_2022
+    for printed, expected in [("Vacancies—Senator—2", 2), ("Vacancies-3", 3), ("Vacancies—None", 0)]:
+        rows = parse_journal(base.replace("Vacancies—None", printed, 1))
+        assert {r["vacancies"] for r in rows if r["block_index"] == 0} == {expected}, printed
