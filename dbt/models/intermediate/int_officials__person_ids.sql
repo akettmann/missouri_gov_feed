@@ -16,7 +16,10 @@
 --      names never hold different seats in the same year (across all ids of both names), and either hold a seat
 --      at the same time (their dated terms in one seat overlap: start_a < end_b and start_b < end_a, an open term
 --      ending 9999-12-31; the same start day overlaps, one term ending the day the other starts does not), or
---      follow each other within a year in a different chamber (a move, as Roberts went House to Senate). Years
+--      follow each other within a year in a different chamber (a move, as Roberts went House to Senate). Overlap
+--      alone is not enough: Open States often leaves a member who left mid-term with the normal term end, so a
+--      special-election successor overlaps on paper (Silvey to 2018-12-31, Lauren Arthur from 2018-09-12, SD17). The
+--      shared-seat case also needs one term to sit inside the other, or both to start the same day. Years
 --      alone cannot decide the shared-seat case: Kenneth Jamison (2025 only) inside Ken Jamison (2025-26) is a
 --      duplicate, but Danielle Smith (2019 only, or 2026 only after a special election) inside a Dan Smith
 --      successor's span looks the same by year. Dates tell them apart: Kenneth's term is a stub that overlaps
@@ -27,7 +30,6 @@
 -- the smaller id. The choice never looks at the latest roster year, so an official's id does not change when they
 -- leave office.
 -- Curated rows (official_id_links) take effect only once a maintainer has signed them off (checked_by filled).
--- Grain: one row per alias_id.
 with terms as (
     select * from {{ ref('int_officials__identity_terms') }}
 ),
@@ -149,6 +151,14 @@ variant_pairs as (
                     where
                         ta.sq = a.sq and tb.sq = b.sq
                         and ta.term_start < tb.term_end and tb.term_start < ta.term_end
+                        -- and one term sits inside the other (or both start the same day): Open States often
+                        -- leaves a mid-term departure's end at the normal term end, so a successor's term
+                        -- overlaps on paper without being inside the predecessor's
+                        and (
+                            ta.term_start = tb.term_start
+                            or (ta.term_start >= tb.term_start and ta.term_end <= tb.term_end)
+                            or (tb.term_start >= ta.term_start and tb.term_end <= ta.term_end)
+                        )
                 )
             )
             -- no shared seat-year: only a move between chambers, one name ending as the other begins. The same
