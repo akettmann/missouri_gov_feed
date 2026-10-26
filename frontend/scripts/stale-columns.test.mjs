@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import { DuckDBInstance } from "@duckdb/node-api";
-import { assertNoMissingColumns, missingColumns } from "../src/lib/exports/requiredColumns.ts";
+import {
+  REQUIRED_COLUMNS,
+  assertNoMissingColumns,
+  missingColumns,
+} from "../src/lib/exports/requiredColumns.ts";
 
 const REQ = { t_one: ["a", "b"], t_two: ["c"] };
 
@@ -54,6 +58,25 @@ test("query() reports a stale fct_jurisdiction_businesses export instead of a bi
       );
     },
   ));
+
+test("a pre-#350 fct_jurisdiction_businesses export ('; '-joined donor_names, no donor_name_list) is stale", () => {
+  const old = REQUIRED_COLUMNS.fct_jurisdiction_businesses
+    .filter((c) => c !== "donor_name_list")
+    .concat("donor_names");
+  assert.deepEqual(missingColumns({ fct_jurisdiction_businesses: old }), {
+    fct_jurisdiction_businesses: ["donor_name_list"],
+  });
+  assert.throws(
+    () => assertNoMissingColumns({ fct_jurisdiction_businesses: old }),
+    (e) =>
+      /stale export: fct_jurisdiction_businesses lacks donor_name_list/.test(e.message) &&
+      e.message.includes("uv run mogov export --format parquet"),
+  );
+  assert.deepEqual(
+    missingColumns({ fct_jurisdiction_businesses: REQUIRED_COLUMNS.fct_jurisdiction_businesses }),
+    {},
+  );
+});
 
 const unlistedMessage = (e) =>
   /t_unlisted has no column newer: if the column is new, the export is stale/.test(e.message) &&

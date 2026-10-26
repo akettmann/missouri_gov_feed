@@ -251,8 +251,8 @@ export interface InterestOverlap {
 
 /** A company that gave to the official and has EPA-regulated sites in their area (fct_jurisdiction_businesses). */
 export interface DistrictDonor {
-  /** the matched contributors as filed, "; "-separated */
-  donor_names: string;
+  /** the matched contributors as filed, sorted; one string per donor */
+  donors: string[];
   /** the official's total from those contributors (all years loaded), not per site */
   donated_amount: number;
   n_contributions: number;
@@ -433,8 +433,8 @@ export interface SiteRow {
   is_donor: boolean;
   /** "same name" | "same company"; null when no donor matched */
   matched_by: string | null;
-  /** donor names as filed, "; "-separated */
-  donor_names: string | null;
+  /** donor names as filed, sorted; one string per donor, empty when no donor matched */
+  donors: string[];
   match_confidence: "high" | "medium" | null;
   /** where each matched donor's contributions are filed: `<url> <donor name>` lines, see parseDonorLinks */
   donor_links: string | null;
