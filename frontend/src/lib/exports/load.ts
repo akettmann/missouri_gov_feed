@@ -425,6 +425,8 @@ async function loadAll(): Promise<OfficialBundle[]> {
           await query<TitledMembership>(`
             select official_id, session_code, committee_name, position_name, is_subcommittee
             from {fct_committee_memberships} where position_name <> 'Member'`),
+          process.env,
+          console.warn,
         )
       : null;
 

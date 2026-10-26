@@ -94,3 +94,18 @@ test("exports from different builds are refused", () => {
     /disagree/,
   );
 });
+
+test("MOGOV_SKIP_COMMITTEE_POSTS_CHECK=1 (exactly) bypasses the mismatch throw and logs it", () => {
+  const posts = [post("a", "261", { chair_posts: 2 })];
+  const mems = [mem("a", "261", "Budget", "Chair")];
+  const logs = [];
+  const out = buildCommitteeSessions(posts, mems, { MOGOV_SKIP_COMMITTEE_POSTS_CHECK: "1" }, (m) =>
+    logs.push(m),
+  );
+  assert.equal(out.get("a")[0].titles.length, 1);
+  assert.equal(logs.length, 1);
+  assert.throws(
+    () => buildCommitteeSessions(posts, mems, { MOGOV_SKIP_COMMITTEE_POSTS_CHECK: "true" }),
+    /uv run mogov export/,
+  );
+});

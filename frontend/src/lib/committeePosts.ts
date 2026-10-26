@@ -7,9 +7,9 @@ export interface CommitteeSession {
   session_year: number;
   /** "2025 regular session" / "2025 extraordinary session (code 253)" */
   label: string;
-  /** true for the newest session in the data, whose snapshot may change before the session ends */
+  /** true for the newest session in the data, the newest session loaded */
   is_latest: boolean;
-  /** full (non-sub) committees served on */
+  /** committees served on: every non-subcommittee entry, so special, joint and conference committees count */
   committees_held: number;
   /** titles held, in a fixed order: chair, co-chair, vice-chair, ranking minority member */
   titles: { position: string; committee: string; subcommittee: boolean }[];
@@ -49,6 +49,11 @@ export function positionLabel(position: string): string {
   return position === "Ranking Minority Member" ? "Ranking minority member" : position;
 }
 
+/** MOGOV_SKIP_COMMITTEE_POSTS_CHECK skips the check only when it is exactly "1" (like MOGOV_SKIP_PAY_YEARS_CHECK). */
+export function skipCommitteePostsCheck(env: Record<string, string | undefined>): boolean {
+  return env.MOGOV_SKIP_COMMITTEE_POSTS_CHECK === "1";
+}
+
 /**
  * Per official, newest session first. Throws when the titled memberships do not add up to the counts in
  * fct_committee_posts (the two exports come from different builds).
@@ -56,7 +61,12 @@ export function positionLabel(position: string): string {
 export function buildCommitteeSessions(
   posts: PostCounts[],
   memberships: TitledMembership[],
+  env: Record<string, string | undefined> = {},
+  log: (msg: string) => void = () => {},
 ): Map<string, CommitteeSession[]> {
+  const skip = skipCommitteePostsCheck(env);
+  if (skip)
+    log("MOGOV_SKIP_COMMITTEE_POSTS_CHECK=1: skipping the committee posts vs memberships consistency check.");
   const latest = posts.reduce((m, p) => (p.session_code > m ? p.session_code : m), "");
   const titled = new Map<string, TitledMembership[]>();
   for (const m of memberships) {
@@ -75,9 +85,9 @@ export function buildCommitteeSessions(
       "Ranking Minority Member": p.ranking_posts,
     };
     for (const [position, n] of Object.entries(expected)) {
-      if (count(position) !== n) {
+      if (!skip && count(position) !== n) {
         throw new Error(
-          `fct_committee_posts and fct_committee_memberships disagree for ${p.official_id} session ${p.session_code}: ${n} ${position} posts vs ${count(position)} (exports from different builds?)`,
+          `fct_committee_posts and fct_committee_memberships disagree for ${p.official_id} session ${p.session_code}: ${n} ${position} posts vs ${count(position)} (exports from different builds). Rebuild and re-export: \`uv run mogov build\` then \`uv run mogov export --format parquet\`, or set MOGOV_SKIP_COMMITTEE_POSTS_CHECK=1 (exactly 1) to build anyway.`,
         );
       }
     }
