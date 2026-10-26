@@ -74,7 +74,11 @@ unit_tests:
       the 2019 "HB 1", which is in both 193 and 194 on the vote date and so ambiguous. The Senate-bill fallback
       only applies in the special session the vote belongs to (the one whose action-date span holds the vote date):
       the 2020-08-07 "SB 1" links to 203 SB1 although 204 also has an SB1 first acted on later, and the
-      2020-08-07 "SB 2", which has no 203 bill and only a later 204 SB2, links to nothing.
+      2020-08-07 "SB 2", which has no 203 bill and only a later 204 SB2, links to nothing. A vote inside the
+      overlap of two special sessions' action spans (2017: 173 runs 05-22..06-19, 174 06-12..06-30) belongs to
+      neither, so the 06-15 "SB 5", first acted on in 174 on 06-25, links to nothing; a Senate-bill vote dated
+      after the bill's first House action, on a day with no action (2021-07-10 "SB 7", first acted on 07-01),
+      also links to nothing.
     given:
       - input: ref('int_bills__status')
         format: sql
@@ -117,7 +121,14 @@ unit_tests:
             select '203', 'SB1', cast('2020-08-10' as date) union all
             select '204', 'HB1', cast('2020-11-05' as date) union all
             select '204', 'SB1', cast('2020-11-20' as date) union all
-            select '204', 'SB2', cast('2020-11-20' as date)
+            select '204', 'SB2', cast('2020-11-20' as date) union all
+            select '173', 'HB1', cast('2017-05-22' as date) union all
+            select '173', 'HB1', cast('2017-06-19' as date) union all
+            select '174', 'HB1', cast('2017-06-12' as date) union all
+            select '174', 'SB5', cast('2017-06-25' as date) union all
+            select '174', 'HB1', cast('2017-06-30' as date) union all
+            select '213', 'SB7', cast('2021-07-01' as date) union all
+            select '213', 'SB7', cast('2021-07-20' as date)
       - input: ref('int_mo_senate__votes')
         format: sql
         rows: |
@@ -129,7 +140,9 @@ unit_tests:
             select 'senate_bill', 'SB 1', cast('2025-06-05' as date), 'https://www.senate.mo.gov/25info/Journals/T1Day04.pdf' union all
             select 'senate_bill_unfiled', 'SB 2', cast('2025-06-05' as date), 'https://www.senate.mo.gov/25info/Journals/T1Day04.pdf' union all
             select 'two_sessions_same_bill', 'SB 1', cast('2020-08-07' as date), 'https://www.senate.mo.gov/20info/Journals/T1Day02.pdf' union all
-            select 'never_reached_house', 'SB 2', cast('2020-08-07' as date), 'https://www.senate.mo.gov/20info/Journals/T1Day02.pdf'
+            select 'never_reached_house', 'SB 2', cast('2020-08-07' as date), 'https://www.senate.mo.gov/20info/Journals/T1Day02.pdf' union all
+            select 'overlapping_spans', 'SB 5', cast('2017-06-15' as date), 'https://www.senate.mo.gov/17info/Journals/T1Day03.pdf' union all
+            select 'after_first_action', 'SB 7', cast('2021-07-10' as date), 'https://www.senate.mo.gov/21info/Journals/T1Day03.pdf'
     expect:
       format: sql
       rows: |
