@@ -1711,8 +1711,9 @@ models:
       - name: donor_names
         data_type: varchar
         description: >
-          The matched contributors as filed, separated by "; ", when is_donor. A ";" inside a filed name becomes a
-          comma, so "; " only ever separates two donors (#276).
+          The matched contributors as filed, joined by chr(31) (the ASCII unit separator, not a printable
+          character), when is_donor. Names are kept as filed, so a ";" or "," inside one stays; chr(31) only ever
+          separates two donors (#350). The frontend splits on it and shows the names joined by "; ".
       - name: donated_amount
         data_type: decimal(38,6)
         description: >

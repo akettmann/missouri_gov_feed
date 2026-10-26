@@ -58,6 +58,26 @@ export function donorLinkLabel(url: string | null | undefined, siblings: string[
   return varying.length ? `${base} (${kind}, ${varying.join(", ")})` : `${base} (${kind})`;
 }
 
+/**
+ * fct_jurisdiction_businesses joins `donor_names` with this ASCII unit separator, not "; ": donor names are kept
+ * as filed and a filed name can hold ";" or "," (e.g. "Missouri and Kansas Laborers; PAC"), so no printable
+ * separator is safe (#350). Split with `splitDonorNames`; show with `donorNamesText`.
+ */
+export const DONOR_NAME_SEPARATOR = "\u001f";
+
+/** The donors in a `donor_names` value, trimmed, blanks dropped; null or empty gives []. */
+export function splitDonorNames(names: string | null | undefined): string[] {
+  return (names ?? "")
+    .split(DONOR_NAME_SEPARATOR)
+    .map((n) => n.trim())
+    .filter(Boolean);
+}
+
+/** `donor_names` for people to read: the donors joined by "; ". */
+export function donorNamesText(names: string | null | undefined): string {
+  return splitDonorNames(names).join("; ");
+}
+
 export interface DonorEntry {
   donor: string;
   /** filing pages for this donor; empty when the donor has none (rendered as "no link") */
@@ -65,14 +85,13 @@ export interface DonorEntry {
 }
 
 /**
- * One entry per donor, in donor_names order (names are joined by "; "), each with its filing-page urls from
+ * One entry per donor, in donor_names order (names are joined by DONOR_NAME_SEPARATOR), each with its filing-page urls from
  * donor_links. A donor named in donor_names with no link line has an empty list, so the page can say "no link"
  * instead of showing the name bare (#268). A link whose donor is not in donor_names is kept, after the others.
  * Donors whose gifts are filed on the same pages collapse into one entry whose `donor` joins their names with
  * "; ": exactly equal page sets, or a donor whose pages are all among another donor's (never partial overlap).
  * Sharing a page is not proof of one organisation: an MEC page is the official's own committee, so it is shared
  * by every donor to that official. The merge only avoids repeating a link; the page still names no more than it did.
- * donor_names itself never holds a "; " inside a name: fct_jurisdiction_businesses turns each ";" into a comma (#276).
  */
 export function donorEntries(
   names: string | null | undefined,
@@ -80,9 +99,8 @@ export function donorEntries(
 ): DonorEntry[] {
   const links = parseDonorLinks(rawLinks);
   const order: string[] = [];
-  for (const n of (names ?? "").split("; ")) {
-    const name = n.trim();
-    if (name && !order.includes(name)) order.push(name);
+  for (const name of splitDonorNames(names)) {
+    if (!order.includes(name)) order.push(name);
   }
   for (const l of links) if (!order.includes(l.donor)) order.push(l.donor);
   // Group donors whose pages are exactly the same: donors whose gifts are filed on the same pages (for MEC,

@@ -1,6 +1,7 @@
 // Counts for the compare page's businesses-in-their-area rows, from the per-official `businesses` block.
 // Pure (only imports the pure format helpers) so node:test can load it.
 import type { DistrictDonor, DistrictIndustry } from "./exports/types";
+import { splitDonorNames } from "./donorLinks.ts";
 import { plural } from "./format.ts";
 
 export interface BusinessCounts {
@@ -13,9 +14,6 @@ export interface BusinessCounts {
   /** true when the possible-match toggle hid every donor group, so "none" would be misleading */
   allHidden: boolean;
 }
-
-/** load.ts groups sites by `donor_names`, the "; "-joined set of contributors matched to one site. */
-const NAME_SEPARATOR = ";";
 
 /** null when the official has no area businesses (statewide office, judge, or the export is missing). */
 export function businessCounts(
@@ -54,11 +52,11 @@ export function countDonors(groups: DistrictDonor[]): number {
   const sets = new Map<string, Set<string>>();
   for (const g of groups) {
     const names = new Set<string>();
-    for (const part of g.donor_names.split(NAME_SEPARATOR)) {
+    for (const part of splitDonorNames(g.donor_names)) {
       const name = part.replace(/\s+/g, " ").trim();
       if (name) names.add(name);
     }
-    if (names.size) sets.set([...names].sort().join(";"), names);
+    if (names.size) sets.set(JSON.stringify([...names].sort()), names);
   }
   const all = [...sets.values()];
   const minimal = all.filter(

@@ -24,16 +24,16 @@ donors as (
     select
         official_id,
         {{ mogov.company_key("coalesce(nullif(trim(counterparty_organization), ''), counterparty)") }} as donor_key,
-        -- CR/LF would split a donor_links line (`<url> <donor>`), so they become spaces here (#268). A ';' would
-        -- split donor_names, which is '; '-joined and split back by the frontend (#276), so it becomes a comma
+        -- CR/LF would split a donor_links line (`<url> <donor>`), so they become spaces here (#268). chr(31) (the
+        -- ASCII unit separator) joins donor_names below, so it becomes a space too; a ';' in a name is kept (#350)
         trim(
             replace(
                 replace(
                     replace(
                         replace(
                             min(coalesce(nullif(trim(counterparty_organization), ''), counterparty)),
-                            ';',
-                            ','
+                            chr(31),
+                            ' '
                         ),
                         chr(13) || chr(10),
                         ' '
@@ -166,7 +166,7 @@ per_facility as (
         official_id,
         registry_id,
         case when max(by_name) = 1 then 'same name' else 'same company' end as matched_by,
-        {{ dbt.listagg('donor_name', "'; '", 'order by donor_name') }} as donor_names,
+        {{ dbt.listagg('donor_name', "chr(31)", 'order by donor_name') }} as donor_names,
         sum(amount) as donated_amount,
         sum(n_contributions) as n_contributions,
         min(first_year) as first_year,

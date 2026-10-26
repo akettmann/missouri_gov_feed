@@ -103,14 +103,14 @@ test("sitesCsv carries the donor match columns and escapes them", () => {
     site({
       is_donor: true,
       matched_by: "same company",
-      donor_names: 'ACME "HOLDINGS"; ACME, LLC',
+      donor_names: 'ACME "HOLDINGS"' + "\u001f" + "ACME; LLC, THE",
       match_confidence: "medium",
       donor_links: "https://example.test/c ACME",
     }),
   ]);
   assert.equal(
     csv.split("\n")[1],
-    'Acme,1 Main St,Joplin,64801,Mining,Acme LLC,,true,medium,same company,"ACME ""HOLDINGS""; ACME, LLC",' +
+    'Acme,1 Main St,Joplin,64801,Mining,Acme LLC,,true,medium,same company,"ACME ""HOLDINGS""; ACME; LLC, THE",' +
       "https://example.test/c ACME,https://example.test/frs?id=1",
   );
 });

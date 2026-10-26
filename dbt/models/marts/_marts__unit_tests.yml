@@ -400,11 +400,11 @@ unit_tests:
         - {registry_id: F1, is_donor: true, donor_names: AMEREN CORPORATION, donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 AMEREN CORPORATION"}
         - {registry_id: F2, is_donor: false, donor_names: null, donor_links: null}
 
-  - name: jurisdiction_businesses_donor_names_hold_no_semicolons
+  - name: jurisdiction_businesses_donor_names_keep_semicolons
     model: fct_jurisdiction_businesses
     description: >
-      donor_names is '; '-joined and the frontend splits it back, so a raw donor name with a ';' in it would show
-      as two donors. The model turns each ';' into a comma (#276). Two donors still join with '; '.
+      donor_names is joined with chr(31) (not '; '), so a raw donor name with a ';' in it stays one donor and is not
+      altered (#350). Two donors join with chr(31); a chr(31) inside a raw name becomes a space.
     given:
       - input: ref('fct_official_districts')
         rows:
@@ -424,4 +424,4 @@ unit_tests:
           - {official_id: o1, direction: received, counterparty: x, counterparty_organization: ACME HOLDINGS INC, counterparty_type: committee, amount: 70, transaction_date: '2022-03-01', match_confidence: high, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9'}
     expect:
       rows:
-        - {registry_id: F1, donor_names: 'ACME HOLDINGS INC; AMEREN CORPORATION, THE', donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9 ACME HOLDINGS INC\nhttps://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 AMEREN CORPORATION, THE"}
+        - {registry_id: F1, donor_names: "ACME HOLDINGS INC\x1fAMEREN CORPORATION; THE", donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9 ACME HOLDINGS INC\nhttps://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 AMEREN CORPORATION; THE"}
