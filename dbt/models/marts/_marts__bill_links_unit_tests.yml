@@ -1,0 +1,94 @@
+# Unit tests for the bill link models: re-listed appropriation bills are not linked to votes or sponsors.
+version: 2
+
+unit_tests:
+  - name: vote_bills_skip_relisted_bills
+    model: fct_vote_bills
+    description: >
+      A re-listed bill (status "relisted for governor message") has no floor action, so no vote links to it by
+      any route. 171 HB2003 and HB2009 and 181 HB2 are re-listings: the roll call the bill XML names for HB2003,
+      the roll call whose measure text reads "HCS HB 2009", and the 2018 Senate journal vote on "HB 2" all link
+      to nothing. The same routes still link real bills: 171 HB2 (exact link and measure text), 181 HB3 (Senate
+      journal vote) and SB5 (topical index).
+    given:
+      - input: ref('int_bills__status')
+        format: sql
+        rows: |
+            select '171' as session_code, 'HB2' as bill, 'signed' as status union all
+            select '171', 'HB2003', 'relisted for governor message' union all
+            select '171', 'HB2009', 'relisted for governor message' union all
+            select '181', 'HB2', 'relisted for governor message' union all
+            select '181', 'HB3', 'signed'
+      - input: ref('stg_mo_house__bills')
+        format: sql
+        rows: |
+            select '171' as session_code, 'HB2' as bill union all
+            select '171', 'HB2003' union all
+            select '171', 'HB2009' union all
+            select '181', 'HB2' union all
+            select '181', 'HB3'
+      - input: ref('stg_mo_senate__bill_topics')
+        format: sql
+        rows: |
+            select '181' as session_code, 'SB5' as bill union all
+            select '181', 'HB3'
+      - input: ref('stg_mo_house__bill_rollcalls')
+        format: sql
+        rows: |
+            select '171' as session_code, 'HB2' as bill, 'Perfected' as bill_version, 'rc1' as rollcall_url union all
+            select '171', 'HB2003', 'Perfected', 'rc2'
+      - input: ref('stg_mo_house__rollcalls')
+        format: sql
+        rows: |
+            select 'rc1' as rollcall_url, '171' as session_code, 'HB 2' as measure union all
+            select 'rc2', '171', 'HCS HB 2003' union all
+            select 'rc3', '171', 'HCS HB 2009' union all
+            select 'rc4', '171', 'HB 2'
+      - input: ref('int_mo_senate__votes')
+        format: sql
+        rows: |
+            select 'sv1' as vote_id, 'HB 2' as measure, cast('2018-09-14' as date) as vote_date union all
+            select 'sv2', 'HB 3', cast('2018-09-14' as date) union all
+            select 'sv3', 'SB 5', cast('2018-09-14' as date)
+    expect:
+      format: sql
+      rows: |
+          select 'state_house' as chamber, 'rc1' as vote_id, '171' as session_code, 'HB2' as bill, 'Perfected' as bill_version, 'roll-call link' as matched_by union all
+          select 'state_house', 'rc4', '171', 'HB2', cast(null as varchar), 'measure text' union all
+          select 'state_senate', 'sv2', '181', 'HB3', cast(null as varchar), 'measure text' union all
+          select 'state_senate', 'sv3', '181', 'SB5', cast(null as varchar), 'measure text'
+
+  - name: bill_sponsors_skip_relisted_bills
+    model: fct_bill_sponsors
+    description: >
+      A re-listed appropriation bill repeats the original's sponsors only to record the governor's message, so it
+      adds no sponsor rows: 181 HB2 (re-listed from 171) is left out while 171 HB2 keeps its sponsor, matched to
+      the official for district 5.
+    given:
+      - input: ref('int_bills__status')
+        format: sql
+        rows: |
+            select '171' as session_code, 'HB2' as bill, 'signed' as status union all
+            select '181', 'HB2', 'relisted for governor message'
+      - input: ref('stg_mo_house__bill_sponsors')
+        format: sql
+        rows: |
+            select '171' as session_code, 2017 as session_year, 'HB2' as bill, 'Sponsor' as sponsor_type, 'Smith' as sponsor_name, 5 as sponsor_district union all
+            select '181', 2018, 'HB2', 'Sponsor', 'Smith', 5
+      - input: ref('int_mo_house__member_identity')
+        format: sql
+        rows: |
+            select '171' as session_code, 5 as district_number, 'smith' as surname_key, 'p_smith' as person_key union all
+            select '181', 5, 'smith', 'p_smith'
+      - input: ref('int_mo_legislators__seats')
+        format: sql
+        rows: |
+            select 'upper' as chamber, 1 as district_number, cast('2017-01-01' as date) as start_date, cast('2018-12-31' as date) as end_date, 'x' as surname_key, 'p_x' as person_id
+      - input: ref('dim_official')
+        format: sql
+        rows: |
+            select 'p_smith' as official_id
+    expect:
+      format: sql
+      rows: |
+          select '171' as session_code, 'HB2' as bill, 'Sponsor' as sponsor_type, 'Smith' as sponsor_name, 'state_house' as sponsor_chamber, 5 as sponsor_district, 'p_smith' as official_id

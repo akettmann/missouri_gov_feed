@@ -4,17 +4,32 @@
 --   ("HCS HB 2", "SS SCS SBs 49 & 118"): every bill number it names, matched to that session's bills.
 --   Senate journal votes: the vote's measure ("HB 2", "SB 974") read from the journal text, matched to that
 --   year's regular-session bill (House bills from the House export, Senate bills from the topical index).
-with bills as (
+--   Re-listed bills (status 'relisted for governor message', int_bills__status) are never linked: the House lists
+--   the previous session's appropriation bill again only to record the governor's Art. IV s.27 message, so it
+--   has no floor action and a vote cannot have been on it. Their votes link to nothing here rather than to a
+--   stub (the original lives in the earlier session, and is linked only when its own roll calls name it).
+with relisted as (
     select
         session_code,
         bill
-    from {{ ref('stg_mo_house__bills') }}
+    from {{ ref('int_bills__status') }}
+    where status = 'relisted for governor message'
+),
+
+bills as (
+    select
+        h.session_code,
+        h.bill
+    from {{ ref('stg_mo_house__bills') }} as h
+    left join relisted as rl on h.session_code = rl.session_code and h.bill = rl.bill
+    where rl.bill is null
     union
     select
-        session_code,
-        bill
-    from {{ ref('stg_mo_senate__bill_topics') }}
-    where bill like 'S%'
+        t.session_code,
+        t.bill
+    from {{ ref('stg_mo_senate__bill_topics') }} as t
+    left join relisted as rl on t.session_code = rl.session_code and t.bill = rl.bill
+    where t.bill like 'S%' and rl.bill is null
 ),
 
 bill_keys as (
@@ -52,7 +67,8 @@ select distinct
     r.bill_version,
     'roll-call link' as matched_by
 from {{ ref('stg_mo_house__bill_rollcalls') }} as r
-where r.rollcall_url is not null
+left join relisted as rl on r.session_code = rl.session_code and r.bill = rl.bill
+where r.rollcall_url is not null and rl.bill is null
 
 union all
 
