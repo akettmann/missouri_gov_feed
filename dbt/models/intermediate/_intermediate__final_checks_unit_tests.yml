@@ -1,0 +1,90 @@
+# Unit tests for int_mo_legislators__final_checks (#250, #269, #471): fixed payroll rows and seats -> exact rows.
+version: 2
+
+unit_tests:
+  - name: final_checks_a_small_december_departure_payment_is_the_departed_members
+    model: int_mo_legislators__final_checks
+    description: >
+      Linda Black's seat ended 2016-12-31, so "BLACK, LINDA R." in 2017 (under half the top pay) is her final check.
+      "BLACK, JAMES R", paid in full and sharing the middle initial, is not.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, JAMES R', last_name: BLACK, first_names: JAMES R, gross_pay: 34418.35}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, LINDA R.', last_name: BLACK, first_names: LINDA R., gross_pay: 1496.45}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_rusty, full_name: Rusty Black, surname_key: black, chamber: lower, end_date: '9999-12-31'}
+          - {person_id: p_linda, full_name: Linda Black, surname_key: black, chamber: lower, end_date: '2016-12-31'}
+    expect:
+      rows:
+        - {calendar_year: 2017, seat_chamber: lower, employee_name: 'BLACK, LINDA R.', person_id: p_linda}
+
+  - name: final_checks_a_small_january_departure_payment_is_the_departed_members
+    model: int_mo_legislators__final_checks
+    description: >
+      Open States ends the 2022 departures on 2023-01-03, so a small 2023 payment fitting that member is a final
+      check as well.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'SMITH, NEIL I', last_name: SMITH, first_names: NEIL I, gross_pay: 1500.0}
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'SMITH, DAVID T', last_name: SMITH, first_names: DAVID T, gross_pay: 38385.46}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: SENATOR, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_neil, full_name: Neil Smith, surname_key: smith, chamber: upper, end_date: '2023-01-03'}
+          - {person_id: p_david, full_name: David Smith, surname_key: smith, chamber: upper, end_date: '9999-12-31'}
+    expect:
+      rows:
+        - {calendar_year: 2023, seat_chamber: upper, employee_name: 'SMITH, NEIL I', person_id: p_neil}
+
+  - name: final_checks_a_full_salary_or_a_first_name_that_does_not_fit_is_not_one
+    model: int_mo_legislators__final_checks
+    description: >
+      A full salary fitting the departed member is not a final check, and neither is a small payment whose first
+      name fits no departed member of the surname, nor one in the other chamber.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, LINDA R.', last_name: BLACK, first_names: LINDA R., gross_pay: 34418.35}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, ZELDA', last_name: BLACK, first_names: ZELDA, gross_pay: 1496.45}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'BLACK, TINA', last_name: BLACK, first_names: TINA, gross_pay: 1496.45}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'JONES, FRED', last_name: JONES, first_names: FRED, gross_pay: 36000.0}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+          - {agency_name: LEGISLATURE, position_title: SENATOR, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_linda, full_name: Linda Black, surname_key: black, chamber: lower, end_date: '2016-12-31'}
+          - {person_id: p_tina, full_name: Tina Black, surname_key: black, chamber: lower, end_date: '2016-12-31'}
+    expect:
+      rows:
+        []
+
+  - name: final_checks_a_departed_member_with_a_later_seat_in_the_chamber_is_not_one
+    model: int_mo_legislators__final_checks
+    description: >
+      Linda Black's first seat ended 2016-12-31, but she holds another House seat from 2019, so "BLACK, LINDA R."
+      in 2017 is not the payment of a member who left.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, JAMES R', last_name: BLACK, first_names: JAMES R, gross_pay: 34418.35}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, LINDA R.', last_name: BLACK, first_names: LINDA R., gross_pay: 1496.45}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_linda, full_name: Linda Black, surname_key: black, chamber: lower, end_date: '2016-12-31'}
+          - {person_id: p_linda, full_name: Linda Black, surname_key: black, chamber: lower, end_date: '2020-12-31'}
+    expect:
+      rows:
+        []

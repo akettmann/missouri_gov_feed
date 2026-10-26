@@ -40,6 +40,7 @@ GRAIN = {
     "int_mo_house__member_seat_keys": "one row per (House session, member) with the seat-matched raw_person_key",
     "int_mo_auditor__reports": "one row per State Auditor report, with its rating and audited entity type",
     "int_mo_house__votes": "one row per (House roll call, attributed person)",
+    "int_mo_legislators__final_checks": "one row per (pay year, chamber, payroll employee_name, departed member)",
     "int_mo_legislators__seats": "one row per Open States legislative seat-term",
     "int_mo_revisor__session_law_bills": "one row per (RSMo section version, act, bill) a history or repeal note names",
     "int_mo_legislators__seat_terms": "one row per Open States legislative seat-term, under the id Open States gave",
