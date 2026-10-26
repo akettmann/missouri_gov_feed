@@ -361,7 +361,7 @@ unit_tests:
         - {registry_id: F1, is_donor: true, donated_amount: 220, n_contributions: 3, donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9 ACME HOLDINGS INC\nhttps://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 AMEREN CORPORATION\nhttps://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C221944 AMEREN CORPORATION"}
         - {registry_id: F2, is_donor: false, donated_amount: null, n_contributions: null, donor_links: null}
 
-  - name: jurisdiction_businesses_donor_names_hold_no_line_breaks
+  - name: jurisdiction_businesses_donor_name_list_hold_no_line_breaks
     model: fct_jurisdiction_businesses
     description: >
       A raw donor name with a CR/LF inside would split its donor_links line in two. The model turns each into a
@@ -397,14 +397,14 @@ unit_tests:
               'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9' as source_url
     expect:
       rows:
-        - {registry_id: F1, is_donor: true, donor_names: AMEREN CORPORATION, donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 AMEREN CORPORATION"}
-        - {registry_id: F2, is_donor: false, donor_names: null, donor_links: null}
+        - {registry_id: F1, is_donor: true, donor_name_list: AMEREN CORPORATION, donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 AMEREN CORPORATION"}
+        - {registry_id: F2, is_donor: false, donor_name_list: null, donor_links: null}
 
-  - name: jurisdiction_businesses_donor_names_hold_no_semicolons
+  - name: jurisdiction_businesses_donor_name_list_keep_semicolons
     model: fct_jurisdiction_businesses
     description: >
-      donor_names is '; '-joined and the frontend splits it back, so a raw donor name with a ';' in it would show
-      as two donors. The model turns each ';' into a comma (#276). Two donors still join with '; '.
+      donor_name_list is joined with chr(31) (not '; '), so a raw donor name with a ';' in it stays one donor and is not
+      altered (#350). Two donors join with chr(31).
     given:
       - input: ref('fct_official_districts')
         rows:
@@ -424,4 +424,80 @@ unit_tests:
           - {official_id: o1, direction: received, counterparty: x, counterparty_organization: ACME HOLDINGS INC, counterparty_type: committee, amount: 70, transaction_date: '2022-03-01', match_confidence: high, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9'}
     expect:
       rows:
-        - {registry_id: F1, donor_names: 'ACME HOLDINGS INC; AMEREN CORPORATION, THE', donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9 ACME HOLDINGS INC\nhttps://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 AMEREN CORPORATION, THE"}
+        - {registry_id: F1, donor_name_list: "ACME HOLDINGS INC\x1fAMEREN CORPORATION; THE", donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9 ACME HOLDINGS INC\nhttps://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 AMEREN CORPORATION; THE"}
+
+  - name: jurisdiction_businesses_donor_name_list_scrub_unit_separator
+    model: fct_jurisdiction_businesses
+    description: >
+      A chr(31) inside a raw donor name would read as a boundary between two donors in donor_name_list, so the
+      model turns it into a space (#350). Without that scrub 'BETA<chr 31>CO' would come out as two donors.
+    given:
+      - input: ref('fct_official_districts')
+        rows:
+          - {official_id: o1, district_id: 'state_house:1', relation: elected from}
+      - input: ref('fct_district_facilities')
+        rows:
+          - {district_id: 'state_house:1', registry_id: F1, facility_name: Plant One, is_government: false}
+      - input: ref('int_epa_frs__facilities')
+        rows:
+          - {registry_id: F1, facility_key: plant one, owner_key: beta, parent_company_key: null}
+      - input: ref('company_brands')
+        rows:
+          - {keyword: unusedbrand, brand: unusedbrand}
+      # sql format: the dict format cannot carry a chr(31) inside a value
+      - input: ref('fct_campaign_finance')
+        format: sql
+        rows: |
+          select
+              'o1' as official_id,
+              'received' as direction,
+              'Beta PAC' as counterparty,
+              'BETA' || chr(31) || 'CO' as counterparty_organization,
+              'committee' as counterparty_type,
+              100 as amount,
+              cast('2020-03-01' as date) as transaction_date,
+              'high' as match_confidence,
+              'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9' as source_url
+    expect:
+      rows:
+        - {registry_id: F1, is_donor: true, donor_name_list: BETA CO, donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 BETA CO"}
+
+  - name: bias_indicator_detail_wording
+    model: fct_bias_indicators
+    description: >
+      DW-NOMINATE detail carries the English ordinal of the Congress: 111th-113th and 119th take "th" (the
+      teens are never st/nd/rd), 121st and 122nd take "st" and "nd", 103rd and 123rd take "rd". Party-unity detail starts with the raw chamber
+      key and the lifetime party-line vote count, which SectionIdeology reads as the lookup key.
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: o1, bioguide_id: B1}
+      - input: ref('stg_voteview__members')
+        rows:
+          - {bioguide_id: B1, icpsr: 1, chamber: House, congress: 103, nominate_dim1: 0.1}
+          - {bioguide_id: B1, icpsr: 1, chamber: House, congress: 111, nominate_dim1: 0.1}
+          - {bioguide_id: B1, icpsr: 1, chamber: House, congress: 112, nominate_dim1: 0.1}
+          - {bioguide_id: B1, icpsr: 1, chamber: House, congress: 113, nominate_dim1: 0.1}
+          - {bioguide_id: B1, icpsr: 1, chamber: House, congress: 119, nominate_dim1: 0.1}
+          - {bioguide_id: B1, icpsr: 1, chamber: House, congress: 121, nominate_dim1: 0.1}
+          - {bioguide_id: B1, icpsr: 1, chamber: House, congress: 122, nominate_dim1: 0.1}
+          - {bioguide_id: B1, icpsr: 1, chamber: House, congress: 123, nominate_dim1: 0.1}
+      - input: ref('stg_shor_mccarty__scores')
+        rows: []
+      - input: ref('int_mo_legislators__seats')
+        rows: []
+      - input: ref('fct_party_unity_yearly')
+        rows:
+          - {official_id: o1, chamber: state_house, vote_year: 2020, party_line_votes: 600, with_party_votes: 500}
+          - {official_id: o1, chamber: state_house, vote_year: 2021, party_line_votes: 406, with_party_votes: 400}
+    expect:
+      rows:
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 103, detail: 'Voteview DW-NOMINATE, House 103rd Congress'}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 111, detail: 'Voteview DW-NOMINATE, House 111th Congress'}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 112, detail: 'Voteview DW-NOMINATE, House 112th Congress'}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 113, detail: 'Voteview DW-NOMINATE, House 113th Congress'}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 119, detail: 'Voteview DW-NOMINATE, House 119th Congress'}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 121, detail: 'Voteview DW-NOMINATE, House 121st Congress'}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 122, detail: 'Voteview DW-NOMINATE, House 122nd Congress'}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 123, detail: 'Voteview DW-NOMINATE, House 123rd Congress'}
+        - {official_id: o1, indicator: party_unity_pct, period: null, detail: 'state_house: 1006 party-line votes'}

@@ -13,7 +13,7 @@ const site = (extra = {}) => ({
   parent_company_name: null,
   is_donor: false,
   matched_by: null,
-  donor_names: null,
+  donors: [],
   match_confidence: null,
   donor_links: null,
   frs_url: "https://example.test/frs?id=1",
@@ -72,9 +72,7 @@ test("cell leaves safe text and real numbers alone and only guards the first cha
 });
 
 test("sitesCsv guards every text column", () => {
-  const csv = sitesCsv([
-    site({ facility_name: "=cmd|' /C calc'!A0", address: "+1 Main", donor_names: "@x" }),
-  ]);
+  const csv = sitesCsv([site({ facility_name: "=cmd|' /C calc'!A0", address: "+1 Main", donors: ["@x"] })]);
   assert.equal(
     csv.split("\n")[1],
     "'=cmd|' /C calc'!A0,'+1 Main,Joplin,64801,Mining,Acme LLC,,false,,,'@x,,https://example.test/frs?id=1",
@@ -103,14 +101,14 @@ test("sitesCsv carries the donor match columns and escapes them", () => {
     site({
       is_donor: true,
       matched_by: "same company",
-      donor_names: 'ACME "HOLDINGS"; ACME, LLC',
+      donors: ['ACME "HOLDINGS"', "ACME; LLC, THE"],
       match_confidence: "medium",
       donor_links: "https://example.test/c ACME",
     }),
   ]);
   assert.equal(
     csv.split("\n")[1],
-    'Acme,1 Main St,Joplin,64801,Mining,Acme LLC,,true,medium,same company,"ACME ""HOLDINGS""; ACME, LLC",' +
+    'Acme,1 Main St,Joplin,64801,Mining,Acme LLC,,true,medium,same company,"ACME ""HOLDINGS""; ACME; LLC, THE",' +
       "https://example.test/c ACME,https://example.test/frs?id=1",
   );
 });

@@ -6,6 +6,10 @@
 --                      majorities count every member who voted, not just today's officials.
 -- chamber is where the indicator was measured (the Congress chamber, the last legislative chamber served
 -- in, or the chamber whose votes were counted), which can differ from the official's current office.
+-- detail is a lookup key as well as a caption: the frontend (SectionIdeology) matches each rpt_indicator_peers
+-- strip to its indicator row on (indicator, period, detail) and tells a member's two party-unity rows apart by
+-- the leading chamber key ("state_house: ..."). Keep the party-unity wording stable; fix other detail text only
+-- together with the frontend.
 with nominate as (
     select
         o.official_id,
@@ -13,8 +17,8 @@ with nominate as (
         case m.chamber when 'House' then 'us_house' else 'us_senate' end as chamber,
         m.nominate_dim1 as value,
         m.congress as period,
-        'Voteview DW-NOMINATE, ' || m.chamber || ' ' || {{ dbt.safe_cast('m.congress', dbt.type_string()) }}
-        || 'th Congress' as detail,
+        'Voteview DW-NOMINATE, ' || m.chamber || ' ' || {{ mogov.ordinal('m.congress') }}
+        || ' Congress' as detail,
         'https://voteview.com/person/' || {{ dbt.safe_cast('m.icpsr', dbt.type_string()) }} as source_url
     from {{ ref('dim_official') }} as o
     inner join {{ ref('stg_voteview__members') }} as m on o.bioguide_id = m.bioguide_id
