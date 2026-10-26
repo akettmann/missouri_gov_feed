@@ -56,8 +56,10 @@ Quirks:
   (`int_mo_house__member_identity`, seed `house_speakers`).
 - A member's seat is matched to an Open States person; when that fails the key is `mohouse:<member id>`.
   Open States also holds some people twice (after a redistricting or a move to the Senate). Both are
-  reconciled to one stable `official_id` per person by `int_officials__person_ids` (same exact name and no
-  conflicting seats; seed `official_id_links` for statewide officers and judges), #97.
+  reconciled to one stable `official_id` per person by `int_officials__person_ids` (same exact name, or names that differ only in the given
+  name like Steve/Steven or Ken/Kenneth (#228, #263), no conflicting seats, and
+  either overlapping dated terms in one seat or a chamber move (years alone cannot tell a duplicate record, Kenneth
+  Jamison's 2025 stub inside Ken's term, from a successor like Danielle after Dan Smith; dates can, using the dates exactly as Open States gives them: the January-1 adjustment used for year membership would make a January successor overlap a predecessor ending Jan 6-9. Known edge: `int_officials__identity_terms` collapses each (id, year, seat) to min(start)/max(end), spanning any gap if one id held the seat in two terms in a year); seed `official_id_links` for statewide officers and judges), #97.
 - The site asks clients not to poll its XML more than every 30 minutes. Cached copies keep it well
   under that.
 - Every shard reads every session zip to list the roll calls. In the October 2026 full run, two shards
@@ -571,7 +573,7 @@ Quirks:
   1900-01-01), so a seat counts from the member's first roster year in that chamber (House or Senate, each on its own) instead, and a by-name match of
   legislator pay is held to the years the member sat, unless nobody else holds the surname that year (a final
   check after a term, or earlier service Open States records as another person: Steve Roberts' 2017-20 House
-  pay stays his because the "Steven Roberts" record that held the seat has a fitting first name, #263). A payee whose
+  pay stays his because the "Steven" and "Steve" Roberts records are now one person, #263). A payee whose
   first name fits a member whose seat ended the December before, and who earned under half the year's top pay, is
   that member's final check and does not compete for the seats held now ("BLACK, LINDA R." 2017 beside Rusty
   Black's "BLACK, JAMES R"). In October 2026, 2025 pay

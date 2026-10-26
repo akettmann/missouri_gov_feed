@@ -118,6 +118,40 @@ unit_tests:
       rows:
         - {official_id: 'mohouse:2243', calendar_year: 2022, employee_name: 'VANSCHOIACK, DEAN A', match_confidence: high}
 
+  - name: salaries_pay_once_for_a_member_with_two_seat_rows_in_a_year
+    model: fct_salaries
+    description: >
+      One person with two Open States seat rows in the same year under spellings of the given name that differ
+      ("Ken" and "Kenneth" Jamison, joined to one person id by #263) is paid once: the pairing with the better
+      first-name fit is kept, so the row is high confidence and not duplicated.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2025, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'JAMISON, KENNETH L', last_name: JAMISON, first_names: KENNETH L, gross_pay: 39679.63}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_ken, full_name: Ken Jamison, surname_key: jamison, chamber: lower, start_date: '2025-01-01', end_date: '9999-12-31'}
+          - {person_id: p_ken, full_name: Kenneth Jamison, surname_key: jamison, chamber: lower, start_date: '2025-01-01', end_date: '2025-12-31'}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p_ken, office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows: *no_name_keys
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows: *no_years
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: p_ken, calendar_year: 2025, employee_name: 'JAMISON, KENNETH L', match_confidence: high}
+
   - name: salaries_pair_shared_surnames_by_first_name_fit
     model: fct_salaries
     description: >
