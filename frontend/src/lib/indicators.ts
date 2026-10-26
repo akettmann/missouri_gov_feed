@@ -73,6 +73,10 @@ export function indicatorMeta(key: string): IndicatorMeta {
   );
 }
 
+/** "Among 90 Missouri House members (2025):" lead of a peer strip's text summary */
+export const peerStripLead = (peerCount: number, where: string, period: string | number | null) =>
+  `Among ${plural(peerCount, `${where} member`, `${where} members`)}${period ? ` (${period})` : ""}:`;
+
 /** the party-line "breaks" sentence on a legislator's voting section */
 export const breaksText = (n: number) =>
   n === 0
