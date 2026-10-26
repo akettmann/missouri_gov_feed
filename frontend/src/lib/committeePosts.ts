@@ -1,11 +1,12 @@
 // House committee posts per official and session (fct_committee_posts for the counts, fct_committee_memberships
 // for the committee names). Pure helpers so the labels are tested on fixed rows.
+import { sessionLabel } from "./format.ts";
 
 /** One session's committee work for one member, as the profile shows it. */
 export interface CommitteeSession {
   session_code: string;
   session_year: number;
-  /** "2025 regular session" / "2025 extraordinary session (code 253)" */
+  /** the House's own name ("2025 Regular Session", "2025 1st Extraordinary Session"); "session code NNN" if unnamed */
   label: string;
   /** true for the newest session in the data, the newest session loaded */
   is_latest: boolean;
@@ -14,6 +15,8 @@ export interface CommitteeSession {
   /** titles held, in a fixed order: chair, co-chair, vice-chair, ranking minority member */
   titles: { position: string; committee: string; subcommittee: boolean }[];
   source_url: string;
+  /** a caveat about how this session's committees were sourced, or null */
+  note: string | null;
 }
 
 export interface PostCounts {
@@ -40,10 +43,13 @@ export const COMMITTEE_LIST_URL = "https://house.mo.gov/CommitteeList.aspx";
 
 const POSITION_ORDER = ["Chair", "Co-Chair", "Vice-Chair", "Ranking Minority Member"];
 
-/** Session codes are two-digit year plus a type digit: 1 regular, 2-4 extraordinary (docs/sources.md). */
-export function sessionLabel(code: string, year: number): string {
-  return code.endsWith("1") ? `${year} regular session` : `${year} extraordinary session (code ${code})`;
-}
+/**
+ * Sessions with no member pages take their committees from the House's committee list, which has no co-chair
+ * seats and (in 253) fewer committees than the neighbouring regular sessions: no Conference Committee on
+ * Budget, no property tax special committees.
+ */
+export const COMMITTEE_LIST_NOTE =
+  "Built from the House's committee list, because the House has no member pages for this session. The list carries no co-chair seats, so a co-chair title may be missing, and it can name fewer committees than the sessions around it.";
 
 export function positionLabel(position: string): string {
   return position === "Ranking Minority Member" ? "Ranking minority member" : position;
@@ -63,6 +69,10 @@ export function buildCommitteeSessions(
   memberships: TitledMembership[],
   env: Record<string, string | undefined> = {},
   log: (msg: string) => void = () => {},
+  /** House session names by session code (dim_house_session) */
+  names: ReadonlyMap<string, string> = new Map(),
+  /** session codes whose committees came from the committee list rather than member pages */
+  listSessions: ReadonlySet<string> = new Set(),
 ): Map<string, CommitteeSession[]> {
   const skip = skipCommitteePostsCheck(env);
   if (skip)
@@ -107,7 +117,7 @@ export function buildCommitteeSessions(
     const session: CommitteeSession = {
       session_code: p.session_code,
       session_year: p.session_year,
-      label: sessionLabel(p.session_code, p.session_year),
+      label: sessionLabel("state_house", p.session_code, names.get(p.session_code)),
       is_latest: p.session_code === latest,
       committees_held: p.committees_held,
       titles,
@@ -115,6 +125,7 @@ export function buildCommitteeSessions(
         p.session_code === latest
           ? COMMITTEE_LIST_URL
           : `https://documents.house.mo.gov/xml/${p.session_code}.zip`,
+      note: listSessions.has(p.session_code) ? COMMITTEE_LIST_NOTE : null,
     };
     out.set(p.official_id, [...(out.get(p.official_id) ?? []), session]);
   }

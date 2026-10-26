@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { sessionLabel } from "../src/lib/format.ts";
 import {
+  COMMITTEE_LIST_NOTE,
   COMMITTEE_LIST_URL,
   buildCommitteeSessions,
   positionLabel,
-  sessionLabel,
 } from "../src/lib/committeePosts.ts";
 
 const post = (official_id, session_code, extra = {}) => ({
@@ -26,9 +27,37 @@ const mem = (official_id, session_code, committee_name, position_name, is_subcom
   is_subcommittee,
 });
 
-test("session labels say regular or extraordinary and the year", () => {
-  assert.equal(sessionLabel("251", 2025), "2025 regular session");
-  assert.equal(sessionLabel("253", 2025), "2025 extraordinary session (code 253)");
+const NAMES = new Map([
+  ["251", "2025 Regular Session"],
+  ["253", "2025 1st Extraordinary Session"],
+  ["254", "2025 2nd Extraordinary Session"],
+]);
+
+test("House sessions are labelled with the House's own names, and a missing name is honest", () => {
+  assert.equal(sessionLabel("state_house", "253", NAMES.get("253")), "2025 1st Extraordinary Session");
+  assert.equal(sessionLabel("state_house", "261", undefined), "session code 261");
+  assert.equal(sessionLabel("state_house", "261", ""), "session code 261");
+});
+
+test("committee sessions are named from the names map; the committee list note shows only for list sessions", () => {
+  const out = buildCommitteeSessions(
+    [post("a", "251"), post("a", "253")],
+    [],
+    {},
+    () => {},
+    NAMES,
+    new Set(["253"]),
+  );
+  const [s253, s251] = out.get("a");
+  assert.equal(s253.label, "2025 1st Extraordinary Session");
+  assert.equal(s253.note, COMMITTEE_LIST_NOTE);
+  assert.equal(s251.label, "2025 Regular Session");
+  assert.equal(s251.note, null);
+});
+
+test("a session the House has not named is labelled by its code, never a guessed ordinal", () => {
+  const out = buildCommitteeSessions([post("a", "261")], []);
+  assert.equal(out.get("a")[0].label, "session code 261");
 });
 
 test("ranking minority member reads as words, the others as listed", () => {
@@ -66,7 +95,7 @@ test("titles are ordered chair, co-chair, vice-chair, ranking; subcommittees las
       "Chair|Budget Subcommittee on X|true",
     ],
   );
-  assert.equal(a[1].label, "2025 regular session");
+  assert.equal(a[1].label, "session code 251");
   assert.deepEqual(out.get("b")[0].titles, []);
 });
 

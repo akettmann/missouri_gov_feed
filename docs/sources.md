@@ -28,9 +28,11 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `wikidata` | Wikidata | past offices, occupations, employers, relatives and the organizations they lead | as edited | `MOGOV_CONTACT` |
 | `shor_mccarty` | Harvard Dataverse | state legislator ideology scores | 1993–2022 | |
 | `mo_employee_pay` | data.mo.gov State Employee Pay | yearly gross pay of legislators, statewide officials and state judges | `MOGOV_LOOKBACK_YEARS` (published from 2007) | |
+| `mo_sos_elections` | Missouri Secretary of State official returns | race results, margins, uncontested races, judicial retention votes | general and primary elections, Aug 2012 on | |
 | `mo_state_expenditures` | data.mo.gov State Expenditures | what each state agency paid each payee per fiscal year: legislators' per diem and mileage, payments to vendors | `MOGOV_LOOKBACK_YEARS` (fiscal years; published from 2000) | |
 | `census_tiger` | Census Bureau TIGER/Line | legislative and congressional district, county and city boundaries | newest vintage | |
 | `epa_frs` | EPA Facility Registry Service | regulated facilities (name, address, coordinates, NAICS, owner) placed in districts; businesses in each official's district that donated to them | current state file (refreshed every few months) | |
+| `mo_auditor` | Missouri State Auditor (auditor.mo.gov) | audit reports of state offices and agencies, counties, cities, courts and schools, with the Auditor's four-level performance rating | reports 1999 to now; ratings from 2012 | |
 | `census_zcta` | Census Bureau Gazetteer | ZIP code area centers and land areas (find-by-ZIP) | newest vintage | |
 
 ## mo_house: Missouri House of Representatives
@@ -49,6 +51,7 @@ Quirks:
 - Session codes are two-digit year plus type: `1` regular, `2`–`4` extraordinary. Unknown codes return
   HTTP 200 with an HTML page, not a 404. The loader probes all four types per year and treats HTML as
   "no such session".
+- Session names (`dim_house_session`): the last digit of a code does not say which extraordinary session it is (183 is the 2018 "Special Session", 184 its "1st Extraordinary Session", 253 and 254 the 2025 1st and 2nd). The `SESSIONLIST` file in every session zip carries the House's own names for the whole history, and the frontend labels sessions from it; the open regular session has no zip, so the loader fetches its `SessionList` directly. A session with no name yet shows as "session code NNN".
 - The open session has no zip yet, so the loader walks the list files and fetches per-member and
   per-bill XML.
 - Vote tokens are printed surnames, sometimes with a district ("SMITH 46"), plus "MR SPEAKER".
@@ -94,6 +97,7 @@ Quirks:
   snapshot is end-of-session, and the dbt marts keep only people in `dim_official`, so older sessions have
   few rows (9 officials in 2017, 151 in 2026). Committee names change between sessions. The metric counts
   full-committee chairs separately from subcommittee chairs.
+  The `COMMITTEELIST` lists carry no Co-Chair seats at all (2025 regular session: member pages show 3 co-chair posts the list lacks), and 253's list names fewer committees than 251 or 254 (no Conference Committee on Budget, 22 seats; neither of the two property tax special committees, 40 seats), so 253 shows 617 committee seats against 697 in 251 and 685 in 254. The joint committees are in the list. The profile says so under the 253 row.
 - Bill sponsorship success (share of a member's sponsored bills that passed) is not built yet: it needs the
   bill status from #34, which is in flight in another session.
 - PDF text extraction is cached by PDF content (`data/cache/pdftext/`). Before that, a re-run spent
@@ -581,6 +585,79 @@ Quirks:
 - The current year's dataset appears in January of the following year.
 - Federal officials (Congress, federal judges) are paid by the U.S. and are not in this source.
 
+## mo_sos_elections: Missouri Secretary of State official election returns
+
+Flow: [diagrams/sources/mo_sos_elections.svg](diagrams/sources/mo_sos_elections.svg)
+
+The Secretary of State's certified returns (https://www.sos.mo.gov/elections/results): one statewide "Grand
+Totals" PDF per general and primary election, as announced by the Board of State Canvassers. Each race lists
+its candidates with party, votes and percentage of votes, and "n of n Precincts Reported". Judicial retention
+(Supreme Court, Court of Appeals, and circuit judges under the nonpartisan plan) is a Yes Votes / No Votes pair per judge.
+Two marts come from it: `fct_election_races` (winner, runner-up, margin, uncontested flag, write-in share;
+serves the uncontested-wins award in #28) and `fct_judicial_retention` (Yes and No votes, Yes %).
+
+- Lands: `mo_sos_election_rows`, one row per printed PDF line: the PDF url, page and line, the verbatim text, a
+  structural `kind` (contest `header`, `candidate`, `total`, `party_total`, `other`), the contest's sequence number in
+  the PDF and, for candidate rows, the cells (name, party, votes, % as printed). Nothing is cleaned in Python; parsing
+  numbers, write-in flags and contest types is dbt (`stg_mo_sos_elections__*`).
+- Coverage: the 14 general and primary elections from August 2012 to November 2024 (7 generals, 7 primaries; about
+  17,700 lines). The election list is read from the results page on every run, so each new canvassed election is picked
+  up by re-running the loader. Not loaded: presidential preference primaries (a different layout with no party
+  column, party codes and "Last, First" names; the March 2020 PDF has no text layer at all), the single-district
+  special-election PDFs, the "Results by County" PDFs, the 1996-2011 results (a separate page, not verified), the
+  precinct files (sold by the Elections Division) and Election Night Reporting (`enr.sos.mo.gov`, JavaScript with no
+  downloads). The August 2026 primary is on Election Night Reporting only until its PDF is posted.
+- Terms: none stated on the site. The loader sends the project User-Agent, fetches one PDF at a time with a
+  2 second delay, and caches PDFs for good once an election is four months old (the newest is re-checked daily).
+- Shard units: elections (one PDF each); the PDFs are small (about 1 MB), so a full run takes about 90 seconds.
+
+Quirks:
+- Column positions, not text, separate the name from the party: the loader clusters words into lines and splits a
+  candidate row at the party column (left of the header's "Party" word minus 30 points). Names with commas or
+  suffixes ("Emanuel Cleaver, II", "John A. Hartwig, Jr.") stay whole.
+- A president/vice-president ticket wraps onto the next line in some years, so the running mate's last name can be
+  missing or on a separate `other` line ("Hillary Rodham Clinton, Timothy", then "Michael Kaine").
+- In a primary a contest lists every party's candidates with "Party Total" lines; percentages are within the party.
+  Each party's ballot is one race in `fct_election_races` (`race_party`), and "Total Votes" spans all parties.
+- A Court of Appeals header can list several judges (2014-2022), each a Yes row followed by a No row. `subcontest_seq`
+  counts the Yes rows. In 2022 the PDF prints a single "Total Votes" for four judges (the first judge's), so the
+  reconciliation test only compares contests with a total per judge.
+- Typos and layout losses in the PDFs, kept as printed: 2016 "No Votes 252,827 59.5" (the "%" lost; parsed), 2016
+  "No Votes 40.9%" (the vote count lost; the judge keeps the Yes figures and `no_votes` is null), and 2018 State
+  Representative District 66 prints its total on two lines ("10,376" and "Total Votes"). The 2014-2020 ballot
+  measures use an older layout ("Constitutional Amendment 1 Ballot Issue Yes: 499,581 Yes: 50.1%", then "No: 497,091
+  No: 49.9%"). The loader lands those lines unsplit (`kind = other`); `stg_mo_sos_elections__lines` recognises them and
+  gives them the same cells as the other years (#331).
+- 2014 primary Constitutional Amendment 1 (right to farm): the printed Yes 499,581 / No 497,091 lines are pre-recount
+  and uncertified. The certified recount gave Yes 499,963 / No 497,588, and the printed Total Votes 997,551 is the
+  recount total. A ballot-measure mart must not treat the staged Yes/No rows as certified for this measure. Amendment 9
+  on the same page (729,750 + 246,515 = 976,265, printed 976,267) is a 2-vote inconsistency in the PDF itself.
+- Candidate-less ballots: a Yes/No pair named like the contest title is a ballot measure (staged as
+  `contest_kind = 'ballot_issue'`, not in a mart); otherwise it is retention.
+- Uncontested means exactly one candidate on the ballot, write-ins not counted (a write-in with 19 votes does not
+  make the race contested). `write_in_share` carries the write-in votes for the 5% rule. In a primary it is per party
+  ballot. Races whose only entries are write-ins are dropped. Winner is the top vote getter; the PDFs do not print the
+  number of seats, so a vote-for-two race would show its second seat as the runner-up.
+- Margin is winner minus runner-up (write-ins excluded) in votes and in points of the race's total votes
+  (`margin_pct`), null when uncontested. Retention is `is_retained` when Yes votes exceed No votes (the printed Yes share above 50 where the No line is lost).
+- Links to officials: `winner_official_id` / `judge_official_id` are set only when the winner is a current official
+  with the same name in the same office and district (suffixes ignored, Supreme Court and Court of Appeals judges by
+  name); losers, former officials and circuit judges are unlinked. Officials who moved districts after redistricting
+  therefore do not link for older elections.
+- Checks: contest vote sums equal the PDF's printed totals where a total exists (3,481 of 3,486 contests and judges),
+  printed percentages sum to 100 within rounding, and figures copied from the 2024 general PDF (Governor, U.S.
+  Senator, State Representative districts 33 and 34, Broniec 63.1% and Gooch 62.2%) are asserted exactly.
+- Special elections on primary day: the 2014-08-05 primary PDF also holds three special elections for unexpired terms
+  (State Representative districts 67, 120 and 151, titled "..., unexpired"). They print no "Party Total" lines and
+  their percentages sum to 100 across the whole contest, so they are one race across parties (`race_party` is null),
+  not one uncontested race per party. A primary contest is split by party only when it prints Party Total lines
+  (`stg_mo_sos_elections__contests.has_party_totals`).
+- The 2020 general PDF's header reads "Unofficial Election Returns" even though it is the Secretary of State's
+  Grand Totals file for that election; the loader does not rely on the header.
+- A candidate or contest name that wraps onto a second PDF line can be cut off at the first line (the second line
+  is not rejoined). Examples: 2018 primary "William Christopher (Chris) McDonough", 2018 general "Martin Luther
+  Dzerzhinsky Lindstedt", and the 2020 header "Associate Circuit Judge - Circuit 22 - Div 24 & 29".
+
 ## mo_state_expenditures: Missouri state expenditures
 
 Flow: [diagrams/sources/mo_state_expenditures.svg](diagrams/sources/mo_state_expenditures.svg)
@@ -604,7 +681,8 @@ pairs the legislators with officials.
   include" its disclaimer: "The data made available here has been modified for use from its original source,
   which is the State of Missouri. THE STATE OF MISSOURI MAKES NO REPRESENTATIONS OR WARRANTY AS TO THE
   COMPLETENESS, ACCURACY, TIMELINESS, OR CONTENT OF ANY DATA MADE AVAILABLE THROUGH THIS SITE..." (full text on
-  that page). The site that shows this data, and the State Employee Pay data above, must carry that notice.
+  that page). The site that shows this data, and the State Employee Pay data above, must carry that notice;
+  the frontend footer (`Layout.astro`) carries it on every page.
 
 Quirks:
 - A row is one payee's annual total for one agency and detail line, not one payment. FY2023 `LEGISLATURE` has
@@ -741,3 +819,26 @@ Quirks:
 - Missouri Accountability Portal (mapyourtaxes.mo.gov, also the "State Expenditures" datasets on data.mo.gov)
   was checked for the same purpose and not used: its files have agency, category, vendor name (cut at 30
   characters) and amount per fiscal year, with no vendor address, and include employees' reimbursements.
+
+## mo_auditor: Missouri State Auditor audit reports
+
+Flow: [diagrams/sources/mo_auditor.svg](diagrams/sources/mo_auditor.svg)
+
+- Site: https://auditor.mo.gov/AuditReport/Reports, backed by the JSON list `/AuditReport/SearchAudits`. No auth. The loader
+  keeps to about 1 request a second.
+- Lands: `mo_auditor_reports` (the list rows verbatim plus `search_year`) and `mo_auditor_ratings` (the rating sentence read
+  from a PDF, with its url, page and extraction status). First full run: 3,494 reports (1999 to 2026), 1,125 PDFs read,
+  about 30 minutes.
+- Quirks:
+  - An unfiltered list call returns only the newest 1,000 rows, so the loader asks one year at a time and fails loudly if a
+    year ever reaches 1,000.
+  - The rating is not in the list. It is the sentence "In the areas audited, the overall performance of this entity was
+    Good." in the one-page Citizens Summary PDF (`citz_sum_fk`) or, when there is none, in the first pages of the full
+    report. pdfplumber sometimes splits a word of that sentence, so the match ignores spaces.
+  - Ratings start in 2012. Financial statements, monthly filing reports, follow-ups, property tax rate filings and
+    compilations are never rated and are not downloaded. Performance audits and special reports have no sentence (status
+    `no_rating_sentence`). A few 2012-2014 summaries left the template unfilled ("was XXXX"); staging gives them no rating
+    (`placeholder_rating`).
+  - The ratings cover only the areas audited. A county's rating is the county's, never one official's: only audits of a
+    statewide office (seed `mo_auditor_statewide_entities`) are linked to an officeholder, and then only to whoever held
+    the office on the release date ("in office when published", not "audited"), and only for current officials.

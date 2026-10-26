@@ -9,6 +9,7 @@ testing: Pytest
 linting: Ruff
 logging: Structlog
 metrics: Opentelemetry
+XML parsing: an XML parser (lxml), never regex or `mogov.xmljson`
 ## ETL
 DBT Core
 DuckDB backend
@@ -25,6 +26,7 @@ They will be:
 * Idempotent
 * Streaming
 * Make as few changes to the raw data as possible when writing it to the raw storage
+* XML sources: store each raw XML file unchanged in raw storage, and parse it (with an XML parser) into rows of the entities it contains, e.g. a document listing laws emits one row per law with that law's fields/attributes as columns
 * emit progress when reasonably knowable (don't add a lot of extra work here. Ask if you are unsure.)
 * be shardable, can spawn workers in parallel that split up the work independently (ensure the split mechanism is idempotent). Ideally use options `--shards` to indicate the max number of shards, and `--shard` to indicate that process's shard. If `--shards` is provided and `--shard` is not provided, the process should run a processpool of `--shards` number of workers
   * If it would require every worker to download the same file, don't use multiple workers until you have downloaded the file once, if the file then needs to be split, we can use multiple processes on that machine
@@ -53,10 +55,10 @@ Acceptable labels:
   `source: house_fd`, `source: senate_efd`, `source: courtlistener_bulk`, `source: courtlistener_case_bulk`,
   `source: courtlistener_cases`, `source: bluebook`, `source: openstates_people`, `source: congress_legislators`,
   `source: fjc_judges`, `source: wikidata`, `source: shor_mccarty`, `source: census_tiger`, `source: census_zcta`,
-  `source: mo_employee_pay`, `source: epa_frs`
+  `source: mo_employee_pay`, `source: epa_frs`, `source: mo_auditor`
 * Candidate sources (not loaded yet): `source: legiscan`, `source: followthemoney`, `source: osha_ita`,
   `source: mo_sos_business`, `source: mo_state_expenditures`, `source: govinfo_billstatus`, `source: house_sod`,
-  `source: house_cpf`, `source: mo_sos_elections`, `source: mo_auditor`, `source: census_acs`,
+  `source: house_cpf`, `source: mo_sos_elections`, `source: census_acs`,
   `source: uscourts_caseload`. When a candidate gets a loader, keep the label and update its description.
 
 Frontend issues follow the rules in docs/frontend_principles.md.

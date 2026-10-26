@@ -118,11 +118,23 @@ Missouri Ethics Commission exports (opt-in). Source: [sources/mec.puml](sources/
 
 ![mec](sources/mec.svg)
 
+### mo_auditor
+
+Missouri State Auditor audit reports and the performance rating printed in each report. Source: [sources/mo_auditor.puml](sources/mo_auditor.puml)
+
+![mo_auditor](sources/mo_auditor.svg)
+
 ### mo_employee_pay
 
 Missouri state payroll from data.mo.gov. Source: [sources/mo_employee_pay.puml](sources/mo_employee_pay.puml)
 
 ![mo_employee_pay](sources/mo_employee_pay.svg)
+
+### mo_sos_elections
+
+Missouri Secretary of State official election returns: race results, margins, uncontested races and judicial retention. Source: [sources/mo_sos_elections.puml](sources/mo_sos_elections.puml)
+
+![mo_sos_elections](sources/mo_sos_elections.svg)
 
 ### mo_house
 

@@ -9,8 +9,10 @@ import type { OfficialBundle } from "../lib/exports/types";
 import { districtSiteLists } from "../lib/exports/districtSites";
 import DonorLinks from "./DonorLinks.astro";
 import { donorEntries } from "../lib/donorLinks";
+import { sitesText } from "../lib/businessCounts";
 import { count, money } from "../lib/format";
 import { href } from "../lib/site";
+import { siteLinkContexts } from "../lib/siteLinkNames";
 
 interface Props {
   bundle: OfficialBundle;
@@ -25,6 +27,9 @@ const maxSites = Math.max(1, ...industries.filter((i) => i.sector_code).map((i) 
 // when every donor is a possible match, "Hide possible matches" would leave a bare table header
 const allPossible =
   (businesses?.donors.length ?? 0) > 0 && businesses?.donors.every((d) => d.match_confidence === "medium");
+// one distinct screen-reader name per EPA record link across the whole section
+const donorSites = (businesses?.donors ?? []).flatMap((d) => d.sites);
+const siteContext = new Map(siteLinkContexts(donorSites).map((c, i) => [donorSites[i], c] as const));
 const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : `${a}–${b}`);
 ---
 
@@ -35,7 +40,10 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
     represents, with the companies among them that gave this official campaign money listed first.{" "}
     <strong>This shows co-occurrence, not influence:</strong> companies often give to the officials who
     represent the places they operate.{" "}
-    <a href={href("/methodology/#district-businesses")}>How it's matched</a>.
+    <a href={href("/methodology/#district-businesses")}>
+      How it's matched<span class="sr-only"> for businesses in their area</span>
+    </a>
+    .
   </p>
   {businesses === null ? (
     <p class="muted small">
@@ -60,7 +68,7 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
       <h3>Companies here that gave to this official</h3>
       {businesses.donors.length === 0 ? (
         <p class="muted small">
-          None of the {count(totalSites)} sites matched a donor to this official by name or listed brand.
+          None of the {sitesText(totalSites)} matched a donor to this official by name or listed brand.
         </p>
       ) : (
         <>
@@ -115,7 +123,7 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
                                   same brand
                                 </span>
                               )}{" "}
-                              · <SourceLink url={s.frs_url} label="EPA record" />
+                              · <SourceLink url={s.frs_url} label="EPA record" context={siteContext.get(s)} />
                             </li>
                           ))}
                         </ul>
@@ -136,11 +144,11 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
           </div>
         </>
       )}
-      <h3>All {count(totalSites)} sites by industry</h3>
+      <h3>All {sitesText(totalSites)} by industry</h3>
       {siteList && (
         <p class="small">
-          <a href={href(`/districts/${siteList.slug}/sites/`)}>See all {count(siteList.n_sites)} sites</a>{" "}
-          (one page) or <a href={href(`/districts/${siteList.slug}/sites.csv`)}>download them as CSV</a>.
+          <a href={href(`/districts/${siteList.slug}/sites/`)}>See all {sitesText(siteList.n_sites)}</a> (one
+          page) or <a href={href(`/districts/${siteList.slug}/sites.csv`)}>download them as CSV</a>.
         </p>
       )}
       <p class="small muted">

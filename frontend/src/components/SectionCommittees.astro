@@ -22,8 +22,9 @@ const show = isHouse || (sessions?.length ?? 0) > 0;
     <p class="lede">
       Missouri House committees {isHouse ? "this member" : "this official"} served on in each session, and the
       chair, co-chair, vice-chair and ranking minority member titles held, as the House lists them. Our data
-      starts with the 2017 session, so earlier House service does not appear here. Subcommittee titles are
-      marked and are not counted in the committee total.
+      starts with the 2017 session, so earlier House service does not appear here. Titles held on
+      subcommittees are listed after the full committee titles, and subcommittees are not counted in the
+      committee total.
       {!isHouse &&
         " These are past posts from when this official served in the House; they hold no House committee seat now."}
     </p>
@@ -39,7 +40,8 @@ const show = isHouse || (sessions?.length ?? 0) > 0;
             <tr>
               <th scope="col">Session</th>
               <th scope="col">
-                Committees served on (incl. special, joint and conference committees; excl. subcommittees)
+                Committees served on (incl. special, joint and conference committees and task forces; excl.
+                subcommittees)
               </th>
               <th scope="col">Titles held</th>
               <th scope="col">Source</th>
@@ -51,6 +53,7 @@ const show = isHouse || (sessions?.length ?? 0) > 0;
                 <th scope="row" class="what">
                   {s.label}
                   {s.is_latest && <span class="muted small"> (newest session loaded)</span>}
+                  {s.note && <p class="muted small note">{s.note}</p>}
                 </th>
                 <td>{s.committees_held}</td>
                 <td class="what">
@@ -85,6 +88,10 @@ const show = isHouse || (sessions?.length ?? 0) > 0;
   .what {
     max-width: 52ch;
     text-align: left;
+    font-weight: normal;
+  }
+  .note {
+    margin: 0.25em 0 0;
     font-weight: normal;
   }
   .titles {

@@ -68,7 +68,8 @@ export function countDonors(groups: DistrictDonor[]): number {
   return minimal.length + uncovered.size;
 }
 
-const plural = (n: number, one: string, many: string) =>
+/** "1 case" / "2 cases", with thousands separators: use for any count followed by a noun. */
+export const plural = (n: number, one: string, many: string) =>
   `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
 export const sitesText = (n: number) => plural(n, "site", "sites");

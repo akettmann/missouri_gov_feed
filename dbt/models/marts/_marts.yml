@@ -225,6 +225,96 @@ models:
         data_type: varchar
         description: Which source this row came from (openstates, congress-legislators, fjc, wikidata, courtlistener, statewide_officials seed, Missouri Official Manual <edition>).
 
+  - name: fct_audit_reports
+    description: >
+      Missouri State Auditor reports (1999 to now) with the performance rating the Auditor printed in the report's
+      Citizens Summary: "In the areas audited, the overall performance of this entity was Good." The rating
+      covers only the areas audited, not the whole operation of the entity. Ratings exist from 2012 and only
+      for audits the Auditor rates (not performance audits, financial statements or follow-ups); rating_status says why a
+      row has none. Grain: one row per report. The officeholder is filled only for audits of a statewide office,
+      and is whoever held it on the release date (the audit may cover a predecessor's term). A county audit is never linked
+      to a person: the Auditor says a county's rating does not indicate the performance of any one elected official.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [report_number]
+    columns:
+      - name: report_number
+        data_type: varchar
+        description: Compact report number, year then sequence ("2018063").
+        data_tests: [not_null]
+      - name: report_number_display
+        data_type: varchar
+        description: Report number as the Auditor prints it ("2018-063").
+      - name: report_year
+        data_type: integer
+        description: Year in the report number.
+      - name: release_date
+        data_type: date
+        description: Date the report was released.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: "'1999-01-01'"
+                max_value: "current_date"
+      - name: title
+        data_type: varchar
+        description: Audited entity or subject, as the Auditor titles the report ("Scott County", "Office of State Treasurer").
+      - name: entity_type
+        data_type: varchar
+        description: "`statewide_office` (the audit of a statewide elected office), `county`, or `other` (state agencies, cities, courts, schools, statewide reports)."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [statewide_office, county, other]
+      - name: office
+        data_type: varchar
+        description: Key of the statewide office (as in statewide_officials) for `statewide_office` audits; null otherwise.
+      - name: rating
+        data_type: varchar
+        description: "Excellent, Good, Fair or Poor, as printed; null when the report has no rating."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [Excellent, Good, Fair, Poor]
+      - name: rating_level
+        data_type: integer
+        description: "Excellent 4, Good 3, Fair 2, Poor 1: orders the ratings. Null without a rating."
+      - name: rating_status
+        data_type: varchar
+        description: >
+          `ok` (rating read), `no_rating_sentence` (the PDF was read and the Auditor gave no rating, as in performance
+          audits), `not_read` (the loader opened no PDF: financial statements, monthly reports, follow-ups, reports
+          before 2012), `http_<code>` or `unreadable` (the PDF could not be fetched or parsed).
+        data_tests: [not_null]
+      - name: rating_sentence
+        data_type: varchar
+        description: The sentence the rating was read from, as extracted from the PDF text.
+      - name: rating_page
+        data_type: integer
+        description: Page of the PDF that sentence is on (1-based).
+      - name: rating_pdf_url
+        data_type: varchar
+        description: The PDF the rating was read from (Citizens Summary, or the full report where there is no summary).
+      - name: full_report_url
+        data_type: varchar
+        description: The full report PDF.
+      - name: citizens_summary_url
+        data_type: varchar
+        description: The one-page Citizens Summary PDF, where the Auditor published one.
+      - name: officeholder_at_release_id
+        data_type: varchar
+        description: "{{ doc('official_id') }} Holder of the audited statewide office on the release date, when a current official; null for any other audit."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: officeholder_at_release_name
+        data_type: varchar
+        description: full_name of that official.
+
   - name: fct_votes
     description: >
       Roll-call votes by current officials, including votes cast in earlier offices (e.g. a state senator's
@@ -1620,7 +1710,9 @@ models:
                 values: ['same name', 'same company']
       - name: donor_names
         data_type: varchar
-        description: The matched contributors as filed, separated by "; ", when is_donor.
+        description: >
+          The matched contributors as filed, separated by "; ", when is_donor. A ";" inside a filed name becomes a
+          comma, so "; " only ever separates two donors (#276).
       - name: donated_amount
         data_type: decimal(38,6)
         description: >
@@ -1658,6 +1750,234 @@ models:
       - name: frs_url
         data_type: varchar
         description: The facility's EPA FRS detail report.
+
+  - name: fct_election_races
+    description: >
+      One row per race in the Missouri Secretary of State's official election returns (statewide Grand Totals
+      PDFs for the general and primary elections of 2012 on): office, winner, runner-up, margin, and whether the
+      winner had no opponent. A primary race is one party's ballot (race_party), so a contested primary has one
+      row per party. Candidates are counted without write-ins; a race whose only entries are write-ins is not
+      listed. Winner is the candidate with the most votes (single-seat races; the PDFs do not print the number
+      of seats). Keyed by election and contest, not by official: former officials and losing candidates are
+      here too. Grain: one row per (election, contest, race party).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [election_key, contest_seq, race_party]
+    columns:
+      - name: election_key
+        data_type: varchar
+        description: "`<yyyy-mm-dd>-general` or `<yyyy-mm-dd>-primary`."
+        data_tests: [not_null]
+      - name: election_type
+        data_type: varchar
+        description: general or primary.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [general, primary]
+      - name: election_date
+        data_type: date
+        description: Election day.
+        data_tests: [not_null]
+      - name: contest_seq
+        data_type: integer
+        description: Position of the contest in its PDF (1 = first); with election_key it identifies the contest.
+      - name: race_party
+        data_type: varchar
+        description: The party whose primary ballot this is; null in general elections.
+      - name: contest_title
+        data_type: varchar
+        description: Contest as printed, without the precinct count, e.g. "State Representative - District 34".
+      - name: office
+        data_type: varchar
+        description: The title before the first " - " ("State Representative", "U.S. Senator", "Circuit Judge"...).
+        data_tests: [not_null]
+      - name: district
+        data_type: varchar
+        description: District number when the title has "District n"; null for statewide offices and judicial circuits.
+      - name: candidates
+        data_type: integer
+        description: Candidates on the ballot, write-ins not counted.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 30
+      - name: is_uncontested
+        data_type: boolean
+        description: >
+          Exactly one candidate on the ballot, write-ins not counted (a write-in with votes does not make a race
+          contested). In a primary this is per party ballot.
+        data_tests: [not_null]
+      - name: total_votes
+        data_type: bigint
+        description: Votes for all candidates including write-ins; the PDF's "Total Votes" (checked against it in a test).
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 6000000
+      - name: write_in_votes
+        data_type: bigint
+        description: Votes for the write-in candidates the SoS lists.
+      - name: write_in_share
+        data_type: decimal(5,2)
+        description: write_in_votes as a percentage of total_votes (points).
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: winner_name
+        data_type: varchar
+        description: Candidate with the most votes (write-ins excluded), as printed.
+        data_tests: [not_null]
+      - name: winner_party
+        data_type: varchar
+        description: Winner's party as printed.
+      - name: winner_votes
+        data_type: bigint
+        description: Winner's votes.
+      - name: winner_share
+        data_type: decimal(5,2)
+        description: Winner's votes as a percentage of total_votes (points).
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: runner_up_name
+        data_type: varchar
+        description: Candidate with the second most votes (write-ins excluded); null when uncontested.
+      - name: runner_up_party
+        data_type: varchar
+        description: Runner-up's party as printed.
+      - name: runner_up_votes
+        data_type: bigint
+        description: Runner-up's votes.
+      - name: margin_votes
+        data_type: bigint
+        description: winner_votes minus runner_up_votes; null when uncontested.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: margin_pct
+        data_type: decimal(5,2)
+        description: (winner_votes minus runner_up_votes) as a percentage of total_votes, in points; null when uncontested.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: precincts_reported
+        data_type: integer
+        description: Precincts reported, from the contest header.
+      - name: precincts_total
+        data_type: integer
+        description: Precincts in the contest.
+      - name: winner_official_id
+        data_type: varchar
+        description: >
+          The winner's official_id when the winner is a current official with the same name (suffixes ignored) in
+          the same office and district; null otherwise (former officials, losers, offices not tracked).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: source_url
+        data_type: varchar
+        description: The Grand Totals PDF the race was read from.
+
+  - name: fct_judicial_retention
+    description: >
+      One row per judge on a retention ballot in the Secretary of State's official returns (Supreme Court, Court
+      of Appeals, and the circuit and associate circuit judges under the nonpartisan plan; elections of 2012 on):
+      Yes and No votes and the printed Yes share. A judge is retained with a majority of Yes votes. Keyed by
+      election and contest. Grain: one row per (election, contest, judge).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [election_key, contest_seq, subcontest_seq]
+    columns:
+      - name: election_key
+        data_type: varchar
+        description: "`<yyyy-mm-dd>-general` or `<yyyy-mm-dd>-primary`."
+        data_tests: [not_null]
+      - name: election_type
+        data_type: varchar
+        description: general or primary.
+      - name: election_date
+        data_type: date
+        description: Election day.
+      - name: contest_seq
+        data_type: integer
+        description: Position of the contest header in its PDF.
+      - name: subcontest_seq
+        data_type: integer
+        description: Which judge under that header (1 = first); a Court of Appeals header lists several judges.
+      - name: contest_title
+        data_type: varchar
+        description: Contest as printed, e.g. "Court of Appeals - Western District".
+      - name: office
+        data_type: varchar
+        description: The title before the first " - " ("Missouri Supreme Court", "Court of Appeals", "Circuit Judge"...).
+      - name: judge_name
+        data_type: varchar
+        description: Judge as printed.
+        data_tests: [not_null]
+      - name: yes_votes
+        data_type: bigint
+        description: Votes to retain.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 6000000
+      - name: no_votes
+        data_type: bigint
+        description: Votes against; null where the PDF's No line lost its vote count (2016 only).
+      - name: yes_pct
+        data_type: decimal(5,1)
+        description: The printed percentage of Yes votes (points), the official figure.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: no_pct
+        data_type: decimal(5,1)
+        description: The printed percentage of No votes (points).
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: is_retained
+        data_type: boolean
+        description: More Yes than No votes (the printed Yes share above 50% when the No line is lost).
+      - name: precincts_reported
+        data_type: integer
+        description: Precincts reported, from the contest header.
+      - name: precincts_total
+        data_type: integer
+        description: Precincts in the contest.
+      - name: judge_official_id
+        data_type: varchar
+        description: >
+          The judge's official_id when they are a current Supreme Court or Court of Appeals judge with the same
+          name; null for circuit judges and former judges.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: source_url
+        data_type: varchar
+        description: The Grand Totals PDF the judge was read from.
 
   - name: fct_committee_memberships
     description: >
@@ -1707,6 +2027,45 @@ models:
           - accepted_values:
               arguments:
                 values: ['member_page', 'committee_list']
+
+  - name: dim_house_session
+    description: >
+      The House's own names for its legislative sessions ("2025 1st Extraordinary Session", "2018 Special
+      Session"), from the SESSIONLIST file in every House session zip. The code's last digit does not say which
+      extraordinary session it is, so the frontend labels sessions from this table. A session the House has not
+      listed yet (the open one before its first list is loaded) is absent: show the code, never guess a name.
+      Grain: one row per session.
+    columns:
+      - name: session_code
+        data_type: varchar
+        description: House session code (two-digit year plus a type digit), the key the other House models carry.
+        data_tests: [unique, not_null]
+      - name: session_name
+        data_type: varchar
+        description: The House's name for the session.
+        data_tests: [not_null]
+      - name: session_year
+        data_type: integer
+        description: Calendar year of the session.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 2000
+                max_value: 2100
+      - name: session_type
+        data_type: varchar
+        description: The House's type code (R regular, S1, S2 later sessions of the year).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['R', 'S1', 'S2', 'S3']
+      - name: general_assembly
+        data_type: varchar
+        description: General Assembly the session belongs to ("103rd General Assembly").
+      - name: session_of_general_assembly
+        data_type: varchar
+        description: Which session of that assembly it is ("1st Regular Session", "1st Special Session").
 
   - name: fct_committee_posts
     description: >

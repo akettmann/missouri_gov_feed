@@ -8,7 +8,7 @@
 -- tell overlap from succession. They are not the January-1 adjusted dates used for the year membership above:
 -- those would make a January successor (from Jan 1) overlap a predecessor Open States ends on Jan 6-9.
 -- Known edge: the min(start)/max(end) collapse per (alias_id, year, office, district) spans any gap if one id holds
--- the same seat in two separate terms in a year. Grain: one row per (alias_id, year, office, district).
+-- the same seat in two separate terms in a year.
 with years as (
     select distinct
         session_year as year,

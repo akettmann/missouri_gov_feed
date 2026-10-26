@@ -87,7 +87,10 @@ const tally = (yea: number | null, nay: number | null) => (yea == null ? "—" :
                           {v.measure && <strong>{v.measure}</strong>}
                           {v.measure && v.vote_description && " · "}
                           {v.vote_description}
-                          <span class="muted small"> ({sessionLabel(v.chamber, v.session_code)})</span>
+                          <span class="muted small">
+                            {" "}
+                            ({sessionLabel(v.chamber, v.session_code, v.session_name)})
+                          </span>
                         </td>
                         <td>{v.vote_cast}</td>
                         <td>{v.party_position}</td>

@@ -1,7 +1,7 @@
 // Side-by-side rows for the compare page, computed from two per-official bundles. Pure (runs in the browser).
 // Every row is one measured or published number; nothing is combined into a score.
 import { payPerVote, payPerVoteSources } from "./comparePay.ts";
-import { businessCounts, donorsText, sitesText } from "./businessCounts.ts";
+import { businessCounts, donorsText, plural, sitesText } from "./businessCounts.ts";
 import type { OfficialBundle } from "./exports/types";
 import { count, HIDE_UNLESS_AVAILABLE, money, pct, statusKind } from "./format.ts";
 import { indicatorMeta } from "./indicators.ts";
@@ -75,7 +75,7 @@ function giftCells(b: OfficialBundle, hideMedium: boolean): [string, string] {
     byPrincipal.set(r.lobbyist_principal, (byPrincipal.get(r.lobbyist_principal) ?? 0) + r.total_amount);
   const [top] = [...byPrincipal].sort((x, y) => y[1] - x[1]);
   const sample = b.gifts.sample ? " (sample data)" : "";
-  return [`${money(total)} in ${count(n)} gifts${sample}`, `${top[0]} (${money(top[1])})`];
+  return [`${money(total)} in ${plural(n, "gift", "gifts")}${sample}`, `${top[0]} (${money(top[1])})`];
 }
 
 export function compareRows(bundles: OfficialBundle[], hideMedium: boolean): CompareRow[] {

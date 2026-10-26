@@ -65,7 +65,7 @@ def _session_files(code: str, year: int) -> dict[str, bytes]:
         return {}  # no such session
     # Open regular session: no zip yet, walk the list files.
     files: dict[str, bytes] = {}
-    for kind in ("MemberList", "BillList", "SenateActList"):
+    for kind in ("MemberList", "BillList", "SenateActList", "SessionList"):
         try:
             listing = fetch(f"{BASE}/xml/{code}-{kind}.XML", delay=POLITE_DELAY)
         except Exception:

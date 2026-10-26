@@ -35,8 +35,14 @@ package "Boundaries" {
   [census_tiger] as L_tiger
   [census_zcta] as L_zcta
 }
+package "Elections" {
+  [mo_sos_elections] as L_sos
+}
 package "Businesses" {
   [epa_frs] as L_epa
+}
+package "Audits" {
+  [mo_auditor] as L_aud
 }
 package "Ratings" {
   [shor_mccarty] as L_sm
@@ -51,6 +57,7 @@ package "seeds" {
   [interest_keywords\nindustry_subjects] as S_interest
   [company_brands] as S_brands
   [naics_sectors] as S_naics
+  [mo_auditor_statewide_entities] as S_aud
   [donor_employer_placeholders] as S_empph
 }
 
@@ -69,11 +76,13 @@ package "intermediate (identity resolution)" {
   [int_courtlistener__mo_cases\nint_courtlistener__bulk_case_matches] as I_cases
   [int_officeholders__years] as I_years
   [int_epa_frs__facilities] as I_frs
+  [int_mo_auditor__reports] as I_aud
 }
 
 package "marts" {
   [dim_official] as dim
   [fct_salaries] as F_sal
+  [fct_election_races\nfct_judicial_retention] as F_elect
   [fct_legislator_expenses] as F_exp
   [fct_bills\nfct_bill_subjects\nfct_bill_sponsors\nfct_vote_bills] as F_bills
   [dim_district\nfct_official_districts] as D_dist
@@ -91,6 +100,7 @@ package "marts" {
   [official_profile] as profile
   [fct_district_facilities] as F_fac
   [fct_jurisdiction_businesses] as F_biz
+  [fct_audit_reports] as F_aud
 }
 
 package "reporting (frontend views)" {
@@ -179,6 +189,8 @@ F_cases --> profile
 L_tiger --> D_dist
 L_zcta --> D_zcta
 L_pay --> F_sal
+L_sos --> F_elect
+I_off --> F_elect
 L_exp --> F_exp
 F_sal --> F_exp
 I_seats --> F_sal
@@ -246,6 +258,10 @@ I_frs --> F_fac
 D_dist --> F_fac
 I_frs --> F_biz
 F_fac --> F_biz
+L_aud --> I_aud
+S_aud --> I_aud
+I_aud --> F_aud
+F_office --> F_aud
 D_dist --> F_biz
 F_money --> F_biz
 S_brands --> F_biz
