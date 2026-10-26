@@ -280,21 +280,33 @@ models:
     made the section: "(L. 1945 p. 1428 § 48, A.L. 2003 S.B. 299 & 40)" is enacted in 1945 (session-law page, no
     bill number) and amended in 2003 by SB 299 and SB 40 (combined); "merged with" joins bills that changed the
     same section in one session; "1st Ex. Sess." names an extraordinary session (the Revisor also prints "2d", "3d",
-    "4th", "1st.", "lst" and "Ex. Sess" without its last period). change is enacted (L.), amended (A.L., or "A."
-    in the 1949 revision''s notes) or repealed ("Repealed L."). Acts cited by page ("p. 1428") name no bill and
-    are left out. session_code follows the House XML codes: two-digit year, then 1 for the regular session. The
-    House numbers every special session (codes 2-4, in order), but the Revisor counts only extraordinary sessions
-    that passed bills: 2018''s legislature-called impeachment session (183, resolutions only) isn''t one, so the
-    Revisor''s 2018 "1st Ex. Sess." is House 184. So the Nth extraordinary session is the House''s session named
-    "Nth Extraordinary Session" (stg_mo_house__sessions); for years the House''s list lacks, N + 2 is assumed. A
-    combined act ("H.B. 115 & 99": one substitute that carries several bills'' subjects) names the bills after "&";
-    only the first, the lead bill (is_lead_bill), is the one that passed. The others stay as rows, with combined_into
-    naming the lead, because the act did take their subjects, but they never reached the governor themselves. Parse
-    bounds (macros/session_law_bounds.sql): a note is read up to 60 acts (longest real note: 43, RSMo 301.010),
-    an act up to 10 "merged with" bills (longest: 6) and 6 "&" bills (longest: 3). Parts past a bound would be dropped
-    silently, and notes list acts oldest first, so the newest acts would go; assert_session_law_bounds_not_exceeded
-    fails the build when real data needs more. Grain: one row per (RSMo section version, act, bill) a history or
-    repeal note names.'
+    "4th", "1st.", "lst", "First" ... "Fourth", and "Ex. Sess" without its last period). change is enacted (L.),
+    amended (A.L., or "A." in the 1949 revision''s notes) or repealed ("Repealed L."). Acts cited by page ("p. 1428")
+    name no bill and are left out. session_code follows the House XML codes: two-digit year, then 1 for the regular
+    session. The House numbers every special session (codes 2-4, in order), but the Revisor counts only extraordinary
+    sessions that passed bills: 2018''s legislature-called impeachment session (183, resolutions only) isn''t one,
+    so the Revisor''s 2018 "1st Ex. Sess." is House 184. So the Nth extraordinary session is the House''s session
+    named "Nth Extraordinary Session" (stg_mo_house__sessions); for years the House''s list lacks, N + 2 is assumed.
+    "Extraordinary Session" with no number (1997''s three "Repealed L." notes) is the year''s only numbered session
+    if the other notes name just one (1997: "2d"), else the 1st. A combined act ("H.B. 115 & 99": one substitute
+    that carries several bills'' subjects) names the bills after "&"; only the first, the lead bill (is_lead_bill),
+    is the one that passed. The others stay as rows, with combined_into naming the lead, because the act did take
+    their subjects, but they never reached the governor themselves. A bill after "&" may repeat its bill head ("H.B.
+    237 & H.B. 238 & H.B. 482", "H.B. 5 & S.B. 7"); a bare number takes the type of the bill before it ("H.B. 69
+    & 179 & H.B. 669"). "and" ("H.B. 1270 and H.B. 2032") is ambiguous: the Revisor uses it both for bills of one
+    combined act (2004 "S.B. 968 and S.B. 969" is one act, lead SB 968) and for separate acts ("H.B. 1606 and S.B.
+    743" in 2018, SB 743 also cited alone). A bill after "and" is its own lead bill only when the same year and
+    session cite it as the first bill of an act elsewhere (in any section''s notes); otherwise it is combined like
+    one after "&", into the lead bill of its group (every bill up to the next separate lead). The Revisor''s "H.B.
+    1268 & 1211 and S.B. 966" is HB1211 combined into HB1268, with SB966 a lead only if 2004 cites SB 966 on its
+    own somewhere. The older notes also list several bills of one act after commas ("A.L. 1978 H.B. 971, S.B. 628").
+    A piece that is only a bill ("S.B. 628", "merged with S.B. 5") continues the act before it (same year, session
+    and change), as long as only such pieces come between (or the act is just a year, "A.L. 1985, H.B. 366"); after
+    a page cite ("p. 509") or an RSMo piece there is no act to continue. Parse bounds (macros/session_law_bounds.sql):
+    a note is read up to 60 acts (longest real note: 43, RSMo 301.010), an act up to 10 "merged with" bills (longest:
+    6) and 6 "&"/"and" bills (longest: 4). Parts past a bound would be dropped silently, and notes list acts oldest
+    first, so the newest acts would go; assert_session_law_bounds_not_exceeded fails the build when real data needs
+    more. Grain: one row per (RSMo section version, act, bill) a history or repeal note names.'
 - name: int_mo_senate__votes
   description: 'MO Senate journal votes attributed to people: the senator serving on the vote date with a matching
     surname (and district, when the journal adds one to disambiguate). Ambiguous tokens stay unattributed. A two-word
