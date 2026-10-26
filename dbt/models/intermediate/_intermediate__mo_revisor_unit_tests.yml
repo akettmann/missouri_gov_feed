@@ -411,3 +411,31 @@ unit_tests:
         - {section_id: t.1, bill: HB1, act_year: 2000, change: amended}
         - {section_id: t.1, bill: SB2, act_year: 2001, change: enacted}
         - {section_id: t.1, bill: SB3, act_year: 2001, change: enacted}
+
+  - name: history_and_repeal_notes_on_one_section_version_are_parsed_apart
+    model: int_mo_revisor__session_law_bills
+    description: >
+      A contingent repeal puts a history note and a repeal note on the same section version (324.406/60569 is on both
+      Revisor pages). Each note is parsed on its own: the acts of one never take the other's act_index, so "and L."
+      inherits "repealed" only inside the repeal note and a continuation piece joins only its own note's act.
+    given:
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 'c.1' as section_id, 'c.1/1' as section_version_id, '(A.L. 2000 H.B. 1 and L. 2001 S.B. 2, S.B. 3)' as history_note
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select 'c.1' as section_id, 'c.1/1' as section_version_id, 'repealed' as change_kind, '(Repealed L. 2005 H.B. 5 and L. 2006 S.B. 6, S.B. 7)' as note
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: c.1, bill: HB1, act_year: 2000, change: amended}
+        - {section_id: c.1, bill: SB2, act_year: 2001, change: enacted}
+        - {section_id: c.1, bill: SB3, act_year: 2001, change: enacted}
+        - {section_id: c.1, bill: HB5, act_year: 2005, change: repealed}
+        - {section_id: c.1, bill: SB6, act_year: 2006, change: repealed}
+        - {section_id: c.1, bill: SB7, act_year: 2006, change: repealed}
