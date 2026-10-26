@@ -167,6 +167,15 @@ models:
     first name anywhere in the name ("Committee to Elect Caleb Rowden") never matches. When the MEC loader has run,
     its CF12 crosswalk (exact MECID<->candidate) should replace this. Grain: one row per (official, MEC committee)
     with a confidence label.'
+- name: int_mo_auditor__reports
+  description: 'State Auditor reports with their rating and the kind of entity audited. A report has a rating only
+    when its PDF carried the sentence "the overall performance of this entity was ..." (rating_status ''ok''); ''not_read''
+    means the loader never opened a PDF for it (financial statements, monthly filing reports, follow-ups, reports
+    before the 2012 summaries). rating_level orders the Auditor''s four levels (Excellent 4 ... Poor 1). entity_type:
+    ''statewide_office'' when the title starts with an audited statewide office (seed mo_auditor_statewide_entities),
+    ''county'' for a title ending in " County", else ''other'' (state agencies, cities, courts, schools, districts,
+    statewide reports). Only a statewide office is ever linked to an officeholder. Grain: one row per State Auditor
+    report, with its rating and audited entity type.'
 - name: int_mo_house__committee_memberships
   description: 'House committee and subcommittee memberships per member and session, keyed to the person (person_key
     from int_mo_house__member_identity). The member pages (stg_mo_house__member_committees) cover every session

@@ -32,6 +32,7 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `mo_state_expenditures` | data.mo.gov State Expenditures | what each state agency paid each payee per fiscal year: legislators' per diem and mileage, payments to vendors | `MOGOV_LOOKBACK_YEARS` (fiscal years; published from 2000) | |
 | `census_tiger` | Census Bureau TIGER/Line | legislative and congressional district, county and city boundaries | newest vintage | |
 | `epa_frs` | EPA Facility Registry Service | regulated facilities (name, address, coordinates, NAICS, owner) placed in districts; businesses in each official's district that donated to them | current state file (refreshed every few months) | |
+| `mo_auditor` | Missouri State Auditor (auditor.mo.gov) | audit reports of state offices and agencies, counties, cities, courts and schools, with the Auditor's four-level performance rating | reports 1999 to now; ratings from 2012 | |
 | `census_zcta` | Census Bureau Gazetteer | ZIP code area centers and land areas (find-by-ZIP) | newest vintage | |
 
 ## mo_house: Missouri House of Representatives
@@ -674,7 +675,8 @@ pairs the legislators with officials.
   include" its disclaimer: "The data made available here has been modified for use from its original source,
   which is the State of Missouri. THE STATE OF MISSOURI MAKES NO REPRESENTATIONS OR WARRANTY AS TO THE
   COMPLETENESS, ACCURACY, TIMELINESS, OR CONTENT OF ANY DATA MADE AVAILABLE THROUGH THIS SITE..." (full text on
-  that page). The site that shows this data, and the State Employee Pay data above, must carry that notice.
+  that page). The site that shows this data, and the State Employee Pay data above, must carry that notice;
+  the frontend footer (`Layout.astro`) carries it on every page.
 
 Quirks:
 - A row is one payee's annual total for one agency and detail line, not one payment. FY2023 `LEGISLATURE` has
@@ -811,3 +813,26 @@ Quirks:
 - Missouri Accountability Portal (mapyourtaxes.mo.gov, also the "State Expenditures" datasets on data.mo.gov)
   was checked for the same purpose and not used: its files have agency, category, vendor name (cut at 30
   characters) and amount per fiscal year, with no vendor address, and include employees' reimbursements.
+
+## mo_auditor: Missouri State Auditor audit reports
+
+Flow: [diagrams/sources/mo_auditor.svg](diagrams/sources/mo_auditor.svg)
+
+- Site: https://auditor.mo.gov/AuditReport/Reports, backed by the JSON list `/AuditReport/SearchAudits`. No auth. The loader
+  keeps to about 1 request a second.
+- Lands: `mo_auditor_reports` (the list rows verbatim plus `search_year`) and `mo_auditor_ratings` (the rating sentence read
+  from a PDF, with its url, page and extraction status). First full run: 3,494 reports (1999 to 2026), 1,125 PDFs read,
+  about 30 minutes.
+- Quirks:
+  - An unfiltered list call returns only the newest 1,000 rows, so the loader asks one year at a time and fails loudly if a
+    year ever reaches 1,000.
+  - The rating is not in the list. It is the sentence "In the areas audited, the overall performance of this entity was
+    Good." in the one-page Citizens Summary PDF (`citz_sum_fk`) or, when there is none, in the first pages of the full
+    report. pdfplumber sometimes splits a word of that sentence, so the match ignores spaces.
+  - Ratings start in 2012. Financial statements, monthly filing reports, follow-ups, property tax rate filings and
+    compilations are never rated and are not downloaded. Performance audits and special reports have no sentence (status
+    `no_rating_sentence`). A few 2012-2014 summaries left the template unfilled ("was XXXX"); staging gives them no rating
+    (`placeholder_rating`).
+  - The ratings cover only the areas audited. A county's rating is the county's, never one official's: only audits of a
+    statewide office (seed `mo_auditor_statewide_entities`) are linked to an officeholder, and then only to whoever held
+    the office on the release date ("in office when published", not "audited"), and only for current officials.
