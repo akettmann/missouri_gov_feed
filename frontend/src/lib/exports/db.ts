@@ -2,7 +2,13 @@
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
-import { assertNoMissingColumns, REEXPORT_COMMANDS, REQUIRED_COLUMNS } from "./requiredColumns.ts";
+import {
+  assertNoMissingColumns,
+  assertNoMissingTables,
+  missingExportMessage,
+  REEXPORT_COMMANDS,
+  REQUIRED_COLUMNS,
+} from "./requiredColumns.ts";
 
 /** MOGOV_EXPORTS overrides the default `<repo>/data/exports`; builds run from frontend/ (pnpm scripts). */
 export const EXPORTS_DIR = path.resolve(
@@ -48,8 +54,9 @@ function exportColumns(table: string): Promise<string[]> {
   return cols;
 }
 
-/** Fails with a re-export message when an export that exists lacks columns REQUIRED_COLUMNS declares. */
+/** Fails with a re-export message when an export that exists lacks columns REQUIRED_COLUMNS declares or a sibling table REQUIRED_TABLES names. */
 async function assertExportsCurrent(tables: string[]): Promise<void> {
+  assertNoMissingTables(tables, hasExport);
   const actual: Record<string, string[]> = {};
   for (const t of tables) if (t in REQUIRED_COLUMNS && hasExport(t)) actual[t] = await exportColumns(t);
   assertNoMissingColumns(actual);
@@ -65,7 +72,7 @@ export async function query<T>(sql: string, params?: (string | number)[]): Promi
   await assertExportsCurrent(used);
   const resolved = sql.replace(/\{(\w+)\}/g, (_, t: string) => {
     if (!hasExport(t)) {
-      throw new Error(`missing export ${exportPath(t)}; run \`uv run mogov export --format parquet\``);
+      throw new Error(missingExportMessage(exportPath(t)));
     }
     return `read_parquet('${exportPath(t)}')`;
   });

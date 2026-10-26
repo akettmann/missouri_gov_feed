@@ -1,6 +1,8 @@
 -- EPA FRS text is decoded in staging (#398): no name, address or city may still hold an HTML entity such as
--- "&AMP;" or "&#39;". A row here means a new entity appeared in an EPA file; add it to mogov.decode_registry_entities.
-{% set entity = '&#?[A-Za-z0-9]{1,10};' %}
+-- "&AMP;" or "&#39;". The pattern matches known entity shapes only (case-sensitive, so each case is listed), so
+-- text like "AT&T;" is not flagged. A row here: check the match is really an entity, then add it to
+-- mogov.decode_registry_entities and to the pattern below.
+{% set entity = '&(#[0-9]{1,5}|amp|AMP|quot|QUOT|lt|LT|gt|GT|apos|nbsp|NBSP);' %}
 
 select
     'facilities' as model,
