@@ -24,14 +24,16 @@ unit_tests:
     model: stg_mo_auditor__ratings
     description: >
       The rating word lands as the loader read it from the sentence; staging title-cases it so "GOOD" and "Good"
-      count as one level. A PDF with no rating sentence keeps its row with a null rating.
+      count as one level. A PDF with no rating sentence keeps its row with a null rating, and so does a template left unfilled ("was XXXX"), with status placeholder_rating.
     given:
       - input: source('mo_auditor', 'ratings')
         format: sql
         rows: |
             select cast('{"report_number": "2018063", "source_kind": "citizens_summary", "pdf_url": "p1", "status": "ok", "rating_sentence": "In the areas audited, the overall performance of this entity was GOOD.", "rating_word": "GOOD", "page": 1, "n_sentences": 1}' as varchar) as payload union all
-            select cast('{"report_number": "2018001", "source_kind": "citizens_summary", "pdf_url": "p2", "status": "no_rating_sentence", "rating_sentence": null, "rating_word": null, "page": null, "n_sentences": 0}' as varchar) as payload
+            select cast('{"report_number": "2018001", "source_kind": "citizens_summary", "pdf_url": "p2", "status": "no_rating_sentence", "rating_sentence": null, "rating_word": null, "page": null, "n_sentences": 0}' as varchar) as payload union all
+            select cast('{"report_number": "2012021", "source_kind": "citizens_summary", "pdf_url": "p3", "status": "ok", "rating_sentence": "In the areas audited, the overall performance of this entity was XXXX.", "rating_word": "XXXX", "page": 1, "n_sentences": 1}' as varchar) as payload
     expect:
       rows:
         - {report_number: '2018063', rating: Good, extraction_status: ok, page: 1, pdf_url: p1}
         - {report_number: '2018001', rating: null, extraction_status: no_rating_sentence, page: null, pdf_url: p2}
+        - {report_number: '2012021', rating: null, extraction_status: placeholder_rating, page: 1, pdf_url: p3}

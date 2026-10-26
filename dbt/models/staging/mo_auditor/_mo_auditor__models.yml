@@ -33,6 +33,7 @@ models:
           values:
           - ok
           - no_rating_sentence
+          - placeholder_rating
         config:
           severity: warn
   - name: n_rating_sentences

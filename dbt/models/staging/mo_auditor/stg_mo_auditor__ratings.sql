@@ -19,9 +19,16 @@ select
     report_number,
     source_kind,
     pdf_url,
-    extraction_status,
+    case
+        when extraction_status = 'ok' and lower(rating_word) not in ('excellent', 'good', 'fair', 'poor')
+            then 'placeholder_rating'
+        else extraction_status
+    end as extraction_status,
     rating_sentence,
-    {{ mogov.title_case('lower(rating_word)') }} as rating,
+    case
+        when lower(rating_word) in ('excellent', 'good', 'fair', 'poor')
+            then {{ mogov.title_case('lower(rating_word)') }}
+    end as rating,
     page,
     n_rating_sentences
 from src
