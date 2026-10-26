@@ -10,16 +10,32 @@
 -- gives them (DATE; end 9999-12-31 while open; null for House roster rows, which carry only a year), so a rule can
 -- tell overlap from succession. They are not the January-1 adjusted dates used for the year membership above:
 -- those would make a January successor (from Jan 1) overlap a predecessor Open States ends on Jan 6-9.
+-- The year before the first roster year is included too (Open States seat-terms only), so a member whose seat ended the
+-- December before the roster begins still has evidence to be joined by (#504).
 -- Known edge: the min(start)/max(end) collapse per (alias_id, year, office, district) spans any gap if one id holds
 -- the same seat in two separate terms in a year.
-with years as (
-    select distinct
-        session_year as year,
-        {{ dbt.safe_cast(dbt.concat([dbt.safe_cast('session_year', dbt.type_string()), "'-01-15'"]), 'date') }}
-            as handover_date,
-        {{ dbt.safe_cast(dbt.concat([dbt.safe_cast('session_year', dbt.type_string()), "'-12-31'"]), 'date') }}
-            as year_end
+with roster_years as (
+    select distinct session_year as year
     from {{ ref('int_mo_house__member_seat_keys') }}
+),
+
+-- the roster years plus the year before the first one: a member whose seat ended the December before the first
+-- roster (Stephen Webber, House to 2016-12-31, Senate from 2025) would otherwise leave no evidence at all and keep
+-- an id of his own, apart from every later id (#504). Only Open States seat-terms count in that year.
+all_years as (
+    select year from roster_years
+    union
+    select min(year) - 1 as year from roster_years
+),
+
+years as (
+    select
+        year,
+        {{ dbt.safe_cast(dbt.concat([dbt.safe_cast('year', dbt.type_string()), "'-01-15'"]), 'date') }}
+            as handover_date,
+        {{ dbt.safe_cast(dbt.concat([dbt.safe_cast('year', dbt.type_string()), "'-12-31'"]), 'date') }}
+            as year_end
+    from all_years
 ),
 
 house_terms as (
