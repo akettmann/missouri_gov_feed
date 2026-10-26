@@ -32,15 +32,15 @@ donors as (
                     replace(
                         replace(
                             min(coalesce(nullif(trim(counterparty_organization), ''), counterparty)),
-                            chr(31),
+                            {{ mogov.chr(31) }},
                             ' '
                         ),
-                        chr(13) || chr(10),
+                        {{ mogov.chr(13) }} || {{ mogov.chr(10) }},
                         ' '
                     ),
-                    chr(13), ' '
+                    {{ mogov.chr(13) }}, ' '
                 ),
-                chr(10), ' '
+                {{ mogov.chr(10) }}, ' '
             )
         ) as donor_name,
         sum(amount) as amount,
@@ -155,7 +155,7 @@ facility_links as (
     select
         official_id,
         registry_id,
-        {{ dbt.listagg("source_url || ' ' || donor_name", "chr(10)", 'order by donor_name, source_url') }}
+        {{ dbt.listagg("source_url || ' ' || donor_name", mogov.chr(10), 'order by donor_name, source_url') }}
             as donor_links
     from links
     group by official_id, registry_id
@@ -166,7 +166,7 @@ per_facility as (
         official_id,
         registry_id,
         case when max(by_name) = 1 then 'same name' else 'same company' end as matched_by,
-        {{ dbt.listagg('donor_name', "chr(31)", 'order by donor_name') }} as donor_name_list,
+        {{ dbt.listagg('donor_name', mogov.chr(31), 'order by donor_name') }} as donor_name_list,
         sum(amount) as donated_amount,
         sum(n_contributions) as n_contributions,
         min(first_year) as first_year,
