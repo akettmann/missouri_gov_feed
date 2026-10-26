@@ -2,17 +2,19 @@
 -- NAICS code each. The owner is the first owner-role organization (owner/operator, owner, operator,
 -- permittee; a known org_type before UNKNOWN, then name, then org_type alphabetically (a stable key, not a
 -- ranking of types), then program record, so tied names pick the same row every build, #386); the NAICS
--- code is the code most of the facility's programs give,
--- taking the programs' primary codes first (naics_source 'naics'), then the ones FRS leaves UNKNOWN
+-- code is the code the most program systems give (program_system: RCRAINFO, NPDES, AIR, ... each counts once
+-- per code however many records it has, so a duplicated NPDES permit or an air record listed twice adds nothing;
+-- AIR and AIRS/AFS are different systems and count separately), taking the programs' primary
+-- codes first (naics_source 'naics'), then the ones FRS leaves UNKNOWN
 -- ('naics_unknown'), then the ones it calls SECONDARY ('naics_secondary'). Only a facility with no NAICS code
--- at all but a SIC code (a primary one before an unknown or secondary one, then the one most programs give)
+-- at all but a SIC code (a primary one before an unknown or secondary one, then the one the most program systems give)
 -- gets the NAICS sector that SIC code's major group falls in (seed sic_naics_sectors): naics_code is then the
 -- two-digit sector prefix, naics_description names the sector and the SIC code, and naics_source is 'sic'.
 -- naics_source is null when the facility has no usable code. A real NAICS code, even a non-primary one, is
 -- more precise than a two-digit SIC-derived sector, and agrees with it on the sector for about 90% of facilities.
--- Codes tied on tier and program count go to the one in the SIC-derived sector (NAICS 31-33 count as one
+-- Codes tied on tier and program-system count go to the one in the SIC-derived sector (NAICS 31-33 count as one
 -- sector), then the lowest code. The SIC sector counts only as a signal when the SIC code is not itself tied
--- (same tier and program count) with a SIC code in a different sector, and is not SIC 1629 (construction
+-- (same tier and program-system count) with a SIC code in a different sector, and is not SIC 1629 (construction
 -- stormwater-permit noise).
 -- is_government: a federal site, any owner-role organization typed as a government body
 -- (municipal, county, state, federal, district, tribal), or a facility or owner named like one ("City of ...",
@@ -93,7 +95,7 @@ sic as (
         sic_code,
         max(sic_description) as sic_description,
         min(case when is_primary then 0 when is_secondary then 2 else 1 end) as rank_class,
-        count(*) as n_programs
+        count(distinct coalesce(program_system, '')) as n_program_systems
     from {{ ref('stg_epa_frs__sic') }}
     where sic_code is not null
     group by registry_id, sic_code
@@ -105,7 +107,7 @@ sic_prefixes as (
         s.sic_code,
         s.sic_description,
         s.rank_class,
-        s.n_programs,
+        s.n_program_systems,
         m.naics_prefix,
         row_number() over (partition by s.registry_id, s.sic_code order by length(m.sic_prefix) desc) as rn
     from sic as s
@@ -119,7 +121,7 @@ sic_sectors as (
         sp.sic_description,
         sp.naics_prefix,
         sp.rank_class,
-        sp.n_programs,
+        sp.n_program_systems,
         sec.sector_code
     from sic_prefixes as sp
     left join {{ ref('naics_sectors') }} as sec on sp.naics_prefix = sec.naics_prefix
@@ -136,10 +138,10 @@ primary_sic as (
         -- SIC codes tied on tier and program count that fall in different sectors: the lowest-code tie-break
         -- picked the SIC code, so its sector is no evidence of the facility's industry (#181)
         (
-            min(sector_code) over (partition by registry_id, rank_class, n_programs)
-            != max(sector_code) over (partition by registry_id, rank_class, n_programs)
+            min(sector_code) over (partition by registry_id, rank_class, n_program_systems)
+            != max(sector_code) over (partition by registry_id, rank_class, n_program_systems)
         ) as sic_is_tied_across_sectors,
-        row_number() over (partition by registry_id order by rank_class asc, n_programs desc, sic_code asc) as rn
+        row_number() over (partition by registry_id order by rank_class asc, n_program_systems desc, sic_code asc) as rn
     from sic_sectors
 ),
 
@@ -149,7 +151,7 @@ naics as (
         naics_code,
         max(naics_description) as naics_description,
         case when is_primary then 0 when is_secondary then 2 else 1 end as rank_class,
-        count(*) as n_programs
+        count(distinct coalesce(program_system, '')) as n_program_systems
     from {{ ref('stg_epa_frs__naics') }}
     where naics_code is not null
     group by registry_id, naics_code, case when is_primary then 0 when is_secondary then 2 else 1 end
@@ -165,7 +167,7 @@ best_naics as (
             partition by n.registry_id
             order by
                 n.rank_class asc,
-                n.n_programs desc,
+                n.n_program_systems desc,
                 -- among tied codes, the one in the sector the facility's SIC code maps to (#181); no signal from
                 -- SIC 1629 (construction stormwater-permit noise) or a SIC code tied across sectors
                 case
