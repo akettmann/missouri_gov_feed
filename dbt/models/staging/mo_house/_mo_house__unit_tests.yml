@@ -190,7 +190,8 @@ unit_tests:
       session must print its General Assembly and an EXTRAORDINARY or SPECIAL label, whose ordinal is not
       compared (173 prints SPECIAL, 184 prints FIRST EXTRAORDINARY). The five misfiled PDFs of the issue are
       the "drop" rows (171 SPECIAL, 201 FIRST EXTRAORDINARY, 204 SECOND REGULAR); the wrong General Assembly
-      and the wrong regular ordinal are dropped too. A row with no header text is kept. A label that is not recognised ("VETO SESSION") is kept too, so the accepted_values test on header_session_label fails loudly instead of rows vanishing. Ignoring the
+      and the wrong regular ordinal are dropped too. A row with no header text is kept. A label that is not recognised ("VETO SESSION") is kept too, under a regular (201) or a non-regular (204) session code, so the
+      accepted_values test on header_session_label fails loudly instead of rows vanishing. Ignoring the
       General Assembly, ignoring the label, or comparing the extraordinary ordinal fails this test.
     given:
       - input: source('mo_house', 'rollcalls')
@@ -208,6 +209,7 @@ unit_tests:
             select '{"url": "drop_204_regular", "session_code": "204", "session_day": "3", "rollcall_number": "2", "vote_date": "11/19/2020", "text": "UNOFFICIAL COPY 100th General Assembly\n   SECOND REGULAR SESSION\n State of Missouri"}' union all
             select '{"url": "keep_204_second", "session_code": "204", "session_day": "3", "rollcall_number": "4", "vote_date": "11/10/2020", "text": "UNOFFICIAL COPY 100th General Assembly\n   SECOND EXTRAORDINARY SESSION\n State of Missouri"}' union all
             select '{"url": "keep_unknown_label", "session_code": "201", "session_day": "13", "rollcall_number": "1", "vote_date": "9/16/2020", "text": "UNOFFICIAL COPY 100th General Assembly\n   VETO SESSION\n State of Missouri"}' union all
+            select '{"url": "keep_unknown_label_204", "session_code": "204", "session_day": "5", "rollcall_number": "1", "vote_date": "11/12/2020", "text": "UNOFFICIAL COPY 100th General Assembly\n   VETO SESSION\n State of Missouri"}' union all
             select '{"url": "keep_no_text", "session_code": "211", "session_day": "1", "rollcall_number": "1", "vote_date": "1/6/2021"}'
     expect:
       rows:
@@ -218,6 +220,7 @@ unit_tests:
         - {rollcall_url: keep_181, header_general_assembly: 99, header_session_label: SECOND REGULAR SESSION}
         - {rollcall_url: keep_204_second, header_general_assembly: 100, header_session_label: SECOND EXTRAORDINARY SESSION}
         - {rollcall_url: keep_unknown_label, header_general_assembly: 100, header_session_label: VETO SESSION}
+        - {rollcall_url: keep_unknown_label_204, header_general_assembly: 100, header_session_label: VETO SESSION}
         - {rollcall_url: keep_no_text, header_general_assembly: null, header_session_label: null}
 
   - name: house_rollcalls_published_twice_under_one_key_keep_one_pdf
