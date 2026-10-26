@@ -16,12 +16,12 @@
 -- two-digit sector prefix, naics_description names the sector and the SIC code, and naics_source is 'sic'.
 -- naics_source is null when the facility has no usable code. A real NAICS code, even a non-primary one, is
 -- more precise than a two-digit SIC-derived sector, and agrees with it on the sector for about 90% of facilities.
--- Codes tied on tier and program-system count go to the one more program systems give across ALL tiers (the
+-- Codes tied on tier and program-system count: any other code first, before the construction stormwater-permit
+-- noise code NAICS 238910 (a site holds that permit beside its real industry, and an MO-DNR UNKNOWN row mirrors
+-- it, which would win the all-tier count, #432); then the one more program systems give across ALL tiers (the
 -- same count over primary, unknown and secondary rows; the UNKNOWN-tier rows usually back the right code, #432),
--- then the one in the SIC-derived sector (NAICS 31-33 count as one
--- sector), then any other code before the construction stormwater-permit noise codes (NAICS 238910, SIC 1629;
--- a site holds that permit beside its real industry, #432), then a 6-digit code before a shorter one, then the
--- lowest code. The SIC sector counts only as
+-- then the one in the SIC-derived sector (NAICS 31-33 count as one sector), then a 6-digit code before a shorter
+-- one, then the lowest code. The SIC sector counts only as
 -- a signal when the SIC code is not itself tied (same tier and program-system count) with a SIC code in a
 -- different sector, and is not SIC 1629 (construction stormwater-permit noise).
 -- is_government: a federal site, any owner-role organization typed as a government body
@@ -237,6 +237,8 @@ best_naics as (
             order by
                 n.rank_class asc,
                 n.n_program_systems desc,
+                -- 238910 (the construction stormwater permit) loses ties to a real industry (#432), ahead of the
+                -- all-tier count: an MO-DNR UNKNOWN row mirrors the permit and would otherwise give it more systems
                 case when n.naics_code = '238910' then 1 else 0 end asc,
                 allt.n_systems_all_tiers desc,
                 -- among tied codes, the one in the sector the facility's SIC code maps to (#181); no signal from
@@ -249,8 +251,8 @@ best_naics as (
                         then 0
                     else 1
                 end asc,
-                -- then NAICS 238910 (site preparation, the construction stormwater permit) loses ties to a
-                -- real industry (#432); other construction codes are real industries
+                -- NAICS 238910 again (no effect after the demotion above; kept as the original tie-break). Other
+                -- construction codes are real industries
                 case when n.naics_code = '238910' then 1 else 0 end asc,
                 -- a full 6-digit code before a truncated one, then the code order
                 length(n.naics_code) desc,
