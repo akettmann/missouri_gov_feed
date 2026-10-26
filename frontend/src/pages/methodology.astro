@@ -71,12 +71,13 @@ const tables = freshness();
       When a Missouri committee gives to an official, the Missouri Ethics Commission records the giver by name
       only, with no committee ID. To show who funds that committee, its name is matched to the names Missouri
       committees file under, trying in order: a short list of known alternate names (acronyms such as HRCC or
-      AMECPAC), each checked by matching gifts reported under that name to the committee's own filings; a
-      committee ID written into the name; the same name, ignoring case, punctuation and spacing; the name with
-      common abbreviations spelled out ("MO" as Missouri, "Assn" as Association); and the name without words
-      like PAC, Political Action Committee or Fund (or a short name the filer put in parentheses). A committee
-      only counts if it was active within a year of the gift, and only when exactly one committee fits. When
-      several do, no link is made.
+      AMECPAC), each group checked against the committee's filings or its own filed name; a committee ID
+      written into the name; the same name, ignoring case, with punctuation read as a space and runs of spaces
+      collapsed ("Health PAC" and "HealthPAC" still differ); the name with common abbreviations spelled out
+      ("MO" as Missouri, "Assn" as Association); and the name without words like PAC, Political Action
+      Committee or Fund (or a short name the filer put in parentheses). A committee only counts if it was
+      active within a year of the gift, and only when exactly one committee fits. When several do, no link is
+      made.
     </p>
     <p>
       About 71% of the committee-to-committee dollars on record match one Missouri committee this way. Most of
@@ -307,11 +308,12 @@ const tables = freshness();
     </p>
     <p>
       A site is tied to a donor when a non-individual contributor's name equals the site's, its owner's or its
-      parent company's after dropping case, punctuation, a leading "the" and words like Inc, LLC and Corp, or
-      when both names carry a brand from a short hand-checked list of large companies (so "Ameren Missouri
-      PAC" ties to a "UNION ELECTRIC CO" substation). A company that gives under another name is missed, and
-      the amount shown is everything those donors gave the official, not money tied to one site. A company
-      giving to the official for the area it operates in is <strong>co-occurrence, not influence</strong>.
+      parent company's, ignoring case, with punctuation read as a space, a leading "the" and words like Inc,
+      LLC and Corp dropped, or when both names carry a brand from a short hand-checked list of large companies
+      (so "Ameren Missouri PAC" ties to a "UNION ELECTRIC CO" substation). A company that gives under another
+      name is missed, and the amount shown is everything those donors gave the official, not money tied to one
+      site. A company giving to the official for the area it operates in is{" "}
+      <strong>co-occurrence, not influence</strong>.
     </p>
   </section>
 

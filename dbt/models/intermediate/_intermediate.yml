@@ -8,14 +8,21 @@ models:
     Senate bills that never reached the House have no row. status   the furthest stage the actions record: introduced,
     in committee, reported do pass, perfected, passed one chamber, passed both chambers, truly agreed, then signed
     / signed with line-item vetoes / vetoed / veto overridden; resolutions: adopted. withdrawn and defeated when
-    the bill stopped there. outcome  enacted (signed, line-item vetoed, veto overridden, or truly agreed and delivered
-    to the Secretary of State without a signature), vetoed, sent to voters (truly agreed joint resolutions), adopted
-    (resolutions), awaiting governor (truly agreed this year, no governor action yet), no governor action recorded
-    (truly agreed in an earlier year, but the export lists no governor action; Senate bills'' lists can stop at
-    the speaker''s signature), pending (session still open), failed (session over without passing). A session is
-    over once its year has ended; a regular session also once June starts (it adjourns in mid-May) and an extraordinary
-    session 30 days after its last action. var as_of_date pins "today" (unit tests). Grain: one row per (session,
-    bill) in the House XML export, House and Senate bills.'
+    the bill stopped there. relisted for governor message when every recorded action is the governor''s Art. IV,
+    s. 27 message (the budget/withholding message). These are not new bills: the House relists the previous regular
+    session''s appropriation bills (same bill number, bill string and effective date; LR numbers from 241 on) under
+    the new session, only to record that message. The real history, and the outcome, live on the original row; relisted_from_session_code
+    names its session. outcome  null for relisted for governor message; otherwise enacted (signed, line-item vetoed,
+    veto overridden, or truly agreed and delivered to the Secretary of State without a signature), vetoed, sent
+    to voters (truly agreed joint resolutions), adopted (resolutions), awaiting governor (truly agreed this year,
+    no governor action yet), no governor action recorded (truly agreed in an earlier year, but the export lists
+    no governor action; Senate bills'' lists can stop at the speaker''s signature), pending (session still open),
+    failed (session over without passing). relisted_from_session_code  for a relisting, the previous regular session
+    whose bill (same number and bill string) it repeats; null for other bills, and for a relisting whose original
+    isn''t loaded (2017''s 15 repeat the 2016 session, 161). A session is over once its year has ended; a regular
+    session also once June starts (it adjourns in mid-May) and an extraordinary session 30 days after its last action.
+    var as_of_date pins "today" (unit tests). Grain: one row per (session, bill) in the House XML export, House
+    and Senate bills.'
 - name: int_bills__subjects
   description: 'Subject index terms per bill from both chambers'' indexes. A House bill keeps the House XML''s own
     terms (2024 sessions on); the Senate topical index fills in House bills without them (earlier sessions, when
@@ -144,23 +151,24 @@ models:
   description: 'Name -> MECID crosswalk for committee donors. MEC records a committee-to-committee gift with the
     donor''s name only (the row''s MECID is the receiving committee), so the donor''s own MECID is found by matching
     that name to the names committees file under (int_mec__committee_names), in tiers: curated alias      a curated
-    donor name -> MECID list (committee_donor_aliases seed), each alias checked against the committee''s own filings,
-    for acronym and shortened names no rule can expand ("HRCC", "AMECPAC", "MHA PAC", #33); each row cites its evidence.
-    Tried first, but only counts when that committee was active that year 0 mecid in name    the filer typed the
-    donor''s MECID into the name ("... (MEC ID# C221962)") and it''s a known committee; taken whatever its active
-    years 1 same name        name_key: case ignored; punctuation and other non-alphanumeric characters turned into
-    spaces; runs of spaces collapsed, not removed (#108) 2 normalized name  committee_key: abbreviations spelled
-    out (MO, Assn, Cmte...), "the/of/for/inc" dropped 3 core name        committee_core_key: also without words
-    like PAC, Political, Action, Committee, Fund, Account, at least 4 characters; also tried on the name outside
-    parentheses, and against a filer''s own parenthesized short name ("Carpenters Help in the Political Process
-    (CHIPP)" -> CHIPP) A candidate counts only if it was active within a year of the gift (first_active_year - 1
-    .. last_active_year + 1). The lowest tier with an active candidate decides: one candidate -> matched, several
+    donor name -> MECID list (committee_donor_aliases seed), each alias group checked against the committee''s filings
+    or its own filed name, for acronym and shortened names no rule can expand ("HRCC", "AMECPAC", "MHA PAC", #33);
+    each row cites its evidence. Tried first, but only counts when that committee was active that year 0 mecid in
+    name    the filer typed the donor''s MECID into the name ("... (MEC ID# C221962)") and it''s a known committee;
+    taken whatever its active years 1 same name        name_key: case ignored; punctuation and other non-alphanumeric
+    characters turned into spaces; runs of spaces collapsed, not removed (#108) 2 normalized name  committee_key:
+    abbreviations spelled out (MO, Assn, Cmte...), "the/of/for/inc" dropped 3 core name        committee_core_key:
+    also without words like PAC, Political, Action, Committee, Fund, Account, at least 4 characters; also tried
+    on the name outside parentheses, and against a filer''s own parenthesized short name ("Carpenters Help in the
+    Political Process (CHIPP)" -> CHIPP) A candidate counts only if it was active within a year of the gift (first_active_year
+    - 1 .. last_active_year + 1). The lowest tier with an active candidate decides: one candidate -> matched, several
     -> ambiguous (no MECID; the candidates are listed). Names that only match committees active in other years are
     "not active that year" (usually an older or newer committee under the same name), the rest "no match" (mostly
     federal and out-of-state PACs, which don''t file with MEC). One-character names ("C", "~") are placeholders
-    (#31): "placeholder name", never matched. match_confidence: high for curated aliases and tiers 0-1 (the alias
-    was matched to the committee''s own filings, or the name is the committee''s own), medium for the looser tiers;
-    either way it rests on the name. Grain: one row per (donor committee name as reported, contribution year).'
+    (#31): "placeholder name", never matched. match_confidence: high for curated aliases and tiers 0-1 (each alias
+    group was checked against the committee''s filings or its own filed name; some spellings rest on their group),
+    medium for the looser tiers; either way it rests on the name. Grain: one row per (donor committee name as reported,
+    contribution year).'
   data_tests:
   - dbt_utils.unique_combination_of_columns:
       arguments:
@@ -338,16 +346,18 @@ models:
     or follow each other within a year in a different chamber (a move, as Roberts went House to Senate). Overlap
     alone is not enough: Open States often leaves a member who left mid-term with the normal term end, so a special-election
     successor overlaps on paper (Silvey to 2018-12-31, Lauren Arthur from 2018-09-12, SD17). The shared-seat case
-    also needs one term to sit inside the other, or both to start the same day. Years alone cannot decide the shared-seat
-    case: Kenneth Jamison (2025 only) inside Ken Jamison (2025-26) is a duplicate, but Danielle Smith (2019 only,
-    or 2026 only after a special election) inside a Dan Smith successor''s span looks the same by year. Dates tell
-    them apart: Kenneth''s term is a stub that overlaps Ken''s, while a successor''s term starts on or after the
-    predecessor''s ends. Undated House-roster rows prove no overlap. A name left with more than one partner (a chain
-    or a fork) is ambiguous and joins nothing. 3. otherwise the id is its own person, basis = self. Among merged
-    ids the person_id is an Open States id over mohouse:, then the one whose service ends latest, then the smaller
-    id. The choice never looks at the latest roster year, so an official''s id does not change when they leave office.
-    Curated rows (official_id_links) take effect only once a maintainer has signed them off (checked_by filled).
-    Grain: one row per id a legislator has been given, with the stable person_id.'
+    also needs one term to be a stub (under 90 days) inside the other, starting within 31 days of it; equal or nested
+    multi-year terms do not qualify (Open States'' placeholder 2013-01-01 starts, #332). Years alone cannot decide
+    the shared-seat case: Kenneth Jamison (2025 only) inside Ken Jamison (2025-26) is a duplicate, but Danielle
+    Smith (2019 only, or 2026 only after a special election) inside a Dan Smith successor''s span looks the same
+    by year. Dates tell them apart: Kenneth''s term is a 26-day stub that overlaps Ken''s, while a successor''s
+    term starts on or after the predecessor''s ends (or is no stub). Undated House-roster rows prove no overlap.
+    A name left with more than one partner (a chain or a fork) is ambiguous and joins nothing. 3. otherwise the
+    id is its own person, basis = self. Among merged ids the person_id is an Open States id over mohouse:, then
+    the one whose service ends latest, then the smaller id. The choice never looks at the latest roster year, so
+    an official''s id does not change when they leave office. Curated rows (official_id_links) take effect only
+    once a maintainer has signed them off (checked_by filled). Grain: one row per id a legislator has been given,
+    with the stable person_id.'
 - name: int_officials__wikidata
   description: 'Wikidata QID per official: from roster cross-references when present, else a unique exact name match
     against living Missouri officeholders on Wikidata. Grain: one row per official with a Wikidata QID.'
