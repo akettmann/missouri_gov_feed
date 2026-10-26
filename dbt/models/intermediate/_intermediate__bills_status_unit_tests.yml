@@ -8,12 +8,29 @@ unit_tests:
       status is the furthest stage reached and outcome follows from it, with "today" pinned to 2026-10-25 (the
       2026 regular session is over). A Senate bill in the House's list has passed the Senate. A truly agreed bill
       with no governor action is awaiting the governor in its own year, and "no governor action recorded" later
-      (the House list can stop at the speaker's signature), never "failed". An extraordinary session with an action
+      (the House list can stop at the speaker's signature), never "failed". A bill whose only action is the
+      governor's Art. IV s.27 message is a re-listing of the prior regular session's appropriation bill: status
+      "relisted for governor message" and a null outcome (the real outcome lives on the original row), not
+      "introduced"/"failed". relisted_from_session_code names the original's session only for a regular-session
+      relisting whose original is loaded with the same bill number and bill string: 241 HB1 links to 231; 241 HB2
+      does not (its bill string differs); 171 HB2001 does not (161 isn't loaded); 243 HB1 (a special session, code
+      not ending in 1) does not, though 231 HB1 has the same bill string. The same message after a signing
+      (211 HB16) changes nothing. An extraordinary session with an action
       in the last 30 days is still pending.
     overrides:
       vars:
         as_of_date: '2026-10-25'
     given:
+      - input: ref('stg_mo_house__bills')
+        format: sql
+        rows: |
+            select '231' as session_code, 'HB1' as bill, 'HCS HB 1' as current_bill_string union all
+            select '241', 'HB1', 'HCS HB 1' union all
+            select '231', 'HB2', 'HCS HB 2' union all
+            select '241', 'HB2', 'CCS HCS HB 2' union all
+            select '171', 'HB2001', 'HCS HB 2001' union all
+            select '211', 'HB16', 'HB 16' union all
+            select '243', 'HB1', 'HCS HB 1'
       - input: ref('stg_mo_house__bill_actions')
         format: sql
         rows: |
@@ -37,19 +54,30 @@ unit_tests:
             select '251', 'HB10', 'house_bill_list', cast('2025-05-14' as date), 'Truly Agreed To and Finally Passed' union all
             select '251', 'HB10', 'house_bill_list', cast('2025-07-14' as date), 'Delivered to Secretary of State (G)' union all
             select '263', 'HB1', 'house_bill_list', cast('2026-10-20' as date), 'Referred: Rules - Legislative(H)' union all
-            select '261', 'HB11', 'house_bill_list', cast('2026-02-01' as date), 'Withdrawn (H)'
+            select '261', 'HB11', 'house_bill_list', cast('2026-02-01' as date), 'Withdrawn (H)' union all
+            select '241', 'HB1', 'house_bill_list', cast('2023-12-27' as date), 'Message Received from the Governor, pursuant to Article IV, Section 27' union all
+            select '241', 'HB2', 'house_bill_list', cast('2023-12-27' as date), 'Message Received from the Governor, pursuant to Article IV, Section 27' union all
+            select '243', 'HB1', 'house_bill_list', cast('2024-01-05' as date), 'Message Received from the Governor, pursuant to Article IV, Section 27' union all
+            select '171', 'HB2001', 'house_bill_list', cast('2016-12-28' as date), 'Message Received from the Governor, pursuant to Article IV, Section 27' union all
+            select '211', 'HB16', 'house_bill_list', cast('2021-02-11' as date), 'Approved by Governor (G)' union all
+            select '211', 'HB16', 'house_bill_list', cast('2021-04-21' as date), 'Message Received from the Governor, pursuant to Article IV, Section 27'
     expect:
       rows:
-        - {session_code: '261', bill: HB1, status: in committee, outcome: failed}
-        - {session_code: '261', bill: HB2, status: signed, outcome: enacted}
-        - {session_code: '261', bill: HB3, status: vetoed, outcome: vetoed}
-        - {session_code: '261', bill: HB4, status: veto overridden, outcome: enacted}
-        - {session_code: '261', bill: HB5, status: signed with line-item vetoes, outcome: enacted}
-        - {session_code: '261', bill: HJR6, status: truly agreed, outcome: sent to voters}
-        - {session_code: '261', bill: HR7, status: adopted, outcome: adopted}
-        - {session_code: '261', bill: HB8, status: passed one chamber, outcome: failed}
-        - {session_code: '261', bill: SB9, status: truly agreed, outcome: awaiting governor}
-        - {session_code: '241', bill: SB727, status: truly agreed, outcome: no governor action recorded}
-        - {session_code: '251', bill: HB10, status: truly agreed, outcome: enacted}
-        - {session_code: '263', bill: HB1, status: in committee, outcome: pending}
-        - {session_code: '261', bill: HB11, status: withdrawn, outcome: failed}
+        - {session_code: '261', bill: HB1, status: in committee, outcome: failed, relisted_from_session_code: null}
+        - {session_code: '261', bill: HB2, status: signed, outcome: enacted, relisted_from_session_code: null}
+        - {session_code: '261', bill: HB3, status: vetoed, outcome: vetoed, relisted_from_session_code: null}
+        - {session_code: '261', bill: HB4, status: veto overridden, outcome: enacted, relisted_from_session_code: null}
+        - {session_code: '261', bill: HB5, status: signed with line-item vetoes, outcome: enacted, relisted_from_session_code: null}
+        - {session_code: '261', bill: HJR6, status: truly agreed, outcome: sent to voters, relisted_from_session_code: null}
+        - {session_code: '261', bill: HR7, status: adopted, outcome: adopted, relisted_from_session_code: null}
+        - {session_code: '261', bill: HB8, status: passed one chamber, outcome: failed, relisted_from_session_code: null}
+        - {session_code: '261', bill: SB9, status: truly agreed, outcome: awaiting governor, relisted_from_session_code: null}
+        - {session_code: '241', bill: SB727, status: truly agreed, outcome: no governor action recorded, relisted_from_session_code: null}
+        - {session_code: '251', bill: HB10, status: truly agreed, outcome: enacted, relisted_from_session_code: null}
+        - {session_code: '263', bill: HB1, status: in committee, outcome: pending, relisted_from_session_code: null}
+        - {session_code: '261', bill: HB11, status: withdrawn, outcome: failed, relisted_from_session_code: null}
+        - {session_code: '241', bill: HB1, status: relisted for governor message, outcome: null, relisted_from_session_code: '231'}
+        - {session_code: '241', bill: HB2, status: relisted for governor message, outcome: null, relisted_from_session_code: null}
+        - {session_code: '243', bill: HB1, status: relisted for governor message, outcome: null, relisted_from_session_code: null}
+        - {session_code: '171', bill: HB2001, status: relisted for governor message, outcome: null, relisted_from_session_code: null}
+        - {session_code: '211', bill: HB16, status: signed, outcome: enacted, relisted_from_session_code: null}

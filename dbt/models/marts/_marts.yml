@@ -1299,6 +1299,8 @@ models:
       Missouri bills and resolutions per session. House bills from the House XML export (titles, current version,
       last action); Senate bills from the Senate topical index (its one-line description as short_title; the other
       House-only columns are null). `subjects` holds the subject index terms, "; "-separated (fct_bill_subjects).
+      Each regular session also has 15 to 17 relistings of the previous session's appropriation bills (status
+      "relisted for governor message"): not new bills, so leave them out of per-session bill counts.
       Grain: one row per (session, bill).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
@@ -1335,25 +1337,36 @@ models:
           The furthest stage the House XML's actions record (int_bills__status): introduced, in committee, reported
           do pass, perfected, passed one chamber, passed both chambers, truly agreed, signed, signed with line-item
           vetoes, vetoed, veto overridden; adopted for resolutions; withdrawn or defeated when the bill stopped
-          there. Null for Senate bills that never reached the House, which means every Senate bill before 2024:
-          the House's Senate-bill list (SENATEACTLIST) exists only for 2024 and later.
+          there. relisted for governor message: a re-listing, not a new bill. The House relists the previous
+          regular session's appropriation bills (same number and bill string, e.g. 2024 HB 1, the FY2024 budget
+          bill of the 2023 session) only to record the governor's Art. IV, s. 27 message, which is their only
+          action; 15 to 17 per regular session, 2017 to 2026 (143 in all), none in 2021. Their outcome is null: it
+          is on the original row (relisted_from_session_code). Null for Senate bills that never reached the
+          House, which means every Senate bill before 2024: the House's Senate-bill list (SENATEACTLIST) exists
+          only for 2024 and later.
         data_tests:
           - accepted_values:
               arguments:
                 values: [introduced, in committee, reported do pass, perfected, passed one chamber,
                   passed both chambers, truly agreed, signed, signed with line-item vetoes, vetoed, veto overridden,
-                  adopted, withdrawn, defeated]
+                  adopted, withdrawn, defeated, relisted for governor message]
       - name: outcome
         data_type: varchar
         description: >
           enacted, vetoed, sent to voters (joint resolutions), adopted (resolutions), awaiting governor, no governor
           action recorded (truly agreed, but the export stops before the governor), pending (session still open),
-          failed (session over without passing). Null with status.
+          failed (session over without passing). Null with status, and for relisted bills (read the original's).
         data_tests:
           - accepted_values:
               arguments:
                 values: [enacted, vetoed, sent to voters, adopted, awaiting governor, no governor action recorded,
                   pending, failed]
+      - name: relisted_from_session_code
+        data_type: varchar
+        description: >
+          For a relisted bill, the previous regular session code (e.g. 231 for 241) whose bill with the same number and
+          bill string it repeats; the original's status and outcome are on that row. Null for every other bill, and
+          for relistings whose original session isn't loaded (2017's 15 repeat 161).
       - name: proposed_effective_date
         data_type: date
         description: Proposed effective date.
@@ -2253,9 +2266,10 @@ models:
     description: >
       House committee and subcommittee memberships per official and session, with the member's position (Chair,
       Vice-Chair, Co-Chair, Ranking Minority Member, Member). An end-of-session snapshot from the House member
-      pages (every session since 2017 but 253) and the COMMITTEELIST export for 253. Former members who are not
-      in dim_official are left out. Committee names change across sessions, so compare a committee by name only
-      within a session. Grain: one row per (official, session, committee).
+      pages (every session since 2017 but 253) and the COMMITTEELIST export for 253. Former members are kept:
+      official_id is the person id, and is_current_official says whether that person is in dim_official (only
+      current officials have a profile page). Committee names change across sessions, so compare a committee by
+      name only within a session. Grain: one row per (person, session, committee).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -2297,6 +2311,21 @@ models:
           - accepted_values:
               arguments:
                 values: ['member_page', 'committee_list']
+      - name: source_url
+        data_type: varchar
+        description: >
+          The House file this row was read from, as the loader fetched it: the session zip for a closed session,
+          the member's own XML file (documents.house.mo.gov/xml/261-072.xml) for the open one, the COMMITTEELIST
+          file's zip for session 253.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "like 'https://documents.house.mo.gov/xml/%'"
+      - name: is_current_official
+        data_type: boolean
+        description: True when official_id is in dim_official (a current official with a profile page).
+        data_tests: [not_null]
 
   - name: dim_house_session
     description: >
@@ -2342,7 +2371,8 @@ models:
       Committee posts held per official and House session, counted from the House's own committee lists: full
       committees served on, and the titles held on them (chair, vice-chair, co-chair, ranking minority member).
       Subcommittees are counted apart (subcommittee_chair_posts) so chairing several subcommittees is not shown as
-      chairing several committees. A count of titles, not a score. Grain: one row per (official, session).
+      chairing several committees. A count of titles, not a score. Former members are kept (is_current_official).
+      Grain: one row per (person, session).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -2361,6 +2391,16 @@ models:
       - name: session_year
         data_type: integer
         description: Calendar year of the session.
+      - name: is_current_official
+        data_type: boolean
+        description: True when official_id is in dim_official (a current official with a profile page).
+        data_tests: [not_null]
+      - name: source_url
+        data_type: varchar
+        description: >
+          The House file the member's rows were read from (the session zip, or the member's own XML file for the
+          open session). If a person held two House member files in one session, one of them.
+        data_tests: [not_null]
       - name: committees_held
         data_type: bigint
         description: Full (non-sub) committees the member served on.

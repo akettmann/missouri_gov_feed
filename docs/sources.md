@@ -130,10 +130,13 @@ Quirks:
   Member, Member), in every session from 2017 except 253, whose pages list none. For 253 the
   `COMMITTEELIST` list (memberships only for 231, 241, 251, 253 and 254) fills in, matched on district.
   `COMMITTEELIST` also lists Senate members (chamber `S`) and a few `N/A` rows; only `H` is used. The
-  snapshot is end-of-session, and the dbt marts keep only people in `dim_official`, so older sessions have
-  few rows (9 officials in 2017, 151 in 2026). Committee names change between sessions. The metric counts
+  snapshot is end-of-session. The marts keep former members too (368 people, 14,678 rows; 191 people and 7,939
+  rows are not in `dim_official`): `is_current_official` flags who has a profile page, and the frontend ships
+  only those. Each row's `source_url` is the House file it came from, taken from `mo_house_xml_files`: the
+  session zip for a closed session, the member's own XML file (`.../xml/261-072.xml`) for the open one. A
+  file inside a zip has no address of its own. Committee names change between sessions. The metric counts
   full-committee chairs separately from subcommittee chairs.
-  The `COMMITTEELIST` lists carry no Co-Chair seats at all (2025 regular session: member pages show 3 co-chair posts the list lacks), and 253's list names fewer committees than 251 or 254 (no Conference Committee on Budget, 22 seats; neither of the two property tax special committees, 40 seats), so 253 shows 617 committee seats against 697 in 251 and 685 in 254. The joint committees are in the list. The profile says so under the 253 row.
+  The `COMMITTEELIST` lists carry no Co-Chair seats at all (2025 regular session: member pages show 3 co-chair posts the list lacks), and 253's list names fewer committees than 251 or 254 (no Conference Committee on Budget, 22 seats; neither of the two property tax special committees, 40 seats), so 253 shows 617 committee seats against 697 in 251 and 685 in 254. The joint committees are in the list. The profile says so under the 253 row. Re-checked against the typed XML raw (2026-10): no other landed file carries 253 co-chair seats. The 253 member pages have no `Committees` element at all, `UPCOMINGHEARINGLIST` names only a committee's chair, and bill files carry no committee roles. The House does not publish them in the exports, so the gap is accepted and not inferred from 251 or 254 (co-chairs of a joint committee are not guaranteed to carry over); 251 and 254 co-chair posts come from the member pages (3 in 251, 2 in 254).
 - Bill sponsorship success (share of a member's sponsored bills that passed) is not built yet: it needs the
   bill status (`fct_bills.status` and `outcome`, from #34), but Senate bills before 2024 have no status (see
   Bill status below), so it can only cover House bills and 2024 and later until #317 lands.
@@ -147,7 +150,16 @@ Quirks:
   and 56 of 58 SJRs in 2026. `SenateActList` exists only for 2024 and later, so every Senate bill of 2017 to
   2023 has a null status and outcome, enacted ones included (2017 to 2023: 0 of 4,143 SBs have a status; 2024: 29
   of 796, none enacted because the list stops before the governor). Counts of failed, pending or enacted bills
-  therefore leave out Senate bills, almost all of them before 2024; House bills are complete. Loading
+  therefore leave out Senate bills, almost all of them before 2024; House bills are complete.
+  Quirk: 143 bills (15 to 17 per regular session, 2017 to 2026, none in 2021; e.g. 2024 HB 1 and HB 2) list
+  only "Message Received from the Governor, pursuant to Article IV, Section 27" as their action. They are
+  re-listings, not new bills: the House repeats the previous regular session's appropriation bills (same bill
+  number, bill string and effective date, LR numbers from 241 on; 2024 HB 1 is the FY2024 budget bill of the 2023
+  session) only to record the governor's budget/withholding message. Where the previous session is loaded (128 of
+  128) the bill string is identical and the original is already "enacted"; the 15 of 2017 repeat the unloaded
+  2016 session (161). They get status "relisted for governor message", a null outcome (it is on the original) and
+  `relisted_from_session_code` naming the original's session (null for 2017), rather than "introduced" /
+  "failed" (#396). Leave them out of per-session bill counts. Loading
   Senate-side actions is #317 (and #237).
 - `ActivitySequence` (action order) is only present from 2024. About 1,000 of 138,000 actions are repeated word
   for word under one `Guid` (mostly 2017–2018); staging keeps them once.
