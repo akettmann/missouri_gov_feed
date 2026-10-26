@@ -9,6 +9,7 @@ testing: Pytest
 linting: Ruff
 logging: Structlog
 metrics: Opentelemetry
+XML parsing: an XML parser (lxml, see `mogov.xmljson`), never regex
 ## ETL
 DBT Core
 DuckDB backend
