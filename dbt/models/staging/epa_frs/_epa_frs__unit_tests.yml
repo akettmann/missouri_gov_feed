@@ -104,7 +104,9 @@ unit_tests:
       EPA writes names and addresses with trailing commas ("BUTTERBALL,", "900 WATSON DR,") and tabs. Name, address
       and city lose leading and trailing commas, semicolons and whitespace and have inner runs of whitespace
       collapsed to one space, while punctuation that belongs to the text stays ("INC.", "ST. LOUIS", an inner comma
-      before "SUITE 1"). Text that is nothing but separators becomes null (#319).
+      before "SUITE 1"). Text that is nothing but separators becomes null (#319). A doubled or tripled inner comma
+      becomes one (a space before it goes too, #381); a doubled semicolon is left alone ("K-BAR-L ;;C" is probably a
+      shifted "LLC").
     given:
       - input: source('epa_frs', 'facilities')
         format: sql
@@ -112,7 +114,9 @@ unit_tests:
             select cast('{"REGISTRY_ID": "1", "PRIMARY_NAME": "BUTTERBALL,", "LOCATION_ADDRESS": "900 WATSON DR,", "CITY_NAME": "BRONAUGH"}' as varchar) as payload, 'u' as source_url union all
             select cast('{"REGISTRY_ID": "2", "PRIMARY_NAME": "ACME, INC.,", "LOCATION_ADDRESS": "100 MAIN ST, SUITE 1,", "CITY_NAME": "ST. LOUIS,"}' as varchar) as payload, 'u' as source_url union all
             select cast('{"REGISTRY_ID": "3", "PRIMARY_NAME": " , P P G  INDUSTRIES INC\t\t;", "LOCATION_ADDRESS": "HIGHWAY N\t\t\t", "CITY_NAME": "MILAN"}' as varchar) as payload, 'u' as source_url union all
-            select cast('{"REGISTRY_ID": "4", "PRIMARY_NAME": "#1 STEP PALLETS", "LOCATION_ADDRESS": " , ;", "CITY_NAME": ""}' as varchar) as payload, 'u' as source_url
+            select cast('{"REGISTRY_ID": "4", "PRIMARY_NAME": "#1 STEP PALLETS", "LOCATION_ADDRESS": " , ;", "CITY_NAME": ""}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "5", "PRIMARY_NAME": "LIPPERT FAMILY FARM,, LLC", "LOCATION_ADDRESS": "K-BAR-L ;;C", "CITY_NAME": "ACME ,, INC,,,"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "6", "PRIMARY_NAME": "A,,, B", "LOCATION_ADDRESS": "1 MAIN ST,,, APT 2", "CITY_NAME": "X"}' as varchar) as payload, 'u' as source_url
       - input: ref('stg_epa_frs__alt_names')
         format: sql
         rows: |
@@ -131,6 +135,8 @@ unit_tests:
         - {registry_id: '2', facility_name: 'ACME, INC.', address: '100 MAIN ST, SUITE 1', city: ST. LOUIS}
         - {registry_id: '3', facility_name: P P G INDUSTRIES INC, address: HIGHWAY N, city: MILAN}
         - {registry_id: '4', facility_name: '#1 STEP PALLETS', address: null, city: null}
+        - {registry_id: '5', facility_name: 'LIPPERT FAMILY FARM, LLC', address: 'K-BAR-L ;;C', city: 'ACME, INC'}
+        - {registry_id: '6', facility_name: 'A, B', address: '1 MAIN ST, APT 2', city: X}
 
   - name: epa_frs_org_name_loses_stray_commas_and_whitespace
     model: stg_epa_frs__organizations

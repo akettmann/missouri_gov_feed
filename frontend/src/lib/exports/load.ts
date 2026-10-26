@@ -87,7 +87,8 @@ async function loadAll(): Promise<OfficialBundle[]> {
 
   const indicators = groupBy(
     await query<Indicator & { official_id: string }>(`
-      select official_id, indicator, value, period, detail, source_url
+      select official_id, indicator, value, period, detail, source_url,
+             cast(first_vote_year as integer) as first_vote_year, cast(last_vote_year as integer) as last_vote_year
       from {fct_bias_indicators} order by indicator, period`),
   );
 

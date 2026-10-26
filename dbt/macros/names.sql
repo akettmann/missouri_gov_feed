@@ -56,15 +56,20 @@
 {%- endmacro %}
 
 {#- Free text from a registry (EPA FRS names, street addresses, cities) as shown to a reader: runs of whitespace
-    (tabs included) become one space, and commas, semicolons and whitespace are cut from both ends, so "BUTTERBALL,"
-    and "900 WATSON DR,  " lose their stray comma while "ACME INC." and "SUITE 1" keep their own punctuation. Null
-    when nothing is left. The ends are cut in one pass: the leading and the trailing run are separate patterns, so
-    each is a plain anchored match. #}
+    (tabs included) become one space, a doubled inner comma becomes one ("LIPPERT FAMILY FARM,, LLC"; a space before
+    the doubled comma goes too), and commas, semicolons and whitespace are cut from both ends, so "BUTTERBALL," and
+    "900 WATSON DR,  " lose their stray comma while "ACME INC." and "SUITE 1" keep their own punctuation. Doubled
+    semicolons are left alone: "K-BAR-L ;;C" is probably a shifted-hand typo for "LLC", not a separator. Null when
+    nothing is left. The ends are cut in one pass: the leading and the trailing run are separate patterns, so each
+    is a plain anchored match. #}
 {% macro clean_registry_text(expr) -%}
     nullif(
         {{ mogov.regex_replace_all(
             mogov.regex_replace_all(
-                mogov.regex_replace_all(expr, '[[:space:]]+', ' '),
+                mogov.regex_replace_all(
+                    mogov.regex_replace_all(expr, '[[:space:]]+', ' '),
+                    ' ?,,+', ','
+                ),
                 '^[,;[:space:]]+', ''
             ),
             '[,;[:space:]]+$', ''
