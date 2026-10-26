@@ -146,6 +146,34 @@ test("donorEntries does not merge partial overlap or chains (#342)", () => {
   assert.equal(donorEntries("A; B; C", chain).length, 3);
 });
 
+test("donorEntries keeps differently sized partial overlaps apart (#342)", () => {
+  // A={M1,M2,M3}, B={M3,FEC}: B is smaller but has FEC, which A lacks, so B is not a subset
+  const a = lines([M1, "A"], [M2, "A"], [M3, "A"], [M3, "B"], [FEC, "B"]);
+  assert.deepEqual(donorEntries("A; B", a), [
+    { donor: "A", urls: [M1, M2, M3] },
+    { donor: "B", urls: [M3, FEC] },
+  ]);
+  // A={M1,M2,M3}, B={M2,M4}: B shares M2 only
+  const M4 = "https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C444444";
+  const b = lines([M1, "A"], [M2, "A"], [M3, "A"], [M2, "B"], [M4, "B"]);
+  assert.deepEqual(donorEntries("A; B", b), [
+    { donor: "A", urls: [M1, M2, M3] },
+    { donor: "B", urls: [M2, M4] },
+  ]);
+});
+
+test("donorEntries does not fold into a group whose extra pages include an FEC link (#342)", () => {
+  // B={M1} is a subset of A={M1,FEC}, but the FEC link is A's own gifts, not B's
+  assert.deepEqual(donorEntries("A; B", lines([M1, "A"], [FEC, "A"], [M1, "B"])), [
+    { donor: "A", urls: [M1, FEC] },
+    { donor: "B", urls: [M1] },
+  ]);
+  // an FEC link both share is fine: the extra page is MEC only
+  assert.deepEqual(donorEntries("A; B", lines([M1, "A"], [M2, "A"], [FEC, "A"], [M1, "B"], [FEC, "B"])), [
+    { donor: "A; B", urls: [M1, M2, FEC] },
+  ]);
+});
+
 test("donorEntries keeps a subset donor alone when two incomparable donors both contain it (#342)", () => {
   const raw = lines([M1, "A"], [M2, "A"], [M1, "B"], [M3, "B"], [M1, "C"]);
   assert.deepEqual(donorEntries("A; B; C", raw), [

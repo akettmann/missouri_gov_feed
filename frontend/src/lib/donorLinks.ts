@@ -85,9 +85,9 @@ export function donorEntries(
     if (name && !order.includes(name)) order.push(name);
   }
   for (const l of links) if (!order.includes(l.donor)) order.push(l.donor);
-  // Group donors whose pages are exactly the same: name variants of one committee (one per spelling it filed
-  // under) link the same pages, so show those pages once under all the names (#276). A donor with no page is
-  // never merged, so "no link" stays attached to its own name.
+  // Group donors whose pages are exactly the same: donors whose gifts are filed on the same pages (for MEC,
+  // the official's own committee), so show those pages once under all the names (#276). Sharing pages is not
+  // proof of one organisation. A donor with no page is never merged, so "no link" stays attached to its own name.
   interface Group {
     names: { name: string; at: number }[];
     urls: string[];
@@ -110,7 +110,9 @@ export function donorEntries(
   // repeated on a row (#342). Subset only, never partial overlap: two donors that each have a page the other
   // lacks stay apart, and so do chains (A shares a page with B, B shares another with C: A and C are not
   // joined). A group folds only when exactly one maximal group contains it; if two incomparable groups both
-  // do, which donor it belongs to is a guess, so it stays alone.
+  // do, which donor it belongs to is a guess, so it stays alone. Also never fold when the target's extra pages
+  // (ones the folded donor lacks) include an FEC link: those are donor-specific ("donor's gifts to the official's
+  // committee"), so the folded name would wrongly carry another donor's FEC link.
   const contains = (big: Group, small: Group) =>
     big.urls.length > small.urls.length && small.urls.every((u) => big.urls.includes(u));
   const maximal = groups.filter((g) => g.urls.length && !groups.some((o) => contains(o, g)));
@@ -119,6 +121,7 @@ export function donorEntries(
     if (!g.urls.length || maximal.includes(g)) continue;
     const homes = maximal.filter((m) => contains(m, g));
     if (homes.length !== 1) continue;
+    if (homes[0].urls.some((u) => !g.urls.includes(u) && u.includes("fec.gov"))) continue;
     homes[0].names.push(...g.names);
     folded.add(g);
   }
