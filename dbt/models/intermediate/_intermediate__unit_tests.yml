@@ -725,6 +725,39 @@ unit_tests:
         - {registry_id: c1, naics_code: '111998', naics_source: naics}
         - {registry_id: c2, naics_code: '236220', naics_source: naics}
 
+  - name: epa_frs_facility_naics_238910_loses_to_all_tier_count
+    model: int_epa_frs__facilities
+    description: >
+      Modeled on B N S F RAILYARD (#432). 238910 (the construction stormwater permit) is given by NPDES in the
+      primary tier and mirrored by an MO-DNR UNKNOWN row, so it has two systems over all tiers against 482111's one
+      (RCRAINFO, primary). Tier and primary-tier count tie at one system each; the all-tier count would pick
+      238910, but the 238910 demotion comes before it, so 482111 wins. SIC 1629 gives no sector signal.
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: r1, facility_name: Railyard, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows: []
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: r1, program_system: NPDES, naics_code: '238910', naics_description: Site preparation, is_primary: true, is_secondary: false}
+          - {registry_id: r1, program_system: NPDES, naics_code: '238910', naics_description: Site preparation, is_primary: true, is_secondary: false}
+          - {registry_id: r1, program_system: RCRAINFO, naics_code: '482111', naics_description: Line-haul railroads, is_primary: true, is_secondary: false}
+          - {registry_id: r1, program_system: MO-DNR, naics_code: '238910', naics_description: Site preparation, is_primary: false, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows:
+          - {registry_id: r1, program_system: NPDES, sic_code: '1629', sic_description: HEAVY CONSTRUCTION NEC, is_primary: true, is_secondary: false}
+      - input: ref('sic_naics_sectors')
+        rows:
+          - {sic_prefix: '16', naics_prefix: '23'}
+      - input: ref('naics_sectors')
+        rows:
+          - {naics_prefix: '23', sector_code: '23', sector_name: Construction}
+          - {naics_prefix: '48', sector_code: '48-49', sector_name: Transportation and Warehousing}
+    expect:
+      rows:
+        - {registry_id: r1, naics_code: '482111', naics_source: naics}
+
   - name: epa_frs_facility_owner_tie_is_deterministic
     model: int_epa_frs__facilities
     description: >

@@ -237,6 +237,7 @@ best_naics as (
             order by
                 n.rank_class asc,
                 n.n_program_systems desc,
+                case when n.naics_code = '238910' then 1 else 0 end asc,
                 allt.n_systems_all_tiers desc,
                 -- among tied codes, the one in the sector the facility's SIC code maps to (#181); no signal from
                 -- SIC 1629 (construction stormwater-permit noise) or a SIC code tied across sectors
