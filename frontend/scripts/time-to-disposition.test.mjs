@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   LOW_COVERAGE_SHARE,
+  caseTypeHeading,
+  coverageText,
+  federalDocketsText,
+  measuredTypedDocketsText,
   MIN_MEASURED,
   daysLabel,
   timeToDispositionView,
@@ -80,4 +84,14 @@ test("daysLabel: singular, plural, half days", () => {
   assert.equal(daysLabel(2), "2 days");
   assert.equal(daysLabel(1234), "1,234 days");
   assert.equal(daysLabel(1234.5), "1,234.5 days");
+});
+
+test("every label names the case type the number counts", () => {
+  assert.equal(caseTypeHeading("civil"), "Median time to disposition: civil cases");
+  assert.equal(caseTypeHeading("criminal"), "Median time to disposition: criminal cases");
+  assert.equal(federalDocketsText(1, "criminal"), "1 federal criminal docket");
+  assert.equal(federalDocketsText(2093, "civil"), "2,093 federal civil dockets");
+  assert.equal(measuredTypedDocketsText(12, "criminal"), "12 criminal dockets");
+  assert.equal(coverageText(146, 256, "criminal"), "146 of 256 assigned criminal dockets measured");
+  assert.equal(coverageText(1, 1, "civil"), "1 of 1 assigned civil docket measured");
 });

@@ -9,7 +9,7 @@
 -- cr). Mapped to civil (cv, and md: multidistrict-litigation master dockets, which carry civil nature-of-suit
 -- codes), criminal (cr), miscellaneous (mc, mj, sw, wi, sm, pr: warrants, subpoenas, complaints, special
 -- matters and the like, not cases) and other (fp, sc, cn and docket numbers with no type: a few dozen
--- pre-2008 filings the maintainer has not ruled on, #321). The CourtListener type wins where the two
+-- pre-2008 filings the maintainer has not ruled on, #465). The CourtListener type wins where the two
 -- disagree: the one such docket (1:00-cr-00008) is a civil suit with a mistyped docket number.
 with typed as (
     select
