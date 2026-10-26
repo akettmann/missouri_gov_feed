@@ -18,14 +18,18 @@
 -- more precise than a two-digit SIC-derived sector, and agrees with it on the sector for about 90% of facilities.
 -- Codes tied on tier and program-system count: the one more program systems give across ALL tiers, not counting
 -- MO-DNR and RMP (the same count over primary, unknown and secondary rows; the UNKNOWN-tier rows usually back the
--- right code, #432; an MO-DNR or RMP UNKNOWN row copies what another system reports, so it must not outvote the
--- SIC sector, #513); then the one in the SIC-derived sector (NAICS 31-33 count as one sector); then any other
+-- right code, #432; MO-DNR is a state copy of what other systems report: its code matches another system's at about
+-- 87% of facilities. RMP, the facility's own Risk Management Plan, matches at only about 53%, so it is not a pure
+-- mirror, but it is left out on purpose: counted, it would let one more UNKNOWN row outvote the SIC sector (#513,
+-- #520); a judgment call, not a claim that RMP duplicates another system); then the one in the SIC-derived sector
+-- (NAICS 31-33 count as one sector); then any other
 -- code before the construction stormwater-permit noise code NAICS 238910 (a site holds that permit beside its real
 -- industry, #432), which still wins when the SIC sector is construction; then the all-tier count again with MO-DNR
--- and RMP included (a copy still backs a code when nothing else separates them), then a 6-digit code before a
+-- and RMP included (they still back a code when nothing else separates them), then a 6-digit code before a
 -- shorter one, then the lowest code. The SIC sector counts only as a signal when the SIC code is not itself tied
 -- (same tier and program-system count) with a SIC code in a different sector, and is not construction
--- stormwater-permit noise: SIC 1629, or 1541/1542/1611 given only by NPDES (or its MO-DNR copy), #513.
+-- stormwater-permit noise: SIC 1629, or 1541/1542/1611 given only by NPDES (or its MO-DNR copy), #513. A
+-- 1541/1542/1611 given only by MO-DNR, with no NPDES row, is read as noise too (21 facility/code pairs), #520.
 -- is_government: a federal site, any owner-role organization typed as a government body
 -- (municipal, county, state, federal, district, tribal), or a facility or owner named like one ("City of ...",
 -- "... County", "... School District"; most organizations are typed UNKNOWN). The *_key columns are
@@ -233,7 +237,7 @@ naics_all_tiers as (
         registry_id,
         naics_code,
         count(distinct program_family) as n_systems_all_tiers,
-        -- the same count without MO-DNR and RMP, whose UNKNOWN rows copy what another system reports (#513)
+        -- the same count without MO-DNR (a state copy of other systems) and RMP (left out by choice, #520), #513
         count(distinct case when program_family not in ('MO-DNR', 'RMP') then program_family end)
             as n_independent_all_tiers
     from naics_normalised
@@ -251,8 +255,8 @@ best_naics as (
             order by
                 n.rank_class asc,
                 n.n_program_systems desc,
-                -- program systems over every tier, not counting MO-DNR and RMP: their UNKNOWN rows copy what another
-                -- system reports, so they must not outvote the SIC sector (#513)
+                -- program systems over every tier, not counting MO-DNR (a copy of other systems) or RMP (left out by
+                -- choice, #520): they must not outvote the SIC sector (#513)
                 allt.n_independent_all_tiers desc,
                 -- among tied codes, the one in the sector the facility's SIC code maps to (#181); no signal from
                 -- a construction stormwater-permit SIC code or a SIC code tied across sectors
@@ -267,7 +271,7 @@ best_naics as (
                 -- 238910 (the construction stormwater permit) loses ties to a real industry (#432). Other
                 -- construction codes are real industries
                 case when n.naics_code = '238910' then 1 else 0 end asc,
-                -- all systems, MO-DNR and RMP included: a copy still backs a code when nothing else separates them
+                -- all systems, MO-DNR and RMP included: they still back a code when nothing else separates them
                 allt.n_systems_all_tiers desc,
                 -- a full 6-digit code before a truncated one, then the code order
                 length(n.naics_code) desc,
