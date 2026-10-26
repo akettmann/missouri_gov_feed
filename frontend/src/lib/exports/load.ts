@@ -33,6 +33,7 @@ import type {
   PastPerson,
   PeerStrip,
   SubjectVotes,
+  TimeToDisposition,
   TopDonorRow,
 } from "./types";
 
@@ -487,6 +488,21 @@ async function loadAll(): Promise<OfficialBundle[]> {
       )
     : null;
 
+  // federal district judges: one row per CourtListener judge, joined to the official by official_id
+  const dispositions = hasExport("fct_judge_time_to_disposition")
+    ? new Map(
+        (
+          await query<TimeToDisposition & { official_id: string }>(`
+            select official_id, cl_person_id, court_id, cast(dockets_assigned as integer) as dockets_assigned,
+                   cast(dockets_with_both_dates as integer) as dockets_with_both_dates,
+                   cast(dockets_ends_before_filed as integer) as dockets_ends_before_filed,
+                   cast(dockets_measured as integer) as dockets_measured,
+                   share_with_both_dates, median_days_to_disposition
+            from {fct_judge_time_to_disposition} where official_id is not null`)
+        ).map((r) => [r.official_id, r]),
+      )
+    : new Map<string, TimeToDisposition>();
+
   return profiles
     .sort((a, b) => (SORT_LEVEL[a.level] ?? 9) - (SORT_LEVEL[b.level] ?? 9))
     .map((p): OfficialBundle => {
@@ -543,6 +559,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
         committees: committeeSessions ? (committeeSessions.get(id) ?? []) : null,
         courts: {
           status: status("cases"),
+          time_to_disposition: dispositions.get(id) ?? null,
           by_year: caseYears
             ? ((caseYears.get(id) ?? []) as { year: number; role: string; cases: number }[])
             : null,

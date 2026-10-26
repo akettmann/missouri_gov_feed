@@ -3,6 +3,7 @@
 // argued as an attorney. Facts per case only; outcomes are never tallied into win/loss statistics.
 import type { OfficialBundle } from "../lib/exports/types";
 import { count, statusKind } from "../lib/format";
+import { daysLabel, MIN_MEASURED, timeToDispositionView } from "../lib/timeToDisposition";
 import SourceLink from "./SourceLink.astro";
 import Viz from "./Viz.astro";
 
@@ -12,6 +13,13 @@ interface Props {
 const { bundle } = Astro.props;
 const { courts } = bundle;
 const shown = courts.recent.length;
+const ttd = courts.time_to_disposition;
+const ttdView = ttd ? timeToDispositionView(ttd) : null;
+const DISTRICTS: Record<string, string> = {
+  moed: "the Eastern District of Missouri",
+  mowd: "the Western District of Missouri",
+  "moed+mowd": "the Eastern and Western Districts of Missouri",
+};
 ---
 
 <section class="card" id="courts" aria-labelledby="courts-h">
@@ -19,6 +27,43 @@ const shown = courts.recent.length;
   <p class="lede">
     Published opinions and dockets naming this official as the judge or as an attorney, from CourtListener.
   </p>
+  {ttd && ttdView && (
+    <div class="ttd" id="time-to-disposition">
+      <h3 class="ttd-h">Median time to disposition</h3>
+      {ttdView.median != null ? (
+        <p class="ttd-n">
+          <strong>{daysLabel(ttdView.median)}</strong>{" "}
+          <span class="muted small">median, filing to termination</span>
+        </p>
+      ) : (
+        <p class="muted">
+          Not shown: only {count(ttdView.measured)} {ttdView.measured === 1 ? "docket" : "dockets"} with both
+          dates (the page needs at least {MIN_MEASURED} for a median).
+        </p>
+      )}
+      <p class="small">
+        Median days from the filing date to the termination date, over {count(ttdView.measured)} federal
+        dockets in {DISTRICTS[ttd.court_id] ?? ttd.court_id} assigned to this judge on the docket record (any
+        filing year). Most are civil cases; the rest are the criminal and miscellaneous dockets (warrants,
+        subpoenas) CourtListener has, in shares that differ by judge, and criminal cases tend to take longer
+        than civil ones. A docket counts only if CourtListener has both dates, so dockets still open are not
+        counted. "Assigned" is the judge listed on the docket, not necessarily the judge who decided it.
+        {ttdView.excluded > 0 &&
+          ` ${count(ttdView.excluded)} ${ttdView.excluded === 1 ? "docket" : "dockets"} that end before they were filed (a source error) ${ttdView.excluded === 1 ? "is" : "are"} left out.`}
+      </p>
+      <p class="small muted">
+        {count(ttdView.measured)} of {count(ttdView.assigned)} assigned dockets measured (
+        {ttdView.coveragePct}%).
+        {ttdView.lowCoverage &&
+          " Fewer than 80% are measured, and dockets still open are not counted, so this median may understate how long this judge's cases take."}{" "}
+        <SourceLink
+          url={`https://www.courtlistener.com/person/${ttd.cl_person_id}/`}
+          label="source: CourtListener judge"
+          context="record"
+        />
+      </p>
+    </div>
+  )}
   {statusKind(courts.status) !== "available" ? (
     <p class="muted">No cases: {courts.status}.</p>
   ) : courts.by_year === null ? (
@@ -67,6 +112,17 @@ const shown = courts.recent.length;
 </section>
 
 <style>
+  .ttd {
+    margin: 12px 0 18px;
+  }
+  .ttd-h {
+    margin: 0 0 4px;
+    font-size: 1rem;
+  }
+  .ttd-n {
+    margin: 0 0 6px;
+    font-size: 1.4rem;
+  }
   .nowrap {
     white-space: nowrap;
   }

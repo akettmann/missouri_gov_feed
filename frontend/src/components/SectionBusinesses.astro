@@ -11,6 +11,7 @@ import DonorLinks from "./DonorLinks.astro";
 import { donorEntries } from "../lib/donorLinks";
 import { count, money } from "../lib/format";
 import { href } from "../lib/site";
+import { siteLinkContexts } from "../lib/siteLinkNames";
 
 interface Props {
   bundle: OfficialBundle;
@@ -25,6 +26,9 @@ const maxSites = Math.max(1, ...industries.filter((i) => i.sector_code).map((i) 
 // when every donor is a possible match, "Hide possible matches" would leave a bare table header
 const allPossible =
   (businesses?.donors.length ?? 0) > 0 && businesses?.donors.every((d) => d.match_confidence === "medium");
+// one distinct screen-reader name per EPA record link across the whole section
+const donorSites = (businesses?.donors ?? []).flatMap((d) => d.sites);
+const siteContext = new Map(siteLinkContexts(donorSites).map((c, i) => [donorSites[i], c] as const));
 const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : `${a}–${b}`);
 ---
 
@@ -35,7 +39,10 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
     represents, with the companies among them that gave this official campaign money listed first.{" "}
     <strong>This shows co-occurrence, not influence:</strong> companies often give to the officials who
     represent the places they operate.{" "}
-    <a href={href("/methodology/#district-businesses")}>How it's matched</a>.
+    <a href={href("/methodology/#district-businesses")}>
+      How it's matched<span class="sr-only"> for businesses in their area</span>
+    </a>
+    .
   </p>
   {businesses === null ? (
     <p class="muted small">
@@ -115,7 +122,7 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
                                   same brand
                                 </span>
                               )}{" "}
-                              · <SourceLink url={s.frs_url} label="EPA record" />
+                              · <SourceLink url={s.frs_url} label="EPA record" context={siteContext.get(s)} />
                             </li>
                           ))}
                         </ul>
