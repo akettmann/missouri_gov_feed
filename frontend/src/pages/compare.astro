@@ -75,7 +75,13 @@ const officials = current.map((o) => ({
   import { renderBadges, type Badge } from "../lib/awardBadges";
   import { compareRows } from "../lib/compare";
   import { valueLinkLine } from "../lib/compareLink";
-  import { filterForOffice, filterOfficials, reconcileFilter, type OfficeFilter } from "../lib/compareFilter";
+  import {
+    filterForOffice,
+    filterOfficials,
+    filterStatusText,
+    reconcileFilter,
+    type OfficeFilter,
+  } from "../lib/compareFilter";
   import type { OfficialBundle } from "../lib/exports/types";
 
   const index: { slug: string; office: string; label: string; badges?: Badge[] }[] = JSON.parse(
@@ -155,9 +161,7 @@ const officials = current.map((o) => ({
           ?.closest("label")
       : null;
     const where = (chip ?? group)?.textContent?.trim() ?? "";
-    filterStatus.textContent = f.group
-      ? `Showing ${shown.length} officials: ${where}.`
-      : `Showing all ${shown.length} officials.`;
+    filterStatus.textContent = filterStatusText(shown.length, Boolean(f.group), where);
   }
 
   async function render() {

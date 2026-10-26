@@ -1,7 +1,7 @@
 // Which officials the compare pickers offer, given the office filter bar. Pure (runs in the browser).
 // The bar narrows the lists to one office group (e.g. the legislature) or one office (e.g. Missouri Senate);
 // "All offices" lists everyone, so a deliberate cross-office comparison stays possible.
-import { officeGroup } from "./format.ts";
+import { officeGroup, plural } from "./format.ts";
 
 export interface OfficeFilter {
   /** office group key from the tiles; "" = all offices */
@@ -36,4 +36,11 @@ export function reconcileFilter(f: OfficeFilter): OfficeFilter {
   const g = officeGroup(f.office);
   if (!f.group) return { group: g, office: f.office };
   return g === f.group ? f : { group: f.group, office: "" };
+}
+
+/** status line under the compare filter bar; `where` is the chosen group or office label */
+export function filterStatusText(n: number, filtered: boolean, where: string): string {
+  const officials = plural(n, "official", "officials");
+  if (filtered) return `Showing ${officials}: ${where}.`;
+  return n === 1 ? "Showing the 1 official." : `Showing all ${officials}.`;
 }

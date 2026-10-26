@@ -498,9 +498,9 @@ models:
       - name: counterparty_link_confidence
         data_type: varchar
         description: >
-          How counterparty_mec_committee_id was matched: `high` = MECID written into the name, or same name
-          (case, punctuation and spacing ignored), `medium` = normalized name (abbreviations spelled out) or core
-          name (words like PAC, Political, Action, Committee, Fund dropped, or a parenthesized short name).
+          How counterparty_mec_committee_id was matched: `high` = curated alias, MECID written into the name, or same
+          name (case, punctuation and spacing ignored), `medium` = normalized name (abbreviations spelled out) or
+          core name (words like PAC, Political, Action, Committee, Fund dropped, or a parenthesized short name).
           Null when there's no link.
         data_tests:
           - accepted_values:

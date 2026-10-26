@@ -6,8 +6,7 @@ import type { GetStaticPaths } from "astro";
 import Layout from "../../layouts/Layout.astro";
 import { officialIndex, pastOfficeholders } from "../../lib/exports/load";
 import type { PastOfficeholder } from "../../lib/exports/types";
-import { plural } from "../../lib/businessCounts";
-import { LEVELS, officeLine } from "../../lib/format";
+import { LEVELS, officeLine, plural } from "../../lib/format";
 import { buildOfficeGroups, missingOfficeLabels, pastNote } from "../../lib/lookback";
 import { href } from "../../lib/site";
 

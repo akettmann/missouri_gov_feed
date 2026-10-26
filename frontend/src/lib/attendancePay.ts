@@ -1,6 +1,8 @@
-// Row selection for the "Pay per vote attended" table under the attendance chart (no imports, so node can test
-// it directly). The division happens in dbt (rpt_attendance_pay); this only picks the rows that cover the same
+// Row selection for the "Pay per vote attended" table under the attendance chart (imports only the pure format
+// helpers, so node can test it directly). The division happens in dbt (rpt_attendance_pay); this only picks the rows that cover the same
 // sessions the attendance chart shows, in the chart's chamber order, and words their coverage.
+
+import { plural } from "./format.ts";
 
 export interface PayVoteRow {
   chamber: string;
@@ -166,7 +168,7 @@ export function coverageNote(
   hidesPossible = false,
 ): string {
   const { covered_years: c, voting_years: v } = total;
-  const years = (n: number) => `${n} ${n === 1 ? "year" : "years"}`;
+  const years = (n: number) => plural(n, "year", "years");
   if (c >= v) return v === 1 ? "the 1 year with votes" : `all ${v} years with votes`;
   const rest = hidesPossible ? "no pay counted or only a possible match" : "no pay counted";
   return `${c} of ${years(v)} with votes (the rest have ${rest})`;
