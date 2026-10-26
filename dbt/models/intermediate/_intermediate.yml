@@ -2,6 +2,16 @@
 # not this file, then regenerate.
 version: 2
 models:
+- name: int_bills__list
+  description: 'Every Missouri bill and resolution per session, from the three places that list them; fct_bills
+    and fct_vote_bills both read this one list so a bill cannot be in one and not the other. Re-listed appropriation
+    bills are kept here (they are House bills; int_bills__status marks them). House bills  the House XML export:
+    titles, current version, last action Senate bills the Senate topical index (regular sessions): its one-line
+    description as the short title; Senate bills filed under no keyword aren''t listed there and are missing Senate
+    bills the House XML''s SenateActList lists as having reached the House (2024 on), when the topical index does
+    not list them: the special-session Senate bills (the index covers regular sessions only), with the titles, version,
+    last action and effective date the XML gives. Senate bills of older special sessions are missing (#237). A column
+    a source does not give is null.'
 - name: int_bills__status
   description: 'Where each bill in the House XML export stands: House bills, and Senate bills once they reach the
     House (their Senate-side history isn''t in the House XML; a Senate bill listed there has passed the Senate).

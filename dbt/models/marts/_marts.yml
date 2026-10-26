@@ -1298,7 +1298,10 @@ models:
     description: >
       Missouri bills and resolutions per session. House bills from the House XML export (titles, current version,
       last action); Senate bills from the Senate topical index (its one-line description as short_title; the other
-      House-only columns are null). `subjects` holds the subject index terms, "; "-separated (fct_bill_subjects).
+      House-only columns are null), plus the Senate bills the House XML's SenateActList lists as reaching the House
+      that the index does not (the special-session Senate bills, 2024 on, with the titles, version, last action and
+      effective date the XML gives; older special sessions' Senate bills are missing, #237). `subjects` holds the
+      subject index terms, "; "-separated (fct_bill_subjects).
       Each regular session also has 15 to 17 relistings of the previous session's appropriation bills (status
       "relisted for governor message"): not new bills, so leave them out of per-session bill counts.
       Grain: one row per (session, bill).

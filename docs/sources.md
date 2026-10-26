@@ -170,6 +170,10 @@ Quirks:
   2023 has a null status and outcome, enacted ones included (2017 to 2023: 0 of 4,143 SBs have a status; 2024: 29
   of 796, none enacted because the list stops before the governor). Counts of failed, pending or enacted bills
   therefore leave out Senate bills, almost all of them before 2024; House bills are complete.
+  The same list names the special-session Senate bills (`stg_mo_house__senate_act_bills`, with titles, version, last
+  action and effective date), which the Senate topical index never covers: `int_bills__list` adds those the index lacks
+  (2025's 253 SB 1, 3 and 4), for `fct_bills` and `fct_vote_bills` alike. Senate bills of older special sessions are still
+  missing (#237).
   Quirk: 143 bills (15 to 17 per regular session, 2017 to 2026, none in 2021; e.g. 2024 HB 1 and HB 2) list
   only "Message Received from the Governor, pursuant to Article IV, Section 27" as their action. They are
   re-listings, not new bills: the House repeats the previous regular session's appropriation bills (same bill
