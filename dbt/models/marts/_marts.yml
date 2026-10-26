@@ -1537,10 +1537,10 @@ models:
   - name: fct_bill_documents
     description: >
       Links to the House's PDFs for each bill, one row per document: summaries, fiscal notes, witness forms, bill
-      text versions and the change maps of text versions and amendments. The PDFs are not fetched. Covers House
-      bills and the Senate bills the House acted on (2024 sessions on). Witness forms name citizens, so only the
-      link is kept. Join to fct_bills on (session_code, bill); the Senate bills of special sessions (253 SB3, SB4) have documents here but no fct_bills row. Grain: one row per (session, bill, document_kind,
-      document_url).
+      text versions, amendments and the change maps of text versions and amendments. The PDFs are not fetched.
+      Covers House bills and the Senate bills the House acted on (2024 sessions on). Witness forms name citizens,
+      so only the link is kept. Join to fct_bills on (session_code, bill); a few special-session Senate bills have
+      documents here but no fct_bills row (#438). Grain: one row per (session, bill, document_kind, document_url).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -1558,11 +1558,11 @@ models:
           - not_null
       - name: document_kind
         data_type: varchar
-        description: What the link is (summary, fiscal_note, witness_form, bill_text, text_map, amendment_map).
+        description: What the link is (summary, fiscal_note, witness_form, bill_text, text_map, amendment, amendment_map). An amendment is the amendment's own PDF; amendment_map is its change map, which few amendments have.
         data_tests:
           - accepted_values:
               arguments:
-                values: ['summary', 'fiscal_note', 'witness_form', 'bill_text', 'text_map', 'amendment_map']
+                values: ['summary', 'fiscal_note', 'witness_form', 'bill_text', 'text_map', 'amendment', 'amendment_map']
       - name: document_url
         data_type: varchar
         description: Link to the PDF (documents.house.mo.gov; a few 2018 links point at the older house.mo.gov and moga.mo.gov hosts).

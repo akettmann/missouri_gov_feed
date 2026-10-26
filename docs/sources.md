@@ -84,6 +84,7 @@ Quirks:
   finds no other unread element; the scan script lists them by file kind.
 - The House BillList lists some bills twice (HR1 and HR2 in the odd-year sessions); the loader fetches and lands
   each linked file once.
+- `AmendmentText` is misnamed: it holds the link to the amendment's PDF (`.../bills181/amendpdf/4083H03.02H.pdf`), not text, and is filled on every amendment (8,775 House, 1,023 SenateActList). `MapLink` (the change map) is filled on only a handful, so `stg_mo_house__bill_amendments` stages `amendment_text` as `amendment_url` and `fct_bill_documents` carries both an `amendment` and an `amendment_map` kind.
 - `AmendmentSortValue` looks like `0507HH`, so `mo_house_xml_bill_amendments.sort_value` is text. A value that
   does not fit its column type (an integer or date field holding something else) becomes NULL and is logged
   (`mo_house.value_not_integer` / `mo_house.value_not_date`), and a document lxml had to repair is logged as
