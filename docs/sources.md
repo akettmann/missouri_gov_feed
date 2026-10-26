@@ -615,6 +615,15 @@ Quirks:
   judge (`assigned_to_id`) and filing and termination dates on a docket; the state courts (`mo`, `moctapp`)
   have none, and `ca8` has no judge. Of 173,882 district dockets with a judge, 165,797 have both dates; 93
   of those end before they were filed (a source error) and are left out of the median.
+  The median is per case type, civil and criminal apart: criminal medians run about twice civil ones
+  (Stephen R. Clark: civil 165 days, criminal 462) and the mix differs by judge. Case type is the docket-number
+  type (`4:25-cr-00236` is `cr`), taken from `federal_dn_case_type` where CourtListener parsed it (about 16% of
+  these dockets) and from the number itself otherwise. Of the 173,882 dockets: civil 164,058 (`cv` 164,027,
+  `md` multidistrict 31), criminal 3,776 (`cr`), miscellaneous 5,967 (`mc` 5,082, `mj` 646, `sw` 194, `wi` 30,
+  `sm` 13, `pr` 2: warrants, subpoenas, complaints, not cases; left out) and 81 other (`fp` 76, `cn` 2, `sc` 2
+  and one with a date in the docket-number field; left out, pending #465). Only 2,149 of the 3,776 criminal
+  dockets have both dates, so criminal coverage is thin. One docket (`1:00-cr-00008`) has a `cr` number but is
+  a civil suit; CourtListener's own type (`cv`) wins.
 - The filtered CSVs are cached per snapshot (`data/cache/courtlistener/mo-*.csv`), so re-runs within
   a quarter are quick. Cases can be up to three months stale; `courtlistener_cases` tops up.
 

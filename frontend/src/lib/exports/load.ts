@@ -510,20 +510,21 @@ async function loadAll(): Promise<OfficialBundle[]> {
     : null;
 
   const expenses = await loadLegislatorExpenses();
-  // federal district judges: one row per CourtListener judge, joined to the official by official_id
-  const dispositions = hasExport("fct_judge_time_to_disposition")
-    ? new Map(
-        (
-          await query<TimeToDisposition & { official_id: string }>(`
-            select official_id, cl_person_id, court_id, cast(dockets_assigned as integer) as dockets_assigned,
+  // federal district judges: one row per CourtListener judge and case type, joined to the official by official_id
+  const dispositionRows = hasExport("fct_judge_time_to_disposition")
+    ? await query<TimeToDisposition & { official_id: string }>(`
+            select official_id, cl_person_id, case_type, court_id, cast(dockets_assigned as integer) as dockets_assigned,
                    cast(dockets_with_both_dates as integer) as dockets_with_both_dates,
                    cast(dockets_ends_before_filed as integer) as dockets_ends_before_filed,
                    cast(dockets_measured as integer) as dockets_measured,
                    share_with_both_dates, median_days_to_disposition
-            from {fct_judge_time_to_disposition} where official_id is not null`)
-        ).map((r) => [r.official_id, r]),
-      )
-    : new Map<string, TimeToDisposition>();
+            from {fct_judge_time_to_disposition} where official_id is not null
+            order by official_id, case_type`)
+    : [];
+  // "civil" sorts before "criminal", so each judge's entries are civil first
+  const dispositions = new Map<string, TimeToDisposition[]>();
+  for (const r of dispositionRows)
+    dispositions.set(r.official_id, [...(dispositions.get(r.official_id) ?? []), r]);
 
   return profiles
     .sort((a, b) => (SORT_LEVEL[a.level] ?? 9) - (SORT_LEVEL[b.level] ?? 9))

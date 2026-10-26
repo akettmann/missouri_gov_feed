@@ -1,4 +1,5 @@
-// Wording and thresholds for a federal district judge's median time to disposition (fct_judge_time_to_disposition).
+// Wording and thresholds for a federal district judge's median time to disposition (fct_judge_time_to_disposition),
+// one median per case type: civil and criminal dockets are never mixed (criminal ones take about twice as long).
 // Pure (imports only the pure format helpers) so node can test it directly. The mart carries no minimum sample size; the page applies one.
 import { count, plural } from "./format.ts";
 
@@ -7,7 +8,11 @@ export const MIN_MEASURED = 30;
 /** When fewer than this share of the judge's assigned dockets have both dates, the page says the median covers a part. */
 export const LOW_COVERAGE_SHARE = 0.8;
 
+/** The case types the mart carries a row for; miscellaneous dockets (warrants, subpoenas) are not in it. */
+export type CaseType = "civil" | "criminal";
+
 export interface TimeToDispositionInput {
+  case_type?: CaseType;
   dockets_assigned: number;
   dockets_measured: number;
   dockets_ends_before_filed: number;
@@ -46,18 +51,23 @@ export function daysLabel(n: number): string {
   return plural(Number.isInteger(n) ? n : Number(n.toFixed(1)), "day", "days");
 }
 
-/** the "only N dockets with both dates" clause shown when too few were measured */
-export const measuredDocketsText = (n: number) => plural(n, "docket", "dockets");
-
 /** sentence appended when some dockets end before they were filed */
 export const excludedDocketsText = (n: number) =>
   n === 1
     ? `${plural(n, "docket", "dockets")} that ends before it was filed (a source error) is left out.`
     : `${plural(n, "docket", "dockets")} that end before they were filed (a source error) are left out.`;
 
-/** "N federal dockets" in the method note */
-export const federalDocketsText = (n: number) => plural(n, "federal docket", "federal dockets");
+/** "N federal civil dockets" / "N federal criminal dockets" in the method note */
+export const federalDocketsText = (n: number, type: CaseType) =>
+  plural(n, `federal ${type} docket`, `federal ${type} dockets`);
 
-/** "M of N assigned dockets measured" coverage line */
-export const coverageText = (measured: number, assigned: number) =>
-  `${count(measured)} of ${plural(assigned, "assigned docket", "assigned dockets")} measured`;
+/** heading for one case type's median */
+export const caseTypeHeading = (type: CaseType) => `Median time to disposition: ${type} cases`;
+
+/** "only N civil dockets with both dates" clause shown when too few were measured */
+export const measuredTypedDocketsText = (n: number, type: CaseType) =>
+  plural(n, `${type} docket`, `${type} dockets`);
+
+/** "M of N assigned civil dockets measured" coverage line */
+export const coverageText = (measured: number, assigned: number, type: CaseType) =>
+  `${count(measured)} of ${plural(assigned, `assigned ${type} docket`, `assigned ${type} dockets`)} measured`;

@@ -2486,24 +2486,46 @@ models:
 
   - name: fct_judge_time_to_disposition
     description: >
-      Median days from filing to termination of the federal district-court dockets (E.D. and W.D. Missouri)
-      assigned to each judge, from the CourtListener bulk export. Built only with the cl_case_bulk var. The state
+      Median days from filing to termination of the civil and criminal federal district-court dockets (E.D. and
+      W.D. Missouri) assigned to each judge, one row per case type, from the CourtListener bulk export. Built only
+      with the cl_case_bulk var. Case type comes from the docket-number type (see
+      int_courtlistener__district_dockets); miscellaneous dockets (warrants, subpoenas, complaints) and the few
+      unclassified old docket types are left out, and a judge with no dockets of a type has no row for it. Counts
+      and medians describe that case type only. The state
       courts carry no judge or dates in that export. Dockets that end before they were filed are left out of the
       median and counted in dockets_ends_before_filed. Show dockets_measured next to the median, and
       share_with_both_dates for how much of the judge's docket load it covers. "Assigned" is the judge on the
-      docket record, not necessarily who decided it. Includes judges who no longer sit. Grain: one row per judge.
+      docket record, not necessarily who decided it. Includes judges who no longer sit. Grain: one row per judge and case type.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
-            combination_of_columns: [cl_person_id]
+            combination_of_columns: [cl_person_id, case_type]
       - dbt_utils.expression_is_true:
           arguments:
             expression: dockets_measured + dockets_ends_before_filed = dockets_with_both_dates
+      # Sanity: a measured median is a real number of days. A civil or criminal federal docket taking under a month
+      # or over four years at the median means the case-type or date logic broke (the combined median that mixed in
+      # warrants and subpoenas read 0-15 days for those).
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: median_days_to_disposition between 30 and 1500
+            config:
+              where: dockets_measured >= 30
     columns:
       - name: cl_person_id
         data_type: varchar
         description: CourtListener person id of the judge.
         data_tests: [not_null]
+      - name: case_type
+        data_type: varchar
+        description: >
+          civil (docket type cv, or md for multidistrict litigation) or criminal (cr). Every count and median on
+          the row is for dockets of this type only.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['civil', 'criminal']
       - name: official_id
         data_type: varchar
         description: "{{ doc('official_id') }} Null for judges not in the officials list (retired or senior)."
@@ -2519,7 +2541,7 @@ models:
                 values: ['moed', 'mowd', 'moed+mowd']
       - name: dockets_assigned
         data_type: bigint
-        description: Dockets assigned to the judge.
+        description: Dockets of this case type assigned to the judge.
       - name: dockets_with_both_dates
         data_type: bigint
         description: Of those, dockets with both a filing and a termination date.

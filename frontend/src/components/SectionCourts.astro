@@ -4,11 +4,12 @@
 import type { OfficialBundle } from "../lib/exports/types";
 import { plural, statusKind } from "../lib/format";
 import {
+  caseTypeHeading,
   daysLabel,
   coverageText,
   excludedDocketsText,
   federalDocketsText,
-  measuredDocketsText,
+  measuredTypedDocketsText,
   MIN_MEASURED,
   timeToDispositionView,
 } from "../lib/timeToDisposition";
@@ -21,8 +22,8 @@ interface Props {
 const { bundle } = Astro.props;
 const { courts } = bundle;
 const shown = courts.recent.length;
-const ttd = courts.time_to_disposition;
-const ttdView = ttd ? timeToDispositionView(ttd) : null;
+// one median per case type (civil first): a criminal docket takes about twice as long as a civil one, so they are never mixed
+const ttds = (courts.time_to_disposition ?? []).map((ttd) => ({ ttd, view: timeToDispositionView(ttd) }));
 const DISTRICTS: Record<string, string> = {
   moed: "the Eastern District of Missouri",
   mowd: "the Western District of Missouri",
@@ -35,35 +36,44 @@ const DISTRICTS: Record<string, string> = {
   <p class="lede">
     Published opinions and dockets naming this official as the judge or as an attorney, from CourtListener.
   </p>
-  {ttd && ttdView && (
+  {ttds.length > 0 && (
     <div class="ttd" id="time-to-disposition">
-      <h3 class="ttd-h">Median time to disposition</h3>
-      {ttdView.median != null ? (
-        <p class="ttd-n">
-          <strong>{daysLabel(ttdView.median)}</strong>{" "}
-          <span class="muted small">median, filing to termination</span>
-        </p>
-      ) : (
-        <p class="muted">
-          Not shown: only {measuredDocketsText(ttdView.measured)} with both dates (the page needs at least{" "}
-          {MIN_MEASURED} for a median).
-        </p>
-      )}
+      {ttds.map(({ ttd, view }) => (
+        <div class="ttd-type" id={`time-to-disposition-${ttd.case_type}`}>
+          <h3 class="ttd-h">{caseTypeHeading(ttd.case_type)}</h3>
+          {view.median != null ? (
+            <p class="ttd-n">
+              <strong>{daysLabel(view.median)}</strong>{" "}
+              <span class="muted small">median, filing to termination</span>
+            </p>
+          ) : (
+            <p class="muted">
+              Not shown: only {measuredTypedDocketsText(view.measured, ttd.case_type)} with both dates (the
+              page needs at least {MIN_MEASURED} for a median).
+            </p>
+          )}
+          <p class="small">
+            Median days from the filing date to the termination date, over{" "}
+            {federalDocketsText(view.measured, ttd.case_type)} in {DISTRICTS[ttd.court_id] ?? ttd.court_id}{" "}
+            assigned to this judge on the docket record (any filing year).
+            {view.excluded > 0 && ` ${excludedDocketsText(view.excluded)}`}
+          </p>
+          <p class="small muted">
+            {coverageText(view.measured, view.assigned, ttd.case_type)} ({view.coveragePct}%).
+            {view.lowCoverage &&
+              ` Fewer than 80% are measured, and dockets still open are not counted, so this median may understate how long this judge's ${ttd.case_type} cases take.`}
+          </p>
+        </div>
+      ))}
       <p class="small">
-        Median days from the filing date to the termination date, over {federalDocketsText(ttdView.measured)}
-        in {DISTRICTS[ttd.court_id] ?? ttd.court_id} assigned to this judge on the docket record (any filing
-        year). Most are civil cases; the rest are the criminal and miscellaneous dockets (warrants, subpoenas)
-        CourtListener has, in shares that differ by judge, and criminal cases tend to take longer than civil
-        ones. A docket counts only if CourtListener has both dates, so dockets still open are not counted.
+        Civil and criminal dockets are counted apart because criminal cases tend to take longer than civil
+        ones and the mix differs by judge. Miscellaneous dockets (warrants, subpoenas, complaints) are in
+        neither. A docket counts only if CourtListener has both dates, so dockets still open are not counted.
         "Assigned" is the judge listed on the docket, not necessarily the judge who decided it.
-        {ttdView.excluded > 0 && ` ${excludedDocketsText(ttdView.excluded)}`}
       </p>
       <p class="small muted">
-        {coverageText(ttdView.measured, ttdView.assigned)} ({ttdView.coveragePct}%).
-        {ttdView.lowCoverage &&
-          " Fewer than 80% are measured, and dockets still open are not counted, so this median may understate how long this judge's cases take."}{" "}
         <SourceLink
-          url={`https://www.courtlistener.com/person/${ttd.cl_person_id}/`}
+          url={`https://www.courtlistener.com/person/${ttds[0].ttd.cl_person_id}/`}
           label="source: CourtListener judge"
           context="record"
         />
@@ -120,6 +130,9 @@ const DISTRICTS: Record<string, string> = {
 <style>
   .ttd {
     margin: 12px 0 18px;
+  }
+  .ttd-type {
+    margin: 0 0 14px;
   }
   .ttd-h {
     margin: 0 0 4px;
