@@ -27,6 +27,10 @@ models:
           - Fair
           - Poor
   - name: extraction_status
+    description: 'ok, no_rating_sentence, placeholder_rating (staging) or unreadable (a PDF that would not parse),
+      or http_<code> (the PDF could not be fetched; the number of those is bounded by assert_audit_ratings_fetch_failures_few).
+
+      '
     data_tests:
     - accepted_values:
         arguments:
@@ -34,8 +38,10 @@ models:
           - ok
           - no_rating_sentence
           - placeholder_rating
+          - unreadable
         config:
           severity: warn
+          where: substr(extraction_status, 1, 5) <> 'http_'
   - name: n_rating_sentences
     description: Rating sentences found in the PDF pages scanned; a report states one rating, so more than one is
       checked.

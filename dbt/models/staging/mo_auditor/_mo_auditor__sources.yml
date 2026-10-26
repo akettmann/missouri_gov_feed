@@ -26,4 +26,4 @@ sources:
     description: >
       One row per report whose PDF was read for a rating: the rating sentence as extracted, its page, the PDF
       url and a status (ok, no_rating_sentence, http_<code>, unreadable). Reports that are never rated (financial
-      statements, monthly filing reports, follow-ups, pre-2012) have no row.
+      statements, monthly filing reports, annual financial reports, follow-ups, pre-2012) have no row.

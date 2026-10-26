@@ -149,6 +149,9 @@ def _filing(title, number="2012008   ", **extra):
         # singular and plural financial statement filings are both unrated
         ("St. Clair County Financial Statement", False),
         ("Scott County Financial Statements", False),
+        # a CAFR is never rated, with or without "Financial" (2013-009 is a 404 PDF)
+        ("Comprehensive Annual Financial Report / Year Ended June 30, 2012", False),
+        ("Annual Report / Year Ended June 30, 2012", False),
     ],
 )
 def test_rating_source_reads_a_single_fire_district_but_not_county_wide_reviews(title, read):
