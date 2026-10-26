@@ -155,7 +155,7 @@ aren't loaded.
 The officials list (`/`) shows the people serving now; its year control loads earlier years from
 `dist/lookup/officeholders/<year>.json`, built from `rpt_officeholders_by_year`. Without that export the page
 lists today's officials only and hides the year control. Past years cover only offices with dated rosters (MO
-House, MO Senate where every seat is dated, Congress, federal courts). Both the JavaScript year control and the static `dist/years/<year>/index.html` pages name the
+House, MO Senate (seats dated from the journal roll calls where Open States has no start or a wrong end), Congress, federal courts). Both the JavaScript year control and the static `dist/years/<year>/index.html` pages name the
 offices a year lacks, using one shared helper (`frontend/src/lib/lookback.ts`).
 
 Without JavaScript, the home page's `<noscript>` block links to those static `/years/<year>/` pages, one per past
