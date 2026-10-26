@@ -163,3 +163,50 @@ unit_tests:
       rows:
         - {registry_id: '1', org_name: ACME INC.}
         - {registry_id: '2', org_name: DOE CO}
+
+  - name: epa_frs_facility_text_html_entities_decoded
+    model: stg_epa_frs__facilities
+    description: >
+      The HTML entities EPA writes into facility names, addresses and cities are decoded (#398): &AMP; and &amp; to
+      "&", &#39; to an apostrophe, &#40; and &#41; to parentheses. A bare "&" ("AT&T", "A & B") and a "&AMP" with no
+      semicolon are left as they are, an unknown entity (&copy;) is not touched, and a double-encoded &amp;#39; is
+      decoded once only.
+    given:
+      - input: source('epa_frs', 'facilities')
+        format: sql
+        rows: |
+            select cast('{"REGISTRY_ID": "1", "PRIMARY_NAME": "D&AMP;A BARRACKS", "LOCATION_ADDRESS": "31ST &AMP; JARBOE", "CITY_NAME": "TOWN &amp; COUNTRY"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "2", "PRIMARY_NAME": "HOLCIM &#40;US&#41; INC"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "3", "PRIMARY_NAME": "LEE&#39;S SUMMIT"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "4", "PRIMARY_NAME": "AT&T & A&B &AMP SHOP"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "5", "PRIMARY_NAME": "X&copy;Y &amp;#39; Z"}' as varchar) as payload, 'u' as source_url
+      - input: ref('stg_epa_frs__alt_names')
+        rows: []
+      - input: ref('epa_frs_name_corrections')
+        rows: []
+    expect:
+      rows:
+        - {registry_id: '1', facility_name: D&A BARRACKS, address: 31ST & JARBOE, city: TOWN & COUNTRY}
+        - {registry_id: '2', facility_name: HOLCIM (US) INC, address: null, city: null}
+        - {registry_id: '3', facility_name: LEE'S SUMMIT, address: null, city: null}
+        - {registry_id: '4', facility_name: AT&T & A&B &AMP SHOP, address: null, city: null}
+        - {registry_id: '5', facility_name: X&copy;Y &#39; Z, address: null, city: null}
+
+  - name: epa_frs_org_name_html_entities_decoded
+    model: stg_epa_frs__organizations
+    description: >
+      An organization name has its HTML entities decoded (#398), while a bare "&" ("AT&T") stays.
+    given:
+      - input: source('epa_frs', 'organizations')
+        format: sql
+        rows: |
+            select cast('{"REGISTRY_ID": "1", "PGM_SYS_ACRNM": "RCRAINFO", "PGM_SYS_ID": "P1", "ORG_NAME": "PROCESS &AMP; SAFETY SOLUTIONS LLC"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "2", "PGM_SYS_ACRNM": "RCRAINFO", "PGM_SYS_ID": "P2", "ORG_NAME": "AT&T"}' as varchar) as payload, 'u' as source_url
+      - input: ref('stg_epa_frs__alt_names')
+        rows: []
+      - input: ref('epa_frs_name_corrections')
+        rows: []
+    expect:
+      rows:
+        - {registry_id: '1', org_name: PROCESS & SAFETY SOLUTIONS LLC}
+        - {registry_id: '2', org_name: AT&T}

@@ -48,7 +48,7 @@ union all
 select
     f.official_id,
     f.full_name,
-    case f.chamber when 'House' then 'us_house' else 'us_senate' end as chamber,
+    case f.chamber when 'House' then 'us_house' when 'Senate' then 'us_senate' end as chamber,
     {{ dbt.safe_cast('f.congress', dbt.type_string()) }} as session_code,
     f.chamber || '-' || {{ dbt.safe_cast('f.congress', dbt.type_string()) }} || '-'
     || {{ dbt.safe_cast('f.rollnumber', dbt.type_string()) }} as vote_id,

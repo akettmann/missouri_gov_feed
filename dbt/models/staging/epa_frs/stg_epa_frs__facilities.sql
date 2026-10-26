@@ -3,7 +3,8 @@
 -- out. A name that still has U+FFFD (EPA lost a letter) is taken from the epa_frs_name_corrections seed if it has a
 -- row, else from the one alternative name of the same registry id that equals it with each run of U+FFFD standing
 -- for one character; failing both, the U+FFFD is dropped. Name, address and city have runs of whitespace
--- collapsed and stray leading/trailing commas, semicolons and spaces cut (EPA writes "BUTTERBALL,", #319).
+-- collapsed and stray leading/trailing commas, semicolons and spaces cut (EPA writes "BUTTERBALL,", #319); the HTML
+-- entities EPA leaves in them (&AMP; &#39; &#40; &#41;) are decoded (#398).
 with src as (
     select
         {{ mogov.json_str('payload', '$.REGISTRY_ID') }} as registry_id,

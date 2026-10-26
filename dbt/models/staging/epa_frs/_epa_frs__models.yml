@@ -15,7 +15,7 @@ models:
     if it has a row, else from the one alternative name of the same registry id that equals it with each run of
     U+FFFD standing for one character; failing both, the U+FFFD is dropped. Name, address and city have runs of
     whitespace collapsed and stray leading/trailing commas, semicolons and spaces cut (EPA writes "BUTTERBALL,",
-    #319).'
+    #319); the HTML entities EPA leaves in them (&AMP; &#39; &#40; &#41;) are decoded (#398).'
 - name: stg_epa_frs__naics
   description: One row per NAICS code an EPA FRS program record gives a facility. is_primary marks the program's
     primary code (PRIMARY_INDICATOR); is_secondary the ones FRS calls SECONDARY; the rest are UNKNOWN. A facility
@@ -27,7 +27,8 @@ models:
     has U+FFFD (EPA lost a letter) is taken from the epa_frs_name_corrections seed if it has a row, else from the
     one alternative name of the same registry id and program record that equals it with each run of U+FFFD standing
     for one character; failing both, the U+FFFD is dropped. The name has runs of whitespace collapsed and stray
-    leading/trailing commas, semicolons and spaces cut (#319).'
+    leading/trailing commas, semicolons and spaces cut (#319); the HTML entities EPA leaves in it (&AMP;) are decoded
+    (#398).'
 - name: stg_epa_frs__sic
   description: One row per SIC code (1987 Standard Industrial Classification, four digits) an EPA FRS program record
     gives a facility. is_primary marks the program's primary code (PRIMARY_INDICATOR); is_secondary the ones FRS

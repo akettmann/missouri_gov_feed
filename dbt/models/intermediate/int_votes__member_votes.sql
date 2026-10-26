@@ -25,7 +25,7 @@ from {{ ref('int_mo_senate__votes') }}
 union all
 
 select
-    case v.chamber when 'House' then 'us_house' else 'us_senate' end as chamber,
+    case v.chamber when 'House' then 'us_house' when 'Senate' then 'us_senate' end as chamber,
     {{ dbt.safe_cast('v.congress', dbt.type_string()) }} as session_code,
     v.chamber || '-' || {{ dbt.safe_cast('v.congress', dbt.type_string()) }} || '-'
     || {{ dbt.safe_cast('v.rollnumber', dbt.type_string()) }} as vote_id,
