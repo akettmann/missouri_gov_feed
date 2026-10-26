@@ -24,12 +24,17 @@ donors as (
     select
         official_id,
         {{ mogov.company_key("coalesce(nullif(trim(counterparty_organization), ''), counterparty)") }} as donor_key,
-        -- CR/LF would split a donor_links line (`<url> <donor>`), so they become spaces here (#268)
+        -- CR/LF would split a donor_links line (`<url> <donor>`), so they become spaces here (#268). A ';' would
+        -- split donor_names, which is '; '-joined and split back by the frontend (#276), so it becomes a comma
         trim(
             replace(
                 replace(
                     replace(
-                        min(coalesce(nullif(trim(counterparty_organization), ''), counterparty)),
+                        replace(
+                            min(coalesce(nullif(trim(counterparty_organization), ''), counterparty)),
+                            ';',
+                            ','
+                        ),
                         chr(13) || chr(10),
                         ' '
                     ),

@@ -90,3 +90,29 @@ test("a donor with 2+ pages of one kind gets the differing committee id in each 
   assert.equal(donorLinkLabel(f1, [f1, m1]), "donor's gifts to the official's committee (FEC)");
   assert.equal(donorLinkLabel(m1, [f1, m1]), "official's committee (MEC)");
 });
+
+test("donorEntries collapses name variants that share the same pages into one entry (#276)", () => {
+  const raw = [`${MEC} SPIRE PAC`, `${MEC} SPIRE POLITICAL ACTION COMMITTEE`, `${FEC} AT&T INC.`].join("\n");
+  assert.deepEqual(donorEntries("AT&T INC.; SPIRE PAC; SPIRE POLITICAL ACTION COMMITTEE", raw), [
+    { donor: "AT&T INC.", urls: [FEC] },
+    { donor: "SPIRE PAC; SPIRE POLITICAL ACTION COMMITTEE", urls: [MEC] },
+  ]);
+});
+
+test("donorEntries does not merge donors with no link, or with different pages (#276)", () => {
+  assert.deepEqual(donorEntries("A; B; C", `${MEC} A\n${FEC} B`), [
+    { donor: "A", urls: [MEC] },
+    { donor: "B", urls: [FEC] },
+    { donor: "C", urls: [] },
+  ]);
+  assert.deepEqual(donorEntries("A; B", ""), [
+    { donor: "A", urls: [] },
+    { donor: "B", urls: [] },
+  ]);
+});
+
+test("donorEntries keeps a comma-joined name as one donor (#276)", () => {
+  assert.deepEqual(donorEntries("NETJETS ASSOCIATION OF SHARED AIRCRAFT PILOTS PAC, NJASAP PAC", null), [
+    { donor: "NETJETS ASSOCIATION OF SHARED AIRCRAFT PILOTS PAC, NJASAP PAC", urls: [] },
+  ]);
+});
