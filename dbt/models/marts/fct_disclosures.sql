@@ -167,8 +167,10 @@ unioned as (
 --                   A House amendment of a candidate report joins that candidate report's group instead
 --                   (house_amendment_base); otherwise it would be a second "latest" beside the report it amends
 --                   and could supersede an annual report it does not amend.
---   report_version  0 = original, N = amendment N (Senate "(amendment N)"; House "amended report" = 1; AO-10
---                   pdf name suffix "_1" = 1)
+--   report_version  0 = original, N = amendment N (Senate "(amendment N)"; AO-10 pdf name suffix "_1" = 1;
+--                   House "amended report": the clerk index carries no amendment number, so N is the amendment's
+--                   position by filing date among the amendments of its report, ties broken by the numeric
+--                   doc id in the url, which grows with time)
 --   has_text        false for House scans with no extractable text. Such an amendment cannot stand in for a
 --                   readable report, so it never supersedes one.
 keyed as (
@@ -196,7 +198,7 @@ keyed as (
     from unioned
 ),
 
-reports as (
+document_reports as (
     select
         official_id,
         disclosure_type,
@@ -208,6 +210,30 @@ reports as (
         min(case when section like 'document (not text-extractable%' then 0 else 1 end) as has_text
     from keyed
     group by official_id, disclosure_type, report_year, document_url, report_group
+),
+
+reports as (
+    select
+        official_id,
+        disclosure_type,
+        report_year,
+        document_url,
+        report_group,
+        case
+            when disclosure_type like 'U.S. House%' and report_version > 0
+                then
+                    cast(row_number() over (
+                        partition by official_id, report_year, report_group, report_version
+                        order by
+                            filing_date,
+                            {{ dbt.safe_cast(mogov.regex_extract('document_url', '([0-9]+)[.]pdf$'), dbt.type_int()) }},
+                            document_url
+                    ) as {{ dbt.type_int() }})
+            else report_version
+        end as report_version,
+        filing_date,
+        has_text
+    from document_reports
 ),
 
 ranked as (
