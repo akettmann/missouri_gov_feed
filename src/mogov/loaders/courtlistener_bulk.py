@@ -13,7 +13,7 @@ import shutil
 
 from lxml import etree
 
-from mogov import db, xmlparse
+from mogov import db, obs, xmlparse
 from mogov.config import CACHE_DIR
 from mogov.http import fetch, fetch_to_file
 from mogov.loaders import loader
@@ -38,7 +38,9 @@ TABLES = {
     "financial-disclosures-reimbursements": "cl_fd_reimbursements",
 }
 
+log = obs.get_logger(__name__)
 
+MAX_LISTING_PAGES = 100  # 1000 keys/page; the prefix matches a few dozen objects
 _SNAPSHOT_KEY = re.compile(r"^bulk-data/people-db-people-(\d{4}-\d{2}-\d{2})\.csv\.bz2$")
 
 
@@ -63,17 +65,23 @@ def _parse_listing(raw: bytes) -> tuple[list[str], str | None]:
             truncated = (el.text or "").strip().lower() == "true"
         elif name == "NextContinuationToken":
             token = (el.text or "").strip() or None
+    if truncated and token is None:
+        log.warning("s3_listing_truncated_without_token", keys=len(keys))
     return keys, (token if truncated else None)
 
 
 def _latest_snapshot() -> str:
     params = {"list-type": "2", "prefix": "bulk-data/people-db-people-"}
     dates: list[str] = []
+    seen: set[str] = set()
     while True:
         keys, token = _parse_listing(fetch(f"{BUCKET}/", params))
         dates += [m.group(1) for k in keys if (m := _SNAPSHOT_KEY.match(k))]
         if token is None:
             break
+        if token in seen or len(seen) >= MAX_LISTING_PAGES:
+            raise RuntimeError(f"S3 listing did not terminate (repeated token or over {MAX_LISTING_PAGES} pages)")
+        seen.add(token)
         params = {**params, "continuation-token": token}
     if not dates:
         raise RuntimeError("no CourtListener people snapshot found in bucket listing")
