@@ -49,6 +49,7 @@ Quirks:
 - Session codes are two-digit year plus type: `1` regular, `2`–`4` extraordinary. Unknown codes return
   HTTP 200 with an HTML page, not a 404. The loader probes all four types per year and treats HTML as
   "no such session".
+- Session names (`dim_house_session`): the last digit of a code does not say which extraordinary session it is (183 is the 2018 "Special Session", 184 its "1st Extraordinary Session", 253 and 254 the 2025 1st and 2nd). The `SESSIONLIST` file in every session zip carries the House's own names for the whole history, and the frontend labels sessions from it; the open regular session has no zip, so the loader fetches its `SessionList` directly. A session with no name yet shows as "session code NNN".
 - The open session has no zip yet, so the loader walks the list files and fetches per-member and
   per-bill XML.
 - Vote tokens are printed surnames, sometimes with a district ("SMITH 46"), plus "MR SPEAKER".
@@ -94,6 +95,7 @@ Quirks:
   snapshot is end-of-session, and the dbt marts keep only people in `dim_official`, so older sessions have
   few rows (9 officials in 2017, 151 in 2026). Committee names change between sessions. The metric counts
   full-committee chairs separately from subcommittee chairs.
+  The `COMMITTEELIST` lists carry no Co-Chair seats at all (2025 regular session: member pages show 3 co-chair posts the list lacks), and 253's list names fewer committees than 251 or 254 (no Conference Committee on Budget, 22 seats; none of the two property tax special committees, 40 seats), so 253 shows 617 committee seats against 697 in 251 and 685 in 254. The joint committees are in the list. The profile says so under the 253 row.
 - Bill sponsorship success (share of a member's sponsored bills that passed) is not built yet: it needs the
   bill status from #34, which is in flight in another session.
 - PDF text extraction is cached by PDF content (`data/cache/pdftext/`). Before that, a re-run spent
