@@ -44,16 +44,18 @@ models:
     Assembly ("99th") and a session label ("FIRST REGULAR SESSION", "SPECIAL SESSION", "SECOND EXTRAORDINARY SESSION").
     A regular session (code ending in 1) must show its General Assembly and the label FIRST in odd years, SECOND
     in even years; an extraordinary or special session (any other last digit) must show its General Assembly and
-    an EXTRAORDINARY or SPECIAL label. The House numbers extraordinary sessions irregularly (173 prints SPECIAL,
-    184 prints FIRST EXTRAORDINARY, 174 prints SECOND), so those labels are not checked against the code''s ordinal.
-    Drops 5 PDFs: 171 002.001/002.002 (SPECIAL SESSION, the 173 session of 2017-05-23), 201 012.001 (FIRST EXTRAORDINARY,
-    a copy of 203''s 012.001) and 204 003.002/003.003 (dated 2020-11-19, SECOND REGULAR SESSION: technical-session
-    votes on HB 2315 of the 2020 regular session; 204''s House journal pages run unbroken from 2020-11-10 to 2020-11-20,
-    so there was no 204 sitting on the 19th, and the header is right, not a typo). A header that does not parse
-    (no PDF text) is kept. 3. The same (session, day, roll-call number) published under two file names (#435): 261
-    has 003.001 = 003.002, 004.002 = 004.004 and 004.003 = 004.005, byte-identical headers and totals. The roll-call
-    number printed in the PDF is the key; the file whose name carries that number (else the first by URL) is kept.
-    Raw keeps everything.'
+    an EXTRAORDINARY or SPECIAL label. Only a recognised label under the wrong kind of code drops a row; an unknown
+    label is kept and fails the accepted_values test on header_session_label. The House numbers extraordinary sessions
+    irregularly (173 prints SPECIAL, 184 prints FIRST EXTRAORDINARY, 174 prints SECOND), so those labels are not
+    checked against the code''s ordinal. Drops 5 PDFs: 171 002.001/002.002 (SPECIAL SESSION; voting-board test records,
+    Y for the first six names alphabetically or MORRIS+KIDD only; 173 has its own different 2.1/2.2), 201 012.001
+    (FIRST EXTRAORDINARY, a copy of 203''s 012.001) and 204 003.002/003.003 (dated 2020-11-19, SECOND REGULAR SESSION:
+    non-votes, voting-board test/practice records under a regular-session header; HB 2315 was never third-read in
+    201, the PDFs show 3 Y/4 N with the rest absent and 25 Y/3 N of 161, and "Session Day : 3" is 204''s own counter).
+    A header that does not parse (no PDF text) is kept. 3. The same (session, day, roll-call number) published under
+    two file names (#435): 261 has 003.001 = 003.002, 004.002 = 004.004 and 004.003 = 004.005, byte-identical headers
+    and totals. The roll-call number printed in the PDF is the key; the file whose name carries that number (else
+    the first by URL) is kept. Raw keeps everything.'
   columns:
   - name: session_day
     description: Legislative day of the session (highest seen through 2026 is 79).
@@ -62,6 +64,17 @@ models:
         arguments:
           min_value: 1
           max_value: 120
+  - name: header_session_label
+    description: Session label printed in the PDF header. Null when the header did not parse.
+    data_tests:
+    - accepted_values:
+        arguments:
+          values:
+          - FIRST REGULAR SESSION
+          - SECOND REGULAR SESSION
+          - SPECIAL SESSION
+          - FIRST EXTRAORDINARY SESSION
+          - SECOND EXTRAORDINARY SESSION
 - name: stg_mo_house__sessions
   description: 'The House''s own names for its legislative sessions (SESSIONLIST: "2025 1st Extraordinary Session",
     "2018 Special Session"). Every session''s SESSIONLIST repeats the full history, so the copy from the newest

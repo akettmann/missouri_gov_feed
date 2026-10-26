@@ -70,9 +70,11 @@ Quirks:
 - Other sessions' PDFs also sit in a session's directory (issue #435). `stg_mo_house__rollcalls` checks the header's
   General Assembly and session label against the session code (regular sessions: FIRST in odd years, SECOND in
   even; extraordinary and special sessions: any EXTRAORDINARY or SPECIAL label, since 173 prints SPECIAL, 184
-  FIRST EXTRAORDINARY and 174 SECOND EXTRAORDINARY). Dropped: `bills171/rollcalls/002.001`, `002.002` (the 2017
-  special session), `bills201/rollcalls/012.001` (a copy of 203's), `bills204/rollcalls/003.002`, `003.003`
-  (2020-11-19 technical-session votes on a 2020 regular-session bill; 204 did not sit that day). The House also
+  FIRST EXTRAORDINARY and 174 SECOND EXTRAORDINARY). Dropped: `bills171/rollcalls/002.001`, `002.002` (voting-board test records, Y for the first six names alphabetically or MORRIS+KIDD only; 173 has its own
+  different 2.1/2.2), `bills201/rollcalls/012.001` (a copy of 203's), `bills204/rollcalls/003.002`, `003.003`
+  (2020-11-19 non-votes: voting-board test/practice records under a regular-session header; HB 2315 was never
+  third-read in 201 and "Session Day : 3" is 204's counter). Only a recognised label under the wrong kind of code
+  drops a row; an unknown label is kept and fails an accepted_values test. The House also
   publishes some roll calls twice under two file names (261: `003.001`/`003.002`, `004.002`/`004.004`,
   `004.003`/`004.005`, identical content); the file whose name carries the printed roll-call number is kept.
 - The XML is never converted on the way in: the loader gzips each file as received. The parser reads the
