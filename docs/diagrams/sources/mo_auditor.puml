@@ -1,0 +1,19 @@
+@startuml mo_auditor
+title mo_auditor: Missouri State Auditor audit reports and ratings
+start
+:SearchAudits, one calendar year at a time (1999 to now);
+note right: the unfiltered list stops at the newest 1,000 rows,\na year holds 90-150, a full year is checked against its total
+:mo_auditor_reports (the list records verbatim, one shard unit each);
+if (summary id, or a rated-looking title since 2012?) then (yes)
+  :fetch the Citizens Summary PDF,\nor else the first pages of the full report;
+  :find "In the areas audited, the overall performance\nof this entity was <rating>." (page, sentence kept);
+  :mo_auditor_ratings (status ok / no_rating_sentence / http error);
+else (no: financial statements, monthly reports,\nfollow-ups, before 2012)
+  :no PDF read (rating_status not_read);
+endif
+:dbt staging: dates, links, rating title-cased;
+:dbt: entity type (statewide office by title prefix seed,\ncounty by title) and rating_level 4..1 (int_mo_auditor__reports);
+:statewide office audits only: officeholder when released,\nfrom fct_office_history -> fct_audit_reports;
+note right: a county rating is never attached to a person
+stop
+@enduml

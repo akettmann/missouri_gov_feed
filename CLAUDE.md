@@ -53,10 +53,10 @@ Acceptable labels:
   `source: house_fd`, `source: senate_efd`, `source: courtlistener_bulk`, `source: courtlistener_case_bulk`,
   `source: courtlistener_cases`, `source: bluebook`, `source: openstates_people`, `source: congress_legislators`,
   `source: fjc_judges`, `source: wikidata`, `source: shor_mccarty`, `source: census_tiger`, `source: census_zcta`,
-  `source: mo_employee_pay`, `source: epa_frs`
+  `source: mo_employee_pay`, `source: epa_frs`, `source: mo_auditor`
 * Candidate sources (not loaded yet): `source: legiscan`, `source: followthemoney`, `source: osha_ita`,
   `source: mo_sos_business`, `source: mo_state_expenditures`, `source: govinfo_billstatus`, `source: house_sod`,
-  `source: house_cpf`, `source: mo_sos_elections`, `source: mo_auditor`, `source: census_acs`,
+  `source: house_cpf`, `source: mo_sos_elections`, `source: census_acs`,
   `source: uscourts_caseload`. When a candidate gets a loader, keep the label and update its description.
 
 Frontend issues follow the rules in docs/frontend_principles.md.

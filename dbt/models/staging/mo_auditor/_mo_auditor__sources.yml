@@ -1,0 +1,29 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+version: 2
+sources:
+- name: mo_auditor
+  description: >
+    Missouri State Auditor audit reports (auditor.mo.gov): the search list verbatim, and the performance rating
+    sentence read from each report's Citizens Summary PDF.
+  tables:
+  - name: reports
+    identifier: mo_auditor_reports
+    description: >
+      One row per report in the Auditor's SearchAudits list (1999 to now), verbatim, plus the `search_year`
+      it was listed under.
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 45
+          period: day
+        error_after:
+          count: 120
+          period: day
+  - name: ratings
+    identifier: mo_auditor_ratings
+    description: >
+      One row per report whose PDF was read for a rating: the rating sentence as extracted, its page, the PDF
+      url and a status (ok, no_rating_sentence, http_<code>, unreadable). Reports that are never rated (financial
+      statements, monthly filing reports, follow-ups, pre-2012) have no row.
