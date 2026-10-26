@@ -2,6 +2,9 @@
 
 - documents.house.mo.gov/xml/{session}.zip for closed sessions; per-file XML for the open one.
   Members (roster, committees, bio, sponsored bills) and bills (sponsors, actions, roll-call totals).
+  Each XML file is landed unchanged as gzip under RAW_DIR/mo_house_xml/<session>/ and recorded (path, URL,
+  size, hash, landing time) in `mo_house_xml_files`; then `mogov.parsers.mo_house` walks the files with lxml
+  and emits typed rows per entity (`mo_house_xml_*` tables).
 - Roll-call PDFs (2014+) are the only per-member House vote record. Each is parsed into one raw
   row per (roll call, member token); tokens are surnames like "SMITH 46" or "MR SPEAKER" and are
   matched to members in dbt. The XML links only roll calls on House bills, so each session day's PDFs
@@ -11,18 +14,23 @@
 The site asks that automated clients poll its XML no more than every 30 minutes; caching is a day.
 """
 
+import gzip
+import hashlib
 import io
 import re
 import zipfile
 from collections import defaultdict
 from collections.abc import Callable, Iterator
-from datetime import date
+from datetime import UTC, date, datetime
 from functools import partial
 
-from mogov import db, obs, pdftext, xmljson
+from lxml import etree
+
+from mogov import db, obs, pdftext
 from mogov.config import window_years
-from mogov.http import CacheMiss, fetch
+from mogov.http import CacheMiss, fetch, write_atomic
 from mogov.loaders import loader
+from mogov.parsers import mo_house as parser
 
 log = obs.get_logger(__name__)
 
@@ -43,43 +51,50 @@ ROLLCALL_URL = re.compile(r"/bills(\d{3})/rollcalls/(\d{3})\.(\d{3})\.pdf$")
 # and days probed in a session whose XML links none.
 DAY_SLACK = 3
 DAYS_IF_UNKNOWN = 10
-TABLES = ["mo_house_members", "mo_house_bills", "mo_house_lists", "mo_house_rollcalls", "mo_house_rollcall_votes"]
+XML_DIR = "mo_house_xml"  # under RAW_DIR: <session>/<FILE>.XML.gz
+TABLES = ["mo_house_rollcalls", "mo_house_rollcall_votes"]
 
 
 def _is_xml(data: bytes) -> bool:
     return data.lstrip()[:1] == b"<" and not data.lstrip()[:15].lower().startswith(b"<!doctype html")
 
 
-def _session_files(code: str, year: int) -> dict[str, bytes]:
-    """All XML files for a House session, keyed by upper-cased file name ({} if the session doesn't exist)."""
+def _session_files(code: str, year: int) -> Iterator[tuple[str, bytes, str]]:
+    """(upper-cased file name, XML bytes, source URL) of every XML file of a House session, one at a time (nothing
+    if the session doesn't exist)."""
     past = year < date.today().year
-    data = fetch(f"{BASE}/xml/{code}.zip", max_age=(30 if past else 7) * 86400, delay=POLITE_DELAY)
+    zip_url = f"{BASE}/xml/{code}.zip"
+    data = fetch(zip_url, max_age=(30 if past else 7) * 86400, delay=POLITE_DELAY)
     if data[:2] == b"PK":
         with zipfile.ZipFile(io.BytesIO(data)) as zf:
-            return {
-                name.rsplit("/", 1)[-1].upper(): zf.read(name)
-                for name in zf.namelist()
-                if name.lower().endswith(".xml")
-            }
+            for name in zf.namelist():
+                if name.lower().endswith(".xml"):
+                    yield name.rsplit("/", 1)[-1].upper(), zf.read(name), f"{zip_url}#{name}"
+        return
     if past or not code.endswith("1"):
-        return {}  # no such session
+        return  # no such session
     # Open regular session: no zip yet, walk the list files.
-    files: dict[str, bytes] = {}
+    listings: dict[str, etree._Element] = {}
     for kind in ("MemberList", "BillList", "SenateActList", "SessionList"):
+        url = f"{BASE}/xml/{code}-{kind}.XML"
         try:
-            listing = fetch(f"{BASE}/xml/{code}-{kind}.XML", delay=POLITE_DELAY)
+            listing = fetch(url, delay=POLITE_DELAY)
         except Exception:
             continue
         if _is_xml(listing):
-            files[f"{code}-{kind}.XML".upper()] = listing
+            if (root := parser.parse_xml(listing)) is not None:
+                listings[kind] = root
+            yield f"{code}-{kind}.XML".upper(), listing, url
+    seen: set[str] = set()  # the BillList may link a bill twice (HR1/HR2 in odd-year sessions)
     for kind, link_tag in (("MemberList", "RepresentativeXMLLink"), ("BillList", "BillXMLLink")):
-        listing = files.get(f"{code}-{kind}.XML".upper())
-        if not listing:
+        if kind not in listings:
             continue
-        for link in re.findall(rf"<{link_tag}>([^<]+)</{link_tag}>".encode(), listing):
-            url = link.decode().strip()
-            files[url.rsplit("/", 1)[-1].upper()] = fetch(url, delay=POLITE_DELAY)
-    return files
+        for url in parser.links(listings[kind], link_tag):
+            name = url.rsplit("/", 1)[-1].upper()
+            if name in seen:
+                continue
+            seen.add(name)
+            yield name, fetch(url, delay=POLITE_DELAY), url
 
 
 def _rollcall_url(code: str, day: int, number: int) -> str:
@@ -135,41 +150,53 @@ def _parse_rollcall_pdf(data: bytes) -> tuple[dict, list[tuple[str, str]]]:
     return header, votes
 
 
+def _land_file(code: str, name: str, xml: bytes, url: str) -> parser.XmlFile:
+    """Write one XML file, byte for byte, as gzip under the raw dir (the same bytes every run, so a re-run
+    rewrites nothing) and describe it for the state table."""
+    kind, item = parser.classify(name)
+    rel = f"{XML_DIR}/{code}/{name}.gz"
+    gz = gzip.compress(xml, mtime=0)
+    dest = db.RAW_DIR / rel
+    if not (dest.exists() and dest.read_bytes() == gz):
+        write_atomic(dest, gz)
+    return parser.XmlFile(
+        code, name, kind, item, url, rel, len(xml), len(gz), hashlib.sha256(xml).hexdigest(), datetime.now(UTC)
+    )
+
+
 @loader("mo_house", service="documents.house.mo.gov", slow=True)
 def load(shard: db.Shard) -> dict[str, int]:
-    """Units: each session's XML documents (by session code) and each session day's roll-call PDFs (by
-    session code and day). Every shard reads every session's XML (cached) to learn which days to probe."""
-    with db.JsonSink(shard, source_url=BASE, tables=TABLES) as sink:
+    """Units: each session's XML files (by session code) and each session day's roll-call PDFs (by session code
+    and day). Every shard reads every session's XML (cached) to learn which days to probe, but lands and parses
+    only the sessions it owns: files go to disk unchanged (state in `mo_house_xml_files`), then the parser turns
+    them into typed rows."""
+    counts: dict[str, int] = {}
+    with db.TableSink(shard, tables=[parser.XmlFile]) as files_sink:
         linked: dict[str, dict[int, set[int]]] = {}  # session code -> day -> roll-call numbers the XML links
         codes = [f"{year % 100:02d}{t}" for year in window_years() for t in SESSION_TYPES]
         progress = obs.Progress("sessions", len(codes), log)
         for code in codes:
-            files = _session_files(code, 2000 + int(code[:2]))
-            progress.tick()
-            if files:
-                linked.setdefault(code, defaultdict(set))
             owned = shard.owns(code)
-            for name, xml in files.items():
-                for url in re.findall(rb"<RollCallPDF>([^<]+)</RollCallPDF>", xml):
-                    if m := ROLLCALL_URL.search(url.decode().strip()):
+            for name, xml, url in _session_files(code, 2000 + int(code[:2])):
+                linked.setdefault(code, defaultdict(set))
+                kind, _ = parser.classify(name)
+                if owned:  # every file, whatever its kind: the raw XML is kept unchanged
+                    files_sink.add(_land_file(code, name, xml, url))
+                if kind == parser.KIND_MEMBER and not owned:
+                    continue  # members link no roll calls
+                if (root := parser.parse_xml(xml)) is None:
+                    continue
+                for pdf in parser.links(root, "RollCallPDF"):
+                    if m := ROLLCALL_URL.search(pdf):
                         linked.setdefault(m.group(1), defaultdict(set))[int(m.group(2))].add(int(m.group(3)))
                     else:
-                        log.warning("mo_house.rollcall_url_unexpected", url=url.decode().strip())
-                if not owned:
-                    continue
-                stem = name.removesuffix(".XML")
-                sess, _, item = stem.partition("-")
-                if item.isdigit():
-                    table, key, extra = "mo_house_members", f"{sess}-{item}", {"district": item}
-                elif item.endswith("LIST"):
-                    table, key, extra = "mo_house_lists", stem, {"list": item}
-                elif re.match(r"^H[A-Z]*\d+$", item):
-                    table, key, extra = "mo_house_bills", stem, {"bill": item}
-                else:
-                    continue
-                sink.add(table, key, {"session_code": sess, **extra, "doc": xmljson.parse(xml)})
+                        log.warning("mo_house.rollcall_url_unexpected", url=pdf)
+            progress.tick()
         progress.finish()
+    counts.update(files_sink.counts)
+    counts.update(parser.parse_landed(shard))
 
+    with db.JsonSink(shard, source_url=BASE, tables=TABLES) as sink:
         days = [
             (code, day)
             for code, by_day in sorted(linked.items())
@@ -193,4 +220,5 @@ def load(shard: db.Shard) -> dict[str, int]:
                         {"session_code": code, "url": url, "vote_code": c, "member_token": n},
                     )
         progress.finish()
-    return sink.counts
+    counts.update(sink.counts)
+    return counts

@@ -3,7 +3,8 @@
 select
     b.session_code,
     b.bill,
-    {{ mogov.json_str('s.value', '$.SubjectID[0]') }} as subject_id,
-    {{ mogov.json_str('s.value', '$.SubjectName[0]') }} as subject_name
-from {{ ref('stg_mo_house__bills') }} as b
-cross join lateral {{ mogov.json_elements('b.bill_doc', '$.SubjectIndex') }} as s
+    s.subject_id,
+    s.subject_name
+from {{ source('mo_house', 'xml_bills') }} as b
+inner join {{ source('mo_house', 'xml_bill_subjects') }} as s
+    on b.session_code = s.session_code and b.file_name = s.file_name
