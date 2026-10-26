@@ -108,6 +108,16 @@ def _publish(con: duckdb.DuckDBPyConnection, select_sql: str, table: str, shard:
     return con.execute(f"select count(*) from read_parquet('{dest.as_posix()}')").fetchone()[0]
 
 
+def _clear_stale_scratch(table: str, shard: Shard) -> None:
+    """Delete this shard's scratch files for <table> left by runs that were killed before they could clean up
+    (they are named .<part>.<pid>.jsonl / .<part>.<pid>.part, so each is one dead run's). A shard is a single
+    writer, and a killed run's rows are never wanted, so starting a sink for the shard makes them stale."""
+    folder = table_dir(table)
+    for suffix in ("jsonl", "part"):
+        for stale in folder.glob(f".{shard.part_name}.*.{suffix}"):
+            stale.unlink(missing_ok=True)
+
+
 def _drop_other_shard_counts(folder: Path, shard: Shard) -> None:
     for old in folder.glob("part-*-of-*.parquet"):
         if not old.name.endswith(f"-of-{shard.count:03d}.parquet"):
@@ -143,6 +153,7 @@ class JsonSink:
 
     def _file(self, table: str):
         if table not in self._files:
+            _clear_stale_scratch(table, self.shard)
             path = table_dir(table) / f".{self.shard.part_name}.{os.getpid()}.jsonl"
             self._files[table] = (path, path.open("w", encoding="utf-8"))
         return self._files[table][1]
@@ -209,6 +220,7 @@ class TableSink:
     def _file(self, row_type: type):
         table = row_type.TABLE
         if table not in self._files:
+            _clear_stale_scratch(table, self.shard)
             path = table_dir(table) / f".{self.shard.part_name}.{os.getpid()}.jsonl"
             self._types[table] = row_type
             self._files[table] = (path, path.open("w", encoding="utf-8"))
