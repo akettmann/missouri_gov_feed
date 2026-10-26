@@ -1,0 +1,17 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. No freshness here: these tables are optional (db.OPTIONAL_JSON_TABLES)
+# until a first load, which takes hours at the ~1 request/s the site allows.
+version: 2
+sources:
+- name: mo_revisor
+  description: Missouri Revisor of Statutes (revisor.mo.gov), the Revised Statutes of Missouri (RSMo) section by section.
+  tables:
+  - name: chapters
+    identifier: mo_revisor_chapters
+    description: One row per RSMo chapter in the site's table of contents (title, chapter number, chapter name).
+  - name: sections
+    identifier: mo_revisor_sections
+    description: One row per RSMo section version listed in force on its chapter page (a section can have several versions, e.g. one not yet effective). The page's content block verbatim, plus its text, effective-date line and footnotes.
+  - name: repeals
+    identifier: mo_revisor_repeals
+    description: One row per repealed or transferred RSMo section (the Revisor's rx.aspx list), with the note and date as printed.

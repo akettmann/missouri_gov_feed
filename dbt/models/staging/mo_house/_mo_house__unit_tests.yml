@@ -89,3 +89,37 @@ unit_tests:
     expect:
       rows:
         - {session_code: '251', session_year: 2025, committee_id: '3029', committee_name: Accounts, member_name: Peggy McGaugh, district_number: 7, position_name: Chair, chamber: H}
+
+  - name: senate_act_list_stages_every_senate_bill
+    model: stg_mo_house__bill_actions
+    description: >
+      House bill actions come from the bill's own file (joined by session and file name, so the same file name in
+      another session does not bleed in); Senate bills that reached the House come from the SenateActList actions,
+      one row per bill and action. Every Senate bill must be staged, not just the first, and an action repeated
+      word for word under one Guid is kept once, on the House side (HB1) and the Senate side (SB834). Dropping
+      the Senate union, joining on file name alone, or removing distinct from either branch fails this test.
+    given:
+      - input: source('mo_house', 'xml_bills')
+        format: sql
+        rows: |
+            select cast('261' as varchar) as session_code, cast('261-HB1.XML' as varchar) as file_name, cast('HB1' as varchar) as bill union all
+            select '261', '261-HB2.XML', 'HB2'
+      - input: source('mo_house', 'xml_bill_actions')
+        format: sql
+        rows: |
+            select cast('261' as varchar) as session_code, cast('261-HB1.XML' as varchar) as file_name, cast('1' as varchar) as guid, cast('Referred: General Laws(H)' as varchar) as description, cast(1 as bigint) as activity_sequence, cast('2026-01-10' as date) as pub_date union all
+            select '261', '261-HB1.XML', '1', 'Referred: General Laws(H)', 1, cast('2026-01-10' as date) union all
+            select '261', '261-HB2.XML', '4', 'Reported Do Pass (H)', 1, cast('2026-02-01' as date) union all
+            select '251', '261-HB1.XML', '9', 'Other session', 1, cast('2025-01-10' as date)
+      - input: source('mo_house', 'xml_senate_act_actions')
+        format: sql
+        rows: |
+            select cast('261' as varchar) as session_code, cast('SB834' as varchar) as bill, cast('2' as varchar) as guid, cast('Reported to the House and First Read (H)' as varchar) as description, cast(1 as bigint) as activity_sequence, cast('2026-03-25' as date) as pub_date union all
+            select '261', 'SB834', '2', 'Reported to the House and First Read (H)', 1, cast('2026-03-25' as date) union all
+            select '261', 'SB999', '3', 'Truly Agreed To and Finally Passed', 2, cast('2026-05-14' as date)
+    expect:
+      rows:
+        - {session_code: '261', bill: HB1, listed_in: house_bill_list, action_seq: 1, action_date: 2026-01-10, description: 'Referred: General Laws(H)', action_guid: '1'}
+        - {session_code: '261', bill: HB2, listed_in: house_bill_list, action_seq: 1, action_date: 2026-02-01, description: 'Reported Do Pass (H)', action_guid: '4'}
+        - {session_code: '261', bill: SB834, listed_in: senate_act_list, action_seq: 1, action_date: 2026-03-25, description: 'Reported to the House and First Read (H)', action_guid: '2'}
+        - {session_code: '261', bill: SB999, listed_in: senate_act_list, action_seq: 2, action_date: 2026-05-14, description: 'Truly Agreed To and Finally Passed', action_guid: '3'}
