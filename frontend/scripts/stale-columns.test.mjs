@@ -55,14 +55,60 @@ test("query() reports a stale fct_jurisdiction_businesses export instead of a bi
     },
   ));
 
-test("query() explains a missing column on a table REQUIRED_COLUMNS does not list", () =>
+const unlistedMessage = (e) =>
+  /t_unlisted has no column newer: if the column is new, the export is stale/.test(e.message) &&
+  e.message.includes("uv run mogov export --format parquet") &&
+  /Otherwise the query is wrong/.test(e.message) &&
+  /DuckDB: Binder Error/.test(e.message) &&
+  e.cause instanceof Error &&
+  /Binder Error/.test(e.cause.message);
+
+test("query() explains a missing column on a table REQUIRED_COLUMNS does not list, keeping DuckDB's message", () =>
   withExports({ t_unlisted: "select 1 as a" }, async (query) => {
+    await assert.rejects(query("select a, newer from {t_unlisted}"), unlistedMessage);
+  }));
+
+test("query() explains a qualified missing column (alias.column)", () =>
+  withExports({ t_unlisted: "select 1 as a" }, async (query) => {
+    await assert.rejects(query("select p.newer from {t_unlisted} p"), unlistedMessage);
+  }));
+
+test("query() names a column missing from every table of a join once, not per table", () =>
+  withExports({ j1: "select 1 as a", j2: "select 1 as a" }, async (query) => {
     await assert.rejects(
-      query("select a, newer from {t_unlisted}"),
+      query("select zz from {j1} x join {j2} y on x.a = y.a"),
+      (e) => /none of j1, j2 has column zz/.test(e.message) && !/j1 lacks/.test(e.message),
+    );
+  }));
+
+test("up-front check names every missing required column of a listed table, before any SQL runs", () =>
+  withExports({ rpt_attendance_pay: "select 1 as other" }, async (query) => {
+    await assert.rejects(
+      query("select other from {rpt_attendance_pay}"),
       (e) =>
-        /stale export: t_unlisted lacks newer/.test(e.message) &&
-        /Re-export/.test(e.message) &&
-        !/Binder/.test(e.message),
+        /^stale export: rpt_attendance_pay lacks .*pay_source_url/.test(e.message) &&
+        /covered_years/.test(e.message) &&
+        /voting_years/.test(e.message) &&
+        !/Binder|query is wrong/.test(e.message),
+    );
+  }));
+
+test("a binder error naming a column the export does have is not called stale", () =>
+  withExports({ t_has: "select 1 as a, 2 as b" }, async (query) => {
+    // `b` exists in the export; the error is about the query (a CTE alias hides it).
+    await assert.rejects(
+      query("with c as (select a from {t_has}) select b from c"),
+      (e) => /Binder Error/.test(e.message) && !/stale|query is wrong/.test(e.message),
+    );
+  }));
+
+test("a typo in a query on a current export is not called stale", () =>
+  withExports({ t_typo: "select 1 as a" }, async (query) => {
+    await assert.rejects(
+      query("select a, aa from {t_typo}"),
+      (e) =>
+        /t_typo has no column aa: if the column is new/.test(e.message) &&
+        /Otherwise the query is wrong/.test(e.message),
     );
   }));
 

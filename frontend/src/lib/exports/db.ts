@@ -2,7 +2,7 @@
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
-import { assertNoMissingColumns, REQUIRED_COLUMNS } from "./requiredColumns.ts";
+import { assertNoMissingColumns, REEXPORT_COMMANDS, REQUIRED_COLUMNS } from "./requiredColumns.ts";
 
 /** MOGOV_EXPORTS overrides the default `<repo>/data/exports`; builds run from frontend/ (pnpm scripts). */
 export const EXPORTS_DIR = path.resolve(
@@ -78,24 +78,33 @@ export async function query<T>(sql: string, params?: (string | number)[]): Promi
 }
 
 /**
- * Catch-all for tables REQUIRED_COLUMNS does not list: a binder error naming a column that one of the
- * exports in this SQL lacks is a stale export, so say so. Otherwise it is a real SQL bug: rethrow as is.
+ * Catch-all for tables REQUIRED_COLUMNS does not list: a binder error naming a column that none of the
+ * exports in this SQL has is either a stale export or a typo in the query, and DuckDB cannot tell which.
+ * Say both, keep DuckDB's message and the original error as `cause`. Anything else is rethrown as is.
  */
 async function explainBinderError(e: unknown, tables: string[]): Promise<unknown> {
-  const m = /Binder Error: .*?(?:Referenced column|Column) "(\w+)"/s.exec(
-    e instanceof Error ? e.message : "",
-  );
+  const msg = e instanceof Error ? e.message : "";
+  const m =
+    /Binder Error: .*?(?:Referenced column|Column) "(\w+)"/s.exec(msg) ??
+    /Binder Error: (?:Table|Values list) "\w+" does not have a column named "(\w+)"/.exec(msg);
   if (!m) return e;
-  const stale: Record<string, string[]> = {};
+  const column = m[1];
+  const lacking: string[] = [];
   for (const t of tables) {
     if (!hasExport(t)) continue;
     const cols = await exportColumns(t).catch(() => null);
-    if (cols && !cols.includes(m[1])) stale[t] = [m[1]];
+    if (cols && !cols.includes(column)) lacking.push(t);
   }
-  try {
-    assertNoMissingColumns(Object.fromEntries(Object.keys(stale).map((t) => [t, []])), stale);
-  } catch (staleError) {
-    return staleError;
-  }
-  return e;
+  if (lacking.length === 0) return e;
+  const who =
+    lacking.length === 1
+      ? `${lacking[0]} has no column ${column}`
+      : lacking.length === tables.length
+        ? `none of ${lacking.join(", ")} has column ${column}`
+        : `${lacking.join(", ")} have no column ${column}`;
+  return new Error(
+    `${who}: if the column is new, the export is stale; re-export with ${REEXPORT_COMMANDS}. ` +
+      `Otherwise the query is wrong. DuckDB: ${msg}`,
+    { cause: e },
+  );
 }
