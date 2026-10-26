@@ -4,6 +4,7 @@
 import { createHash } from "node:crypto";
 import { DONOR_GROUP_SQL } from "../rollups";
 import { exportedAt, hasExport, query } from "./db";
+import { buildCommitteeSessions, type PostCounts, type TitledMembership } from "../committeePosts";
 import { payYearsGate, type PayVoteRow } from "../attendancePay";
 import { groupPast, linkSameName, type RosterRow } from "./past";
 import { sampleDonorCycles, sampleGiftRollup, sampleTopDonors } from "./fixtures";
@@ -412,6 +413,24 @@ async function loadAll(): Promise<OfficialBundle[]> {
       )
     : null;
 
+  // House committee posts: counts from fct_committee_posts, committee names from the titled memberships only
+  const committeeSessions =
+    hasExport("fct_committee_posts") && hasExport("fct_committee_memberships")
+      ? buildCommitteeSessions(
+          await query<PostCounts>(`
+            select official_id, session_code, cast(session_year as integer) as session_year,
+                   cast(committees_held as integer) as committees_held, cast(chair_posts as integer) as chair_posts,
+                   cast(vice_chair_posts as integer) as vice_chair_posts,
+                   cast(co_chair_posts as integer) as co_chair_posts, cast(ranking_posts as integer) as ranking_posts
+            from {fct_committee_posts}`),
+          await query<TitledMembership>(`
+            select official_id, session_code, committee_name, position_name, is_subcommittee
+            from {fct_committee_memberships} where position_name <> 'Member'`),
+          process.env,
+          console.warn,
+        )
+      : null;
+
   // a federal appellate judge has ~6k cases: ship yearly counts plus the most recent ones
   const RECENT_CASES = 50;
   const hasCases = hasExport("fct_case_history");
@@ -513,6 +532,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
           by_subject: subjects ? ((subjects.get(id) ?? []) as SubjectVotes[]) : null,
         },
         overlap: hasOverlap ? ((overlap.get(id) ?? []) as InterestOverlap[]) : null,
+        committees: committeeSessions ? (committeeSessions.get(id) ?? []) : null,
         courts: {
           status: status("cases"),
           time_to_disposition: dispositions.get(id) ?? null,
@@ -632,6 +652,8 @@ export function freshness(): { table: string; exported_at: string | null; sample
     "rpt_gift_rollup",
     "rpt_indicator_peers",
     "rpt_party_breaks",
+    "fct_committee_posts",
+    "fct_committee_memberships",
     "rpt_attendance",
     "rpt_attendance_pay",
     "rpt_votes_by_subject",

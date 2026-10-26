@@ -1,7 +1,7 @@
 -- House committee and subcommittee memberships per member and session, keyed to the person (person_key from
 -- int_mo_house__member_identity). The member pages (stg_mo_house__member_committees) cover every session but
 -- 253; for a session with no member-page rows the COMMITTEELIST export fills in (House members only, matched
--- on session + district). Grain: one row per (session, member, committee).
+-- on session + district).
 with member_pages as (
     select
         c.session_code,

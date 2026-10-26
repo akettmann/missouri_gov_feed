@@ -12,6 +12,7 @@ import { districtSiteLists, districtSites } from "../../../lib/exports/districtS
 import { allOfficials } from "../../../lib/exports/load";
 import { count, officeLine } from "../../../lib/format";
 import { href } from "../../../lib/site";
+import { siteLinkContexts } from "../../../lib/siteLinkNames";
 
 export const getStaticPaths = (async () => {
   const lists = await districtSiteLists();
@@ -25,6 +26,7 @@ export const getStaticPaths = (async () => {
 const { list, official } = Astro.props;
 const sites = await districtSites(list.district_id);
 const area = officeLine(official);
+const recordContexts = siteLinkContexts(sites);
 ---
 
 <Layout
@@ -105,7 +107,7 @@ const area = officeLine(official);
                 {s.frs_url && (
                   <a href={s.frs_url} rel="noopener noreferrer" target="_blank">
                     EPA record
-                    <span class="sr-only"> for {s.facility_name ?? "unnamed site"}</span>
+                    <span class="sr-only"> {recordContexts[si]}</span>
                     <span aria-hidden="true">↗</span>
                   </a>
                 )}

@@ -7,6 +7,8 @@
 --     but the session (and their votes) began January 4.
 --   * seed legislator_seat_corrections adds terms Open States lacks or cuts short (senators who left
 --     mid-term for statewide office), each with its source.
+-- source_start_date/source_end_date carry the dates exactly as Open States (or the seed) gives them, without those
+-- adjustments (null start when undated; end 9999-12-31 while open).
 with roles as (
     select
         openstates_id,
