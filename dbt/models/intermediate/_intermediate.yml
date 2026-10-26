@@ -292,6 +292,12 @@ models:
     member id>, so people missing from Open States still get a key. One person can end up with several raw keys
     across sessions (see int_officials__person_ids); int_mo_house__member_identity applies that. Grain: one row
     per (House session, member) with the seat-matched raw_person_key.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - session_code
+        - district_number
 - name: int_mo_house__votes
   description: 'MO House roll-call votes attributed to people. A PDF token ("SMITH 46", "FOUNTAIN HENDERS", "MR
     SPEAKER") is matched against that session''s House member list: same surname (prefix match for names the PDF
