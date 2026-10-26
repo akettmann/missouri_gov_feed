@@ -116,7 +116,8 @@ async function load(): Promise<DistrictData | null> {
   const slugOf = new Map(bundles.map((b) => [b.official.official_id, b.official.slug]));
 
   const links = await query<{ official_id: string; district_id: string }>(`
-    select distinct official_id, district_id from {fct_official_districts}`);
+    select distinct official_id, district_id from {fct_official_districts}
+    order by district_id, official_id`);
   const officials: Record<string, string[]> = {};
   for (const l of links) {
     const slug = slugOf.get(l.official_id);
@@ -135,7 +136,7 @@ async function load(): Promise<DistrictData | null> {
     from {dim_district}
     where is_current and geometry_geojson is not null
       and (district_type <> 'place' or district_id in (select district_id from {fct_official_districts}))
-    order by district_type, district_number, name`);
+    order by district_type, district_number, name, district_id`);
 
   const shapes: DistrictShape[] = [];
   const map: DistrictData["map"] = [];
@@ -175,7 +176,7 @@ async function load(): Promise<DistrictData | null> {
     left join {dim_district} as d on d.district_id = f.district_id
     order by f.county_id,
       case f.district_type when 'us_house' then 1 when 'state_senate' then 2 when 'state_house' then 3 else 4 end,
-      d.district_number`)) {
+      d.district_number, f.district_id`)) {
     const into = r.district_type === "place" ? countyCities : countyDistricts;
     (into[r.county_id] ??= []).push(r.district_id);
   }

@@ -110,7 +110,9 @@ sic_prefixes as (
         s.rank_class,
         s.n_program_systems,
         m.naics_prefix,
-        row_number() over (partition by s.registry_id, s.sic_code order by length(m.sic_prefix) desc) as rn
+        row_number()
+            over (partition by s.registry_id, s.sic_code order by length(m.sic_prefix) desc, m.naics_prefix)
+            as rn
     from sic as s
     inner join {{ ref('sic_naics_sectors') }} as m on left(s.sic_code, length(m.sic_prefix)) = m.sic_prefix
 ),

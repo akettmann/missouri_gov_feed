@@ -150,7 +150,13 @@ ranked as (
         *,
         row_number() over (
             partition by official_id, office_title, start_date
-            order by source_rank
+            order by
+                source_rank asc,
+                source asc,
+                -- the open term (null end) first, then the latest end: a renewed or current term beats a stale copy
+                coalesce(end_date, {{ dbt.safe_cast("'9999-12-31'", 'date') }}) desc,
+                district,
+                jurisdiction asc
         ) as rn
     from all_terms
 )

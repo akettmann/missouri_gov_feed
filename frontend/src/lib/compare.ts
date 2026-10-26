@@ -73,7 +73,7 @@ function giftCells(b: OfficialBundle, hideMedium: boolean): [string, string] {
   const byPrincipal = new Map<string, number>();
   for (const r of rows)
     byPrincipal.set(r.lobbyist_principal, (byPrincipal.get(r.lobbyist_principal) ?? 0) + r.total_amount);
-  const [top] = [...byPrincipal].sort((x, y) => y[1] - x[1]);
+  const [top] = [...byPrincipal].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]));
   const sample = b.gifts.sample ? " (sample data)" : "";
   return [`${money(total)} in ${plural(n, "gift", "gifts")}${sample}`, `${top[0]} (${money(top[1])})`];
 }

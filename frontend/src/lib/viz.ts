@@ -322,7 +322,7 @@ export const VIZ: Record<string, VizSpec> = {
             confidence: medium || "matched",
           };
         })
-        .sort((a, b) => b.total - a.total)
+        .sort((a, b) => b.total - a.total || a.label.localeCompare(b.label))
         .slice(0, 10);
     },
   },

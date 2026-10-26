@@ -10,6 +10,6 @@ export async function loadLegislatorExpenses(): Promise<Map<string, LegislatorEx
     select official_id, cast(fiscal_year as integer) as fiscal_year, expense_type, payee_name,
            cast(amount as double) as amount, match_confidence, source_url
     from {fct_legislator_expenses}
-    order by official_id, expense_type, fiscal_year desc`);
+    order by official_id, expense_type, fiscal_year desc, payee_name, amount, source_url, match_confidence`);
   return groupExpenses(rows);
 }

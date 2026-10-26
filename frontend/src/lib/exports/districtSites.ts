@@ -38,7 +38,7 @@ function load(): Promise<Loaded | null> {
              naics_description, owner_name, parent_company_name, is_donor, matched_by,
              match_confidence, frs_url
       from {fct_jurisdiction_businesses}
-      order by district_id, is_donor desc, city, facility_name, frs_url`);
+      order by district_id, is_donor desc, city, facility_name, frs_url, registry_id`);
 
     // Pages are keyed by district but written for one official, so the district <-> official mapping
     // must be 1:1 (the table only guarantees uniqueness on (official_id, district_id)); fail loudly.
