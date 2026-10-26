@@ -307,6 +307,24 @@ models:
     who left mid-session are missing from that session''s (end-of-session) list, so a second pass matches against
     every session''s members. Keys ignore spaces ("VANSCHOIACK" = "Van Schoiack"). Tokens matching zero or several
     people stay unattributed rather than guessed. Grain: one row per (House roll call, attributed person).'
+- name: int_mo_legislators__final_checks
+  description: 'Legislator payroll rows that are a departed member''s final check: a small payment to a payee whose
+    surname and first name fit a member of the same chamber whose seat ended the December before the pay year, or
+    that January (Open States ends the 2022 and 2024 departures on 2023-01-03 and 2025-01-07), and who was paid
+    well under a full year''s salary (under half of the year''s highest pay for the position). It is that departed
+    member''s last pay, unless the member later held a seat in the chamber again, so neither it nor the member competes
+    for the seats held now ("BLACK, LINDA R." 2017 is Linda Black''s, not a second claimant to Rusty Black''s seat,
+    whose middle initial it shares, #250). fct_salaries sets these rows aside and, for a departed member, matches
+    them by name only (#269, #471). The payee is identified by the payroll''s employee_name, exactly as printed.
+    Grain: one row per (pay year, chamber, payroll employee_name, departed member).'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - calendar_year
+        - seat_chamber
+        - employee_name
+        - person_id
 - name: int_mo_legislators__seat_terms
   description: 'Every Missouri legislative seat-term in Open States (current and retired people), keyed for matching:
     chamber, district number, surname key, and date range (open-ended where Open States has no date). One row per
