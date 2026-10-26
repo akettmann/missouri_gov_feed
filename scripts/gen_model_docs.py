@@ -13,6 +13,7 @@ from pathlib import Path
 import yaml
 
 GRAIN = {
+    "int_bills__list": "one row per (session, bill), House and Senate bills",
     "int_bills__status": "one row per (session, bill) in the House XML export, House and Senate bills",
     "int_bills__subjects": "one row per (session, bill, subject) from one chamber's index",
     "int_bluebook__bios": "one biography per (edition, person) in the legislative/executive chapters",
