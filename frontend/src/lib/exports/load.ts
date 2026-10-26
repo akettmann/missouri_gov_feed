@@ -193,6 +193,10 @@ async function loadAll(): Promise<OfficialBundle[]> {
                  ) as rank
           from {rpt_donor_rollup}
           where donor_mec_committee_id is not null
+            -- rank only committees that have a donor list to show, so the top ${TRAILS} are all displayable
+            and exists (
+              select 1 from {rpt_committee_donors} as cd where cd.mec_committee_id = donor_mec_committee_id
+            )
           group by official_id, donor_mec_committee_id
         ) ranked
         where rank <= ${TRAILS} order by official_id, rank`)

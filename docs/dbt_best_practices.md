@@ -32,9 +32,7 @@ projects", and the testing and documentation best practices.
 - `indirect_selection: buildable` (dbt_project.yml): a test runs only if every model it reads is selected or upstream
   of the selection. With dbt's default `eager`, `-s +rpt_awards` ran `assert_official_ids_one_per_person` against a
   stale `int_officeholders__years` and reported failures a full build doesn't produce (#198). To run such a test, select
-  it (`-s +test_name`) so its parents rebuild. `buildable` is a complete guard only for `+model` selections (a model
-  plus its parents): with `model+` or a bare `-s model`, a downstream test can still read a stale table. After changing
-  `dim_official` (its ids), build `dim_official+` so every model and test that reads the ids is rebuilt together.
+  it (`-s +test_name`) so its parents rebuild.
 - Ties are broken on stable keys: every `row_number()` / `rank()` that picks a row, and every frontend `order by ... limit`
   or sort that lists the top N, ends its order with a key that is unique within the group, never a lone amount or date,
   so two builds of the same data give byte-identical site output (#226). `scripts/check_site_determinism.py` builds the

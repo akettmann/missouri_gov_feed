@@ -607,7 +607,8 @@ unit_tests:
     description: >
       Three CourtListener position rows per official, title and start date (so the same source rank) differ only in
       end date. The kept row must be the same on every build, not whichever the engine happens to read first (#226):
-      the earliest end date. The inputs list the rows in descending or mixed order, so a pick by row order fails.
+      the open term (no end date) if there is one, else the latest end date (an ended copy must not hide a current term).
+      The inputs list the rows in ascending, descending or mixed order, so a pick by row order fails.
     given:
       - input: ref('int_officials__current')
         rows: []
@@ -641,20 +642,23 @@ unit_tests:
           - {official_id: judge4, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2019-01-01'}
           - {official_id: judge4, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2020-01-01'}
           - {official_id: judge4, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2018-01-01'}
+          - {official_id: judge4, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: null}
           - {official_id: judge5, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2020-01-01'}
           - {official_id: judge5, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2019-01-01'}
           - {official_id: judge5, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2018-01-01'}
+          - {official_id: judge5, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: null}
           - {official_id: judge6, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2019-01-01'}
           - {official_id: judge6, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2020-01-01'}
           - {official_id: judge6, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: '2018-01-01'}
+          - {official_id: judge6, position_title: Judge, organization: null, start_date: '2010-01-01', end_date: null}
     expect:
       rows:
-        - {official_id: judge1, office_title: Judge, start_date: '2010-01-01', end_date: '2018-01-01', source: courtlistener}
-        - {official_id: judge2, office_title: Judge, start_date: '2010-01-01', end_date: '2018-01-01', source: courtlistener}
-        - {official_id: judge3, office_title: Judge, start_date: '2010-01-01', end_date: '2018-01-01', source: courtlistener}
-        - {official_id: judge4, office_title: Judge, start_date: '2010-01-01', end_date: '2018-01-01', source: courtlistener}
-        - {official_id: judge5, office_title: Judge, start_date: '2010-01-01', end_date: '2018-01-01', source: courtlistener}
-        - {official_id: judge6, office_title: Judge, start_date: '2010-01-01', end_date: '2018-01-01', source: courtlistener}
+        - {official_id: judge1, office_title: Judge, start_date: '2010-01-01', end_date: '2020-01-01', source: courtlistener}
+        - {official_id: judge2, office_title: Judge, start_date: '2010-01-01', end_date: '2020-01-01', source: courtlistener}
+        - {official_id: judge3, office_title: Judge, start_date: '2010-01-01', end_date: '2020-01-01', source: courtlistener}
+        - {official_id: judge4, office_title: Judge, start_date: '2010-01-01', end_date: null, source: courtlistener}
+        - {official_id: judge5, office_title: Judge, start_date: '2010-01-01', end_date: null, source: courtlistener}
+        - {official_id: judge6, office_title: Judge, start_date: '2010-01-01', end_date: null, source: courtlistener}
 
   - name: case_history_tied_duplicates_pick_the_same_row_whatever_the_input_order
     model: fct_case_history

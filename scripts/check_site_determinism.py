@@ -27,7 +27,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def _shuffled_copy(src: Path, dst: Path) -> None:
     con = duckdb.connect()
     for f in sorted(src.glob("*.parquet")):
-        src_file, dst_file = f.as_posix(), (dst / f.name).as_posix()
+        src_file = f.as_posix().replace("'", "''")
+        dst_file = (dst / f.name).as_posix().replace("'", "''")
         con.execute(
             f"copy (select * from read_parquet('{src_file}') order by random()) to '{dst_file}' (format parquet)"
         )
@@ -53,6 +54,10 @@ def main() -> int:
     ap.add_argument("--shuffle", action="store_true", help="build the second time from exports with shuffled rows")
     ap.add_argument("--exports", type=Path, default=Path(os.environ.get("MOGOV_EXPORTS", ROOT / "data" / "exports")))
     args = ap.parse_args()
+    if not args.exports.is_dir() or not any(args.exports.glob("*.parquet")):
+        sys.exit(f"no exports (*.parquet) in {args.exports}; run `mogov export` first, or pass --exports DIR")
+    if not (args.exports / "dim_official.parquet").exists():
+        sys.exit(f"{args.exports} looks stale or partial (no dim_official.parquet); re-run `mogov export`")
     with tempfile.TemporaryDirectory(prefix="mogov_det_") as tmp:
         tmp_dir = Path(tmp)
         second_exports = args.exports
