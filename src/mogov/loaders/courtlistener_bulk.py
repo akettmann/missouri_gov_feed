@@ -11,6 +11,8 @@ import bz2
 import re
 import shutil
 
+from lxml import etree
+
 from mogov import db
 from mogov.config import CACHE_DIR
 from mogov.http import fetch, fetch_to_file
@@ -37,9 +39,42 @@ TABLES = {
 }
 
 
+_SNAPSHOT_KEY = re.compile(r"^bulk-data/people-db-people-(\d{4}-\d{2}-\d{2})\.csv\.bz2$")
+
+
+def _parse_listing(raw: bytes) -> tuple[list[str], str | None]:
+    """Return (object keys, next continuation token or None) from one S3 ListObjectsV2 XML page.
+
+    Hardened parser settings and local-name selection (the response is namespaced); same settings as the
+    other XML loaders so a later cleanup can unify them behind one helper.
+    """
+    parser = etree.XMLParser(recover=True, resolve_entities=False, no_network=True, huge_tree=True)
+    root = etree.fromstring(raw, parser)
+    if root is None:
+        return [], None
+    keys, token, truncated = [], None, False
+    for el in root:
+        if not isinstance(el.tag, str):  # comments, processing instructions
+            continue
+        name = etree.QName(el).localname
+        if name == "Contents":
+            keys += [(k.text or "").strip() for k in el if isinstance(k.tag, str) and etree.QName(k).localname == "Key"]
+        elif name == "IsTruncated":
+            truncated = (el.text or "").strip().lower() == "true"
+        elif name == "NextContinuationToken":
+            token = (el.text or "").strip() or None
+    return keys, (token if truncated else None)
+
+
 def _latest_snapshot() -> str:
-    listing = fetch(f"{BUCKET}/", {"list-type": "2", "prefix": "bulk-data/people-db-people-"}).decode()
-    dates = re.findall(r"people-db-people-(\d{4}-\d{2}-\d{2})\.csv\.bz2", listing)
+    params = {"list-type": "2", "prefix": "bulk-data/people-db-people-"}
+    dates: list[str] = []
+    while True:
+        keys, token = _parse_listing(fetch(f"{BUCKET}/", params))
+        dates += [m.group(1) for k in keys if (m := _SNAPSHOT_KEY.match(k))]
+        if token is None:
+            break
+        params = {**params, "continuation-token": token}
     if not dates:
         raise RuntimeError("no CourtListener people snapshot found in bucket listing")
     return max(dates)
