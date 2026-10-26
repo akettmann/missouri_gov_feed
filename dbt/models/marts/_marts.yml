@@ -805,8 +805,8 @@ models:
           - dbt_utils.expression_is_true:
               arguments:
                 expression: "is not null"
-                config:
-                  where: "indicator = 'party_unity_pct'"
+              config:
+                where: "indicator = 'party_unity_pct'"
       - name: last_vote_year
         data_type: integer
         description: >
@@ -816,8 +816,20 @@ models:
           - dbt_utils.expression_is_true:
               arguments:
                 expression: ">= first_vote_year"
-                config:
-                  where: "indicator = 'party_unity_pct'"
+              config:
+                where: "indicator = 'party_unity_pct'"
+      - name: chamber_data_start_year
+        data_type: integer
+        description: >
+          Party unity only (null otherwise): the first calendar year with a dated party-line vote for `chamber` in our
+          loaded data, from any official. When `first_vote_year` equals it, the official's range starts where our
+          records begin, not necessarily where their service did.
+        data_tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "<= first_vote_year"
+              config:
+                where: "indicator = 'party_unity_pct'"
 
   - name: fct_commercial_ties
     description: >

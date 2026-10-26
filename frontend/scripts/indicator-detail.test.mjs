@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { indicatorDetailText } from "../src/lib/indicators.ts";
+import { indicatorDetailText, voteYearsText } from "../src/lib/indicators.ts";
 
 test("party unity names the chamber and counts with separators", () => {
   assert.equal(
@@ -22,15 +22,15 @@ test("party unity names the chamber and counts with separators", () => {
   );
 });
 
-test("party unity states the official's own first-last vote year", () => {
+test("party unity binds the official's first-last vote year to the votes", () => {
   const d = "state_house: 1006 party-line votes";
   assert.equal(
-    indicatorDetailText(d, { first_vote_year: 2017, last_vote_year: 2026 }),
-    "Based on 1,006 votes this official cast on party-line roll calls in the Missouri House, 2017–2026",
+    indicatorDetailText(d, { first_vote_year: 2017, last_vote_year: 2026, chamber_data_start_year: 2016 }),
+    "Based on 1,006 votes this official cast on party-line roll calls in the Missouri House from 2017 to 2026",
   );
   assert.equal(
     indicatorDetailText("us_senate: 3 party-line votes", { first_vote_year: 2023, last_vote_year: 2023 }),
-    "Based on 3 votes this official cast on party-line roll calls in the U.S. Senate, 2023",
+    "Based on 3 votes this official cast on party-line roll calls in the U.S. Senate in 2023",
   );
   // missing years (older export) leave the caption as before rather than printing "null"
   assert.equal(
@@ -45,6 +45,32 @@ test("party unity states the official's own first-last vote year", () => {
     }),
     "Voteview DW-NOMINATE, U.S. House, 119th Congress",
   );
+});
+
+test("a range that starts where our records begin says so", () => {
+  assert.equal(
+    indicatorDetailText("state_house: 1006 party-line votes", {
+      first_vote_year: 2016,
+      last_vote_year: 2026,
+      chamber_data_start_year: 2016,
+    }),
+    "Based on 1,006 votes this official cast on party-line roll calls in the Missouri House from 2016 to 2026 (our records for this chamber begin in 2016)",
+  );
+  assert.equal(
+    voteYearsText({ first_vote_year: 2021, last_vote_year: 2021, chamber_data_start_year: 2021 }),
+    "in 2021 (our records for this chamber begin in 2021)",
+  );
+  // the official's first year is later than the data start: no note
+  assert.equal(
+    voteYearsText({ first_vote_year: 2019, last_vote_year: 2026, chamber_data_start_year: 2016 }),
+    "from 2019 to 2026",
+  );
+  assert.equal(voteYearsText({ first_vote_year: null, last_vote_year: null }), "");
+});
+
+test("SectionVoting shows the same range beside the party-unity percentage", () => {
+  const src = readFileSync(new URL("../src/components/SectionVoting.astro", import.meta.url), "utf8");
+  assert.match(src, /voteYearsText\(unity\)/);
 });
 
 test("DW-NOMINATE keeps the Congress ordinal as written", () => {

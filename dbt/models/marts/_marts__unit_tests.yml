@@ -522,17 +522,22 @@ unit_tests:
           - {official_id: o1, chamber: state_house, vote_year: 2020, party_line_votes: 600, with_party_votes: 500}
           - {official_id: o1, chamber: state_house, vote_year: 2021, party_line_votes: 406, with_party_votes: 400}
           - {official_id: o1, chamber: state_house, vote_year: null, party_line_votes: 5, with_party_votes: 5}
+          # another official's earlier year sets the chamber's data start; a different chamber starts later
+          - {official_id: o9, chamber: state_house, vote_year: 2019, party_line_votes: 3, with_party_votes: 3}
+          - {official_id: o9, chamber: state_senate, vote_year: 2022, party_line_votes: 3, with_party_votes: 3}
     expect:
       rows:
-        - {official_id: o1, indicator: dw_nominate_dim1, period: 103, detail: 'Voteview DW-NOMINATE, House 103rd Congress', first_vote_year: null, last_vote_year: null}
-        - {official_id: o1, indicator: dw_nominate_dim1, period: 111, detail: 'Voteview DW-NOMINATE, House 111th Congress', first_vote_year: null, last_vote_year: null}
-        - {official_id: o1, indicator: dw_nominate_dim1, period: 112, detail: 'Voteview DW-NOMINATE, House 112th Congress', first_vote_year: null, last_vote_year: null}
-        - {official_id: o1, indicator: dw_nominate_dim1, period: 113, detail: 'Voteview DW-NOMINATE, House 113th Congress', first_vote_year: null, last_vote_year: null}
-        - {official_id: o1, indicator: dw_nominate_dim1, period: 119, detail: 'Voteview DW-NOMINATE, House 119th Congress', first_vote_year: null, last_vote_year: null}
-        - {official_id: o1, indicator: dw_nominate_dim1, period: 121, detail: 'Voteview DW-NOMINATE, House 121st Congress', first_vote_year: null, last_vote_year: null}
-        - {official_id: o1, indicator: dw_nominate_dim1, period: 122, detail: 'Voteview DW-NOMINATE, House 122nd Congress', first_vote_year: null, last_vote_year: null}
-        - {official_id: o1, indicator: dw_nominate_dim1, period: 123, detail: 'Voteview DW-NOMINATE, House 123rd Congress', first_vote_year: null, last_vote_year: null}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 103, detail: 'Voteview DW-NOMINATE, House 103rd Congress', first_vote_year: null, last_vote_year: null, chamber_data_start_year: null}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 111, detail: 'Voteview DW-NOMINATE, House 111th Congress', first_vote_year: null, last_vote_year: null, chamber_data_start_year: null}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 112, detail: 'Voteview DW-NOMINATE, House 112th Congress', first_vote_year: null, last_vote_year: null, chamber_data_start_year: null}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 113, detail: 'Voteview DW-NOMINATE, House 113th Congress', first_vote_year: null, last_vote_year: null, chamber_data_start_year: null}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 119, detail: 'Voteview DW-NOMINATE, House 119th Congress', first_vote_year: null, last_vote_year: null, chamber_data_start_year: null}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 121, detail: 'Voteview DW-NOMINATE, House 121st Congress', first_vote_year: null, last_vote_year: null, chamber_data_start_year: null}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 122, detail: 'Voteview DW-NOMINATE, House 122nd Congress', first_vote_year: null, last_vote_year: null, chamber_data_start_year: null}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 123, detail: 'Voteview DW-NOMINATE, House 123rd Congress', first_vote_year: null, last_vote_year: null, chamber_data_start_year: null}
         # data_end_year is the max last_year in the Shor-McCarty data (2022, from Roe), shown for both legislators
-        - {official_id: o2, indicator: shor_mccarty_np, period: 2018, detail: 'Shor-McCarty career ideal point; in the Shor-McCarty data 2009-2018 (data ends 2022)', first_vote_year: null, last_vote_year: null}
-        - {official_id: o3, indicator: shor_mccarty_np, period: 2022, detail: 'Shor-McCarty career ideal point; in the Shor-McCarty data 2015-2022 (data ends 2022)', first_vote_year: null, last_vote_year: null}
-        - {official_id: o1, indicator: party_unity_pct, period: null, detail: 'state_house: 1011 party-line votes', first_vote_year: 2020, last_vote_year: 2021}
+        - {official_id: o2, indicator: shor_mccarty_np, period: 2018, detail: 'Shor-McCarty career ideal point; in the Shor-McCarty data 2009-2018 (data ends 2022)', first_vote_year: null, last_vote_year: null, chamber_data_start_year: null}
+        - {official_id: o3, indicator: shor_mccarty_np, period: 2022, detail: 'Shor-McCarty career ideal point; in the Shor-McCarty data 2015-2022 (data ends 2022)', first_vote_year: null, last_vote_year: null, chamber_data_start_year: null}
+        - {official_id: o1, indicator: party_unity_pct, period: null, detail: 'state_house: 1011 party-line votes', first_vote_year: 2020, last_vote_year: 2021, chamber_data_start_year: 2019}
+        - {official_id: o9, indicator: party_unity_pct, period: null, detail: 'state_house: 3 party-line votes', first_vote_year: 2019, last_vote_year: 2019, chamber_data_start_year: 2019}
+        - {official_id: o9, indicator: party_unity_pct, period: null, detail: 'state_senate: 3 party-line votes', first_vote_year: 2022, last_vote_year: 2022, chamber_data_start_year: 2022}
