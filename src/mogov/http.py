@@ -105,15 +105,22 @@ def pause_host(host: str, seconds: float, *, clock: Callable[[], float] = time.t
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     until = clock() + seconds
     with contextlib.suppress(FileNotFoundError, ValueError, OSError):
-        until = max(until, float((CACHE_DIR / f".throttle-{host}.pause").read_text()))
+        # an existing pause further out than the cap (clock set back) must not outlive a fresh one
+        old = float((CACHE_DIR / f".throttle-{host}.pause").read_text())
+        until = max(until, min(old, clock() + THROTTLE_MAX_PAUSE_S))
     write_atomic(CACHE_DIR / f".throttle-{host}.pause", repr(until).encode())
 
 
 def _pause_left(pause: Path, now: float) -> float:
     try:
-        return min(float(pause.read_text()) - now, THROTTLE_MAX_PAUSE_S)
+        until = float(pause.read_text())
     except (FileNotFoundError, ValueError, PermissionError):
         return 0.0
+    if until - now > THROTTLE_MAX_PAUSE_S:  # clock set back: cut the stamp on disk too, or it would never end
+        until = now + THROTTLE_MAX_PAUSE_S
+        with contextlib.suppress(OSError):
+            write_atomic(pause, repr(until).encode())
+    return until - now
 
 
 @contextlib.contextmanager
@@ -145,6 +152,7 @@ def host_throttle(
         if (left := _pause_left(pause, clock())) > 0:
             log.warning("http.host_paused", host=host, seconds=round(left))
             sleep(left)
+            began = time.time()  # a pause is not lock contention: don't count it toward the slow-lock warning
             continue
         try:
             os.close(os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
@@ -170,8 +178,9 @@ def host_throttle(
         except (FileNotFoundError, ValueError):
             last = float("-inf")
         # a stamp in the future (clock set back) must not stall the run for longer than one interval
-        wait = min(last + interval - clock(), interval)
-        if wait > 0:
+        last = min(last, clock())
+        # sleep can return early (Windows timer granularity), so check the clock again
+        while (wait := last + interval - clock()) > 0:
             sleep(wait)
         write_atomic(stamp, repr(clock()).encode())
         yield

@@ -185,12 +185,13 @@ def test_throttle_across_real_processes(tmp_path):
         "http.CACHE_DIR = Path(sys.argv[1])\n"
         "for _ in range(4):\n"
         "    with http.host_throttle('h', 0.3):\n"
-        "        print(time.time(), flush=True)\n"
+        "        print((Path(sys.argv[1]) / '.throttle-h.last').read_text(), flush=True)\n"
     )
     procs = [
         subprocess.Popen([sys.executable, "-c", script, str(tmp_path)], stdout=subprocess.PIPE, text=True)
         for _ in range(3)
     ]
+    # the throttle's own recorded start times: reading time.time() after the fact adds scheduling jitter
     starts = sorted(float(line) for p in procs for line in p.communicate()[0].split())
     assert len(starts) == 12
     assert min(b - a for a, b in itertools.pairwise(starts)) >= 0.29
@@ -275,12 +276,24 @@ def test_a_warning_pauses_other_threads_requests_host_wide(tmp_path, monkeypatch
         with http.host_throttle("revisor.mo.gov", 2.0, clock=clock.time, sleep=clock.sleep):
             starts.append(clock.time())
 
-    t = threading.Thread(target=shard_b)
+    t = threading.Thread(target=shard_b, daemon=True)
     t.start()
-    t.join()
+    t.join(timeout=10)
+    assert not t.is_alive(), "shard B never got past the pause"
     assert starts == [pytest.approx(1060.0)]  # waited out the pause, no request in between
     with http.host_throttle("revisor.mo.gov", 2.0, clock=clock.time, sleep=clock.sleep):
         assert clock.time() == 1062.0  # and the pause doesn't linger
+
+
+def test_a_pause_stamp_far_in_the_future_is_capped(tmp_path, monkeypatch):
+    monkeypatch.setattr(http, "CACHE_DIR", tmp_path)
+    (tmp_path / ".throttle-h.pause").write_text("9999999999.0")  # clock was set back after a pause was written
+    clock = FakeClock()
+    with http.host_throttle("h", 2.0, clock=clock.time, sleep=clock.sleep):
+        assert clock.time() == 1000.0 + http.THROTTLE_MAX_PAUSE_S
+    (tmp_path / ".throttle-h.pause").write_text("9999999999.0")
+    http.pause_host("h", 60, clock=lambda: 1000.0)  # a fresh pause replaces the stale far one
+    assert float((tmp_path / ".throttle-h.pause").read_text()) <= 1000.0 + http.THROTTLE_MAX_PAUSE_S
 
 
 def test_pause_never_shortens_and_get_writes_it(tmp_path, monkeypatch):

@@ -135,16 +135,17 @@ Quirks:
   full-committee chairs separately from subcommittee chairs.
   The `COMMITTEELIST` lists carry no Co-Chair seats at all (2025 regular session: member pages show 3 co-chair posts the list lacks), and 253's list names fewer committees than 251 or 254 (no Conference Committee on Budget, 22 seats; neither of the two property tax special committees, 40 seats), so 253 shows 617 committee seats against 697 in 251 and 685 in 254. The joint committees are in the list. The profile says so under the 253 row.
 - Bill sponsorship success (share of a member's sponsored bills that passed) is not built yet: it needs the
-  bill status from #34, which is in flight in another session.
+  bill status (`fct_bills.status` and `outcome`, from #34), but Senate bills before 2024 have no status (see
+  Bill status below), so it can only cover House bills and 2024 and later until #317 lands.
 - PDF text extraction is cached by PDF content (`data/cache/pdftext/`). Before that, a re-run spent
   3–10 minutes per shard re-parsing PDFs that were already downloaded.
 - Bill status (`fct_bills.status`, `outcome`; `int_bills__status`) comes from each bill's `Action` list. The
   `SenateActList` file adds the Senate bills that reached the House, but only with their House-side and governor
-  actions. In 2024 it stops at the speaker's signature for 15 of its 38 bills: 2024 SB 727 was signed into law, yet the list ends at
+  actions. In 2024 it stops at the speaker's signature for 17 of its 38 bills: 2024 SB 727 was signed into law, yet the list ends at
   "Signed by House Speaker". Such bills get the outcome "no governor action recorded", not "failed". Senate bills
   that never reached the House have no actions in any source we load, so their status is null: 906 of 972 SBs
   and 56 of 58 SJRs in 2026. `SenateActList` exists only for 2024 and later, so every Senate bill of 2017 to
-  2023 has a null status and outcome, enacted ones included (2017 to 2023: 0 of 3,743 SBs have a status; 2024: 29
+  2023 has a null status and outcome, enacted ones included (2017 to 2023: 0 of 4,143 SBs have a status; 2024: 29
   of 796, none enacted because the list stops before the governor). Counts of failed, pending or enacted bills
   therefore leave out Senate bills, almost all of them before 2024; House bills are complete. Loading
   Senate-side actions is #317 (and #237).
@@ -244,15 +245,18 @@ Quirks:
   30 seconds. First it serves a warning page with status 200 in place of the page asked for (the same page it
   serves for a page that doesn't exist). If requests keep coming, every request from that IP, browsers
   included, redirects to `Block.aspx`. Three shards at ~10 requests/s got an IP blocked within two minutes on
-  2026-10-25. The block page gives WebMaster@LR.mo.gov for help. The loader waits 2 s × the shard count
-  before each request, so all shards together stay under one request per 2 s from one IP. Neither page is
+  2026-10-25. The block page gives WebMaster@LR.mo.gov for help. All shards and runs on one machine share one
+  per-host lock and spacing: requests start at least 2 s apart whatever the shard count, and a warning pauses
+  the whole host (see Pacing below).
+  Neither page is
   ever cached. A warning backs off 1, 5 and then 15 minutes and retries: at 1.5 s apart, one shard still drew a
   warning after ~600 pages, since other traffic from the same IP counts too. The load stops with `Blocked` on
   a fourth warning or on `Block.aspx`. A cold load reads ~30,500 section-version pages (October 2026), so it
-  takes about 17 hours. A full load has not completed yet (the first runs were stopped at about 380 of 445
-  chapters). Nothing lands until a run finishes, but every page fetched stays in the HTTP cache (`data/cache`:
-  section pages 180 days, lists 7 days), so re-running reads the cached pages without touching the site and
-  continues with the rest.
+  takes about 17 hours. The first full load finished on 2026-10-26 (exit 0, about 52 minutes on top of the
+  pages already cached): 468 chapters, 30,435 section versions and 14,689 repeals; 10 chapters (152, 203, 255,
+  280, 312, 318, 342, 460, 560, 564) are empty and were skipped. Nothing lands until a run finishes, but every
+  page fetched stays in the HTTP cache (`data/cache`: section pages 180 days, lists 7 days), so re-running reads
+  the cached pages without touching the site and continues with the rest.
 - **Pacing across shards.** Requests to the host take turns through a lock file and a last-request time in
   `data/cache` (`http.host_throttle`, held across the 2 s wait and the request), so shards and separate runs
   on one machine never send two requests less than 2 s apart; more shards add no speed. (The earlier pacing

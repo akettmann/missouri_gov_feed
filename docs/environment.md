@@ -39,8 +39,8 @@ Diagrams: [pipeline](diagrams/pipeline.svg), [lineage](diagrams/lineage.svg),
    ten years of House roll-call PDFs and Senate journals. The statutes (`mo_revisor`) take longest, about
    17 hours: revisor.mo.gov blocks any IP that reads faster than about one page a second, so the loader
    reads ~30,000 section-version pages 2 s apart, however many shards run (a lock in `data/cache` spaces
-   every process's requests; it needs one filesystem, so on Cloud Run use a single task). A full load has not
-   finished yet; an interrupted run keeps its fetched pages in the cache and resumes from them. Avoid browsing revisor.mo.gov
+   every process's requests; it needs one filesystem, so on Cloud Run use a single task). The first full load took about 52 minutes
+   on top of a warm cache; an interrupted run keeps its fetched pages in the cache and resumes from them. Avoid browsing revisor.mo.gov
    from the same IP during the load: that traffic counts toward the limit too. Everything fetched is cached under
    `data/cache`, so later runs are much faster.
 
