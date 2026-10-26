@@ -48,7 +48,23 @@ def test_new_shard_count_drops_old_parts(raw_dir):
     db.replace_json("t", [("new", {})])
     names = sorted(p.name for p in (raw_dir / "t").iterdir())
     assert [n for n in names if n.endswith(".parquet")] == ["part-000-of-001.parquet"]
-    assert names == ["part-000-of-001.parquet"] or names == [".part-000-of-001.parquet.lock", "part-000-of-001.parquet"]
+    assert names == [".part-000-of-001.parquet.lock", "part-000-of-001.parquet"]
+
+
+def test_new_shard_count_drops_orphan_lock_files_but_not_held_ones(raw_dir):
+    folder = db.table_dir("t")
+    orphan = folder / f".{db.Shard(0, 3).part_name}.lock"  # a run that failed before publishing: lock, no part
+    orphan.write_bytes(b"")
+    held_lock = db._ShardLock("t", db.Shard(1, 3))
+    held_lock.acquire()  # a live run of the old count
+    try:
+        db.replace_json("t", [("new", {})])
+        assert not orphan.exists()
+        assert held_lock.path.exists()
+    finally:
+        held_lock.release()
+    db.replace_json("t", [("new2", {})])  # no longer held: swept on the next publish
+    assert sorted(p.name for p in folder.iterdir()) == [".part-000-of-001.parquet.lock", "part-000-of-001.parquet"]
 
 
 def test_sink_publishes_declared_empty_tables_and_nothing_on_error():
@@ -160,17 +176,37 @@ def test_second_run_of_same_shard_fails_fast_and_leaves_first_run_alone(raw_dir,
         pass
 
 
-def test_failed_run_releases_the_shard_lock(raw_dir):
+@pytest.fixture
+def made_locks(monkeypatch):
+    """Every _ShardLock created, kept alive so a test can see whether release() really ran (otherwise
+    refcounting closes the file handle and hides a missing release())."""
+    made = []
+    real_init = db._ShardLock.__init__
+
+    def spy_init(self, *args, **kwargs):
+        real_init(self, *args, **kwargs)
+        made.append(self)
+
+    monkeypatch.setattr(db._ShardLock, "__init__", spy_init)
+    return made
+
+
+def test_failed_run_releases_the_shard_lock(raw_dir, made_locks):
     with pytest.raises(RuntimeError, match="boom"), db.JsonSink(tables=["t"]):
         raise RuntimeError("boom")
+    assert len(made_locks) == 1
+    assert made_locks[0]._fh is None
     with db.JsonSink(tables=["t"]):
         pass
 
 
-def test_partial_open_releases_locks_already_taken(raw_dir):
+def test_partial_open_releases_locks_already_taken(raw_dir, made_locks):
     with db.JsonSink(db.Shard(0, 1), tables=["b"]):
         with pytest.raises(db.ShardBusyError):
             db.JsonSink(db.Shard(0, 1), tables=["a", "b"])
+        taken = [lock for lock in made_locks if lock.table == "a"]
+        assert len(taken) == 1
+        assert taken[0]._fh is None
         with db.JsonSink(db.Shard(0, 1), tables=["a"]):  # "a" was locked then released by the failed open
             pass
 
@@ -201,3 +237,40 @@ def test_killed_holder_leaves_no_stale_lock(raw_dir):
         sink.add("t", "k2", {"v": 2})
     assert [r[0] for r in _rows("t")] == ["k2"]
     assert not list(folder.glob(".*.jsonl"))
+
+
+def test_second_process_holding_the_shard_makes_this_one_fail_fast(raw_dir):
+    """A real cross-process conflict: a child process holds the lock until told to exit."""
+    import subprocess
+    import sys
+    import textwrap
+
+    code = textwrap.dedent(
+        """
+        import sys
+        from pathlib import Path
+        from mogov import db
+        db.RAW_DIR = Path(sys.argv[1])
+        with db.JsonSink(db.Shard(0, 2), tables=["t"]):
+            print("ready", flush=True)
+            sys.stdin.readline()  # hold the lock until the parent closes stdin
+        """
+    )
+    child = subprocess.Popen(
+        [sys.executable, "-c", code, str(raw_dir)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert child.stdout.readline().strip() == "ready", child.stderr.read()
+        with pytest.raises(db.ShardBusyError, match="another run is already writing t shard 0 of 2"):
+            db.JsonSink(db.Shard(0, 2), tables=["t"])
+        with db.JsonSink(db.Shard(1, 2), tables=["t"]):  # a different shard is not blocked
+            pass
+    finally:
+        child.communicate(timeout=30)  # closes the child's stdin, so it exits
+    assert child.returncode == 0
+    with db.JsonSink(db.Shard(0, 2), tables=["t"]):  # the child released it on exit
+        pass
