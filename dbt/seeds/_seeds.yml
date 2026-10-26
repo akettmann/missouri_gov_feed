@@ -286,3 +286,24 @@ seeds:
         data_tests: [not_null]
       - name: source
         data_tests: [not_null]
+  - name: mo_auditor_statewide_entities
+    description: >
+      Audit report titles that audit a statewide elected office, matched as a case-insensitive prefix of the
+      Auditor's report title (titles vary by year: "Office of State Treasurer", "Office of the State Treasurer/
+      Year Ended June 30, 2011", "State Treasurer's Office"). `office` is the key in statewide_officials. Only
+      these audits are linked to an officeholder (fct_audit_reports); a county audit never is, because the
+      Auditor's summary says the rating "does not indicate the performance of any one elected official".
+      Add a prefix when a new title form appears (assert_audit_statewide_titles_map_to_one_office checks that
+      none matches two offices).
+    config:
+      column_types: {title_prefix: varchar, office: varchar}
+    columns:
+      - name: title_prefix
+        data_tests: [unique, not_null]
+      - name: office
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('statewide_officials')
+                field: office
