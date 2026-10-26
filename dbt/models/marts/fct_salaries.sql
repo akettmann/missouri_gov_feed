@@ -18,6 +18,16 @@
 --                A seat counts from the member's first roster year in that chamber (House and Senate each) when Open
 --                States has no start date (#227). A small payment that fits a member whose seat ended the December
 --                before, or that January, is that member's final check and is left out of 1 to 4 (#250).
+--                A final check is only ever set aside, never paired by seat: a December one is matched by name as
+--                well, and so is a January one (#269). Both depend on the departed member having a row in
+--                int_officials__name_keys and on the by-name checks passing (exactly one matching official, one row);
+--                without them the final check stays unmatched rather than mis-paired (#471). A payee set aside
+--                who is paid in the same chamber in a later year is suspect (a mid-year special-election successor
+--                with a similar name): tests/assert_salaries_final_checks_not_paid_again_later flags it.
+--                The final checks are int_mo_legislators__final_checks. The by-name step also guards a December final
+--                check by service years: pay outside the years a member sat is kept for them only when no other
+--                member of the chamber shares the surname that year, unless that member fits the departed member's
+--                first name (the 2017 pay of a member whose seat ended that December, #227).
 --   by name      payroll "LAST, FIRST" against the official's name variants within the same group of
 --                offices, first names that fit (see mogov.first_name_fit): statewide officials, judges, and
 --                legislator rows the seat match leaves open (members without an Open States seat), and only in
@@ -40,8 +50,7 @@ with pay as (
         {{ dbt.replace(mogov.surname_key('p.last_name'), "' '", "''") }} as last_flat,
         {{ mogov.name_key(dbt.split_part('p.first_names', "' '", 1)) }} as first_key,
         {{ mogov.name_key('p.first_names') }} as first_all_key,
-        {{ mogov.name_key(dbt.split_part('p.first_names', "' '", 2)) }} as middle_key,
-        max(p.gross_pay) over (partition by p.calendar_year, p.position_title) as top_pay
+        {{ mogov.name_key(dbt.split_part('p.first_names', "' '", 2)) }} as middle_key
     from {{ ref('stg_mo_employee_pay__pay') }} as p
     inner join {{ ref('mo_payroll_office_titles') }} as t
         on p.agency_name = t.agency_name and p.position_title = t.position_title
@@ -92,48 +101,6 @@ service_years as (
     group by person_id
 ),
 
--- A final check: a payee whose first name fits a member of the chamber whose seat ended the December before,
--- and who was paid well under a full year's salary (under half of the year's highest pay for the position).
--- It is that departed member's last pay (unless the member later held a seat in the chamber again), so neither
--- it nor the member competes for the seats held now ("BLACK, LINDA R." 2017 is Linda Black's, not a second
--- claimant to Rusty Black's seat, whose middle initial it shares, #250).
-final_checks as (
-    select distinct
-        p.calendar_year,
-        p.seat_chamber,
-        p.employee_name,
-        d.person_id
-    from pay as p
-    inner join {{ ref('int_mo_legislators__seats') }} as d
-        on
-            p.seat_chamber = d.chamber
-            -- the seat ended in December of the year before, or in January of this year (Open States ends the
-            -- 2022 and 2024 departures on 2023-01-03 and 2025-01-07)
-            and (
-                (extract(year from d.end_date) = p.calendar_year - 1 and extract(month from d.end_date) = 12)
-                or (extract(year from d.end_date) = p.calendar_year and extract(month from d.end_date) = 1)
-            )
-            and {{ dbt.replace('d.surname_key', "' '", "''") }} = p.last_flat
-            and {{
-                mogov.first_name_fit(
-                    'p.first_key',
-                    'p.first_all_key',
-                    mogov.name_key(dbt.split_part('d.full_name', "' '", 1))
-                )
-            }} >= 1
-    where
-        p.office_group = 'legislature'
-        and p.gross_pay * 2 < p.top_pay
-        and not exists (
-            select 1
-            from {{ ref('int_mo_legislators__seats') }} as later
-            where
-                later.person_id = d.person_id
-                and later.chamber = d.chamber
-                and later.end_date > d.end_date
-        )
-),
-
 -- every (payroll row, member of the same chamber and year) pair whose surnames agree: the whole surname
 -- (spaces ignored, so VANSCHOIACK = Van Schoiack), or its last words ("WALSH MOORE" for Moore), which also
 -- needs the first name to fit
@@ -157,10 +124,10 @@ seat_pairs_raw as (
             p.calendar_year = s.calendar_year
             and p.seat_chamber = s.chamber
             and (p.last_flat = s.surname_flat or p.last_key like '% ' || s.surname_key)
-    left join final_checks as f
+    left join {{ ref('int_mo_legislators__final_checks') }} as f
         on p.calendar_year = f.calendar_year and p.seat_chamber = f.seat_chamber and p.employee_name = f.employee_name
     -- a member who left in January and was paid that final check is no claimant to the year's pay either
-    left join final_checks as fm
+    left join {{ ref('int_mo_legislators__final_checks') }} as fm
         on s.calendar_year = fm.calendar_year and s.chamber = fm.seat_chamber and s.person_id = fm.person_id
     where p.office_group = 'legislature' and f.employee_name is null and fm.person_id is null
 ),
