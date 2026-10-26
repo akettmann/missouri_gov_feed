@@ -3,7 +3,7 @@
 -- dates (null when the docket has none) and the days between. A docket whose termination date is before its
 -- filing date has a negative duration (a source error): it is kept and flagged with ends_before_filed, and the
 -- judge metric leaves it out. The state courts carry no judge or dates in the bulk export, so only the federal
--- districts are here. Grain: one row per docket_id.
+-- districts are here.
 select
     docket_id,
     court_id,

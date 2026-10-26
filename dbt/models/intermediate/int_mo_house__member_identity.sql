@@ -2,7 +2,7 @@
 -- person_key = the stable person id (int_officials__person_ids) of the key the seat match gave: an Open States id
 -- when the seat (district + date + surname) matches one person, otherwise mohouse:<House member id>, so people
 -- missing from Open States still get a key and a person split across several keys gets one. raw_person_key is the
--- key before that. Grain: one row per (House session, member) with a person_key.
+-- key before that.
 select
     k.session_code,
     k.session_year,

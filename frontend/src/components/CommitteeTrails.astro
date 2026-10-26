@@ -42,7 +42,10 @@ const donorName = (d: CommitteeDonorRow) =>
       who gave to those committees, across every year loaded. The Missouri Ethics Commission records a gift
       from one committee to another by the giver's name only, so each committee here was found by matching
       that name, and may be a different committee with a similar name.{" "}
-      <a href={href("/methodology/#committee-donors")}>How it's matched</a>.
+      <a href={href("/methodology/#committee-donors")}>
+        How it's matched<span class="sr-only"> for committee donors</span>
+      </a>
+      .
     </p>
     {trails.map((t) => (
       <section
