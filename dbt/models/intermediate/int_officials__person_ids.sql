@@ -19,12 +19,15 @@
 --      follow each other within a year in a different chamber (a move, as Roberts went House to Senate). Overlap
 --      alone is not enough: Open States often leaves a member who left mid-term with the normal term end, so a
 --      special-election successor overlaps on paper (Silvey to 2018-12-31, Lauren Arthur from 2018-09-12, SD17). The
---      shared-seat case also needs one term to sit inside the other, or both to start the same day. Years
+--      shared-seat case also needs one term to be a stub (under 90 days) inside the other, starting within 31 days
+--      of it; equal or nested multi-year terms do not qualify (Open States' placeholder 2013-01-01 starts, #332).
+--      Years
 --      alone cannot decide the shared-seat case: Kenneth Jamison (2025 only) inside Ken Jamison (2025-26) is a
 --      duplicate, but Danielle Smith (2019 only, or 2026 only after a special election) inside a Dan Smith
---      successor's span looks the same by year. Dates tell them apart: Kenneth's term is a stub that overlaps
---      Ken's, while a successor's term starts on or after the predecessor's ends. Undated House-roster rows prove
---      no overlap. A name left with more than one partner (a chain or a fork) is ambiguous and joins nothing.
+--      successor's span looks the same by year. Dates tell them apart: Kenneth's term is a 26-day stub that overlaps
+--      Ken's, while a successor's term starts on or after the predecessor's ends (or is no stub). Undated
+--      House-roster rows prove no overlap. A name left with more than one partner (a chain or a fork) is ambiguous
+--      and joins nothing.
 --   3. otherwise the id is its own person, basis = self.
 -- Among merged ids the person_id is an Open States id over mohouse:, then the one whose service ends latest, then
 -- the smaller id. The choice never looks at the latest roster year, so an official's id does not change when they
@@ -111,7 +114,11 @@ name_terms as (
         t.office,
         t.district,
         t.term_start,
-        t.term_end
+        t.term_end,
+        {{
+            dbt.datediff('t.term_start', 't.term_end', 'day')
+        }} as term_days,
+        {{ dbt.dateadd('day', 31, 't.term_start') }} as start_plus_31
     from terms as t
     inner join aliases as a on t.alias_id = a.alias_id
 ),
@@ -151,13 +158,20 @@ variant_pairs as (
                     where
                         ta.sq = a.sq and tb.sq = b.sq
                         and ta.term_start < tb.term_end and tb.term_start < ta.term_end
-                        -- and one term sits inside the other (or both start the same day): Open States often
-                        -- leaves a mid-term departure's end at the normal term end, so a successor's term
-                        -- overlaps on paper without being inside the predecessor's
+                        -- and one is a short stub (under 90 days) inside the other, starting within 31 days of it.
+                        -- Open States often leaves a mid-term departure's end at the normal term end, so a
+                        -- successor's term overlaps on paper without being inside the predecessor's; and it gives
+                        -- some pre-2015 terms a placeholder 2013-01-01 start, so two different people can hold
+                        -- equal or nested multi-year terms (Smith/Sisco, Fowler/Hubrecht; #332)
                         and (
-                            ta.term_start = tb.term_start
-                            or (ta.term_start >= tb.term_start and ta.term_end <= tb.term_end)
-                            or (tb.term_start >= ta.term_start and tb.term_end <= ta.term_end)
+                            (
+                                ta.term_start >= tb.term_start and ta.term_end <= tb.term_end
+                                and ta.term_days < 90 and ta.term_start <= tb.start_plus_31
+                            )
+                            or (
+                                tb.term_start >= ta.term_start and tb.term_end <= ta.term_end
+                                and tb.term_days < 90 and tb.term_start <= ta.start_plus_31
+                            )
                         )
                 )
             )
