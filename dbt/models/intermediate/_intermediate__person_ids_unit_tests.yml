@@ -664,7 +664,7 @@ unit_tests:
       Two Open States terms cover the seat with the same surname, one undated (a relative, #136). The seat alone
       is ambiguous, so the House member's given name picks the term (Joe Don McGaugh vs Peggy McGaugh, HD39).
       Two same-surname terms with no given-name match, or a given name matching both, stay unmatched (mohouse:
-      key); a lone surname match needs no given name.
+      key); a lone surname match needs no given name. The given name must end at a word boundary: Dan picks "dan pratt" over "daniel pratt".
     given:
       - input: ref('stg_mo_house__members')
         rows:
@@ -673,6 +673,7 @@ unit_tests:
           - {session_code: '171', session_year: 2017, district_number: 40, house_member_id: '900', first_name: Zed, last_name: Smith}
           - {session_code: '171', session_year: 2017, district_number: 41, house_member_id: '901', first_name: Ann, last_name: Jones}
           - {session_code: '171', session_year: 2017, district_number: 42, house_member_id: '902', first_name: Ann, last_name: Lee}
+          - {session_code: '171', session_year: 2017, district_number: 43, house_member_id: '903', first_name: Dan, last_name: Pratt}
       - input: ref('int_mo_legislators__seat_terms')
         rows:
           - {openstates_id: ocd-person/joedon, chamber: lower, district_number: 39, surname_key: mcgaugh, full_name_key: joe don mcgaugh, start_date: '2013-01-01', end_date: '2018-12-31'}
@@ -682,6 +683,8 @@ unit_tests:
           - {openstates_id: ocd-person/jones-a, chamber: lower, district_number: 41, surname_key: jones, full_name_key: ann jones, start_date: '2015-01-01', end_date: '2020-12-31'}
           - {openstates_id: ocd-person/jones-b, chamber: lower, district_number: 41, surname_key: jones, full_name_key: ann jones, start_date: '1900-01-01', end_date: '2020-12-31'}
           - {openstates_id: ocd-person/lee, chamber: lower, district_number: 42, surname_key: lee, full_name_key: bo lee, start_date: '2015-01-01', end_date: '2020-12-31'}
+          - {openstates_id: ocd-person/daniel, chamber: lower, district_number: 43, surname_key: pratt, full_name_key: daniel pratt, start_date: '2015-01-01', end_date: '2020-12-31'}
+          - {openstates_id: ocd-person/dan, chamber: lower, district_number: 43, surname_key: pratt, full_name_key: dan pratt, start_date: '1900-01-01', end_date: '2020-12-31'}
     expect:
       rows:
         - {session_code: '171', district_number: 39, house_member_id: '658', raw_person_key: ocd-person/joedon}
@@ -689,6 +692,7 @@ unit_tests:
         - {session_code: '171', district_number: 40, house_member_id: '900', raw_person_key: 'mohouse:900'}
         - {session_code: '171', district_number: 41, house_member_id: '901', raw_person_key: 'mohouse:901'}
         - {session_code: '171', district_number: 42, house_member_id: '902', raw_person_key: ocd-person/lee}
+        - {session_code: '171', district_number: 43, house_member_id: '903', raw_person_key: ocd-person/dan}
 
   - name: house_departed_member_keeps_own_person_when_roster_outlives_term
     model: int_mo_house__member_seat_keys
@@ -740,3 +744,24 @@ unit_tests:
         - {session_code: '171', district_number: 10, house_member_id: '2235', raw_person_key: ocd-person/ann-one}
         - {session_code: '191', district_number: 11, house_member_id: '2235', raw_person_key: ocd-person/ann-two}
         - {session_code: '201', district_number: 12, house_member_id: '2235', raw_person_key: ocd-person/bob}
+
+  - name: house_given_name_anchor_ends_at_a_word_boundary
+    model: int_mo_house__member_seat_keys
+    description: >
+      The name anchor matches the House member's given name against the Open States name only up to a word boundary,
+      like the seat match: Dan Hart (member 800) sits in HD50 beside "daniel hart" and in HD51 beside "bob hart". "dan"
+      is a prefix of "daniel" but not a whole given name, so HD50 gives no anchor and HD51 stays on its seat match.
+      Dropping the boundary in name_anchors would anchor Dan to Daniel and override Bob (#498).
+    given:
+      - input: ref('stg_mo_house__members')
+        rows:
+          - {session_code: '171', session_year: 2017, district_number: 50, house_member_id: '800', first_name: Dan, last_name: Hart}
+          - {session_code: '201', session_year: 2020, district_number: 51, house_member_id: '800', first_name: Dan, last_name: Hart}
+      - input: ref('int_mo_legislators__seat_terms')
+        rows:
+          - {openstates_id: ocd-person/daniel, chamber: lower, district_number: 50, surname_key: hart, full_name_key: daniel hart, start_date: '2015-01-01', end_date: '2018-12-31'}
+          - {openstates_id: ocd-person/bob, chamber: lower, district_number: 51, surname_key: hart, full_name_key: bob hart, start_date: '2019-01-01', end_date: '2021-12-31'}
+    expect:
+      rows:
+        - {session_code: '171', district_number: 50, house_member_id: '800', raw_person_key: ocd-person/daniel}
+        - {session_code: '201', district_number: 51, house_member_id: '800', raw_person_key: ocd-person/bob}

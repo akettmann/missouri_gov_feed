@@ -34,6 +34,9 @@ candidates as (
 
 -- one Open States person matches the seat, or (same-surname terms overlapping, e.g. a relative whose term has no
 -- start date) exactly one of them also matches the given name; otherwise no match
+-- Grouped by (session, district), not by member: a seat with two House members in one session (a mid-session
+-- replacement) could hand one member's id to the other. The roster is an end-of-session snapshot so none exist today;
+-- a unique test on (session_code, district_number) fails if that changes (#475).
 seat_match as (
     select
         session_code,

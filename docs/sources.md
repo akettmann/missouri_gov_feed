@@ -372,6 +372,11 @@ Quirks:
 - Some versions are on both pages: 324.406/60569 and 324.424/60572 are listed contingent on their chapter page
   and printed on `rx.aspx` as "Repealed L. 2026 S.B. 1233" with the 2099 date. `fct_statute_sections` keeps the
   listed row and sets `repeal_pending`.
+- One bill can be both `repealed` and `amended` for the same section in `int_mo_revisor__session_law_bills` and
+  `fct_bill_statute_links`. A repeal-and-enact-in-lieu act is cited twice in the note ("A.L. 2026 S.B. 888 and
+  Repealed L. 2026 H.B. 2637 & 3155", 566.211), once as the repeal and once as the new text. Anyone counting
+  "sections a bill repealed" should expect rows for sections it also amended, and filter on `change`. In a repeal
+  note "Repealed" covers every "and L." act after it, however long the chain, and any bill-only pieces that follow.
 - Some chapters list no sections at all: every section in them was repealed or transferred.
 - History notes only cover bills that became law. A pending bill's statute targets are in its text, which
   isn't loaded yet (#175).
@@ -638,8 +643,8 @@ Quirks:
   these dockets) and from the number itself otherwise. Of the 173,882 dockets: civil 164,058 (`cv` 164,027,
   `md` multidistrict 31), criminal 3,776 (`cr`), miscellaneous 5,967 (`mc` 5,082, `mj` 646, `sw` 194, `wi` 30,
   `sm` 13, `pr` 2: warrants, subpoenas, complaints, not cases; left out) and 81 other (`fp` 76, `cn` 2, `sc` 2
-  and one with a date in the docket-number field; left out, pending #465). Only 2,149 of the 3,776 criminal
-  dockets have both dates, so criminal coverage is thin. One docket (`1:00-cr-00008`) has a `cr` number but is
+  and one with a date in the docket-number field; left out, pending #465). Only 2,152 of the 3,776 criminal
+  dockets have both dates (2,149 are measured: 3 end before they were filed), so criminal coverage is thin. One docket (`1:00-cr-00008`) has a `cr` number but is
   a civil suit; CourtListener's own type (`cv`) wins.
 - The filtered CSVs are cached per snapshot (`data/cache/courtlistener/mo-*.csv`), so re-runs within
   a quarter are quick. Cases can be up to three months stale; `courtlistener_cases` tops up.
