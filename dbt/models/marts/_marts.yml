@@ -648,6 +648,7 @@ models:
       - name: document_url
         data_type: varchar
         description: Link to the filed report.
+        data_tests: [not_null]
       - name: is_garbled
         data_type: boolean
         description: >
