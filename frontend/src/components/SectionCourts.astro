@@ -2,6 +2,7 @@
 // Section F: court record (fct_case_history, from CourtListener): cases the official decided as a judge or
 // argued as an attorney. Facts per case only; outcomes are never tallied into win/loss statistics.
 import type { OfficialBundle } from "../lib/exports/types";
+import { plural } from "../lib/businessCounts";
 import { count, statusKind } from "../lib/format";
 import { daysLabel, MIN_MEASURED, timeToDispositionView } from "../lib/timeToDisposition";
 import SourceLink from "./SourceLink.astro";
@@ -70,7 +71,7 @@ const DISTRICTS: Record<string, string> = {
     <p class="muted small">Not available yet (the fct_case_history export is missing).</p>
   ) : (
     <>
-      <p class="small">{count(courts.total)} cases in CourtListener.</p>
+      <p class="small">{plural(courts.total, "case", "cases")} in CourtListener.</p>
       <Viz id="cases-by-year" bundle={bundle} />
       <details open={shown <= 8}>
         <summary class="small">{courts.total > shown ? `The ${shown} most recent` : "All of them"}</summary>

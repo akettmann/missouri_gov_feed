@@ -3,6 +3,7 @@
 // current commercial ties (latest report only) and the filings themselves. Commercial ties and filings are
 // left out entirely when there are none, rather than shown as "not public" (format.ts HIDE_UNLESS_AVAILABLE).
 import type { OfficialBundle } from "../lib/exports/types";
+import { plural } from "../lib/businessCounts";
 import { count } from "../lib/format";
 import SourceLink from "./SourceLink.astro";
 
@@ -74,7 +75,7 @@ const disclosed = x.commercial_ties.length > 0 || x.filings.length > 0;
     <>
       <h3>Disclosure filings</h3>
       <details open={x.filings.length <= 6}>
-        <summary class="small">{count(x.filings.length)} filings</summary>
+        <summary class="small">{plural(x.filings.length, "filing", "filings")}</summary>
         <div class="table-scroll">
           <table>
             <thead>
