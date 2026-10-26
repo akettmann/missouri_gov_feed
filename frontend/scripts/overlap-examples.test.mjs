@@ -8,12 +8,13 @@ import { overlapExamplesSql } from "../src/lib/exports/overlapQuery.ts";
 async function run(rows, examples = 5) {
   const conn = await (await DuckDBInstance.create(":memory:")).connect();
   await conn.run(`create table ov (official_id varchar, industry varchar, chamber varchar, vote_id varchar,
-    vote_date date, bill varchar, short_title varchar, vote_cast varchar, vote_description varchar,
+    session_code varchar, vote_date date, bill varchar, short_title varchar, vote_cast varchar, vote_description varchar,
     vote_source_url varchar, bill_source_url varchar)`);
-  for (const [vote_id, date, bill, desc, chamber = "state_senate"] of rows) {
-    await conn.run(`insert into ov values ('A','Gas',?,?,?,?,'t','yea',?,?,'b')`, [
+  for (const [vote_id, date, bill, desc, chamber = "state_senate", session = "S1"] of rows) {
+    await conn.run(`insert into ov values ('A','Gas',?,?,?,?,?,'t','yea',?,?,'b')`, [
       chamber,
       vote_id,
+      session,
       date,
       bill,
       desc,
@@ -102,5 +103,32 @@ test("a non-amendment, non-passage vote beats a later amendment", async () => {
   assert.deepEqual(
     rows.map((r) => r.vote_source_url),
     [`${J}0`],
+  );
+});
+
+test("a motion to reconsider passage is not passage, even though it says 'finally passed'", async () => {
+  const rows = await run([
+    [`${J}4`, "2020-05-14", "SB782", PASS],
+    [
+      `${J}7`,
+      "2020-05-14",
+      "SB782",
+      "Senator B moved that the vote by which SB 782 finally passed be reconsidered:",
+    ],
+  ]);
+  assert.deepEqual(
+    rows.map((r) => r.vote_source_url),
+    [`${J}4`],
+  );
+});
+
+test("the same bill number in two sessions is two examples", async () => {
+  const rows = await run([
+    [`${J}0`, "2018-05-10", "SB782", PASS, "state_senate", "181"],
+    [`${J}1`, "2020-05-10", "SB782", PASS, "state_senate", "201"],
+  ]);
+  assert.deepEqual(
+    rows.map((r) => r.vote_date),
+    ["2020-05-10", "2018-05-10"],
   );
 });
