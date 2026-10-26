@@ -499,6 +499,55 @@ unit_tests:
         - {registry_id: c6, naics_code: '237310', naics_source: naics}
         - {registry_id: c7, naics_code: '23', naics_source: sic}
 
+  - name: epa_frs_facility_naics_merges_air_systems_and_code_lengths
+    model: int_epa_frs__facilities
+    description: >
+      AIR and AIRS/AFS are one program under two names, and a 5-digit code is the 6-digit code at the same
+      facility it prefixes (#432). p1: 311111 from AIR and AIRS/AFS counts one system, so 722511 from two real systems
+      (RCRAINFO, NPDES) wins; counted as two it would tie and the lower 311111 would win. p2: RCRAINFO's 81232 and
+      NPDES's 812320 are one code with two systems and beat 811111 from one system, and the displayed code and
+      description are the 6-digit ones (a split vote ties three ways and the lowest, 811111, would win);
+      p3: a 5-digit code with no 6-digit code at the facility stays as it is; p4: SIC 3714 from AIR and AIRS/AFS counts once, so 4952 from two real systems wins (as two it would tie and the lower 3714 would win).
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: p1, facility_name: Air mirrored, latitude: 38.5, longitude: -92.1}
+          - {registry_id: p2, facility_name: Five and six digits, latitude: 38.5, longitude: -92.1}
+          - {registry_id: p3, facility_name: Lone five digits, latitude: 38.5, longitude: -92.1}
+          - {registry_id: p4, facility_name: SIC air mirrored, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows: []
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: p1, program_system: AIR, naics_code: '311111', naics_description: Dog food, is_primary: true, is_secondary: false}
+          - {registry_id: p1, program_system: AIRS/AFS, naics_code: '311111', naics_description: Dog food, is_primary: true, is_secondary: false}
+          - {registry_id: p1, program_system: RCRAINFO, naics_code: '722511', naics_description: Restaurants, is_primary: true, is_secondary: false}
+          - {registry_id: p1, program_system: NPDES, naics_code: '722511', naics_description: Restaurants, is_primary: true, is_secondary: false}
+          - {registry_id: p2, program_system: RCRAINFO, naics_code: '81232', naics_description: Drycleaning (short), is_primary: true, is_secondary: false}
+          - {registry_id: p2, program_system: NPDES, naics_code: '812320', naics_description: Drycleaning and laundry, is_primary: true, is_secondary: false}
+          - {registry_id: p2, program_system: AIR, naics_code: '811111', naics_description: General auto repair, is_primary: true, is_secondary: false}
+          - {registry_id: p3, program_system: RCRAINFO, naics_code: '56291', naics_description: Remediation, is_primary: true, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows:
+          - {registry_id: p4, program_system: AIR, sic_code: '3714', sic_description: MOTOR VEHICLE PARTS, is_primary: true, is_secondary: false}
+          - {registry_id: p4, program_system: AIRS/AFS, sic_code: '3714', sic_description: MOTOR VEHICLE PARTS, is_primary: true, is_secondary: false}
+          - {registry_id: p4, program_system: NPDES, sic_code: '4952', sic_description: SEWERAGE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: p4, program_system: RCRAINFO, sic_code: '4952', sic_description: SEWERAGE SYSTEMS, is_primary: true, is_secondary: false}
+      - input: ref('sic_naics_sectors')
+        rows:
+          - {sic_prefix: '37', naics_prefix: '31'}
+          - {sic_prefix: '49', naics_prefix: '22'}
+      - input: ref('naics_sectors')
+        rows:
+          - {naics_prefix: '22', sector_code: '22', sector_name: Utilities}
+          - {naics_prefix: '31', sector_code: 31-33, sector_name: Manufacturing}
+    expect:
+      rows:
+        - {registry_id: p1, naics_code: '722511', naics_description: Restaurants, naics_source: naics}
+        - {registry_id: p2, naics_code: '812320', naics_description: Drycleaning and laundry, naics_source: naics}
+        - {registry_id: p3, naics_code: '56291', naics_description: Remediation, naics_source: naics}
+        - {registry_id: p4, naics_code: '22', naics_description: "Utilities sector, from SIC 4952 SEWERAGE SYSTEMS", naics_source: sic}
+
   - name: epa_frs_facility_naics_tie_sic_sector_merges_31_33
     model: int_epa_frs__facilities
     description: >

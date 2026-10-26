@@ -4,7 +4,9 @@
 -- ranking of types), then program record, so tied names pick the same row every build, #386); the NAICS
 -- code is the code the most program systems give (program_system: RCRAINFO, NPDES, AIR, ... each counts once
 -- per code however many records it has, so a duplicated NPDES permit or an air record listed twice adds nothing;
--- AIR and AIRS/AFS are different systems and count separately), taking the programs' primary
+-- AIR and AIRS/AFS are one program under two names (the same air permit, mirrored IDs) and count once; a
+-- 4- or 5-digit code (RCRAINFO, EIS and RMP truncate: 81232) counts for the 6-digit code at the same facility
+-- that extends it (812320), so the two forms of one code no longer split the vote, #432), taking the programs' primary
 -- codes first (naics_source 'naics'), then the ones FRS leaves UNKNOWN
 -- ('naics_unknown'), then the ones it calls SECONDARY ('naics_secondary'). Only a facility with no NAICS code
 -- at all but a SIC code (a primary one before an unknown or secondary one, then the one the most program systems give)
@@ -24,6 +26,8 @@
 {% set sic_description_parts = [
     "sec.sector_name", "' sector, from SIC '", "ps.sic_code", "' '", "ps.sic_description"
 ] %}
+{# FRS lists one air program under two names; count it once. #}
+{% set program_family = "case when program_system = 'AIRS/AFS' then 'AIR' else program_system end" %}
 {% set government_name = (
     '(^| )(city|town|village|county|state) of | county$|county commission'
     ~ '|school district|water district|sewer district|public works'
@@ -96,7 +100,7 @@ sic as (
         sic_code,
         max(sic_description) as sic_description,
         min(case when is_primary then 0 when is_secondary then 2 else 1 end) as rank_class,
-        count(distinct coalesce(program_system, '')) as n_program_systems
+        count(distinct coalesce({{ program_family }}, '')) as n_program_systems
     from {{ ref('stg_epa_frs__sic') }}
     where sic_code is not null
     group by registry_id, sic_code
@@ -157,16 +161,54 @@ primary_sic as (
     from sic_sectors
 ),
 
+naics_rows as (
+    select
+        registry_id,
+        naics_code,
+        naics_description,
+        coalesce({{ program_family }}, '') as program_family,
+        case when is_primary then 0 when is_secondary then 2 else 1 end as rank_class
+    from {{ ref('stg_epa_frs__naics') }}
+    where naics_code is not null
+),
+
+-- the 6-digit codes a facility has: the targets a shorter code at the same facility extends
+naics_full as (
+    select
+        registry_id,
+        naics_code,
+        max(naics_description) as naics_description
+    from naics_rows
+    where length(naics_code) = 6
+    group by registry_id, naics_code
+),
+
+-- a 4- or 5-digit code becomes (one row per) 6-digit code of the same facility it is the prefix of, and takes that
+-- code's description; with no such code it stays as it is
+naics_normalised as (
+    select
+        r.registry_id,
+        coalesce(f.naics_code, r.naics_code) as naics_code,
+        coalesce(f.naics_description, r.naics_description) as naics_description,
+        r.program_family,
+        r.rank_class
+    from naics_rows as r
+    left join naics_full as f
+        on
+            r.registry_id = f.registry_id
+            and length(r.naics_code) < 6
+            and left(f.naics_code, length(r.naics_code)) = r.naics_code
+),
+
 naics as (
     select
         registry_id,
         naics_code,
         max(naics_description) as naics_description,
-        case when is_primary then 0 when is_secondary then 2 else 1 end as rank_class,
-        count(distinct coalesce(program_system, '')) as n_program_systems
-    from {{ ref('stg_epa_frs__naics') }}
-    where naics_code is not null
-    group by registry_id, naics_code, case when is_primary then 0 when is_secondary then 2 else 1 end
+        rank_class,
+        count(distinct program_family) as n_program_systems
+    from naics_normalised
+    group by registry_id, naics_code, rank_class
 ),
 
 best_naics as (
