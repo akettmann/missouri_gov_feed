@@ -50,3 +50,14 @@ test("SectionIdeology renders every indicator detail through the formatter", () 
   assert.match(src, /indicatorDetailText\(latest\.detail\)/);
   assert.match(src, /indicatorDetailText\(r\.detail\)/);
 });
+
+test("formatter matches the exact Shor-McCarty strings the dbt unit test expects", () => {
+  const yml = readFileSync(new URL("../../dbt/models/marts/_marts__unit_tests.yml", import.meta.url), "utf8");
+  const details = [...yml.matchAll(/detail: '(Shor-McCarty career ideal point;[^']*)'/g)].map((m) => m[1]);
+  assert.ok(details.length >= 2, "dbt unit test no longer expects Shor-McCarty details");
+  for (const d of details) {
+    const out = indicatorDetailText(d);
+    assert.notEqual(out, d, `formatter did not recognise dbt wording: ${d}`);
+    assert.equal(out, d.replace(/(\d{4})-(\d{4})/, "$1–$2"));
+  }
+});
