@@ -120,3 +120,49 @@ def test_load_is_sharded_idempotent_and_keeps_the_search_record_verbatim(raw_dir
     again = [mo_auditor.load(db.Shard(i, 2)) for i in range(2)]  # re-run replaces each shard's own part
     assert _rows(raw_dir, "mo_auditor_reports") == reports
     assert sum(c["mo_auditor_reports"] for c in again) == len(SEARCH)
+
+
+def _filing(title, number="2012008   ", **extra):
+    return {
+        "rpt_number": number,
+        "title": title,
+        "citz_sum_fk": None,
+        "full_rpt_link": "~/Repository/Press/x.pdf",
+        **extra,
+    }
+
+
+@pytest.mark.parametrize(
+    ("title", "read"),
+    [
+        # the full report of Monarch FPD (2012-008) rates it Fair, so it must be read
+        ("Monarch Fire Protection District", True),
+        ("Northeast Ambulance and Fire Protection District", True),
+        # county-wide reviews of every district in the county carry no rating sentence
+        ("Greene County Fire Protection Districts", False),
+        ("St. Louis County Fire Protection District", False),
+        ("Review of Independent Audits of Fire Protection Districts in Greene County", False),
+        # singular and plural financial statement filings are both unrated
+        ("St. Clair County Financial Statement", False),
+        ("Scott County Financial Statements", False),
+    ],
+)
+def test_rating_source_reads_a_single_fire_district_but_not_county_wide_reviews(title, read):
+    assert (mo_auditor.rating_source(_filing(title)) is not None) is read
+
+
+def test_requests_are_throttled_across_shards_not_slept_per_process(monkeypatch):
+    calls = []
+
+    def fake_fetch(url, params=None, **kw):
+        calls.append(kw)
+        return json.dumps({"data": [], "numTotalRecords": 0}).encode() if params else b""
+
+    monkeypatch.setattr(mo_auditor, "fetch", fake_fetch)
+    monkeypatch.setattr(pdftext, "page_texts", lambda *a, **k: [])
+    mo_auditor.list_year(2018)
+    mo_auditor.read_rating("full_report", "https://auditor.mo.gov/x.pdf")
+    assert len(calls) == 2
+    for kw in calls:  # min_interval is the host-wide lock shared by every shard; delay would be per process
+        assert kw["min_interval"] == mo_auditor.DELAY
+        assert "delay" not in kw

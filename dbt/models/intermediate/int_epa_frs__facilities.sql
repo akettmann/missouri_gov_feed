@@ -13,9 +13,10 @@
 -- naics_source is null when the facility has no usable code. A real NAICS code, even a non-primary one, is
 -- more precise than a two-digit SIC-derived sector, and agrees with it on the sector for about 90% of facilities.
 -- Codes tied on tier and program-system count go to the one in the SIC-derived sector (NAICS 31-33 count as one
--- sector), then the lowest code. The SIC sector counts only as a signal when the SIC code is not itself tied
--- (same tier and program-system count) with a SIC code in a different sector, and is not SIC 1629 (construction
--- stormwater-permit noise).
+-- sector), then any other code before the construction stormwater-permit noise codes (NAICS 238910, SIC 1629;
+-- a site holds that permit beside its real industry, #432), then the lowest code. The SIC sector counts only as
+-- a signal when the SIC code is not itself tied (same tier and program-system count) with a SIC code in a
+-- different sector, and is not SIC 1629 (construction stormwater-permit noise).
 -- is_government: a federal site, any owner-role organization typed as a government body
 -- (municipal, county, state, federal, district, tribal), or a facility or owner named like one ("City of ...",
 -- "... County", "... School District"; most organizations are typed UNKNOWN). The *_key columns are
@@ -135,13 +136,22 @@ primary_sic as (
         sic_description,
         naics_prefix,
         sector_code,
-        -- SIC codes tied on tier and program count that fall in different sectors: the lowest-code tie-break
+        -- SIC codes tied on tier and program-system count that fall in different sectors: the lowest-code tie-break
         -- picked the SIC code, so its sector is no evidence of the facility's industry (#181)
         (
             min(sector_code) over (partition by registry_id, rank_class, n_program_systems)
             != max(sector_code) over (partition by registry_id, rank_class, n_program_systems)
         ) as sic_is_tied_across_sectors,
-        row_number() over (partition by registry_id order by rank_class asc, n_program_systems desc, sic_code asc) as rn
+        row_number() over (
+            partition by registry_id
+            order by
+                rank_class asc,
+                n_program_systems desc,
+                -- SIC 1629 (the construction stormwater permit) loses ties to a real industry (#432), then the
+                -- lowest code; other construction codes (1521, 1794, ...) are real industries and keep their place
+                case when sic_code = '1629' then 1 else 0 end asc,
+                sic_code asc
+        ) as rn
     from sic_sectors
 ),
 
@@ -178,6 +188,9 @@ best_naics as (
                         then 0
                     else 1
                 end asc,
+                -- then NAICS 238910 (site preparation, the construction stormwater permit) loses ties to a
+                -- real industry (#432); other construction codes are real industries
+                case when n.naics_code = '238910' then 1 else 0 end asc,
                 n.naics_code asc
         ) as rn
     from naics as n

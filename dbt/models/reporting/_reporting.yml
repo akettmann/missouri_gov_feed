@@ -547,7 +547,8 @@ models:
       Number-based awards for the frontend: the top officials (ties share a rank; 5 by default, set per award
       by the awards_threshold var) on one measured number within one office, per calendar year and over all
       loaded years ('lifetime'), each shown with its opposite: lowest/highest attendance (rpt_attendance,
-      100+ recorded votes), most money from PACs, committees and parties / lowest share of it among officials
+      100+ recorded votes, ranked in the chamber the votes were cast in; an official who served in both
+      chambers has a row per chamber, so `office` can differ from the official's current office), most money from PACs, committees and parties / lowest share of it among officials
       raising $10,000+ (rpt_donor_rollup, medium name matches excluded; federal officials' share is per FEC
       two-year cycle, reported under the cycle's end year, over FEC total receipts from fct_federal_donor_summary,
       since the rollup holds only their committee receipts), most breaks with / most loyal to
@@ -706,8 +707,8 @@ models:
     description: >
       EPA-regulated business sites (fct_jurisdiction_businesses) in each district-elected official's area,
       counted by NAICS sector (naics_sectors seed, matched on the first two digits of the site's naics_code), with
-      how many are tied to a donor. The code is the NAICS code most of the site's programs give or, for a site
-      with no NAICS code, the sector its SIC code maps to (int_epa_frs__facilities). The donor sites themselves
+      how many are tied to a donor. The code is the NAICS code the most EPA program systems give (the stormwater
+      permit code 238910 loses ties) or, for a site with no NAICS code, the sector its SIC code maps to (int_epa_frs__facilities). The donor sites themselves
       are listed in fct_jurisdiction_businesses (is_donor). EPA FRS covers regulated sites only (factories, fuel
       stations, shops with permits), and about 45% of (official, site) rows have neither a NAICS nor a SIC code;
       those are counted under sector_name "No industry code" with a null sector_code. Grain: one row per

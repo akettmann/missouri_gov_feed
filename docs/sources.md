@@ -214,6 +214,14 @@ Quirks:
   the above: 443 votes listed 35 or 36 names before the fixes.
 - PDF parsing (about 3 s per journal) dominates a cold run, so it shards well. The extracted text is
   cached by PDF content, so re-runs skip it.
+- Journal file prefixes: `R` regular, `V` veto, and `S1`/`S2`/`T1`/`T2` extraordinary sessions. The prefix does not
+  say which special session it is (2018's `S1` is 183 but its `T1` is 184; 2017's `S1` and `S2` are 173 and 174), so
+  `fct_vote_bills` links special-session votes by date, not by prefix. A `source_url` with no `Journals/<prefix>`
+  part is treated as a regular `R` journal.
+- Special-session Senate bills (SB, SJR, SCR) before 2024 can't be linked to a bill: the Senate act list only
+  exists from session 241, so no source lists those bills and a vote on one links to nothing. House bills in
+  special sessions link through the House XML actions. From 253 on, Senate bills link through the House XML
+  actions (the Senate's own steps are not listed, so the match is by date span).
 
 ## mo_senate_topics: Missouri Senate topical index
 
@@ -975,8 +983,10 @@ offices, shops and most service businesses are missing.
   across sectors) to NAICS sector. That gives a sector, not a NAICS code: `int_epa_frs__facilities.naics_code`
   then holds the two-digit sector prefix and `naics_source` is `sic` (23%). Together they cover 56% of the
   geocoded sites; the rest have neither code. Where a site has both, the non-primary NAICS code and the SIC
-  sector agree on the sector for about 90% of sites; among codes tied on tier and program count, the one in the SIC sector (NAICS 31-33 count as one sector) wins.
-  The SIC sector is ignored for that tie-break when the site's SIC code is itself tied on tier and program count
+  sector agree on the sector for about 90% of sites. Among codes tied on tier and program systems, the tie-break
+  runs in order: the code in the SIC sector (NAICS 31-33 count as one sector) wins; then NAICS 238910 and SIC 1629
+  (construction stormwater permits) lose to any other code; then the lowest code.
+  The SIC sector is ignored for that tie-break when the site's SIC code is itself tied on tier and program systems
   with a SIC code in another sector (the lowest code was picked arbitrarily), and for SIC 1629. This changes the
   NAICS code of 56 facilities against the lowest-code rule.
   About 10,400 of the SIC-filled facilities are SIC 1629 (heavy construction), likely construction stormwater
@@ -1019,7 +1029,7 @@ Quirks:
 Flow: [diagrams/sources/mo_auditor.svg](diagrams/sources/mo_auditor.svg)
 
 - Site: https://auditor.mo.gov/AuditReport/Reports, backed by the JSON list `/AuditReport/SearchAudits`. No auth. The loader
-  keeps to about 1 request a second.
+  keeps to about 1 request a second in total: the throttle is shared by every shard on the machine (`http.host_throttle`).
 - Lands: `mo_auditor_reports` (the list rows verbatim plus `search_year`) and `mo_auditor_ratings` (the rating sentence read
   from a PDF, with its url, page and extraction status). First full run: 3,494 reports (1999 to 2026), 1,125 PDFs read,
   about 30 minutes.
@@ -1029,7 +1039,7 @@ Flow: [diagrams/sources/mo_auditor.svg](diagrams/sources/mo_auditor.svg)
   - The rating is not in the list. It is the sentence "In the areas audited, the overall performance of this entity was
     Good." in the one-page Citizens Summary PDF (`citz_sum_fk`) or, when there is none, in the first pages of the full
     report. pdfplumber sometimes splits a word of that sentence, so the match ignores spaces.
-  - Ratings start in 2012. Financial statements, monthly filing reports, follow-ups, property tax rate filings and
+  - Ratings start in 2012. Financial statements (singular or plural), county-wide fire protection district reviews (no rating sentence; a single district's own audit is rated and is read), monthly filing reports, follow-ups, property tax rate filings and
     compilations are never rated and are not downloaded. Performance audits and special reports have no sentence (status
     `no_rating_sentence`). A few 2012-2014 summaries left the template unfilled ("was XXXX"); staging gives them no rating
     (`placeholder_rating`).
