@@ -68,6 +68,8 @@ export interface DonorEntry {
  * One entry per donor, in donor_names order (names are joined by "; "), each with its filing-page urls from
  * donor_links. A donor named in donor_names with no link line has an empty list, so the page can say "no link"
  * instead of showing the name bare (#268). A link whose donor is not in donor_names is kept, after the others.
+ * Donors whose pages are exactly the same collapse into one entry whose `donor` joins their names with "; ".
+ * donor_names itself never holds a "; " inside a name: fct_jurisdiction_businesses turns each ";" into a comma (#276).
  */
 export function donorEntries(
   names: string | null | undefined,
@@ -80,10 +82,24 @@ export function donorEntries(
     if (name && !order.includes(name)) order.push(name);
   }
   for (const l of links) if (!order.includes(l.donor)) order.push(l.donor);
-  return order.map((donor) => ({
-    donor,
-    urls: links.filter((l) => l.donor === donor).map((l) => l.url),
-  }));
+  const entries: DonorEntry[] = [];
+  const byPages = new Map<string, DonorEntry>();
+  for (const donor of order) {
+    const urls = [...new Set(links.filter((l) => l.donor === donor).map((l) => l.url))];
+    // Name variants of one committee (one per spelling it filed under) all link the same pages: show those
+    // pages once, under all the names, instead of the same link once per variant (#276). A donor with no
+    // page is never merged, so "no link" stays attached to its own name.
+    const key = urls.slice().sort().join(" ");
+    const same = urls.length ? byPages.get(key) : undefined;
+    if (same) {
+      same.donor += `; ${donor}`;
+      continue;
+    }
+    const entry = { donor, urls };
+    entries.push(entry);
+    if (urls.length) byPages.set(key, entry);
+  }
+  return entries;
 }
 
 /**

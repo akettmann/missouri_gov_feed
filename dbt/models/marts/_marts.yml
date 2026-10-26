@@ -1710,7 +1710,9 @@ models:
                 values: ['same name', 'same company']
       - name: donor_names
         data_type: varchar
-        description: The matched contributors as filed, separated by "; ", when is_donor.
+        description: >
+          The matched contributors as filed, separated by "; ", when is_donor. A ";" inside a filed name becomes a
+          comma, so "; " only ever separates two donors (#276).
       - name: donated_amount
         data_type: decimal(38,6)
         description: >
