@@ -20,3 +20,8 @@ models:
     is_contingent with no date. held_unconstitutional: the effective line says "(all or part is unconstitutional)".
     history_note is the session-law history footnote ("(RSMo 1939 § 645, A.L. 1957 p. 587, A.L. 2015 S.B. 239)"),
     when the first footnote is one.'
+  columns:
+  - name: section_version_id
+    description: section_id/bid; a null here would silently break the not-exists anti-join in fct_statute_sections.
+    data_tests:
+    - not_null

@@ -13,6 +13,8 @@ import httpx
 from mogov import obs
 from mogov.config import CACHE_DIR, USER_AGENT
 
+log = obs.get_logger(__name__)
+
 _client: httpx.Client | None = None
 
 
@@ -87,9 +89,31 @@ def _single_flight(path: Path) -> Iterator[Path]:
         lock.unlink(missing_ok=True)
 
 
-# A throttle lock is held across one sleep (the interval) plus one request (timeout 120 s), so a lock this old
-# belongs to a process that died.
-THROTTLE_LOCK_STALE_S = 300
+# A throttle lock is held across one sleep (the interval) plus one request, so a lock this old belongs to a
+# process that died. The longest request is revisor.mo.gov's rx.aspx (~10 MB): the client's timeout is 120 s per
+# read, not for the whole download, so a slow transfer can run several minutes. 900 s covers that; a crashed
+# holder delays the others by at most this long.
+THROTTLE_LOCK_STALE_S = 900
+THROTTLE_LOCK_WARN_S = 10  # log when waiting for the lock this long
+THROTTLE_PERMISSION_RETRIES = 250  # ~5 s of PermissionError (a peer's unlink pending on Windows) is transient
+THROTTLE_MAX_PAUSE_S = 3600  # a pause stamp further out than this (clock set back) is cut to this
+
+
+def pause_host(host: str, seconds: float, *, clock: Callable[[], float] = time.time) -> None:
+    """Make every process sharing CACHE_DIR hold its next request to `host` until `seconds` from now (a host-wide
+    back-off: the site warned us, so no shard may keep requesting while one shard waits). Never shortens a pause."""
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    until = clock() + seconds
+    with contextlib.suppress(FileNotFoundError, ValueError, OSError):
+        until = max(until, float((CACHE_DIR / f".throttle-{host}.pause").read_text()))
+    write_atomic(CACHE_DIR / f".throttle-{host}.pause", repr(until).encode())
+
+
+def _pause_left(pause: Path, now: float) -> float:
+    try:
+        return min(float(pause.read_text()) - now, THROTTLE_MAX_PAUSE_S)
+    except (FileNotFoundError, ValueError, PermissionError):
+        return 0.0
 
 
 @contextlib.contextmanager
@@ -103,24 +127,43 @@ def host_throttle(
     """Hold the host's lock across a request that starts at least `interval` seconds after the last one any
     process on this machine started.
 
-    Processes share two files in CACHE_DIR: a lock and the time the last request started. The holder sleeps out
-    the rest of the interval, stamps the new start time and yields, so every process (shards of one run, two runs,
-    a shard and a re-run) serialises its requests to the host. The wall clock is used because processes cannot
-    compare monotonic clocks. This needs a shared filesystem: Cloud Run tasks don't share one, so a source that
-    depends on it must not be split over several tasks.
+    Processes share files in CACHE_DIR: a lock, the time the last request started, and optionally a "pause until"
+    time (pause_host). The holder sleeps out the rest of the interval, stamps the new start time and yields, so
+    every process (shards of one run, two runs, a shard and a re-run) serialises its requests to the host. A pause
+    is waited out without holding the lock (it can outlast THROTTLE_LOCK_STALE_S). The wall clock is used because
+    processes cannot compare monotonic clocks. This needs a shared filesystem: Cloud Run tasks that don't share one
+    must not split a source that depends on it.
     """
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     lock = CACHE_DIR / f".throttle-{host}.lock"
     stamp = CACHE_DIR / f".throttle-{host}.last"
+    pause = CACHE_DIR / f".throttle-{host}.pause"
+    began = time.time()
+    warned = False
+    denied = 0
     while True:
+        if (left := _pause_left(pause, clock())) > 0:
+            log.warning("http.host_paused", host=host, seconds=round(left))
+            sleep(left)
+            continue
         try:
             os.close(os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
-            break
-        except (FileExistsError, PermissionError):  # PermissionError: Windows, a peer's unlink is pending
+        except (FileExistsError, PermissionError) as e:  # PermissionError: Windows, a peer's unlink is pending
+            denied = denied + 1 if isinstance(e, PermissionError) else 0
+            if denied > THROTTLE_PERMISSION_RETRIES:
+                raise
             with contextlib.suppress(FileNotFoundError, PermissionError):
                 if time.time() - lock.stat().st_mtime > THROTTLE_LOCK_STALE_S:
                     lock.unlink(missing_ok=True)
+            if not warned and time.time() - began > THROTTLE_LOCK_WARN_S:
+                warned = True
+                log.warning("http.throttle_lock_slow", host=host, waited_s=round(time.time() - began))
             time.sleep(0.02)
+            continue
+        if _pause_left(pause, clock()) > 0:  # a peer was warned while we waited for the lock
+            lock.unlink(missing_ok=True)
+            continue
+        break
     try:
         try:
             last = float(stamp.read_text())

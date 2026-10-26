@@ -196,9 +196,9 @@ def test_throttle_across_real_processes(tmp_path):
     assert min(b - a for a, b in itertools.pairwise(starts)) >= 0.29
 
 
-def _loader_pages(monkeypatch, refused: set[str]):
+def _loader_pages(monkeypatch, refused: set[str], n: int = 5):
     """Run mo_revisor.load on one chapter with sections 1.010, 1.020, ...; pages in `refused` get the warning."""
-    sections = [(f"1.0{i}0", i) for i in range(1, 6)]
+    sections = [(f"1.0{i}0", i) for i in range(1, n + 1)]
     added, fetched = [], []
 
     class Sink:
@@ -245,6 +245,79 @@ def test_consecutive_refused_section_pages_stop_the_load(monkeypatch):
     with pytest.raises(mo_revisor.Warned):
         mo_revisor.load(mo_revisor.db.UNSHARDED)
     assert fetched == ["1.010", "1.020", "1.030", "1.040"]
+
+
+def test_alternating_refusals_stop_the_load_by_their_total(monkeypatch):
+    # every other page refused: never 3 in a row, but 30 of 60 skipped is a warned IP, not missing pages
+    refused = {f"1.0{i}0" for i in range(1, 61, 2)}
+    _loader_pages(monkeypatch, refused=refused, n=60)
+    with pytest.raises(RuntimeError, match="skipped 30 of 60"):
+        mo_revisor.load(mo_revisor.db.UNSHARDED)
+
+
+def test_a_few_scattered_refusals_are_tolerated_and_totalled(monkeypatch):
+    refused = {f"1.0{i}0" for i in range(1, 100, 7)}  # 15 of 100, each followed by good pages
+    added, _ = _loader_pages(monkeypatch, refused=refused, n=100)
+    logged = []
+    monkeypatch.setattr(mo_revisor.log, "info", lambda event, **kw: logged.append((event, kw)))
+    mo_revisor.load(mo_revisor.db.UNSHARDED)
+    assert len([k for t, k in added if t == "mo_revisor_sections"]) == 100 - len(refused)
+    assert ("mo_revisor.sections_skipped", {"total": len(refused), "of": 100}) in logged
+
+
+def test_a_warning_pauses_other_threads_requests_host_wide(tmp_path, monkeypatch):
+    monkeypatch.setattr(http, "CACHE_DIR", tmp_path)
+    clock = FakeClock()
+    starts = []
+    http.pause_host("revisor.mo.gov", 60, clock=clock.time)  # shard A was warned at t=1000
+
+    def shard_b():  # shard B's next request, nothing else holding the lock
+        with http.host_throttle("revisor.mo.gov", 2.0, clock=clock.time, sleep=clock.sleep):
+            starts.append(clock.time())
+
+    t = threading.Thread(target=shard_b)
+    t.start()
+    t.join()
+    assert starts == [pytest.approx(1060.0)]  # waited out the pause, no request in between
+    with http.host_throttle("revisor.mo.gov", 2.0, clock=clock.time, sleep=clock.sleep):
+        assert clock.time() == 1062.0  # and the pause doesn't linger
+
+
+def test_pause_never_shortens_and_get_writes_it(tmp_path, monkeypatch):
+    monkeypatch.setattr(http, "CACHE_DIR", tmp_path)
+    http.pause_host("h", 100, clock=lambda: 1000.0)
+    http.pause_host("h", 10, clock=lambda: 1000.0)
+    assert float((tmp_path / ".throttle-h.pause").read_text()) == 1100.0
+
+
+def test_get_pauses_the_whole_host_on_a_warning(monkeypatch):
+    paused = []
+    monkeypatch.setattr(mo_revisor, "pause_host", lambda host, s: paused.append((host, s)))
+    monkeypatch.setattr(mo_revisor, "WARNING_BACKOFF", (7,))
+    monkeypatch.setattr(mo_revisor.time, "sleep", lambda s: None)
+    answers = iter([mo_revisor.Warned("w"), b"ok"])
+
+    def fake_fetch(*a, **k):
+        r = next(answers)
+        if isinstance(r, Exception):
+            raise r
+        return r
+
+    monkeypatch.setattr(mo_revisor, "fetch", fake_fetch)
+    assert mo_revisor._get("https://revisor.mo.gov/main/x") == "ok"
+    assert paused == [("revisor.mo.gov", 7)]
+
+
+def test_throttle_raises_on_a_permanent_permission_error(tmp_path, monkeypatch):
+    monkeypatch.setattr(http, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(http.time, "sleep", lambda s: None)
+
+    def deny(*a, **k):
+        raise PermissionError("denied")
+
+    monkeypatch.setattr(http.os, "open", deny)
+    with pytest.raises(PermissionError), http.host_throttle("h", 1.0):
+        pass
 
 
 def test_more_than_one_cloud_run_task_is_refused(monkeypatch):

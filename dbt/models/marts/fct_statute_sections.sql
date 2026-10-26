@@ -55,8 +55,11 @@ removed as (
         cast(null as {{ dbt.type_string() }}) as section_text,
         source_url,
         false as repeal_pending
-    from {{ ref('stg_mo_revisor__repeals') }}
-    where section_version_id not in (select s.section_version_id from {{ ref('stg_mo_revisor__sections') }} as s)
+    from {{ ref('stg_mo_revisor__repeals') }} as rp
+    where not exists (
+        select 1 from {{ ref('stg_mo_revisor__sections') }} as s
+        where s.section_version_id = rp.section_version_id
+    )
 ),
 
 versions as (

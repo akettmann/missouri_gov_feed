@@ -222,12 +222,18 @@ Quirks:
   `data/cache` (`http.host_throttle`, held across the 2 s wait and the request), so shards and separate runs
   on one machine never send two requests less than 2 s apart; more shards add no speed. (The earlier pacing
   had each shard sleep 2 s × the shard count on its own clock, which let two shards' requests land under a second
-  apart, 400 to 520 times an hour with 2 to 4 shards.) The lock needs a shared filesystem. Cloud Run tasks have
-  none, so the loader refuses to start when `CLOUD_RUN_TASK_COUNT` is above 1: run it as a single task
-  (`--tasks 1`); shards inside that task are fine.
+  apart, 400 to 520 times an hour with 2 to 4 shards.) A warning page pauses the whole host: the shard that
+  got it writes a "pause until" time next to the lock (`.throttle-revisor.mo.gov.pause`) and every shard waits it out (60, 300, then 900 s) before its next request.
+  The lock is a file created with `O_EXCL`, which is not a reliable lock on GCS FUSE, where the documented Cloud
+  Run setup mounts `/data` (so the cache is shared between tasks, but the lock can't be trusted there). The loader
+  therefore refuses to start when `CLOUD_RUN_TASK_COUNT` is above 1: run it as a single task (`--tasks 1`);
+  shards (processes) inside that task are fine. A lock older than 900 s is taken for a dead holder's; the slowest
+  request, the ~10 MB `rx.aspx`, has to finish inside that.
 - A section page that answers with the warning twice, a minute apart, is taken for a page that doesn't exist
   and is skipped (logged as `mo_revisor.section_page_refused`; a re-run tries it again). Three skipped in a row
-  stop the load, since that is a real warning.- Several versions of one section can be in force side by side: a later version with a future effective date
+  stop the load, since that is a real warning, and so does a total above max(20, 0.5% of the pages) however
+  they are spread; the run ends with `mo_revisor.sections_skipped total=N`.
+- Several versions of one section can be in force side by side: a later version with a future effective date
   (27.117 has one effective 28 Aug 2026 and one effective 1 Jul 2027), or conflicting enactments of the same
   year (`MultiEnact.aspx`). `fct_statute_sections.is_current` marks the in-force version with the latest
   effective date.

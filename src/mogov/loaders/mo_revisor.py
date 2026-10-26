@@ -22,12 +22,13 @@ import httpx
 import lxml.html
 
 from mogov import db, obs
-from mogov.http import fetch
+from mogov.http import fetch, pause_host
 from mogov.loaders import loader
 
 log = obs.get_logger(__name__)
 
-BASE = "https://revisor.mo.gov/main"
+HOST = "revisor.mo.gov"
+BASE = f"https://{HOST}/main"
 # The site's rule: requests from one IP less than a second apart, several times in 30 seconds, get a warning page
 # (served with 200 in place of the page asked for); keep going and every request from that IP, browsers included,
 # redirects to Block.aspx. ~10 requests/s from three shards got an IP blocked within two minutes on 2026-10-25.
@@ -44,6 +45,10 @@ WARNING_BACKOFF = (60, 300, 900)
 # several skipped in a row stop the load (the IP is being warned for real).
 SECTION_WARNING_BACKOFF = (60,)
 MAX_CONSECUTIVE_SKIPS = 3
+# Refusals that alternate with good pages never reach the consecutive limit, so the run's total is capped too: more
+# than max(MIN_SKIPS_ALLOWED, MAX_SKIPPED_SHARE of the pages) skipped fails the load (nothing lands).
+MIN_SKIPS_ALLOWED = 20
+MAX_SKIPPED_SHARE = 0.005
 REFUSED_MARKER = b"Recent accesses are tracked over a thirty second interval"
 # A new enactment or amendment is a new version with its own bid (a new URL), found through the chapter lists,
 # which are re-read weekly. A version's page only changes with annotations, so it is re-read twice a year.
@@ -83,6 +88,8 @@ def _get(
             if wait is None:
                 raise
             log.warning("mo_revisor.warned", url=url, params=params, backoff_s=wait)
+            # host-wide: other shards (processes sharing the cache) must stop requesting too, not just this one
+            pause_host(HOST, wait)
             time.sleep(wait)
     raise AssertionError("unreachable")
 
@@ -217,6 +224,7 @@ def load(shard: db.Shard) -> dict[str, int]:
         progress = obs.Progress("section versions", len(versions), log)
         url = f"{BASE}/OneSection.aspx"
         skipped = 0
+        skipped_total = 0
         for chapter, section, bid in versions:
             try:
                 page = _get(
@@ -224,7 +232,14 @@ def load(shard: db.Shard) -> dict[str, int]:
                 )
             except Warned:
                 skipped += 1
-                log.warning("mo_revisor.section_page_refused", section=section, bid=bid, consecutive=skipped)
+                skipped_total += 1
+                log.warning(
+                    "mo_revisor.section_page_refused",
+                    section=section,
+                    bid=bid,
+                    consecutive=skipped,
+                    total=skipped_total,
+                )
                 if skipped >= MAX_CONSECUTIVE_SKIPS:
                     raise
                 progress.tick()
@@ -242,4 +257,11 @@ def load(shard: db.Shard) -> dict[str, int]:
             )
             progress.tick()
         progress.finish()
+        log.info("mo_revisor.sections_skipped", total=skipped_total, of=len(versions))
+        limit = max(MIN_SKIPS_ALLOWED, MAX_SKIPPED_SHARE * len(versions))
+        if skipped_total > limit:
+            raise RuntimeError(
+                f"mo_revisor skipped {skipped_total} of {len(versions)} section pages as refused (limit {limit:.0f}); "
+                "the site is warning this IP, not reporting missing pages"
+            )
     return sink.counts
