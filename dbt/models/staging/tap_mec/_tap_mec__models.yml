@@ -28,27 +28,30 @@ models:
     * an Individual ctrb_name ''FIRST LAST 0'' whose last_name also ends '' 0'' (3 rows): the trailing '' 0'' is
     dropped. * a Corporation whose ctrb_name and company are placeholders, last_name is blank and first_name is
     a multi-word name (C000642 / C081050, 8 rows): the organization sits in first_name; the name is kept and the
-    reported type stays Corporation rather than becoming Individual. Not handled (left as reported): addresses typed
-    into ctrb_name, and surnames repeated in first_name. The model exposes no address columns, so only name and
-    type are repaired. Identity and double loading (#82, #75, #83): record_id is the source row''s own id, txn in
-    the older export layout or cd1_a_id in the 2020-2022 layout. The two TAP files overlap for 2020 and share one
-    MEC id space: all 19,231 ids present as both a txn and a cd1_a_id are the same record (same committee, date,
-    amount, address), so the id is not prefixed with its layout. TAP also loaded 97.5k transactions twice (same
-    id, same file; only address_clean differs, because TAP doubled the address), which counted ~$179M twice. One
-    row per record_id is kept, preferring the newer layout (cd1_a_id, no txn) when an id is in both (the shared
-    columns are identical; the older layout''s only extras are ctrb_name / ctrb_type), then the copy whose address_clean
-    is not doubled (the shorter one). Cross-layout near-duplicates (#99): 290 person and 107 organization gifts
-    (about $5.2M) appear once in each layout under different ids. Two mechanisms: an amended report re-filed in
-    the 2020-2022 export (older report X against newer "AMENDED X": 267 rows, $0.79M), and a 24-hour notice re-itemized
-    in the next full report (28 rows, $4.19M, about 81% of the dollars, including all four Democratic Governors
-    Association gifts: $3.55M across two committees); the remaining ~100 rows ($0.2M) pair other reports (8-day-before
-    vs 30-day-after / January Quarterly). Same committee, date, amount and donor (first + last name, else company
-    / committee / ctrb_name, upper-cased and trimmed), one older-layout row (txn) against one newer-layout row (cd1_a_id):
-    the older row is dropped. Matching is one-to-one: rows sharing that key are numbered within each layout (by
-    record_id) and the nth older row is dropped only if the newer layout has an nth row, so a donor who gave the
-    same amount twice in a day in ONE layout keeps both gifts, and a pair with a different amount, date, committee
-    or donor is never matched. Only 2 of 397 matched keys are not 1:1 (2 older rows, 1 newer; the extra older row
-    is kept).'
+    reported type stays Corporation rather than becoming Individual. The un-shift signature and the final company
+    fallback use the same clean_name test as the other names (#472): a ''~~'' / ''--'' placeholder counts as missing
+    and is never emitted as the donor, and a one-character company no longer types a row Organization. No row of
+    the current TAP files carries a placeholder of two or more characters there, so only 3 one-character-company
+    rows change type (Organization to Individual). Not handled (left as reported): addresses typed into ctrb_name,
+    and surnames repeated in first_name. The model exposes no address columns, so only name and type are repaired.
+    Identity and double loading (#82, #75, #83): record_id is the source row''s own id, txn in the older export
+    layout or cd1_a_id in the 2020-2022 layout. The two TAP files overlap for 2020 and share one MEC id space: all
+    19,231 ids present as both a txn and a cd1_a_id are the same record (same committee, date, amount, address),
+    so the id is not prefixed with its layout. TAP also loaded 97.5k transactions twice (same id, same file; only
+    address_clean differs, because TAP doubled the address), which counted ~$179M twice. One row per record_id is
+    kept, preferring the newer layout (cd1_a_id, no txn) when an id is in both (the shared columns are identical;
+    the older layout''s only extras are ctrb_name / ctrb_type), then the copy whose address_clean is not doubled
+    (the shorter one). Cross-layout near-duplicates (#99): 290 person and 107 organization gifts (about $5.2M) appear
+    once in each layout under different ids. Two mechanisms: an amended report re-filed in the 2020-2022 export
+    (older report X against newer "AMENDED X": 267 rows, $0.79M), and a 24-hour notice re-itemized in the next full
+    report (28 rows, $4.19M, about 81% of the dollars, including all four Democratic Governors Association gifts:
+    $3.55M across two committees); the remaining ~100 rows ($0.2M) pair other reports (8-day-before vs 30-day-after
+    / January Quarterly). Same committee, date, amount and donor (first + last name, else company / committee /
+    ctrb_name, upper-cased and trimmed), one older-layout row (txn) against one newer-layout row (cd1_a_id): the
+    older row is dropped. Matching is one-to-one: rows sharing that key are numbered within each layout (by record_id)
+    and the nth older row is dropped only if the newer layout has an nth row, so a donor who gave the same amount
+    twice in a day in ONE layout keeps both gifts, and a pair with a different amount, date, committee or donor
+    is never matched. Only 2 of 397 matched keys are not 1:1 (2 older rows, 1 newer; the extra older row is kept).'
   columns:
   - name: record_id
     description: 'The source row''s own id (`txn`, or `cd1_a_id` in the 2020-2022 layout; one MEC id space). One
