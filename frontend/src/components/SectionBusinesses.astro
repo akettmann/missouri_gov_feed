@@ -9,6 +9,7 @@ import type { OfficialBundle } from "../lib/exports/types";
 import { districtSiteLists } from "../lib/exports/districtSites";
 import DonorLinks from "./DonorLinks.astro";
 import { donorEntries } from "../lib/donorLinks";
+import { sitesText } from "../lib/businessCounts";
 import { count, money } from "../lib/format";
 import { href } from "../lib/site";
 import { siteLinkContexts } from "../lib/siteLinkNames";
@@ -67,7 +68,7 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
       <h3>Companies here that gave to this official</h3>
       {businesses.donors.length === 0 ? (
         <p class="muted small">
-          None of the {count(totalSites)} sites matched a donor to this official by name or listed brand.
+          None of the {sitesText(totalSites)} matched a donor to this official by name or listed brand.
         </p>
       ) : (
         <>
@@ -143,11 +144,11 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
           </div>
         </>
       )}
-      <h3>All {count(totalSites)} sites by industry</h3>
+      <h3>All {sitesText(totalSites)} by industry</h3>
       {siteList && (
         <p class="small">
-          <a href={href(`/districts/${siteList.slug}/sites/`)}>See all {count(siteList.n_sites)} sites</a>{" "}
-          (one page) or <a href={href(`/districts/${siteList.slug}/sites.csv`)}>download them as CSV</a>.
+          <a href={href(`/districts/${siteList.slug}/sites/`)}>See all {sitesText(siteList.n_sites)}</a> (one
+          page) or <a href={href(`/districts/${siteList.slug}/sites.csv`)}>download them as CSV</a>.
         </p>
       )}
       <p class="small muted">

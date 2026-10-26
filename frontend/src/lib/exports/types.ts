@@ -2,6 +2,7 @@
 // Column names follow the dbt marts / planned rpt_* contracts so a real export can replace a fixture as-is.
 
 import type { PayVoteRow } from "../attendancePay";
+import type { LegislatorExpenseRow } from "../legislatorExpenses";
 import type { CommitteeSession } from "../committeePosts";
 
 export type Confidence = string; // 'exact id' | 'exact (MEC crosswalk)' | 'high' | 'medium' | ...
@@ -345,6 +346,8 @@ export interface OfficialBundle {
     committee_trails: CommitteeTrail[] | null;
   };
   gifts: Dataset<GiftRollupRow>;
+  /** per diem and mileage by state fiscal year (fct_legislator_expenses); null when the export is missing or empty (state expenditures not loaded) */
+  expenses: LegislatorExpenseRow[] | null;
   /**
    * Businesses in the official's district or city; null when either export is missing. Officials elected
    * statewide (and judges) have no area, so both lists are empty.
