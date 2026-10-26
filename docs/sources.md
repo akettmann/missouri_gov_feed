@@ -413,6 +413,13 @@ Quirks:
   with MEC, plus acronyms that no name rule can expand (the common ones, HRCC, AMECPAC and MHA PAC, are in the alias
   seed). Distinct committees can differ only by "MO" vs "Missouri" ("MO Values PAC" and "Missouri Values PAC"), so
   the exact-name tier is tried first.
+- Signing off donor aliases. Each row of the `committee_donor_aliases` seed (`dbt/seeds/committee_donor_aliases.csv`)
+  carries `checked_by` (who verified the alias against the committee's filings, a name or GitHub handle) and
+  `checked_on` (the date of that check, `YYYY-MM-DD`). Both are empty until a maintainer signs the row off; a row
+  with only one of them filled still counts as unsigned. To sign one off, read its `evidence` column, confirm it
+  against the committee's filings, fill both columns in the CSV, and run `mogov build`. The warn-level test
+  `assert_committee_donor_aliases_signed_off` lists each committee with unsigned aliases (`committee_name`,
+  `n_unsigned_aliases`, `unsigned_aliases`) and goes quiet once every row is signed. Unsigned aliases still match.
 - Personal financial disclosures (PFDs) are not online. MEC's 2026 Ethics Guide: "State law requires a
   request to receive copies of PFDs filed with the Commission. Therefore, PFDs are not available for
   public viewing on the MEC's website." Anyone can request copies from MEC (legislators, statewide
