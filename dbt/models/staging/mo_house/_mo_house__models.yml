@@ -24,7 +24,8 @@ models:
 - name: stg_mo_house__committee_list_members
   description: 'Members of each House committee per session from the House COMMITTEELIST export: one row per (session,
     committee, member). Held only for sessions 231, 241, 251, 253 and 254 (2023 onward). The member is identified
-    by the House district number, which is unique within a session.'
+    by the House district number, which is unique within a session. source_url is the House file the COMMITTEELIST
+    export was fetched from (the session zip for a closed session).'
 - name: stg_mo_house__member_committees
   description: 'Committee and subcommittee posts of each MO House member per session, as the member''s own XML page
     lists them (end-of-session snapshot): committee name and position (Chair, Vice-Chair, Co-Chair, Ranking Minority

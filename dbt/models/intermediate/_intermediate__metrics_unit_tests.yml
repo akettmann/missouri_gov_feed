@@ -16,17 +16,17 @@ unit_tests:
           - {session_code: '253', house_member_id: '9002', district_number: 2, person_key: p_two}
       - input: ref('stg_mo_house__member_committees')
         rows:
-          - {session_code: '251', house_member_id: '9001', committee_name: Budget, position_name: Chair}
-          - {session_code: '251', house_member_id: '9001', committee_name: Subcommittee on Roads, position_name: Member}
+          - {session_code: '251', house_member_id: '9001', committee_name: Budget, position_name: Chair, source_url: https://documents.house.mo.gov/xml/251.zip}
+          - {session_code: '251', house_member_id: '9001', committee_name: Subcommittee on Roads, position_name: Member, source_url: https://documents.house.mo.gov/xml/251.zip}
       - input: ref('stg_mo_house__committee_list_members')
         rows:
-          - {session_code: '251', committee_name: Budget, district_number: 1, position_name: Member, chamber: H}
-          - {session_code: '253', committee_name: Budget, district_number: 1, position_name: Chair, chamber: H}
-          - {session_code: '253', committee_name: Budget, district_number: 2, position_name: Member, chamber: H}
-          - {session_code: '253', committee_name: Budget, district_number: 2, position_name: Member, chamber: S}
+          - {session_code: '251', committee_name: Budget, district_number: 1, position_name: Member, chamber: H, source_url: https://x/list251}
+          - {session_code: '253', committee_name: Budget, district_number: 1, position_name: Chair, chamber: H, source_url: https://x/list253}
+          - {session_code: '253', committee_name: Budget, district_number: 2, position_name: Member, chamber: H, source_url: https://x/list253}
+          - {session_code: '253', committee_name: Budget, district_number: 2, position_name: Member, chamber: S, source_url: https://x/list253}
     expect:
       rows:
-        - {session_code: '251', person_key: p_one, committee_name: Budget, position_name: Chair, source: member_page, is_subcommittee: false}
-        - {session_code: '251', person_key: p_one, committee_name: Subcommittee on Roads, position_name: Member, source: member_page, is_subcommittee: true}
-        - {session_code: '253', person_key: p_one, committee_name: Budget, position_name: Chair, source: committee_list, is_subcommittee: false}
-        - {session_code: '253', person_key: p_two, committee_name: Budget, position_name: Member, source: committee_list, is_subcommittee: false}
+        - {session_code: '251', person_key: p_one, committee_name: Budget, position_name: Chair, source: member_page, source_url: https://documents.house.mo.gov/xml/251.zip, is_subcommittee: false}
+        - {session_code: '251', person_key: p_one, committee_name: Subcommittee on Roads, position_name: Member, source: member_page, source_url: https://documents.house.mo.gov/xml/251.zip, is_subcommittee: true}
+        - {session_code: '253', person_key: p_one, committee_name: Budget, position_name: Chair, source: committee_list, source_url: https://x/list253, is_subcommittee: false}
+        - {session_code: '253', person_key: p_two, committee_name: Budget, position_name: Member, source: committee_list, source_url: https://x/list253, is_subcommittee: false}

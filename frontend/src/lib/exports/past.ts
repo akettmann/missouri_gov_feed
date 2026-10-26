@@ -18,7 +18,7 @@ export function sameNameKindLabel(kind: SameNameLink["kind"]): string {
   return kind === "current" ? "current profile" : "past roster entry";
 }
 
-/** Name comparison key: case, accents, punctuation and spacing ignored. Used only to offer a cross-link. */
+/** Name comparison key: case and accents ignored, punctuation read as a space, runs of spaces collapsed. Used only to offer a cross-link. */
 export function normalizeName(name: string): string {
   return name
     .normalize("NFKD")

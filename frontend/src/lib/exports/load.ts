@@ -89,7 +89,8 @@ async function loadAll(): Promise<OfficialBundle[]> {
   const indicators = groupBy(
     await query<Indicator & { official_id: string }>(`
       select official_id, indicator, value, period, detail, source_url,
-             cast(first_vote_year as integer) as first_vote_year, cast(last_vote_year as integer) as last_vote_year
+             cast(first_vote_year as integer) as first_vote_year, cast(last_vote_year as integer) as last_vote_year,
+             cast(chamber_data_start_year as integer) as chamber_data_start_year
       from {fct_bias_indicators} order by indicator, period`),
   );
 
@@ -456,18 +457,19 @@ async function loadAll(): Promise<OfficialBundle[]> {
             select official_id, session_code, cast(session_year as integer) as session_year,
                    cast(committees_held as integer) as committees_held, cast(chair_posts as integer) as chair_posts,
                    cast(vice_chair_posts as integer) as vice_chair_posts,
-                   cast(co_chair_posts as integer) as co_chair_posts, cast(ranking_posts as integer) as ranking_posts
-            from {fct_committee_posts}`),
+                   cast(co_chair_posts as integer) as co_chair_posts, cast(ranking_posts as integer) as ranking_posts,
+                   source_url
+            from {fct_committee_posts} where is_current_official`),
           await query<TitledMembership>(`
             select official_id, session_code, committee_name, position_name, is_subcommittee
-            from {fct_committee_memberships} where position_name <> 'Member'`),
+            from {fct_committee_memberships} where position_name <> 'Member' and is_current_official`),
           process.env,
           console.warn,
           houseSessionNames,
           new Set(
             (
               await query<{ session_code: string }>(
-                `select distinct session_code from {fct_committee_memberships} where source = 'committee_list'`,
+                `select distinct session_code from {fct_committee_memberships} where source = 'committee_list' and is_current_official`,
               )
             ).map((r) => r.session_code),
           ),

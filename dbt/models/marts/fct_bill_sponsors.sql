@@ -2,12 +2,25 @@
 -- The House numbers senators 200 + senate district. A representative is matched on (session, district)
 -- through the House roster; a senator on the senate seat held that year. Either way the listed name must
 -- contain the member's surname. Unmatched rows (former members, typos) keep official_id null.
-with sponsors as (
+-- Re-listed bills (status 'relisted for governor message', int_bills__status) are left out: the House lists the
+-- previous session's appropriation bill again only for the governor's message, repeating its sponsors, so keeping
+-- them would count the budget chair's sponsorship twice. The original's row carries the sponsorship.
+with relisted as (
     select
-        *,
-        {{ mogov.name_key('sponsor_name') }} as sponsor_key,
-        case when sponsor_district > 200 then 'state_senate' else 'state_house' end as sponsor_chamber
-    from {{ ref('stg_mo_house__bill_sponsors') }}
+        session_code,
+        bill
+    from {{ ref('int_bills__status') }}
+    where status = 'relisted for governor message'
+),
+
+sponsors as (
+    select
+        sp.*,
+        {{ mogov.name_key('sp.sponsor_name') }} as sponsor_key,
+        case when sp.sponsor_district > 200 then 'state_senate' else 'state_house' end as sponsor_chamber
+    from {{ ref('stg_mo_house__bill_sponsors') }} as sp
+    left join relisted as rl on sp.session_code = rl.session_code and sp.bill = rl.bill
+    where rl.bill is null
 ),
 
 house_match as (
