@@ -89,6 +89,22 @@ Quirks:
   drops a row; an unknown label is kept and fails an accepted_values test. The House also
   publishes some roll calls twice under two file names (261: `003.001`/`003.002`, `004.002`/`004.004`,
   `004.003`/`004.005`, identical content); the file whose name carries the printed roll-call number is kept.
+- Voting-board test records survive the header check in 173 and 231 (issue #449): `bills173/rollcalls/002.001`
+  (a QUORUM CALL with one voter, HUBRECHT) and `002.002` (a PQ with one voter, LOVE), 2017-05-23, and
+  `bills231/rollcalls/026.003`/`026.004` (ADJOURNMENT, 7 and 5 voters, the first names alphabetically, printed after the
+  day's last real vote on 2023-02-21). Real roll calls never go below 83 voters of about 162 (a quorum call; a quorum is
+  82), so `stg_mo_house__rollcalls` drops a roll call where fewer than a quarter of the listed members cast a vote
+  (`house_rollcall_min_participation`; the 204 and 171 test records fall under it as well). The singular test
+  `assert_house_rollcalls_quorum_participation` fails on any survivor under half the members unless its URL is in
+  `house_rollcall_small_quorum_allowlist` (a genuine call that failed to produce a quorum). Effect: 4 roll calls and 650
+  member votes fewer; the 173 attendance of 16 members moves from 80% to 100%, and the House attendance awards for
+  2017, 2023 and lifetime shuffle by a rank or a tenth of a point.
+- Session 204 has only 5 roll-call PDFs, all "Session Day : 3", and that is complete (issue #449). The only House floor
+  vote that session was 2020-11-10 (HB 14 third read and passed; HR 1 was adopted without a roll call); no later House
+  action in the bill XML (2020-11-13 to 2020-12-16) is a floor roll call: they are introductions, readings, referrals,
+  HR 2's committee hearing and executive session, and the Speaker signing HB 14 and its truly agreed and finally
+  passed after Senate passage (which needs no House roll call). The loader probes days up to the last linked day plus 3 (here days 4-6, all the site's 404 page), and
+  spot checks of days 7, 8, 10 and 13 also answer 404. Not a loader gap.
 - The XML is never converted on the way in: the loader gzips each file as received. The parser reads the
   gzip with lxml (hardened settings in `mogov.xmlparse`) and selects elements by local name, so namespaces,
   attributes, entities and CDATA are the parser's problem, not a regex's. The links that drive crawling

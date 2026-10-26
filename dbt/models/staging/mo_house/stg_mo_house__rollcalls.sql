@@ -20,6 +20,18 @@
 -- 3. The same (session, day, roll-call number) published under two file names (#435): 261 has 003.001 = 003.002,
 --    004.002 = 004.004 and 004.003 = 004.005, byte-identical headers and totals. The roll-call number printed in
 --    the PDF is the key; the file whose name carries that number (else the first by URL) is kept.
+-- 4. Voting-board test records (#449): a roll call on which hardly any member voted. A recorded vote needs a
+--    quorum (a majority of the 163 seats, 82), and in 6,449 PDFs the fewest members who voted on a real roll call
+--    is 83 (a quorum call); 211 sit between 83 and 120. Nine PDFs have 1 to 28 voters of 161 to 163: 171
+--    002.001/002.002 (2 and 6) and 058.018 (4/26/2016, HCS HB 1465: only MR SPEAKER voting, 161 absent; already
+--    dropped by the out-of-session-year check),
+--    173 002.001/002.002 (HUBRECHT alone on a QUORUM CALL; LOVE alone on a PQ), 231
+--    026.003/026.004 (7 and 5 members on an ADJOURNMENT, the first names alphabetically, printed after the last
+--    real vote of the day), 204 003.002/003.003 (10 and 28). A roll call where fewer than
+--    var('house_rollcall_min_participation') (a quarter) of the listed members cast a vote is dropped; the 28-to-83
+--    gap leaves room either way. A roll call with no parsed votes is kept. The singular test
+--    assert_house_rollcalls_quorum_participation fails on any survivor under half the members (an allowlist
+--    var holds genuine small-quorum calls).
 -- Raw keeps everything.
 {#- the file name that carries the roll call's own number, e.g. '%/003.001.pdf' -#}
 {% set file_name_like = dbt.concat([
@@ -38,6 +50,15 @@ with src as (
         {{ mogov.json_str('payload', '$.totals.No') }} as total_no,
         {{ mogov.json_str('payload', '$.error') }} as load_error
     from {{ source('mo_house', 'rollcalls') }}
+),
+
+participation as (
+    select
+        {{ mogov.json_str('payload', '$.url') }} as rollcall_url,
+        count(*) as members_listed,
+        sum(case when {{ mogov.json_str('payload', '$.vote_code') }} = '@' then 0 else 1 end) as members_voting
+    from {{ source('mo_house', 'rollcall_votes') }}
+    group by 1
 ),
 
 parsed as (
@@ -64,10 +85,13 @@ parsed as (
 
 checked as (
     select
-        *,
+        parsed.*,
+        participation.members_listed,
+        participation.members_voting,
         -- the General Assembly sitting in the session's year: 99th = 2017-2018, 100th = 2019-2020, ...
-        (session_year - 1819 - mod(session_year - 1819, 2)) / 2 as session_general_assembly
+        (parsed.session_year - 1819 - mod(parsed.session_year - 1819, 2)) / 2 as session_general_assembly
     from parsed
+    left join participation on parsed.rollcall_url = participation.rollcall_url
 ),
 
 in_session as (
@@ -78,6 +102,11 @@ in_session as (
         (vote_date is null or extract(year from vote_date) = session_year)
         -- a header that didn't parse is kept (null passes)
         and (header_general_assembly is null or header_general_assembly = session_general_assembly)
+        -- voting-board test records: hardly anyone voted (a roll call with no parsed votes is kept)
+        and (
+            members_listed is null
+            or members_voting >= {{ var('house_rollcall_min_participation') }} * members_listed
+        )
         -- drop only on a RECOGNISED label that belongs to another kind of session; an unknown label ("VETO SESSION")
         -- is kept so the accepted_values test on header_session_label fails loudly instead of rows vanishing
         and (
@@ -133,6 +162,8 @@ select
     measure,
     sponsor,
     total_yes,
-    total_no
+    total_no,
+    members_listed,
+    members_voting
 from deduped
 where key_rank = 1

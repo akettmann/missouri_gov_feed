@@ -204,6 +204,10 @@ unit_tests:
             select '{"url": "u4", "session_code": "173", "session_day": "1", "rollcall_number": "1", "vote_date": "9/12/2017"}' union all
             select '{"url": "u5", "session_code": "181", "session_day": "1", "rollcall_number": "1", "vote_date": "1/4/2017"}' union all
             select '{"url": "u6", "session_code": "171", "session_day": "2", "rollcall_number": "1", "vote_date": "1/5/2017", "error": "not a pdf"}'
+      - input: source('mo_house', 'rollcall_votes')
+        format: sql
+        rows: |
+            select cast(null as varchar) as payload where 1 = 0
     expect:
       rows:
         - {rollcall_url: u1, session_code: '171', session_day: 35, rollcall_number: 8, vote_date: '2017-03-02'}
@@ -267,6 +271,10 @@ unit_tests:
             select '{"url": "keep_unknown_label", "session_code": "201", "session_day": "13", "rollcall_number": "1", "vote_date": "9/16/2020", "text": "UNOFFICIAL COPY 100th General Assembly\n   VETO SESSION\n State of Missouri"}' union all
             select '{"url": "keep_unknown_label_204", "session_code": "204", "session_day": "5", "rollcall_number": "1", "vote_date": "11/12/2020", "text": "UNOFFICIAL COPY 100th General Assembly\n   VETO SESSION\n State of Missouri"}' union all
             select '{"url": "keep_no_text", "session_code": "211", "session_day": "1", "rollcall_number": "1", "vote_date": "1/6/2021"}'
+      - input: source('mo_house', 'rollcall_votes')
+        format: sql
+        rows: |
+            select cast(null as varchar) as payload where 1 = 0
     expect:
       rows:
         - {rollcall_url: keep_171, header_general_assembly: 99, header_session_label: FIRST REGULAR SESSION}
@@ -300,6 +308,10 @@ unit_tests:
             select '{"url": "https://x/bills261/rollcalls/006.002.pdf", "session_code": "261", "session_day": "6", "vote_date": "1/15/2026"}' union all
             select '{"url": "https://x/bills261/rollcalls/007.001.pdf", "session_code": "261", "session_day": "7", "rollcall_number": "1", "vote_date": "1/16/2026"}' union all
             select '{"url": "https://x/bills251/rollcalls/007.001.pdf", "session_code": "251", "session_day": "7", "rollcall_number": "1", "vote_date": "1/16/2025"}'
+      - input: source('mo_house', 'rollcall_votes')
+        format: sql
+        rows: |
+            select cast(null as varchar) as payload where 1 = 0
     expect:
       rows:
         - {rollcall_url: https://x/bills261/rollcalls/003.001.pdf, session_code: '261', session_day: 3, rollcall_number: 1}
@@ -309,3 +321,46 @@ unit_tests:
         - {rollcall_url: https://x/bills261/rollcalls/006.002.pdf, session_code: '261', session_day: 6, rollcall_number: null}
         - {rollcall_url: https://x/bills261/rollcalls/007.001.pdf, session_code: '261', session_day: 7, rollcall_number: 1}
         - {rollcall_url: https://x/bills251/rollcalls/007.001.pdf, session_code: '251', session_day: 7, rollcall_number: 1}
+
+  - name: house_rollcalls_where_hardly_anyone_voted_are_voting_board_tests
+    model: stg_mo_house__rollcalls
+    description: >
+      A roll call on which fewer than a quarter of the listed members cast a vote (house_rollcall_min_participation,
+      #449) is a voting-board test record and is dropped (231 026.003 had 7 voters of 163, 173 002.001 had 1). Exactly a quarter
+      (1 of 4) stays, a roll call where nobody voted goes, and a roll call with no parsed vote rows at all stays
+      (its votes were not loaded, which says nothing about turnout). Counting absent ('@') members as voters,
+      using a strict instead of an inclusive threshold, or dropping rows with no votes fails this test.
+    given:
+      - input: source('mo_house', 'rollcalls')
+        format: sql
+        rows: |
+            select cast('{"url": "keep_all", "session_code": "231", "session_day": "1", "rollcall_number": "1", "vote_date": "2/21/2023"}' as varchar) as payload union all
+            select '{"url": "keep_exact_quarter", "session_code": "231", "session_day": "2", "rollcall_number": "1", "vote_date": "2/21/2023"}' union all
+            select '{"url": "drop_under_quarter", "session_code": "231", "session_day": "3", "rollcall_number": "1", "vote_date": "2/21/2023"}' union all
+            select '{"url": "drop_nobody", "session_code": "231", "session_day": "4", "rollcall_number": "1", "vote_date": "2/21/2023"}' union all
+            select '{"url": "keep_no_votes_rows", "session_code": "231", "session_day": "5", "rollcall_number": "1", "vote_date": "2/21/2023"}'
+      - input: source('mo_house', 'rollcall_votes')
+        format: sql
+        rows: |
+            select cast('{"url": "keep_all", "vote_code": "Y"}' as varchar) as payload union all
+            select '{"url": "keep_all", "vote_code": "Y"}' union all
+            select '{"url": "keep_all", "vote_code": "N"}' union all
+            select '{"url": "keep_all", "vote_code": "P"}' union all
+            select '{"url": "keep_exact_quarter", "vote_code": "Y"}' union all
+            select '{"url": "keep_exact_quarter", "vote_code": "@"}' union all
+            select '{"url": "keep_exact_quarter", "vote_code": "@"}' union all
+            select '{"url": "keep_exact_quarter", "vote_code": "@"}' union all
+            select '{"url": "drop_under_quarter", "vote_code": "Y"}' union all
+            select '{"url": "drop_under_quarter", "vote_code": "@"}' union all
+            select '{"url": "drop_under_quarter", "vote_code": "@"}' union all
+            select '{"url": "drop_under_quarter", "vote_code": "@"}' union all
+            select '{"url": "drop_under_quarter", "vote_code": "@"}' union all
+            select '{"url": "drop_nobody", "vote_code": "@"}' union all
+            select '{"url": "drop_nobody", "vote_code": "@"}' union all
+            select '{"url": "drop_nobody", "vote_code": "@"}' union all
+            select '{"url": "drop_nobody", "vote_code": "@"}'
+    expect:
+      rows:
+        - {rollcall_url: keep_all, members_listed: 4, members_voting: 4}
+        - {rollcall_url: keep_exact_quarter, members_listed: 4, members_voting: 1}
+        - {rollcall_url: keep_no_votes_rows, members_listed: null, members_voting: null}
