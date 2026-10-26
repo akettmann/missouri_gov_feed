@@ -47,9 +47,9 @@ unit_tests:
       - input: ref('int_mo_senate__votes')
         format: sql
         rows: |
-            select 'sv1' as vote_id, 'HB 2' as measure, cast('2018-09-14' as date) as vote_date union all
-            select 'sv2', 'HB 3', cast('2018-09-14' as date) union all
-            select 'sv3', 'SB 5', cast('2018-09-14' as date)
+            select 'sv1' as vote_id, 'HB 2' as measure, cast('2018-05-10' as date) as vote_date union all
+            select 'sv2', 'HB 3', cast('2018-05-10' as date) union all
+            select 'sv3', 'SB 5', cast('2018-05-10' as date)
     expect:
       format: sql
       rows: |

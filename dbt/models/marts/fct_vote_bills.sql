@@ -7,7 +7,9 @@
 --   Re-listed bills (status 'relisted for governor message', int_bills__status) are never linked: the House lists
 --   the previous session's appropriation bill again only to record the governor's Art. IV s.27 message, so it
 --   has no floor action and a vote cannot have been on it. Their votes link to nothing here rather than to a
---   stub (the original lives in the earlier session, and is linked only when its own roll calls name it).
+--   stub. (Five Senate journal votes from extraordinary-session journals, 2018-09-14, 2020-09-02, 2022-10-04, are
+--   special-session bills the Senate-journal session rule mislinks to the regular session's re-listed HB2/HB3;
+--   they are dropped here by accident of that bug, which is tracked in #429.)
 with relisted as (
     select
         session_code,
@@ -27,9 +29,9 @@ bills as (
     select
         t.session_code,
         t.bill
+    -- no relisted anti-join here: re-listings are House bills and this branch keeps only 'S%'
     from {{ ref('stg_mo_senate__bill_topics') }} as t
-    left join relisted as rl on t.session_code = rl.session_code and t.bill = rl.bill
-    where t.bill like 'S%' and rl.bill is null
+    where t.bill like 'S%'
 ),
 
 bill_keys as (
