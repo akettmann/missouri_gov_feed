@@ -56,19 +56,20 @@
 {%- endmacro %}
 
 {#- Free text from a registry (EPA FRS names, street addresses, cities) as shown to a reader: runs of whitespace
-    (tabs included) become one space, a doubled inner comma becomes one ("LIPPERT FAMILY FARM,, LLC"; a space before
-    the doubled comma goes too), and commas, semicolons and whitespace are cut from both ends, so "BUTTERBALL," and
-    "900 WATSON DR,  " lose their stray comma while "ACME INC." and "SUITE 1" keep their own punctuation. Doubled
-    semicolons are left alone: "K-BAR-L ;;C" is probably a shifted-hand typo for "LLC", not a separator. Null when
-    nothing is left. HTML entities are decoded first (decode_registry_entities, #398). The ends are cut in one pass:
-    the leading and the trailing run are separate patterns, so each is a plain anchored match. #}
+    (tabs included) become one space, and any run of commas, each with an optional space before it, becomes one comma
+    ("LIPPERT FAMILY FARM,, LLC" is "LIPPERT FAMILY FARM, LLC", "NEMO FEEDS , LLC" is "NEMO FEEDS, LLC", "T 33N ,R 04W"
+    is "T 33N,R 04W", "A , , B" is "A, B"; #399). Commas, semicolons and whitespace are cut from both ends, so
+    "BUTTERBALL," and "900 WATSON DR,  " lose their stray comma while "ACME INC." and "SUITE 1" keep their own
+    punctuation. Doubled semicolons are left alone: "K-BAR-L ;;C" is probably a shifted-hand typo for "LLC", not a
+    separator. Null when nothing is left. HTML entities are decoded first (decode_registry_entities, #398). The ends
+    are cut in one pass: the leading and the trailing run are separate patterns, so each is a plain anchored match. #}
 {% macro clean_registry_text(expr) -%}
     nullif(
         {{ mogov.regex_replace_all(
             mogov.regex_replace_all(
                 mogov.regex_replace_all(
                     mogov.regex_replace_all(mogov.decode_registry_entities(expr), '[[:space:]]+', ' '),
-                    ' ?,,+', ','
+                    '( ?,)+', ','
                 ),
                 '^[,;[:space:]]+', ''
             ),
