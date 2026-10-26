@@ -127,8 +127,8 @@ class JsonSink:
     leaves the previous landing in place.
 
         with db.JsonSink(shard, source_url=BASE) as sink:
-            sink.add("mo_house_bills", key, payload)
-        sink.counts  # {"mo_house_bills": 1234}
+            sink.add("senate_bills", key, payload)
+        sink.counts  # {"senate_bills": 1234}
 
     Tables named in `tables` are published even when empty, so a shard that owns no rows for a table
     still replaces its stale part.

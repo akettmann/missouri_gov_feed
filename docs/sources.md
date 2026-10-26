@@ -42,15 +42,30 @@ Flow: [diagrams/sources/mo_house.svg](diagrams/sources/mo_house.svg)
 documents.house.mo.gov XML exports (members, bills, actions) plus one PDF per roll call. The PDFs are
 the only per-member House vote record.
 
-- Lands: `mo_house_members`, `mo_house_bills`, `mo_house_lists`, `mo_house_rollcalls`,
+- Lands: every XML file unchanged as gzip (`<raw dir>/mo_house_xml/<session>/<FILE>.XML.gz`) with one state row
+  per file in `mo_house_xml_files` (path, source URL, size, sha256, fetch time), then typed tables parsed from
+  those files by `mogov.parsers.mo_house`: `mo_house_xml_bills` with child tables `_bill_actions` (with printed
+  roll-call totals), `_bill_sponsors`, `_bill_texts`, `_bill_amendments`, `_bill_rollcalls`, `_bill_subjects`
+  and `_bill_hearings`; `mo_house_xml_members` with `_member_committees` and `_member_counties`;
+  `mo_house_xml_sessions`, `_committees` and `_committee_members`; and one row per item of the BillList,
+  MemberList, UpcomingHearingList and CalendarList files. The roll-call PDFs land as `mo_house_rollcalls` and
   `mo_house_rollcall_votes`.
 - Window: `MOGOV_LOOKBACK_YEARS` (default 10). Roll-call PDFs go back to 2014.
 - Shard units: session codes (XML) and session days (roll-call PDFs).
 
 Quirks:
-- Links that drive crawling (`RollCallPDF`, `BillXMLLink`, `RepresentativeXMLLink`) are read with lxml via
-  `mogov.xmlparse` (any namespace/attributes, entities decoded), never regex. Loader convention: XML is
-  parsed with `mogov.xmlparse`, never regex.
+- The XML is never converted on the way in: the loader gzips each file as received. The parser reads the
+  gzip with lxml (hardened settings in `mogov.xmlparse`) and selects elements by local name, so namespaces,
+  attributes, entities and CDATA are the parser's problem, not a regex's. The links that drive crawling
+  (`RollCallPDF`, `BillXMLLink`, `RepresentativeXMLLink`) come from the same parsed tree. Re-run the parser
+  alone, with no fetching, via `python -m mogov.parsers.mo_house [--shards N --shard I]`.
+- Not parsed into rows (only kept in the gzip): `SenateActList` (House actions on Senate bills; see #358), the
+  odd `GRP*` files, a member's `RepresentativeLegislation` lists (the bill sponsor rows carry the same
+  information) and a member's contact details, which the project keeps out of everything but the raw file.
+- The raw dir must be writable from the loader: locally `data/raw`, on Cloud Run the mounted bucket named by
+  `MOGOV_RAW_DIR`. The gzip files are written atomically and with a fixed header, so a re-run of an unchanged
+  file rewrites nothing.
+- Empty XML elements are NULL in the typed tables (the old JSON landing held empty strings).
 - Session codes are two-digit year plus type: `1` regular, `2`–`4` extraordinary. Unknown codes return
   HTTP 200 with an HTML page, not a 404. The loader probes all four types per year and treats HTML as
   "no such session".
@@ -76,7 +91,7 @@ Quirks:
   bills have no subjects in `fct_bill_subjects`. Older sessions would need another source (Open States'
   bills API needs a key).
 - Each bill's roll calls are nested under the bill text version voted on
-  (`BillText[].RollCalls[].RollCall[].RollCallPDF`). The PDF URL is the House `vote_id`, so
+  (`mo_house_xml_bill_rollcalls`, `parent_kind = 'text'`). The PDF URL is the House `vote_id`, so
   `fct_vote_bills` links House votes to bills exactly. Roll calls the XML doesn't nest (all House votes on
   Senate bills, some on House bills) are linked by the lead bill of the measure printed on the PDF
   (`matched_by = 'measure text'`). In October 2026 5,274 of 6,449 roll calls were linked; most of the rest
