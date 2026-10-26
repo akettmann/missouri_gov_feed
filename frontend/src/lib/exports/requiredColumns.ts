@@ -4,7 +4,11 @@
 // Add a table's new column here in the same change that starts selecting it.
 // (rpt_awards.period_kind is checked separately in awardDefs.ts: it has a documented skip switch.)
 
+// Tables not listed here still get a clear message: query() turns a binder error naming a column an
+// export lacks into the same stale-export error. Listing a column here only adds the up-front, all-at-once report.
 export const REQUIRED_COLUMNS: Record<string, readonly string[]> = {
+  rpt_attendance: ["recused_from_voting"],
+  rpt_attendance_pay: ["pay_source_url", "covered_years", "voting_years"],
   fct_jurisdiction_businesses: [
     "official_id",
     "district_id",

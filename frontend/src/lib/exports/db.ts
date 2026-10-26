@@ -42,6 +42,8 @@ function exportColumns(table: string): Promise<string[]> {
       )
       .then((r) => r.getRowObjectsJson().map((row) => String(row.column_name)));
     checked.set(table, cols);
+    // Do not keep a failed lookup for the process lifetime: `astro dev` must recover after a re-export.
+    cols.catch(() => checked.delete(table));
   }
   return cols;
 }
@@ -67,6 +69,33 @@ export async function query<T>(sql: string, params?: (string | number)[]): Promi
     }
     return `read_parquet('${exportPath(t)}')`;
   });
-  const reader = await (await connection()).runAndReadAll(resolved, params);
-  return reader.getRowObjectsJson() as unknown as T[];
+  try {
+    const reader = await (await connection()).runAndReadAll(resolved, params);
+    return reader.getRowObjectsJson() as unknown as T[];
+  } catch (e) {
+    throw await explainBinderError(e, used);
+  }
+}
+
+/**
+ * Catch-all for tables REQUIRED_COLUMNS does not list: a binder error naming a column that one of the
+ * exports in this SQL lacks is a stale export, so say so. Otherwise it is a real SQL bug: rethrow as is.
+ */
+async function explainBinderError(e: unknown, tables: string[]): Promise<unknown> {
+  const m = /Binder Error: .*?(?:Referenced column|Column) "(\w+)"/s.exec(
+    e instanceof Error ? e.message : "",
+  );
+  if (!m) return e;
+  const stale: Record<string, string[]> = {};
+  for (const t of tables) {
+    if (!hasExport(t)) continue;
+    const cols = await exportColumns(t).catch(() => null);
+    if (cols && !cols.includes(m[1])) stale[t] = [m[1]];
+  }
+  try {
+    assertNoMissingColumns(Object.fromEntries(Object.keys(stale).map((t) => [t, []])), stale);
+  } catch (staleError) {
+    return staleError;
+  }
+  return e;
 }
