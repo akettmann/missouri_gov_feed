@@ -28,6 +28,7 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `wikidata` | Wikidata | past offices, occupations, employers, relatives and the organizations they lead | as edited | `MOGOV_CONTACT` |
 | `shor_mccarty` | Harvard Dataverse | state legislator ideology scores | 1993–2022 | |
 | `mo_employee_pay` | data.mo.gov State Employee Pay | yearly gross pay of legislators, statewide officials and state judges | `MOGOV_LOOKBACK_YEARS` (published from 2007) | |
+| `mo_state_expenditures` | data.mo.gov State Expenditures | what each state agency paid each payee per fiscal year: legislators' per diem and mileage, payments to vendors | `MOGOV_LOOKBACK_YEARS` (fiscal years; published from 2000) | |
 | `census_tiger` | Census Bureau TIGER/Line | legislative and congressional district, county and city boundaries | newest vintage | |
 | `epa_frs` | EPA Facility Registry Service | regulated facilities (name, address, coordinates, NAICS, owner) placed in districts; businesses in each official's district that donated to them | current state file (refreshed every few months) | |
 | `mo_auditor` | Missouri State Auditor (auditor.mo.gov) | audit reports of state offices and agencies, counties, cities, courts and schools, with the Auditor's four-level performance rating | reports 1999 to now; ratings from 2012 | |
@@ -84,6 +85,16 @@ Quirks:
   links none in). That found 6,449 roll calls, 1,526 on Senate measures. Misses are cached for good once
   the session's year is over and re-checked daily before that. The first probe took about 8 minutes per
   shard with 4 shards.
+- Committee posts (`fct_committee_memberships`, `fct_committee_posts`): the member XML page lists each
+  member's committees and subcommittees with a position (Chair, Vice-Chair, Co-Chair, Ranking Minority
+  Member, Member), in every session from 2017 except 253, whose pages list none. For 253 the
+  `COMMITTEELIST` list (memberships only for 231, 241, 251, 253 and 254) fills in, matched on district.
+  `COMMITTEELIST` also lists Senate members (chamber `S`) and a few `N/A` rows; only `H` is used. The
+  snapshot is end-of-session, and the dbt marts keep only people in `dim_official`, so older sessions have
+  few rows (9 officials in 2017, 151 in 2026). Committee names change between sessions. The metric counts
+  full-committee chairs separately from subcommittee chairs.
+- Bill sponsorship success (share of a member's sponsored bills that passed) is not built yet: it needs the
+  bill status from #34, which is in flight in another session.
 - PDF text extraction is cached by PDF content (`data/cache/pdftext/`). Before that, a re-run spent
   3–10 minutes per shard re-parsing PDFs that were already downloaded.
 
@@ -381,6 +392,10 @@ Quirks:
   dbt var `case_history_min_year` (default 1975).
 - In the 2026-09 snapshot, 8th Circuit (ca8) opinions stop in August 2019. The API loader covers later
   ones.
+- Time to disposition (`fct_judge_time_to_disposition`): only the federal districts (`moed`, `mowd`) have a
+  judge (`assigned_to_id`) and filing and termination dates on a docket; the state courts (`mo`, `moctapp`)
+  have none, and `ca8` has no judge. Of 173,882 district dockets with a judge, 165,797 have both dates; 93
+  of those end before they were filed (a source error) and are left out of the median.
 - The filtered CSVs are cached per snapshot (`data/cache/courtlistener/mo-*.csv`), so re-runs within
   a quarter are quick. Cases can be up to three months stale; `courtlistener_cases` tops up.
 
@@ -564,6 +579,56 @@ Quirks:
   matched all 155 representatives and all 33 senators.
 - The current year's dataset appears in January of the following year.
 - Federal officials (Congress, federal judges) are paid by the U.S. and are not in this source.
+
+## mo_state_expenditures: Missouri state expenditures
+
+Flow: [diagrams/sources/mo_state_expenditures.svg](diagrams/sources/mo_state_expenditures.svg)
+
+data.mo.gov's "<fiscal year> State Expenditures" datasets (the Missouri Accountability Portal's spending data):
+for each fiscal year (July to June), the total each state agency paid each payee per category and detail line.
+Under the agency `LEGISLATURE` it lists every legislator's per diem (`LEGISLATIVE DAILY EXPENSE ALLOWANCE`) and
+`IN-STATE MILEAGE`; every other agency's rows are payments to vendors and people. `fct_legislator_expenses`
+pairs the legislators with officials.
+
+- Lands: `mo_state_expenditures`, one JSON row per dataset row exactly as the API serves it (`fiscal_year`,
+  `agency_name`, `category_description`, `detail_description`, `vendor_name`, `payments_total`, all text), keyed
+  `<fiscal year>:<n>` in `:id` order. All agencies land, about 100,000 to 130,000 rows a year, so the vendor
+  payments are on hand for later use. Optional like the other stage-1 JSON tables: `mogov build` creates an
+  empty placeholder when it has not been loaded.
+- Window: `MOGOV_LOOKBACK_YEARS`, counted as fiscal-year numbers (2017 to 2026 by default: about 1.1M rows).
+  Shard units: fiscal years (one dataset each; ids from the Socrata catalog). Pages of 50,000 rows with a
+  half-second pause; a page that comes back short fails the run rather than landing a partial year.
+- Terms: no licence field on the datasets. The state's data policy (https://mo.gov/data-policy) says the user
+  accepts the data as is, at their own risk, and that "applications using data supplied by this site must
+  include" its disclaimer: "The data made available here has been modified for use from its original source,
+  which is the State of Missouri. THE STATE OF MISSOURI MAKES NO REPRESENTATIONS OR WARRANTY AS TO THE
+  COMPLETENESS, ACCURACY, TIMELINESS, OR CONTENT OF ANY DATA MADE AVAILABLE THROUGH THIS SITE..." (full text on
+  that page). The site that shows this data, and the State Employee Pay data above, must carry that notice.
+
+Quirks:
+- A row is one payee's annual total for one agency and detail line, not one payment. FY2023 `LEGISLATURE` has
+  240 per diem rows ($1,799,338.96) and 295 in-state mileage rows ($880,139.52), one per payee.
+- Negative totals are refunds and corrections and are kept (the smallest is -$18,418). No legislator per diem or
+  mileage row has been negative. The largest total is $11.24B (the Medicaid recipient line, FY2026), so the
+  sanity test allows $20B.
+- Payees are people and vendors in one column (`vendor_name`), mixed with lines such as "PROCUREMENT CARD
+  PAYMENT". Legislators appear under their full legal name, "ATCHISON, FRANKLIN DARRELL", where the payroll
+  prints "ATCHISON, FRANKLIN D". Payees therefore pair with officials through the payroll names already matched
+  in `fct_salaries` (same legal-name form), not through the officials' own names: surname without suffixes plus
+  a fitting first name, middle initials that agree when both sides carry one ("SMITH, DAVID T" is not "SMITH,
+  DAVID C"), and a payroll row in the fiscal year's calendar years (fiscal year 2023 is July 2022 to June 2023,
+  so 2022 or 2023 payroll). One best-fitting official and one payee per official, line and year are required;
+  otherwise the payee is left out. `high` means equal first names and either a shared middle initial or a
+  surname no other legislator on the payroll holds that year; nicknames ("DAVE" for David) and shared surnames
+  without a middle initial are `medium`.
+- Because the payroll rows come from `fct_salaries`, which covers current officials, former legislators' per
+  diem is not linked. In October 2026, fiscal year 2026 paired 176 of 193 per diem payees (162 high), fiscal year
+  2025 paired 177 of 241, and the share falls to 19 of 229 for fiscal year 2017. Unpaired payees are former members.
+- The portal serves an occasional sparse row with only some columns set (FY2025 has `fiscal_year: "KEVIN KRAUS"`
+  and `agency_name: "11408"`). It lands as published and staging drops it.
+- Datasets are replaced when the state republishes them (FY2023 `rowsUpdatedAt` 2024-09-26), so a run replaces
+  the whole fiscal year. The fiscal year numbered 2026 ended in June 2026; the next appears after it closes.
+- Per diem is claimed per day attended and mileage follows distance, so neither is a measure of performance.
 
 ## epa_frs: EPA Facility Registry Service
 
