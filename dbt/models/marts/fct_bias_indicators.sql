@@ -12,6 +12,10 @@
 -- together with the frontend.
 -- first_vote_year / last_vote_year (party unity only, else null) are the official's own first and last calendar
 -- year with a dated party-line vote in `chamber`; the frontend puts them in the caption, never in the match key.
+-- chamber_data_start_year (party unity only, else null) is the first calendar year with any dated party-line vote
+-- for `chamber` in our loaded data (any official); when first_vote_year equals it, the caption says the range
+-- starts where our records begin, not where the official's service did. The chamber start comes from the party-line
+-- votes of tracked officials (fct_party_unity_yearly), which matches the first roll call in the chamber today.
 with nominate as (
     select
         o.official_id,
@@ -23,7 +27,8 @@ with nominate as (
         || ' Congress' as detail,
         'https://voteview.com/person/' || {{ dbt.safe_cast('m.icpsr', dbt.type_string()) }} as source_url,
         cast(null as {{ dbt.type_int() }}) as first_vote_year,
-        cast(null as {{ dbt.type_int() }}) as last_vote_year
+        cast(null as {{ dbt.type_int() }}) as last_vote_year,
+        cast(null as {{ dbt.type_int() }}) as chamber_data_start_year
     from {{ ref('dim_official') }} as o
     inner join {{ ref('stg_voteview__members') }} as m on o.bioguide_id = m.bioguide_id
     where m.nominate_dim1 is not null
@@ -46,7 +51,8 @@ shor as (
         || ')' as detail,
         'https://doi.org/10.7910/DVN/SGOQ7G' as source_url,
         cast(null as {{ dbt.type_int() }}) as first_vote_year,
-        cast(null as {{ dbt.type_int() }}) as last_vote_year
+        cast(null as {{ dbt.type_int() }}) as last_vote_year,
+        cast(null as {{ dbt.type_int() }}) as chamber_data_start_year
     from {{ ref('stg_shor_mccarty__scores') }} as s
     cross join (select max(last_year) as data_end_year from {{ ref('stg_shor_mccarty__scores') }}) as d
     inner join {{ ref('int_mo_legislators__seats') }} as seat
@@ -72,12 +78,23 @@ unity as (
         cast(null as {{ dbt.type_string() }}) as source_url,
         -- the official's own first and last calendar year with a dated party-line vote in this chamber
         cast(min(y.vote_year) as {{ dbt.type_int() }}) as first_vote_year,
-        cast(max(y.vote_year) as {{ dbt.type_int() }}) as last_vote_year
+        cast(max(y.vote_year) as {{ dbt.type_int() }}) as last_vote_year,
+        cast(max(c.data_start_year) as {{ dbt.type_int() }}) as chamber_data_start_year
     from {{ ref('fct_party_unity_yearly') }} as y
+    inner join (
+        select
+            chamber,
+            min(vote_year) as data_start_year
+        from {{ ref('fct_party_unity_yearly') }}
+        group by chamber
+    ) as c on y.chamber = c.chamber
     group by y.official_id, y.chamber
 )
 
-{% set cols = 'official_id, indicator, chamber, value, period, detail, source_url, first_vote_year, last_vote_year' %}
+{% set cols = [
+    'official_id', 'indicator', 'chamber', 'value', 'period', 'detail', 'source_url',
+    'first_vote_year', 'last_vote_year', 'chamber_data_start_year'
+] | join(', ') %}
 select {{ cols }} from nominate
 union all
 select {{ cols }} from shor
