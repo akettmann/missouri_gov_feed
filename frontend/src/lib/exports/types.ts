@@ -93,7 +93,7 @@ export interface CommitteeTrail {
   first_year: number;
   last_year: number;
   /**
-   * high = curated alias (a curated alias list, each alias matched against the committee's own filings), committee
+   * high = curated alias (a curated alias list, each alias group checked against the committee's filings or its own filed name), committee
    * ID written into the name, or the same name; medium = looser name (abbreviations spelled out,
    * PAC/Fund etc. dropped, or a filer's parenthesized short name)
    */
