@@ -40,6 +40,6 @@ select
     date_filed,
     date_terminated,
     date_filed is not null and date_terminated is not null as has_both_dates,
-    {{ dbt.datediff('date_filed', 'date_terminated', 'day') }} as days_to_disposition,
+    {{ dbt.datediff('date_filed', 'date_terminated', 'day') }} as days_to_disposition,  -- noqa: LT05
     date_terminated < date_filed as ends_before_filed
 from typed

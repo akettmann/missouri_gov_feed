@@ -128,53 +128,54 @@ mec_given as (
         and lower(e.purpose) not like '%fee%'
         and lower(e.purpose) not like '%refund%'
         and lower(e.purpose) not like '%return%'
-){% if var('mec_direct', false) %},
+){% if var('mec_direct', false) %}
+    ,
 
--- MEC direct exports (report years 2023+; the TAP mirror covers report years through 2022, so no overlap)
-mec_direct_received as (
-    select
-        m.official_id,
-        'received' as direction,
-        'state' as level,
-        c.contribution_date as transaction_date,
-        c.amount,
-        c.contributor_name as counterparty,
-        {{ null_if_placeholder('c.contributor_company') }} as counterparty_organization,
-        c.contributor_type as counterparty_type,
-        lower(c.contribution_kind) || ' to ' || m.committee_name as kind,
-        'MEC' as source,
-        m.confidence as match_confidence,
-        'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url,
-        'mec_cd1_a:' || cast(c.record_id as {{ dbt.type_string() }}) as source_record_id,
-        x.mec_committee_id as counterparty_mec_committee_id,
-        x.match_confidence as counterparty_link_confidence
-    from {{ ref('stg_mec__contributions') }} as c
-    inner join {{ ref('int_mec__official_committees') }} as m on c.mec_committee_id = m.mec_committee_id
-    left join {{ ref('int_mec__donor_committees') }} as x
-        on
-            c.contributor_committee_name = x.donor_committee_name
-            and c.contribution_year = x.contribution_year
-            and x.match_status = 'matched'
-),
+    -- MEC direct exports (report years 2023+; the TAP mirror covers report years through 2022, so no overlap)
+    mec_direct_received as (
+        select
+            m.official_id,
+            'received' as direction,
+            'state' as level,
+            c.contribution_date as transaction_date,
+            c.amount,
+            c.contributor_name as counterparty,
+            {{ null_if_placeholder('c.contributor_company') }} as counterparty_organization,
+            c.contributor_type as counterparty_type,
+            lower(c.contribution_kind) || ' to ' || m.committee_name as kind,
+            'MEC' as source,
+            m.confidence as match_confidence,
+            'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url,
+            'mec_cd1_a:' || cast(c.record_id as {{ dbt.type_string() }}) as source_record_id,
+            x.mec_committee_id as counterparty_mec_committee_id,
+            x.match_confidence as counterparty_link_confidence
+        from {{ ref('stg_mec__contributions') }} as c
+        inner join {{ ref('int_mec__official_committees') }} as m on c.mec_committee_id = m.mec_committee_id
+        left join {{ ref('int_mec__donor_committees') }} as x
+            on
+                c.contributor_committee_name = x.donor_committee_name
+                and c.contribution_year = x.contribution_year
+                and x.match_status = 'matched'
+    ),
 
-mec_direct_given as (
-    select
-        m.official_id,
-        'given' as direction,
-        'state' as level,
-        c.contribution_date as transaction_date,
-        c.amount,
-        c.recipient_name as counterparty,
-        cast(null as {{ dbt.type_string() }}) as counterparty_organization,
-        'committee or candidate' as counterparty_type,
-        lower(c.contribution_kind) || ' contribution from ' || m.committee_name as kind,
-        'MEC' as source,
-        m.confidence as match_confidence,
-        'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url,
-        'mec_cd3_c:' || cast(c.record_id as {{ dbt.type_string() }}) as source_record_id
-    from {{ ref('stg_mec__contributions_made') }} as c
-    inner join {{ ref('int_mec__official_committees') }} as m on c.mec_committee_id = m.mec_committee_id
-)
+    mec_direct_given as (
+        select
+            m.official_id,
+            'given' as direction,
+            'state' as level,
+            c.contribution_date as transaction_date,
+            c.amount,
+            c.recipient_name as counterparty,
+            cast(null as {{ dbt.type_string() }}) as counterparty_organization,
+            'committee or candidate' as counterparty_type,
+            lower(c.contribution_kind) || ' contribution from ' || m.committee_name as kind,
+            'MEC' as source,
+            m.confidence as match_confidence,
+            'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=' || m.mec_committee_id as source_url,
+            'mec_cd3_c:' || cast(c.record_id as {{ dbt.type_string() }}) as source_record_id
+        from {{ ref('stg_mec__contributions_made') }} as c
+        inner join {{ ref('int_mec__official_committees') }} as m on c.mec_committee_id = m.mec_committee_id
+    )
 {% endif %}
 
 {% set cols = 'official_id, direction, level, transaction_date, amount, counterparty, counterparty_organization,

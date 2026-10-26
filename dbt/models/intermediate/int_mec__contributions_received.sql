@@ -19,24 +19,25 @@ with tap as (
         'MEC (via Accountability Project)' as source
     from {{ ref('stg_tap_mec__contributions') }}
     where mec_committee_id is not null
-){% if var('mec_direct', false) %},
+){% if var('mec_direct', false) %}
+    ,
 
-direct as (
-    select
-        upper(trim(mec_committee_id)) as mec_committee_id,
-        committee_name,
-        contributor_name,
-        contributor_type,
-        contributor_committee_name,
-        contributor_company,
-        contributor_employer,
-        amount,
-        contribution_date,
-        contribution_year,
-        'MEC' as source
-    from {{ ref('stg_mec__contributions') }}
-    where mec_committee_id is not null
-)
+    direct as (
+        select
+            upper(trim(mec_committee_id)) as mec_committee_id,
+            committee_name,
+            contributor_name,
+            contributor_type,
+            contributor_committee_name,
+            contributor_company,
+            contributor_employer,
+            amount,
+            contribution_date,
+            contribution_year,
+            'MEC' as source
+        from {{ ref('stg_mec__contributions') }}
+        where mec_committee_id is not null
+    )
 {% endif %}
 
 select * from tap

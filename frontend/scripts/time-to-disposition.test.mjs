@@ -2,8 +2,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   LOW_COVERAGE_SHARE,
+  CASE_TYPES,
+  EXCLUDED_TYPES_TEXT,
   caseTypeHeading,
   coverageText,
+  hiddenMedianText,
+  missingCaseTypes,
+  noDocketsText,
   federalDocketsText,
   measuredTypedDocketsText,
   MIN_MEASURED,
@@ -94,4 +99,32 @@ test("every label names the case type the number counts", () => {
   assert.equal(measuredTypedDocketsText(12, "criminal"), "12 criminal dockets");
   assert.equal(coverageText(146, 256, "criminal"), "146 of 256 assigned criminal dockets measured");
   assert.equal(coverageText(1, 1, "civil"), "1 of 1 assigned civil docket measured");
+});
+
+test("a hidden median says what was counted: measured dockets, the minimum, and what measured means", () => {
+  const t = hiddenMedianText(12, "criminal");
+  assert.match(
+    t,
+    /^Not shown: only 12 criminal dockets could be measured, and the page needs at least 30 for a median\./,
+  );
+  assert.match(t, /both its filing date and its termination date/);
+  assert.match(t, /did not end before it was filed/);
+  assert.match(hiddenMedianText(1, "civil"), /only 1 civil docket could be measured/);
+  // it never promises a median or a method for a number that is not shown
+  assert.doesNotMatch(t, /median days|may understate/i);
+});
+
+test("a judge with only civil dockets is told there are no criminal ones; one with both is told nothing", () => {
+  assert.deepEqual(CASE_TYPES, ["civil", "criminal"]);
+  assert.deepEqual(missingCaseTypes(["civil"]), ["criminal"]);
+  assert.deepEqual(missingCaseTypes(["criminal"]), ["civil"]);
+  assert.deepEqual(missingCaseTypes(["civil", "criminal"]), []);
+  assert.deepEqual(missingCaseTypes([]), []);
+  assert.equal(noDocketsText("criminal"), "No criminal dockets assigned to this judge in CourtListener.");
+});
+
+test("the note on what is in neither median names miscellaneous and other dockets", () => {
+  assert.match(EXCLUDED_TYPES_TEXT, /Miscellaneous dockets \(warrants, subpoenas, complaints\)/);
+  assert.match(EXCLUDED_TYPES_TEXT, /other or unclassified types/);
+  assert.match(EXCLUDED_TYPES_TEXT, /in neither\.$/);
 });

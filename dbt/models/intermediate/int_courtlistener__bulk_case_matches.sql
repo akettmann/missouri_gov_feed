@@ -103,10 +103,11 @@ select
     n.cluster_id,
     'judges text' as matched_by
 from named_judge as n
-where not exists (
-    select 1 from on_panel as p
-    where p.official_id = n.official_id and p.cluster_id = n.cluster_id
-)
+where
+    not exists (
+        select 1 from on_panel as p
+        where p.official_id = n.official_id and p.cluster_id = n.cluster_id
+    )
 union all
 select
     official_id,
