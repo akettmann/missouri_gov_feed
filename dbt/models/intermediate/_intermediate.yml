@@ -272,8 +272,12 @@ models:
     "Nth Extraordinary Session" (stg_mo_house__sessions); for years the House''s list lacks, N + 2 is assumed. A
     combined act ("H.B. 115 & 99": one substitute that carries several bills'' subjects) names the bills after "&";
     only the first, the lead bill (is_lead_bill), is the one that passed. The others stay as rows, with combined_into
-    naming the lead, because the act did take their subjects, but they never reached the governor themselves. Grain:
-    one row per (RSMo section version, act, bill) a history or repeal note names.'
+    naming the lead, because the act did take their subjects, but they never reached the governor themselves. Parse
+    bounds (macros/session_law_bounds.sql): a note is read up to 60 acts (longest real note: 43, RSMo 301.010),
+    an act up to 10 "merged with" bills (longest: 6) and 6 "&" bills (longest: 3). Parts past a bound would be dropped
+    silently, and notes list acts oldest first, so the newest acts would go; assert_session_law_bounds_not_exceeded
+    fails the build when real data needs more. Grain: one row per (RSMo section version, act, bill) a history or
+    repeal note names.'
 - name: int_mo_senate__votes
   description: 'MO Senate journal votes attributed to people: the senator serving on the vote date with a matching
     surname (and district, when the journal adds one to disambiguate). Ambiguous tokens stay unattributed. A two-word

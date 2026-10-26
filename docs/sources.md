@@ -918,7 +918,9 @@ offices, shops and most service businesses are missing.
   whitespace runs and cuts leading/trailing commas, semicolons and whitespace from facility name, address, city and
   organization name; "INC." and single inner commas stay. Names that were only separators or empty become null (60
   sites; the sites tables say "unnamed site"). A doubled inner comma becomes one
-  ("LIPPERT FAMILY FARM,, LLC" shows as "LIPPERT FAMILY FARM, LLC") (#381). "K-BAR-L ;;C" (facility 110013336416) is
+  ("LIPPERT FAMILY FARM,, LLC" shows as "LIPPERT FAMILY FARM, LLC") (#381).
+  A single space before a comma goes too ("NEMO FEEDS , LLC" shows as "NEMO FEEDS, LLC", "T 33N ,R 04W" as "T 33N,R 04W") (#399);
+  a run of space-comma pairs collapses to one comma ("A , , B" shows as "A, B"). "K-BAR-L ;;C" (facility 110013336416) is
   left as is: it is likely a shifted-hand typo for "K-BAR-L LLC", not a separator, so it is not rewritten.
 - HTML entities: a few names and addresses carry entities ("D&AMP;A BARRACKS", "HOLCIM &#40;US&#41; INC",
   "LEE&#39;S SUMMIT"; 8 facilities and 1 organization name in the Oct 2026 file). `mogov.clean_registry_text` decodes `&AMP;`,
