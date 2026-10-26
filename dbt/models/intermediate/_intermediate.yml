@@ -144,23 +144,24 @@ models:
   description: 'Name -> MECID crosswalk for committee donors. MEC records a committee-to-committee gift with the
     donor''s name only (the row''s MECID is the receiving committee), so the donor''s own MECID is found by matching
     that name to the names committees file under (int_mec__committee_names), in tiers: curated alias      a curated
-    donor name -> MECID list (committee_donor_aliases seed), each alias checked against the committee''s own filings,
-    for acronym and shortened names no rule can expand ("HRCC", "AMECPAC", "MHA PAC", #33); each row cites its evidence.
-    Tried first, but only counts when that committee was active that year 0 mecid in name    the filer typed the
-    donor''s MECID into the name ("... (MEC ID# C221962)") and it''s a known committee; taken whatever its active
-    years 1 same name        name_key: case ignored; punctuation and other non-alphanumeric characters turned into
-    spaces; runs of spaces collapsed, not removed (#108) 2 normalized name  committee_key: abbreviations spelled
-    out (MO, Assn, Cmte...), "the/of/for/inc" dropped 3 core name        committee_core_key: also without words
-    like PAC, Political, Action, Committee, Fund, Account, at least 4 characters; also tried on the name outside
-    parentheses, and against a filer''s own parenthesized short name ("Carpenters Help in the Political Process
-    (CHIPP)" -> CHIPP) A candidate counts only if it was active within a year of the gift (first_active_year - 1
-    .. last_active_year + 1). The lowest tier with an active candidate decides: one candidate -> matched, several
+    donor name -> MECID list (committee_donor_aliases seed), each alias group checked against the committee''s filings
+    or its own filed name, for acronym and shortened names no rule can expand ("HRCC", "AMECPAC", "MHA PAC", #33);
+    each row cites its evidence. Tried first, but only counts when that committee was active that year 0 mecid in
+    name    the filer typed the donor''s MECID into the name ("... (MEC ID# C221962)") and it''s a known committee;
+    taken whatever its active years 1 same name        name_key: case ignored; punctuation and other non-alphanumeric
+    characters turned into spaces; runs of spaces collapsed, not removed (#108) 2 normalized name  committee_key:
+    abbreviations spelled out (MO, Assn, Cmte...), "the/of/for/inc" dropped 3 core name        committee_core_key:
+    also without words like PAC, Political, Action, Committee, Fund, Account, at least 4 characters; also tried
+    on the name outside parentheses, and against a filer''s own parenthesized short name ("Carpenters Help in the
+    Political Process (CHIPP)" -> CHIPP) A candidate counts only if it was active within a year of the gift (first_active_year
+    - 1 .. last_active_year + 1). The lowest tier with an active candidate decides: one candidate -> matched, several
     -> ambiguous (no MECID; the candidates are listed). Names that only match committees active in other years are
     "not active that year" (usually an older or newer committee under the same name), the rest "no match" (mostly
     federal and out-of-state PACs, which don''t file with MEC). One-character names ("C", "~") are placeholders
-    (#31): "placeholder name", never matched. match_confidence: high for curated aliases and tiers 0-1 (the alias
-    was matched to the committee''s own filings, or the name is the committee''s own), medium for the looser tiers;
-    either way it rests on the name. Grain: one row per (donor committee name as reported, contribution year).'
+    (#31): "placeholder name", never matched. match_confidence: high for curated aliases and tiers 0-1 (each alias
+    group was checked against the committee''s filings or its own filed name; some spellings rest on their group),
+    medium for the looser tiers; either way it rests on the name. Grain: one row per (donor committee name as reported,
+    contribution year).'
   data_tests:
   - dbt_utils.unique_combination_of_columns:
       arguments:
