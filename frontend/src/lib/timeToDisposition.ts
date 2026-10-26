@@ -41,10 +41,9 @@ export function timeToDispositionView(r: TimeToDispositionInput): TimeToDisposit
   };
 }
 
-/** "238 days" / "1 day"; whole days, with a half day (an even count of dockets) kept as "276.5". */
+/** "238 days" / "1 day" / "1,234 days"; whole days, with a half day (an even count of dockets) kept as "276.5". */
 export function daysLabel(n: number): string {
-  const text = Number.isInteger(n) ? String(n) : n.toFixed(1);
-  return `${text} ${n === 1 ? "day" : "days"}`;
+  return plural(Number.isInteger(n) ? n : Number(n.toFixed(1)), "day", "days");
 }
 
 /** the "only N dockets with both dates" clause shown when too few were measured */
