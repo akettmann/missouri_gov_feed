@@ -2249,9 +2249,10 @@ models:
     description: >
       House committee and subcommittee memberships per official and session, with the member's position (Chair,
       Vice-Chair, Co-Chair, Ranking Minority Member, Member). An end-of-session snapshot from the House member
-      pages (every session since 2017 but 253) and the COMMITTEELIST export for 253. Former members who are not
-      in dim_official are left out. Committee names change across sessions, so compare a committee by name only
-      within a session. Grain: one row per (official, session, committee).
+      pages (every session since 2017 but 253) and the COMMITTEELIST export for 253. Former members are kept:
+      official_id is the person id, and is_current_official says whether that person is in dim_official (only
+      current officials have a profile page). Committee names change across sessions, so compare a committee by
+      name only within a session. Grain: one row per (person, session, committee).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -2293,6 +2294,21 @@ models:
           - accepted_values:
               arguments:
                 values: ['member_page', 'committee_list']
+      - name: source_url
+        data_type: varchar
+        description: >
+          The House file this row was read from, as the loader fetched it: the session zip for a closed session,
+          the member's own XML file (documents.house.mo.gov/xml/261-072.xml) for the open one, the COMMITTEELIST
+          file's zip for session 253.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "like 'https://documents.house.mo.gov/xml/%'"
+      - name: is_current_official
+        data_type: boolean
+        description: True when official_id is in dim_official (a current official with a profile page).
+        data_tests: [not_null]
 
   - name: dim_house_session
     description: >
@@ -2338,7 +2354,8 @@ models:
       Committee posts held per official and House session, counted from the House's own committee lists: full
       committees served on, and the titles held on them (chair, vice-chair, co-chair, ranking minority member).
       Subcommittees are counted apart (subcommittee_chair_posts) so chairing several subcommittees is not shown as
-      chairing several committees. A count of titles, not a score. Grain: one row per (official, session).
+      chairing several committees. A count of titles, not a score. Former members are kept (is_current_official).
+      Grain: one row per (person, session).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -2357,6 +2374,16 @@ models:
       - name: session_year
         data_type: integer
         description: Calendar year of the session.
+      - name: is_current_official
+        data_type: boolean
+        description: True when official_id is in dim_official (a current official with a profile page).
+        data_tests: [not_null]
+      - name: source_url
+        data_type: varchar
+        description: >
+          The House file the member's rows were read from (the session zip, or the member's own XML file for the
+          open session). If a person held two House member files in one session, one of them.
+        data_tests: [not_null]
       - name: committees_held
         data_type: bigint
         description: Full (non-sub) committees the member served on.

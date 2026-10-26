@@ -11,17 +11,50 @@ unit_tests:
     given:
       - input: ref('fct_committee_memberships')
         rows:
-          - {official_id: o1, session_code: '254', session_year: 2024, committee_name: Budget, position_name: Chair, is_subcommittee: false}
-          - {official_id: o1, session_code: '254', session_year: 2024, committee_name: Rules, position_name: Chair, is_subcommittee: false}
-          - {official_id: o1, session_code: '254', session_year: 2024, committee_name: Health, position_name: Vice-Chair, is_subcommittee: false}
-          - {official_id: o1, session_code: '254', session_year: 2024, committee_name: Utilities, position_name: Ranking Minority Member, is_subcommittee: false}
-          - {official_id: o1, session_code: '254', session_year: 2024, committee_name: Ethics, position_name: Member, is_subcommittee: false}
-          - {official_id: o1, session_code: '254', session_year: 2024, committee_name: Subcommittee on Roads, position_name: Chair, is_subcommittee: true}
-          - {official_id: o1, session_code: '251', session_year: 2023, committee_name: Budget, position_name: Member, is_subcommittee: false}
+          - {official_id: o1, session_code: '254', session_year: 2024, committee_name: Budget, position_name: Chair, is_subcommittee: false, is_current_official: true, source_url: https://x/a}
+          - {official_id: o1, session_code: '254', session_year: 2024, committee_name: Rules, position_name: Chair, is_subcommittee: false, is_current_official: true, source_url: https://x/a}
+          - {official_id: o1, session_code: '254', session_year: 2024, committee_name: Health, position_name: Vice-Chair, is_subcommittee: false, is_current_official: true, source_url: https://x/a}
+          - {official_id: o1, session_code: '254', session_year: 2024, committee_name: Utilities, position_name: Ranking Minority Member, is_subcommittee: false, is_current_official: true, source_url: https://x/a}
+          - {official_id: o1, session_code: '254', session_year: 2024, committee_name: Ethics, position_name: Member, is_subcommittee: false, is_current_official: true, source_url: https://x/a}
+          - {official_id: o1, session_code: '254', session_year: 2024, committee_name: Subcommittee on Roads, position_name: Chair, is_subcommittee: true, is_current_official: true, source_url: https://x/a}
+          - {official_id: o1, session_code: '251', session_year: 2023, committee_name: Budget, position_name: Member, is_subcommittee: false, is_current_official: true, source_url: https://x/b}
     expect:
       rows:
-        - {official_id: o1, session_code: '254', committees_held: 5, chair_posts: 2, vice_chair_posts: 1, co_chair_posts: 0, ranking_posts: 1, subcommittee_chair_posts: 1}
-        - {official_id: o1, session_code: '251', committees_held: 1, chair_posts: 0, vice_chair_posts: 0, co_chair_posts: 0, ranking_posts: 0, subcommittee_chair_posts: 0}
+        - {official_id: o1, session_code: '254', is_current_official: true, source_url: https://x/a, committees_held: 5, chair_posts: 2, vice_chair_posts: 1, co_chair_posts: 0, ranking_posts: 1, subcommittee_chair_posts: 1}
+        - {official_id: o1, session_code: '251', is_current_official: true, source_url: https://x/b, committees_held: 1, chair_posts: 0, vice_chair_posts: 0, co_chair_posts: 0, ranking_posts: 0, subcommittee_chair_posts: 0}
+
+  - name: committee_posts_keep_former_members_and_carry_the_source_url
+    model: fct_committee_posts
+    description: >
+      A former member (is_current_official false) keeps a row, with that flag and the House file the rows came
+      from, next to a current member's row.
+    given:
+      - input: ref('fct_committee_memberships')
+        rows:
+          - {official_id: gone, session_code: '201', session_year: 2020, committee_name: Budget, position_name: Chair, is_subcommittee: false, is_current_official: false, source_url: 'https://documents.house.mo.gov/xml/201.zip'}
+          - {official_id: here, session_code: '201', session_year: 2020, committee_name: Budget, position_name: Member, is_subcommittee: false, is_current_official: true, source_url: 'https://documents.house.mo.gov/xml/201.zip'}
+    expect:
+      rows:
+        - {official_id: gone, session_code: '201', is_current_official: false, source_url: 'https://documents.house.mo.gov/xml/201.zip', committees_held: 1, chair_posts: 1}
+        - {official_id: here, session_code: '201', is_current_official: true, source_url: 'https://documents.house.mo.gov/xml/201.zip', committees_held: 1, chair_posts: 0}
+
+  - name: committee_memberships_keep_former_members_flagged_not_current
+    model: fct_committee_memberships
+    description: >
+      Only person p_now is in dim_official. p_gone (a former member, absent from dim_official) is kept, flagged
+      is_current_official false; the source_url passes through unchanged for both.
+    given:
+      - input: ref('int_mo_house__committee_memberships')
+        rows:
+          - {session_code: '201', session_year: 2020, person_key: p_now, committee_name: Budget, position_name: Chair, source: member_page, source_url: 'https://documents.house.mo.gov/xml/201.zip', is_subcommittee: false}
+          - {session_code: '201', session_year: 2020, person_key: p_gone, committee_name: Budget, position_name: Member, source: member_page, source_url: 'https://documents.house.mo.gov/xml/201.zip', is_subcommittee: false}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p_now}
+    expect:
+      rows:
+        - {official_id: p_now, session_code: '201', committee_name: Budget, is_current_official: true, source_url: 'https://documents.house.mo.gov/xml/201.zip'}
+        - {official_id: p_gone, session_code: '201', committee_name: Budget, is_current_official: false, source_url: 'https://documents.house.mo.gov/xml/201.zip'}
 
   - name: judge_time_to_disposition_excludes_negative_and_undated_dockets
     model: fct_judge_time_to_disposition
