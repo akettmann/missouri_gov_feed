@@ -2,6 +2,7 @@
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
+import { assertNoMissingColumns, REQUIRED_COLUMNS } from "./requiredColumns.ts";
 
 /** MOGOV_EXPORTS overrides the default `<repo>/data/exports`; builds run from frontend/ (pnpm scripts). */
 export const EXPORTS_DIR = path.resolve(
@@ -27,12 +28,39 @@ function connection(): Promise<DuckDBConnection> {
   return conn;
 }
 
+const checked = new Map<string, Promise<string[]>>();
+
+/** Column names of an export file, read once per table. */
+function exportColumns(table: string): Promise<string[]> {
+  let cols = checked.get(table);
+  if (!cols) {
+    cols = connection()
+      .then((c) =>
+        c.runAndReadAll(
+          `select column_name from (describe select * from read_parquet('${exportPath(table)}'))`,
+        ),
+      )
+      .then((r) => r.getRowObjectsJson().map((row) => String(row.column_name)));
+    checked.set(table, cols);
+  }
+  return cols;
+}
+
+/** Fails with a re-export message when an export that exists lacks columns REQUIRED_COLUMNS declares. */
+async function assertExportsCurrent(tables: string[]): Promise<void> {
+  const actual: Record<string, string[]> = {};
+  for (const t of tables) if (t in REQUIRED_COLUMNS && hasExport(t)) actual[t] = await exportColumns(t);
+  assertNoMissingColumns(actual);
+}
+
 /**
  * Run SQL where `{table}` placeholders become read_parquet('<exports>/table.parquet').
  * Cast DATE/DECIMAL/BIGINT in the SQL so rows come back as plain JSON-safe values.
  * Values that vary go in `params` (bound to `?` placeholders), never into the SQL text.
  */
 export async function query<T>(sql: string, params?: (string | number)[]): Promise<T[]> {
+  const used = [...new Set([...sql.matchAll(/\{(\w+)\}/g)].map((m) => m[1]))];
+  await assertExportsCurrent(used);
   const resolved = sql.replace(/\{(\w+)\}/g, (_, t: string) => {
     if (!hasExport(t)) {
       throw new Error(`missing export ${exportPath(t)}; run \`uv run mogov export --format parquet\``);
