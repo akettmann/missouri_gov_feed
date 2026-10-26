@@ -134,9 +134,9 @@ const CHAMBER_NAMES: Record<string, string> = {
 /**
  * Reader-facing text for a fct_bias_indicators `detail`. The raw detail stays the internal match key (peer strips,
  * current-chamber ordering); only display goes through here. Handles every shape the mart emits:
- *   "state_house: 1006 party-line votes"                      -> "1,006 party-line votes cast in the Missouri House"
+ *   "state_house: 1006 party-line votes"                      -> "Based on 1,006 votes this official cast on party-line roll calls in the Missouri House"
  *   "Voteview DW-NOMINATE, House 119th Congress"              -> "Voteview DW-NOMINATE, U.S. House, 119th Congress"
- *   "Shor-McCarty career ideal point; served 2009-2022"       -> "... served 2009–2022"
+ *   "Shor-McCarty ...; in the Shor-McCarty data 2009-2022 (data ends 2022)" -> en dash in the range
  * The Congress ordinal is taken as written (never re-derived), so "121st" survives. Unknown shapes pass through.
  */
 export function indicatorDetailText(detail: string | null | undefined): string {
@@ -145,11 +145,11 @@ export function indicatorDetailText(detail: string | null | undefined): string {
   if (unity) {
     const n = Number(unity[2]);
     const where = CHAMBER_NAMES[unity[1]] ?? unity[1];
-    return `${plural(n, "party-line vote", "party-line votes")} cast in the ${where}`;
+    return `Based on ${plural(n, "vote", "votes")} this official cast on party-line roll calls in the ${where}`;
   }
   const dw = /^(.*DW-NOMINATE), (House|Senate) (\S+ Congress)$/.exec(detail);
   if (dw) return `${dw[1]}, U.S. ${dw[2]}, ${dw[3]}`;
-  const sm = /^(.*; served )(\d{4})-(\d{4})$/.exec(detail);
-  if (sm) return `${sm[1]}${sm[2]}–${sm[3]}`;
+  const sm = /^(.*; in the Shor-McCarty data )(\d{4})-(\d{4})( \(data ends \d{4}\))$/.exec(detail);
+  if (sm) return `${sm[1]}${sm[2]}–${sm[3]}${sm[4]}`;
   return detail;
 }
