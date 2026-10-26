@@ -143,6 +143,16 @@ models:
           - SPECIAL SESSION
           - FIRST EXTRAORDINARY SESSION
           - SECOND EXTRAORDINARY SESSION
+- name: stg_mo_house__senate_act_bills
+  description: 'One row per Senate bill the House XML''s SenateActList (2024 on) lists as having reached the House:
+    number, current version, titles, last action, proposed effective date and the Senate sponsor. The list covers
+    regular and special sessions alike; it has no subjects and no bill-page link. Older sessions have no SenateActList.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - session_code
+        - bill
 - name: stg_mo_house__sessions
   description: 'The House''s own names for its legislative sessions (SESSIONLIST: "2025 1st Extraordinary Session",
     "2018 Special Session"). Every session''s SESSIONLIST repeats the full history, so the copy from the newest

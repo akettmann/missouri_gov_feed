@@ -19,19 +19,15 @@ unit_tests:
             select '171', 'HB2009', 'relisted for governor message' union all
             select '181', 'HB2', 'relisted for governor message' union all
             select '181', 'HB3', 'signed'
-      - input: ref('stg_mo_house__bills')
+      - input: ref('int_bills__list')
         format: sql
         rows: |
             select '171' as session_code, 'HB2' as bill union all
             select '171', 'HB2003' union all
             select '171', 'HB2009' union all
             select '181', 'HB2' union all
-            select '181', 'HB3'
-      - input: ref('stg_mo_senate__bill_topics')
-        format: sql
-        rows: |
-            select '181' as session_code, 'SB5' as bill union all
-            select '181', 'HB3'
+            select '181', 'HB3' union all
+            select '181', 'SB5'
       - input: ref('stg_mo_house__bill_rollcalls')
         format: sql
         rows: |
@@ -84,7 +80,7 @@ unit_tests:
         format: sql
         rows: |
             select '181' as session_code, 'HB2' as bill, 'signed' as status
-      - input: ref('stg_mo_house__bills')
+      - input: ref('int_bills__list')
         format: sql
         rows: |
             select '181' as session_code, 'HB2' as bill union all
@@ -96,10 +92,6 @@ unit_tests:
             select '194', 'HB1' union all
             select '251', 'SB1' union all
             select '251', 'SB2'
-      - input: ref('stg_mo_senate__bill_topics')
-        format: sql
-        rows: |
-            select '251' as session_code, 'SB2' as bill
       - input: ref('stg_mo_house__bill_rollcalls')
         format: sql
         rows: |

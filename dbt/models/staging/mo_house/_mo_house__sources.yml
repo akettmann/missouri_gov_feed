@@ -3,7 +3,7 @@
 # The mo_house_xml_* tables are written by mogov.parsers.mo_house from the gzipped XML files that the
 # loader lands unchanged (listed in mo_house_xml_files). Other parsed tables (mo_house_xml_bill_hearings,
 # _member_counties, _bill_list, _member_list, _upcoming_hearings, _calendar_bills, _list_notices and the
-# SenateActList's _senate_act_bills, _hearings and _rollcalls) are landed too but not read by any model yet (#384).
+# SenateActList's _hearings and _rollcalls) are landed too but not read by any model yet (#384).
 # (The SenateActList carries no sponsors or subjects: its bill row names the sponsor.)
 version: 2
 sources:
@@ -61,6 +61,18 @@ sources:
   - name: xml_bill_actions
     identifier: mo_house_xml_bill_actions
     description: "One row per action on a bill, in document order (action_index), with the printed roll-call totals when the action is a vote."
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: xml_senate_act_bills
+    identifier: mo_house_xml_senate_act_bills
+    description: "One row per Senate bill the SenateActList lists as reaching the House (2024 on): number, current version, titles, last action, proposed effective date, governor action, sponsor."
     config:
       loaded_at_field: loaded_at
       freshness:
