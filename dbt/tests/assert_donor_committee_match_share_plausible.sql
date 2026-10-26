@@ -1,8 +1,9 @@
 -- Share of committee-to-committee dollars whose donor name resolves to one Missouri committee
 -- (int_mec__donor_committees). Measured October 2026, both MEC feeds (TAP 2011-2022 + MEC direct 2023-2026,
--- $489M from committees): matched 68.2%, ambiguous 1.4%, not active that year 0.6%, no match 29.8% (mostly
--- federal and out-of-state PACs, which don't file with MEC). TAP alone (mec_direct off, $385M): matched 68.3%,
--- ambiguous 0.8%. Exact names alone matched about 46% (#9).
+-- $489M from committees): matched 71.1%, ambiguous 1.4%, not active that year 0.6%, no match 26.9%
+-- (mostly federal and out-of-state PACs, which don't file with MEC). TAP alone (mec_direct off, $385M;
+-- measured before the alias tier): matched 68.3%, ambiguous 0.8%. Exact names alone matched about 46%
+-- (#9).
 -- Fails when:
 --   matched < 55%   a normalization rule or the filer-name list broke and links were lost
 --   matched > 85%   a key collapsed (e.g. to a few common words) and names now match the wrong committee
