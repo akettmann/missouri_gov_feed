@@ -32,10 +32,17 @@ shor as (
         case s.last_chamber when 'upper' then 'state_senate' else 'state_house' end as chamber,
         s.np_score as value,
         s.last_year as period,
-        'Shor-McCarty career ideal point; served ' || {{ dbt.safe_cast('s.first_year', dbt.type_string()) }}
-        || '-' || {{ dbt.safe_cast('s.last_year', dbt.type_string()) }} as detail,
+        -- first/last year come from the dataset's per-year columns, which end at the dataset's last year (2022), so
+        -- for current members the end year is that cutoff, not the end of service: say so in the caption.
+        'Shor-McCarty career ideal point; in the Shor-McCarty data '
+        || {{ dbt.safe_cast('s.first_year', dbt.type_string()) }}
+        || '-' || {{ dbt.safe_cast('s.last_year', dbt.type_string()) }}
+        || ' (data ends '
+        || {{ dbt.safe_cast('d.data_end_year', dbt.type_string()) }}
+        || ')' as detail,
         'https://doi.org/10.7910/DVN/SGOQ7G' as source_url
     from {{ ref('stg_shor_mccarty__scores') }} as s
+    cross join (select max(last_year) as data_end_year from {{ ref('stg_shor_mccarty__scores') }}) as d
     inner join {{ ref('int_mo_legislators__seats') }} as seat
         on
             s.last_chamber = seat.chamber
