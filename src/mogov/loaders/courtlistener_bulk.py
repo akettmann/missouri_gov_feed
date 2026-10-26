@@ -13,7 +13,7 @@ import shutil
 
 from lxml import etree
 
-from mogov import db
+from mogov import db, xmlparse
 from mogov.config import CACHE_DIR
 from mogov.http import fetch, fetch_to_file
 from mogov.loaders import loader
@@ -45,12 +45,12 @@ _SNAPSHOT_KEY = re.compile(r"^bulk-data/people-db-people-(\d{4}-\d{2}-\d{2})\.cs
 def _parse_listing(raw: bytes) -> tuple[list[str], str | None]:
     """Return (object keys, next continuation token or None) from one S3 ListObjectsV2 XML page.
 
-    Hardened parser settings and local-name selection (the response is namespaced); same settings as the
-    other XML loaders so a later cleanup can unify them behind one helper.
+    Parsed with the shared hardened helper (`mogov.xmlparse`); elements are selected by local name because the
+    response is namespaced.
     """
-    parser = etree.XMLParser(recover=True, resolve_entities=False, no_network=True, huge_tree=True)
-    root = etree.fromstring(raw, parser)
-    if root is None:
+    try:
+        root = xmlparse.parse(raw)
+    except (ValueError, etree.XMLSyntaxError):
         return [], None
     keys, token, truncated = [], None, False
     for el in root:

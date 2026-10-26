@@ -1,13 +1,18 @@
 # Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
 # default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
+# The mo_house_xml_* tables are written by mogov.parsers.mo_house from the gzipped XML files that the
+# loader lands unchanged (listed in mo_house_xml_files). Other parsed tables (mo_house_xml_bill_amendments,
+# _bill_texts, _bill_hearings, _bill_summaries, _bill_fiscal_notes, _bill_witnesses, _member_counties,
+# _bill_list, _member_list, _upcoming_hearings, _calendar_bills, _list_notices and the SenateActList's
+# mo_house_xml_senate_act_*) are landed too but not read by any model yet.
 version: 2
 sources:
 - name: mo_house
-  description: Missouri House XML exports and roll-call PDFs.
+  description: Missouri House XML exports (landed as gzip, parsed into typed tables) and roll-call PDFs.
   tables:
-  - name: members
-    identifier: mo_house_members
-    description: MO House member XML per session (roster, committees, bio, sponsored bills).
+  - name: xml_files
+    identifier: mo_house_xml_files
+    description: "One row per landed House XML file: session, file name, kind, source URL, gzip path under MOGOV_RAW_DIR, size, sha256 and fetch time. The XML itself is the gzip file, unchanged."
     config:
       loaded_at_field: loaded_at
       freshness:
@@ -17,9 +22,9 @@ sources:
         error_after:
           count: 32
           period: day
-  - name: bills
-    identifier: mo_house_bills
-    description: MO House bill XML per session (sponsors, actions, roll-call totals and RollCallPDF links), as JSON.
+  - name: xml_members
+    identifier: mo_house_xml_members
+    description: "One row per MO House member XML file (roster fields; contact details stay in the raw file)."
     config:
       loaded_at_field: loaded_at
       freshness:
@@ -29,9 +34,105 @@ sources:
         error_after:
           count: 32
           period: day
-  - name: lists
-    identifier: mo_house_lists
-    description: MO House list XML per session (MemberList, BillList, SenateActList, hearing lists...), as JSON.
+  - name: xml_member_committees
+    identifier: mo_house_xml_member_committees
+    description: "One row per committee post on a member page."
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: xml_bills
+    identifier: mo_house_xml_bills
+    description: "One row per MO House bill XML file (number, titles, last action, governor action)."
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: xml_bill_actions
+    identifier: mo_house_xml_bill_actions
+    description: "One row per action on a bill, in document order (action_index), with the printed roll-call totals when the action is a vote."
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: xml_bill_sponsors
+    identifier: mo_house_xml_bill_sponsors
+    description: "One row per sponsor, co-sponsor, handler or conferee on a bill."
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: xml_bill_rollcalls
+    identifier: mo_house_xml_bill_rollcalls
+    description: "One row per roll call listed under a bill text version (parent_kind text) or amendment (amendment), with its PDF link and printed totals."
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: xml_bill_subjects
+    identifier: mo_house_xml_bill_subjects
+    description: "One row per subject index term on a bill (2024 sessions on)."
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: xml_sessions
+    identifier: mo_house_xml_sessions
+    description: "One row per session in each sessions SESSIONLIST file (every list repeats the history)."
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: xml_committees
+    identifier: mo_house_xml_committees
+    description: "One row per committee in each sessions COMMITTEELIST file."
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: xml_committee_members
+    identifier: mo_house_xml_committee_members
+    description: "One row per committee member in COMMITTEELIST files."
     config:
       loaded_at_field: loaded_at
       freshness:
@@ -43,7 +144,7 @@ sources:
           period: day
   - name: rollcalls
     identifier: mo_house_rollcalls
-    description: One row per House roll-call PDF (header fields, printed totals).
+    description: "One row per House roll-call PDF (header fields, printed totals)."
     config:
       loaded_at_field: loaded_at
       freshness:
@@ -55,7 +156,7 @@ sources:
           period: day
   - name: rollcall_votes
     identifier: mo_house_rollcall_votes
-    description: One row per (House roll call, member token) parsed from the PDF grid.
+    description: "One row per (House roll call, member token) parsed from the PDF grid."
     config:
       loaded_at_field: loaded_at
       freshness:
