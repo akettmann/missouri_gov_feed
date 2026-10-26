@@ -155,6 +155,23 @@ seat_pairs_raw as (
     where p.office_group = 'legislature' and f.employee_name is null
 ),
 
+-- a member can hold two seat rows in a year under name spellings that differ ("Ken"/"Kenneth" Jamison, one person
+-- since #263): keep the pairing with the better first-name fit once per payee and member
+seat_pairs_best as (
+    select *
+    from (
+        select
+            *,
+            row_number() over (
+                partition by
+                    calendar_year, agency_name, position_title, seat_chamber, employee_name, gross_pay, person_id
+                order by name_fit desc, initial_fit desc, same_surname desc
+            ) as pair_rank
+        from seat_pairs_raw
+    ) as ranked_pairs
+    where pair_rank = 1
+),
+
 seat_pairs as (
     select
         *,
@@ -162,7 +179,7 @@ seat_pairs as (
         count(distinct employee_name) over (partition by calendar_year, seat_chamber, person_id) as n_payees,
         max(name_fit) over (partition by calendar_year, seat_chamber, employee_name) as payee_best,
         max(name_fit) over (partition by calendar_year, seat_chamber, person_id) as member_best
-    from seat_pairs_raw
+    from seat_pairs_best
     where same_surname or name_fit >= 1
 ),
 
@@ -376,8 +393,9 @@ name_candidates as (
     -- legislator pay outside the years the member sat is another member's, when a member of that chamber that
     -- year shares the surname and none has the member's first name ("SMITH, DAVID C" in 2017-20 is Cody
     -- Smith's, not David Smith's, #227). With nobody else to claim it, it stays: a final check after a term
-    -- ended (Hough, 2017), or earlier service Open States records as another person (Steve Roberts' House years
-    -- as "Steven Roberts").
+    -- ended (Hough, 2017), or earlier service Open States records as another person that the person-id rules
+    -- do not join (Steve Roberts' House years as "Steven Roberts" are joined since #263, but the rule is kept
+    -- for the cases that stay apart).
     where
         p.office_group <> 'legislature'
         or w.person_id is null
