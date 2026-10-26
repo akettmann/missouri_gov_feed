@@ -5,11 +5,23 @@
 -- the person). Rules, in order:
 --   1. seed official_id_links, same_person: a curated id for a person the name rule can't join (statewide officers,
 --      judges). basis = curated.
---   2. ids with the same exact full name (case, punctuation and spacing ignored) are one person, basis =
---      name_continuity, unless two of them hold different seats in more than one shared year. The same seat in the
+--   2. ids with the same exact full name (case, punctuation and spacing ignored: "Van Schoiack" and "VanSchoiack"
+--      are one name, #228) are one person, basis = name_continuity, unless two of them hold different seats in more
+--      than one shared year. The same seat in the
 --      same year is how a split shows (Jean Evans, Joe Adams); different seats across several shared years mean two
 --      people, while a single shared year is a hand-over between seats. A pair listed
 --      as different_people in official_id_links also keeps that whole name apart.
+--   2b. two names that differ only in the given name, one being the start of the other ("Steve"/"Steven" Roberts,
+--      "Ken"/"Kenneth" Jamison; #263), are one person when each name belongs to exactly one such pair and the
+--      names never hold different seats in the same year (across all ids of both names), and either hold a seat
+--      at the same time (their dated terms in one seat overlap: start_a < end_b and start_b < end_a, an open term
+--      ending 9999-12-31; the same start day overlaps, one term ending the day the other starts does not), or
+--      follow each other within a year in a different chamber (a move, as Roberts went House to Senate). Years
+--      alone cannot decide the shared-seat case: Kenneth Jamison (2025 only) inside Ken Jamison (2025-26) is a
+--      duplicate, but Danielle Smith (2019 only, or 2026 only after a special election) inside a Dan Smith
+--      successor's span looks the same by year. Dates tell them apart: Kenneth's term is a stub that overlaps
+--      Ken's, while a successor's term starts on or after the predecessor's ends. Undated House-roster rows prove
+--      no overlap. A name left with more than one partner (a chain or a fork) is ambiguous and joins nothing.
 --   3. otherwise the id is its own person, basis = self.
 -- Among merged ids the person_id is an Open States id over mohouse:, then the one whose service ends latest, then
 -- the smaller id. The choice never looks at the latest roster year, so an official's id does not change when they
@@ -20,74 +32,226 @@ with terms as (
     select * from {{ ref('int_officials__identity_terms') }}
 ),
 
-aliases as (
+-- sq is the name with spaces removed: the key every name rule compares, so "van schoiack" equals "vanschoiack".
+-- given is its first word and family the rest, for the given-name variant rule.
+alias_names as (
     select
         alias_id,
         max(name_key) as name_key,
         max(year) as last_year,
+        min(year) as first_year,
         case when alias_id like 'mohouse:%' then 0 else 1 end as is_openstates
     from terms
     group by alias_id
 ),
 
+aliases as (
+    select
+        alias_id,
+        name_key,
+        last_year,
+        first_year,
+        is_openstates,
+        replace(name_key, ' ', '') as sq,
+        {{ mogov.regex_replace_all('name_key', ' .*$', '') }} as given
+    from alias_names
+),
+
 -- the same name holding two different seats in more than one year. One shared year is a hand-over: a member sworn
 -- into the Senate mid-year, or an Open States term dated a year early, still sits in the House roster that year.
 seat_conflicts as (
-    select distinct name_key
+    select distinct sq
     from (
         select
-            a.name_key,
+            a.sq,
             a.alias_id,
             b.alias_id as other_alias_id
-        from terms as a
-        inner join terms as b
-            on
-                a.name_key = b.name_key
-                and a.year = b.year
-                and a.alias_id < b.alias_id
-                and (a.office <> b.office or a.district <> b.district)
-        group by a.name_key, a.alias_id, b.alias_id
-        having count(distinct a.year) > 1
+        from terms as ta
+        inner join aliases as a on ta.alias_id = a.alias_id
+        inner join terms as tb on ta.year = tb.year and ta.alias_id < tb.alias_id
+        inner join aliases as b on tb.alias_id = b.alias_id and a.sq = b.sq
+        where ta.office <> tb.office or ta.district <> tb.district
+        group by a.sq, a.alias_id, b.alias_id
+        having count(distinct ta.year) > 1
     ) as pairs
 ),
 
 separated as (
-    select distinct a.name_key
+    select distinct a.sq
     from {{ ref('official_id_links') }} as l
     inner join aliases as a on l.alias_id = a.alias_id or l.person_id = a.alias_id
     where l.relation = 'different_people' and l.checked_by is not null
 ),
 
 keep_apart as (
-    select name_key from seat_conflicts
+    select sq from seat_conflicts
     union
-    select name_key from separated
+    select sq from separated
+),
+
+-- names (not ids) that differ only in the given name, one starting with the other, and whose seats fit as one
+-- person. A shared seat joins them only when their dated terms in it overlap in time. Every id of either name
+-- is checked, so another id of one name holding a different seat in the other name's years rules the pair out.
+name_spans as (
+    select
+        sq,
+        min(given) as given,
+        min(first_year) as first_year,
+        max(last_year) as last_year
+    from aliases
+    group by sq
+),
+
+name_terms as (
+    select
+        a.sq,
+        t.year,
+        t.office,
+        t.district,
+        t.term_start,
+        t.term_end
+    from terms as t
+    inner join aliases as a on t.alias_id = a.alias_id
+),
+
+variant_pairs as (
+    select distinct
+        a.sq as sq_a,
+        b.sq as sq_b
+    from name_spans as a
+    inner join name_spans as b
+        on
+            a.sq < b.sq
+            and substr(a.sq, length(a.given) + 1) = substr(b.sq, length(b.given) + 1)
+            and length(substr(a.sq, length(a.given) + 1)) > 0
+            and a.given <> b.given
+            and length(a.given) >= 3
+            and length(b.given) >= 3
+            and (b.given like a.given || '%' or a.given like b.given || '%')
+    where
+        not exists (
+            select 1
+            from name_terms as ta
+            inner join name_terms as tb on ta.year = tb.year
+            where
+                ta.sq = a.sq and tb.sq = b.sq
+                and (ta.office <> tb.office or ta.district <> tb.district)
+        )
+        and (
+            (
+                -- the names hold one seat at the same time. Succession (a term starting on/after the other
+                -- ends: Dan 2019, Danielle 2019-21) is not overlap; Kenneth's stub inside Ken's term is.
+                exists (
+                    select 1
+                    from name_terms as ta
+                    inner join name_terms as tb
+                        on ta.office = tb.office and ta.district = tb.district
+                    where
+                        ta.sq = a.sq and tb.sq = b.sq
+                        and ta.term_start < tb.term_end and tb.term_start < ta.term_end
+                )
+            )
+            -- no shared seat-year: only a move between chambers, one name ending as the other begins. The same
+            -- chamber a year apart is a successor ("Dan" Smith, then "Danielle" Smith in the same seat).
+            or (
+                a.last_year < b.first_year and b.first_year - a.last_year <= 1
+                and exists (
+                    select 1
+                    from name_terms as ta
+                    inner join name_terms as tb on ta.year = a.last_year and tb.year = b.first_year
+                    where ta.sq = a.sq and tb.sq = b.sq and ta.office <> tb.office
+                )
+                and not exists (
+                    select 1
+                    from name_terms as ta
+                    inner join name_terms as tb on ta.year = a.last_year and tb.year = b.first_year
+                    where ta.sq = a.sq and tb.sq = b.sq and ta.office = tb.office
+                )
+            )
+            or (
+                b.last_year < a.first_year and a.first_year - b.last_year <= 1
+                and exists (
+                    select 1
+                    from name_terms as ta
+                    inner join name_terms as tb on tb.year = b.last_year and ta.year = a.first_year
+                    where ta.sq = a.sq and tb.sq = b.sq and ta.office <> tb.office
+                )
+                and not exists (
+                    select 1
+                    from name_terms as ta
+                    inner join name_terms as tb on tb.year = b.last_year and ta.year = a.first_year
+                    where ta.sq = a.sq and tb.sq = b.sq and ta.office = tb.office
+                )
+            )
+        )
+        and a.sq not in (select k.sq from keep_apart as k)
+        and b.sq not in (select k.sq from keep_apart as k)
+),
+
+variant_counts as (
+    select
+        sq,
+        count(*) as n_pairs
+    from (
+        select sq_a as sq from variant_pairs
+        union all
+        select sq_b as sq from variant_pairs
+    ) as sides
+    group by sq
+),
+
+-- each name that has exactly one variant partner, which also has exactly one
+name_groups as (
+    select
+        p.sq_a as sq,
+        p.sq_a as group_key
+    from variant_pairs as p
+    inner join variant_counts as ca on p.sq_a = ca.sq and ca.n_pairs = 1
+    inner join variant_counts as cb on p.sq_b = cb.sq and cb.n_pairs = 1
+    union all
+    select
+        p.sq_b as sq,
+        p.sq_a as group_key
+    from variant_pairs as p
+    inner join variant_counts as ca on p.sq_a = ca.sq and ca.n_pairs = 1
+    inner join variant_counts as cb on p.sq_b = cb.sq and cb.n_pairs = 1
+),
+
+keyed as (
+    select
+        a.alias_id,
+        a.sq,
+        a.last_year,
+        a.is_openstates,
+        coalesce(g.group_key, a.sq) as group_key
+    from aliases as a
+    left join name_groups as g on a.sq = g.sq
 ),
 
 ranked as (
     select
-        a.alias_id,
-        a.name_key,
+        k.alias_id,
+        k.group_key,
         row_number() over (
-            partition by a.name_key
+            partition by k.group_key
             order by
-                a.is_openstates desc,
-                a.last_year desc,
-                a.alias_id asc
+                k.is_openstates desc,
+                k.last_year desc,
+                k.alias_id asc
         ) as rn
-    from aliases as a
+    from keyed as k
     where not exists (
-        select 1 from keep_apart as k
-        where k.name_key = a.name_key
+        select 1 from keep_apart as ka
+        where ka.sq = k.sq
     )
 ),
 
 name_person as (
     select
-        a.alias_id,
-        coalesce(r.alias_id, a.alias_id) as person_id
-    from aliases as a
-    left join ranked as r on a.name_key = r.name_key and r.rn = 1
+        k.alias_id,
+        coalesce(r.alias_id, k.alias_id) as person_id
+    from keyed as k
+    left join ranked as r on k.group_key = r.group_key and r.rn = 1
 ),
 
 same_person as (

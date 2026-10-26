@@ -3,7 +3,12 @@
 -- years with a House roster, from the House's own roster (its raw seat-matched key: an Open States id or
 -- mohouse:<House member id>) and from Open States seat-terms (both chambers). A term counts for a year when it
 -- runs past January 15 of it, and terms with an undated start are left out, as in int_officeholders__years.
--- name_key is the id's own full name. Grain: one row per (alias_id, year, office, district).
+-- name_key is the id's own full name. term_start/term_end are the Open States term's dates exactly as Open States
+-- gives them (DATE; end 9999-12-31 while open; null for House roster rows, which carry only a year), so a rule can
+-- tell overlap from succession. They are not the January-1 adjusted dates used for the year membership above:
+-- those would make a January successor (from Jan 1) overlap a predecessor Open States ends on Jan 6-9.
+-- Known edge: the min(start)/max(end) collapse per (alias_id, year, office, district) spans any gap if one id holds
+-- the same seat in two separate terms in a year. Grain: one row per (alias_id, year, office, district).
 with years as (
     select distinct
         session_year as year,
@@ -20,7 +25,9 @@ house_terms as (
         m.session_year as year,
         'state_house' as office,
         {{ dbt.safe_cast('m.district_number', dbt.type_string()) }} as district,
-        coalesce(p.full_name, m.full_name) as full_name
+        coalesce(p.full_name, m.full_name) as full_name,
+        {{ dbt.safe_cast('null', 'date') }} as term_start,
+        {{ dbt.safe_cast('null', 'date') }} as term_end
     from {{ ref('int_mo_house__member_seat_keys') }} as m
     left join {{ ref('stg_openstates__people') }} as p on m.openstates_id = p.openstates_id
 ),
@@ -31,7 +38,9 @@ seat_terms as (
         y.year,
         case s.chamber when 'upper' then 'state_senate' else 'state_house' end as office,
         {{ dbt.safe_cast('s.district_number', dbt.type_string()) }} as district,
-        s.full_name
+        s.full_name,
+        {{ dbt.safe_cast('s.source_start_date', 'date') }} as term_start,
+        {{ dbt.safe_cast('s.source_end_date', 'date') }} as term_end
     from {{ ref('int_mo_legislators__seat_terms') }} as s
     inner join years as y on s.start_date <= y.year_end and s.end_date > y.handover_date
     -- int_mo_legislators__seat_terms puts undated starts at 1900-01-01: their first year is unknown, so they are no
@@ -50,6 +59,8 @@ select
     year,
     office,
     district,
-    max({{ mogov.name_key('full_name') }}) as name_key
+    max({{ mogov.name_key('full_name') }}) as name_key,
+    min(term_start) as term_start,
+    max(term_end) as term_end
 from unioned
 group by alias_id, year, office, district
