@@ -14,14 +14,14 @@ unit_tests:
     given:
       - input: ref('stg_mo_state_expenditures__payments')
         rows:
-          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'ANDERSON, MARLON SHEPARD', payments_total: 8000.00, source_url: u23}
-          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: IN-STATE MILEAGE, vendor_name: 'ANDERSON, MARLON SHEPARD', payments_total: 1500.50, source_url: u23}
-          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: IN-STATE MILEAGE, vendor_name: 'ANDERSON, MARLON SHEPARD', payments_total: -100.50, source_url: u23}
-          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'BOGGS JR, MITCHELL', payments_total: 7000.00, source_url: u23}
-          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'GRIFFITH, DAVE', payments_total: 6000.00, source_url: u23}
-          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'OLD, TIMER', payments_total: 5000.00, source_url: u23}
-          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: SUPPLIES, detail_description: OFFICE SUPPLIES, vendor_name: 'ANDERSON, MARLON SHEPARD', payments_total: 99.00, source_url: u23}
-          - {fiscal_year: 2023, agency_name: CORRECTIONS, category_description: TRAVEL, detail_description: IN-STATE MILEAGE, vendor_name: 'CLERK, JOHN', payments_total: 50.00, source_url: u23}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'ANDERSON, MARLON SHEPARD', payments_total: 8000.00, source_url: 'https://data.mo.gov/resource/abcd-1234.json'}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: IN-STATE MILEAGE, vendor_name: 'ANDERSON, MARLON SHEPARD', payments_total: 1500.50, source_url: 'https://data.mo.gov/resource/abcd-1234.json'}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: IN-STATE MILEAGE, vendor_name: 'ANDERSON, MARLON SHEPARD', payments_total: -100.50, source_url: 'https://data.mo.gov/resource/abcd-1234.json'}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'BOGGS JR, MITCHELL', payments_total: 7000.00, source_url: 'https://data.mo.gov/resource/abcd-1234.json'}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'GRIFFITH, DAVE', payments_total: 6000.00, source_url: 'https://data.mo.gov/resource/abcd-1234.json'}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'OLD, TIMER', payments_total: 5000.00, source_url: 'https://data.mo.gov/resource/abcd-1234.json'}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: SUPPLIES, detail_description: OFFICE SUPPLIES, vendor_name: 'ANDERSON, MARLON SHEPARD', payments_total: 99.00, source_url: 'https://data.mo.gov/resource/abcd-1234.json'}
+          - {fiscal_year: 2023, agency_name: CORRECTIONS, category_description: TRAVEL, detail_description: IN-STATE MILEAGE, vendor_name: 'CLERK, JOHN', payments_total: 50.00, source_url: 'https://data.mo.gov/resource/abcd-1234.json'}
       - input: ref('fct_salaries')
         rows:
           - {official_id: o_anderson, calendar_year: 2022, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'ANDERSON, MARLON', pay: 35000, pay_basis: gross pay}
@@ -40,10 +40,10 @@ unit_tests:
           - {official_id: o_clerk}
     expect:
       rows:
-        - {official_id: o_anderson, fiscal_year: 2023, expense_type: per diem, payee_name: 'ANDERSON, MARLON SHEPARD', amount: 8000.00, match_confidence: high}
-        - {official_id: o_anderson, fiscal_year: 2023, expense_type: mileage, payee_name: 'ANDERSON, MARLON SHEPARD', amount: 1400.00, match_confidence: high}
-        - {official_id: o_boggs, fiscal_year: 2023, expense_type: per diem, payee_name: 'BOGGS JR, MITCHELL', amount: 7000.00, match_confidence: high}
-        - {official_id: o_dave, fiscal_year: 2023, expense_type: per diem, payee_name: 'GRIFFITH, DAVE', amount: 6000.00, match_confidence: medium}
+        - {official_id: o_anderson, fiscal_year: 2023, expense_type: per diem, payee_name: 'ANDERSON, MARLON SHEPARD', amount: 8000.00, match_confidence: high, source_url: 'https://data.mo.gov/d/abcd-1234', source_api_url: 'https://data.mo.gov/resource/abcd-1234.json'}
+        - {official_id: o_anderson, fiscal_year: 2023, expense_type: mileage, payee_name: 'ANDERSON, MARLON SHEPARD', amount: 1400.00, match_confidence: high, source_url: 'https://data.mo.gov/d/abcd-1234', source_api_url: 'https://data.mo.gov/resource/abcd-1234.json'}
+        - {official_id: o_boggs, fiscal_year: 2023, expense_type: per diem, payee_name: 'BOGGS JR, MITCHELL', amount: 7000.00, match_confidence: high, source_url: 'https://data.mo.gov/d/abcd-1234', source_api_url: 'https://data.mo.gov/resource/abcd-1234.json'}
+        - {official_id: o_dave, fiscal_year: 2023, expense_type: per diem, payee_name: 'GRIFFITH, DAVE', amount: 6000.00, match_confidence: medium, source_url: 'https://data.mo.gov/d/abcd-1234', source_api_url: 'https://data.mo.gov/resource/abcd-1234.json'}
 
   - name: legislator_expenses_never_guess_between_shared_surnames
     model: fct_legislator_expenses
@@ -56,10 +56,10 @@ unit_tests:
     given:
       - input: ref('stg_mo_state_expenditures__payments')
         rows:
-          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'BROWN, DAVID C', payments_total: 100.00, source_url: u}
-          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'BROWN, DAVID T', payments_total: 200.00, source_url: u}
-          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'BROWN, ANN', payments_total: 300.00, source_url: u}
-          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'KING, ROBERT', payments_total: 400.00, source_url: u}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'BROWN, DAVID C', payments_total: 100.00, source_url: 'https://data.mo.gov/resource/abcd-1234.json'}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'BROWN, DAVID T', payments_total: 200.00, source_url: 'https://data.mo.gov/resource/abcd-1234.json'}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'BROWN, ANN', payments_total: 300.00, source_url: 'https://data.mo.gov/resource/abcd-1234.json'}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'KING, ROBERT', payments_total: 400.00, source_url: 'https://data.mo.gov/resource/abcd-1234.json'}
       - input: ref('fct_salaries')
         rows:
           - {official_id: o_dc, calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BROWN, DAVID C', pay: 1, pay_basis: gross pay}
@@ -81,3 +81,43 @@ unit_tests:
         - {official_id: o_dc, fiscal_year: 2023, expense_type: per diem, payee_name: 'BROWN, DAVID C', amount: 100.00, match_confidence: high}
         - {official_id: o_dt, fiscal_year: 2023, expense_type: per diem, payee_name: 'BROWN, DAVID T', amount: 200.00, match_confidence: high}
         - {official_id: o_ann, fiscal_year: 2023, expense_type: per diem, payee_name: 'BROWN, ANN', amount: 300.00, match_confidence: medium}
+
+  - name: legislator_expenses_source_url_rewrites_only_socrata_api_urls
+    model: fct_legislator_expenses
+    description: >
+      source_url is the dataset's /d/<id> page for a Socrata API URL: .json, .csv and .geojson extensions and a query
+      string are all dropped. A URL that is already a /d/ page, and a non-Socrata URL that merely contains /resource/,
+      pass through unchanged. source_api_url is always the loaded URL as is.
+    given:
+      - input: ref('stg_mo_state_expenditures__payments')
+        rows:
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'ADAMS, PAT', payments_total: 100.00, source_url: 'https://data.mo.gov/resource/abcd-1234.csv'}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'BAKER, PAT', payments_total: 100.00, source_url: 'https://data.mo.gov/resource/abcd-1234.geojson'}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'CLARK, PAT', payments_total: 100.00, source_url: 'https://data.mo.gov/resource/abcd-1234.json?$limit=5&$where=a.json'}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'DAVIS, PAT', payments_total: 100.00, source_url: 'https://data.mo.gov/d/abcd-1234'}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'EVANS, PAT', payments_total: 100.00, source_url: 'https://example.org/api/resource/report.json'}
+          - {fiscal_year: 2023, agency_name: LEGISLATURE, category_description: TRAVEL, detail_description: LEGISLATIVE DAILY EXPENSE ALLOWANCE, vendor_name: 'FISHER, PAT', payments_total: 100.00, source_url: 'https://data.mo.gov/resource/abcd-1234.json'}
+      - input: ref('fct_salaries')
+        rows:
+          - {official_id: o_adams, calendar_year: 2023, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'ADAMS, PAT', pay: 1, pay_basis: gross pay}
+          - {official_id: o_baker, calendar_year: 2023, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'BAKER, PAT', pay: 1, pay_basis: gross pay}
+          - {official_id: o_clark, calendar_year: 2023, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'CLARK, PAT', pay: 1, pay_basis: gross pay}
+          - {official_id: o_davis, calendar_year: 2023, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'DAVIS, PAT', pay: 1, pay_basis: gross pay}
+          - {official_id: o_evans, calendar_year: 2023, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'EVANS, PAT', pay: 1, pay_basis: gross pay}
+          - {official_id: o_fisher, calendar_year: 2023, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'FISHER, PAT', pay: 1, pay_basis: gross pay}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: o_adams}
+          - {official_id: o_baker}
+          - {official_id: o_clark}
+          - {official_id: o_davis}
+          - {official_id: o_evans}
+          - {official_id: o_fisher}
+    expect:
+      rows:
+        - {official_id: o_adams, fiscal_year: 2023, expense_type: per diem, payee_name: 'ADAMS, PAT', amount: 100.00, match_confidence: high, source_url: 'https://data.mo.gov/d/abcd-1234', source_api_url: 'https://data.mo.gov/resource/abcd-1234.csv'}
+        - {official_id: o_baker, fiscal_year: 2023, expense_type: per diem, payee_name: 'BAKER, PAT', amount: 100.00, match_confidence: high, source_url: 'https://data.mo.gov/d/abcd-1234', source_api_url: 'https://data.mo.gov/resource/abcd-1234.geojson'}
+        - {official_id: o_clark, fiscal_year: 2023, expense_type: per diem, payee_name: 'CLARK, PAT', amount: 100.00, match_confidence: high, source_url: 'https://data.mo.gov/d/abcd-1234', source_api_url: 'https://data.mo.gov/resource/abcd-1234.json?$limit=5&$where=a.json'}
+        - {official_id: o_davis, fiscal_year: 2023, expense_type: per diem, payee_name: 'DAVIS, PAT', amount: 100.00, match_confidence: high, source_url: 'https://data.mo.gov/d/abcd-1234', source_api_url: 'https://data.mo.gov/d/abcd-1234'}
+        - {official_id: o_evans, fiscal_year: 2023, expense_type: per diem, payee_name: 'EVANS, PAT', amount: 100.00, match_confidence: high, source_url: 'https://example.org/api/resource/report.json', source_api_url: 'https://example.org/api/resource/report.json'}
+        - {official_id: o_fisher, fiscal_year: 2023, expense_type: per diem, payee_name: 'FISHER, PAT', amount: 100.00, match_confidence: high, source_url: 'https://data.mo.gov/d/abcd-1234', source_api_url: 'https://data.mo.gov/resource/abcd-1234.json'}
