@@ -126,6 +126,45 @@ unit_tests:
         - {year: 2020, official_id: 'p_arthur', office: state_house, session_code: '201'}
         - {year: 2020, official_id: 'p_mute', office: state_house, session_code: '201'}
 
+  - name: officeholders_house_roster_kept_whole_in_a_year_with_no_roll_calls_after_the_handover
+    model: int_officeholders__years
+    description: >
+      Every January, before the year's first roll calls are loaded, each returning member's last vote is in the
+      previous year; the last-vote test would drop the whole roster (2026 House 155 -> 0). It applies only in a year
+      with House roll calls on or after the January 15 handover. Here 2021 has a roster but no roll call after
+      2021-01-15 (the only 2021 roll call is 2021-01-05), so Gone, whose last vote (2020-12-01) is before the
+      handover, stays for 2021 along with Back. In 2022 a roll call on 2022-02-01 exists, so Gone is dropped and Back
+      (voted 2022-02-01) stays.
+    given:
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '211', session_year: 2021, person_key: 'p_back', full_name: Ann Back, district_number: 1}
+          - {session_code: '211', session_year: 2021, person_key: 'p_gone', full_name: Bob Gone, district_number: 2}
+          - {session_code: '221', session_year: 2022, person_key: 'p_back', full_name: Ann Back, district_number: 1}
+          - {session_code: '221', session_year: 2022, person_key: 'p_gone', full_name: Bob Gone, district_number: 2}
+      - input: ref('int_mo_house__votes')
+        rows:
+          - {vote_id: v1, person_key: 'p_back', vote_date: '2021-01-05'}
+          - {vote_id: v2, person_key: 'p_gone', vote_date: '2020-12-01'}
+          - {vote_id: v3, person_key: 'p_back', vote_date: '2022-02-01'}
+      - input: ref('stg_openstates__people')
+        rows: []
+        format: dict
+      - input: ref('int_mo_legislators__seats')
+        rows: []
+        format: dict
+      - input: ref('stg_congress__terms')
+        rows: []
+        format: dict
+      - input: ref('stg_fjc__appointments')
+        rows: []
+        format: dict
+    expect:
+      rows:
+        - {year: 2021, official_id: 'p_back', office: state_house, session_code: '211'}
+        - {year: 2021, official_id: 'p_gone', office: state_house, session_code: '211'}
+        - {year: 2022, official_id: 'p_back', office: state_house, session_code: '221'}
+
   - name: officeholders_senate_seats_as_dated_by_the_seat_table
     model: int_officeholders__years
     description: >

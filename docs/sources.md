@@ -78,7 +78,8 @@ Quirks:
   term test cannot see it. Scott Fitzpatrick (HD158) cast his last vote on 2019-01-09 and became State Treasurer;
   the 2019 roster still lists him though HD158 had no member until Scott Cupps in 2020. Mike Cierpiot (HD30) left for
   the Senate (his last House vote was 2017-09-13) yet the 2018 roster lists him. `int_officeholders__years` therefore
-  also drops a roster row when the person's last roll-call vote is before the year's January 15 handover. Open States
+  also drops a roster row when the person's last roll-call vote is before the year's January 15 handover, but only in a year that has House roll calls on or after the handover (each
+  January the roster stays whole until that year's roll calls are loaded). Open States
   dates alone are not enough: Lauren Arthur's House term ends 2016-12-31 but she voted through 2018, so her row stays.
   The Speaker must be in the `house_speakers` seed for 2017-2022 as well as 2023+, else a Speaker with no named votes
   (Haahr 2019-2020, Vescovo 2021-2022) would read as a member who stopped voting. Issue #491.

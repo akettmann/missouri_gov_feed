@@ -423,13 +423,14 @@ models:
     (as int_judges__federal) A term counts for a year when it runs past January 15 of it, so a hand-over in the
     first days of January (Congress turns over on January 3) doesn''t list both the outgoing and the incoming holder.
     Years are those with a House roster. A roster row is dropped when the roster outlived the member, by either
-    of two tests: the person''s last roll-call vote was before the year''s handover (any row, #491), or the row''s
-    Open States person has a last House term that ended before the handover (only rows whose roster member carries
-    an Open States id: the name-anchor override, #152). Statewide officers, mayors and state judges have no dated
-    past rosters here. person keys match dim_official.official_id, so a past holder who serves today links to their
-    profile. official_id is the stable person id; openstates_id is the Open States record the senate row came from
-    (null for other sources), kept so rpt_officeholders_by_year can find that record''s folder. session_code is
-    the House session file (e.g. 251, 253) listing the member, the earliest one in the year; null for other sources.
+    of two tests: the person''s last roll-call vote was before the year''s handover (any row, #491; only in a year
+    with House roll calls on or after the handover, so a roster stays whole until that year''s roll calls are loaded),
+    or the row''s Open States person has a last House term that ended before the handover (only rows whose roster
+    member carries an Open States id: the name-anchor override, #152). Statewide officers, mayors and state judges
+    have no dated past rosters here. person keys match dim_official.official_id, so a past holder who serves today
+    links to their profile. official_id is the stable person id; openstates_id is the Open States record the senate
+    row came from (null for other sources), kept so rpt_officeholders_by_year can find that record''s folder. session_code
+    is the House session file (e.g. 251, 253) listing the member, the earliest one in the year; null for other sources.
     Grain: one row per (year, person, office) for offices with dated past rosters.'
 - name: int_officials__bios
   description: 'One biography text per current official where a source has one: Official Manual (legislators), MO
