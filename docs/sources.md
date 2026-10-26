@@ -61,6 +61,12 @@ the only per-member House vote record.
 - Shard units: session codes (XML) and session days (roll-call PDFs).
 
 Quirks:
+- `bills171/rollcalls/` still holds the 2016 session's roll-call PDFs (numbered by 2016 session day, header
+  "98th General Assembly, Second Regular Session"). The probe walks past the last 2017 roll call of a day, so
+  it lands them under session 171: 415 roll calls dated 2016 (45 session days, 1/13/2016 to 5/13/2016,
+  interleaved with 663 real 2017 ones), none linked from the bill XML. Raw keeps them as served;
+  `stg_mo_house__rollcalls` drops roll calls dated outside their session code's year (2016's session, 161, is
+  not loaded). Issue #430.
 - The XML is never converted on the way in: the loader gzips each file as received. The parser reads the
   gzip with lxml (hardened settings in `mogov.xmlparse`) and selects elements by local name, so namespaces,
   attributes, entities and CDATA are the parser's problem, not a regex's. The links that drive crawling
@@ -200,6 +206,14 @@ Quirks:
   the above: 443 votes listed 35 or 36 names before the fixes.
 - PDF parsing (about 3 s per journal) dominates a cold run, so it shards well. The extracted text is
   cached by PDF content, so re-runs skip it.
+- Journal file prefixes: `R` regular, `V` veto, and `S1`/`S2`/`T1`/`T2` extraordinary sessions. The prefix does not
+  say which special session it is (2018's `S1` is 183 but its `T1` is 184; 2017's `S1` and `S2` are 173 and 174), so
+  `fct_vote_bills` links special-session votes by date, not by prefix. A `source_url` with no `Journals/<prefix>`
+  part is treated as a regular `R` journal.
+- Special-session Senate bills (SB, SJR, SCR) before 2024 can't be linked to a bill: the Senate act list only
+  exists from session 241, so no source lists those bills and a vote on one links to nothing. House bills in
+  special sessions link through the House XML actions. From 253 on, Senate bills link through the House XML
+  actions (the Senate's own steps are not listed, so the match is by date span).
 
 ## mo_senate_topics: Missouri Senate topical index
 
