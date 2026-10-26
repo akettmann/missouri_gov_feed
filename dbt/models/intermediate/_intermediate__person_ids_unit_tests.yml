@@ -561,3 +561,99 @@ unit_tests:
       rows:
         - {alias_id: 'mohouse:9', year: 2019, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
         - {alias_id: ocd-person/gap, year: 2019, office: state_house, district: '10', name_key: gap person, term_start: '2019-01-09', term_end: '2019-12-31'}
+
+  - name: person_ids_join_a_name_change_by_house_member_id
+    model: int_officials__person_ids
+    description: >
+      Mazzie Boyd (2023) and Mazzie Christensen (2024-26) are House member 2381 in the same seat under two names
+      (#151). The names differ entirely so no name rule joins them; the member id does. The Open States id wins.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: 'mohouse:2381', year: 2023, office: state_house, district: '2', name_key: mazzie boyd, house_member_id: '2381'}
+          - {alias_id: ocd-person/christensen, year: 2024, office: state_house, district: '2', name_key: mazzie christensen, house_member_id: '2381'}
+          - {alias_id: ocd-person/christensen, year: 2025, office: state_house, district: '2', name_key: mazzie christensen, house_member_id: '2381'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: 'mohouse:2381', person_id: ocd-person/christensen, basis: member_id_continuity}
+        - {alias_id: ocd-person/christensen, person_id: ocd-person/christensen, basis: self}
+
+  - name: person_ids_join_the_whole_person_a_member_id_reaches
+    model: int_officials__person_ids
+    description: >
+      Open States holds Ann Lee twice (same exact name, same seat in the same year: one person, rule 2). The House
+      lists her later as Ann Wu under member 7 and the first Ann Lee id also carries member 7. The member id joins
+      the name-rule person, so all three ids end up as one person, not just the two that share the member id. Ties on the last year
+      go to the smaller id.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/lee-a, year: 2019, office: state_house, district: '9', name_key: ann lee, house_member_id: '7'}
+          - {alias_id: ocd-person/lee-a, year: 2020, office: state_house, district: '9', name_key: ann lee, house_member_id: '7'}
+          - {alias_id: ocd-person/lee-b, year: 2020, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: 'mohouse:7', year: 2022, office: state_house, district: '9', name_key: ann wu, house_member_id: '7'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/lee-a, person_id: ocd-person/lee-a, basis: self}
+        - {alias_id: ocd-person/lee-b, person_id: ocd-person/lee-a, basis: name_continuity}
+        - {alias_id: 'mohouse:7', person_id: ocd-person/lee-a, basis: member_id_continuity}
+
+  - name: person_ids_keep_ids_apart_when_they_carry_no_shared_house_member_id
+    model: int_officials__person_ids
+    description: >
+      Different member ids, and ids with no member id at all (Open States seat-terms), are not joined by the member
+      id rule: two women of different names in one seat over time stay two people.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: 'mohouse:10', year: 2019, office: state_house, district: '3', name_key: pat day, house_member_id: '10'}
+          - {alias_id: 'mohouse:11', year: 2021, office: state_house, district: '3', name_key: sam cole, house_member_id: '11'}
+          - {alias_id: ocd-person/senator, year: 2021, office: state_senate, district: '3', name_key: lee ray}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: 'mohouse:10', person_id: 'mohouse:10', basis: self}
+        - {alias_id: 'mohouse:11', person_id: 'mohouse:11', basis: self}
+        - {alias_id: ocd-person/senator, person_id: ocd-person/senator, basis: self}
+
+  - name: person_ids_skip_a_key_that_carries_two_house_member_ids
+    model: int_officials__person_ids
+    description: >
+      A seat-match error can give one Open States id two member ids (Rick Roeber's id also holds Rebecca Roeber's
+      member 1790 for 2020, #152). Following 1790 would join Rebecca (2017-19, mohouse:1790) to Rick, two people,
+      so an id with two member ids takes no part in the rule.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: 'mohouse:1790', year: 2019, office: state_house, district: '34', name_key: rebecca roeber, house_member_id: '1790'}
+          - {alias_id: ocd-person/rick, year: 2020, office: state_house, district: '34', name_key: rick roeber, house_member_id: '1790'}
+          - {alias_id: ocd-person/rick, year: 2021, office: state_house, district: '34', name_key: rick roeber, house_member_id: '2215'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: 'mohouse:1790', person_id: 'mohouse:1790', basis: self}
+        - {alias_id: ocd-person/rick, person_id: ocd-person/rick, basis: self}
+
+  - name: person_ids_keep_a_signed_different_people_id_out_of_the_house_member_id_rule
+    model: int_officials__person_ids
+    description: >
+      An id a maintainer has signed off as a different person (different_people, checked_by filled) is not pulled in
+      by a shared member id.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: 'mohouse:5', year: 2019, office: state_house, district: '4', name_key: kim old, house_member_id: '5'}
+          - {alias_id: ocd-person/new, year: 2021, office: state_house, district: '4', name_key: kim new, house_member_id: '5'}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: 'mohouse:5', person_id: ocd-person/new, relation: different_people, checked_by: maintainer}
+    expect:
+      rows:
+        - {alias_id: 'mohouse:5', person_id: 'mohouse:5', basis: self}
+        - {alias_id: ocd-person/new, person_id: ocd-person/new, basis: self}

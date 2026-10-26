@@ -114,7 +114,7 @@ Quirks:
   (`int_mo_house__member_identity`, seed `house_speakers`).
 - A member's seat is matched to an Open States person; when that fails the key is `mohouse:<member id>`.
   Open States also holds some people twice (after a redistricting or a move to the Senate). Both are
-  reconciled to one stable `official_id` per person by `int_officials__person_ids` (same exact name, or names that differ only in the given
+  reconciled to one stable `official_id` per person by `int_officials__person_ids` (the same MO House member id, which follows a name change such as Mazzie Boyd/Christensen, member 2381, #151; otherwise the same exact name, or names that differ only in the given
   name like Steve/Steven or Ken/Kenneth (#228, #263), no conflicting seats, and
   either overlapping dated terms in one seat or a chamber move (years alone cannot tell a duplicate record, Kenneth
   Jamison's 2025 stub inside Ken's term, from a successor like Danielle after Dan Smith; dates can, using the dates exactly as Open States gives them: the January-1 adjustment used for year membership would make a January successor overlap a predecessor ending Jan 6-9. Known edge: `int_officials__identity_terms` collapses each (id, year, seat) to min(start)/max(end), spanning any gap if one id held the seat in two terms in a year); seed `official_id_links` for statewide officers and judges), #97.

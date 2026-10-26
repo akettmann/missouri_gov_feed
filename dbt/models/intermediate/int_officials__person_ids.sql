@@ -27,6 +27,13 @@
 --      Ken's, while a successor's term starts on or after the predecessor's ends (or is no stub). Undated
 --      House-roster rows prove no overlap. A name left with more than one partner (a chain or a fork) is ambiguous
 --      and joins nothing.
+--   2c. MO House member id continuity (#151): the House keeps one member id per person across sessions and name
+--      changes (Mazzie Boyd, 2023, and Mazzie Christensen, 2024-26, are member 2381), so ids that share a House member
+--      id are one person whatever their names, basis = member_id_continuity. This is applied after rules 2 and 2b
+--      and joins the persons they made, so it also reaches ids the name rules keep apart. It skips an id that carries
+--      more than one member id (Open States' Rick Roeber holds member 2215 and, through a seat-match error, Rebecca
+--      Roeber's 1790, #152: the shared 1790 would join two people) and any id listed as different_people in
+--      official_id_links. Only ids with a roster row (a House member id) take part; Senate-only ids rely on names.
 --   3. otherwise the id is its own person, basis = self.
 -- Among merged ids the person_id is an Open States id over mohouse:, then the one whose service ends latest, then
 -- the smaller id. The choice never looks at the latest roster year, so an official's id does not change when they
@@ -277,6 +284,98 @@ name_person as (
     left join ranked as r on k.group_key = r.group_key and r.rn = 1
 ),
 
+-- rule 2c. An id takes part when its roster rows carry exactly one House member id and it is not a signed
+-- different_people id. Ids that share a member id are one person: each such id's name-rule person is pulled to
+-- the smallest person any of them has, so the persons the name rules made are joined, not just the single ids.
+member_aliases as (
+    select
+        t.alias_id,
+        min(t.house_member_id) as house_member_id
+    from terms as t
+    where
+        t.house_member_id is not null
+        and not exists (
+            select 1
+            from {{ ref('official_id_links') }} as l
+            where
+                l.relation = 'different_people' and l.checked_by is not null
+                and (l.alias_id = t.alias_id or l.person_id = t.alias_id)
+        )
+    group by t.alias_id
+    having count(distinct t.house_member_id) = 1
+),
+
+member_persons as (
+    select
+        m.house_member_id,
+        m.alias_id,
+        n.person_id as name_person_id
+    from member_aliases as m
+    inner join name_person as n on m.alias_id = n.alias_id
+),
+
+member_anchors as (
+    select
+        house_member_id,
+        min(name_person_id) as anchor_id
+    from member_persons
+    group by house_member_id
+    having count(distinct name_person_id) > 1
+),
+
+-- the person each name-rule person is joined into: the smallest anchor of a member id any of its ids carries
+person_anchors as (
+    select
+        p.name_person_id,
+        min(a.anchor_id) as anchor_id
+    from member_persons as p
+    inner join member_anchors as a on p.house_member_id = a.house_member_id
+    group by p.name_person_id
+),
+
+-- every id of a joined person (its name-rule person's other ids included) is a candidate for the joined person_id;
+-- an anchor person is in person_anchors too, as its own anchor
+member_groups as (
+    select
+        n.alias_id,
+        pa.anchor_id as group_key
+    from name_person as n
+    inner join person_anchors as pa on n.person_id = pa.name_person_id
+),
+
+member_ranked as (
+    select
+        g.alias_id,
+        g.group_key,
+        row_number() over (
+            partition by g.group_key
+            order by
+                a.is_openstates desc,
+                a.last_year desc,
+                g.alias_id asc
+        ) as rn
+    from member_groups as g
+    inner join aliases as a on g.alias_id = a.alias_id
+),
+
+member_person as (
+    select
+        g.alias_id,
+        r.alias_id as person_id
+    from member_groups as g
+    inner join member_ranked as r on g.group_key = r.group_key and r.rn = 1
+),
+
+merged as (
+    select
+        n.alias_id,
+        coalesce(mp.person_id, n.person_id) as person_id,
+        n.person_id as name_person_id,
+        mp.person_id is not null as via_member_id
+    from name_person as n
+    left join member_person as mp on n.alias_id = mp.alias_id
+),
+
 same_person as (
     select
         alias_id,
@@ -290,9 +389,10 @@ select
     coalesce(by_alias.person_id, by_person.person_id, n.person_id) as person_id,
     case
         when by_alias.person_id is not null or by_person.person_id is not null then 'curated'
+        when n.via_member_id and n.person_id <> n.name_person_id then 'member_id_continuity'
         when n.person_id <> n.alias_id then 'name_continuity'
         else 'self'
     end as basis
-from name_person as n
+from merged as n
 left join same_person as by_alias on n.alias_id = by_alias.alias_id
 left join same_person as by_person on n.person_id = by_person.alias_id
