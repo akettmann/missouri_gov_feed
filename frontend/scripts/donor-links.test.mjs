@@ -47,21 +47,21 @@ test("parseDonorLinks drops empty input and malformed lines", () => {
   assert.deepEqual(parseDonorLinks([FEC, " AMEREN", `${FEC} `].join("\n")), []);
 });
 
-test("donorEntries gives each donor its names and all its pages, in donor_names order", () => {
+test("donorEntries gives each donor its names and all its pages, in the given order", () => {
   const raw = [`${FEC} AMEREN CORPORATION`, `${MEC} AMEREN CORPORATION`].join("\n");
-  assert.deepEqual(donorEntries("AMEREN CORPORATION\u001fAT&T INC.", raw), [
+  assert.deepEqual(donorEntries(["AMEREN CORPORATION", "AT&T INC."], raw), [
     { donor: "AMEREN CORPORATION", urls: [FEC, MEC] },
     { donor: "AT&T INC.", urls: [] },
   ]);
 });
 
 test("donorEntries marks a donor with no link line as having no urls (rendered 'no link')", () => {
-  assert.deepEqual(donorEntries("ACME", null), [{ donor: "ACME", urls: [] }]);
+  assert.deepEqual(donorEntries(["ACME"], null), [{ donor: "ACME", urls: [] }]);
   assert.deepEqual(donorEntries(null, null), []);
 });
 
-test("donorEntries keeps a linked donor missing from donor_names and does not repeat names", () => {
-  assert.deepEqual(donorEntries("ACME\u001fACME", `${FEC} OTHER`), [
+test("donorEntries keeps a linked donor missing from the donor list and does not repeat names", () => {
+  assert.deepEqual(donorEntries(["ACME", "ACME"], `${FEC} OTHER`), [
     { donor: "ACME", urls: [] },
     { donor: "OTHER", urls: [FEC] },
   ]);
@@ -100,26 +100,26 @@ test("a donor with 2+ pages of one kind gets the differing committee id in each 
 
 test("donorEntries collapses name variants that share the same pages into one entry (#276)", () => {
   const raw = [`${MEC} SPIRE PAC`, `${MEC} SPIRE POLITICAL ACTION COMMITTEE`, `${FEC} AT&T INC.`].join("\n");
-  assert.deepEqual(donorEntries("AT&T INC.\u001fSPIRE PAC\u001fSPIRE POLITICAL ACTION COMMITTEE", raw), [
+  assert.deepEqual(donorEntries(["AT&T INC.", "SPIRE PAC", "SPIRE POLITICAL ACTION COMMITTEE"], raw), [
     { donor: "AT&T INC.", urls: [FEC] },
     { donor: "SPIRE PAC; SPIRE POLITICAL ACTION COMMITTEE", urls: [MEC] },
   ]);
 });
 
 test("donorEntries does not merge donors with no link, or with different pages (#276)", () => {
-  assert.deepEqual(donorEntries("A\u001fB\u001fC", `${MEC} A\n${FEC} B`), [
+  assert.deepEqual(donorEntries(["A", "B", "C"], `${MEC} A\n${FEC} B`), [
     { donor: "A", urls: [MEC] },
     { donor: "B", urls: [FEC] },
     { donor: "C", urls: [] },
   ]);
-  assert.deepEqual(donorEntries("A\u001fB", ""), [
+  assert.deepEqual(donorEntries(["A", "B"], ""), [
     { donor: "A", urls: [] },
     { donor: "B", urls: [] },
   ]);
 });
 
 test("donorEntries keeps a comma-joined name as one donor (#276)", () => {
-  assert.deepEqual(donorEntries("NETJETS ASSOCIATION OF SHARED AIRCRAFT PILOTS PAC, NJASAP PAC", null), [
+  assert.deepEqual(donorEntries(["NETJETS ASSOCIATION OF SHARED AIRCRAFT PILOTS PAC, NJASAP PAC"], null), [
     { donor: "NETJETS ASSOCIATION OF SHARED AIRCRAFT PILOTS PAC, NJASAP PAC", urls: [] },
   ]);
 });
@@ -131,12 +131,12 @@ const lines = (...pairs) => pairs.map(([u, d]) => `${u} ${d}`).join("\n");
 
 test("donorEntries folds a donor whose pages are a subset of another's into it (#342)", () => {
   const raw = lines([M1, "AMEREN MISSOURI PAC"], [M2, "AMEREN MISSOURI PAC"], [M2, "Ameren MO PAC"]);
-  assert.deepEqual(donorEntries("AMEREN MISSOURI PAC\u001fAmeren MO PAC", raw), [
+  assert.deepEqual(donorEntries(["AMEREN MISSOURI PAC", "Ameren MO PAC"], raw), [
     { donor: "AMEREN MISSOURI PAC; Ameren MO PAC", urls: [M1, M2] },
   ]);
-  // the subset donor listed first still folds into the superset, keeping donor_names order in the label
+  // the subset donor listed first still folds into the superset, keeping the given order in the label
   const rev = lines([M2, "Ameren MO PAC"], [M1, "AMEREN MISSOURI PAC"], [M2, "AMEREN MISSOURI PAC"]);
-  assert.deepEqual(donorEntries("Ameren MO PAC\u001fAMEREN MISSOURI PAC", rev), [
+  assert.deepEqual(donorEntries(["Ameren MO PAC", "AMEREN MISSOURI PAC"], rev), [
     { donor: "Ameren MO PAC; AMEREN MISSOURI PAC", urls: [M1, M2] },
   ]);
 });
@@ -144,26 +144,26 @@ test("donorEntries folds a donor whose pages are a subset of another's into it (
 test("donorEntries does not merge partial overlap or chains (#342)", () => {
   // A={M1,M2}, B={M2,M3}: each has a page the other lacks
   const partial = lines([M1, "A"], [M2, "A"], [M2, "B"], [M3, "B"]);
-  assert.deepEqual(donorEntries("A\u001fB", partial), [
+  assert.deepEqual(donorEntries(["A", "B"], partial), [
     { donor: "A", urls: [M1, M2] },
     { donor: "B", urls: [M2, M3] },
   ]);
   // chain A~B~C: A and C share nothing, so none of them join
   const chain = lines([M1, "A"], [M2, "A"], [M2, "B"], [M3, "B"], [M3, "C"], [FEC, "C"]);
-  assert.equal(donorEntries("A\u001fB\u001fC", chain).length, 3);
+  assert.equal(donorEntries(["A", "B", "C"], chain).length, 3);
 });
 
 test("donorEntries keeps differently sized partial overlaps apart (#342)", () => {
   // A={M1,M2,M3}, B={M3,FEC}: B is smaller but has FEC, which A lacks, so B is not a subset
   const a = lines([M1, "A"], [M2, "A"], [M3, "A"], [M3, "B"], [FEC, "B"]);
-  assert.deepEqual(donorEntries("A\u001fB", a), [
+  assert.deepEqual(donorEntries(["A", "B"], a), [
     { donor: "A", urls: [M1, M2, M3] },
     { donor: "B", urls: [M3, FEC] },
   ]);
   // A={M1,M2,M3}, B={M2,M4}: B shares M2 only
   const M4 = "https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C444444";
   const b = lines([M1, "A"], [M2, "A"], [M3, "A"], [M2, "B"], [M4, "B"]);
-  assert.deepEqual(donorEntries("A\u001fB", b), [
+  assert.deepEqual(donorEntries(["A", "B"], b), [
     { donor: "A", urls: [M1, M2, M3] },
     { donor: "B", urls: [M2, M4] },
   ]);
@@ -171,19 +171,19 @@ test("donorEntries keeps differently sized partial overlaps apart (#342)", () =>
 
 test("donorEntries does not fold into a group whose extra pages include an FEC link (#342)", () => {
   // B={M1} is a subset of A={M1,FEC}, but the FEC link is A's own gifts, not B's
-  assert.deepEqual(donorEntries("A\u001fB", lines([M1, "A"], [FEC, "A"], [M1, "B"])), [
+  assert.deepEqual(donorEntries(["A", "B"], lines([M1, "A"], [FEC, "A"], [M1, "B"])), [
     { donor: "A", urls: [M1, FEC] },
     { donor: "B", urls: [M1] },
   ]);
   // an FEC link both share is fine: the extra page is MEC only
-  assert.deepEqual(donorEntries("A\u001fB", lines([M1, "A"], [M2, "A"], [FEC, "A"], [M1, "B"], [FEC, "B"])), [
+  assert.deepEqual(donorEntries(["A", "B"], lines([M1, "A"], [M2, "A"], [FEC, "A"], [M1, "B"], [FEC, "B"])), [
     { donor: "A; B", urls: [M1, M2, FEC] },
   ]);
 });
 
 test("donorEntries keeps a subset donor alone when two incomparable donors both contain it (#342)", () => {
   const raw = lines([M1, "A"], [M2, "A"], [M1, "B"], [M3, "B"], [M1, "C"]);
-  assert.deepEqual(donorEntries("A\u001fB\u001fC", raw), [
+  assert.deepEqual(donorEntries(["A", "B", "C"], raw), [
     { donor: "A", urls: [M1, M2] },
     { donor: "B", urls: [M1, M3] },
     { donor: "C", urls: [M1] },
@@ -192,19 +192,20 @@ test("donorEntries keeps a subset donor alone when two incomparable donors both 
 
 test("donorEntries folds a nested chain A subset B subset C into C (#342)", () => {
   const raw = lines([M1, "A"], [M1, "B"], [M2, "B"], [M1, "C"], [M2, "C"], [M3, "C"]);
-  assert.deepEqual(donorEntries("A\u001fB\u001fC", raw), [{ donor: "A; B; C", urls: [M1, M2, M3] }]);
+  assert.deepEqual(donorEntries(["A", "B", "C"], raw), [{ donor: "A; B; C", urls: [M1, M2, M3] }]);
 });
 
 test("donorEntries never folds a donor with no page (#342)", () => {
-  assert.deepEqual(donorEntries("A\u001fB", lines([M1, "A"])), [
+  assert.deepEqual(donorEntries(["A", "B"], lines([M1, "A"])), [
     { donor: "A", urls: [M1] },
     { donor: "B", urls: [] },
   ]);
 });
 
 test("a ';' or ',' inside a donor name stays in that one donor (#350)", () => {
-  const names = "Missouri and Kansas Laborers; PACSMITH, JONES & CO";
-  assert.deepEqual(splitDonorNames(names), ["Missouri and Kansas Laborers; PAC", "SMITH, JONES & CO"]);
+  const list = "Missouri and Kansas Laborers; PACSMITH, JONES & CO";
+  const names = splitDonorNames(list);
+  assert.deepEqual(names, ["Missouri and Kansas Laborers; PAC", "SMITH, JONES & CO"]);
   assert.deepEqual(
     donorEntries(names, null).map((e) => e.donor),
     ["Missouri and Kansas Laborers; PAC", "SMITH, JONES & CO"],

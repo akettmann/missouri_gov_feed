@@ -1644,7 +1644,7 @@ models:
       subsidiaries: "Spire PAC" and "LACLEDE GAS CO"). A company not in the seed that gives under another name
       is missed. Statewide officials have no rows (they serve every area). Grain: one row per (official,
       facility); district_id is the area that puts the facility in the official's jurisdiction. The donor
-      columns (donor_names through donor_links) are filled only when is_donor.
+      columns (donor_name_list through donor_links) are filled only when is_donor.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -1708,12 +1708,14 @@ models:
           - accepted_values:
               arguments:
                 values: ['same name', 'same company']
-      - name: donor_names
+      - name: donor_name_list
         data_type: varchar
         description: >
-          The matched contributors as filed, joined by chr(31) (the ASCII unit separator, not a printable
-          character), when is_donor. Names are kept as filed, so a ";" or "," inside one stays; chr(31) only ever
-          separates two donors (#350). The frontend splits on it and shows the names joined by "; ".
+          Internal, not for display: the matched contributors as filed, joined by chr(31) (the ASCII unit
+          separator, not a printable character), when is_donor. Names are kept as filed, so a ";" or "," inside
+          one stays; chr(31) only ever separates two donors (#350). A consumer must split on chr(31) and never
+          print or export the raw value. The frontend loader splits it into a list and shows the names joined
+          by "; ". Renamed from donor_names so a stale export (which joined with "; ") fails the column guard.
       - name: donated_amount
         data_type: decimal(38,6)
         description: >

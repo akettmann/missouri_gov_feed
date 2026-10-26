@@ -1,7 +1,6 @@
 // Counts for the compare page's businesses-in-their-area rows, from the per-official `businesses` block.
 // Pure (only imports the pure format helpers) so node:test can load it.
 import type { DistrictDonor, DistrictIndustry } from "./exports/types";
-import { splitDonorNames } from "./donorLinks.ts";
 import { plural } from "./format.ts";
 
 export interface BusinessCounts {
@@ -52,7 +51,7 @@ export function countDonors(groups: DistrictDonor[]): number {
   const sets = new Map<string, Set<string>>();
   for (const g of groups) {
     const names = new Set<string>();
-    for (const part of splitDonorNames(g.donor_names)) {
+    for (const part of g.donors) {
       const name = part.replace(/\s+/g, " ").trim();
       if (name) names.add(name);
     }

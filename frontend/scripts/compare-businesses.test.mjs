@@ -10,8 +10,9 @@ const site = {
   frs_url: null,
 };
 const SEP = "\u001f";
-const donor = (donor_names, match_confidence, nSites) => ({
-  donor_names,
+// `names` is written SEP-joined for brevity; the export carries an array
+const donor = (names, match_confidence, nSites) => ({
+  donors: names.split(SEP),
   donated_amount: 100,
   n_contributions: 1,
   first_year: 2020,

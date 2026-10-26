@@ -3,6 +3,7 @@
 // a page draws); the real aggregation lives in dbt (rpt_*), with a fixture standing in when one is missing.
 import { createHash } from "node:crypto";
 import { DONOR_GROUP_SQL } from "../rollups";
+import { splitDonorNames } from "../donorLinks";
 import { exportedAt, hasExport, query } from "./db";
 import { buildCommitteeSessions, type PostCounts, type TitledMembership } from "../committeePosts";
 import { payYearsGate, type PayVoteRow } from "../attendancePay";
@@ -401,24 +402,35 @@ async function loadAll(): Promise<OfficialBundle[]> {
 
   // A U.S. House district holds up to ~10k EPA sites: ship only the ones tied to a donor (a few hundred at
   // most), grouped under their donor, plus the per-sector counts. A site's donor columns repeat the totals
-  // for its set of donors, so rows sharing donor_names carry the same amount, years and links.
+  // for its set of donors, so rows sharing donor_name_list carry the same amount, years and links.
   const hasBusinesses =
     hasExport("fct_jurisdiction_businesses") && hasExport("rpt_district_business_industries");
   const districtDonors = new Map<string, DistrictDonor[]>();
   if (hasBusinesses) {
-    type SiteRow = Omit<DistrictDonor, "sites"> & DistrictDonor["sites"][number] & { official_id: string };
+    type SiteRow = Omit<DistrictDonor, "donors" | "sites"> &
+      DistrictDonor["sites"][number] & { official_id: string; donor_name_list: string };
     const byDonor = new Map<string, DistrictDonor>();
     for (const r of await query<SiteRow>(`
-      select official_id, donor_names, cast(donated_amount as double) as donated_amount,
+      select official_id, donor_name_list, cast(donated_amount as double) as donated_amount,
              cast(n_contributions as integer) as n_contributions, first_year, last_year, match_confidence,
              donor_links, facility_name, city, naics_description, matched_by, frs_url
       from {fct_jurisdiction_businesses} where is_donor
-      order by official_id, donated_amount desc, donor_names, facility_name, city`)) {
-      const { official_id, facility_name, city, naics_description, matched_by, frs_url, ...donor } = r;
-      const key = `${official_id}|${donor.donor_names}`;
+      order by official_id, donated_amount desc, donor_name_list, facility_name, city`)) {
+      const {
+        official_id,
+        donor_name_list,
+        facility_name,
+        city,
+        naics_description,
+        matched_by,
+        frs_url,
+        ...donor
+      } = r;
+      // the raw list is a chr(31)-joined string: split it here and key on it, but never ship it
+      const key = `${official_id}|${donor_name_list}`;
       let group = byDonor.get(key);
       if (!group) {
-        group = { ...donor, sites: [] };
+        group = { ...donor, donors: splitDonorNames(donor_name_list), sites: [] };
         byDonor.set(key, group);
         districtDonors.set(official_id, [...(districtDonors.get(official_id) ?? []), group]);
       }

@@ -87,11 +87,7 @@ const recordContexts = siteLinkContexts(sites);
               <td>
                 {s.is_donor ? (
                   <>
-                    <DonorLinks
-                      donorNames={s.donor_names}
-                      donorLinks={s.donor_links}
-                      idPrefix={`site${si}`}
-                    />{" "}
+                    <DonorLinks donors={s.donors} donorLinks={s.donor_links} idPrefix={`site${si}`} />{" "}
                     <ConfidenceBadge confidence={s.match_confidence} />
                     <span class="muted small">
                       {" "}

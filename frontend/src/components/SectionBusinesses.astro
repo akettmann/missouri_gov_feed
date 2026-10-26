@@ -93,7 +93,7 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
                 {businesses.donors.map((d, ri) => (
                   <tr data-confidence={d.match_confidence === "medium" ? "medium" : undefined}>
                     <td>
-                      {donorNamesText(d.donor_names)} <ConfidenceBadge confidence={d.match_confidence} />
+                      {donorNamesText(d.donors)} <ConfidenceBadge confidence={d.match_confidence} />
                     </td>
                     <td class="num">
                       {money(d.donated_amount)}
@@ -125,10 +125,10 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
                     </td>
                     <td>
                       <DonorLinks
-                        donorNames={d.donor_names}
+                        donors={d.donors}
                         donorLinks={d.donor_links}
                         idPrefix={`biz${ri}`}
-                        hideName={donorEntries(d.donor_names, d.donor_links).length === 1}
+                        hideName={donorEntries(d.donors, d.donor_links).length === 1}
                       />
                     </td>
                   </tr>

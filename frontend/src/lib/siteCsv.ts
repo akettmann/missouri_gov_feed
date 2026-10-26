@@ -52,7 +52,7 @@ export function sitesCsv(rows: SiteRow[]): string {
       r.is_donor,
       r.match_confidence,
       r.matched_by,
-      donorNamesText(r.donor_names),
+      donorNamesText(r.donors),
       r.donor_links,
       r.frs_url,
     ]
