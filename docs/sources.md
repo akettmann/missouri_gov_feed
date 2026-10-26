@@ -63,6 +63,11 @@ the only per-member House vote record.
 - Shard units: session codes (XML) and session days (roll-call PDFs).
 
 Quirks:
+- The member roster can keep listing a member after they left. HD34's 2020 sessions (201, 203, 204) still list Rebecca Roeber
+  (member 1790, elected 2014); Open States ends her term 2019-07-30 and Rick Roeber (member 2215, elected November 2020,
+  expelled April 2021) is the next holder, so the seat was vacant for most of 2020 and those rows carry no votes.
+  The seat match lands on Rick, so `int_mo_house__member_seat_keys` keeps a member id on the person its other sessions
+  matched by given name. Raw keeps the roster as served. Issue #152.
 - `bills171/rollcalls/` still holds the 2016 session's roll-call PDFs (numbered by 2016 session day, header
   "98th General Assembly, Second Regular Session"). The probe walks past the last 2017 roll call of a day, so
   it lands them under session 171: 415 roll calls dated 2016 (45 session days, 1/13/2016 to 5/13/2016,

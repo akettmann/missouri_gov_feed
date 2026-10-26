@@ -689,3 +689,30 @@ unit_tests:
         - {session_code: '171', district_number: 40, house_member_id: '900', raw_person_key: 'mohouse:900'}
         - {session_code: '171', district_number: 41, house_member_id: '901', raw_person_key: 'mohouse:901'}
         - {session_code: '171', district_number: 42, house_member_id: '902', raw_person_key: ocd-person/lee}
+
+  - name: house_departed_member_keeps_own_person_when_roster_outlives_term
+    model: int_mo_house__member_seat_keys
+    description: >
+      The House roster still lists a member after her Open States term ended and a successor with the same surname took
+      the seat (Rebecca Roeber, HD34, listed in 2020; Rick Roeber was elected in November 2020, #152). The seat match
+      lands on the successor, whose given name differs, so the member id keeps the person its other sessions matched by
+      given name. A member with no such session (Ann Lee) stays on the seat match, and a member whose seat match
+      already carries the given name (Rick) is untouched.
+    given:
+      - input: ref('stg_mo_house__members')
+        rows:
+          - {session_code: '191', session_year: 2019, district_number: 34, house_member_id: '1790', first_name: Rebecca, last_name: Roeber}
+          - {session_code: '201', session_year: 2020, district_number: 34, house_member_id: '1790', first_name: Rebecca, last_name: Roeber}
+          - {session_code: '211', session_year: 2021, district_number: 34, house_member_id: '2215', first_name: Rick, last_name: Roeber}
+          - {session_code: '201', session_year: 2020, district_number: 42, house_member_id: '902', first_name: Ann, last_name: Lee}
+      - input: ref('int_mo_legislators__seat_terms')
+        rows:
+          - {openstates_id: ocd-person/rebecca, chamber: lower, district_number: 34, surname_key: roeber, full_name_key: rebecca roeber, start_date: '2015-01-01', end_date: '2019-07-30'}
+          - {openstates_id: ocd-person/rick, chamber: lower, district_number: 34, surname_key: roeber, full_name_key: rick roeber, start_date: '2019-08-01', end_date: '2021-04-21'}
+          - {openstates_id: ocd-person/lee, chamber: lower, district_number: 42, surname_key: lee, full_name_key: bo lee, start_date: '2015-01-01', end_date: '2020-12-31'}
+    expect:
+      rows:
+        - {session_code: '191', district_number: 34, house_member_id: '1790', raw_person_key: ocd-person/rebecca}
+        - {session_code: '201', district_number: 34, house_member_id: '1790', raw_person_key: ocd-person/rebecca}
+        - {session_code: '211', district_number: 34, house_member_id: '2215', raw_person_key: ocd-person/rick}
+        - {session_code: '201', district_number: 42, house_member_id: '902', raw_person_key: ocd-person/lee}
