@@ -61,3 +61,19 @@ def test_rollcall_pdf_tokens_match_printed_totals():
     assert counts["@"] == int(header["totals"]["Absent"]) == 8
     names = {name for _, name in votes}
     assert {"BROWN 149", "FOUNTAIN HENDERS", "MR SPEAKER", "WALSH MOORE", "SMITH 46"} <= names
+
+
+def test_open_session_also_lands_its_session_list(monkeypatch):
+    """The open regular session has no zip, so its SessionList (the House's session names) is fetched directly;
+    without it the newest session would have no name in dim_house_session."""
+    from mogov.loaders import mo_house
+
+    asked = []
+
+    def fake_fetch(url, **_):
+        asked.append(url.rsplit("/", 1)[-1])
+        return b"<SessionList></SessionList>" if "List" in url else b"<html>no zip</html>"
+
+    monkeypatch.setattr(mo_house, "fetch", fake_fetch)
+    files = mo_house._session_files("261", 9999)  # a year that is never past
+    assert "261-SESSIONLIST.XML" in files

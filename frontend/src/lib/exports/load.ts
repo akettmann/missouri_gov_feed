@@ -260,6 +260,27 @@ async function loadAll(): Promise<OfficialBundle[]> {
     peerRows.map(({ party: _party, ...r }) => ({ ...r, peers: peerValues.get(r.peer_group) ?? [] })),
   );
 
+  // The House's own session names (dim_house_session); a missing export or session leaves the label honest ("session code NNN")
+  if (!hasExport("dim_house_session")) {
+    console.warn(
+      "dim_house_session is missing from the exports, so House sessions are labelled by session code instead of the House's session name. Re-export: `uv run mogov build`, then `uv run mogov export --format parquet`.",
+    );
+  }
+  const houseSessionNames = new Map<string, string>(
+    hasExport("dim_house_session")
+      ? (
+          await query<{ session_code: string; session_name: string }>(
+            `select session_code, session_name from {dim_house_session}`,
+          )
+        ).map((r) => [r.session_code, r.session_name])
+      : [],
+  );
+  const withSessionName = <T extends { chamber: string; session_code: string }>(rows: T[]) =>
+    rows.map((r) => ({
+      ...r,
+      session_name: r.chamber === "state_house" ? (houseSessionNames.get(r.session_code) ?? null) : null,
+    }));
+
   const breaks = hasExport("rpt_party_breaks")
     ? groupBy(
         await query<PartyBreak & { official_id: string }>(`
@@ -429,6 +450,14 @@ async function loadAll(): Promise<OfficialBundle[]> {
             from {fct_committee_memberships} where position_name <> 'Member'`),
           process.env,
           console.warn,
+          houseSessionNames,
+          new Set(
+            (
+              await query<{ session_code: string }>(
+                `select distinct session_code from {fct_committee_memberships} where source = 'committee_list'`,
+              )
+            ).map((r) => r.session_code),
+          ),
         )
       : null;
 
@@ -528,8 +557,8 @@ async function loadAll(): Promise<OfficialBundle[]> {
         peers: (peers.get(id) ?? []) as PeerStrip[],
         voting: {
           status: status("votes"),
-          party_breaks: breaks ? ((breaks.get(id) ?? []) as PartyBreak[]) : null,
-          attendance: attendance ? ((attendance.get(id) ?? []) as AttendanceRow[]) : null,
+          party_breaks: breaks ? (withSessionName(breaks.get(id) ?? []) as PartyBreak[]) : null,
+          attendance: attendance ? (withSessionName(attendance.get(id) ?? []) as AttendanceRow[]) : null,
           attendance_pay: attendancePay ? ((attendancePay.get(id) ?? []) as PayVoteRow[]) : null,
           by_subject: subjects ? ((subjects.get(id) ?? []) as SubjectVotes[]) : null,
         },
@@ -659,6 +688,7 @@ export function freshness(): { table: string; exported_at: string | null; sample
     "fct_committee_memberships",
     "rpt_attendance",
     "rpt_attendance_pay",
+    "dim_house_session",
     "rpt_votes_by_subject",
     "rpt_interest_vote_overlap",
     "fct_jurisdiction_businesses",

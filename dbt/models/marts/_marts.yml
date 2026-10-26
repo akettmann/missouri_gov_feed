@@ -2028,6 +2028,45 @@ models:
               arguments:
                 values: ['member_page', 'committee_list']
 
+  - name: dim_house_session
+    description: >
+      The House's own names for its legislative sessions ("2025 1st Extraordinary Session", "2018 Special
+      Session"), from the SESSIONLIST file in every House session zip. The code's last digit does not say which
+      extraordinary session it is, so the frontend labels sessions from this table. A session the House has not
+      listed yet (the open one before its first list is loaded) is absent: show the code, never guess a name.
+      Grain: one row per session.
+    columns:
+      - name: session_code
+        data_type: varchar
+        description: House session code (two-digit year plus a type digit), the key the other House models carry.
+        data_tests: [unique, not_null]
+      - name: session_name
+        data_type: varchar
+        description: The House's name for the session.
+        data_tests: [not_null]
+      - name: session_year
+        data_type: integer
+        description: Calendar year of the session.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 2000
+                max_value: 2100
+      - name: session_type
+        data_type: varchar
+        description: The House's type code (R regular, S1, S2 later sessions of the year).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['R', 'S1', 'S2', 'S3']
+      - name: general_assembly
+        data_type: varchar
+        description: General Assembly the session belongs to ("103rd General Assembly").
+      - name: session_of_general_assembly
+        data_type: varchar
+        description: Which session of that assembly it is ("1st Regular Session", "1st Special Session").
+
   - name: fct_committee_posts
     description: >
       Committee posts held per official and House session, counted from the House's own committee lists: full

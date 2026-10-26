@@ -9,6 +9,24 @@
 export const REQUIRED_COLUMNS: Record<string, readonly string[]> = {
   rpt_attendance: ["recused_from_voting"],
   rpt_attendance_pay: ["pay_source_url", "covered_years", "voting_years"],
+  fct_committee_posts: [
+    "official_id",
+    "session_code",
+    "session_year",
+    "committees_held",
+    "chair_posts",
+    "vice_chair_posts",
+    "co_chair_posts",
+    "ranking_posts",
+  ],
+  fct_committee_memberships: [
+    "official_id",
+    "session_code",
+    "committee_name",
+    "position_name",
+    "is_subcommittee",
+    "source",
+  ],
   fct_jurisdiction_businesses: [
     "official_id",
     "district_id",
