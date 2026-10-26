@@ -18,6 +18,8 @@ export const REQUIRED_COLUMNS: Record<string, readonly string[]> = {
     "vice_chair_posts",
     "co_chair_posts",
     "ranking_posts",
+    "is_current_official",
+    "source_url",
   ],
   fct_committee_memberships: [
     "official_id",
@@ -26,6 +28,8 @@ export const REQUIRED_COLUMNS: Record<string, readonly string[]> = {
     "position_name",
     "is_subcommittee",
     "source",
+    "source_url",
+    "is_current_official",
   ],
   fct_jurisdiction_businesses: [
     "official_id",

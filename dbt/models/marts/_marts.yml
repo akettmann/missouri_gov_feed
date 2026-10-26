@@ -805,8 +805,8 @@ models:
           - dbt_utils.expression_is_true:
               arguments:
                 expression: "is not null"
-                config:
-                  where: "indicator = 'party_unity_pct'"
+              config:
+                where: "indicator = 'party_unity_pct'"
       - name: last_vote_year
         data_type: integer
         description: >
@@ -816,8 +816,25 @@ models:
           - dbt_utils.expression_is_true:
               arguments:
                 expression: ">= first_vote_year"
-                config:
-                  where: "indicator = 'party_unity_pct'"
+              config:
+                where: "indicator = 'party_unity_pct'"
+      - name: chamber_data_start_year
+        data_type: integer
+        description: >
+          Party unity only (null otherwise): the first calendar year with a dated party-line vote for `chamber` in our
+          loaded data, from any official. When `first_vote_year` equals it, the official's range starts where our
+          records begin, not necessarily where their service did.
+        data_tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "<= first_vote_year"
+              config:
+                where: "indicator = 'party_unity_pct'"
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "is not null"
+              config:
+                where: "indicator = 'party_unity_pct'"
 
   - name: fct_commercial_ties
     description: >
@@ -1550,8 +1567,9 @@ models:
   - name: fct_bill_sponsors
     description: >
       Sponsors, co-sponsors, handlers and House/Senate conferees of each House bill, as the House lists them,
-      matched to officials where the district and surname agree. Grain: one row per (session, bill, sponsor
-      type, sponsor name).
+      matched to officials where the district and surname agree. Re-listed appropriation bills (fct_bills status
+      "relisted for governor message") are excluded: they repeat the original's sponsors only to record the
+      governor's message. Grain: one row per (session, bill, sponsor type, sponsor name).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -1584,7 +1602,9 @@ models:
       Which bill a state vote was on. House roll calls are linked exactly where the bill XML names the roll-call
       PDF (the vote_id); the rest (votes on Senate bills, some on House bills) through every bill number in the
       measure printed on the PDF ("HCS HB 2", "SS SCS SBs 49 & 118" -> SB 49 and SB 118) in the same session. Senate journal votes
-      through the measure in the journal text ("HB 2", "SB 974") and the year's regular session. Grain: one row
+      through the measure in the journal text ("HB 2", "SB 974") and the year's regular session. Re-listed
+      appropriation bills (fct_bills status "relisted for governor message") are never linked: they have no floor
+      action, so a vote naming one links to nothing rather than to the stub. Grain: one row
       per (chamber, vote, bill, bill version).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
@@ -1840,7 +1860,7 @@ models:
       - name: naics_code
         data_type: varchar
         description: >
-          The NAICS code most of the facility's programs give, primary codes before UNKNOWN or SECONDARY ones
+          The NAICS code the most EPA program systems give (one count per system), primary codes before UNKNOWN or SECONDARY ones
           (int_epa_frs__facilities naics_source). A facility with no NAICS code but a SIC code instead gets the
           two-digit NAICS sector prefix its SIC code maps to (seed sic_naics_sectors), so a two-character
           value is a sector, not a full code. Null when the facility has neither.
@@ -1920,7 +1940,7 @@ models:
       - name: naics_code
         data_type: varchar
         description: >
-          NAICS code most of the facility's programs give (primary before UNKNOWN or SECONDARY), or, for a
+          NAICS code the most EPA program systems give (primary before UNKNOWN or SECONDARY), or, for a
           facility with only a SIC code, the two-digit NAICS sector prefix its SIC major group maps to. Null when
           the facility has neither. See int_epa_frs__facilities.
       - name: naics_description
@@ -2249,9 +2269,10 @@ models:
     description: >
       House committee and subcommittee memberships per official and session, with the member's position (Chair,
       Vice-Chair, Co-Chair, Ranking Minority Member, Member). An end-of-session snapshot from the House member
-      pages (every session since 2017 but 253) and the COMMITTEELIST export for 253. Former members who are not
-      in dim_official are left out. Committee names change across sessions, so compare a committee by name only
-      within a session. Grain: one row per (official, session, committee).
+      pages (every session since 2017 but 253) and the COMMITTEELIST export for 253. Former members are kept:
+      official_id is the person id, and is_current_official says whether that person is in dim_official (only
+      current officials have a profile page). Committee names change across sessions, so compare a committee by
+      name only within a session. Grain: one row per (person, session, committee).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -2293,6 +2314,21 @@ models:
           - accepted_values:
               arguments:
                 values: ['member_page', 'committee_list']
+      - name: source_url
+        data_type: varchar
+        description: >
+          The House file this row was read from, as the loader fetched it: the session zip for a closed session,
+          the member's own XML file (documents.house.mo.gov/xml/261-072.xml) for the open one, the COMMITTEELIST
+          file's zip for session 253.
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "like 'https://documents.house.mo.gov/xml/%'"
+      - name: is_current_official
+        data_type: boolean
+        description: True when official_id is in dim_official (a current official with a profile page).
+        data_tests: [not_null]
 
   - name: dim_house_session
     description: >
@@ -2338,7 +2374,8 @@ models:
       Committee posts held per official and House session, counted from the House's own committee lists: full
       committees served on, and the titles held on them (chair, vice-chair, co-chair, ranking minority member).
       Subcommittees are counted apart (subcommittee_chair_posts) so chairing several subcommittees is not shown as
-      chairing several committees. A count of titles, not a score. Grain: one row per (official, session).
+      chairing several committees. A count of titles, not a score. Former members are kept (is_current_official).
+      Grain: one row per (person, session).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -2357,6 +2394,16 @@ models:
       - name: session_year
         data_type: integer
         description: Calendar year of the session.
+      - name: is_current_official
+        data_type: boolean
+        description: True when official_id is in dim_official (a current official with a profile page).
+        data_tests: [not_null]
+      - name: source_url
+        data_type: varchar
+        description: >
+          The House file the member's rows were read from (the session zip, or the member's own XML file for the
+          open session). If a person held two House member files in one session, one of them.
+        data_tests: [not_null]
       - name: committees_held
         data_type: bigint
         description: Full (non-sub) committees the member served on.

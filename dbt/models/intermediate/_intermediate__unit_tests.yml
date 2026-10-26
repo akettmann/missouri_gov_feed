@@ -322,11 +322,11 @@ unit_tests:
   - name: epa_frs_facility_naics_tie_prefers_sic_sector
     model: int_epa_frs__facilities
     description: >
-      Codes tied on tier and program count go to the one whose two-digit sector agrees with the sector of the
+      Codes tied on tier and program-system count go to the one whose two-digit sector agrees with the sector of the
       facility's SIC code, then to the lowest code (#181). t1: primary codes 111998 and 424510 tie, SIC 5191
       maps to wholesale (42), so 424510 beats the lower 111998; t2: UNKNOWN-type tie, same rule; t3: neither
       tied code agrees with the SIC sector, so the lowest wins; t4: no SIC code, lowest wins; t5: the SIC
-      sector never beats a code that more programs give (111998 has two programs) or a better tier.
+      sector never beats a code that more program systems give (111998 has two systems, RCRAINFO and NPDES) or a better tier.
     given:
       - input: ref('stg_epa_frs__facilities')
         rows:
@@ -347,8 +347,8 @@ unit_tests:
           - {registry_id: t3, naics_code: '424510', naics_description: Grain wholesale, is_primary: true, is_secondary: false}
           - {registry_id: t4, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
           - {registry_id: t4, naics_code: '424510', naics_description: Grain wholesale, is_primary: true, is_secondary: false}
-          - {registry_id: t5, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
-          - {registry_id: t5, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: t5, program_system: RCRAINFO, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: t5, program_system: NPDES, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
           - {registry_id: t5, naics_code: '424510', naics_description: Grain wholesale, is_primary: true, is_secondary: false}
       - input: ref('stg_epa_frs__sic')
         rows:
@@ -372,6 +372,61 @@ unit_tests:
         - {registry_id: t3, naics_code: '111998', naics_source: naics}
         - {registry_id: t4, naics_code: '111998', naics_source: naics}
         - {registry_id: t5, naics_code: '111998', naics_source: naics}
+
+  - name: epa_frs_facility_industry_counts_program_systems_not_rows
+    model: int_epa_frs__facilities
+    description: >
+      A code's weight is the number of distinct program systems that give it, not the number of records (#274).
+      d1: 111998 is given by three NPDES records (one system), 424510 by RCRAINFO and AIR (two systems), so
+      424510 wins; counting rows would pick 111998. d2: the same for SIC codes with no NAICS code at all, SIC
+      5015 (two systems, sector 42) beats SIC 4953 (three NPDES records, sector 56); d3: records with no program
+      system count as one system, so 111998 (one record) ties 424510 (two records, both without a system) and the
+      lowest code wins; d4: tier comes before count, so the primary code (one system) beats an UNKNOWN one that
+      two systems give.
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: d1, facility_name: Duplicate NPDES rows, latitude: 38.5, longitude: -92.1}
+          - {registry_id: d2, facility_name: Duplicate SIC rows, latitude: 38.5, longitude: -92.1}
+          - {registry_id: d3, facility_name: No program system, latitude: 38.5, longitude: -92.1}
+          - {registry_id: d4, facility_name: Tier beats count, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows: []
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: d1, program_system: NPDES, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: d1, program_system: NPDES, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: d1, program_system: NPDES, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: d1, program_system: RCRAINFO, naics_code: '424510', naics_description: Grain wholesale, is_primary: true, is_secondary: false}
+          - {registry_id: d1, program_system: AIR, naics_code: '424510', naics_description: Grain wholesale, is_primary: true, is_secondary: false}
+          - {registry_id: d3, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: d3, naics_code: '424510', naics_description: Grain wholesale, is_primary: true, is_secondary: false}
+          - {registry_id: d3, naics_code: '424510', naics_description: Grain wholesale, is_primary: true, is_secondary: false}
+          - {registry_id: d4, program_system: NPDES, naics_code: '111998', naics_description: Crop farming, is_primary: true, is_secondary: false}
+          - {registry_id: d4, program_system: RCRAINFO, naics_code: '424510', naics_description: Grain wholesale, is_primary: false, is_secondary: false}
+          - {registry_id: d4, program_system: AIR, naics_code: '424510', naics_description: Grain wholesale, is_primary: false, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows:
+          - {registry_id: d2, program_system: NPDES, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: d2, program_system: NPDES, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: d2, program_system: NPDES, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: d2, program_system: RCRAINFO, sic_code: '5015', sic_description: MOTOR VEHICLE PARTS USED, is_primary: true, is_secondary: false}
+          - {registry_id: d2, program_system: AIR, sic_code: '5015', sic_description: MOTOR VEHICLE PARTS USED, is_primary: true, is_secondary: false}
+      - input: ref('sic_naics_sectors')
+        rows:
+          - {sic_prefix: '4953', naics_prefix: '56'}
+          - {sic_prefix: '5015', naics_prefix: '42'}
+      - input: ref('naics_sectors')
+        rows:
+          - {naics_prefix: '11', sector_code: '11', sector_name: Agriculture}
+          - {naics_prefix: '42', sector_code: '42', sector_name: Wholesale Trade}
+          - {naics_prefix: '56', sector_code: '56', sector_name: Administrative and Waste Services}
+    expect:
+      rows:
+        - {registry_id: d1, naics_code: '424510', naics_source: naics}
+        - {registry_id: d2, naics_code: '42', naics_source: sic}
+        - {registry_id: d3, naics_code: '111998', naics_source: naics}
+        - {registry_id: d4, naics_code: '111998', naics_source: naics}
 
   - name: epa_frs_facility_naics_tie_sic_sector_merges_31_33
     model: int_epa_frs__facilities
@@ -416,13 +471,13 @@ unit_tests:
   - name: epa_frs_facility_naics_tie_ignores_sic_tied_across_sectors
     model: int_epa_frs__facilities
     description: >
-      When the facility's chosen SIC code is itself tied (same tier and program count) with a SIC code in another
+      When the facility's chosen SIC code is itself tied (same tier and program-system count) with a SIC code in another
       sector, the lowest-code tie-break chose it and its sector is no signal. s1: SIC 4953 (sector 56) ties
       SIC 5015 (42), so the tied NAICS codes 111998 and 561990 go to the lowest, 111998, not the 56 code;
       s2: SIC 4953 alone (no tie) still pulls 561990;
-      s3: SIC 4953 on two program records beats SIC 5015 (42) on one, so it is not tied (same tier, more programs)
-      and still pulls 561990; s4: SIC 4953 primary beats SIC 5015 (42) secondary, same program count (better tier),
-      so it still pulls 561990. s3 and s4 pin the partition to registry, tier and program count.
+      s3: SIC 4953 from two program systems beats SIC 5015 (42) on one, so it is not tied (same tier, more programs)
+      and still pulls 561990; s4: SIC 4953 primary beats SIC 5015 (42) secondary, same program-system count (better tier),
+      so it still pulls 561990. s3 and s4 pin the partition to registry, tier and program-system count.
     given:
       - input: ref('stg_epa_frs__facilities')
         rows:
@@ -447,8 +502,8 @@ unit_tests:
           - {registry_id: s1, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
           - {registry_id: s1, sic_code: '5015', sic_description: MOTOR VEHICLE PARTS USED, is_primary: true, is_secondary: false}
           - {registry_id: s2, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
-          - {registry_id: s3, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
-          - {registry_id: s3, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: s3, program_system: RCRAINFO, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: s3, program_system: NPDES, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
           - {registry_id: s3, sic_code: '5015', sic_description: MOTOR VEHICLE PARTS USED, is_primary: true, is_secondary: false}
           - {registry_id: s4, sic_code: '4953', sic_description: REFUSE SYSTEMS, is_primary: true, is_secondary: false}
           - {registry_id: s4, sic_code: '5015', sic_description: MOTOR VEHICLE PARTS USED, is_primary: false, is_secondary: true}

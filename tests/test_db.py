@@ -102,3 +102,29 @@ def test_optional_json_tables_map_to_registered_loaders():
 
     load_all_modules()
     assert set(db.OPTIONAL_JSON_TABLES.values()) <= set(REGISTRY)
+
+
+@pytest.mark.parametrize("sink_type", ["json", "table"])
+def test_sink_removes_scratch_files_left_by_killed_runs(raw_dir, sink_type):
+    import dataclasses
+
+    @dataclasses.dataclass
+    class Row:
+        TABLE = "t"
+        x: str
+
+    folder = db.table_dir("t")
+    part = db.Shard(0, 2).part_name
+    mine = [folder / f".{part}.111.jsonl", folder / f".{part}.222.part"]
+    other_shard = folder / f".{db.Shard(1, 2).part_name}.333.jsonl"  # another shard's live run: untouched
+    published = folder / part
+    for path in (*mine, other_shard):
+        path.write_text("killed\n")
+    shard = db.Shard(0, 2)
+    if sink_type == "json":
+        with db.JsonSink(shard, tables=["t"]) as sink:
+            sink.add("t", "k", {})
+    else:
+        with db.TableSink(shard, tables=[Row]) as sink:
+            sink.add(Row("v"))
+    assert sorted(p.name for p in folder.iterdir()) == sorted([published.name, other_shard.name])
