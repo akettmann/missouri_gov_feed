@@ -15,6 +15,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 GENERAL_2024 = FIXTURES / "mo_sos_general_2024_excerpt.pdf"
 PRIMARY_2024 = FIXTURES / "mo_sos_primary_2024_excerpt.pdf"
 GENERAL_2014 = FIXTURES / "mo_sos_general_2014_excerpt.pdf"
+PRIMARY_2014_BALLOT = FIXTURES / "mo_sos_primary_2014_ballot_excerpt.pdf"  # page 51 of 2014PrimaryElection.pdf
 
 
 @pytest.fixture(autouse=True)
@@ -104,6 +105,33 @@ def test_a_percentage_that_lost_its_sign_still_parses_but_a_missing_vote_count_d
     assert row["kind"] == "candidate" and row["cells"]["votes"] == "252,827"
     row = parse_pdf([[[("No", 55.0), ("Votes", 70.0), ("40.9%", 462.0)]]])[0]
     assert row["kind"] == "other"
+
+
+def test_older_ballot_measure_lines_land_raw_with_their_text_for_dbt_to_recognise():
+    # 2014-2020 layout (#331): the loader keeps raw raw and does not split these into cells; staging reads the text
+    lines = [
+        [
+            *[("Constitutional", 20.0), ("Amendment", 90.0), ("1", 150.0), ("Ballot", 170.0), ("Issue", 200.0)],
+            *[("Yes:", 300.0), ("499,581", 330.0), ("Yes:", 400.0), ("50.1%", 430.0)],
+        ],
+        [("No:", 300.0), ("497,091", 330.0), ("No:", 400.0), ("49.9%", 430.0)],
+    ]
+    rows = parse_pdf([lines])
+    assert [r["kind"] for r in rows] == ["other", "other"]
+    assert rows[0]["text"] == "Constitutional Amendment 1 Ballot Issue Yes: 499,581 Yes: 50.1%"
+    assert rows[1]["text"] == "No: 497,091 No: 49.9%"
+    assert all("cells" not in r for r in rows)
+
+
+def test_older_ballot_measure_page_joins_into_the_text_staging_recognises():
+    # a real page of the 2014 primary PDF (Amendments 8 and 9): each line's words must join into exactly the text
+    # stg_mo_sos_elections__lines pattern-matches ("... Ballot Issue Yes: n Yes: p%", "No: n No: p%")
+    texts = [r["text"] for r in _rows(PRIMARY_2014_BALLOT) if r["kind"] == "other"]
+    assert "Constitutional Amendment 8 Ballot Issue Yes: 441,520 Yes: 45.0%" in texts
+    assert "No: 539,519 No: 55.0%" in texts
+    assert "Constitutional Amendment 9 Ballot Issue Yes: 729,750 Yes: 74.7%" in texts
+    assert "No: 246,515 No: 25.3%" in texts
+    assert not any("cells" in r for r in _rows(PRIMARY_2014_BALLOT) if r["text"].startswith(("No:", "Constitutional")))
 
 
 def test_load_lands_one_raw_row_per_line_with_provenance(tmp_path, monkeypatch):

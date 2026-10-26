@@ -104,3 +104,31 @@ unit_tests:
         1,1,10,1
         1,2,10,2
         2,0,1200,2
+
+  - name: sos_lines_recognise_the_older_ballot_measure_layout
+    model: stg_mo_sos_elections__lines
+    description: >
+      The 2014-2020 PDFs print a measure as "<title> Ballot Issue Yes: n Yes: p%" and "No: n No: p%". The loader lands
+      them unsplit (kind other, no cells); they become candidate lines with the measure title as name, "Yes Votes" or
+      "No Votes" as party and numbers parsed, so they match the 2012 and 2022+ layout. Other "other" lines (page
+      furniture, a line that merely contains "No:") stay other with null cells (#331).
+    given:
+      - input: source('mo_sos_elections', 'rows')
+        format: sql
+        rows: |
+            select '2014-08-05-primary#050.0014' as record_key, cast('{"election_key": "2014-08-05-primary", "election_type": "primary", "election_date": "2014-08-05", "pdf_url": "https://example.test/b.pdf", "page": 50, "line": 14, "contest_seq": 202, "kind": "header", "text": "Constitutional Amendment 1 (3898 of 3898 Precincts Reported)"}' as varchar) as payload union all
+            select '2014-08-05-primary#050.0015' as record_key, cast('{"election_key": "2014-08-05-primary", "election_type": "primary", "election_date": "2014-08-05", "pdf_url": "https://example.test/b.pdf", "page": 50, "line": 15, "contest_seq": 202, "kind": "other", "text": "Constitutional Amendment 1 Ballot Issue Yes: 499,581 Yes: 50.1%"}' as varchar) as payload union all
+            select '2014-08-05-primary#050.0016' as record_key, cast('{"election_key": "2014-08-05-primary", "election_type": "primary", "election_date": "2014-08-05", "pdf_url": "https://example.test/b.pdf", "page": 50, "line": 16, "contest_seq": 202, "kind": "other", "text": "No: 497,091 No: 49.9%"}' as varchar) as payload union all
+            select '2014-08-05-primary#050.0017' as record_key, cast('{"election_key": "2014-08-05-primary", "election_type": "primary", "election_date": "2014-08-05", "pdf_url": "https://example.test/b.pdf", "page": 50, "line": 17, "contest_seq": 202, "kind": "total", "text": "Total Votes 997,551"}' as varchar) as payload union all
+            select '2014-08-05-primary#050.0018' as record_key, cast('{"election_key": "2014-08-05-primary", "election_type": "primary", "election_date": "2014-08-05", "pdf_url": "https://example.test/b.pdf", "page": 50, "line": 18, "contest_seq": 202, "kind": "other", "text": "Page 50 of 51 No: not a measure line"}' as varchar) as payload union all
+            select '2014-08-05-primary#050.0019' as record_key, cast('{"election_key": "2014-08-05-primary", "election_type": "primary", "election_date": "2014-08-05", "pdf_url": "https://example.test/b.pdf", "page": 50, "line": 19, "contest_seq": 202, "kind": "other", "text": "Constitutional Amendment 5 Ballot Issue Yes: 1,000 Yes: 100.0%"}' as varchar) as payload
+    expect:
+      format: csv
+      rows: |
+        line,kind,cell_name,cell_party,cell_votes,cell_pct
+        14,header,,,,
+        15,candidate,Constitutional Amendment 1,Yes Votes,499581,50.1
+        16,candidate,,No Votes,497091,49.9
+        17,total,,,,
+        18,other,,,,
+        19,candidate,Constitutional Amendment 5,Yes Votes,1000,100.0

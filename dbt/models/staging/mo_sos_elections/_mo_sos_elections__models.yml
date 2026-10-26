@@ -33,7 +33,9 @@ models:
 - name: stg_mo_sos_elections__lines
   description: 'Missouri Secretary of State official returns: one row per printed PDF line (as the loader split
     it), with the election, the contest sequence number within the PDF, and the cells of candidate rows. Numbers
-    are parsed here.'
+    are parsed here. The 2014-2020 PDFs print a ballot measure''s choices as "<measure> Ballot Issue Yes: 499,581
+    Yes: 50.1%" and "No: 497,091 No: 49.9%". The loader lands these unsplit (kind ''other''); they are recognised
+    here and given the same kind and cells ("Yes Votes" / "No Votes" in the party cell) as the 2012 and 2022+ measures.'
   data_tests:
   - dbt_utils.unique_combination_of_columns:
       arguments:
@@ -82,8 +84,8 @@ models:
     election, with votes, party, the printed percentage and a write-in flag. A retention judge has a "Yes Votes"
     and a "No Votes" row; a block of several judges under one header is split with subcontest_seq (it counts the
     Yes rows so far). contest_kind: candidate, retention (judge Yes/No), ballot_issue (Yes/No on a measure whose
-    name is the contest title). Rows in layouts the loader doesn''t split into cells (older "Ballot Issue Yes: n"
-    lines) are not here.'
+    name is the contest title), in every layout (the 2014-2020 "Ballot Issue Yes: n" lines are recognised in the
+    lines model).'
   data_tests:
   - dbt_utils.unique_combination_of_columns:
       arguments:
