@@ -1,0 +1,55 @@
+# Unit tests for bill status and outcome: fixed House XML actions -> exact status/outcome per bill.
+version: 2
+
+unit_tests:
+  - name: bill_status_and_outcome
+    model: int_bills__status
+    description: >
+      status is the furthest stage reached and outcome follows from it, with "today" pinned to 2026-10-25 (the
+      2026 regular session is over). A Senate bill in the House's list has passed the Senate. A truly agreed bill
+      with no governor action is awaiting the governor in its own year, and "no governor action recorded" later
+      (the House list can stop at the speaker's signature), never "failed". An extraordinary session with an action
+      in the last 30 days is still pending.
+    overrides:
+      vars:
+        as_of_date: '2026-10-25'
+    given:
+      - input: ref('stg_mo_house__bill_actions')
+        format: sql
+        rows: |
+            select '261' as session_code, 'HB1' as bill, 'house_bill_list' as listed_in, cast('2026-01-10' as date) as action_date, 'Referred: General Laws(H)' as description union all
+            select '261', 'HB2', 'house_bill_list', cast('2026-05-15' as date), 'Truly Agreed To and Finally Passed' union all
+            select '261', 'HB2', 'house_bill_list', cast('2026-07-09' as date), 'Approved by Governor (G)' union all
+            select '261', 'HB3', 'house_bill_list', cast('2026-05-15' as date), 'Truly Agreed To and Finally Passed' union all
+            select '261', 'HB3', 'house_bill_list', cast('2026-07-09' as date), 'Vetoed by Governor (G)' union all
+            select '261', 'HB4', 'house_bill_list', cast('2026-07-09' as date), 'Vetoed by Governor (G)' union all
+            select '261', 'HB4', 'house_bill_list', cast('2026-09-16' as date), 'Passed over Veto (G)' union all
+            select '261', 'HB5', 'house_bill_list', cast('2026-05-15' as date), 'Truly Agreed To and Finally Passed' union all
+            select '261', 'HB5', 'house_bill_list', cast('2026-06-30' as date), 'Vetoed in Part by Governor (G)' union all
+            select '261', 'HJR6', 'house_bill_list', cast('2026-05-15' as date), 'Truly Agreed To and Finally Passed' union all
+            select '261', 'HR7', 'house_bill_list', cast('2026-02-01' as date), 'Adopted (H)' union all
+            select '261', 'HB8', 'house_bill_list', cast('2026-03-01' as date), 'Perfected (H)' union all
+            select '261', 'HB8', 'house_bill_list', cast('2026-03-05' as date), 'Third Read and Passed (H)' union all
+            select '261', 'SB9', 'senate_act_list', cast('2026-04-01' as date), 'Reported to the House and First Read (H)' union all
+            select '261', 'SB9', 'senate_act_list', cast('2026-05-10' as date), 'Third Read and Passed (H)' union all
+            select '261', 'SB9', 'senate_act_list', cast('2026-05-14' as date), 'Truly Agreed To and Finally Passed' union all
+            select '241', 'SB727', 'senate_act_list', cast('2024-04-18' as date), 'Truly Agreed To and Finally Passed' union all
+            select '251', 'HB10', 'house_bill_list', cast('2025-05-14' as date), 'Truly Agreed To and Finally Passed' union all
+            select '251', 'HB10', 'house_bill_list', cast('2025-07-14' as date), 'Delivered to Secretary of State (G)' union all
+            select '263', 'HB1', 'house_bill_list', cast('2026-10-20' as date), 'Referred: Rules - Legislative(H)' union all
+            select '261', 'HB11', 'house_bill_list', cast('2026-02-01' as date), 'Withdrawn (H)'
+    expect:
+      rows:
+        - {session_code: '261', bill: HB1, status: in committee, outcome: failed}
+        - {session_code: '261', bill: HB2, status: signed, outcome: enacted}
+        - {session_code: '261', bill: HB3, status: vetoed, outcome: vetoed}
+        - {session_code: '261', bill: HB4, status: veto overridden, outcome: enacted}
+        - {session_code: '261', bill: HB5, status: signed with line-item vetoes, outcome: enacted}
+        - {session_code: '261', bill: HJR6, status: truly agreed, outcome: sent to voters}
+        - {session_code: '261', bill: HR7, status: adopted, outcome: adopted}
+        - {session_code: '261', bill: HB8, status: passed one chamber, outcome: failed}
+        - {session_code: '261', bill: SB9, status: truly agreed, outcome: awaiting governor}
+        - {session_code: '241', bill: SB727, status: truly agreed, outcome: no governor action recorded}
+        - {session_code: '251', bill: HB10, status: truly agreed, outcome: enacted}
+        - {session_code: '263', bill: HB1, status: in committee, outcome: pending}
+        - {session_code: '261', bill: HB11, status: withdrawn, outcome: failed}
