@@ -2,8 +2,9 @@
 # default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
 # The mo_house_xml_* tables are written by mogov.parsers.mo_house from the gzipped XML files that the
 # loader lands unchanged (listed in mo_house_xml_files). Other parsed tables (mo_house_xml_bill_amendments,
-# _bill_texts, _bill_hearings, _member_counties, _bill_list, _member_list, _upcoming_hearings,
-# _calendar_bills) are landed too but not read by any model yet.
+# _bill_texts, _bill_hearings, _bill_summaries, _bill_fiscal_notes, _bill_witnesses, _member_counties,
+# _bill_list, _member_list, _upcoming_hearings, _calendar_bills, _list_notices and the SenateActList's
+# mo_house_xml_senate_act_*) are landed too but not read by any model yet.
 version: 2
 sources:
 - name: mo_house

@@ -4,6 +4,7 @@ from datetime import date
 
 import duckdb
 import pytest
+import structlog.testing
 
 from mogov import db
 from mogov.loaders import mo_house as loader
@@ -65,7 +66,8 @@ def test_parser_does_not_resolve_entities_or_touch_the_network():
         ("251-HCB1.XML", ("bill", "HCB1")),
         ("251-SESSIONLIST.XML", ("list", "SESSIONLIST")),
         ("251-UpcomingHearingList.xml", ("list", "UPCOMINGHEARINGLIST")),
-        ("251-GRP1.XML", None),
+        ("251-GRP1.XML", ("other", "GRP1")),
+        ("191-HJR.XML", ("other", "HJR")),
     ],
 )
 def test_classify(name, expected):
@@ -196,7 +198,9 @@ def test_list_documents_emit_one_row_per_item():
     ]
 
 
-def test_unparsed_kinds_emit_nothing():
+def test_other_kinds_are_not_parsed():
+    grp = b"<ROOT><BillInformation><BillNumber>GRP1</BillNumber><Title><ShortTitle>X</ShortTitle></Title></BillInformation></ROOT>"
+    assert not any(_rows("191-GRP1.XML", grp, "191").values())
     assert not any(_rows("251-SENATEACTLIST.XML", b"<ROOT><SenateBillsWithHouseActions/></ROOT>").values())
 
 
@@ -254,3 +258,190 @@ def test_typed_columns_survive_the_round_trip(raw_dir):
     assert cols["action_index"] == "BIGINT"
     assert cols["rollcall_total_yes"] == "BIGINT"
     assert cols["description"] == "VARCHAR"
+
+
+# ---- values that are not what the column type says ---------------------------------------------------------------
+
+
+def test_amendment_sort_value_is_text_not_dropped():
+    xml = b"<R><BillInformation><Amendment><AmendmentDescription>HA 1</AmendmentDescription><AmendmentSortValue>0507HH</AmendmentSortValue></Amendment></BillInformation></R>"
+    (am,) = _rows("251-HB1.XML", xml)[p.BillAmendment]
+    assert am.sort_value == "0507HH"
+
+
+def test_unconvertible_values_are_logged_not_silently_dropped():
+    xml = b"<R><BillInformation><Action><Description>x</Description><ActivitySequence>12a</ActivitySequence><PubDate>not a date</PubDate></Action></BillInformation></R>"
+    with structlog.testing.capture_logs() as logs:
+        (a,) = _rows("251-HB1.XML", xml)[p.BillAction]
+    assert (a.activity_sequence, a.pub_date) == (None, None)
+    warned = {(e["event"], e["field"], e["value"]) for e in logs if e["log_level"] == "warning"}
+    assert warned == {
+        ("mo_house.value_not_integer", "ActivitySequence", "12a"),
+        ("mo_house.value_not_date", "PubDate", "not a date"),
+    }
+
+
+def test_missing_or_blank_numbers_and_dates_do_not_warn():
+    xml = b"<R><BillInformation><Action><Description>x</Description><ActivitySequence> </ActivitySequence></Action></BillInformation></R>"
+    with structlog.testing.capture_logs() as logs:
+        _rows("251-HB1.XML", xml)
+    assert logs == []
+
+
+def test_empty_elements_are_null_not_empty_strings():
+    bill = b"<R><BillInformation><BillNumber>HB1</BillNumber><Title><ShortTitle></ShortTitle><LongTitle> </LongTitle></Title></BillInformation></R>"
+    (b,) = _rows("251-HB1.XML", bill)[p.Bill]
+    assert (b.bill_number, b.short_title, b.long_title) == ("HB1", None, None)
+    member = b"<R><RepresentativeData><RepresentativeInfo><DistrictNum>001</DistrictNum><LastName>Farnan</LastName><Biography/></RepresentativeInfo></RepresentativeData></R>"
+    (m,) = _rows("251-001.XML", member)[p.Member]
+    assert (m.last_name, m.biography) == ("Farnan", None)
+
+
+def test_a_repaired_document_is_reported_with_its_file_name():
+    with structlog.testing.capture_logs() as logs:
+        root = p.parse_xml(b"<R><a>x</R>", "251-HB1.XML")
+    assert root is not None
+    (event,) = [e for e in logs if e["event"] == "mo_house.xml_recovered"]
+    assert event["file"] == "251-HB1.XML"
+    assert event["errors"] >= 1
+    with structlog.testing.capture_logs() as logs:
+        p.parse_xml(b"<R><a>x</a></R>", "251-HB1.XML")
+    assert logs == []
+
+
+# ---- fields that used to be skipped -------------------------------------------------------------------------------
+
+FULL_BILL = b"""<ROOT><BillInformation><BillNumber>HB5</BillNumber>
+<SubstitutedBy><ParentBillString>HB 1</ParentBillString><ParentBillLink>http://x/hb1</ParentBillLink></SubstitutedBy>
+<SummarySheet><SummarySheetLink>http://x/sheet.pdf</SummarySheetLink></SummarySheet>
+<PastSessionAppropriationBill>HB 2002</PastSessionAppropriationBill>
+<BillSummary><DocumentName>Introduced</DocumentName><SummaryTextLink>http://x/s1.pdf</SummaryTextLink><VersionTypeCode>I</VersionTypeCode><LRNumber>0001H.01I</LRNumber><BillVersionSort>1</BillVersionSort></BillSummary>
+<BillSummary><DocumentName>Perfected</DocumentName><SummaryTextLink>http://x/s2.pdf</SummaryTextLink></BillSummary>
+<FiscalNote><FiscalNoteLink>http://x/fn1.pdf</FiscalNoteLink></FiscalNote>
+<FiscalNotes><FiscalNoteLink>http://x/fn2.pdf</FiscalNoteLink><FiscalNoteLink>http://x/fn3.pdf</FiscalNoteLink></FiscalNotes>
+<Witness><WitnessFormsLink>http://x/w1</WitnessFormsLink><WitnessFormLinkDescription>Forms for HB 5</WitnessFormLinkDescription></Witness>
+<Witness><WitnessFormsLink>http://x/w2</WitnessFormsLink></Witness>
+<BillText><DocumentName>Introduced</DocumentName><SummaryTextLink>http://x/ts.pdf</SummaryTextLink><Map><MapLink>http://x/map.pdf</MapLink></Map></BillText>
+<Amendment><AmendmentDescription>HA 1</AmendmentDescription><Map><MapLink>http://x/amap.pdf</MapLink></Map></Amendment>
+</BillInformation></ROOT>"""
+
+
+def test_bill_summaries_fiscal_notes_witness_links_and_maps_become_rows():
+    out = _rows("251-HB5.XML", FULL_BILL)
+    (b,) = out[p.Bill]
+    assert (b.substituted_by, b.substituted_by_link) == ("HB 1", "http://x/hb1")
+    assert (b.summary_sheet_link, b.past_session_appropriation_bill) == ("http://x/sheet.pdf", "HB 2002")
+    assert [
+        (s.summary_index, s.document_name, s.summary_text_link, s.version_type_code, s.lr_number, s.version_sort)
+        for s in out[p.BillSummary]
+    ] == [
+        (1, "Introduced", "http://x/s1.pdf", "I", "0001H.01I", 1),
+        (2, "Perfected", "http://x/s2.pdf", None, None, None),
+    ]
+    assert [(f.fiscal_note_index, f.element, f.fiscal_note_link) for f in out[p.BillFiscalNote]] == [
+        (1, "FiscalNote", "http://x/fn1.pdf"),
+        (2, "FiscalNotes", "http://x/fn2.pdf"),
+        (3, "FiscalNotes", "http://x/fn3.pdf"),
+    ]
+    assert [(w.witness_forms_link, w.witness_form_link_description) for w in out[p.BillWitness]] == [
+        ("http://x/w1", "Forms for HB 5"),
+        ("http://x/w2", None),
+    ]
+    (t,) = out[p.BillText]
+    assert (t.summary_text_link, t.map_link) == ("http://x/ts.pdf", "http://x/map.pdf")
+    assert out[p.BillAmendment][0].map_link == "http://x/amap.pdf"
+
+
+def test_calendar_handler_upcoming_hearing_chair_and_list_notice():
+    cal = b"""<ROOT><NOTICE>Subject to change</NOTICE><DailyCalendar><SessionDay><DateString>Mon</DateString></SessionDay><Calendar><CalendarName>Perfection</CalendarName>
+    <BillInfo><BillType>HB</BillType><BillNumber>4</BillNumber><SponsorLastName>Smith</SponsorLastName><SponsorDistrict>001</SponsorDistrict>
+    <HandlerFirstName>Ann</HandlerFirstName><HandlerLastName>Lee</HandlerLastName><HandlerDistrict>009</HandlerDistrict><HandlerChamber>H</HandlerChamber></BillInfo>
+    <BillInfo><BillType>HB</BillType><BillNumber>5</BillNumber></BillInfo></Calendar></DailyCalendar></ROOT>"""
+    out = _rows("251-CALENDARLIST.XML", cal)
+    assert [
+        (c.bill_number, c.handler_first_name, c.handler_last_name, c.handler_district, c.handler_chamber)
+        for c in out[p.CalendarBill]
+    ] == [
+        (4, "Ann", "Lee", 9, "H"),
+        (5, None, None, None, None),
+    ]
+    assert [n.notice for n in out[p.ListNotice]] == ["Subject to change"]
+    hearing = b"""<ROOT><NOTICE>Hearing notice</NOTICE><HearingInfo><HearingID>1</HearingID><CommitteeChairFirstName>Bo</CommitteeChairFirstName>
+    <CommitteeChairLastName>Ray</CommitteeChairLastName><CommitteeChairDistrict>12</CommitteeChairDistrict><CommitteeChairChamber>H</CommitteeChairChamber></HearingInfo></ROOT>"""
+    out = _rows("251-UPCOMINGHEARINGLIST.XML", hearing)
+    assert [
+        (h.chair_first_name, h.chair_last_name, h.chair_district, h.chair_chamber) for h in out[p.UpcomingHearing]
+    ] == [("Bo", "Ray", 12, "H")]
+    assert [n.notice for n in out[p.ListNotice]] == ["Hearing notice"]
+    assert not _rows("251-BILLLIST.XML", b"<ROOT/>")[p.ListNotice]
+
+
+# ---- SenateActList: the House's actions on Senate bills ---------------------------------------------------------
+
+SENATE_ACT = b"""<ROOT><SenateBillsWithHouseActions>
+<BillInformation><BillNumber>SB727</BillNumber><CurrentBillString>SS#2 SCS SB 727</CurrentBillString><SubstitutedBy/>
+<CurrentVersionTypeCode>T</CurrentVersionTypeCode><CurrentLRNumber>3329S.24T</CurrentLRNumber><ShortTitle>EDUCATION</ShortTitle><LongTitle>Creates provisions</LongTitle>
+<ProposedEffectiveDate>2024-08-28T00:00:00</ProposedEffectiveDate><EffectiveDateVaries>1</EffectiveDateVaries>
+<SponsorName>Koenig, Andrew</SponsorName><SponsorDistrict>15</SponsorDistrict><SponsorLink>https://senate.mo.gov/Senators/Member/15</SponsorLink>
+<LastAction>04/24/2024 - Signed by House Speaker (H)</LastAction>
+<GovernorLastAction><GovernorLastAction><GovernorAction>07/01/2024 - Signed</GovernorAction><GovernorsVetoLetter/></GovernorLastAction></GovernorLastAction>
+<Action><Link>http://x/b?bill=SB727 </Link><Description>Reported to the House and First Read (H)</Description><Guid>1</Guid><ActivitySequence>600</ActivitySequence><PubDate>2024-03-14</PubDate></Action>
+<Action><Link>http://x/b</Link><Description>Reported Do Pass (H)</Description><Guid>2</Guid><PubDate>2024-04-02</PubDate><RollCall><TotalYes>6</TotalYes><TotalNo>2</TotalNo><TotalPresent>0</TotalPresent></RollCall></Action>
+<BillSummary><DocumentName>Truly Agreed</DocumentName><SummaryTextLink>http://x/sum.pdf</SummaryTextLink></BillSummary>
+<BillText><DocumentName>Truly Agreed</DocumentName><RollCalls><RollCall><RollCallNumber>3</RollCallNumber><RollCallPDF>http://x/bills241/rollcalls/060.003.pdf</RollCallPDF></RollCall></RollCalls></BillText>
+<Amendment><AmendmentDescription>HA 1</AmendmentDescription><AmendmentSortValue>0507HH</AmendmentSortValue></Amendment>
+<Witness><WitnessFormsLink>http://x/w</WitnessFormsLink></Witness>
+</BillInformation>
+<BillInformation><BillNumber>SB9</BillNumber><ShortTitle>OTHER</ShortTitle>
+<Action><Description>Read Second Time (H)</Description><Guid>3</Guid><PubDate>2024-03-18</PubDate></Action></BillInformation>
+</SenateBillsWithHouseActions></ROOT>"""
+
+
+def test_senate_act_list_rows_reuse_the_bill_shape_in_their_own_tables():
+    out = _rows("241-SENATEACTLIST.XML", SENATE_ACT, "241")
+    sa = p.SENATE_ACT_TYPES
+    bills = out[sa[p.Bill]]
+    assert [(b.bill, b.bill_number, b.short_title, b.long_title) for b in bills] == [
+        ("SB727", "SB727", "EDUCATION", "Creates provisions"),
+        ("SB9", "SB9", "OTHER", None),
+    ]
+    b = bills[0]
+    assert (b.session_code, b.file_name, b.current_lr_number) == ("241", "241-SENATEACTLIST.XML", "3329S.24T")
+    assert b.proposed_effective_date == date(2024, 8, 28)
+    assert (b.sponsor_name, b.sponsor_district, b.sponsor_link) == (
+        "Koenig, Andrew",
+        15,
+        "https://senate.mo.gov/Senators/Member/15",
+    )
+    assert (b.current_version_type_code, b.effective_date_varies) == ("T", "1")
+    assert (b.governor_action, b.governors_veto_letter) == ("07/01/2024 - Signed", None)
+    actions = out[sa[p.BillAction]]
+    assert [(a.bill, a.action_index, a.description, a.rollcall_total_yes) for a in actions] == [
+        ("SB727", 1, "Reported to the House and First Read (H)", None),
+        ("SB727", 2, "Reported Do Pass (H)", 6),
+        ("SB9", 1, "Read Second Time (H)", None),
+    ]
+    assert actions[0].link == "http://x/b?bill=SB727"
+    assert [(s.bill, s.document_name) for s in out[sa[p.BillSummary]]] == [("SB727", "Truly Agreed")]
+    assert [(r.bill, r.parent_kind, r.rollcall_pdf[-11:]) for r in out[sa[p.BillRollCall]]] == [
+        ("SB727", "text", "060.003.pdf")
+    ]
+    assert [(a.bill, a.sort_value) for a in out[sa[p.BillAmendment]]] == [("SB727", "0507HH")]
+    assert [w.bill for w in out[sa[p.BillWitness]]] == ["SB727"]
+    # nothing leaks into the House bill tables that staging reads
+    assert not any(out[t] for t in p.BILL_ROW_TYPES)
+
+
+def test_senate_act_tables_are_distinct_and_typed(raw_dir):
+    names = [t.TABLE for t in p.ROW_TYPES]
+    assert len(names) == len(set(names))
+    assert p.SENATE_ACT_TYPES[p.BillAction].TABLE == "mo_house_xml_senate_act_actions"
+    assert p.SENATE_ACT_TYPES[p.Bill].TABLE == "mo_house_xml_senate_act_bills"
+    _land(raw_dir, db.UNSHARDED, [("241", "241-SENATEACTLIST.XML", SENATE_ACT)])
+    counts = p.parse_landed(db.UNSHARDED)
+    assert (counts["mo_house_xml_senate_act_bills"], counts["mo_house_xml_senate_act_actions"]) == (2, 3)
+    assert counts["mo_house_xml_bills"] == 0
+    sql = f"describe select * from read_parquet('{db.raw_glob('mo_house_xml_senate_act_actions')}')"
+    cols = {r[0]: r[1] for r in duckdb.sql(sql).fetchall()}
+    assert cols["bill"] == "VARCHAR"
+    assert cols["pub_date"] == "DATE"

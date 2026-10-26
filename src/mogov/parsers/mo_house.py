@@ -8,17 +8,20 @@ files with lxml (hardened settings, via `mogov.xmlparse`), walks each document a
                        subjects, hearings
 - SessionList       -> one row per session
 - CommitteeList     -> one row per committee + one per committee member
-- BillList / MemberList / UpcomingHearingList / CalendarList -> one row per listed item
+- BillList / MemberList / UpcomingHearingList / CalendarList -> one row per listed item (+ the list's NOTICE)
+- SenateActList      -> the same typed rows as a bill document for every Senate bill the House acted on, in
+                       `mo_house_xml_senate_act_*` tables (a `bill` column ties child rows to their bill)
 
 Elements are selected by local name, so namespaces and attributes don't matter. Empty elements are NULL. A
 member's contact details (email, phone, address, assistant) are deliberately not carried into rows; they stay in
-the raw gzip. SenateActList and the odd GRP* files are landed but not parsed (see docs/sources.md).
+the raw gzip. The odd GRP* files (and any other file that is not a member, bill or list) are landed with the
+rest but never parsed: kind 'other' (see docs/sources.md).
 """
 
 import gzip
 import re
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, make_dataclass
 from datetime import date, datetime
 from typing import ClassVar
 
@@ -28,13 +31,13 @@ from mogov import db, obs, xmlparse
 
 log = obs.get_logger(__name__)
 
-KIND_MEMBER, KIND_BILL, KIND_LIST = "member", "bill", "list"
+KIND_MEMBER, KIND_BILL, KIND_LIST, KIND_OTHER = "member", "bill", "list", "other"
 BILL_ITEM = re.compile(r"^H[A-Z]*\d+$")
 
 
-def classify(file_name: str) -> tuple[str, str] | None:
-    """(kind, item) of a House XML file name such as 251-HB10.XML, 251-001.XML or 251-SESSIONLIST.XML; None for
-    files that are not members, bills or lists."""
+def classify(file_name: str) -> tuple[str, str]:
+    """(kind, item) of a House XML file name such as 251-HB10.XML, 251-001.XML or 251-SESSIONLIST.XML; kind
+    'other' for files that are not members, bills or lists (e.g. 191-GRP1.XML): landed, never parsed."""
     stem = file_name.upper().removesuffix(".XML")
     _, _, item = stem.partition("-")
     if item.isdigit():
@@ -43,7 +46,7 @@ def classify(file_name: str) -> tuple[str, str] | None:
         return KIND_LIST, item
     if BILL_ITEM.match(item):
         return KIND_BILL, item
-    return None
+    return KIND_OTHER, item
 
 
 # ---- element helpers --------------------------------------------------------------------------------------
@@ -70,27 +73,41 @@ def text(el: etree._Element | None, name: str) -> str | None:
 
 
 def integer(el: etree._Element | None, name: str) -> int | None:
+    """Integer value of the first <name> child; None when missing or blank. A value that is present but not an
+    integer is also None, but logged (a typed column must not silently drop data)."""
     value = text(el, name)
+    if value is None:
+        return None
     try:
-        return int(value) if value is not None else None
+        return int(value)
     except ValueError:
+        log.warning("mo_house.value_not_integer", field=name, value=value)
         return None
 
 
 def day(el: etree._Element | None, name: str) -> date | None:
+    """Date of the first <name> child (an ISO date or datetime); None when missing, blank or (logged) unreadable."""
     value = text(el, name)
+    if value is None:
+        return None
     try:
-        return date.fromisoformat(value[:10]) if value else None
+        return date.fromisoformat(value[:10])
     except ValueError:
+        log.warning("mo_house.value_not_date", field=name, value=value)
         return None
 
 
-def parse_xml(data: bytes) -> etree._Element | None:
-    """Root element of a document, or None when the bytes aren't XML (e.g. the site's HTML error page)."""
+def parse_xml(data: bytes, file: str | None = None) -> etree._Element | None:
+    """Root element of a document, or None when the bytes aren't XML (e.g. the site's HTML error page). With a
+    `file` name, a document lxml had to repair (it recovers from malformed XML) is logged against that name."""
+    errors: list[str] = []
     try:
-        return xmlparse.parse(data)
+        root = xmlparse.parse(data, errors)
     except (ValueError, etree.XMLSyntaxError):
         return None
+    if errors and file:
+        log.warning("mo_house.xml_recovered", file=file, errors=len(errors), first=errors[0])
+    return root
 
 
 def links(root: etree._Element, tag: str) -> list[str]:
@@ -116,7 +133,7 @@ class XmlFile:
     size_bytes: int  # XML size before gzip
     gz_bytes: int
     sha256: str  # of the XML bytes
-    fetched_at: datetime
+    landed_at: datetime  # when this run wrote the file (not when the House published it)
 
 
 @dataclass
@@ -174,6 +191,15 @@ class Bill:
     governor_action: str | None
     governors_veto_letter: str | None
     substituted_by: str | None
+    substituted_by_link: str | None
+    summary_sheet_link: str | None
+    past_session_appropriation_bill: str | None
+    # the SenateActList bill element names these (NULL in House bill documents)
+    current_version_type_code: str | None
+    effective_date_varies: str | None
+    sponsor_name: str | None
+    sponsor_district: int | None
+    sponsor_link: str | None
 
 
 @dataclass
@@ -222,6 +248,8 @@ class BillText:
     version_type_code: str | None
     version_sort: int | None
     text_link: str | None
+    summary_text_link: str | None
+    map_link: str | None
 
 
 @dataclass
@@ -233,10 +261,46 @@ class BillAmendment:
     description: str | None
     amendment_text: str | None
     lr_number: str | None
-    sort_value: int | None
+    sort_value: str | None  # e.g. '0507HH': not a number
     sponsor: str | None
     status: str | None
     status_description: str | None
+    map_link: str | None
+
+
+@dataclass
+class BillSummary:
+    TABLE: ClassVar[str] = "mo_house_xml_bill_summaries"
+    session_code: str
+    file_name: str
+    summary_index: int
+    document_name: str | None
+    summary_text_link: str | None
+    version_type_code: str | None
+    lr_number: str | None
+    version_sort: int | None
+
+
+@dataclass
+class BillFiscalNote:
+    TABLE: ClassVar[str] = "mo_house_xml_bill_fiscal_notes"
+    session_code: str
+    file_name: str
+    fiscal_note_index: int
+    element: str  # FiscalNote or FiscalNotes: the XML uses both
+    fiscal_note_link: str | None
+
+
+@dataclass
+class BillWitness:
+    """A witness-form link on a bill (the forms themselves, which name citizens, are not fetched or parsed)."""
+
+    TABLE: ClassVar[str] = "mo_house_xml_bill_witnesses"
+    session_code: str
+    file_name: str
+    witness_index: int
+    witness_forms_link: str | None
+    witness_form_link_description: str | None
 
 
 @dataclass
@@ -359,6 +423,10 @@ class UpcomingHearing:
     notice_executive_session: str | None
     comments: str | None
     approved_timestamp: str | None
+    chair_first_name: str | None
+    chair_last_name: str | None
+    chair_district: int | None
+    chair_chamber: str | None
 
 
 @dataclass
@@ -376,7 +444,52 @@ class CalendarBill:
     sponsor_last_name: str | None
     sponsor_district: int | None
     sponsor_chamber: str | None
+    handler_first_name: str | None
+    handler_last_name: str | None
+    handler_district: int | None
+    handler_chamber: str | None
 
+
+@dataclass
+class ListNotice:
+    """The NOTICE element some list files (CalendarList, UpcomingHearingList) carry next to their items."""
+
+    TABLE: ClassVar[str] = "mo_house_xml_list_notices"
+    session_code: str
+    file_name: str
+    notice: str
+
+
+BILL_ROW_TYPES: list[type] = [
+    Bill,
+    BillAction,
+    BillSponsor,
+    BillText,
+    BillAmendment,
+    BillRollCall,
+    BillSubject,
+    BillHearing,
+    BillSummary,
+    BillFiscalNote,
+    BillWitness,
+]
+
+
+def _senate_act_type(row_type: type) -> type:
+    """The SenateActList twin of a bill row type: table `mo_house_xml_senate_act_*` and, for child rows, a `bill`
+    column naming the Senate bill (many bills share one file)."""
+    if row_type is Bill:
+        return make_dataclass("SenateActBill", [], bases=(Bill,), namespace={"TABLE": "mo_house_xml_senate_act_bills"})
+    table = "mo_house_xml_senate_act_" + row_type.TABLE.removeprefix("mo_house_xml_bill_")
+    return make_dataclass(
+        "SenateAct" + row_type.__name__.removeprefix("Bill"),
+        [("bill", str)],
+        bases=(row_type,),
+        namespace={"TABLE": table},
+    )
+
+
+SENATE_ACT_TYPES: dict[type, type] = {t: _senate_act_type(t) for t in BILL_ROW_TYPES}
 
 ROW_TYPES: list[type] = [
     Member,
@@ -397,6 +510,11 @@ ROW_TYPES: list[type] = [
     MemberListEntry,
     UpcomingHearing,
     CalendarBill,
+    ListNotice,
+    BillSummary,
+    BillFiscalNote,
+    BillWitness,
+    *SENATE_ACT_TYPES.values(),
 ]
 
 # ---- document walkers ---------------------------------------------------------------------------------------
@@ -449,12 +567,16 @@ def _rollcalls(
         )
 
 
-def _bill(key: Key, bill: str, root: etree._Element) -> Iterator[object]:
-    info = child(root, "BillInformation")
-    if info is None:
-        return
+def _bill(key: Key, bill: str, info: etree._Element) -> Iterator[object]:
+    """Rows of one <BillInformation> element: a bill document's, or one item of a SenateActList (which differs
+    only in a few places: titles sit directly in the element, the governor's action is nested once more, and
+    the sponsor is named in SponsorName/District/Link instead of Sponsor children)."""
     title = child(info, "Title")
+    if title is None:
+        title = info
     gov = child(info, "GovernorLastAction")
+    if (inner := child(gov, "GovernorLastAction")) is not None:
+        gov = inner
     yield Bill(
         *key,
         bill,
@@ -470,6 +592,14 @@ def _bill(key: Key, bill: str, root: etree._Element) -> Iterator[object]:
         text(gov, "GovernorAction"),
         text(gov, "GovernorsVetoLetter"),
         text(child(info, "SubstitutedBy"), "ParentBillString"),
+        text(child(info, "SubstitutedBy"), "ParentBillLink"),
+        text(child(info, "SummarySheet"), "SummarySheetLink"),
+        text(info, "PastSessionAppropriationBill"),
+        text(info, "CurrentVersionTypeCode"),
+        text(info, "EffectiveDateVaries"),
+        text(info, "SponsorName"),
+        integer(info, "SponsorDistrict"),
+        text(info, "SponsorLink"),
     )
     for i, a in enumerate(children(info, "Action"), 1):
         rc = child(a, "RollCall")
@@ -506,6 +636,8 @@ def _bill(key: Key, bill: str, root: etree._Element) -> Iterator[object]:
             text(t, "VersionTypeCode"),
             integer(t, "BillVersionSort"),
             text(t, "BillTextLink"),
+            text(t, "SummaryTextLink"),
+            text(child(t, "Map"), "MapLink"),
         )
         yield from _rollcalls(key, "text", i, name, t)
     for i, am in enumerate(children(info, "Amendment"), 1):
@@ -516,10 +648,11 @@ def _bill(key: Key, bill: str, root: etree._Element) -> Iterator[object]:
             desc,
             text(am, "AmendmentText"),
             text(am, "LRNumber"),
-            integer(am, "AmendmentSortValue"),
+            text(am, "AmendmentSortValue"),
             text(am, "Sponsor"),
             text(am, "Status"),
             text(am, "StatusDescription"),
+            text(child(am, "Map"), "MapLink"),
         )
         yield from _rollcalls(key, "amendment", i, desc, am)
     for i, s in enumerate(children(info, "SubjectIndex"), 1):
@@ -535,6 +668,43 @@ def _bill(key: Key, bill: str, root: etree._Element) -> Iterator[object]:
             text(h, "Location"),
             text(h, "Comments"),
         )
+    for i, s in enumerate(children(info, "BillSummary"), 1):
+        yield BillSummary(
+            *key,
+            i,
+            text(s, "DocumentName"),
+            text(s, "SummaryTextLink"),
+            text(s, "VersionTypeCode"),
+            text(s, "LRNumber"),
+            integer(s, "BillVersionSort"),
+        )
+    fiscal_notes = [
+        (_local(note), link)
+        for note in info
+        if _local(note) in ("FiscalNote", "FiscalNotes")
+        for link in children(note, "FiscalNoteLink")
+    ]
+    for i, (element, link) in enumerate(fiscal_notes, 1):
+        yield BillFiscalNote(*key, i, element or "FiscalNote", "".join(link.itertext()).strip() or None)
+    for i, w in enumerate(children(info, "Witness"), 1):
+        yield BillWitness(*key, i, text(w, "WitnessFormsLink"), text(w, "WitnessFormLinkDescription"))
+
+
+def _bill_document(key: Key, bill: str, root: etree._Element) -> Iterator[object]:
+    if (info := child(root, "BillInformation")) is not None:
+        yield from _bill(key, bill, info)
+
+
+def _senate_act_list(key: Key, root: etree._Element) -> Iterator[object]:
+    """The House's actions on Senate bills: each item is a bill element. Rows go to the `senate_act` twin of the
+    bill tables and (children) carry the bill they belong to."""
+    for holder in children(root, "SenateBillsWithHouseActions"):
+        for info in children(holder, "BillInformation"):
+            bill = text(info, "BillNumber") or ""
+            for row in _bill(key, bill, info):
+                twin = SENATE_ACT_TYPES[type(row)]
+                values = {f.name: getattr(row, f.name) for f in fields(row)}
+                yield twin(**values) if isinstance(row, Bill) else twin(**values, bill=bill)
 
 
 def _sessions(key: Key, root: etree._Element) -> Iterator[object]:
@@ -601,6 +771,10 @@ def _hearings(key: Key, root: etree._Element) -> Iterator[object]:
             text(h, "NoticeExecutiveSession"),
             text(h, "Comments"),
             text(h, "ApprovedTimeStamp"),
+            text(h, "CommitteeChairFirstName"),
+            text(h, "CommitteeChairLastName"),
+            integer(h, "CommitteeChairDistrict"),
+            text(h, "CommitteeChairChamber"),
         )
 
 
@@ -621,6 +795,10 @@ def _calendar(key: Key, root: etree._Element) -> Iterator[object]:
                     text(b, "SponsorLastName"),
                     integer(b, "SponsorDistrict"),
                     text(b, "SponsorChamber"),
+                    text(b, "HandlerFirstName"),
+                    text(b, "HandlerLastName"),
+                    integer(b, "HandlerDistrict"),
+                    text(b, "HandlerChamber"),
                 )
 
 
@@ -631,21 +809,23 @@ LIST_WALKERS: dict[str, Callable[[Key, etree._Element], Iterator[object]]] = {
     "MEMBERLIST": _member_list,
     "UPCOMINGHEARINGLIST": _hearings,
     "CALENDARLIST": _calendar,
+    "SENATEACTLIST": _senate_act_list,
 }
 
 
 def parse_document(session_code: str, file_name: str, root: etree._Element) -> Iterator[object]:
-    """Typed rows of one document; nothing for kinds that are landed but not parsed (e.g. SenateActList)."""
-    kind = classify(file_name)
-    if kind is None:
-        return
+    """Typed rows of one document; nothing for files that are landed but not parsed (kind 'other')."""
+    kind, item = classify(file_name)
     key = (session_code, file_name)
-    if kind[0] == KIND_MEMBER:
+    if kind == KIND_MEMBER:
         yield from _member(key, root)
-    elif kind[0] == KIND_BILL:
-        yield from _bill(key, kind[1], root)
-    elif walker := LIST_WALKERS.get(kind[1]):
-        yield from walker(key, root)
+    elif kind == KIND_BILL:
+        yield from _bill_document(key, item, root)
+    elif kind == KIND_LIST:
+        if walker := LIST_WALKERS.get(item):
+            yield from walker(key, root)
+        if notice := text(root, "NOTICE"):
+            yield ListNotice(*key, notice)
 
 
 # ---- from landed files to raw tables ------------------------------------------------------------------------
@@ -677,7 +857,7 @@ def parse_landed(shard: db.Shard) -> dict[str, int]:
     with db.TableSink(shard, tables=ROW_TYPES) as sink:
         for session_code, file_name, path in files:
             progress.tick()
-            root = parse_xml(read_landed(path))
+            root = parse_xml(read_landed(path), file_name)
             if root is None:
                 log.warning("mo_house.xml_unparseable", file=file_name, session=session_code)
                 continue

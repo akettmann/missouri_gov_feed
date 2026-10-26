@@ -9,12 +9,15 @@ from collections.abc import Iterator
 from lxml import etree
 
 
-def parse(data: bytes) -> etree._Element:
-    """Root element of an XML document. Tolerant of malformed input; never resolves entities or touches the network."""
+def parse(data: bytes, errors: list[str] | None = None) -> etree._Element:
+    """Root element of an XML document. Tolerant of malformed input; never resolves entities or touches the network.
+    When lxml had to recover from errors, they are appended to `errors` (if given) so the caller can report them."""
     parser = etree.XMLParser(recover=True, resolve_entities=False, no_network=True, huge_tree=True)
     root = etree.fromstring(data, parser)
     if root is None:
         raise ValueError("no XML root element")
+    if errors is not None:
+        errors.extend(str(e) for e in parser.error_log)
     return root
 
 

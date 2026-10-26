@@ -77,3 +77,61 @@ def test_open_session_also_lands_its_session_list(monkeypatch):
     monkeypatch.setattr(mo_house, "fetch", fake_fetch)
     files = {name for name, _, _ in mo_house._session_files("261", 9999)}  # a year that is never past
     assert "261-SESSIONLIST.XML" in files
+
+
+def test_open_session_dedupes_a_bill_the_billlist_links_twice(monkeypatch):
+    """The House BillList repeats HR1/HR2 in odd-year sessions; each file must be yielded (and landed) once."""
+    from mogov.loaders import mo_house
+
+    link = "https://documents.house.mo.gov/xml/251-HR1.XML"
+    lists = {
+        "251-BillList.XML": f"<BillList><BillXML><BillXMLLink>{link}</BillXMLLink></BillXML>"
+        f"<BillXML><BillXMLLink>{link}</BillXMLLink></BillXML>"
+        "<BillXML><BillXMLLink>https://documents.house.mo.gov/xml/251-HB1.XML</BillXMLLink></BillXML></BillList>",
+    }
+
+    def fake_fetch(url, **_):
+        name = url.rsplit("/", 1)[-1]
+        if name in lists:
+            return lists[name].encode()
+        if name.upper().endswith(("-HR1.XML", "-HB1.XML")):
+            return b"<R><BillInformation/></R>"
+        return b"<html>no zip</html>"
+
+    monkeypatch.setattr(mo_house, "fetch", fake_fetch)
+    names = [name for name, _, _ in mo_house._session_files("251", 9999)]
+    assert sorted(n for n in names if "HR1" in n or "HB1" in n) == ["251-HB1.XML", "251-HR1.XML"]
+    assert len(names) == len(set(names))
+
+
+def test_every_xml_in_the_zip_is_landed_including_unparsed_kinds(tmp_path, monkeypatch):
+    """GRP* files are not parsed but the raw XML is kept unchanged like every other file."""
+    import io
+    import zipfile
+
+    import duckdb
+
+    from mogov import db
+    from mogov.loaders import mo_house
+    from mogov.parsers import mo_house as parser
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("191-HB1.xml", "<R><BillInformation><BillNumber>HB1</BillNumber></BillInformation></R>")
+        zf.writestr("191-GRP1.xml", "<R><BillInformation><BillNumber>GRP1</BillNumber></BillInformation></R>")
+    zip_bytes = buf.getvalue()
+    monkeypatch.setattr(db, "RAW_DIR", tmp_path)
+    monkeypatch.setattr(mo_house, "window_years", lambda: [2019])
+    monkeypatch.setattr(mo_house, "fetch", lambda url, **_: zip_bytes if url.endswith("/191.zip") else b"<html/>")
+    monkeypatch.setattr(mo_house, "_probe_day", lambda *a, **k: iter(()))
+    mo_house.load(db.UNSHARDED)
+    rows = duckdb.sql(
+        f"select file_name, kind, path from read_parquet('{db.raw_glob(parser.XmlFile.TABLE)}') order by 1"
+    ).fetchall()
+    assert rows == [
+        ("191-GRP1.XML", "other", "mo_house_xml/191/191-GRP1.XML.gz"),
+        ("191-HB1.XML", "bill", "mo_house_xml/191/191-HB1.XML.gz"),
+    ]
+    assert (tmp_path / "mo_house_xml/191/191-GRP1.XML.gz").exists()
+    bills = duckdb.sql(f"select bill from read_parquet('{db.raw_glob(parser.Bill.TABLE)}')").fetchall()
+    assert bills == [("HB1",)]  # GRP1 stays out of the parser

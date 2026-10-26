@@ -3,7 +3,7 @@
 - documents.house.mo.gov/xml/{session}.zip for closed sessions; per-file XML for the open one.
   Members (roster, committees, bio, sponsored bills) and bills (sponsors, actions, roll-call totals).
   Each XML file is landed unchanged as gzip under RAW_DIR/mo_house_xml/<session>/ and recorded (path, URL,
-  size, hash, fetch time) in `mo_house_xml_files`; then `mogov.parsers.mo_house` walks the files with lxml
+  size, hash, landing time) in `mo_house_xml_files`; then `mogov.parsers.mo_house` walks the files with lxml
   and emits typed rows per entity (`mo_house_xml_*` tables).
 - Roll-call PDFs (2014+) are the only per-member House vote record. Each is parsed into one raw
   row per (roll call, member token); tokens are surnames like "SMITH 46" or "MR SPEAKER" and are
@@ -85,11 +85,16 @@ def _session_files(code: str, year: int) -> Iterator[tuple[str, bytes, str]]:
             if (root := parser.parse_xml(listing)) is not None:
                 listings[kind] = root
             yield f"{code}-{kind}.XML".upper(), listing, url
+    seen: set[str] = set()  # the BillList may link a bill twice (HR1/HR2 in odd-year sessions)
     for kind, link_tag in (("MemberList", "RepresentativeXMLLink"), ("BillList", "BillXMLLink")):
         if kind not in listings:
             continue
         for url in parser.links(listings[kind], link_tag):
-            yield url.rsplit("/", 1)[-1].upper(), fetch(url, delay=POLITE_DELAY), url
+            name = url.rsplit("/", 1)[-1].upper()
+            if name in seen:
+                continue
+            seen.add(name)
+            yield name, fetch(url, delay=POLITE_DELAY), url
 
 
 def _rollcall_url(code: str, day: int, number: int) -> str:
@@ -148,7 +153,7 @@ def _parse_rollcall_pdf(data: bytes) -> tuple[dict, list[tuple[str, str]]]:
 def _land_file(code: str, name: str, xml: bytes, url: str) -> parser.XmlFile:
     """Write one XML file, byte for byte, as gzip under the raw dir (the same bytes every run, so a re-run
     rewrites nothing) and describe it for the state table."""
-    kind, item = parser.classify(name)  # type: ignore[misc]  # callers pass only names that classify
+    kind, item = parser.classify(name)
     rel = f"{XML_DIR}/{code}/{name}.gz"
     gz = gzip.compress(xml, mtime=0)
     dest = db.RAW_DIR / rel
@@ -174,10 +179,10 @@ def load(shard: db.Shard) -> dict[str, int]:
             owned = shard.owns(code)
             for name, xml, url in _session_files(code, 2000 + int(code[:2])):
                 linked.setdefault(code, defaultdict(set))
-                kind = parser.classify(name)
-                if owned and kind is not None:
+                kind, _ = parser.classify(name)
+                if owned:  # every file, whatever its kind: the raw XML is kept unchanged
                     files_sink.add(_land_file(code, name, xml, url))
-                if kind and kind[0] == parser.KIND_MEMBER and not owned:
+                if kind == parser.KIND_MEMBER and not owned:
                     continue  # members link no roll calls
                 if (root := parser.parse_xml(xml)) is None:
                     continue
