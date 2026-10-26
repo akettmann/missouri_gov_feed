@@ -921,12 +921,13 @@ offices, shops and most service businesses are missing.
     sites are filed under legal or subsidiary names ("UNION ELECTRIC CO", "LACLEDE GAS", "SOUTHWESTERN BELL
     TELEPHONE", "KANSAS CITY POWER & LIGHT"). The seed covers the largest corporate donors with Missouri sites.
   - In October 2026: 502 (official, facility) pairs by name and 1,541 more by brand, for 122 officials.
-- Each matched site also carries the matched donors' first and last contribution year, the links
-  (`donor_links`: one line per matched donor and filing page, `<url> <donor name>`. A page is the MEC committee
+- Each matched site also carries the matched donors' first and last contribution year, `match_confidence`
+  (`medium` when any of that money was tied to the official by name only) and, in `fct_jurisdiction_business_donors`
+  (one row per official, site, donor and filing page; #370), the donors and their links. A page is the MEC committee
   matched to the official, which is not filtered to the donor, or the FEC disbursements of the donor's committee
   filtered to the receiving committee; a donor filed on both keeps both. Line breaks in a donor name become spaces so a
-  line never splits; in the published sites.csv the cell holds several lines. A donor with no page has no line) and `match_confidence`
-  (`medium` when any of that money was tied to the official by name only).
+  line never splits; the frontend writes them as `<url> <donor name>` lines, which in the published sites.csv sit in one
+  cell. A donor with no page has one row with a null `source_url`.
 - Industry: the NAICS code most of a site's programs give, taking primary codes first (`naics_source` `naics`,
   31% of the geocoded sites in October 2026), then codes FRS leaves UNKNOWN (`naics_unknown`, 2%), then SECONDARY
   ones (`naics_secondary`, 0.1%). A real NAICS code is more precise than a SIC-derived sector, so only a site with
