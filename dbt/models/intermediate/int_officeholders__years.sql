@@ -11,7 +11,8 @@
 -- Years are those with a House roster. Statewide officers, mayors and state judges have no dated past rosters
 -- here. person keys match dim_official.official_id, so a past holder who serves today links to their profile.
 -- official_id is the stable person id; openstates_id is the Open States record the senate row came from (null for
--- other sources), kept so rpt_officeholders_by_year can find that record's folder.
+-- other sources), kept so rpt_officeholders_by_year can find that record's folder. session_code is the House
+-- session file (e.g. 251, 253) listing the member, the earliest one in the year; null for other sources.
 with years as (
     select distinct
         session_year as year,
@@ -33,7 +34,8 @@ house as (
         'State Representative' as office_title,
         {{ dbt.safe_cast('m.district_number', dbt.type_string()) }} as district,
         'mo_house roster' as source,
-        cast(null as {{ dbt.type_string() }}) as openstates_id
+        cast(null as {{ dbt.type_string() }}) as openstates_id,
+        m.session_code
     from {{ ref('int_mo_house__member_identity') }} as m
     left join {{ ref('stg_openstates__people') }} as p on m.openstates_id = p.openstates_id
 ),
@@ -49,7 +51,8 @@ senate_terms as (
         'State Senator' as office_title,
         {{ dbt.safe_cast('s.district_number', dbt.type_string()) }} as district,
         'openstates' as source,
-        s.openstates_id
+        s.openstates_id,
+        cast(null as {{ dbt.type_string() }}) as session_code
     from {{ ref('int_mo_legislators__seats') }} as s
     inner join years as y on s.start_date <= y.year_end and s.end_date > y.handover_date
     where
@@ -82,7 +85,8 @@ congress as (
         case t.term_type when 'sen' then 'U.S. Senator' else 'U.S. Representative' end as office_title,
         t.district,
         'congress-legislators' as source,
-        cast(null as {{ dbt.type_string() }}) as openstates_id
+        cast(null as {{ dbt.type_string() }}) as openstates_id,
+        cast(null as {{ dbt.type_string() }}) as session_code
     from {{ ref('stg_congress__terms') }} as t
     inner join years as y on t.start_date <= y.year_end and t.end_date > y.handover_date
     where t.state = 'MO'
@@ -128,7 +132,8 @@ judges as (
         end as office_title,
         case when count(distinct court_key) > 1 then 'moed+mowd' else max(court_key) end as district,
         'fjc' as source,
-        cast(null as {{ dbt.type_string() }}) as openstates_id
+        cast(null as {{ dbt.type_string() }}) as openstates_id,
+        cast(null as {{ dbt.type_string() }}) as session_code
     from judge_terms
     where
         court_key is not null
@@ -136,7 +141,8 @@ judges as (
     group by year, fjc_nid
 ),
 
-{% set cols = 'year, official_id, full_name, party, level, office, office_title, district, source, openstates_id' %}
+{% set cols = 'year, official_id, full_name, party, level, office, office_title, district, source, '
+    ~ 'openstates_id, session_code' %}
 unioned as (
     select {{ cols }} from house
     union all
@@ -158,6 +164,8 @@ select
     max(office_title) as office_title,
     max(district) as district,
     max(source) as source,
-    max(openstates_id) as openstates_id
+    max(openstates_id) as openstates_id,
+    -- a House member listed in a regular and a special session keeps the earliest file (the regular one, if listed)
+    min(session_code) as session_code
 from unioned
 group by year, official_id, office
