@@ -35,9 +35,9 @@ calls (2,905 votes), unless marked "verify".
   117th, 0 of 72 failed. In the 118th, 7 of 66 failed: H.Res. 463, 680, 712, 869, 947, 994, 1125. In
   the 119th, 5 of 62 failed: H.Res. 282, 580, 1042, 1175, 1398. Examples include H.Res. 463 (June
   2023, REINS Act), H.Res. 712 (Sept. 2023, Defense appropriations), H.Res. 1125 (Apr. 2024, FISA
-  reauthorization), and H.Res. 580 (July 2025). H.Res. 580 covered FY2026 Defense appropriations plus the GENIUS, CLARITY
-  and Anti-CBDC crypto bills (the "crypto week" revolt). It failed on July 15, 2025 and passed the
-  next day after a motion to reconsider.
+  reauthorization), and H.Res. 580 (July 2025). H.Res. 580 covered FY2026 Defense appropriations plus
+  the GENIUS, CLARITY and Anti-CBDC crypto bills (the "crypto week" revolt). It failed on July 15,
+  2025 and passed the next day after a motion to reconsider.
 - **Self-executing rules / "deem and pass":** Adopting the rule changes bill text or treats another
   measure as passed, with no separate recorded vote on the change. When you see a passage vote on a
   bill whose text changed between committee and floor, check the rule.
@@ -59,8 +59,9 @@ calls (2,905 votes), unless marked "verify".
 ## 4. Discharge petition (bypassing leadership)
 
 - **What:** Under Rule XV cl. 2, if a measure has been in committee for 30 legislative days (7 legislative days
-  for a special rule held in the Rules Committee), 218 members can sign a petition to discharge it. The usual target is the Rules Committee, holding a
-  special rule that a member has written to bring up the real bill.
+  for a special rule held in the Rules Committee), 218 members can sign a petition to discharge it.
+  The usual target is the Rules Committee, holding a special rule that a member has written to bring
+  up the real bill.
 - **Procedure:** Once it has 218 signatures, it is placed on the Discharge Calendar. After 7
   legislative days, any signer can call it up on the 2nd or 4th Monday. The House then votes
   `On Motion to Discharge`, and if that passes, takes up the rule and then the bill.
@@ -135,8 +136,8 @@ privileged.
 - **Debt limit:** Raised or suspended by ordinary bill, for example the Fiscal Responsibility Act
   (2023). The "Gephardt rule" (Rule XXVIII), which deems a debt-limit change passed when the budget
   resolution is adopted, was restored in the 116th and dropped again in the 118th (verify).
-- **Pay-as-you-go:** House CUTGO (112th-115th, so also the 114th, and 118th onward) or PAYGO (116th-117th). It creates a point
-  of order, and special rules often waive it. Statutory PAYGO is a separate law.
+- **Pay-as-you-go:** House CUTGO (112th–115th and 118th onward) or PAYGO (116th-117th). It
+  creates a point of order, and special rules often waive it. Statutory PAYGO is a separate law.
 - **Earmarks:** Banned 2011-2020. "Community Project Funding" returned for FY2022 (117th) with
   disclosure rules.
 
