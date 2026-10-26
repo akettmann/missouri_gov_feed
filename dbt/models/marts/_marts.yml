@@ -336,6 +336,11 @@ models:
       - name: chamber
         data_type: varchar
         description: "`state_house`, `state_senate`, `us_house` or `us_senate`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [state_house, state_senate, us_house, us_senate]
       - name: session_code
         data_type: varchar
         description: MO House session code (YY + type, e.g. 251), Senate journal year, or Congress number.
@@ -418,6 +423,7 @@ models:
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"
+        data_tests: [not_null]
 
   - name: fct_campaign_finance
     description: >
