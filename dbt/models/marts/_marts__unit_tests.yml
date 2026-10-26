@@ -328,13 +328,44 @@ unit_tests:
         - {county_id: 'county:29901', district_id: 'state_house:8', district_type: state_house}
         - {county_id: 'county:29901', district_id: 'place:2999999', district_type: place}
 
-  - name: jurisdiction_businesses_give_every_donor_its_own_link
-    model: fct_jurisdiction_businesses
+  - name: jurisdiction_business_donors_one_row_per_donor_and_page
+    model: fct_jurisdiction_business_donors
     description: >
-      A site tied to several donors lists one `<url> <donor name>` line per donor and per distinct filing page, so
-      each donor gets its own link. A donor filed on both an MEC and an FEC page keeps both: no single url is
-      picked by min(), which would silently prefer fec.gov over mec.mo.gov (#248). Gifts from individuals do not
-      count, and a site with no donor has no links.
+      A donor has one row per distinct filing page, so each page is its own row: a donor filed on both an MEC and an
+      FEC page keeps both, and no single url is picked by min(), which would silently prefer fec.gov over
+      mec.mo.gov (#248). The same page repeated across gifts is one row. A donor with no url keeps one row with a
+      null source_url, and a donor's pages are matched on the donor key, so another donor's pages never attach to
+      it. Gifts from individuals add no rows. A donor matched to two facilities has its rows on both (#370).
+    given:
+      - input: ref('int_jurisdiction_business_donor_matches')
+        rows:
+          - {official_id: o1, registry_id: F1, donor_key: ameren, donor_name: AMEREN CORPORATION}
+          - {official_id: o1, registry_id: F1, donor_key: acme holdings, donor_name: ACME HOLDINGS INC}
+          - {official_id: o1, registry_id: F1, donor_key: nolink, donor_name: NO LINK CO}
+          - {official_id: o1, registry_id: F3, donor_key: ameren, donor_name: AMEREN CORPORATION}
+      - input: ref('fct_campaign_finance')
+        rows:
+          - {official_id: o1, direction: received, counterparty: Ameren Corp PAC, counterparty_organization: AMEREN CORPORATION, counterparty_type: committee, amount: 100, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9'}
+          - {official_id: o1, direction: received, counterparty: Ameren Corp PAC, counterparty_organization: AMEREN CORPORATION, counterparty_type: committee, amount: 25, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9'}
+          - {official_id: o1, direction: received, counterparty: Ameren Corp PAC, counterparty_organization: AMEREN CORPORATION, counterparty_type: committee, amount: 50, source_url: 'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C221944'}
+          - {official_id: o1, direction: received, counterparty: Acme Holdings PAC, counterparty_organization: ACME HOLDINGS INC, counterparty_type: committee, amount: 70, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9'}
+          - {official_id: o1, direction: received, counterparty: Pat Doe, counterparty_organization: AMEREN CORPORATION, counterparty_type: individual, amount: 900, source_url: 'https://example.test/individual'}
+          - {official_id: o1, direction: received, counterparty: No Link Co, counterparty_organization: NO LINK CO, counterparty_type: committee, amount: 10, source_url: null}
+    expect:
+      rows:
+        - {official_id: o1, registry_id: F1, donor_name: AMEREN CORPORATION, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9'}
+        - {official_id: o1, registry_id: F1, donor_name: AMEREN CORPORATION, source_url: 'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C221944'}
+        - {official_id: o1, registry_id: F1, donor_name: ACME HOLDINGS INC, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9'}
+        - {official_id: o1, registry_id: F1, donor_name: NO LINK CO, source_url: null}
+        - {official_id: o1, registry_id: F3, donor_name: AMEREN CORPORATION, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9'}
+        - {official_id: o1, registry_id: F3, donor_name: AMEREN CORPORATION, source_url: 'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C221944'}
+
+  - name: jurisdiction_business_donor_matches_sum_each_donors_gifts
+    model: int_jurisdiction_business_donor_matches
+    description: >
+      One row per (official, facility, donor): a donor's gifts are summed once per facility, gifts from individuals
+      and refunds (amount <= 0) are left out, and a donor tied to the official by a name-only match is marked
+      medium. A facility outside the official's area gets no row.
     given:
       - input: ref('fct_official_districts')
         rows:
@@ -343,29 +374,32 @@ unit_tests:
         rows:
           - {district_id: 'state_house:1', registry_id: F1, facility_name: Plant One, is_government: false}
           - {district_id: 'state_house:1', registry_id: F2, facility_name: Plant Two, is_government: false}
+          - {district_id: 'state_house:2', registry_id: F9, facility_name: Elsewhere, is_government: false}
       - input: ref('int_epa_frs__facilities')
         rows:
           - {registry_id: F1, facility_key: plant one, owner_key: ameren, parent_company_key: acme holdings}
           - {registry_id: F2, facility_key: plant two, owner_key: nobody, parent_company_key: null}
+          - {registry_id: F9, facility_key: elsewhere, owner_key: ameren, parent_company_key: null}
       - input: ref('company_brands')
         rows:
           - {keyword: unusedbrand, brand: unusedbrand}
       - input: ref('fct_campaign_finance')
         rows:
           - {official_id: o1, direction: received, counterparty: Ameren Corp PAC, counterparty_organization: AMEREN CORPORATION, counterparty_type: committee, amount: 100, transaction_date: '2020-03-01', match_confidence: high, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9'}
-          - {official_id: o1, direction: received, counterparty: Ameren Corp PAC, counterparty_organization: AMEREN CORPORATION, counterparty_type: committee, amount: 50, transaction_date: '2021-03-01', match_confidence: high, source_url: 'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C221944'}
+          - {official_id: o1, direction: received, counterparty: Ameren Corp PAC, counterparty_organization: AMEREN CORPORATION, counterparty_type: committee, amount: 50, transaction_date: '2021-03-01', match_confidence: medium, source_url: 'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C221944'}
           - {official_id: o1, direction: received, counterparty: Acme Holdings PAC, counterparty_organization: ACME HOLDINGS INC, counterparty_type: committee, amount: 70, transaction_date: '2022-03-01', match_confidence: high, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9'}
           - {official_id: o1, direction: received, counterparty: Pat Doe, counterparty_organization: AMEREN CORPORATION, counterparty_type: individual, amount: 900, transaction_date: '2022-04-01', match_confidence: high, source_url: 'https://example.test/individual'}
+          - {official_id: o1, direction: received, counterparty: Ameren Corp PAC, counterparty_organization: AMEREN CORPORATION, counterparty_type: committee, amount: -30, transaction_date: '2022-05-01', match_confidence: high, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9'}
     expect:
       rows:
-        - {registry_id: F1, is_donor: true, donated_amount: 220, n_contributions: 3, donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9 ACME HOLDINGS INC\nhttps://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 AMEREN CORPORATION\nhttps://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C221944 AMEREN CORPORATION"}
-        - {registry_id: F2, is_donor: false, donated_amount: null, n_contributions: null, donor_links: null}
+        - {official_id: o1, registry_id: F1, donor_key: ameren, donor_name: AMEREN CORPORATION, by_name: 1, amount: 150, n_contributions: 2, first_year: 2020, last_year: 2021, is_medium: 1}
+        - {official_id: o1, registry_id: F1, donor_key: acme holdings, donor_name: ACME HOLDINGS INC, by_name: 1, amount: 70, n_contributions: 1, first_year: 2022, last_year: 2022, is_medium: 0}
 
-  - name: jurisdiction_businesses_donor_name_list_hold_no_line_breaks
-    model: fct_jurisdiction_businesses
+  - name: jurisdiction_business_donor_matches_hold_no_line_breaks
+    model: int_jurisdiction_business_donor_matches
     description: >
-      A raw donor name with a CR/LF inside would split its donor_links line in two. The model turns each into a
-      space and trims, so every line stays `<url> <donor name>` (#268).
+      A raw donor name with a CR/LF inside would split a `<url> <donor>` line in the site CSV and the JSON. The
+      model turns each into a space and trims (#268).
     given:
       - input: ref('fct_official_districts')
         rows:
@@ -373,11 +407,9 @@ unit_tests:
       - input: ref('fct_district_facilities')
         rows:
           - {district_id: 'state_house:1', registry_id: F1, facility_name: Plant One, is_government: false}
-          - {district_id: 'state_house:1', registry_id: F2, facility_name: Plant Two, is_government: false}
       - input: ref('int_epa_frs__facilities')
         rows:
           - {registry_id: F1, facility_key: plant one, owner_key: ameren, parent_company_key: acme holdings}
-          - {registry_id: F2, facility_key: plant two, owner_key: nobody, parent_company_key: null}
       - input: ref('company_brands')
         rows:
           - {keyword: unusedbrand, brand: unusedbrand}
@@ -398,14 +430,12 @@ unit_tests:
               'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9' as source_url
     expect:
       rows:
-        - {registry_id: F1, is_donor: true, donor_name_list: AMEREN CORPORATION, donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 AMEREN CORPORATION"}
-        - {registry_id: F2, is_donor: false, donor_name_list: null, donor_links: null}
+        - {registry_id: F1, donor_name: AMEREN CORPORATION}
 
-  - name: jurisdiction_businesses_donor_name_list_keep_semicolons
-    model: fct_jurisdiction_businesses
+  - name: jurisdiction_business_donor_matches_keep_semicolons
+    model: int_jurisdiction_business_donor_matches
     description: >
-      donor_name_list is joined with chr(31) (not '; '), so a raw donor name with a ';' in it stays one donor and is not
-      altered (#350). Two donors join with chr(31).
+      Donor names are kept as filed: a ';' in one stays and the name is one donor, not two (#350, #370).
     given:
       - input: ref('fct_official_districts')
         rows:
@@ -425,13 +455,15 @@ unit_tests:
           - {official_id: o1, direction: received, counterparty: x, counterparty_organization: ACME HOLDINGS INC, counterparty_type: committee, amount: 70, transaction_date: '2022-03-01', match_confidence: high, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9'}
     expect:
       rows:
-        - {registry_id: F1, donor_name_list: "ACME HOLDINGS INC\x1fAMEREN CORPORATION; THE", donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9 ACME HOLDINGS INC\nhttps://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 AMEREN CORPORATION; THE"}
+        - {registry_id: F1, donor_name: ACME HOLDINGS INC}
+        - {registry_id: F1, donor_name: 'AMEREN CORPORATION; THE'}
 
-  - name: jurisdiction_businesses_donor_name_list_scrub_unit_separator
+  - name: jurisdiction_businesses_total_the_donors_per_facility
     model: fct_jurisdiction_businesses
     description: >
-      A chr(31) inside a raw donor name would read as a boundary between two donors in donor_name_list, so the
-      model turns it into a space (#350). Without that scrub 'BETA<chr 31>CO' would come out as two donors.
+      A facility's donor columns add up its donors' rows: amounts and counts sum, the years span all of them,
+      matched_by is `same name` when any donor matched by name (else `same company`), match_confidence is
+      `medium` when any donor is, and a facility with no donor row is not is_donor with null donor columns.
     given:
       - input: ref('fct_official_districts')
         rows:
@@ -439,30 +471,18 @@ unit_tests:
       - input: ref('fct_district_facilities')
         rows:
           - {district_id: 'state_house:1', registry_id: F1, facility_name: Plant One, is_government: false}
-      - input: ref('int_epa_frs__facilities')
+          - {district_id: 'state_house:1', registry_id: F2, facility_name: Plant Two, is_government: false}
+          - {district_id: 'state_house:1', registry_id: F3, facility_name: Plant Three, is_government: false}
+      - input: ref('int_jurisdiction_business_donor_matches')
         rows:
-          - {registry_id: F1, facility_key: plant one, owner_key: beta, parent_company_key: null}
-      - input: ref('company_brands')
-        rows:
-          - {keyword: unusedbrand, brand: unusedbrand}
-      # sql format: the dict format cannot carry a chr(31) inside a value. Unit-test fixtures render without the
-      # adapter/macro context (no mogov.chr), so these fixtures keep a bare chr(n); BigQuery would need its own (#371)
-      - input: ref('fct_campaign_finance')
-        format: sql
-        rows: |
-          select
-              'o1' as official_id,
-              'received' as direction,
-              'Beta PAC' as counterparty,
-              'BETA' || chr(31) || 'CO' as counterparty_organization,
-              'committee' as counterparty_type,
-              100 as amount,
-              cast('2020-03-01' as date) as transaction_date,
-              'high' as match_confidence,
-              'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9' as source_url
+          - {official_id: o1, registry_id: F1, donor_key: a, by_name: 1, amount: 100, n_contributions: 2, first_year: 2020, last_year: 2021, is_medium: 0}
+          - {official_id: o1, registry_id: F1, donor_key: b, by_name: 0, amount: 70, n_contributions: 1, first_year: 2018, last_year: 2019, is_medium: 1}
+          - {official_id: o1, registry_id: F3, donor_key: b, by_name: 0, amount: 70, n_contributions: 1, first_year: 2018, last_year: 2019, is_medium: 0}
     expect:
       rows:
-        - {registry_id: F1, is_donor: true, donor_name_list: BETA CO, donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 BETA CO"}
+        - {registry_id: F1, is_donor: true, matched_by: same name, donated_amount: 170, n_contributions: 3, first_year: 2018, last_year: 2021, match_confidence: medium}
+        - {registry_id: F2, is_donor: false, matched_by: null, donated_amount: null, n_contributions: null, first_year: null, last_year: null, match_confidence: null}
+        - {registry_id: F3, is_donor: true, matched_by: same company, donated_amount: 70, n_contributions: 1, first_year: 2018, last_year: 2019, match_confidence: high}
 
   - name: bias_indicator_detail_wording
     model: fct_bias_indicators

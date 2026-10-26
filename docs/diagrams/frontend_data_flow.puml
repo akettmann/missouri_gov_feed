@@ -14,7 +14,7 @@ folder "data/exports" as exports {
 package "frontend/ (pnpm build, Node + @duckdb/node-api)" {
   [lib/exports/load.ts\nselect rows per official] as load
   [lib/exports/fixtures.ts\nSAMPLE rpt_* fallback] as fixtures
-  [lib/exports/districtSites.ts\nselect fct_jurisdiction_businesses once] as dsites
+  [lib/exports/districtSites.ts\nselect fct_jurisdiction_businesses and\nfct_jurisdiction_business_donors once] as dsites
   [lib/viz.ts\nchart + table specs] as viz
 }
 

@@ -7,7 +7,9 @@ import { DuckDBInstance } from "@duckdb/node-api";
 import {
   REQUIRED_COLUMNS,
   assertNoMissingColumns,
+  assertNoMissingTables,
   missingColumns,
+  missingTables,
 } from "../src/lib/exports/requiredColumns.ts";
 
 const REQ = { t_one: ["a", "b"], t_two: ["c"] };
@@ -46,36 +48,75 @@ async function withExports(files, fn) {
   await fn(query);
 }
 
-test("query() reports a stale fct_jurisdiction_businesses export instead of a binder error", () =>
+// a one-row select holding every column REQUIRED_COLUMNS lists for a table
+const fullRow = (table) => "select " + REQUIRED_COLUMNS[table].map((c) => `'x' as ${c}`).join(", ");
+
+test("query() reports a stale fct_jurisdiction_business_donors export instead of a binder error", () =>
   withExports(
-    { fct_jurisdiction_businesses: "select 'x' as official_id, 'y' as donor_names" },
+    {
+      fct_jurisdiction_businesses: fullRow("fct_jurisdiction_businesses"),
+      fct_jurisdiction_business_donors: "select 'x' as official_id",
+    },
     async (query) => {
       await assert.rejects(
-        query("select donor_links from {fct_jurisdiction_businesses}"),
+        query("select source_url from {fct_jurisdiction_business_donors}"),
         (e) =>
-          /stale export: fct_jurisdiction_businesses lacks .*donor_links/.test(e.message) &&
+          /stale export: fct_jurisdiction_business_donors lacks .*source_url/.test(e.message) &&
           !/Binder/.test(e.message),
       );
     },
   ));
 
-test("a pre-#350 fct_jurisdiction_businesses export ('; '-joined donor_names, no donor_name_list) is stale", () => {
-  const old = REQUIRED_COLUMNS.fct_jurisdiction_businesses
-    .filter((c) => c !== "donor_name_list")
-    .concat("donor_names");
-  assert.deepEqual(missingColumns({ fct_jurisdiction_businesses: old }), {
-    fct_jurisdiction_businesses: ["donor_name_list"],
-  });
-  assert.throws(
-    () => assertNoMissingColumns({ fct_jurisdiction_businesses: old }),
-    (e) =>
-      /stale export: fct_jurisdiction_businesses lacks donor_name_list/.test(e.message) &&
-      e.message.includes("uv run mogov export --format parquet"),
-  );
+test("a pre-#370 export (fct_jurisdiction_businesses alone, with donor_name_list) is stale, not 'no donors'", () => {
+  const present = new Set(["fct_jurisdiction_businesses"]);
   assert.deepEqual(
-    missingColumns({ fct_jurisdiction_businesses: REQUIRED_COLUMNS.fct_jurisdiction_businesses }),
+    missingTables(["fct_jurisdiction_businesses"], (t) => present.has(t)),
+    {
+      fct_jurisdiction_businesses: ["fct_jurisdiction_business_donors"],
+    },
+  );
+  assert.throws(
+    () => assertNoMissingTables(["fct_jurisdiction_businesses"], (t) => present.has(t)),
+    (e) =>
+      /stale export: fct_jurisdiction_businesses needs fct_jurisdiction_business_donors, which is not exported/.test(
+        e.message,
+      ) && e.message.includes("uv run mogov export --format parquet"),
+  );
+  present.add("fct_jurisdiction_business_donors");
+  assert.deepEqual(
+    missingTables(["fct_jurisdiction_businesses"], (t) => present.has(t)),
     {},
   );
+  // a table that is not exported at all is the caller's "missing export" case, not a stale one
+  assert.deepEqual(
+    missingTables(["fct_jurisdiction_businesses"], () => false),
+    {},
+  );
+});
+
+test("query() on the business table of a pre-#370 export fails loudly, before any SQL runs", () =>
+  withExports(
+    {
+      fct_jurisdiction_businesses: `${fullRow("fct_jurisdiction_businesses")}, 'y' as donor_name_list, 'z' as donor_links`,
+    },
+    async (query) => {
+      // the shared directory may still hold the donor table an earlier test wrote
+      rmSync(path.join(dir, "fct_jurisdiction_business_donors.parquet"), { force: true });
+      await assert.rejects(query("select official_id from {fct_jurisdiction_businesses}"), (e) =>
+        /stale export: fct_jurisdiction_businesses needs fct_jurisdiction_business_donors/.test(e.message),
+      );
+    },
+  ));
+
+test("the new donor table is required, the delimited columns are not", () => {
+  assert.deepEqual(REQUIRED_COLUMNS.fct_jurisdiction_business_donors, [
+    "official_id",
+    "registry_id",
+    "donor_name",
+    "source_url",
+  ]);
+  assert.equal(REQUIRED_COLUMNS.fct_jurisdiction_businesses.includes("donor_links"), false);
+  assert.equal(REQUIRED_COLUMNS.fct_jurisdiction_businesses.includes("donor_name_list"), false);
 });
 
 const unlistedMessage = (e) =>

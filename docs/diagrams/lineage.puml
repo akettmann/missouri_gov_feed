@@ -100,6 +100,7 @@ package "marts" {
   [official_profile] as profile
   [fct_district_facilities] as F_fac
   [fct_jurisdiction_businesses] as F_biz
+  [fct_jurisdiction_business_donors] as F_bizd
   [fct_audit_reports] as F_aud
 }
 
@@ -266,6 +267,7 @@ D_dist --> F_biz
 F_money --> F_biz
 S_brands --> F_biz
 F_biz --> R_ind
+F_biz --> F_bizd
 S_naics --> R_ind
 F_biz --> EXP
 R_ind --> EXP

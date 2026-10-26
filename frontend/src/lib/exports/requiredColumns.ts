@@ -40,16 +40,56 @@ export const REQUIRED_COLUMNS: Record<string, readonly string[]> = {
     "parent_company_name",
     "is_donor",
     "matched_by",
-    "donor_name_list",
     "donated_amount",
     "n_contributions",
     "first_year",
     "last_year",
     "match_confidence",
-    "donor_links",
     "frs_url",
   ],
+  fct_jurisdiction_business_donors: ["official_id", "registry_id", "donor_name", "source_url"],
 };
+
+/**
+ * Tables that must be exported together: an export of the key table from before a sibling existed is stale even
+ * though every one of its own columns is present, and a missing sibling would otherwise just look like "no data".
+ * fct_jurisdiction_businesses lost its donor_name_list and donor_links columns to this table (#370).
+ */
+export const REQUIRED_TABLES: Record<string, readonly string[]> = {
+  fct_jurisdiction_businesses: ["fct_jurisdiction_business_donors"],
+  fct_jurisdiction_business_donors: ["fct_jurisdiction_businesses"],
+};
+
+/** Sibling tables missing from an export, per table that is there. Empty when all is well. */
+export function missingTables(
+  used: readonly string[],
+  exists: (table: string) => boolean,
+  required: Record<string, readonly string[]> = REQUIRED_TABLES,
+): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const table of used) {
+    if (!exists(table)) continue;
+    const missing = (required[table] ?? []).filter((t) => !exists(t));
+    if (missing.length > 0) out[table] = missing;
+  }
+  return out;
+}
+
+/** Throws one error naming every table whose required sibling table is not exported, with the re-export commands. */
+export function assertNoMissingTables(
+  used: readonly string[],
+  exists: (table: string) => boolean,
+  required: Record<string, readonly string[]> = REQUIRED_TABLES,
+): void {
+  const missing = missingTables(used, exists, required);
+  const tables = Object.keys(missing);
+  if (tables.length === 0) return;
+  const detail = tables.map((t) => `${t} needs ${missing[t].join(", ")}`).join("; ");
+  throw new Error(
+    `stale export: ${detail}, which ${tables.length === 1 && missing[tables[0]].length === 1 ? "is" : "are"} not exported ` +
+      `(exported before that table was added). Re-export: ${REEXPORT_COMMANDS}.`,
+  );
+}
 
 export const REEXPORT_COMMANDS = "`uv run mogov build`, then `uv run mogov export --format parquet`";
 
