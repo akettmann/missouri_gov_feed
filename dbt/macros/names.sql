@@ -60,8 +60,8 @@
     before a comma goes ("NEMO FEEDS , LLC" is "NEMO FEEDS, LLC", "T 33N ,R 04W" is "T 33N,R 04W", #399), and commas, semicolons and whitespace are cut from both ends, so "BUTTERBALL," and
     "900 WATSON DR,  " lose their stray comma while "ACME INC." and "SUITE 1" keep their own punctuation. Doubled
     semicolons are left alone: "K-BAR-L ;;C" is probably a shifted-hand typo for "LLC", not a separator. Null when
-    nothing is left. HTML entities are decoded first (decode_registry_entities, #398). The ends are cut in one pass: the leading and the trailing run are separate patterns, so each
-    is a plain anchored match. #}
+    nothing is left. HTML entities are decoded first (decode_registry_entities, #398). The ends are cut in one pass:
+    the leading and the trailing run are separate patterns, so each is a plain anchored match. #}
 {% macro clean_registry_text(expr) -%}
     nullif(
         {{ mogov.regex_replace_all(
