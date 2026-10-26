@@ -141,3 +141,13 @@ def test_vacancies_reads_the_first_token_only():
     assert {r["vacancies"] for r in parse_journal(base) if r["block_index"] == 0} == {0}
     text = base.replace("Vacancies—None", "Vacancies—None 5", 1)
     assert {r["vacancies"] for r in parse_journal(text) if r["block_index"] == 0} == {0}
+
+
+def test_excused_after_vacancies_past_an_odd_page_header():
+    # odd pages print "<page> <Day> - <Weekday>, <date>" (digits first), mixed case, with a plain hyphen
+    text = EXCUSED_AFTER_VACANCIES.replace(
+        "Journal of the Senate 2308", "623 Forty-Fourth Day - Thursday, April 4, 2024"
+    )
+    rows = parse_journal(text)
+    excused = [r for r in rows if r["category"] == "Excused from voting"]
+    assert [(r["name"], r["declared_count"], r["vacancies"]) for r in excused] == [("Williams", 1, 0)]
