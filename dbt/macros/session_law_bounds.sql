@@ -8,12 +8,19 @@
 
 {# The history or repeal note with one separator (", ") between acts and "et al." attached to the act before it. A
    trailing act joined with "and" ("H.B. 1489 and A.L. 2004 S.B. 1233 et al.") is an act of its own, so it gets the
-   same separator. #}
+   same separator. " and Repealed L." starts a repealed act of its own. " and L." gets a leading "@" on the act: the
+   Revisor's "L." is the act that made the text, "A.L." one that amended it, and "Repealed" governs the whole list in
+   a repeal note, so a bare "L." that follows a repealed act ("Repealed L. 2013 H.B. 374 & 434 and L. 2016 S.B. 585")
+   is one more repealing act, not an enactment (int_mo_revisor__session_law_bills reads and strips the marker). #}
 {% macro normalize_session_law_note(expr) -%}
     replace(
         replace(
-            replace(replace(replace(replace({{ expr }}, '(', ''), ')', ''), '; ', ', '), ' and A.L. ', ', A.L. '),
-            ' and L. ', ', L. '
+            replace(
+                replace(replace(replace(replace({{ expr }}, '(', ''), ')', ''), '; ', ', '), ' and A.L. ', ', A.L. '),
+                ' and Repealed L. ',
+                ', Repealed L. '
+            ),
+            ' and L. ', ', @L. '
         ),
         ', et al.', ' et al.'
     )

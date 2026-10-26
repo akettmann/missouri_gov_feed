@@ -90,12 +90,23 @@ acts as (
     where s.n <= {{ dbt.length('o.note') }} - {{ dbt.length(dbt.replace('o.note', "','", "''")) }} + 1
 ),
 
+-- "@" marks an act the note joined with " and L." (normalize_session_law_note): it follows its previous act's change
+acts_marked as (
+    select
+        section_id,
+        section_version_id,
+        act_index,
+        act like '@%' as after_and_l,
+        {{ mogov.regex_replace_all('act', '^@', '') }} as act
+    from acts
+),
+
 acts_flagged as (
     select
         *,
         {{ mogov.regex_matches('act', act_head ~ '[0-9]{4}') }} as is_head,
         {{ mogov.regex_matches('act', '^(merged with )?' ~ bill_item ~ '[0-9]') }} as is_continuation
-    from acts
+    from acts_marked
 ),
 
 -- the last piece before each continuation that isn't itself a continuation: the act it continues, if that is an act
@@ -121,6 +132,7 @@ acts_resolved as (
         section_id,
         section_version_id,
         act_index,
+        after_and_l,
         act
     from acts_flagged
     where is_head
@@ -131,6 +143,7 @@ acts_resolved as (
         c.section_id,
         c.section_version_id,
         c.act_index,
+        h.after_and_l,
         -- the head's "A.L. 1978" (and session), then the continuing piece
         {{ mogov.regex_extract('h.act', '^((Repealed )?(A\\.L\\.|L\\.|A\\.) [0-9]{4}( ' ~ ex_sess ~ ')?)( |$)', 1) }}
         || ' ' || {{ mogov.regex_replace_all('c.act', '^merged with ', '') }} as act
@@ -146,17 +159,38 @@ acts_resolved as (
         and {{ mogov.regex_matches('h.act', act_head ~ '[0-9]{4}( ' ~ ex_sess ~ ')?( ' ~ bill_item ~ '[0-9]|$)') }}
 ),
 
+own_change as (
+    select
+        *,
+        case
+            when act like 'Repealed %' then 'repealed'
+            when act like 'A.L. %' or act like 'A. %' then 'amended'
+            else 'enacted'
+        end as change
+    from acts_resolved
+),
+
+-- a bare "L." joined with " and L." to a repealed act is repealed too: "Repealed" in a repeal note covers the list
+inherited_change as (
+    select
+        *,
+        case
+            when
+                after_and_l
+                and lag(change) over (partition by section_id, section_version_id order by act_index) = 'repealed'
+                then 'repealed'
+            else change
+        end as final_change
+    from own_change
+),
+
 parsed_acts as (
     select
         section_id,
         section_version_id,
         act_index,
         act,
-        case
-            when act like 'Repealed %' then 'repealed'
-            when act like 'A.L. %' or act like 'A. %' then 'amended'
-            else 'enacted'
-        end as change,
+        final_change as change,
         {{ dbt.safe_cast(mogov.regex_extract('act', act_head ~ '([0-9]{4})', 3), dbt.type_int()) }} as act_year,
         {{ mogov.regex_extract('act', act_head ~ '[0-9]{4} ' ~ ex_ord ~ ' (Ex\\.|Extraordinary)', 3) }} as ex_ordinal,
         {{ mogov.regex_matches('act', act_head ~ '[0-9]{4} ' ~ ex_sess ~ ' ') }} as is_extra,
@@ -164,7 +198,7 @@ parsed_acts as (
         {{ mogov.regex_replace_all(
             mogov.regex_replace_all('act', act_head ~ '[0-9]{4} ', ''), '^' ~ ex_sess ~ ' ', ''
         ) }} as refs
-    from acts_resolved
+    from inherited_change
 ),
 
 numbered as (
