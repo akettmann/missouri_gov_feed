@@ -191,12 +191,38 @@ def _clear_stale_scratch(table: str, shard: Shard) -> None:
             stale.unlink(missing_ok=True)
 
 
+def _unlink_lock_if_free(lock_path: Path) -> None:
+    """Delete an old shard count's lock file, unless a live run still holds it. Held is detected with a
+    non-blocking lock (on POSIX unlinking a held file succeeds and would let a later run lock a fresh file
+    alongside the live one; on Windows the unlink would fail anyway). Closing before unlinking leaves a tiny
+    window; overlapping shard counts are unsupported, so that is accepted."""
+    try:
+        fh = lock_path.open("r+b")  # never creates: a lock file that is already gone needs nothing
+    except OSError:
+        return
+    try:
+        try:
+            _lock_fd(fh.fileno())
+        except OSError:  # held by a live run (or the filesystem can't lock): leave the file alone
+            log.debug("shard_lock_file_kept", path=str(lock_path))
+            return
+        _unlock_fd(fh.fileno())
+    finally:
+        fh.close()
+    with contextlib.suppress(OSError):
+        lock_path.unlink(missing_ok=True)
+
+
 def _drop_other_shard_counts(folder: Path, shard: Shard) -> None:
+    """Remove parts, and lock files, written under a different shard count. A lock file is removed even when
+    its part never got published (a run that failed first leaves only the lock), if no run holds it."""
+    suffix = f"-of-{shard.count:03d}.parquet"
     for old in folder.glob("part-*-of-*.parquet"):
-        if not old.name.endswith(f"-of-{shard.count:03d}.parquet"):
+        if not old.name.endswith(suffix):
             old.unlink(missing_ok=True)
-            with contextlib.suppress(OSError):  # its lock file; skip if a run of that old count still holds it
-                (folder / f".{old.name}.lock").unlink(missing_ok=True)
+    for lock_path in folder.glob(".part-*-of-*.parquet.lock"):
+        if not lock_path.name.endswith(f"{suffix}.lock"):
+            _unlink_lock_if_free(lock_path)
 
 
 def remove_part(table: str, shard: Shard = UNSHARDED) -> None:
