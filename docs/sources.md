@@ -433,6 +433,16 @@ Flow: [diagrams/sources/voteview.svg](diagrams/sources/voteview.svg)
 - Window: `MOGOV_VOTEVIEW_CONGRESSES`.
 - Full-chamber files; Missouri members are picked out in dbt.
 
+Quirks:
+- The members file also lists the Presidents, with chamber `President` and ICPSR ids 99912/99913 (two rows each
+  in the loaded congresses). `stg_voteview__members` keeps only House and Senate rows.
+- The votes file carries the President's announced position on some roll calls as vote rows under those same
+  999xx ICPSR ids, with the roll call's chamber (House or Senate; 941 rows in the loaded congresses). They aren't
+  members of a chamber, so `stg_voteview__votes` drops icpsr >= 99000 explicitly. A test on that column fails if
+  the filter goes.
+- The rollcalls file has only House and Senate rows, and the source `accepted_values` tests on all three files
+  flag any new chamber value; staging drops unknown chambers either way.
+
 ## house_fd: U.S. House financial disclosures
 
 Flow: [diagrams/sources/house_fd.svg](diagrams/sources/house_fd.svg)

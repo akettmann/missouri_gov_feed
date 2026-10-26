@@ -352,6 +352,17 @@ models:
     files (member_key is the ICPSR id). Chamber-wide figures (party majorities, chamber attendance) count from here,
     so they don''t depend on who holds office today. vote_id, chamber and session_code match fct_votes. Grain: one
     row per (chamber, vote, member) for every member, tracked or not.'
+  columns:
+  - name: chamber
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - state_house
+          - state_senate
+          - us_house
+          - us_senate
 - name: int_votes__party_positions
   description: 'Each party''s majority position on every recorded vote, counted over every member who voted (int_votes__member_votes),
     not only the officials tracked today. A party''s position is the side most of its yea/nay voters took; a tie
