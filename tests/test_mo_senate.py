@@ -93,3 +93,51 @@ def test_vote_blocks_parse_and_counts_match_declared_totals():
     for (block, cat), n in Counter((r["block_index"], r["category"]) for r in rows).items():
         declared = next(r["declared_count"] for r in rows if r["block_index"] == block and r["category"] == cat)
         assert declared is None or declared == n, (block, cat, n, declared)
+
+
+def test_vacancy_count_lands_on_every_row_of_its_block():
+    rows = parse_journal(BLOCKS_2022)
+    assert {r["vacancies"] for r in rows} == {0}
+    # "Vacancies—None" is zero; a printed number is that many
+    text = BLOCKS_2022.replace("Vacancies—None", "Vacancies—1", 1)
+    rows = parse_journal(text)
+    assert {r["vacancies"] for r in rows if r["block_index"] == 0} == {1}
+    assert {r["vacancies"] for r in rows if r["block_index"] == 1} == {0}
+
+
+def test_vacancy_count_forms():
+    base = BLOCKS_2022
+    for printed, expected in [("Vacancies—Senator—2", 2), ("Vacancies-3", 3), ("Vacancies—None", 0)]:
+        rows = parse_journal(base.replace("Vacancies—None", printed, 1))
+        assert {r["vacancies"] for r in rows if r["block_index"] == 0} == {expected}, printed
+
+
+# 2024+ order: "Excused from voting" is printed AFTER "Vacancies", possibly past a page header
+EXCUSED_AFTER_VACANCIES = """HB 1 was read the 3rd time and passed by the following vote:
+YEAS—Senators
+Bean Beck Bernskoetter Brattin Brown Burlison Cierpiot
+Crawford Eslinger Gannon Hoskins Hough Koenig Luetkemeyer
+May O'Laughlin Onder Razer Riddle Rizzo Roberts
+Rowden Schatz Thompson Rehder Washington White Wieland—27
+NAYS—Senators
+Arthur Moon Mosley Schupp—4
+Absent—Senators—None
+Absent with leave—Senators—2
+Eigel Gannon
+Vacancies—None
+Journal of the Senate 2308
+Excused from voting—Senator Williams—1
+"""
+
+
+def test_excused_printed_after_vacancies_is_kept():
+    rows = parse_journal(EXCUSED_AFTER_VACANCIES)
+    excused = [r for r in rows if r["category"] == "Excused from voting"]
+    assert [(r["name"], r["declared_count"], r["vacancies"]) for r in excused] == [("Williams", 1, 0)]
+
+
+def test_vacancies_reads_the_first_token_only():
+    base = BLOCKS_2022
+    assert {r["vacancies"] for r in parse_journal(base) if r["block_index"] == 0} == {0}
+    text = base.replace("Vacancies—None", "Vacancies—None 5", 1)
+    assert {r["vacancies"] for r in parse_journal(text) if r["block_index"] == 0} == {0}

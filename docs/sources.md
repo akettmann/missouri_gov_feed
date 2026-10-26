@@ -49,13 +49,15 @@ the only per-member House vote record.
   it, not when the House published it), then typed tables parsed from those files by `mogov.parsers.mo_house`:
   `mo_house_xml_bills` with child tables `_bill_actions` (with printed roll-call totals), `_bill_sponsors`,
   `_bill_texts`, `_bill_amendments`, `_bill_rollcalls`, `_bill_subjects`, `_bill_hearings`, `_bill_summaries`,
-  `_bill_fiscal_notes` and `_bill_witnesses` (witness-form links only); `mo_house_xml_members` with
+  `_bill_fiscal_notes` and `_bill_witnesses` (witness-form links only; empty `<Witness/>` elements are not landed); `mo_house_xml_members` with
   `_member_committees` and `_member_counties`; `mo_house_xml_sessions`, `_committees` and `_committee_members`;
   one row per item of the BillList, MemberList, UpcomingHearingList and CalendarList files plus the lists'
   `NOTICE` text (`_list_notices`); and the SenateActList (the House's actions on Senate bills) as
   `mo_house_xml_senate_act_bills` with child tables `mo_house_xml_senate_act_` + `actions`, `texts`, `amendments`,
-  `rollcalls`, `subjects`, `hearings`, `summaries`, `fiscal_notes`, `witnesses` (each child row carries a `bill`
-  column naming its Senate bill). The roll-call PDFs land as `mo_house_rollcalls` and
+  `rollcalls`, `hearings`, `summaries`, `fiscal_notes`, `witnesses` (each child row carries a `bill`
+  column naming its Senate bill; the list has no sponsor or subject children, the sponsor is on the bill row as
+  `sponsor_name`/`sponsor_district`/`sponsor_link`). Bill, text, amendment, summary, fiscal-note and witness-form
+  links reach `marts.fct_bill_documents`. The roll-call PDFs land as `mo_house_rollcalls` and
   `mo_house_rollcall_votes`.
 - Window: `MOGOV_LOOKBACK_YEARS` (default 10). Roll-call PDFs go back to 2014.
 - Shard units: session codes (XML) and session days (roll-call PDFs).
@@ -67,6 +69,16 @@ Quirks:
   interleaved with 663 real 2017 ones), none linked from the bill XML. Raw keeps them as served;
   `stg_mo_house__rollcalls` drops roll calls dated outside their session code's year (2016's session, 161, is
   not loaded). Issue #430.
+- Other sessions' PDFs also sit in a session's directory (issue #435). `stg_mo_house__rollcalls` checks the header's
+  General Assembly and session label against the session code (regular sessions: FIRST in odd years, SECOND in
+  even; extraordinary and special sessions: any EXTRAORDINARY or SPECIAL label, since 173 prints SPECIAL, 184
+  FIRST EXTRAORDINARY and 174 SECOND EXTRAORDINARY). Dropped: `bills171/rollcalls/002.001`, `002.002` (voting-board test records, Y for the first six names alphabetically or MORRIS+KIDD only; 173 has its own
+  different 2.1/2.2), `bills201/rollcalls/012.001` (a copy of 203's), `bills204/rollcalls/003.002`, `003.003`
+  (2020-11-19 non-votes: voting-board test/practice records under a regular-session header; HB 2315 was never
+  third-read in 201 and "Session Day : 3" is 204's counter). Only a recognised label under the wrong kind of code
+  drops a row; an unknown label is kept and fails an accepted_values test. The House also
+  publishes some roll calls twice under two file names (261: `003.001`/`003.002`, `004.002`/`004.004`,
+  `004.003`/`004.005`, identical content); the file whose name carries the printed roll-call number is kept.
 - The XML is never converted on the way in: the loader gzips each file as received. The parser reads the
   gzip with lxml (hardened settings in `mogov.xmlparse`) and selects elements by local name, so namespaces,
   attributes, entities and CDATA are the parser's problem, not a regex's. The links that drive crawling
@@ -82,6 +94,7 @@ Quirks:
   finds no other unread element; the scan script lists them by file kind.
 - The House BillList lists some bills twice (HR1 and HR2 in the odd-year sessions); the loader fetches and lands
   each linked file once.
+- `AmendmentText` is misnamed: it holds the link to the amendment's PDF (`.../bills181/amendpdf/4083H03.02H.pdf`), not text, and is filled on every amendment (8,775 House, 1,023 SenateActList). `MapLink` (the change map) is filled on only a handful, so `stg_mo_house__bill_amendments` stages `amendment_text` as `amendment_url` and `fct_bill_documents` carries both an `amendment` and an `amendment_map` kind.
 - `AmendmentSortValue` looks like `0507HH`, so `mo_house_xml_bill_amendments.sort_value` is text. A value that
   does not fit its column type (an integer or date field holding something else) becomes NULL and is logged
   (`mo_house.value_not_integer` / `mo_house.value_not_date`), and a document lxml had to repair is logged as
@@ -202,6 +215,13 @@ Quirks:
 - Names are space-separated, so a two-word surname looks like two senators. Known ones are listed in
   `COMPOUND_SURNAMES` (Holly Thompson Rehder, printed "Thompson Rehder"); dbt matches a two-word token on
   its last word. The PDF text sometimes cuts "Senator" short ("Senato"); such words are skipped.
+- The block's closing `Vacancies—None` / `Vacancies—N` lands as `vacancies` on every row of the vote
+  (`stg_mo_senate__votes.vacancies`). The `assert_senate_seats_sum_to_34` dbt test (error) checks that senators
+  listed + vacancies = 34, with one allow-listed vote: 2021-04-29, HB 574 (`RDay5804291051-1071.pdf` #4), where the
+  journal itself prints only 32 names (YEAS 23, NAYS 9) and omits Eigel and Hough. From 2024 the journal prints
+  "Excused from voting" after the Vacancies line; the parser's block includes that trailing line (until
+  October 2026 it stopped at Vacancies and dropped every 2024+ recusal). `assert_senate_vacancies_parsed`
+  fails if `vacancies` is null on every row, i.e. `mo_senate` was never reloaded after the count was added.
 - The `assert_votes_within_seats` dbt test fails if a vote lists more than 34 senators. It caught all of
   the above: 443 votes listed 35 or 36 names before the fixes.
 - PDF parsing (about 3 s per journal) dominates a cold run, so it shards well. The extracted text is
@@ -1030,7 +1050,7 @@ Flow: [diagrams/sources/mo_auditor.svg](diagrams/sources/mo_auditor.svg)
 - Site: https://auditor.mo.gov/AuditReport/Reports, backed by the JSON list `/AuditReport/SearchAudits`. No auth. The loader
   keeps to about 1 request a second in total: the throttle is shared by every shard on the machine (`http.host_throttle`).
 - Lands: `mo_auditor_reports` (the list rows verbatim plus `search_year`) and `mo_auditor_ratings` (the rating sentence read
-  from a PDF, with its url, page and extraction status). First full run: 3,494 reports (1999 to 2026), 1,125 PDFs read,
+  from a PDF, with its url, page and extraction status). First full run: 3,494 reports (1999 to 2026), 1,124 PDFs read (the first run read 1,125 before #439 narrowed the unrated-title pattern),
   about 30 minutes.
 - Quirks:
   - An unfiltered list call returns only the newest 1,000 rows, so the loader asks one year at a time and fails loudly if a

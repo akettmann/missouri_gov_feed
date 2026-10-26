@@ -186,3 +186,48 @@ unit_tests:
       format: sql
       rows: |
           select '171' as session_code, 'HB2' as bill, 'Sponsor' as sponsor_type, 'Smith' as sponsor_name, 'state_house' as sponsor_chamber, 5 as sponsor_district, 'p_smith' as official_id
+
+  - name: bill_documents_one_row_per_link_with_its_kind
+    model: fct_bill_documents
+    description: >
+      Each staged link becomes one row tagged with its kind: a text version gives a bill_text row and, when it
+      has a change map, a text_map row; an amendment gives an amendment row and, when it has a change map, an
+      amendment_map row. A summary the XML lists under two versions (same link) is one row, with the lower index
+      and the name at that index, not the alphabetically first name (index 1 "Perfected", index 2 "House Committee
+      Substitute" keeps "Perfected"). A text version with no map gives no map row. Dropping the map rows, not
+      collapsing repeated links, or taking the alphabetically first label fails this test.
+    given:
+      - input: ref('stg_mo_house__bill_summaries')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('HB1' as varchar) as bill, cast(1 as bigint) as summary_index, cast('Perfected' as varchar) as document_name, cast('https://documents.house.mo.gov/s/a.pdf' as varchar) as summary_url union all
+            select '251', 'HB1', 2, 'House Committee Substitute', 'https://documents.house.mo.gov/s/a.pdf'
+      - input: ref('stg_mo_house__bill_fiscal_notes')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('HB1' as varchar) as bill, cast(1 as bigint) as fiscal_note_index, cast('https://documents.house.mo.gov/f/1.pdf' as varchar) as fiscal_note_url
+      - input: ref('stg_mo_house__bill_witness_forms')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('SB7' as varchar) as bill, cast(1 as bigint) as witness_index, cast('https://documents.house.mo.gov/w/SB7.pdf' as varchar) as witness_forms_url, cast('Testimony' as varchar) as description
+      - input: ref('stg_mo_house__bill_texts')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('HB1' as varchar) as bill, cast(1 as bigint) as text_index, cast('Introduced' as varchar) as document_name, cast('Intro web' as varchar) as web_name, cast('https://documents.house.mo.gov/t/1.pdf' as varchar) as text_url, cast('https://documents.house.mo.gov/m/1.pdf' as varchar) as map_url union all
+            select '251', 'HB1', 2, 'Perfected', null, 'https://documents.house.mo.gov/t/2.pdf', null
+      - input: ref('stg_mo_house__bill_amendments')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('HB1' as varchar) as bill, cast(1 as bigint) as amendment_index, cast('House Amendment 1' as varchar) as description, cast('https://documents.house.mo.gov/a/am1.pdf' as varchar) as amendment_url, cast('https://documents.house.mo.gov/m/am1.pdf' as varchar) as map_url union all
+            select '251', 'HB1', 2, 'House Amendment 2', 'https://documents.house.mo.gov/a/am2.pdf', null
+    expect:
+      rows:
+        - {session_code: '251', bill: HB1, document_kind: summary, document_url: 'https://documents.house.mo.gov/s/a.pdf', document_index: 1, label: Perfected}
+        - {session_code: '251', bill: HB1, document_kind: fiscal_note, document_url: 'https://documents.house.mo.gov/f/1.pdf', document_index: 1, label: null}
+        - {session_code: '251', bill: SB7, document_kind: witness_form, document_url: 'https://documents.house.mo.gov/w/SB7.pdf', document_index: 1, label: Testimony}
+        - {session_code: '251', bill: HB1, document_kind: bill_text, document_url: 'https://documents.house.mo.gov/t/1.pdf', document_index: 1, label: Intro web}
+        - {session_code: '251', bill: HB1, document_kind: bill_text, document_url: 'https://documents.house.mo.gov/t/2.pdf', document_index: 2, label: Perfected}
+        - {session_code: '251', bill: HB1, document_kind: text_map, document_url: 'https://documents.house.mo.gov/m/1.pdf', document_index: 1, label: Intro web}
+        - {session_code: '251', bill: HB1, document_kind: amendment, document_url: 'https://documents.house.mo.gov/a/am1.pdf', document_index: 1, label: House Amendment 1}
+        - {session_code: '251', bill: HB1, document_kind: amendment, document_url: 'https://documents.house.mo.gov/a/am2.pdf', document_index: 2, label: House Amendment 2}
+        - {session_code: '251', bill: HB1, document_kind: amendment_map, document_url: 'https://documents.house.mo.gov/m/am1.pdf', document_index: 1, label: House Amendment 1}
