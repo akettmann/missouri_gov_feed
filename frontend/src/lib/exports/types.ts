@@ -2,6 +2,7 @@
 // Column names follow the dbt marts / planned rpt_* contracts so a real export can replace a fixture as-is.
 
 import type { PayVoteRow } from "../attendancePay";
+import type { CommitteeSession } from "../committeePosts";
 
 export type Confidence = string; // 'exact id' | 'exact (MEC crosswalk)' | 'high' | 'medium' | ...
 
@@ -297,6 +298,8 @@ export interface OfficialBundle {
   };
   /** null when the rpt_interest_vote_overlap export is missing */
   overlap: InterestOverlap[] | null;
+  /** House committee posts by session, newest first; null when either committee export is missing */
+  committees: CommitteeSession[] | null;
   courts: {
     status: string;
     /** cases per filing year and role; null when the export is missing */
