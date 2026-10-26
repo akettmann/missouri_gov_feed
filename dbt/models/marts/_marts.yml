@@ -1964,6 +1964,10 @@ models:
       - name: session_type
         data_type: varchar
         description: The House's type code (R regular, S1, S2 later sessions of the year).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['R', 'S1', 'S2', 'S3']
       - name: general_assembly
         data_type: varchar
         description: General Assembly the session belongs to ("103rd General Assembly").

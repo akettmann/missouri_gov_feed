@@ -260,6 +260,11 @@ async function loadAll(): Promise<OfficialBundle[]> {
   );
 
   // The House's own session names (dim_house_session); a missing export or session leaves the label honest ("session code NNN")
+  if (!hasExport("dim_house_session")) {
+    console.warn(
+      "dim_house_session is missing from the exports, so House sessions are labelled by session code instead of the House's session name. Re-export: `uv run mogov build`, then `uv run mogov export --format parquet`.",
+    );
+  }
   const houseSessionNames = new Map<string, string>(
     hasExport("dim_house_session")
       ? (
@@ -680,6 +685,7 @@ export function freshness(): { table: string; exported_at: string | null; sample
     "fct_committee_memberships",
     "rpt_attendance",
     "rpt_attendance_pay",
+    "dim_house_session",
     "rpt_votes_by_subject",
     "rpt_interest_vote_overlap",
     "fct_jurisdiction_businesses",

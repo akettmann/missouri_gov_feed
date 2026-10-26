@@ -96,7 +96,7 @@ Quirks:
   snapshot is end-of-session, and the dbt marts keep only people in `dim_official`, so older sessions have
   few rows (9 officials in 2017, 151 in 2026). Committee names change between sessions. The metric counts
   full-committee chairs separately from subcommittee chairs.
-  The `COMMITTEELIST` lists carry no Co-Chair seats at all (2025 regular session: member pages show 3 co-chair posts the list lacks), and 253's list names fewer committees than 251 or 254 (no Conference Committee on Budget, 22 seats; none of the two property tax special committees, 40 seats), so 253 shows 617 committee seats against 697 in 251 and 685 in 254. The joint committees are in the list. The profile says so under the 253 row.
+  The `COMMITTEELIST` lists carry no Co-Chair seats at all (2025 regular session: member pages show 3 co-chair posts the list lacks), and 253's list names fewer committees than 251 or 254 (no Conference Committee on Budget, 22 seats; neither of the two property tax special committees, 40 seats), so 253 shows 617 committee seats against 697 in 251 and 685 in 254. The joint committees are in the list. The profile says so under the 253 row.
 - Bill sponsorship success (share of a member's sponsored bills that passed) is not built yet: it needs the
   bill status from #34, which is in flight in another session.
 - PDF text extraction is cached by PDF content (`data/cache/pdftext/`). Before that, a re-run spent
