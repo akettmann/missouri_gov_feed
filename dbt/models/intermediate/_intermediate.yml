@@ -252,7 +252,12 @@ models:
     years with a House roster, from the House''s own roster (its raw seat-matched key: an Open States id or mohouse:<House
     member id>) and from Open States seat-terms (both chambers). A term counts for a year when it runs past January
     15 of it, and terms with an undated start are left out, as in int_officeholders__years. name_key is the id''s
-    own full name. Grain: one row per (alias_id, year, office, district). Grain: one row per (id as sourced, year,
+    own full name. term_start/term_end are the Open States term''s dates exactly as Open States gives them (DATE;
+    end 9999-12-31 while open; null for House roster rows, which carry only a year), so a rule can tell overlap
+    from succession. They are not the January-1 adjusted dates used for the year membership above: those would make
+    a January successor (from Jan 1) overlap a predecessor Open States ends on Jan 6-9. Known edge: the min(start)/max(end)
+    collapse per (alias_id, year, office, district) spans any gap if one id holds the same seat in two separate
+    terms in a year. Grain: one row per (alias_id, year, office, district). Grain: one row per (id as sourced, year,
     office, district).'
 - name: int_officials__name_keys
   description: 'Normalized name variants per current official, for matching sources that only carry names (MEC committees,
@@ -265,15 +270,26 @@ models:
     in int_officials__identity_terms gets one row: alias_id (as the source gave it) -> person_id (what the pipeline
     calls the person). Rules, in order: 1. seed official_id_links, same_person: a curated id for a person the name
     rule can''t join (statewide officers, judges). basis = curated. 2. ids with the same exact full name (case,
-    punctuation and spacing ignored) are one person, basis = name_continuity, unless two of them hold different
-    seats in more than one shared year. The same seat in the same year is how a split shows (Jean Evans, Joe Adams);
-    different seats across several shared years mean two people, while a single shared year is a hand-over between
-    seats. A pair listed as different_people in official_id_links also keeps that whole name apart. 3. otherwise
-    the id is its own person, basis = self. Among merged ids the person_id is an Open States id over mohouse:, then
-    the one whose service ends latest, then the smaller id. The choice never looks at the latest roster year, so
-    an official''s id does not change when they leave office. Curated rows (official_id_links) take effect only
-    once a maintainer has signed them off (checked_by filled). Grain: one row per alias_id. Grain: one row per id
-    a legislator has been given, with the stable person_id.'
+    punctuation and spacing ignored: "Van Schoiack" and "VanSchoiack" are one name, #228) are one person, basis
+    = name_continuity, unless two of them hold different seats in more than one shared year. The same seat in the
+    same year is how a split shows (Jean Evans, Joe Adams); different seats across several shared years mean two
+    people, while a single shared year is a hand-over between seats. A pair listed as different_people in official_id_links
+    also keeps that whole name apart. 2b. two names that differ only in the given name, one being the start of the
+    other ("Steve"/"Steven" Roberts, "Ken"/"Kenneth" Jamison; #263), are one person when each name belongs to exactly
+    one such pair and the names never hold different seats in the same year (across all ids of both names), and
+    either hold a seat at the same time (their dated terms in one seat overlap: start_a < end_b and start_b < end_a,
+    an open term ending 9999-12-31; the same start day overlaps, one term ending the day the other starts does not),
+    or follow each other within a year in a different chamber (a move, as Roberts went House to Senate). Years alone
+    cannot decide the shared-seat case: Kenneth Jamison (2025 only) inside Ken Jamison (2025-26) is a duplicate,
+    but Danielle Smith (2019 only, or 2026 only after a special election) inside a Dan Smith successor''s span looks
+    the same by year. Dates tell them apart: Kenneth''s term is a stub that overlaps Ken''s, while a successor''s
+    term starts on or after the predecessor''s ends. Undated House-roster rows prove no overlap. A name left with
+    more than one partner (a chain or a fork) is ambiguous and joins nothing. 3. otherwise the id is its own person,
+    basis = self. Among merged ids the person_id is an Open States id over mohouse:, then the one whose service
+    ends latest, then the smaller id. The choice never looks at the latest roster year, so an official''s id does
+    not change when they leave office. Curated rows (official_id_links) take effect only once a maintainer has signed
+    them off (checked_by filled). Grain: one row per alias_id. Grain: one row per id a legislator has been given,
+    with the stable person_id.'
 - name: int_officials__wikidata
   description: 'Wikidata QID per official: from roster cross-references when present, else a unique exact name match
     against living Missouri officeholders on Wikidata. Grain: one row per official with a Wikidata QID.'
