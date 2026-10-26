@@ -773,8 +773,10 @@ unit_tests:
     description: >
       The first House roster year is 2017. A member whose Open States seat ended 2016-12-31 (Stephen Webber, House
       to 2016, Senate from 2025; #504) has no roster row, so without the year before the first roster year he would
-      leave no evidence at all and keep an id of his own. 2016 is covered, 2015 is not (a seat ended 2015-12-31 is
-      two years back), and the 2016 row carries no House roster row (the roster starts 2017).
+      leave no evidence at all and keep an id of his own. 2016 and 2015 are covered (Tom Dempsey and Paul LeVota
+      resigned in mid-2015; #512), 2014 is not (a seat ended 2014-12-31 is three years back, and the older Open
+      States terms are mostly placeholder starts, #332), and the 2016 row carries no House roster row (the roster
+      starts 2017).
     given:
       - input: ref('int_mo_house__member_seat_keys')
         rows:
@@ -784,8 +786,48 @@ unit_tests:
       - input: ref('int_mo_legislators__seat_terms')
         rows:
           - {openstates_id: ocd-person/webber-house, chamber: lower, district_number: 46, full_name: Stephen Webber, start_date: '2013-01-01', end_date: '2016-12-31', source_start_date: '2013-01-01', source_end_date: '2016-12-31'}
-          - {openstates_id: ocd-person/old-house, chamber: lower, district_number: 12, full_name: Olive Old, start_date: '2011-01-01', end_date: '2015-12-31', source_start_date: '2011-01-01', source_end_date: '2015-12-31'}
+          - {openstates_id: ocd-person/old-house, chamber: lower, district_number: 12, full_name: Olive Old, start_date: '2011-01-01', end_date: '2014-12-31', source_start_date: '2011-01-01', source_end_date: '2014-12-31'}
+          - {openstates_id: ocd-person/dempsey, chamber: upper, district_number: 23, full_name: Tom Dempsey, start_date: '2007-09-18', end_date: '2015-08-07', source_start_date: '2007-09-18', source_end_date: '2015-08-07'}
     expect:
       rows:
         - {alias_id: 'mohouse:9', year: 2017, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: ocd-person/webber-house, year: 2015, office: state_house, district: '46', name_key: stephen webber, term_start: '2013-01-01', term_end: '2016-12-31'}
         - {alias_id: ocd-person/webber-house, year: 2016, office: state_house, district: '46', name_key: stephen webber, term_start: '2013-01-01', term_end: '2016-12-31'}
+        - {alias_id: ocd-person/dempsey, year: 2015, office: state_senate, district: '23', name_key: tom dempsey, term_start: '2007-09-18', term_end: '2015-08-07'}
+
+  - name: identity_terms_undated_start_counts_for_its_last_year
+    model: int_officials__identity_terms
+    description: >
+      Open States gives 22 senators of 2017-2023 no start date (#512); int_mo_legislators__seat_terms puts such a
+      start at 1900-01-01. Their first year is unknown, but the end date proves the last year: the id gets one row for
+      the last year its term ran past the January 15 handover, not a row for every year since 1900. A term ending
+      2023-01-04 (before the 2023 handover) is last held in 2022; one ending 2020-01-16 (after the handover) in
+      2020; a dated term is unchanged. The roster years in the fixture are 2017-2022.
+    given:
+      - input: ref('int_mo_house__member_seat_keys')
+        rows:
+          - {raw_person_key: 'mohouse:9', session_year: 2017, district_number: 99, full_name: Zed Zed, openstates_id: null}
+          - {raw_person_key: 'mohouse:9', session_year: 2018, district_number: 99, full_name: Zed Zed, openstates_id: null}
+          - {raw_person_key: 'mohouse:9', session_year: 2019, district_number: 99, full_name: Zed Zed, openstates_id: null}
+          - {raw_person_key: 'mohouse:9', session_year: 2020, district_number: 99, full_name: Zed Zed, openstates_id: null}
+          - {raw_person_key: 'mohouse:9', session_year: 2021, district_number: 99, full_name: Zed Zed, openstates_id: null}
+          - {raw_person_key: 'mohouse:9', session_year: 2022, district_number: 99, full_name: Zed Zed, openstates_id: null}
+      - input: ref('stg_openstates__people')
+        rows: []
+      - input: ref('int_mo_legislators__seat_terms')
+        rows:
+          - {openstates_id: ocd-person/undated-a, chamber: upper, district_number: 22, full_name: Paul Wieland, start_date: '1900-01-01', end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
+          - {openstates_id: ocd-person/undated-b, chamber: upper, district_number: 9, full_name: Kiki Curls, start_date: '1900-01-01', end_date: '2020-01-16', source_start_date: null, source_end_date: '2020-01-16'}
+          - {openstates_id: ocd-person/dated, chamber: upper, district_number: 5, full_name: Dee Dated, start_date: '2019-01-01', end_date: '2020-12-31', source_start_date: '2019-01-01', source_end_date: '2020-12-31'}
+    expect:
+      rows:
+        - {alias_id: 'mohouse:9', year: 2017, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: 'mohouse:9', year: 2018, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: 'mohouse:9', year: 2019, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: 'mohouse:9', year: 2020, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: 'mohouse:9', year: 2021, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: 'mohouse:9', year: 2022, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: ocd-person/undated-a, year: 2022, office: state_senate, district: '22', name_key: paul wieland, term_start: null, term_end: '2023-01-04'}
+        - {alias_id: ocd-person/undated-b, year: 2020, office: state_senate, district: '9', name_key: kiki curls, term_start: null, term_end: '2020-01-16'}
+        - {alias_id: ocd-person/dated, year: 2019, office: state_senate, district: '5', name_key: dee dated, term_start: '2019-01-01', term_end: '2020-12-31'}
+        - {alias_id: ocd-person/dated, year: 2020, office: state_senate, district: '5', name_key: dee dated, term_start: '2019-01-01', term_end: '2020-12-31'}
