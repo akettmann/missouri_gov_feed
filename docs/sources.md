@@ -61,6 +61,12 @@ the only per-member House vote record.
 - Shard units: session codes (XML) and session days (roll-call PDFs).
 
 Quirks:
+- `bills171/rollcalls/` still holds the 2016 session's roll-call PDFs (numbered by 2016 session day, header
+  "98th General Assembly, Second Regular Session"). The probe walks past the last 2017 roll call of a day, so
+  it lands them under session 171: 415 roll calls dated 2016 (45 session days, 1/13/2016 to 5/13/2016,
+  interleaved with 663 real 2017 ones), none linked from the bill XML. Raw keeps them as served;
+  `stg_mo_house__rollcalls` drops roll calls dated outside their session code's year (2016's session, 161, is
+  not loaded). Issue #430.
 - The XML is never converted on the way in: the loader gzips each file as received. The parser reads the
   gzip with lxml (hardened settings in `mogov.xmlparse`) and selects elements by local name, so namespaces,
   attributes, entities and CDATA are the parser's problem, not a regex's. The links that drive crawling
@@ -952,7 +958,7 @@ offices, shops and most service businesses are missing.
   filtered to the receiving committee; a donor filed on both keeps both. Line breaks in a donor name become spaces so a
   line never splits; the frontend writes them as `<url> <donor name>` lines, which in the published sites.csv sit in one
   cell. A donor with no page has one row with a null `source_url`.
-- Industry: the NAICS code most of a site's programs give, taking primary codes first (`naics_source` `naics`,
+- Industry: the NAICS code the most program systems (RCRAINFO, NPDES, AIR, ...) give, one count per system however many records it has, taking primary codes first (`naics_source` `naics`,
   31% of the geocoded sites in October 2026), then codes FRS leaves UNKNOWN (`naics_unknown`, 2%), then SECONDARY
   ones (`naics_secondary`, 0.1%). A real NAICS code is more precise than a SIC-derived sector, so only a site with
   no NAICS code at all falls back to its SIC code (1987 Standard Industrial Classification, from
