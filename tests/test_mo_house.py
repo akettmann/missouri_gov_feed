@@ -1,7 +1,7 @@
 from collections import Counter
 from pathlib import Path
 
-from mogov.loaders.mo_house import _parse_rollcall_pdf, _probe_day, _rollcall_url
+from mogov.loaders.mo_house import _links, _parse_rollcall_pdf, _probe_day, _rollcall_url
 
 FIXTURE = Path(__file__).parent / "fixtures" / "house_rollcall_251_048_010.pdf"
 MISS = b"<!DOCTYPE html><html>error</html>"
@@ -77,3 +77,34 @@ def test_open_session_also_lands_its_session_list(monkeypatch):
     monkeypatch.setattr(mo_house, "fetch", fake_fetch)
     files = mo_house._session_files("261", 9999)  # a year that is never past
     assert "261-SESSIONLIST.XML" in files
+
+
+def test_links_plain_elements():
+    xml = (
+        b"<BillList><Bill><BillXMLLink>http://x/a.XML</BillXMLLink></Bill>"
+        b"<Bill><BillXMLLink> http://x/b.XML </BillXMLLink></Bill></BillList>"
+    )
+    assert _links(xml, "BillXMLLink") == ["http://x/a.XML", "http://x/b.XML"]
+
+
+def test_links_decode_entities():
+    xml = b"<R><RollCallPDF>http://x/a.pdf?p=1&amp;q=2</RollCallPDF></R>"
+    assert _links(xml, "RollCallPDF") == ["http://x/a.pdf?p=1&q=2"]
+
+
+def test_links_elements_with_attributes_or_namespace():
+    xml = b'<R xmlns:h="urn:h"><BillXMLLink type="x">http://x/a</BillXMLLink><h:BillXMLLink>http://x/b</h:BillXMLLink></R>'
+    assert _links(xml, "BillXMLLink") == ["http://x/a", "http://x/b"]
+    ns = b'<R xmlns="urn:h"><RollCallPDF>http://x/c.pdf</RollCallPDF></R>'
+    assert _links(ns, "RollCallPDF") == ["http://x/c.pdf"]
+
+
+def test_links_cdata_and_comments():
+    xml = b"<R><!-- <BillXMLLink>http://x/old</BillXMLLink> --><BillXMLLink><![CDATA[http://x/new?a=1&b=2]]></BillXMLLink></R>"
+    assert _links(xml, "BillXMLLink") == ["http://x/new?a=1&b=2"]
+
+
+def test_links_ignore_empty_and_non_xml():
+    assert _links(b"<R><BillXMLLink/><BillXMLLink>  </BillXMLLink></R>", "BillXMLLink") == []
+    assert _links(b"<!DOCTYPE html><html>error</html", "BillXMLLink") == []
+    assert _links(b"", "BillXMLLink") == []

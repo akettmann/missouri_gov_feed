@@ -7,6 +7,8 @@ Leaf elements become their stripped text. Attributes go under "@attr".
 
 from lxml import etree
 
+from mogov import xmlparse
+
 
 def element_to_obj(el: etree._Element) -> object:
     children = [c for c in el if isinstance(c.tag, str)]
@@ -23,6 +25,4 @@ def element_to_obj(el: etree._Element) -> object:
 
 
 def parse(data: bytes) -> object:
-    parser = etree.XMLParser(recover=True, huge_tree=True, resolve_entities=False, no_network=True)
-    root = etree.fromstring(data, parser)
-    return element_to_obj(root)
+    return element_to_obj(xmlparse.parse(data))

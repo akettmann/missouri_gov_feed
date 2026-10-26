@@ -48,6 +48,9 @@ the only per-member House vote record.
 - Shard units: session codes (XML) and session days (roll-call PDFs).
 
 Quirks:
+- Links that drive crawling (`RollCallPDF`, `BillXMLLink`, `RepresentativeXMLLink`) are read with lxml via
+  `mogov.xmlparse` (any namespace/attributes, entities decoded), never regex. Loader convention: XML is
+  parsed with `mogov.xmlparse`, never regex.
 - Session codes are two-digit year plus type: `1` regular, `2`–`4` extraordinary. Unknown codes return
   HTTP 200 with an HTML page, not a 404. The loader probes all four types per year and treats HTML as
   "no such session".

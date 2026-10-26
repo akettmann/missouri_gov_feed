@@ -19,7 +19,9 @@ from collections.abc import Callable, Iterator
 from datetime import date
 from functools import partial
 
-from mogov import db, obs, pdftext, xmljson
+from lxml import etree
+
+from mogov import db, obs, pdftext, xmljson, xmlparse
 from mogov.config import window_years
 from mogov.http import CacheMiss, fetch
 from mogov.loaders import loader
@@ -50,6 +52,15 @@ def _is_xml(data: bytes) -> bool:
     return data.lstrip()[:1] == b"<" and not data.lstrip()[:15].lower().startswith(b"<!doctype html")
 
 
+def _links(xml: bytes, tag: str) -> list[str]:
+    """Texts of every <tag> element in a document (any namespace/attributes); none if it isn't parseable XML."""
+    try:
+        root = xmlparse.parse(xml)
+    except (ValueError, etree.XMLSyntaxError):
+        return []
+    return [text for _, text in xmlparse.iter_text(root, tag)]
+
+
 def _session_files(code: str, year: int) -> dict[str, bytes]:
     """All XML files for a House session, keyed by upper-cased file name ({} if the session doesn't exist)."""
     past = year < date.today().year
@@ -76,8 +87,7 @@ def _session_files(code: str, year: int) -> dict[str, bytes]:
         listing = files.get(f"{code}-{kind}.XML".upper())
         if not listing:
             continue
-        for link in re.findall(rf"<{link_tag}>([^<]+)</{link_tag}>".encode(), listing):
-            url = link.decode().strip()
+        for url in _links(listing, link_tag):
             files[url.rsplit("/", 1)[-1].upper()] = fetch(url, delay=POLITE_DELAY)
     return files
 
@@ -150,11 +160,11 @@ def load(shard: db.Shard) -> dict[str, int]:
                 linked.setdefault(code, defaultdict(set))
             owned = shard.owns(code)
             for name, xml in files.items():
-                for url in re.findall(rb"<RollCallPDF>([^<]+)</RollCallPDF>", xml):
-                    if m := ROLLCALL_URL.search(url.decode().strip()):
+                for url in _links(xml, "RollCallPDF"):
+                    if m := ROLLCALL_URL.search(url):
                         linked.setdefault(m.group(1), defaultdict(set))[int(m.group(2))].add(int(m.group(3)))
                     else:
-                        log.warning("mo_house.rollcall_url_unexpected", url=url.decode().strip())
+                        log.warning("mo_house.rollcall_url_unexpected", url=url)
                 if not owned:
                     continue
                 stem = name.removesuffix(".XML")
