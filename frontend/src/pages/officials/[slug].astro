@@ -7,6 +7,7 @@ import ConfidenceToggle from "../../components/ConfidenceToggle.astro";
 import CoverageStrip from "../../components/CoverageStrip.astro";
 import ProfileScript from "../../components/ProfileScript.astro";
 import SectionBusinesses from "../../components/SectionBusinesses.astro";
+import SectionExpenses from "../../components/SectionExpenses.astro";
 import SectionCourts from "../../components/SectionCourts.astro";
 import SectionGifts from "../../components/SectionGifts.astro";
 import SectionIdeology from "../../components/SectionIdeology.astro";
@@ -106,6 +107,7 @@ const term = o ? [o.current_term_start, o.current_term_end].filter(Boolean).join
       <SectionVoting bundle={bundle} />
       <SectionMoney bundle={bundle} />
       <SectionGifts bundle={bundle} />
+      <SectionExpenses bundle={bundle} />
       <SectionOverlap bundle={bundle} />
       <SectionBusinesses bundle={bundle} />
       <SectionInterests bundle={bundle} />

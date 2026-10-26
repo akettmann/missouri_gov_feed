@@ -1,0 +1,134 @@
+---
+// Per diem and mileage the state paid a legislator, by state fiscal year (fct_legislator_expenses, from the
+// state's expenditures data). Per diem is a sourced number; mileage is context only.
+import type { OfficialBundle } from "../lib/exports/types";
+import { money } from "../lib/format";
+import { href } from "../lib/site";
+import { expenseYears, fiscalYearLabel, gapYears, showsExpenses } from "../lib/legislatorExpenses";
+import ConfidenceBadge from "./ConfidenceBadge.astro";
+import SourceLink from "./SourceLink.astro";
+
+interface Props {
+  bundle: OfficialBundle;
+}
+const { bundle } = Astro.props;
+const { expenses } = bundle;
+const show = showsExpenses(bundle.official.office, expenses);
+const perDiem = expenseYears(expenses ?? [], "per diem");
+const mileage = expenseYears(expenses ?? [], "mileage");
+const gaps = [...new Set([...gapYears(perDiem), ...gapYears(mileage)])].sort((a, b) => a - b);
+---
+
+{show && (
+  <section class="card" id="expenses" aria-labelledby="expenses-h">
+    <h2 id="expenses-h">Per diem and mileage</h2>
+    <p class="lede">
+      What the State of Missouri paid this official as a legislator: a daily expense allowance (per diem) and
+      in-state mileage, from the state's expenditure records, per state fiscal year (July to June).
+    </p>
+    {expenses === null ? (
+      <p class="muted small">Not available yet (the fct_legislator_expenses export is missing).</p>
+    ) : expenses.length === 0 ? (
+      <p class="muted small">
+        No per diem or mileage payment is matched to this official. Payees are matched to current legislators
+        through the state payroll; a payee whose name fits more than one legislator is left out, and former
+        legislators are not matched yet. This does not mean nothing was paid.
+      </p>
+    ) : (
+      <>
+        <h3>Per diem</h3>
+        {perDiem.length === 0 ? (
+          <p class="muted small">No per diem payment is matched to this official.</p>
+        ) : (
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>State fiscal year</th>
+                  <th class="num">Per diem paid</th>
+                  <th>Listed by the state as</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody>
+                {perDiem.map((y) => (
+                  <tr data-confidence={y.match_confidence === "medium" ? "medium" : undefined}>
+                    <td>
+                      {fiscalYearLabel(y.fiscal_year)} <ConfidenceBadge confidence={y.match_confidence} />
+                    </td>
+                    <td class="num">{money(y.amount)}</td>
+                    <td>{y.payee_name}</td>
+                    <td>
+                      <SourceLink
+                        url={y.source_url}
+                        label={`FY${y.fiscal_year} data`}
+                        context="State Expenditures, per diem"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p class="small muted">
+          Per diem is the legislative daily expense allowance, claimed for days attended, so it follows the
+          session calendar and committee work. It is not a measure of performance.
+        </p>
+
+        <h3>In-state mileage (context only)</h3>
+        {mileage.length === 0 ? (
+          <p class="muted small">No in-state mileage payment is matched to this official.</p>
+        ) : (
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>State fiscal year</th>
+                  <th class="num">Mileage paid</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mileage.map((y) => (
+                  <tr data-confidence={y.match_confidence === "medium" ? "medium" : undefined}>
+                    <td>
+                      {fiscalYearLabel(y.fiscal_year)} <ConfidenceBadge confidence={y.match_confidence} />
+                    </td>
+                    <td class="num">{money(y.amount)}</td>
+                    <td>
+                      <SourceLink
+                        url={y.source_url}
+                        label={`FY${y.fiscal_year} data`}
+                        context="State Expenditures, in-state mileage"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p class="small muted">
+          Mileage follows the distance from the district to the Capitol, so it says where a district is, not
+          how the legislator works.
+        </p>
+      </>
+    )}
+    <p class="small muted">
+      Amounts are what the state paid, not what was claimed, and each is the payee's total for the fiscal
+      year, not one payment. The state's records carry legal names, so payees are matched to officials through
+      the state payroll; "possible match" rows are matched on a looser name fit and can be hidden above.
+      {gaps.length > 0 && (
+        <>
+          {" "}
+          No row for {gaps.map((g) => `FY${g}`).join(", ")}: the payee was not paid or could not be matched.
+        </>
+      )}{" "}
+      Only current legislators are matched so far, so a legislator who has since left is missing. Source:
+      Missouri Accountability Portal "State Expenditures" on data.mo.gov, agency LEGISLATURE; see the State of
+      Missouri notice at the foot of this page.{" "}
+      <a href={href("/methodology/#per-diem-mileage")}>How this is counted</a>.
+    </p>
+  </section>
+)}

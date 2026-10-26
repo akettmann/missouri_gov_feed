@@ -50,6 +50,19 @@ const { title, description = "Measured lean and potential conflicts of interest 
     <footer class="wrap site-footer muted small">
       Evidence, not verdicts. Every figure links to its public source; see{" "}
       <a href={href("/methodology/")}>methodology</a> for what each measure can and can't tell you.
+      <p class="notice" id="state-data-notice">
+        The data made available here has been modified for use from its original source, which is the State of
+        Missouri. THE STATE OF MISSOURI MAKES NO REPRESENTATIONS OR WARRANTY AS TO THE COMPLETENESS, ACCURACY,
+        TIMELINESS, OR CONTENT OF ANY DATA MADE AVAILABLE THROUGH THIS SITE. THE STATE OF MISSOURI EXPRESSLY
+        DISCLAIMS ALL WARRANTIES, WHETHER EXPRESS OR IMPLIED, INCLUDING ANY IMPLIED WARRANTIES OF
+        MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE. The data is subject to change as modifications
+        and updates are complete. It is understood that the information contained in the Web feed is being
+        used at one's own risk. (State data policy:{" "}
+        <a href="https://mo.gov/data-policy" rel="noopener noreferrer" target="_blank">
+          mo.gov/data-policy
+        </a>
+        .)
+      </p>
     </footer>
   </body>
 </html>
@@ -77,6 +90,9 @@ const { title, description = "Measured lean and potential conflicts of interest 
     display: flex;
     flex-wrap: wrap;
     gap: 4px 16px;
+  }
+  .notice {
+    margin: 16px 0 0;
   }
   .site-footer {
     padding: 32px 16px 48px;

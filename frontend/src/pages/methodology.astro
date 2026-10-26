@@ -157,6 +157,33 @@ const tables = freshness();
     </p>
   </section>
 
+  <section class="card" id="per-diem-mileage">
+    <h2>Per diem and mileage</h2>
+    <p>
+      State legislators' profiles show the per diem (legislative daily expense allowance) and in-state mileage
+      the state paid them, from the Missouri Accountability Portal's "State Expenditures" datasets on
+      data.mo.gov (agency LEGISLATURE).
+    </p>
+    <ul>
+      <li>
+        <strong>Years</strong> are state fiscal years, July to June: FY2026 is July 2025 to June 2026.
+      </li>
+      <li>
+        <strong>Amounts</strong> are what the state paid, not what was claimed, and each is one payee's total
+        for the fiscal year and line, not one payment. Per diem is claimed for days attended and mileage
+        follows the distance from the district to the Capitol, so neither measures performance; mileage is
+        shown as context only.
+      </li>
+      <li>
+        <strong>Matching</strong>: the state lists legal names ("ATCHISON, FRANKLIN DARRELL"), so a payee is
+        matched to an official through the state payroll, which prints the same names. A payee whose name fits
+        more than one legislator is left out, and a name-only fit is flagged "possible match". Only current
+        legislators are matched so far, so a year can be missing because the payee was not matched, not
+        because nothing was paid.
+      </li>
+    </ul>
+  </section>
+
   <section class="card" id="pay-per-vote">
     <h2>Pay per vote attended</h2>
     <p>

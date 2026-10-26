@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { DONOR_GROUP_SQL } from "../rollups";
 import { exportedAt, hasExport, query } from "./db";
 import { payYearsGate, type PayVoteRow } from "../attendancePay";
+import { loadLegislatorExpenses } from "./legislatorExpenses";
 import { groupPast, linkSameName, type RosterRow } from "./past";
 import { sampleDonorCycles, sampleGiftRollup, sampleTopDonors } from "./fixtures";
 import type {
@@ -444,6 +445,8 @@ async function loadAll(): Promise<OfficialBundle[]> {
       )
     : null;
 
+  const expenses = await loadLegislatorExpenses();
+
   return profiles
     .sort((a, b) => (SORT_LEVEL[a.level] ?? 9) - (SORT_LEVEL[b.level] ?? 9))
     .map((p): OfficialBundle => {
@@ -515,6 +518,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
           committee_trails: trails ? ((trails.get(id) ?? []) as CommitteeTrail[]) : null,
         },
         gifts,
+        expenses: expenses ? (expenses.get(id) ?? []) : null,
         businesses: districtIndustries
           ? {
               donors: districtDonors.get(id) ?? [],
