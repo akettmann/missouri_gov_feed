@@ -5,6 +5,9 @@ const num = new Intl.NumberFormat("en-US");
 export const money = (n: number) => (Math.abs(n) >= 1000 ? usd0 : usd2).format(n);
 export const count = (n: number) => num.format(n);
 
+/** "1 case" / "2 cases", with thousands separators: use for any count followed by a noun. */
+export const plural = (n: number, one: string, many: string) => `${count(n)} ${n === 1 ? one : many}`;
+
 /** Federal courts: `district` holds a court key (moed, mowd, ca8), and the title already names the court. */
 const COURT_OFFICES = ["us_district_court", "us_court_of_appeals"];
 

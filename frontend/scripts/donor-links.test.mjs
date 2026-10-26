@@ -116,3 +116,81 @@ test("donorEntries keeps a comma-joined name as one donor (#276)", () => {
     { donor: "NETJETS ASSOCIATION OF SHARED AIRCRAFT PILOTS PAC, NJASAP PAC", urls: [] },
   ]);
 });
+
+const M1 = "https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C171365";
+const M2 = "https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C222315";
+const M3 = "https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C333333";
+const lines = (...pairs) => pairs.map(([u, d]) => `${u} ${d}`).join("\n");
+
+test("donorEntries folds a donor whose pages are a subset of another's into it (#342)", () => {
+  const raw = lines([M1, "AMEREN MISSOURI PAC"], [M2, "AMEREN MISSOURI PAC"], [M2, "Ameren MO PAC"]);
+  assert.deepEqual(donorEntries("AMEREN MISSOURI PAC; Ameren MO PAC", raw), [
+    { donor: "AMEREN MISSOURI PAC; Ameren MO PAC", urls: [M1, M2] },
+  ]);
+  // the subset donor listed first still folds into the superset, keeping donor_names order in the label
+  const rev = lines([M2, "Ameren MO PAC"], [M1, "AMEREN MISSOURI PAC"], [M2, "AMEREN MISSOURI PAC"]);
+  assert.deepEqual(donorEntries("Ameren MO PAC; AMEREN MISSOURI PAC", rev), [
+    { donor: "Ameren MO PAC; AMEREN MISSOURI PAC", urls: [M1, M2] },
+  ]);
+});
+
+test("donorEntries does not merge partial overlap or chains (#342)", () => {
+  // A={M1,M2}, B={M2,M3}: each has a page the other lacks
+  const partial = lines([M1, "A"], [M2, "A"], [M2, "B"], [M3, "B"]);
+  assert.deepEqual(donorEntries("A; B", partial), [
+    { donor: "A", urls: [M1, M2] },
+    { donor: "B", urls: [M2, M3] },
+  ]);
+  // chain A~B~C: A and C share nothing, so none of them join
+  const chain = lines([M1, "A"], [M2, "A"], [M2, "B"], [M3, "B"], [M3, "C"], [FEC, "C"]);
+  assert.equal(donorEntries("A; B; C", chain).length, 3);
+});
+
+test("donorEntries keeps differently sized partial overlaps apart (#342)", () => {
+  // A={M1,M2,M3}, B={M3,FEC}: B is smaller but has FEC, which A lacks, so B is not a subset
+  const a = lines([M1, "A"], [M2, "A"], [M3, "A"], [M3, "B"], [FEC, "B"]);
+  assert.deepEqual(donorEntries("A; B", a), [
+    { donor: "A", urls: [M1, M2, M3] },
+    { donor: "B", urls: [M3, FEC] },
+  ]);
+  // A={M1,M2,M3}, B={M2,M4}: B shares M2 only
+  const M4 = "https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C444444";
+  const b = lines([M1, "A"], [M2, "A"], [M3, "A"], [M2, "B"], [M4, "B"]);
+  assert.deepEqual(donorEntries("A; B", b), [
+    { donor: "A", urls: [M1, M2, M3] },
+    { donor: "B", urls: [M2, M4] },
+  ]);
+});
+
+test("donorEntries does not fold into a group whose extra pages include an FEC link (#342)", () => {
+  // B={M1} is a subset of A={M1,FEC}, but the FEC link is A's own gifts, not B's
+  assert.deepEqual(donorEntries("A; B", lines([M1, "A"], [FEC, "A"], [M1, "B"])), [
+    { donor: "A", urls: [M1, FEC] },
+    { donor: "B", urls: [M1] },
+  ]);
+  // an FEC link both share is fine: the extra page is MEC only
+  assert.deepEqual(donorEntries("A; B", lines([M1, "A"], [M2, "A"], [FEC, "A"], [M1, "B"], [FEC, "B"])), [
+    { donor: "A; B", urls: [M1, M2, FEC] },
+  ]);
+});
+
+test("donorEntries keeps a subset donor alone when two incomparable donors both contain it (#342)", () => {
+  const raw = lines([M1, "A"], [M2, "A"], [M1, "B"], [M3, "B"], [M1, "C"]);
+  assert.deepEqual(donorEntries("A; B; C", raw), [
+    { donor: "A", urls: [M1, M2] },
+    { donor: "B", urls: [M1, M3] },
+    { donor: "C", urls: [M1] },
+  ]);
+});
+
+test("donorEntries folds a nested chain A subset B subset C into C (#342)", () => {
+  const raw = lines([M1, "A"], [M1, "B"], [M2, "B"], [M1, "C"], [M2, "C"], [M3, "C"]);
+  assert.deepEqual(donorEntries("A; B; C", raw), [{ donor: "A; B; C", urls: [M1, M2, M3] }]);
+});
+
+test("donorEntries never folds a donor with no page (#342)", () => {
+  assert.deepEqual(donorEntries("A; B", lines([M1, "A"])), [
+    { donor: "A", urls: [M1] },
+    { donor: "B", urls: [] },
+  ]);
+});

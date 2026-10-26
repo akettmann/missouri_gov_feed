@@ -1,6 +1,8 @@
 // What each fct_bias_indicators.indicator means and how to draw it. Shared by the profile and methodology
 // pages so the explanation next to a number is always the one on the methodology page.
 
+import { plural } from "./format.ts";
+
 export interface IndicatorMeta {
   label: string;
   /** scale drawn under the value; diverging scales get a neutral midpoint */
@@ -70,3 +72,9 @@ export function indicatorMeta(key: string): IndicatorMeta {
     }
   );
 }
+
+/** the party-line "breaks" sentence on a legislator's voting section */
+export const breaksText = (n: number) =>
+  n === 0
+    ? "No recorded votes against their party's majority on a party-line vote."
+    : `${plural(n, "recorded vote", "recorded votes")} against their party's majority on a party-line vote.`;

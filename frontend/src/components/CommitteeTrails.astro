@@ -57,7 +57,7 @@ const donorName = (d: CommitteeDonorRow) =>
           {t.committee_name ?? t.mec_committee_id}{" "}
           <span
             class="badge medium"
-            title={`Matched by ${t.link_confidence === "high" ? "the same name (or an ID written into the name)" : "a looser name (abbreviations spelled out, words like PAC dropped, or a short name in parentheses)"}: MEC records no ID for a donor committee`}
+            title={`Matched by ${t.link_confidence === "high" ? "the same name, an ID written into the name, or a known alternate name (an acronym matched to the committee's own filings)" : "a looser name (abbreviations spelled out, words like PAC dropped, or a short name in parentheses)"}: MEC records no ID for a donor committee`}
           >
             possible match
           </span>

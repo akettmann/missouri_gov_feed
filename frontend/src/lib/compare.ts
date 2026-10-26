@@ -1,9 +1,9 @@
 // Side-by-side rows for the compare page, computed from two per-official bundles. Pure (runs in the browser).
 // Every row is one measured or published number; nothing is combined into a score.
 import { payPerVote, payPerVoteSources } from "./comparePay.ts";
-import { businessCounts, donorsText, plural, sitesText } from "./businessCounts.ts";
+import { businessCounts, donorsText, sitesText } from "./businessCounts.ts";
 import type { OfficialBundle } from "./exports/types";
-import { count, HIDE_UNLESS_AVAILABLE, money, pct, statusKind } from "./format.ts";
+import { count, HIDE_UNLESS_AVAILABLE, money, pct, plural, statusKind } from "./format.ts";
 import { indicatorMeta } from "./indicators.ts";
 import { withoutMedium } from "./rollups.ts";
 
