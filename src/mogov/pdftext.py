@@ -22,7 +22,9 @@ def page_texts(data: bytes, *, max_pages: int | None = None, **extract_opts) -> 
     no text layer)."""
     key = hashlib.sha256(data)
     # max_pages joins the key only when set, so existing cache entries stay valid
-    key.update(json.dumps([_EXTRACTOR, extract_opts] + ([max_pages] if max_pages else []), sort_keys=True).encode())
+    key.update(
+        json.dumps([_EXTRACTOR, extract_opts] + ([max_pages] if max_pages is not None else []), sort_keys=True).encode()
+    )
     path = CACHE_DIR / "pdftext" / f"{key.hexdigest()}.json"
     if path.exists():
         return json.loads(path.read_bytes())

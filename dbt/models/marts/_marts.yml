@@ -1602,7 +1602,10 @@ models:
       Which bill a state vote was on. House roll calls are linked exactly where the bill XML names the roll-call
       PDF (the vote_id); the rest (votes on Senate bills, some on House bills) through every bill number in the
       measure printed on the PDF ("HCS HB 2", "SS SCS SBs 49 & 118" -> SB 49 and SB 118) in the same session. Senate journal votes
-      through the measure in the journal text ("HB 2", "SB 974") and the year's regular session. Re-listed
+      through the measure in the journal text ("HB 2", "SB 974"): regular (R) and veto (V) session journals link to the
+      year's regular session; extraordinary-session journals (S1, S2, T1, T2) link to the year's extraordinary session
+      (YY3 or YY4) in which that bill has an action on the vote date (a Senate bill with only House-side actions
+      also links when the vote precedes its first action), and to nothing when no single session fits. Re-listed
       appropriation bills (fct_bills status "relisted for governor message") are never linked: they have no floor
       action, so a vote naming one links to nothing rather than to the stub. Grain: one row
       per (chamber, vote, bill, bill version).

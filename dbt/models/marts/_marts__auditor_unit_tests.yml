@@ -44,3 +44,37 @@ unit_tests:
         - {report_number: r4, officeholder_at_release_id: null, officeholder_at_release_name: null}
         - {report_number: r5, officeholder_at_release_id: kehoe, officeholder_at_release_name: Mike Kehoe}
         - {report_number: r6, officeholder_at_release_id: null, officeholder_at_release_name: null}
+
+  - name: audit_reports_are_not_linked_to_a_holder_whose_term_ended_before_release
+    model: fct_audit_reports
+    description: >
+      Treasurer audit r1 was released in 2019, after Schmitt's term ended (2017-01-09) and before any successor in
+      the table (the 2019 holder is not a current official): nobody is linked, rather than the last holder on
+      record. r2 is released on the last day of that term (the end date is inclusive) and so is linked to him.
+      r3 shows the "Missouri State Treasurer" title form, r4 the "State Treasurer of Missouri" form.
+    given:
+      - input: ref('int_mo_auditor__reports')
+        rows:
+          - {report_number: r1, entity_type: statewide_office, office: state_treasurer, release_date: '2019-04-01', rating: Good, rating_level: 3, rating_status: ok}
+          - {report_number: r2, entity_type: statewide_office, office: state_treasurer, release_date: '2017-01-09', rating: Good, rating_level: 3, rating_status: ok}
+          - {report_number: r3, entity_type: statewide_office, office: state_treasurer, release_date: '2026-03-01', rating: Good, rating_level: 3, rating_status: ok}
+          - {report_number: r4, entity_type: statewide_office, office: state_treasurer, release_date: '2030-03-01', rating: Good, rating_level: 3, rating_status: ok}
+      - input: ref('statewide_officials')
+        rows:
+          - {office: state_treasurer, office_title: State Treasurer}
+      - input: ref('fct_office_history')
+        rows:
+          - {official_id: schmitt, office_title: State Treasurer, start_date: '2017-01-09', end_date: '2017-01-09'}
+          - {official_id: malek, office_title: Missouri State Treasurer, start_date: '2023-01-09', end_date: '2029-01-08'}
+          - {official_id: future, office_title: State Treasurer of Missouri, start_date: '2029-01-09', end_date: null}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: schmitt, full_name: Eric Schmitt}
+          - {official_id: malek, full_name: Vivek Malek}
+          - {official_id: future, full_name: A Successor}
+    expect:
+      rows:
+        - {report_number: r1, officeholder_at_release_id: null, officeholder_at_release_name: null}
+        - {report_number: r2, officeholder_at_release_id: schmitt, officeholder_at_release_name: Eric Schmitt}
+        - {report_number: r3, officeholder_at_release_id: malek, officeholder_at_release_name: Vivek Malek}
+        - {report_number: r4, officeholder_at_release_id: future, officeholder_at_release_name: A Successor}
