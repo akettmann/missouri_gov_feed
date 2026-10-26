@@ -52,3 +52,53 @@ unit_tests:
         - {openstates_id: a10, district_number: 10, start_date: '2011-01-01', end_date: '2017-09-13'}
         - {openstates_id: a10b, district_number: 10, start_date: '2019-01-01', end_date: '9999-12-31'}
         - {openstates_id: h01, district_number: 1, start_date: '1900-01-01', end_date: '2018-12-31'}
+
+  - name: senate_seat_terms_untouched_when_the_journal_is_empty
+    model: int_mo_legislators__seats
+    description: >
+      With no Senate journal votes loaded (a fresh or partial environment) nothing can be said about who voted, so no
+      Senate term is dropped, capped or moved (#534). Before the guard the empty journal's first date was null and the
+      final filter dropped every closed Senate term. b01: a closed term running into the journal years. b02: an
+      undated start. b03: a term that ended before the journals begin. h01: a House term.
+    given:
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {openstates_id: b01, person_id: b01, chamber: upper, district_number: 1, start_date: '2011-01-01', end_date: '2018-12-31'}
+          - {openstates_id: b02, person_id: b02, chamber: upper, district_number: 2, start_date: '1900-01-01', end_date: '2018-12-31'}
+          - {openstates_id: b03, person_id: b03, chamber: upper, district_number: 3, start_date: '2009-01-01', end_date: '2016-12-31'}
+          - {openstates_id: h01, person_id: h01, chamber: lower, district_number: 1, start_date: '2011-01-01', end_date: '2018-12-31'}
+      - input: ref('int_mo_senate__votes')
+        rows: []
+    expect:
+      rows:
+        - {openstates_id: b01, district_number: 1, start_date: '2011-01-01', end_date: '2018-12-31'}
+        - {openstates_id: b02, district_number: 2, start_date: '1900-01-01', end_date: '2018-12-31'}
+        - {openstates_id: b03, district_number: 3, start_date: '2009-01-01', end_date: '2016-12-31'}
+        - {openstates_id: h01, district_number: 1, start_date: '2011-01-01', end_date: '2018-12-31'}
+
+  - name: senate_seat_terms_untouched_when_a_journal_year_is_missing
+    model: int_mo_legislators__seats
+    description: >
+      Dropping or capping a term for lacking votes needs journal votes in every calendar year the term spans within
+      the journals (#534). Here the journal has votes in 2017 and 2019 only, so 2018 is missing and a partial raw load
+      is assumed. c01 ends 2018-12-31 with its last vote in 2017: not capped. c02 ends 2018-12-31 with no vote:
+      not dropped or moved to 2017-01-03. c03 ends 2017-12-31, a year the journal covers, with no vote and a dated start
+      before the journals: ends the day before the journals begin (2017-01-31 here) as usual. c04 has a vote in every
+      year it spans within the journals (2019 only): capped by its last vote.
+    given:
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {openstates_id: c01, person_id: c01, chamber: upper, district_number: 1, start_date: '2011-01-01', end_date: '2018-12-31'}
+          - {openstates_id: c02, person_id: c02, chamber: upper, district_number: 2, start_date: '2011-01-01', end_date: '2018-12-31'}
+          - {openstates_id: c03, person_id: c03, chamber: upper, district_number: 3, start_date: '2011-01-01', end_date: '2017-12-31'}
+          - {openstates_id: c04, person_id: c04, chamber: upper, district_number: 4, start_date: '2019-01-01', end_date: '2020-12-31'}
+      - input: ref('int_mo_senate__votes')
+        rows:
+          - {person_key: c01, vote_date: '2017-02-01'}
+          - {person_key: c04, vote_date: '2019-02-01'}
+    expect:
+      rows:
+        - {openstates_id: c01, district_number: 1, start_date: '2011-01-01', end_date: '2018-12-31'}
+        - {openstates_id: c02, district_number: 2, start_date: '2011-01-01', end_date: '2018-12-31'}
+        - {openstates_id: c03, district_number: 3, start_date: '2011-01-01', end_date: '2017-01-31'}
+        - {openstates_id: c04, district_number: 4, start_date: '2019-01-01', end_date: '2019-02-01'}

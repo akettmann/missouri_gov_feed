@@ -19,15 +19,53 @@
 --   * a closed term that runs into the journal years with no vote at all was not held in them. Where it started
 --     before the journals began, it ends the day before the first journal date (the latest it can have ended);
 --     otherwise (an undated start, or a start inside the journal years) the term is dropped.
+-- The last two rules need the journals to cover the term: with no journal loaded, or a calendar year inside the term
+-- (from the journals' first to last date) with no journal vote at all, a term is left as Open States gives it, never
+-- dropped or capped for lacking votes (#534). Only the first rule (an undated start) needs a vote of the term itself.
 with as_given as (
     select * from {{ ref('int_mo_legislators__seats_as_given') }}
 ),
 
+-- With no journal loaded (a fresh or partial environment) first_date is the open-end date, so no term runs "into
+-- the journal years" and none is dropped or capped; the min/max are null on an empty table.
 journal as (
     select
-        min(vote_date) as first_date,
-        max(vote_date) as last_date
+        coalesce(min(vote_date), {{ dbt.safe_cast("'9999-12-31'", 'date') }}) as first_date,
+        coalesce(max(vote_date), {{ dbt.safe_cast("'1900-01-01'", 'date') }}) as last_date
     from {{ ref('int_mo_senate__votes') }}
+),
+
+journal_years as (
+    select distinct extract(year from vote_date) as yr
+    from {{ ref('int_mo_senate__votes') }}
+),
+
+-- calendar years of a term that the journals could cover (the term's years from the first journal date to the last
+-- journal date) against the years in which the journal has votes at all. A term is only dropped or capped for lacking
+-- votes when every one of those years has journal votes; a missing year (a partial raw load) leaves it as given.
+term_years as (
+    select
+        s.openstates_id,
+        s.district_number,
+        s.start_date,
+        s.end_date,
+        extract(year from case when s.start_date > j.first_date then s.start_date else j.first_date end) as year_from,
+        extract(year from case when s.end_date < j.last_date then s.end_date else j.last_date end) as year_to
+    from as_given as s
+    cross join journal as j
+    where s.chamber = 'upper'
+),
+
+term_coverage as (
+    select
+        t.openstates_id,
+        t.district_number,
+        t.start_date,
+        t.end_date,
+        count(y.yr) >= max(t.year_to - t.year_from + 1) as journal_covers_term
+    from term_years as t
+    left join journal_years as y on y.yr between t.year_from and t.year_to
+    group by t.openstates_id, t.district_number, t.start_date, t.end_date
 ),
 
 term_votes as (
@@ -62,6 +100,7 @@ dated as (
         -- a closed Senate term in the journal years with no vote at all
         (
             s.chamber = 'upper'
+            and c.journal_covers_term
             and v.openstates_id is null
             and s.end_date < {{ dbt.safe_cast("'9999-12-31'", 'date') }}
             and s.end_date >= j.first_date
@@ -78,6 +117,7 @@ dated as (
             when
                 s.chamber = 'upper'
                 and s.end_date < {{ dbt.safe_cast("'9999-12-31'", 'date') }}
+                and c.journal_covers_term
                 and {{ dbt.dateadd('year', 1, 'v.last_vote') }} < s.end_date
                 then v.last_vote
             else s.end_date
@@ -90,6 +130,12 @@ dated as (
             and s.district_number = v.district_number
             and s.start_date = v.start_date
             and s.end_date = v.end_date
+    left join term_coverage as c
+        on
+            s.openstates_id = c.openstates_id
+            and s.district_number = c.district_number
+            and s.start_date = c.start_date
+            and s.end_date = c.end_date
 )
 
 select
