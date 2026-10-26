@@ -72,11 +72,12 @@ const tables = freshness();
       only, with no committee ID. To show who funds that committee, its name is matched to the names Missouri
       committees file under, trying in order: a short list of known alternate names (acronyms such as HRCC or
       AMECPAC), each checked by matching gifts reported under that name to the committee's own filings; a
-      committee ID written into the name; the same name, ignoring case, punctuation and spacing; the name with
-      common abbreviations spelled out ("MO" as Missouri, "Assn" as Association); and the name without words
-      like PAC, Political Action Committee or Fund (or a short name the filer put in parentheses). A committee
-      only counts if it was active within a year of the gift, and only when exactly one committee fits. When
-      several do, no link is made.
+      committee ID written into the name; the same name, ignoring case, with punctuation read as a space and
+      runs of spaces collapsed ("Health PAC" and "HealthPAC" still differ); the name with common abbreviations
+      spelled out ("MO" as Missouri, "Assn" as Association); and the name without words like PAC, Political
+      Action Committee or Fund (or a short name the filer put in parentheses). A committee only counts if it
+      was active within a year of the gift, and only when exactly one committee fits. When several do, no link
+      is made.
     </p>
     <p>
       About 71% of the committee-to-committee dollars on record match one Missouri committee this way. Most of
