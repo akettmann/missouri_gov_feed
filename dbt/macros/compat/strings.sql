@@ -111,7 +111,8 @@
 {%- endmacro %}
 
 
-{# Normalize a person/org name for matching: lower-case, letters/digits/spaces only, single spaces. #}
+{# Normalize a person/org name for matching: lower-case, any character outside a-z/0-9/space (punctuation, accented letters) becomes a
+   space, runs of spaces collapsed to one ("O'Hearn" -> "o hearn"; spaces are kept, not removed: "Health PAC" and "HealthPAC" differ, #108; callers split on them). #}
 {% macro name_key(expr) -%}
     trim({{ mogov.regex_replace_all(mogov.regex_replace_all('lower(' ~ expr ~ ')', '[^a-z0-9 ]', ' '), ' +', ' ') }})
 {%- endmacro %}
@@ -131,4 +132,17 @@
 {# Left-pad with zeros to width n (lpad isn't universal). #}
 {% macro zero_pad(expr, n) -%}
     {{ dbt.right(dbt.concat(["'" ~ ('0' * n) ~ "'", dbt.safe_cast(expr, dbt.type_string())]), n) }}
+{%- endmacro %}
+
+{# The character with code point `n` (e.g. 10 for a newline). BigQuery has no CHR; everything else here does. #}
+{% macro chr(n) -%}
+    {{ return(adapter.dispatch('chr', 'mogov')(n)) }}
+{%- endmacro %}
+
+{% macro default__chr(n) -%}
+    chr({{ n }})
+{%- endmacro %}
+
+{% macro bigquery__chr(n) -%}
+    code_points_to_string([{{ n }}])
 {%- endmacro %}

@@ -1,7 +1,9 @@
 -- One hop back: for each Missouri committee that gave to an official (fct_campaign_finance's
 -- counterparty_mec_committee_id), who gave to that committee, over every year loaded (both MEC feeds).
--- Its 10 largest non-individual donors are listed (donor_rank 1-10); itemized individuals are summed into one
--- row (donor_class 'individual', no rank), since a person's name is not an organization to follow.
+-- Its 10 largest non-individual donors are listed (donor_rank 1-10, a strict order: amount ties break by
+-- donor_name, then donor_class, which with the committee is the grain's key, so a rank is never shared or
+-- flipped); itemized individuals are summed into one row (donor_class 'individual', no rank), since a
+-- person's name is not an organization to follow.
 -- trail_status says whether the trail goes on:
 --   mec committee          the donor is a committee whose name matches one Missouri filer (donor_mec_committee_id)
 --   ambiguous mec name     several Missouri committees active that year share the name
@@ -101,7 +103,7 @@ ranked as (
             when d.donor_class <> 'individual'
                 then row_number() over (
                     partition by d.mec_committee_id, case when d.donor_class = 'individual' then 1 else 0 end
-                    order by d.total_amount desc, d.donor_name asc
+                    order by d.total_amount desc, d.donor_name asc, d.donor_class asc
                 )
         end as donor_rank,
         sum(d.total_amount) over (partition by d.mec_committee_id) as committee_total_amount
