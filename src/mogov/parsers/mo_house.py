@@ -489,7 +489,10 @@ def _senate_act_type(row_type: type) -> type:
     )
 
 
-SENATE_ACT_TYPES: dict[type, type] = {t: _senate_act_type(t) for t in BILL_ROW_TYPES}
+# The SenateActList names the sponsor on the bill row (SponsorName/District/Link) and carries no Sponsor or
+# SubjectIndex children, so those twin tables would always be empty: not made, and the rows are skipped.
+SENATE_ACT_SKIPPED: tuple[type, ...] = (BillSponsor, BillSubject)
+SENATE_ACT_TYPES: dict[type, type] = {t: _senate_act_type(t) for t in BILL_ROW_TYPES if t not in SENATE_ACT_SKIPPED}
 
 ROW_TYPES: list[type] = [
     Member,
@@ -687,7 +690,10 @@ def _bill(key: Key, bill: str, info: etree._Element) -> Iterator[object]:
     for i, (element, link) in enumerate(fiscal_notes, 1):
         yield BillFiscalNote(*key, i, element or "FiscalNote", "".join(link.itertext()).strip() or None)
     for i, w in enumerate(children(info, "Witness"), 1):
-        yield BillWitness(*key, i, text(w, "WitnessFormsLink"), text(w, "WitnessFormLinkDescription"))
+        link, description = text(w, "WitnessFormsLink"), text(w, "WitnessFormLinkDescription")
+        if link is None and description is None:
+            continue  # an empty <Witness/>: nothing to keep (witness_index still counts it)
+        yield BillWitness(*key, i, link, description)
 
 
 def _bill_document(key: Key, bill: str, root: etree._Element) -> Iterator[object]:
@@ -702,6 +708,8 @@ def _senate_act_list(key: Key, root: etree._Element) -> Iterator[object]:
         for info in children(holder, "BillInformation"):
             bill = text(info, "BillNumber") or ""
             for row in _bill(key, bill, info):
+                if isinstance(row, SENATE_ACT_SKIPPED):
+                    continue
                 twin = SENATE_ACT_TYPES[type(row)]
                 values = {f.name: getattr(row, f.name) for f in fields(row)}
                 yield twin(**values) if isinstance(row, Bill) else twin(**values, bill=bill)

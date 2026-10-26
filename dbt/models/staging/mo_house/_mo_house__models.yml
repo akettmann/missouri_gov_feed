@@ -9,6 +9,12 @@ models:
     Governor (G)"; action_seq orders a bill''s actions (the XML''s ActivitySequence; missing before 2024). The XML
     repeats some actions word for word under one Guid (about 1,000 of 138,000, mostly 2017-2018); they are kept
     once.'
+- name: stg_mo_house__bill_amendments
+  description: Amendments offered to a bill with the link to the amendment's change map PDF, for House bills and
+    for the Senate bills the House acted on (SenateActList). One row per amendment.
+- name: stg_mo_house__bill_fiscal_notes
+  description: Fiscal note PDF links per bill, for House bills and for the Senate bills the House acted on (SenateActList).
+    The XML names the element FiscalNote or FiscalNotes; the link is what matters.
 - name: stg_mo_house__bill_rollcalls
   description: 'The House roll calls taken on each bill: the XML nests them under the bill text version voted on
     (amendment roll calls are left out). rollcall_url is the roll-call PDF, which is the House vote_id.'
@@ -18,6 +24,16 @@ models:
 - name: stg_mo_house__bill_subjects
   description: The House's subject index terms for each bill ("APPROPRIATIONS", "EDUCATION, ELEMENTARY AND SECONDARY").
     The XML export has them from the 2024 sessions on; earlier sessions have none.
+- name: stg_mo_house__bill_summaries
+  description: 'Bill summary PDFs: one row per summary link per bill version (introduced, committee substitute,
+    ...), for House bills and for the Senate bills the House acted on (SenateActList). Rows without a link are dropped.'
+- name: stg_mo_house__bill_texts
+  description: Bill text versions with the links to the text PDF and the House's change map PDF, for House bills
+    and for the Senate bills the House acted on (SenateActList). One row per text version.
+- name: stg_mo_house__bill_witness_forms
+  description: 'Witness-form PDF links per bill (committee testimony), for House bills and for the Senate bills
+    the House acted on (SenateActList). Links only: the forms name citizens and are neither fetched nor parsed.
+    Empty <Witness/> elements (no link) are dropped.'
 - name: stg_mo_house__bills
   description: 'One row per MO House bill per session (House XML export): number, current version, titles, last
     action. source_url is the link on the bill''s first listed action (the bill''s page on house.mo.gov).'

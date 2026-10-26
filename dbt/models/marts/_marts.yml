@@ -1534,6 +1534,50 @@ models:
         data_type: boolean
         description: Whether fct_bills has the bill (it covers the House XML export's sessions, 2017 on).
 
+  - name: fct_bill_documents
+    description: >
+      Links to the House's PDFs for each bill, one row per document: summaries, fiscal notes, witness forms, bill
+      text versions and the change maps of text versions and amendments. The PDFs are not fetched. Covers House
+      bills and the Senate bills the House acted on (2024 sessions on). Witness forms name citizens, so only the
+      link is kept. Join to fct_bills on (session_code, bill); the Senate bills of special sessions (253 SB3, SB4) have documents here but no fct_bills row. Grain: one row per (session, bill, document_kind,
+      document_url).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [session_code, bill, document_kind, document_url]
+    columns:
+      - name: session_code
+        data_type: varchar
+        description: House session code.
+        data_tests:
+          - not_null
+      - name: bill
+        data_type: varchar
+        description: Bill number without spaces (HB2, SB727).
+        data_tests:
+          - not_null
+      - name: document_kind
+        data_type: varchar
+        description: What the link is (summary, fiscal_note, witness_form, bill_text, text_map, amendment_map).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['summary', 'fiscal_note', 'witness_form', 'bill_text', 'text_map', 'amendment_map']
+      - name: document_url
+        data_type: varchar
+        description: Link to the PDF (documents.house.mo.gov; a few 2018 links point at the older house.mo.gov and moga.mo.gov hosts).
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "like 'http%://documents.house.mo.gov/%' or document_url like 'http%://house.mo.gov/%' or document_url like 'http%://www.moga.mo.gov/%'"
+      - name: document_index
+        data_type: bigint
+        description: Position of the link in the bill's XML among documents of its kind (lowest, when listed twice).
+      - name: label
+        data_type: varchar
+        description: The House's name for the document (summary or text version name, amendment description, witness-form description); null for fiscal notes.
+
   - name: fct_bill_subjects
     description: >
       Subject index terms per bill, one row per term. House bills keep the House XML's terms (2024 sessions on);

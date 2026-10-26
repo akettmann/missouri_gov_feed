@@ -17,6 +17,12 @@ Existing environments: `mo_house` used to land JSON tables. Run `uv run mogov lo
 `data/raw/mo_house_bills`, `data/raw/mo_house_lists` and `data/raw/mo_house_members` are no longer read by
 anything and can be deleted.
 
+Parser change (#384): `mo_house_xml_bill_witnesses` no longer holds empty `<Witness/>` rows (2,469 of 6,633) and
+the always-empty `mo_house_xml_senate_act_sponsors` / `_subjects` tables are no longer written. Re-parse once
+(`uv run python -m mogov.parsers.mo_house`, or a `mogov load mo_house`) to apply it; the staging models already
+ignore empty witness rows, so a build before the re-parse is still correct. Delete the two stale
+`data/raw/mo_house_xml_senate_act_sponsors` and `_subjects` directories afterwards; nothing reads them.
+
 ## How often each source changes (and how long it's cached)
 
 | Loader                        | Upstream changes                             | Cache policy                                                               | Suggested run                                         |
