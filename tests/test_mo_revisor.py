@@ -372,3 +372,44 @@ def test_more_than_one_cloud_run_task_is_refused(monkeypatch):
     monkeypatch.setenv("CLOUD_RUN_TASK_COUNT", "3")
     with pytest.raises(RuntimeError, match="Cloud Run tasks"):
         mo_revisor.load(mo_revisor.db.UNSHARDED)
+
+
+def test_chapter_links_are_read_as_markup_not_text():
+    page = (
+        "<html><body>"
+        "<a class=\"v\" href='/main/PageSelect.aspx?section=1.010&bid=42'>single quotes, attribute first</a>"
+        '<a href="/main/PageSelect.aspx?section=1.016&amp;bid=51044" title="t">extra attribute</a>'
+        '<a href="/main/PageSelect.aspx?section=1.016&amp;bid=51044">duplicate</a>'
+        '<!-- <a href="/main/PageSelect.aspx?section=9.999&amp;bid=1">commented out</a> -->'
+        "<script>var x = '<a href=\"/main/PageSelect.aspx?section=8.888&amp;bid=2\">';</script>"
+        '<a href="/main/PageSelect.aspx?section=2.010&amp;bid=abc">not a bid</a>'
+        '<a href="/main/OneChapter.aspx?chapter=1">not a section</a>'
+        "</body></html>"
+    )
+    assert parse_chapter(page) == [("1.010", 42), ("1.016", 51044)]
+
+
+def test_toc_links_in_any_attribute_layout():
+    page = (
+        "<details><summary><span>I</span><span>TITLE</span></summary>"
+        "<a class='x' href='/main/OneChapter.aspx?chapter=7'>7 Seven</a>"
+        '<a href="/main/OneChapter.aspx?chapter=8&amp;x=1">other parameter</a>'
+        "</details>"
+    )
+    assert parse_toc(page) == [{"title": "TITLE", "chapter": "7", "chapter_name": "Seven"}]
+
+
+def test_repeal_rows_in_any_attribute_layout():
+    page = (
+        "<table>"
+        '<tr class="r" style="width:100%;"><td><a href="/main/PageSelect.aspx?section=1.5&amp;bid=3">1.5</a></td>'
+        "<td>(Repealed 1975)<span>(1/2/1975)</span></td></tr>"
+        '<tr style="width:100%;"><td>no link</td><td>x</td></tr>'
+        "</table><p id='xfer'>Transferred</p><table>"
+        "<tr style='width:100%;'><td><a href='/main/PageSelect.aspx?section=2.5&bid=4'>2.5</a></td>"
+        "<td>(Transferred; now 3.5)</td></tr></table>"
+    )
+    assert parse_repeals(page) == [
+        {"kind": "repealed", "section": "1.5", "bid": 3, "note": "(Repealed 1975)", "date": "1/2/1975"},
+        {"kind": "transferred", "section": "2.5", "bid": 4, "note": "(Transferred; now 3.5)", "date": None},
+    ]

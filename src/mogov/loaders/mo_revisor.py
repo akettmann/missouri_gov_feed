@@ -17,6 +17,7 @@ parses dates, status and the history citations. Units: chapters, plus rx.aspx (o
 import os
 import re
 import time
+from urllib.parse import urlsplit
 
 import httpx
 import lxml.html
@@ -57,8 +58,9 @@ LIST_MAX_AGE = 7 * 86400
 TABLES = ["mo_revisor_chapters", "mo_revisor_sections", "mo_revisor_repeals"]
 REPEALS_UNIT = "rx.aspx"
 
-CHAPTER_LINK = re.compile(r'href="/main/OneChapter\.aspx\?chapter=([0-9A-Za-z]+)"')
-SECTION_LINK = re.compile(r'href="/main/PageSelect\.aspx\?section=([^&"]+)&amp;bid=(\d+)')
+CHAPTER_PATH = "/main/OneChapter.aspx"
+SECTION_PATH = "/main/PageSelect.aspx"
+CHAPTER_ID = re.compile(r"[0-9A-Za-z]+")  # a chapter id; this matches an attribute value, not markup
 
 
 class Blocked(RuntimeError):
@@ -94,6 +96,30 @@ def _get(
     raise AssertionError("unreachable")
 
 
+def _query(href: str, path: str) -> dict[str, str] | None:
+    """The (undecoded) query parameters of an href on `path`, or None for any other link."""
+    split = urlsplit(href.strip())
+    if split.path != path:
+        return None
+    return dict(part.partition("=")[::2] for part in split.query.split("&"))
+
+
+def chapter_link(href: str) -> str | None:
+    """An OneChapter.aspx link -> its chapter id (the only parameter), else None."""
+    query = _query(href, CHAPTER_PATH)
+    if query is None or list(query) != ["chapter"] or not CHAPTER_ID.fullmatch(query["chapter"]):
+        return None
+    return query["chapter"]
+
+
+def section_link(href: str) -> tuple[str, int] | None:
+    """A PageSelect.aspx link -> (section, bid), else None."""
+    query = _query(href, SECTION_PATH)
+    if query is None or not query.get("section") or not re.fullmatch(r"[0-9]+", query.get("bid", "")):
+        return None
+    return query["section"].strip(), int(query["bid"])
+
+
 def _text(el) -> str:
     return re.sub(r"\s+", " ", el.text_content()).strip()
 
@@ -105,18 +131,19 @@ def parse_toc(page: str) -> list[dict]:
         spans = details.find("summary").findall("span") if details.find("summary") is not None else []
         title = _text(spans[-1]) if spans else None
         for a in details.iterfind(".//a[@href]"):
-            m = CHAPTER_LINK.search(f'href="{a.get("href")}"')
-            if m:
+            chapter = chapter_link(a.get("href"))
+            if chapter:
                 name = _text(a)
-                rows.append({"title": title, "chapter": m.group(1), "chapter_name": name.partition(" ")[2] or name})
+                rows.append({"title": title, "chapter": chapter, "chapter_name": name.partition(" ")[2] or name})
     return rows
 
 
 def parse_chapter(page: str) -> list[tuple[str, int]]:
     """A chapter page -> its (section, bid) versions, in page order, without duplicates."""
     seen: dict[tuple[str, int], None] = {}
-    for section, bid in SECTION_LINK.findall(page):
-        seen[(section.strip(), int(bid))] = None
+    for a in lxml.html.fromstring(page).iterfind(".//a[@href]"):
+        if link := section_link(a.get("href")):
+            seen[link] = None
     return list(seen)
 
 
@@ -169,23 +196,25 @@ def parse_section(page: str) -> dict:
 def parse_repeals(page: str) -> list[dict]:
     """rx.aspx -> [{kind: repealed|transferred, section, bid, note, date}], note and date as printed."""
     rows = []
-    xfer = page.find('id="xfer"')
-    for m in re.finditer(r'<tr style="width:100%;">(.*?)</tr>', page, re.S):
-        link = SECTION_LINK.search(m.group(1))
+    in_transfers = False  # the transferred sections follow the element with id="xfer", in document order
+    for el in lxml.html.fromstring(page).iter():
+        if el.get("id") == "xfer":
+            in_transfers = True
+        if el.tag != "tr" or el.get("style") != "width:100%;":
+            continue
+        link = next((x for a in el.iterfind(".//a[@href]") if (x := section_link(a.get("href")))), None)
         if not link:
             continue
-        cells = lxml.html.fragment_fromstring(m.group(0), create_parent="table").iter("td")
-        cells = list(cells)
-        note_cell = cells[1]
+        note_cell = list(el.iter("td"))[1]
         date_span = note_cell.find("span")
         date = _text(date_span).strip("() ") if date_span is not None else None
         if date_span is not None:
             date_span.drop_tree()
         rows.append(
             {
-                "kind": "transferred" if 0 <= xfer < m.start() else "repealed",
-                "section": link.group(1).strip(),
-                "bid": int(link.group(2)),
+                "kind": "transferred" if in_transfers else "repealed",
+                "section": link[0],
+                "bid": link[1],
                 "note": _text(note_cell),
                 "date": date,
             }
