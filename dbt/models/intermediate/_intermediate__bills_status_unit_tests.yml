@@ -8,7 +8,9 @@ unit_tests:
       status is the furthest stage reached and outcome follows from it, with "today" pinned to 2026-10-25 (the
       2026 regular session is over). A Senate bill in the House's list has passed the Senate. A truly agreed bill
       with no governor action is awaiting the governor in its own year, and "no governor action recorded" later
-      (the House list can stop at the speaker's signature), never "failed". An extraordinary session with an action
+      (the House list can stop at the speaker's signature), never "failed". A bill whose only action is the governor's Art. IV s.27 message has status "governor message only"
+      and a null outcome (its real history is missing), not "introduced"/"failed"; the same message after a signing
+      changes nothing. An extraordinary session with an action
       in the last 30 days is still pending.
     overrides:
       vars:
@@ -37,7 +39,10 @@ unit_tests:
             select '251', 'HB10', 'house_bill_list', cast('2025-05-14' as date), 'Truly Agreed To and Finally Passed' union all
             select '251', 'HB10', 'house_bill_list', cast('2025-07-14' as date), 'Delivered to Secretary of State (G)' union all
             select '263', 'HB1', 'house_bill_list', cast('2026-10-20' as date), 'Referred: Rules - Legislative(H)' union all
-            select '261', 'HB11', 'house_bill_list', cast('2026-02-01' as date), 'Withdrawn (H)'
+            select '261', 'HB11', 'house_bill_list', cast('2026-02-01' as date), 'Withdrawn (H)' union all
+            select '241', 'HB1', 'house_bill_list', cast('2023-12-27' as date), 'Message Received from the Governor, pursuant to Article IV, Section 27' union all
+            select '211', 'HB16', 'house_bill_list', cast('2021-02-11' as date), 'Approved by Governor (G)' union all
+            select '211', 'HB16', 'house_bill_list', cast('2021-04-21' as date), 'Message Received from the Governor, pursuant to Article IV, Section 27'
     expect:
       rows:
         - {session_code: '261', bill: HB1, status: in committee, outcome: failed}
@@ -53,3 +58,5 @@ unit_tests:
         - {session_code: '251', bill: HB10, status: truly agreed, outcome: enacted}
         - {session_code: '263', bill: HB1, status: in committee, outcome: pending}
         - {session_code: '261', bill: HB11, status: withdrawn, outcome: failed}
+        - {session_code: '241', bill: HB1, status: governor message only, outcome: null}
+        - {session_code: '211', bill: HB16, status: signed, outcome: enacted}

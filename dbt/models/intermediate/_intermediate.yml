@@ -8,14 +8,18 @@ models:
     Senate bills that never reached the House have no row. status   the furthest stage the actions record: introduced,
     in committee, reported do pass, perfected, passed one chamber, passed both chambers, truly agreed, then signed
     / signed with line-item vetoes / vetoed / veto overridden; resolutions: adopted. withdrawn and defeated when
-    the bill stopped there. outcome  enacted (signed, line-item vetoed, veto overridden, or truly agreed and delivered
-    to the Secretary of State without a signature), vetoed, sent to voters (truly agreed joint resolutions), adopted
-    (resolutions), awaiting governor (truly agreed this year, no governor action yet), no governor action recorded
-    (truly agreed in an earlier year, but the export lists no governor action; Senate bills'' lists can stop at
-    the speaker''s signature), pending (session still open), failed (session over without passing). A session is
-    over once its year has ended; a regular session also once June starts (it adjourns in mid-May) and an extraordinary
-    session 30 days after its last action. var as_of_date pins "today" (unit tests). Grain: one row per (session,
-    bill) in the House XML export, House and Senate bills.'
+    the bill stopped there. governor message only when the bill''s only recorded action is the governor''s Art.
+    IV, s. 27 message (the budget/withholding message, filed before the session starts). Those are regular appropriation
+    bills (HB 1-13 and so on, many already carrying conference substitutes) whose House XML history was cut down
+    to that one line, so how far they got is unknown, not "introduced". outcome  null for governor message only;
+    otherwise enacted (signed, line-item vetoed, veto overridden, or truly agreed and delivered to the Secretary
+    of State without a signature), vetoed, sent to voters (truly agreed joint resolutions), adopted (resolutions),
+    awaiting governor (truly agreed this year, no governor action yet), no governor action recorded (truly agreed
+    in an earlier year, but the export lists no governor action; Senate bills'' lists can stop at the speaker''s
+    signature), pending (session still open), failed (session over without passing). A session is over once its
+    year has ended; a regular session also once June starts (it adjourns in mid-May) and an extraordinary session
+    30 days after its last action. var as_of_date pins "today" (unit tests). Grain: one row per (session, bill)
+    in the House XML export, House and Senate bills.'
 - name: int_bills__subjects
   description: 'Subject index terms per bill from both chambers'' indexes. A House bill keeps the House XML''s own
     terms (2024 sessions on); the Senate topical index fills in House bills without them (earlier sessions, when

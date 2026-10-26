@@ -4,8 +4,13 @@
 --   status   the furthest stage the actions record: introduced, in committee, reported do pass, perfected, passed
 --            one chamber, passed both chambers, truly agreed, then signed / signed with line-item vetoes / vetoed /
 --            veto overridden; resolutions: adopted. withdrawn and defeated when the bill stopped there.
---   outcome  enacted (signed, line-item vetoed, veto overridden, or truly agreed and delivered to the Secretary of
---            State without a signature), vetoed, sent to voters (truly agreed joint resolutions), adopted
+--            governor message only when the bill's only recorded action is the governor's Art. IV, s. 27 message (the
+--            budget/withholding message, filed before the session starts). Those are regular appropriation bills
+--            (HB 1-13 and so on, many already carrying conference substitutes) whose House XML history was cut down
+--            to that one line, so how far they got is unknown, not "introduced".
+--   outcome  null for governor message only; otherwise enacted (signed, line-item vetoed, veto overridden, or
+--            truly agreed and delivered to the Secretary of State without a signature), vetoed,
+--            sent to voters (truly agreed joint resolutions), adopted
 --            (resolutions), awaiting governor (truly agreed this year, no governor action yet), no governor action
 --            recorded (truly agreed in an earlier year, but the export lists no governor action; Senate bills'
 --            lists can stop at the speaker's signature), pending (session still open), failed (session over
@@ -30,6 +35,12 @@ flags as (
         bill,
         max(case when listed_in = 'senate_act_list' then 1 else 0 end) as reached_house_from_senate,
         max(action_date) as last_action_date,
+        count(*) as action_count,
+        sum(case
+            when description like 'Message Received from the Governor, pursuant to Article IV, Section 27%'
+                then 1
+            else 0
+        end) as governor_message_count,
         max(case when description like 'Referred:%' or description like '%read and referred%' then 1 else 0 end)
             as referred,
         max(case when description like '%Reported Do Pass%' or description like '%Voted Do Pass%' then 1 else 0 end)
@@ -75,6 +86,7 @@ staged_status as (
     select
         *,
         case
+            when governor_message_count = action_count then 'governor message only'
             when veto_overridden = 1 then 'veto overridden'
             when vetoed_in_part = 1 then 'signed with line-item vetoes'
             when approved = 1 then 'signed'
@@ -105,6 +117,8 @@ select
     bill_type,
     status,
     case
+        -- the bill's real history is missing from the export; don't call it failed
+        when status = 'governor message only' then cast(null as {{ dbt.type_string() }})
         when status in ('signed', 'signed with line-item vetoes', 'veto overridden') then 'enacted'
         when status = 'vetoed' then 'vetoed'
         when truly_agreed = 1 and bill_type in ('HJR', 'SJR') then 'sent to voters'

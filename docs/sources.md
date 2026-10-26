@@ -147,7 +147,12 @@ Quirks:
   and 56 of 58 SJRs in 2026. `SenateActList` exists only for 2024 and later, so every Senate bill of 2017 to
   2023 has a null status and outcome, enacted ones included (2017 to 2023: 0 of 4,143 SBs have a status; 2024: 29
   of 796, none enacted because the list stops before the governor). Counts of failed, pending or enacted bills
-  therefore leave out Senate bills, almost all of them before 2024; House bills are complete. Loading
+  therefore leave out Senate bills, almost all of them before 2024; House bills are complete.
+  Quirk: 143 appropriation bills (15 to 17 per regular session, 2017 to 2026; e.g. 2024 HB 1 and HB 2) list only
+  "Message Received from the Governor, pursuant to Article IV, Section 27" (the governor's budget/withholding
+  message, dated before the session opens) as their action list, although their bill record shows conference
+  substitutes (`CCS SCS HCS HB 2`) and a full title. The export cut their real history, so they get status
+  "governor message only" and a null outcome rather than "introduced" / "failed" (#396). Loading
   Senate-side actions is #317 (and #237).
 - `ActivitySequence` (action order) is only present from 2024. About 1,000 of 138,000 actions are repeated word
   for word under one `Guid` (mostly 2017–2018); staging keeps them once.

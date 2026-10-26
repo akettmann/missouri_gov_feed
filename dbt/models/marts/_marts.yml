@@ -1312,20 +1312,22 @@ models:
           The furthest stage the House XML's actions record (int_bills__status): introduced, in committee, reported
           do pass, perfected, passed one chamber, passed both chambers, truly agreed, signed, signed with line-item
           vetoes, vetoed, veto overridden; adopted for resolutions; withdrawn or defeated when the bill stopped
-          there. Null for Senate bills that never reached the House, which means every Senate bill before 2024:
-          the House's Senate-bill list (SENATEACTLIST) exists only for 2024 and later.
+          there. governor message only: the only recorded action is the governor's Art. IV, s. 27 message (about 15
+          to 17 appropriation bills per regular session, e.g. 2024 HB 1 and HB 2); the export dropped their real
+          history, so how far they got is unknown and outcome is null. Null for Senate bills that never reached the
+          House, which means every Senate bill before 2024: the House's Senate-bill list (SENATEACTLIST) exists only for 2024 and later.
         data_tests:
           - accepted_values:
               arguments:
                 values: [introduced, in committee, reported do pass, perfected, passed one chamber,
                   passed both chambers, truly agreed, signed, signed with line-item vetoes, vetoed, veto overridden,
-                  adopted, withdrawn, defeated]
+                  adopted, withdrawn, defeated, governor message only]
       - name: outcome
         data_type: varchar
         description: >
           enacted, vetoed, sent to voters (joint resolutions), adopted (resolutions), awaiting governor, no governor
           action recorded (truly agreed, but the export stops before the governor), pending (session still open),
-          failed (session over without passing). Null with status.
+          failed (session over without passing). Null with status, and for governor message only bills.
         data_tests:
           - accepted_values:
               arguments:
