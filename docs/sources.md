@@ -98,6 +98,22 @@ Quirks:
   drops a row; an unknown label is kept and fails an accepted_values test. The House also
   publishes some roll calls twice under two file names (261: `003.001`/`003.002`, `004.002`/`004.004`,
   `004.003`/`004.005`, identical content); the file whose name carries the printed roll-call number is kept.
+- Voting-board test records survive the header check in 173 and 231 (issue #449): `bills173/rollcalls/002.001`
+  (a QUORUM CALL with one voter, HUBRECHT) and `002.002` (a PQ with one voter, LOVE), 2017-05-23, and
+  `bills231/rollcalls/026.003`/`026.004` (ADJOURNMENT, 7 and 5 voters, the first names alphabetically, printed after the
+  day's last real vote on 2023-02-21). Real roll calls never go below 83 voters of about 162 (a quorum call; a quorum is
+  82), so `stg_mo_house__rollcalls` drops a roll call where fewer than a quarter of the listed members cast a vote
+  (`house_rollcall_min_participation`; the 204 and 171 test records fall under it as well). The singular test
+  `assert_house_rollcalls_quorum_participation` fails on any survivor under half the members unless its URL is in
+  `house_rollcall_small_quorum_allowlist` (a genuine call that failed to produce a quorum). Effect: 4 roll calls and 650
+  member votes fewer; the 173 attendance of 16 members moves from 80% to 100%, and the House attendance awards for
+  2017, 2023 and lifetime shuffle by a rank or a tenth of a point.
+- Session 204 has only 5 roll-call PDFs, all "Session Day : 3", and that is complete (issue #449). The only House floor
+  vote that session was 2020-11-10 (HB 14 third read and passed; HR 1 was adopted without a roll call); no later House
+  action in the bill XML (2020-11-13 to 2020-12-16) is a floor roll call: they are introductions, readings, referrals,
+  HR 2's committee hearing and executive session, and the Speaker signing HB 14 and its truly agreed and finally
+  passed after Senate passage (which needs no House roll call). The loader probes days up to the last linked day plus 3 (here days 4-6, all the site's 404 page), and
+  spot checks of days 7, 8, 10 and 13 also answer 404. Not a loader gap.
 - The XML is never converted on the way in: the loader gzips each file as received. The parser reads the
   gzip with lxml (hardened settings in `mogov.xmlparse`) and selects elements by local name, so namespaces,
   attributes, entities and CDATA are the parser's problem, not a regex's. The links that drive crawling
@@ -1123,10 +1139,15 @@ Flow: [diagrams/sources/mo_auditor.svg](diagrams/sources/mo_auditor.svg)
   - The rating is not in the list. It is the sentence "In the areas audited, the overall performance of this entity was
     Good." in the one-page Citizens Summary PDF (`citz_sum_fk`) or, when there is none, in the first pages of the full
     report. pdfplumber sometimes splits a word of that sentence, so the match ignores spaces.
-  - Ratings start in 2012. Financial statements (singular or plural), county-wide fire protection district reviews (no rating sentence; a single district's own audit is rated and is read), monthly filing reports, follow-ups, property tax rate filings and
-    compilations are never rated and are not downloaded. Performance audits and special reports have no sentence (status
+  - Ratings start in 2012. Financial statements (singular or plural), county-wide fire protection district reviews (no rating sentence; a single district's own audit is rated and is read), monthly filing reports, follow-ups, property tax rate filings,
+    compilations and the state's annual financial reports (titled "Comprehensive Annual Financial Report" until 2021, "Annual
+    Comprehensive Financial Report" since 2022) are never rated and are not downloaded. Performance audits and special reports have no sentence (status
     `no_rating_sentence`). A few 2012-2014 summaries left the template unfilled ("was XXXX"); staging gives them no rating
     (`placeholder_rating`).
+  - The link for report 2013-009 (the 2012 Comprehensive Annual Financial Report) is a dead PDF (`Repository/Press/2013-009.pdf`
+    404s; the first full run recorded status `http_404`). It is no longer fetched, since annual financial reports are skipped by title.
+    The "Report on Internal Control..." companions of the annual financial report have a Citizens Summary, which is still read
+    (status `no_rating_sentence`).
   - The ratings cover only the areas audited. A county's rating is the county's, never one official's: only audits of a
     statewide office (seed `mo_auditor_statewide_entities`) are linked to an officeholder, and then only to whoever held
     the office on the release date ("in office when published", not "audited"), and only for current officials.

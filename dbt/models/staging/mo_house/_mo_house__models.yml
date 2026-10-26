@@ -126,7 +126,16 @@ models:
     A header that does not parse (no PDF text) is kept. 3. The same (session, day, roll-call number) published under
     two file names (#435): 261 has 003.001 = 003.002, 004.002 = 004.004 and 004.003 = 004.005, byte-identical headers
     and totals. The roll-call number printed in the PDF is the key; the file whose name carries that number (else
-    the first by URL) is kept. Raw keeps everything.'
+    the first by URL) is kept. 4. Voting-board test records (#449): a roll call on which hardly any member voted.
+    A recorded vote needs a quorum (a majority of the 163 seats, 82), and in 6,449 PDFs the fewest members who voted
+    on a real roll call is 83 (a quorum call); 211 sit between 83 and 120. Nine PDFs have 1 to 28 voters of 161
+    to 163: 171 002.001/002.002 (2 and 6) and 058.018 (4/26/2016, HCS HB 1465: only MR SPEAKER voting, 161 absent;
+    already dropped by the out-of-session-year check), 173 002.001/002.002 (HUBRECHT alone on a QUORUM CALL; LOVE
+    alone on a PQ), 231 026.003/026.004 (7 and 5 members on an ADJOURNMENT, the first names alphabetically, printed
+    after the last real vote of the day), 204 003.002/003.003 (10 and 28). A roll call where fewer than var(''house_rollcall_min_participation'')
+    (a quarter) of the listed members cast a vote is dropped; the 28-to-83 gap leaves room either way. A roll call
+    with no parsed votes is kept. The singular test assert_house_rollcalls_quorum_participation fails on any survivor
+    under half the members (an allowlist var holds genuine small-quorum calls). Raw keeps everything.'
   columns:
   - name: session_day
     description: Legislative day of the session (highest seen through 2026 is 79).
@@ -135,6 +144,11 @@ models:
         arguments:
           min_value: 1
           max_value: 120
+  - name: members_listed
+    description: Members listed on the roll call PDF (every member token, absent included). Null when no vote rows
+      were parsed.
+  - name: members_voting
+    description: Members who cast a vote (yea, nay or present), i.e. not absent. Null when no vote rows were parsed.
   - name: header_session_label
     description: Session label printed in the PDF header. Null when the header did not parse.
     data_tests:
