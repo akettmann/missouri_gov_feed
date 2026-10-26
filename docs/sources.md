@@ -637,9 +637,17 @@ Quirks:
   Periodic transaction reports, candidate reports and extension requests are separate filings, never collapsed.
   The index has no amendment number either, so a House amendment's `report_version` is its position by filing date
   among the amendments of its report (ties: numeric doc id).
-  The Clerk index does not say which report a House amendment amends, so it is taken to amend the latest annual or
-  candidate report the filer filed that year on or before it (a candidate-report amendment supersedes that candidate
-  report only) (#142).
+  The Clerk index does not say which report a House amendment amends, so it is taken to amend the latest annual,
+  candidate or termination report the filer filed that year on or before it (an amendment of a candidate or
+  termination report supersedes that report only) (#142, #463). Periodic transaction reports and the "other" kinds
+  (W withdrawal, H new-filer notice, B, E, G) are never a base. The "Period Covered: mm/dd/yyyy-mm/dd/yyyy" line in
+  the amendment's PDF text (`int_house_fd__period_covered`; candidate reports and their amendments carry it, annual
+  reports do not) refines this: the base covering through the same last day wins, and an amendment with such a line
+  is never taken for an amendment of an annual report. Measured on the Clerk index (all filers, 2,097 amendments;
+  name-matched, so approximate): counting termination reports as bases re-points 18 amendments, "other" kinds 195
+  (all H, which holds no report; W, B, E and G re-point none). For Missouri officials neither change moves a row: the
+  rebuilt `fct_disclosures` is identical (0 rows differ either way). The Period Covered text is loaded for Missouri
+  filers only, and only 3 of the 10 Missouri amendments carry the line.
 
 ## courtlistener_case_bulk: case history from bulk files
 

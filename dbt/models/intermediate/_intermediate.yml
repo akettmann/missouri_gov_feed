@@ -160,6 +160,20 @@ models:
     or a facility or owner named like one ("City of ...", "... County", "... School District"; most organizations
     are typed UNKNOWN). The *_key columns are company_key names for matching donors. Grain: one row per geocoded
     EPA FRS facility.'
+- name: int_house_fd__period_covered
+  description: 'The "Period Covered: 01/01/2016-11/11/2017" line on page 1 of a House disclosure PDF. Candidate
+    reports and their amendments carry it; annual reports do not. It is the only thing that says which kind of report
+    an amendment restates, because the Clerk index links an amendment to nothing (#463).'
+  columns:
+  - name: doc_id
+    description: House Clerk document id.
+    data_tests:
+    - unique
+    - not_null
+  - name: period_start
+    description: First day the report covers.
+  - name: period_end
+    description: Last day the report covers.
 - name: int_house_fd__schedule_lines
   description: 'House disclosure PDF text, each line tagged with the schedule it falls under (the nearest preceding
     "Schedule X:" header in the same document). Column-header rows, "None disclosed." and boilerplate drop out.
