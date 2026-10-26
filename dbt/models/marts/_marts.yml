@@ -1528,7 +1528,8 @@ models:
         data_type: boolean
         description: >
           False for a bill named after "&" in a combined act ("A.L. 2023 H.B. 115 & 99": the Revisor cites the one
-          substitute under both numbers). Only the first, the lead bill, passed; the others never reached the
+          substitute under both numbers), or after "and" when no act in the same year and session cites that bill
+          as its first ("A.L. 2004 S.B. 968 and S.B. 969": SB969 is combined into SB968). Only the first, the lead bill, passed; the others never reached the
           governor, and fct_bills shows them as failed (2023 HB99, 2025 HB486, 2026 HB3155). Filter on this to
           list the bills that became law. A bill that leads in any act is a lead bill.
       - name: combined_into

@@ -57,7 +57,14 @@ deduped as (
                             then 0
                         when cases.input = 'bulk' then 1
                         else 2
-                    end
+                    end,
+                    -- rows that still tie (an API row repeated, or two bulk matches of one cluster): a stable key
+                    cases.input,
+                    cases.source_url,
+                    cases.docket_number,
+                    cases.court_id,
+                    cases.date_filed,
+                    cases.case_name
             ) as rn
         from cases
     ) as ranked

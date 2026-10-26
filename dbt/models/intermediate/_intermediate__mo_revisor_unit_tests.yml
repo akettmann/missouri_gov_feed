@@ -142,7 +142,9 @@ unit_tests:
       is a lead bill only when the same year and session cite it as the first bill of an act elsewhere; otherwise it
       is combined into the lead of its group. Always-lead (the old reading) makes SB969 and HB1142 leads; always-
       combined makes SB743 (2018) combined. The citation must be in the same year: 2005's "S.B. 743" after "and" is
-      combined although 2018 cites SB 743 alone, and so is an "and" bill cited only after "&" (not as a lead).
+      combined although 2018 cites SB 743 alone, and so is an "and" bill cited only after "&" (not as a lead). The
+      session must match too: 2004's regular-session "H.B. 20 and S.B. 30" combines SB30 although the 1st extraordinary
+      session cites SB 30 alone.
     given:
       - input: ref('stg_mo_revisor__sections')
         format: sql
@@ -153,7 +155,9 @@ unit_tests:
             select 'n.4', 'n.4/1', '(A.L. 2005 H.B. 1606 and S.B. 743)' union all
             select 'n.5', 'n.5/1', '(A.L. 2004 H.B. 1 & 2 and H.B. 3 and H.B. 4)' union all
             select 'n.6', 'n.6/1', '(A.L. 2004 H.B. 7 & 4)' union all
-            select 'n.7', 'n.7/1', '(A.L. 2004 H.B. 3)'
+            select 'n.7', 'n.7/1', '(A.L. 2004 H.B. 3)' union all
+            select 'n.8', 'n.8/1', '(A.L. 2004 H.B. 20 and S.B. 30)' union all
+            select 'n.9', 'n.9/1', '(A.L. 2004 1st Ex. Sess. S.B. 30)'
       - input: ref('stg_mo_revisor__repeals')
         format: sql
         rows: |
@@ -178,6 +182,9 @@ unit_tests:
         - {section_id: n.6, bill: HB7, is_lead_bill: true, combined_into: }
         - {section_id: n.6, bill: HB4, is_lead_bill: false, combined_into: HB7}
         - {section_id: n.7, bill: HB3, is_lead_bill: true, combined_into: }
+        - {section_id: n.8, bill: HB20, is_lead_bill: true, combined_into: }
+        - {section_id: n.8, bill: SB30, is_lead_bill: false, combined_into: HB20}
+        - {section_id: n.9, bill: SB30, is_lead_bill: true, combined_into: }
 
   - name: bills_after_a_comma_continue_the_act_before_them
     model: int_mo_revisor__session_law_bills

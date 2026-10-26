@@ -232,7 +232,7 @@ typed as (
     select
         *,
         -- "299 & 40 § A Revision" -> "299 & 40"; "H.B. 1270 and H.B. 2032" -> "H.B. 1270 & @H.B. 2032" (@ marks a bill
-        -- after "and": a lead bill only if cited as one elsewhere, see lead_cited)
+        -- after "and": a lead bill only if cited as one elsewhere, see cited_leads)
         {{ dbt.replace(
             mogov.regex_extract('ref', '^(' ~ bill_item ~ '[0-9]+( (&|and) (' ~ bill_item ~ ')?[0-9]+)*)', 1),
             "' and '",
