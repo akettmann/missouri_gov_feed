@@ -135,7 +135,7 @@ unit_tests:
       first_name): name kept, type stays Corporation. Look-alikes stay as reported: an ID with a digit-bearing
       address_1, a real company next to a '0' first/last name, a single-word first_name under a Corporation
       placeholder, a ctrb_name that merely ends in a real ' 0' without the '0' last_name, a '0' last_name with a real ctrb_name
-      (not ending ' 0'), an all-digit first_name with a real company and a blank ctrb_name, and a multi-word first_name under a placeholder ctrb_name with a real company (the company is checked too).
+      (not ending ' 0'), an all-digit first_name with a real company and a blank ctrb_name, and a multi-word first_name under a placeholder ctrb_name with a real company (the company is checked too). Placeholders of two or more characters ('~~', '--') count as missing in the un-shift signature (ctrb_name, committee and company alike; #472) and are never the fallback company name; a one-character company does not make a row an Organization.
     given:
       - input: source('tap_mec', 'contributions')
         format: sql
@@ -181,6 +181,9 @@ unit_tests:
           union all select 'C7', null, null, null, 'SAM JONES', 'Individual', null, null, 'SAM', '0', 'MAIN ST', null, null, null, null, null, null, '11', null, null, null, null, null, null, null, 't27', null, null
           union all select 'C8', null, null, null, '', 'Corporation', null, 'Real Co LLC', '12345', 'ANNA', 'LEE', null, null, null, null, null, null, '12', null, null, null, null, null, null, null, 't28', null, null
           union all select 'C9', null, null, null, '~~', 'Corporation', null, 'Real Co LLC', 'Two Words', null, null, null, null, null, null, null, null, '13', null, null, null, null, null, null, null, 't29', null, null
+          union all select 'C10', null, null, null, '~~', 'Corporation', '--', '~~', '79047862', 'ANNA', 'LEE', null, null, null, null, null, null, '14', null, null, null, null, null, null, null, 't30', null, null
+          union all select 'C11', null, null, null, null, null, null, '--', null, null, null, null, null, null, null, null, null, '15', null, null, null, null, null, null, null, 't31', null, null
+          union all select 'C11', null, null, null, null, null, null, 'S', 'Steve', 'Lowy', null, null, null, null, null, null, null, '16', null, null, null, null, null, null, null, 't32', null, null
     expect:
       rows:
         - {mec_committee_id: C1, contributor_name: VINCENT SIEMER, contributor_type: Individual, amount: 1}
@@ -196,6 +199,9 @@ unit_tests:
         - {mec_committee_id: C7, contributor_name: SAM JONES, contributor_type: Individual, amount: 11}
         - {mec_committee_id: C8, contributor_name: Real Co LLC, contributor_type: Corporation, amount: 12}
         - {mec_committee_id: C9, contributor_name: Two Words, contributor_type: Individual, amount: 13}
+        - {mec_committee_id: C10, contributor_name: ANNA LEE, contributor_type: Individual, amount: 14}
+        - {mec_committee_id: C11, contributor_name: null, contributor_type: Individual, amount: 15}
+        - {mec_committee_id: C11, contributor_name: Steve Lowy, contributor_type: Individual, amount: 16}
 
   - name: tap_contributions_dedupe_double_loaded
     model: stg_tap_mec__contributions
