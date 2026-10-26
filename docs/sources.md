@@ -1130,10 +1130,15 @@ Flow: [diagrams/sources/mo_auditor.svg](diagrams/sources/mo_auditor.svg)
   - The rating is not in the list. It is the sentence "In the areas audited, the overall performance of this entity was
     Good." in the one-page Citizens Summary PDF (`citz_sum_fk`) or, when there is none, in the first pages of the full
     report. pdfplumber sometimes splits a word of that sentence, so the match ignores spaces.
-  - Ratings start in 2012. Financial statements (singular or plural), county-wide fire protection district reviews (no rating sentence; a single district's own audit is rated and is read), monthly filing reports, follow-ups, property tax rate filings and
-    compilations are never rated and are not downloaded. Performance audits and special reports have no sentence (status
+  - Ratings start in 2012. Financial statements (singular or plural), county-wide fire protection district reviews (no rating sentence; a single district's own audit is rated and is read), monthly filing reports, follow-ups, property tax rate filings,
+    compilations and the state's annual financial reports (titled "Comprehensive Annual Financial Report" until 2021, "Annual
+    Comprehensive Financial Report" since 2022) are never rated and are not downloaded. Performance audits and special reports have no sentence (status
     `no_rating_sentence`). A few 2012-2014 summaries left the template unfilled ("was XXXX"); staging gives them no rating
     (`placeholder_rating`).
+  - The link for report 2013-009 (the 2012 Comprehensive Annual Financial Report) is a dead PDF (`Repository/Press/2013-009.pdf`
+    404s; the first full run recorded status `http_404`). It is no longer fetched, since annual financial reports are skipped by title.
+    The "Report on Internal Control..." companions of the annual financial report have a Citizens Summary, which is still read
+    (status `no_rating_sentence`).
   - The ratings cover only the areas audited. A county's rating is the county's, never one official's: only audits of a
     statewide office (seed `mo_auditor_statewide_entities`) are linked to an officeholder, and then only to whoever held
     the office on the release date ("in office when published", not "audited"), and only for current officials.
