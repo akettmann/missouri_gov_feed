@@ -35,6 +35,7 @@ with house_members as (
 -- is on file, the long-standing default).
 house_amendment_base as (
     select
+        a.official_id,
         a.doc_id,
         b.document_url as base_url,
         b.filing_kind as base_kind,
@@ -53,6 +54,7 @@ house_amendment_base as (
 
 house_amends as (
     select
+        official_id,
         doc_id,
         case when base_kind = 'candidate report' then base_url end as amends_candidate_url
     from house_amendment_base
@@ -77,7 +79,7 @@ house as (
         || cast(l.line_no as {{ dbt.type_string() }}) as disclosure_item_id
     from house_members as h
     inner join {{ ref('int_house_fd__schedule_lines') }} as l on h.doc_id = l.doc_id
-    left join house_amends as am on h.doc_id = am.doc_id
+    left join house_amends as am on h.official_id = am.official_id and h.doc_id = am.doc_id
 ),
 
 house_unparsed as (
@@ -97,7 +99,7 @@ house_unparsed as (
         false as is_garbled,
         'house:' || h.doc_id as disclosure_item_id
     from house_members as h
-    left join house_amends as am on h.doc_id = am.doc_id
+    left join house_amends as am on h.official_id = am.official_id and h.doc_id = am.doc_id
     where h.doc_id not in (select sl.doc_id from {{ ref('int_house_fd__schedule_lines') }} as sl)
 ),
 
