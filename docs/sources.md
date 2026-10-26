@@ -90,7 +90,9 @@ Quirks:
   `SenateActList` file adds the Senate bills that reached the House, but only with their House-side and governor
   actions. In 2024 it stops at the speaker's signature for 15 of its 38 bills: 2024 SB 727 was signed into law, yet the list ends at
   "Signed by House Speaker". Such bills get the outcome "no governor action recorded", not "failed". Senate bills
-  that never reached the House have no actions in any source we load, so their status is null.
+  that never reached the House have no actions in any source we load, so their status is null: 906 of 972 SBs
+  and 56 of 58 SJRs in 2026. Counts of failed or pending bills therefore leave out most Senate bills; enacted
+  counts are complete. Loading Senate-side actions is #317.
 - `ActivitySequence` (action order) is only present from 2024. About 1,000 of 138,000 actions are repeated word
   for word under one `Guid` (mostly 2017–2018); staging keeps them once.
 - Session codes: 1 is the regular session and 2–4 are special sessions, in order. Code 2 doesn't appear in
