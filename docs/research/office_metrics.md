@@ -14,7 +14,7 @@ These need dbt work only, no new loader. (Judge dockets are under "Federal judge
 
 | Data | Where it sits | What it enables |
 |---|---|---|
-| House committee membership and positions (Chair, Vice-Chair, Co-Chair, Ranking Minority Member, Member) | `mo_house_lists` (`COMMITTEELIST`: memberships only for sessions 231, 241, 251, 253, 254, i.e. 2023+) and `mo_house_members` (`CommitteePosition`: positions 2017+, every session except 253) | Committee assignments per member and session |
+| House committee membership and positions (Chair, Vice-Chair, Co-Chair, Ranking Minority Member, Member) | `mo_house_xml_committee_members` (from `COMMITTEELIST`: memberships only for sessions 231, 241, 251, 253, 254, i.e. 2023+) and `mo_house_xml_member_committees` (`CommitteePosition`: positions 2017+, every session except 253) | Committee assignments per member and session |
 | House sponsored and co-sponsored bills per member | `mo_house_members` (`RepresentativeLegislation`), `fct_bill_sponsors` | Bills sponsored, share that passed. `fct_bills` has no outcome column (`last_action` null for 18,578 of 24,215), so derive it from House XML actions (`Action` in 16,784 of 16,787 payloads); depends on #34. Senate sponsors barely resolve (13 of 958 with `official_id`): effectively House-only |
 | `cl_retention_events` | CourtListener bulk | Empty in our export (0 rows); not usable |
 

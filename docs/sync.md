@@ -8,6 +8,15 @@ again:
 uv run mogov run --shards 4
 ```
 
+Loaders that land files rather than rows (today `mo_house`, whose XML goes to `data/raw/mo_house_xml/` as
+gzip) keep the file bytes unchanged and parse them in a second step inside the same run. To change only the
+parsing, re-parse the landed files without fetching: `uv run python -m mogov.parsers.mo_house`.
+
+Existing environments: `mo_house` used to land JSON tables. Run `uv run mogov load mo_house` once before the next
+`mogov build`, because the staging models now read the `mo_house_xml_*` tables, which only that load creates.
+`data/raw/mo_house_bills`, `data/raw/mo_house_lists` and `data/raw/mo_house_members` are no longer read by
+anything and can be deleted.
+
 ## How often each source changes (and how long it's cached)
 
 | Loader                        | Upstream changes                             | Cache policy                                                               | Suggested run                                         |

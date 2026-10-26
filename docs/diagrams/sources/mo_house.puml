@@ -13,8 +13,21 @@ else (HTML page)
   :skip: no such session
   (site answers unknown codes with 200 + HTML);
 endif
-:owned sessions -> xmljson -> mo_house_members / _bills / _lists;
-:collect <RollCallPDF> URLs from all sessions (every shard);
+if (session owned by this shard?) then (yes)
+  :gzip every XML file in the archive (any kind), unchanged,
+  under RAW_DIR/mo_house_xml/SESSION/;
+  :one state row per file in mo_house_xml_files
+  (kind, path, URL, size, sha256, landed_at);
+endif
+:parse each file once with lxml (every shard)
+and collect its RollCallPDF URLs;
+:Parser (mogov.parsers.mo_house) reads this shard's gzip files
+and walks each document: bills with actions, sponsors, texts,
+amendments, roll calls, subjects, hearings, summaries, fiscal notes
+and witness links; members with committee posts; sessions,
+committees, list items; the SenateActList as senate_act bills
+(files of kind "other", e.g. GRP*, are kept but not parsed);
+:typed rows land as the mo_house_xml tables;
 :owned roll-call PDFs -> pdfplumber layout text
 -> header fields + one row per (roll call, member token);
 note right

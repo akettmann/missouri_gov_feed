@@ -2,7 +2,10 @@
 // rows (already ranked and streak-counted in dbt); every page and browser script draws them with
 // renderBadges, so the icon, the link and the accessible text are the same everywhere.
 import { AWARD_PAIRS, AWARDS, isCycleList, periodWhen, type PeriodKind } from "./exports/awardDefs.ts";
-import { count, money, pct, streakMarker } from "./format.ts";
+import { count, money, ordinal, pct, plural, streakMarker } from "./format.ts";
+
+// ordinal lives in format.ts (sessionLabel needs it too); re-exported for existing importers.
+export { ordinal };
 
 /**
  * One award an official holds now: [award key, consecutive-period streak or null, plain-language detail,
@@ -53,9 +56,9 @@ const orderOf = (award: string) => {
 export function outOfText(award: string, sampleSize: number | null): string {
   const outOf = AWARDS[award]?.outOf;
   if (sampleSize == null || !outOf) return "";
-  if (outOf === "votes") return `of ${count(sampleSize)} votes`;
+  if (outOf === "votes") return `of ${plural(sampleSize, "vote", "votes")}`;
   if (outOf === "raised") return `of ${money(sampleSize)} raised`;
-  return `with party, of ${count(sampleSize)} party-line votes`;
+  return `with party, of ${plural(sampleSize, "party-line vote", "party-line votes")}`;
 }
 
 /** "62.5% of 1,203 votes", the measured number with what it is out of. */
@@ -76,16 +79,6 @@ export function awardNickname(award: string): string {
 
 /** Lower-case the first letter only, so "PACs" stays "PACs". */
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
-
-/** 1st, 2nd, 3rd, 4th, 11th, 22nd. */
-export function ordinal(n: number): string {
-  const tail = n % 100;
-  const suffix =
-    tail >= 11 && tail <= 13
-      ? "th"
-      : (({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th");
-  return `${n}${suffix}`;
-}
 
 /**
  * Current awards by official slug. "Current" is each award's latest yearly list within each office (the

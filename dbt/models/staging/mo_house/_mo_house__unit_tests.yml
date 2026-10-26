@@ -8,38 +8,114 @@ unit_tests:
       Names come from the House's SESSIONLIST, not from the code: 253 is the 2025 1st Extraordinary Session, 183
       the 2018 Special Session and 184 the 2018 1st Extraordinary Session (the last digit follows no rule).
       Every session's list repeats the history, so the same session appears in two lists; one row per session,
-      taken from the newest list (254 renames 2025 "extraordinary" in the old list). Other list types are
-      ignored. Deriving the name from the code, or keeping both copies, fails this test.
+      taken from the newest list (254 renames 2025 "extraordinary" in the old list), with the name trimmed.
+      Deriving the name from the code, or keeping both copies, fails this test.
     given:
-      - input: source('mo_house', 'lists')
+      - input: source('mo_house', 'xml_sessions')
         format: sql
         rows: |
-            select cast('{"session_code": "253", "list": "SESSIONLIST", "doc": {"Session": [{"ID": ["253"], "Name": ["2025 Extraordinary Session"], "SessionYear": ["2025"], "SessionCode": ["S1"], "GeneralAssembly": ["103rd General Assembly"], "SessionOfGeneralAssembly": ["1st Extraordinary Session"]}, {"ID": ["184"], "Name": ["2018 1st Extraordinary Session"], "SessionYear": ["2018"], "SessionCode": ["S2"], "GeneralAssembly": ["99th General Assembly"], "SessionOfGeneralAssembly": ["1st Extraordinary Session"]}]}}' as varchar) as payload union all
-            select cast('{"session_code": "254", "list": "SESSIONLIST", "doc": {"Session": [{"ID": ["253"], "Name": ["2025 1st Extraordinary Session"], "SessionYear": ["2025"], "SessionCode": ["S1"], "GeneralAssembly": ["103rd General Assembly"], "SessionOfGeneralAssembly": ["1st Extraordinary Session"]}, {"ID": ["183"], "Name": ["2018 Special Session"], "SessionYear": ["2018"], "SessionCode": ["S1"], "GeneralAssembly": ["99th General Assembly"], "SessionOfGeneralAssembly": ["1st Special Session"]}]}}' as varchar) as payload union all
-            select cast('{"session_code": "254", "list": "COMMITTEELIST", "doc": {"Committee": []}}' as varchar) as payload
+            select cast('253' as varchar) as session_code, cast('253' as varchar) as session_id, cast('2025 Extraordinary Session' as varchar) as name, cast(2025 as bigint) as session_year, cast('S1' as varchar) as session_type, cast('103rd General Assembly' as varchar) as general_assembly, cast('1st Extraordinary Session' as varchar) as session_of_general_assembly union all
+            select '253', '184', '2018 1st Extraordinary Session', 2018, 'S2', '99th General Assembly', '1st Extraordinary Session' union all
+            select '254', '253', '2025 1st Extraordinary Session', 2025, 'S1', '103rd General Assembly', '1st Extraordinary Session' union all
+            select '254', '183', ' 2018 Special Session ', 2018, 'S1', '99th General Assembly', '1st Special Session'
     expect:
       rows:
         - {session_code: '253', session_name: 2025 1st Extraordinary Session, session_year: 2025, session_type: S1, general_assembly: 103rd General Assembly, session_of_general_assembly: 1st Extraordinary Session}
         - {session_code: '184', session_name: 2018 1st Extraordinary Session, session_year: 2018, session_type: S2, general_assembly: 99th General Assembly, session_of_general_assembly: 1st Extraordinary Session}
         - {session_code: '183', session_name: 2018 Special Session, session_year: 2018, session_type: S1, general_assembly: 99th General Assembly, session_of_general_assembly: 1st Special Session}
 
+  - name: house_bills_take_their_source_url_from_the_first_action
+    model: stg_mo_house__bills
+    description: >
+      A bill's source_url is the link on its first action in document order (action_index 1), not the last or
+      any other, and only from its own session's file. A bill with no actions still gets a row, with no
+      source_url. Picking another action or dropping bills without actions fails this test.
+    given:
+      - input: source('mo_house', 'xml_bills')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast('HB1' as varchar) as bill, cast('HB 1' as varchar) as current_bill_string, cast('Short' as varchar) as short_title, cast('Long' as varchar) as long_title, cast('02/19/2025 - Introduced' as varchar) as last_action, cast('2025-08-28' as date) as proposed_effective_date union all
+            select '251', '251-HB2.XML', 'HB2', 'HB 2', null, null, null, null
+      - input: source('mo_house', 'xml_bill_actions')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast(2 as bigint) as action_index, cast('http://x/second' as varchar) as link union all
+            select '251', '251-HB1.XML', 1, 'http://x/first' union all
+            select '241', '251-HB1.XML', 1, 'http://x/other-session'
+    expect:
+      rows:
+        - {session_code: '251', session_year: 2025, bill: HB1, current_bill_string: HB 1, short_title: Short, long_title: Long, last_action: 02/19/2025 - Introduced, proposed_effective_date: 2025-08-28, source_url: http://x/first}
+        - {session_code: '251', session_year: 2025, bill: HB2, current_bill_string: HB 2, short_title: null, long_title: null, last_action: null, proposed_effective_date: null, source_url: null}
+
+  - name: house_bill_rollcalls_are_the_text_version_votes_only
+    model: stg_mo_house__bill_rollcalls
+    description: >
+      Roll calls listed under a bill text version (parent_kind text) become bill roll calls, named for the text
+      version voted on; roll calls under an amendment are not bill roll calls. A roll call is matched to its bill
+      by session and file, so the same file name in another session does not bleed in. Dropping the parent_kind
+      filter or joining on file name alone fails this test.
+    given:
+      - input: source('mo_house', 'xml_bills')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast('HB1' as varchar) as bill
+      - input: source('mo_house', 'xml_bill_rollcalls')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast('text' as varchar) as parent_kind, cast('Perfected' as varchar) as parent_name, cast('http://x/048.007.pdf' as varchar) as rollcall_pdf union all
+            select '251', '251-HB1.XML', 'amendment', 'HA 1', 'http://x/050.001.pdf' union all
+            select '241', '251-HB1.XML', 'text', 'Perfected', 'http://x/other-session.pdf'
+    expect:
+      rows:
+        - {session_code: '251', bill: HB1, bill_version: Perfected, rollcall_url: http://x/048.007.pdf}
+
+  - name: house_committee_members_join_their_committee_within_the_session_file
+    model: stg_mo_house__committee_list_members
+    description: >
+      Each committee member row takes the committee's name from its own session's COMMITTEELIST (the same
+      committee ID is reused across sessions), trims the name and position, and a committee with no members
+      yields no rows. Joining on committee ID alone, which duplicates members across sessions, fails this test.
+    given:
+      - input: source('mo_house', 'xml_committees')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-COMMITTEELIST.XML' as varchar) as file_name, cast('3029' as varchar) as committee_id, cast(' Accounts ' as varchar) as name union all
+            select '251', '251-COMMITTEELIST.XML', '9', 'Empty' union all
+            select '241', '241-COMMITTEELIST.XML', '3029', 'Old name'
+      - input: source('mo_house', 'xml_committee_members')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-COMMITTEELIST.XML' as varchar) as file_name, cast('3029' as varchar) as committee_id, cast('Peggy McGaugh' as varchar) as member_name, cast(7 as bigint) as member_district, cast(' Chair ' as varchar) as position_name, cast('H' as varchar) as chamber
+    expect:
+      rows:
+        - {session_code: '251', session_year: 2025, committee_id: '3029', committee_name: Accounts, member_name: Peggy McGaugh, district_number: 7, position_name: Chair, chamber: H}
+
   - name: senate_act_list_stages_every_senate_bill
     model: stg_mo_house__bill_actions
     description: >
-      The SenateActList file wraps all of a session's Senate bills in one element's BillInformation array
-      (38 bills in 2024). Every bill and each of its actions must be staged, not just the first bill; repeated
-      actions under one Guid are kept once.
+      House bill actions come from the bill's own file (joined by session and file name, so the same file name in
+      another session does not bleed in); Senate bills that reached the House come from the SenateActList actions,
+      one row per bill and action. Every Senate bill must be staged, not just the first, and an action repeated
+      word for word under one Guid is kept once. Dropping the Senate union, joining on file name alone, or
+      removing distinct fails this test.
     given:
-      - input: ref('stg_mo_house__bills')
+      - input: source('mo_house', 'xml_bills')
         format: sql
         rows: |
-            select '261' as session_code, 'HB1' as bill, cast('{"Action": [{"Guid": ["1"], "Description": ["Referred: General Laws(H)"], "PubDate": ["2026-01-10"]}]}' as varchar) as bill_doc
-      - input: source('mo_house', 'lists')
+            select cast('261' as varchar) as session_code, cast('261-HB1.XML' as varchar) as file_name, cast('HB1' as varchar) as bill
+      - input: source('mo_house', 'xml_bill_actions')
         format: sql
         rows: |
-            select cast('{"session_code": "261", "list": "SENATEACTLIST", "doc": {"SenateBillsWithHouseActions": [{"BillInformation": [{"BillNumber": ["SB834"], "Action": [{"Guid": ["2"], "Description": ["Reported to the House and First Read (H)"], "PubDate": ["2026-03-25"]}, {"Guid": ["2"], "Description": ["Reported to the House and First Read (H)"], "PubDate": ["2026-03-25"]}]}, {"BillNumber": ["SB999"], "Action": [{"Guid": ["3"], "Description": ["Truly Agreed To and Finally Passed"], "PubDate": ["2026-05-14"]}]}]}]}}' as varchar) as payload
+            select cast('261' as varchar) as session_code, cast('261-HB1.XML' as varchar) as file_name, cast('1' as varchar) as guid, cast('Referred: General Laws(H)' as varchar) as description, cast(1 as bigint) as activity_sequence, cast('2026-01-10' as date) as pub_date union all
+            select '251', '261-HB1.XML', '9', 'Other session', 1, cast('2025-01-10' as date)
+      - input: source('mo_house', 'xml_senate_act_actions')
+        format: sql
+        rows: |
+            select cast('261' as varchar) as session_code, cast('SB834' as varchar) as bill, cast('2' as varchar) as guid, cast('Reported to the House and First Read (H)' as varchar) as description, cast(1 as bigint) as activity_sequence, cast('2026-03-25' as date) as pub_date union all
+            select '261', 'SB834', '2', 'Reported to the House and First Read (H)', 1, cast('2026-03-25' as date) union all
+            select '261', 'SB999', '3', 'Truly Agreed To and Finally Passed', 2, cast('2026-05-14' as date)
     expect:
       rows:
-        - {session_code: '261', bill: HB1, listed_in: house_bill_list, description: 'Referred: General Laws(H)'}
-        - {session_code: '261', bill: SB834, listed_in: senate_act_list, description: 'Reported to the House and First Read (H)'}
-        - {session_code: '261', bill: SB999, listed_in: senate_act_list, description: 'Truly Agreed To and Finally Passed'}
+        - {session_code: '261', bill: HB1, listed_in: house_bill_list, action_seq: 1, action_date: 2026-01-10, description: 'Referred: General Laws(H)', action_guid: '1'}
+        - {session_code: '261', bill: SB834, listed_in: senate_act_list, action_seq: 1, action_date: 2026-03-25, description: 'Reported to the House and First Read (H)', action_guid: '2'}
+        - {session_code: '261', bill: SB999, listed_in: senate_act_list, action_seq: 2, action_date: 2026-05-14, description: 'Truly Agreed To and Finally Passed', action_guid: '3'}

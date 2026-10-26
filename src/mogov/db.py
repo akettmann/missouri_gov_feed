@@ -11,11 +11,13 @@ changing the shard count, run every shard before the next dbt build.
 """
 
 import contextlib
+import dataclasses
 import json
 import os
+import typing
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from zlib import crc32
 
@@ -125,8 +127,8 @@ class JsonSink:
     leaves the previous landing in place.
 
         with db.JsonSink(shard, source_url=BASE) as sink:
-            sink.add("mo_house_bills", key, payload)
-        sink.counts  # {"mo_house_bills": 1234}
+            sink.add("senate_bills", key, payload)
+        sink.counts  # {"senate_bills": 1234}
 
     Tables named in `tables` are published even when empty, so a shard that owns no rows for a table
     still replaces its stale part.
@@ -169,6 +171,71 @@ class JsonSink:
                 with _connect() as con:
                     for table, (path, _) in self._files.items():
                         self.counts[table] = _publish(con, _jsonl_select(path), table, self.shard, [loaded_at])
+        finally:
+            for path, _ in self._files.values():
+                path.unlink(missing_ok=True)
+
+
+_DUCKDB_TYPES = {str: "varchar", int: "bigint", float: "double", bool: "boolean", date: "date", datetime: "timestamptz"}
+
+
+def _column_type(annotation) -> str:
+    """DuckDB type for a row field annotated `T` or `T | None` (T one of str, int, float, bool, date, datetime)."""
+    args = [a for a in typing.get_args(annotation) if a is not type(None)]
+    return _DUCKDB_TYPES[args[0] if args else annotation]
+
+
+def row_columns(row_type: type) -> dict[str, str]:
+    hints = typing.get_type_hints(row_type)
+    return {f.name: _column_type(hints[f.name]) for f in dataclasses.fields(row_type)}
+
+
+class TableSink:
+    """Streams statically typed rows (dataclass instances) to disk as they're produced, then publishes one
+    typed raw table per row class on a clean exit. Each row class names its table in a `TABLE` class attribute
+    and declares its columns as annotated fields (`str`, `int`, `float`, `bool`, `date`, `datetime`, each
+    optionally `| None`). Row classes named in `tables` are published even when empty. On an exception nothing
+    is published, so a failed run leaves the previous landing in place.
+    """
+
+    def __init__(self, shard: Shard = UNSHARDED, *, tables: Iterable[type] = ()):
+        self.shard = shard
+        self.counts: dict[str, int] = {}
+        self._types: dict[str, type] = {}
+        self._files: dict[str, tuple[Path, object]] = {}
+        for row_type in tables:
+            self._file(row_type)
+
+    def _file(self, row_type: type):
+        table = row_type.TABLE
+        if table not in self._files:
+            path = table_dir(table) / f".{self.shard.part_name}.{os.getpid()}.jsonl"
+            self._types[table] = row_type
+            self._files[table] = (path, path.open("w", encoding="utf-8"))
+        return self._files[table][1]
+
+    def add(self, row) -> None:
+        self._file(type(row)).write(json.dumps(dataclasses.asdict(row), default=str) + "\n")
+
+    def __enter__(self) -> "TableSink":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        try:
+            for fh in (fh for _, fh in self._files.values()):
+                fh.close()
+            if exc_type is None:
+                loaded_at = datetime.now(UTC)
+                with _connect() as con:
+                    for table, (path, _) in self._files.items():
+                        cols = row_columns(self._types[table])
+                        spec = ", ".join(f"{name}: '{typ}'" for name, typ in cols.items())
+                        select = (
+                            f"select {', '.join(cols)}, ?::timestamptz as loaded_at "
+                            f"from read_json('{path.as_posix()}', format = 'newline_delimited', columns = {{{spec}}}, "
+                            "maximum_object_size = 67108864)"
+                        )
+                        self.counts[table] = _publish(con, select, table, self.shard, [loaded_at])
         finally:
             for path, _ in self._files.values():
                 path.unlink(missing_ok=True)

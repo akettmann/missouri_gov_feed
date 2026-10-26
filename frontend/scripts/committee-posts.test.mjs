@@ -138,3 +138,20 @@ test("MOGOV_SKIP_COMMITTEE_POSTS_CHECK=1 (exactly) bypasses the mismatch throw a
     /uv run mogov export/,
   );
 });
+
+test("a Congress is labelled with its ordinal, including 111th-113th and 121st-123rd", () => {
+  const got = ["111", "112", "113", "117", "119", "121", "122", "123"].map((c) =>
+    sessionLabel("us_house", c),
+  );
+  assert.deepEqual(got, [
+    "111th Congress",
+    "112th Congress",
+    "113th Congress",
+    "117th Congress",
+    "119th Congress",
+    "121st Congress",
+    "122nd Congress",
+    "123rd Congress",
+  ]);
+  assert.equal(sessionLabel("us_senate", "122"), "122nd Congress");
+});

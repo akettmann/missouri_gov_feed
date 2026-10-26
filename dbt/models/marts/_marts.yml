@@ -1688,7 +1688,12 @@ models:
                 values: ['high', 'medium']
       - name: source_url
         data_type: varchar
-        description: The Socrata dataset the fiscal year's rows come from.
+        description: >
+          The dataset's page on data.mo.gov (https://data.mo.gov/d/<id>) for the fiscal year's rows, which a reader can
+          open; source_api_url is the Socrata API URL the loader fetched.
+      - name: source_api_url
+        data_type: varchar
+        description: The Socrata API URL (https://data.mo.gov/resource/<id>.json) the fiscal year's rows were loaded from; a raw JSON dump, not for display.
 
   - name: fct_county_districts
     description: >
@@ -1829,7 +1834,7 @@ models:
       subsidiaries: "Spire PAC" and "LACLEDE GAS CO"). A company not in the seed that gives under another name
       is missed. Statewide officials have no rows (they serve every area). Grain: one row per (official,
       facility); district_id is the area that puts the facility in the official's jurisdiction. The donor
-      columns (donor_names through donor_links) are filled only when is_donor.
+      columns (donor_name_list through donor_links) are filled only when is_donor.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -1893,11 +1898,14 @@ models:
           - accepted_values:
               arguments:
                 values: ['same name', 'same company']
-      - name: donor_names
+      - name: donor_name_list
         data_type: varchar
         description: >
-          The matched contributors as filed, separated by "; ", when is_donor. A ";" inside a filed name becomes a
-          comma, so "; " only ever separates two donors (#276).
+          Internal, not for display: the matched contributors as filed, joined by chr(31) (the ASCII unit
+          separator, not a printable character), when is_donor. Names are kept as filed, so a ";" or "," inside
+          one stays; chr(31) only ever separates two donors (#350). A consumer must split on chr(31) and never
+          print or export the raw value. The frontend loader splits it into a list and shows the names joined
+          by "; ". Renamed from donor_names so a stale export (which joined with "; ") fails the column guard.
       - name: donated_amount
         data_type: decimal(38,6)
         description: >

@@ -3,7 +3,8 @@ import { test } from "node:test";
 import { contributionsText, sitesDescription, sitesText } from "../src/lib/businessCounts.ts";
 import { filterStatusText } from "../src/lib/compareFilter.ts";
 import { plural } from "../src/lib/format.ts";
-import { breaksText } from "../src/lib/indicators.ts";
+import { breaksText, peerStripLead } from "../src/lib/indicators.ts";
+import { metricText } from "../src/lib/awardBadges.ts";
 import {
   coverageText,
   excludedDocketsText,
@@ -16,6 +17,69 @@ test("plural uses the singular for exactly 1", () => {
   assert.equal(plural(0, "case", "cases"), "0 cases");
   assert.equal(plural(2, "case", "cases"), "2 cases");
   assert.equal(plural(1234, "case", "cases"), "1,234 cases");
+});
+
+test("peer strip lead", () => {
+  const lead = (n, chamber, indicator, period) => peerStripLead(n, chamber, indicator, period);
+  // federal DW-NOMINATE: a Congress number, ordinal, counted as current Missouri members
+  assert.equal(
+    lead(2, "us_senate", "dw_nominate_dim1", 119),
+    "Among 2 current Missouri U.S. senators with a score in the 119th Congress:",
+  );
+  assert.equal(
+    lead(1, "us_senate", "dw_nominate_dim1", 112),
+    "Among 1 current Missouri U.S. senator with a score in the 112th Congress:",
+  );
+  assert.equal(
+    lead(8, "us_house", "dw_nominate_dim1", 111),
+    "Among 8 current Missouri U.S. House members with a score in the 111th Congress:",
+  );
+  assert.equal(
+    lead(4, "us_house", "dw_nominate_dim1", 121),
+    "Among 4 current Missouri U.S. House members with a score in the 121st Congress:",
+  );
+  assert.equal(
+    lead(4, "us_house", "dw_nominate_dim1", 122),
+    "Among 4 current Missouri U.S. House members with a score in the 122nd Congress:",
+  );
+  assert.equal(
+    lead(1, "us_house", "dw_nominate_dim1", 113),
+    "Among 1 current Missouri U.S. House member with a score in the 113th Congress:",
+  );
+  assert.equal(
+    lead(2, "us_house", "dw_nominate_dim1", null),
+    "Among 2 current Missouri U.S. House members with a score:",
+  );
+  // federal party unity: the sitting delegation, by chamber voted in
+  assert.equal(
+    lead(8, "us_house", "party_unity_pct", null),
+    "Among 8 current Missouri U.S. House members who cast party-line votes in the U.S. House:",
+  );
+  // state groups are current officials of any office, named by the chamber of the measurement, never the office
+  assert.equal(
+    lead(178, "state_house", "party_unity_pct", null),
+    "Among 178 current officials who cast party-line votes in the Missouri House:",
+  );
+  assert.equal(
+    lead(35, "state_senate", "party_unity_pct", null),
+    "Among 35 current officials who cast party-line votes in the Missouri Senate:",
+  );
+  assert.equal(
+    lead(80, "state_house", "shor_mccarty_np", 2018),
+    "Among 80 current officials whose Shor-McCarty career score was last measured in the Missouri House:",
+  );
+  assert.equal(
+    lead(1, "state_senate", "shor_mccarty_np", 2022),
+    "Among 1 current official whose Shor-McCarty career score was last measured in the Missouri Senate:",
+  );
+});
+
+test("award badge sample sizes", () => {
+  assert.equal(metricText("highest_attendance", 100, 1), "100.0% of 1 vote");
+  assert.equal(metricText("highest_attendance", 99.5, 2), "99.5% of 2 votes");
+  assert.equal(metricText("highest_attendance", 99.5, 1203), "99.5% of 1,203 votes");
+  assert.equal(metricText("most_party_loyal", 90, 1), "90.0% with party, of 1 party-line vote");
+  assert.equal(metricText("most_party_loyal", 90, 20), "90.0% with party, of 20 party-line votes");
 });
 
 test("voting breaks sentence", () => {

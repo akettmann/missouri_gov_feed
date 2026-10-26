@@ -55,6 +55,7 @@ Layout under `data/` (override the root with `MOGOV_DATA_DIR`):
 | ------------------------------------------ | ---------------------------------------------------------------------------- |
 | `data/cache/`                              | HTTP cache (one file per request, keyed by URL + params) and large downloads |
 | `data/raw/<table>/part-<i>-of-<N>.parquet` | Raw landings, one part per loader shard (`MOGOV_RAW_DIR`)                    |
+| `data/raw/mo_house_xml/<session>/*.gz`     | Raw files landed unchanged, gzipped; `mo_house_xml_files` records each path  |
 | `data/mogov.duckdb`                        | dbt warehouse (`MOGOV_DB`)                                                   |
 | `data/exports/`                            | `mogov export` output                                                        |
 
