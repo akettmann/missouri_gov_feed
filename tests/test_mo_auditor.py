@@ -149,13 +149,24 @@ def _filing(title, number="2012008   ", **extra):
         # singular and plural financial statement filings are both unrated
         ("St. Clair County Financial Statement", False),
         ("Scott County Financial Statements", False),
-        # a CAFR is never rated, with or without "Financial" (2013-009 is a 404 PDF)
-        ("Comprehensive Annual Financial Report / Year Ended June 30, 2012", False),
-        ("Annual Report / Year Ended June 30, 2012", False),
     ],
 )
 def test_rating_source_reads_a_single_fire_district_but_not_county_wide_reviews(title, read):
     assert (mo_auditor.rating_source(_filing(title)) is not None) is read
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        # CAFR: the Auditor's title until 2021 (2013-009)
+        "Comprehensive Annual Financial Report / Year Ended June 30, 2012",
+        # ACFR: the word order since 2022, which "annual (financial) report" alone does not match
+        "State of Missouri Annual Comprehensive Financial Report / Year Ended June 30, 2025",
+        "Annual Comprehensive Financial Report - Report on Internal Control, Compliance, and Other Matters",
+    ],
+)
+def test_rating_source_skips_annual_financial_reports_even_with_a_pdf(title):
+    assert mo_auditor.rating_source(_filing(title)) is None
 
 
 def test_requests_are_throttled_across_shards_not_slept_per_process(monkeypatch):
