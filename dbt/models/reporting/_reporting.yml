@@ -943,6 +943,7 @@ exposures:
       - ref('rpt_donor_employers')
       - ref('rpt_interest_vote_overlap')
       - ref('fct_jurisdiction_businesses')
+      - ref('fct_jurisdiction_business_donors')
       - ref('rpt_district_business_industries')
       - ref('rpt_officeholders_by_year')
       - ref('rpt_committee_donors')

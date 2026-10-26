@@ -17,6 +17,12 @@ sources:
   - name: rollcalls
     identifier: voteview_rollcalls
     description: 'Voteview roll calls (both chambers, loaded congresses): date, bill, question, result.'
+    columns:
+    - name: chamber
+      data_tests:
+      - accepted_values:
+          arguments:
+            values: [House, Senate]
   - name: votes
     identifier: voteview_votes
     description: Voteview individual votes, one row per (roll call, member) with a cast code; national, filtered

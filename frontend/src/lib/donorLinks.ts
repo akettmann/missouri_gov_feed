@@ -1,6 +1,5 @@
-// What a donor "reports" link on the sites and businesses tables really opens. fct_jurisdiction_businesses
-// builds donor_links from the campaign-finance rows it summed, one `<url> <donor name>` line per donor and
-// filing page: an MEC row links the committee that RECEIVED the money (the one matched to the official), not
+// What a donor "reports" link on the sites and businesses tables really opens. fct_jurisdiction_business_donors
+// has one row per donor and filing page (lib/siteDonors turns them into one `<url> <donor name>` line each): an MEC row links the committee that RECEIVED the money (the one matched to the official), not
 // filtered to the donor; an FEC row links the donor committee's disbursements filtered to the receiving
 // committee. The label names the page instead of promising "reports" for the donor (#236), and each donor
 // gets its own link instead of the row sharing one (#248).
@@ -13,7 +12,7 @@ export interface DonorLink {
 }
 
 /**
- * Split fct_jurisdiction_businesses.donor_links into links. A url never contains a space, so each line splits
+ * Split `<url> <donor name>` lines (lib/siteDonors) into links. A url never contains a space, so each line splits
  * at its first one; a line with no url or no donor name is dropped rather than rendered as a blank link.
  */
 export function parseDonorLinks(raw: string | null | undefined): DonorLink[] {
@@ -56,22 +55,6 @@ export function donorLinkLabel(url: string | null | undefined, siblings: string[
   const all = same.map(committeeIds);
   const varying = mine.filter((id, i) => id && all.some((o) => o[i] !== id));
   return varying.length ? `${base} (${kind}, ${varying.join(", ")})` : `${base} (${kind})`;
-}
-
-/**
- * fct_jurisdiction_businesses joins `donor_name_list` with this ASCII unit separator, not "; ": donor names are
- * kept as filed and a filed name can hold ";" or "," (e.g. "Missouri and Kansas Laborers; PAC"), so no printable
- * separator is safe (#350). The loader splits it once with `splitDonorNames`; everything downstream (pages, CSV,
- * JSON downloads) takes a `string[]` and the separator never leaves the loader. Show with `donorNamesText`.
- */
-export const DONOR_NAME_SEPARATOR = "\u001f";
-
-/** The donors in a `donor_name_list` value, trimmed, blanks dropped; null or empty gives []. */
-export function splitDonorNames(names: string | null | undefined): string[] {
-  return (names ?? "")
-    .split(DONOR_NAME_SEPARATOR)
-    .map((n) => n.trim())
-    .filter(Boolean);
 }
 
 /** The donors for people to read: joined by "; ". */
