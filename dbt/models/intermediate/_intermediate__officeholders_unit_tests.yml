@@ -15,6 +15,9 @@ unit_tests:
       - input: ref('stg_openstates__people')
         rows: []
         format: dict
+      - input: ref('int_mo_house__votes')
+        rows: []
+        format: dict
       - input: ref('int_mo_legislators__seats')
         rows: []
         format: dict
@@ -35,8 +38,9 @@ unit_tests:
       The House roster keeps listing a member after their last Open States House term ended (Rebecca Roeber, HD34,
       died 2019-07-30 but 2020 still lists her; #152). The row counts only while the term runs past the year's
       January 15 handover: she is listed for 2019 (term ends mid-year) and dropped for 2020, a member whose term ends
-      in 2020 stays for 2020, and a member with no Open States House term stays, and so does a row the seat match did not tie to an Open States
-      person even when that person's House term in Open States stops earlier (Lauren Arthur, 2017-2018).
+      in 2020 stays for 2020, and a member with no Open States House term stays, and so does a row whose roster member
+      has no Open States id even when that person's House term in Open States stops earlier (Lauren Arthur,
+      2017-2018; the roll-call test below keeps her because she kept voting).
     given:
       - input: ref('int_mo_house__member_identity')
         rows:
@@ -46,6 +50,9 @@ unit_tests:
           - {session_code: '201', session_year: 2020, person_key: 'mohouse:7', full_name: Bob Poe, district_number: 7}
           - {session_code: '201', session_year: 2020, person_key: 'ocd-person/arthur', full_name: Cy Arthur, district_number: 18}
       - input: ref('stg_openstates__people')
+        rows: []
+        format: dict
+      - input: ref('int_mo_house__votes')
         rows: []
         format: dict
       - input: ref('int_mo_legislators__seats')
@@ -66,6 +73,59 @@ unit_tests:
         - {year: 2020, official_id: 'mohouse:7', office: state_house, session_code: '201'}
         - {year: 2020, official_id: 'ocd-person/arthur', office: state_house, session_code: '201'}
 
+  - name: officeholders_house_row_dropped_when_the_members_last_roll_call_is_before_the_handover
+    model: int_officeholders__years
+    description: >
+      The roster outlives a member whose seat match failed, so the row has no Open States id to hold it to (Scott
+      Fitzpatrick, HD158: last vote 2019-01-09, then State Treasurer, the seat empty until 2020; #491). A roster row
+      counts only while the person's last roll-call vote is on or after the year's January 15 handover. Fitz is
+      dropped for 2019 but kept for 2018 (he voted in 2019). Lee voted through 2019-01-15, the handover itself, and
+      stays. Short (2019-01-14) is dropped. Mid (last vote 2019-05-10) stays for 2019 and is dropped for 2020. Arthur
+      has an Open States House term that stopped in 2016 yet kept voting through 2020, and stays. Mute has no
+      attributed vote at all (a Speaker whose votes carry no name) and is never dropped by votes.
+    given:
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '181', session_year: 2018, person_key: 'p_fitz', full_name: Sam Fitz, district_number: 158}
+          - {session_code: '191', session_year: 2019, person_key: 'p_fitz', full_name: Sam Fitz, district_number: 158}
+          - {session_code: '191', session_year: 2019, person_key: 'p_lee', full_name: Ann Lee, district_number: 2}
+          - {session_code: '191', session_year: 2019, person_key: 'p_short', full_name: Dee Short, district_number: 3}
+          - {session_code: '191', session_year: 2019, person_key: 'p_mid', full_name: Moe Mid, district_number: 4}
+          - {session_code: '201', session_year: 2020, person_key: 'p_mid', full_name: Moe Mid, district_number: 4}
+          - {session_code: '191', session_year: 2019, person_key: 'p_arthur', full_name: Cy Arthur, district_number: 18}
+          - {session_code: '201', session_year: 2020, person_key: 'p_arthur', full_name: Cy Arthur, district_number: 18}
+          - {session_code: '191', session_year: 2019, person_key: 'p_mute', full_name: Pat Mute, district_number: 5}
+          - {session_code: '201', session_year: 2020, person_key: 'p_mute', full_name: Pat Mute, district_number: 5}
+      - input: ref('int_mo_house__votes')
+        rows:
+          - {vote_id: v1, person_key: 'p_fitz', vote_date: '2019-01-09'}
+          - {vote_id: v2, person_key: 'p_lee', vote_date: '2019-01-15'}
+          - {vote_id: v3, person_key: 'p_short', vote_date: '2019-01-14'}
+          - {vote_id: v4, person_key: 'p_mid', vote_date: '2019-05-10'}
+          - {vote_id: v5, person_key: 'p_arthur', vote_date: '2020-05-10'}
+          - {vote_id: v6, person_key: null, vote_date: '2020-05-10'}
+      - input: ref('stg_openstates__people')
+        rows: []
+        format: dict
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: 'p_arthur', chamber: lower, district_number: 18, start_date: '2015-01-01', end_date: '2016-12-31'}
+      - input: ref('stg_congress__terms')
+        rows: []
+        format: dict
+      - input: ref('stg_fjc__appointments')
+        rows: []
+        format: dict
+    expect:
+      rows:
+        - {year: 2018, official_id: 'p_fitz', office: state_house, session_code: '181'}
+        - {year: 2019, official_id: 'p_lee', office: state_house, session_code: '191'}
+        - {year: 2019, official_id: 'p_mid', office: state_house, session_code: '191'}
+        - {year: 2019, official_id: 'p_arthur', office: state_house, session_code: '191'}
+        - {year: 2019, official_id: 'p_mute', office: state_house, session_code: '191'}
+        - {year: 2020, official_id: 'p_arthur', office: state_house, session_code: '201'}
+        - {year: 2020, official_id: 'p_mute', office: state_house, session_code: '201'}
+
   - name: officeholders_senate_seats_as_dated_by_the_seat_table
     model: int_officeholders__years
     description: >
@@ -80,6 +140,9 @@ unit_tests:
         rows:
           - {session_code: '181', session_year: 2018, person_key: 'mohouse:1', full_name: Ann Roe, district_number: 1}
       - input: ref('stg_openstates__people')
+        rows: []
+        format: dict
+      - input: ref('int_mo_house__votes')
         rows: []
         format: dict
       - input: ref('int_mo_legislators__seats')

@@ -71,8 +71,17 @@ Quirks:
   from 2019-07-30 until January 2021, and the 2020 rows carry no votes. The seat match lands on Rick, so
   `int_mo_house__member_seat_keys` keeps a member id on the person its other sessions matched by given name (only when
   exactly one person matches; member ids with two Open States duplicates keep the seat match), and
-  `int_officeholders__years` drops a roster row whose matched person's last Open States House term ended before the
-  year's January 15 handover, so HD34 has no 2020 officeholder. Raw keeps the roster as served. Issue #152.
+  `int_officeholders__years` drops a roster row whose roster member carries an Open States id (the name-anchor
+  override assigns it) when that person's last Open States House term ended before the year's January 15 handover,
+  so HD34 has no 2020 officeholder. Raw keeps the roster as served. Issue #152.
+- The same stale roster also outlives members whose seat match failed, so their row has no Open States id and the
+  term test cannot see it. Scott Fitzpatrick (HD158) cast his last vote on 2019-01-09 and became State Treasurer;
+  the 2019 roster still lists him though HD158 had no member until Scott Cupps in 2020. Mike Cierpiot (HD30) left for
+  the Senate (his last House vote was 2017-09-13) yet the 2018 roster lists him. `int_officeholders__years` therefore
+  also drops a roster row when the person's last roll-call vote is before the year's January 15 handover. Open States
+  dates alone are not enough: Lauren Arthur's House term ends 2016-12-31 but she voted through 2018, so her row stays.
+  The Speaker must be in the `house_speakers` seed for 2017-2022 as well as 2023+, else a Speaker with no named votes
+  (Haahr 2019-2020, Vescovo 2021-2022) would read as a member who stopped voting. Issue #491.
 - `bills171/rollcalls/` still holds the 2016 session's roll-call PDFs (numbered by 2016 session day, header
   "98th General Assembly, Second Regular Session"). The probe walks past the last 2017 roll call of a day, so
   it lands them under session 171: 415 roll calls dated 2016 (45 session days, 1/13/2016 to 5/13/2016,
