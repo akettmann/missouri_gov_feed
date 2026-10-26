@@ -57,7 +57,7 @@ unit_tests:
           - {vote_id: v1, journal_url: j1, session_year: 2025, vote_date: '2025-03-10', senator_token: Brown, token_name: Brown, token_district: null, vote_cast: yea}
           - {vote_id: v1, journal_url: j1, session_year: 2025, vote_date: '2025-03-10', senator_token: Eigel, token_name: Eigel, token_district: null, vote_cast: nay}
           - {vote_id: v1, journal_url: j1, session_year: 2025, vote_date: '2025-03-10', senator_token: Schupp, token_name: Schupp, token_district: null, vote_cast: nay}
-      - input: ref('int_mo_legislators__seats')
+      - input: ref('int_mo_legislators__seats_as_given')
         rows:
           - {openstates_id: p_brown16, person_id: p_brown16, chamber: upper, district_number: 16, surname_key: brown, party: Republican, start_date: '2023-01-04', end_date: '2026-12-31'}
           - {openstates_id: p_brown26, person_id: p_brown26, chamber: upper, district_number: 26, surname_key: brown, party: Republican, start_date: '2023-01-04', end_date: '2026-12-31'}

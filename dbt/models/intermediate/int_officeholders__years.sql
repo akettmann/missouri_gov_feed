@@ -1,8 +1,8 @@
 -- Who held each tracked office in each year, for the offices whose past holders have dated records:
 --   state_house    the House's own roster for each session year (int_mo_house__member_identity). Members who
 --                  left mid-session are missing from that session's end-of-session list.
---   state_senate   Open States seat-terms (int_mo_legislators__seats), dated from the Senate journal roll calls where
---                  Open States has no start or a wrong end (see senate_votes below). A year is kept only when all 34
+--   state_senate   Open States seat-terms (int_mo_legislators__seats, which dates them from the Senate journal
+--                  roll calls where Open States has no start or a wrong end). A year is kept only when all 34
 --                  districts have a dated holder, so a partial year doesn't pass as the full Senate.
 --   us_house, us_senate                 congress-legislators terms for Missouri
 --   us_district_court, us_court_of_appeals   FJC commissions on the E.D./W.D. Mo. district courts, and
@@ -60,63 +60,6 @@ house as (
     where m.openstates_id is null or t.last_end_date is null or t.last_end_date > y.handover_date
 ),
 
--- Open States dates a senator's seat-term by when it started and ended, but 25 senators in office from 2017 have no
--- start date at all, and a few terms end long after the person left (Joseph Keaveny, 2011-2018, never voted in the
--- journals, which begin 2017-01-04; Ryan Silvey's last vote was 2017-09-13, not 2018-12-31). The Senate journal
--- roll calls (int_mo_senate__votes) date both from what happened (#516):
---   * an undated start becomes the person's first roll-call vote. That is the latest the start can be (a senator
---     seated on the journal's first day, 2017-01-04, started on or before it), so it decides which years the
---     senator held the seat in, without inventing a start. It agrees with the 4-year term rule where the rule
---     can be checked (a term ending 2020-12-31 starts 2017; Bill White's, ending 2023-01-04, starts 2019-01-09
---     on both) and with every dated start (the first vote falls on or just after the start). The rule fails
---     for six 2017 senators whose terms end 2023-01-04 (consecutive terms), so it is not used.
---   * a term that Open States ends more than a year after the person's last roll-call vote ends at that vote. A
---     smaller gap stays: a senator who resigned on January 16 voted last on January 13 (Jason Holsman, 2020), and
---     the Open States date, not the last vote, says whether they held the seat past the January 15 handover. An
---     open term (no end date) is never cut.
---   * a term that runs into the journal's years without a single vote by the person was not held.
--- Terms that ended before the journals begin keep the dates Open States gives them.
-senate_votes as (
-    select
-        person_key,
-        min(vote_date) as first_vote,
-        max(vote_date) as last_vote
-    from {{ ref('int_mo_senate__votes') }}
-    where person_key is not null
-    group by person_key
-),
-
-journal_start as (
-    select min(vote_date) as first_date
-    from {{ ref('int_mo_senate__votes') }}
-),
-
-senate_seats as (
-    select
-        s.person_id,
-        s.full_name,
-        s.party,
-        s.district_number,
-        s.openstates_id,
-        case
-            when s.start_date > {{ dbt.safe_cast("'1900-01-01'", 'date') }} then s.start_date
-            else v.first_vote
-        end as start_date,
-        case
-            when
-                s.end_date < {{ dbt.safe_cast("'9999-12-31'", 'date') }}
-                and {{ dbt.dateadd('year', 1, 'v.last_vote') }} < s.end_date
-                then v.last_vote
-            else s.end_date
-        end as end_date
-    from {{ ref('int_mo_legislators__seats') }} as s
-    cross join journal_start as j
-    left join senate_votes as v on s.person_id = v.person_key
-    where
-        s.chamber = 'upper'
-        and (s.end_date < j.first_date or v.person_key is not null)
-),
-
 senate_terms as (
     select
         y.year,
@@ -130,8 +73,13 @@ senate_terms as (
         'openstates' as source,
         s.openstates_id,
         cast(null as {{ dbt.type_string() }}) as session_code
-    from senate_seats as s
+    from {{ ref('int_mo_legislators__seats') }} as s
     inner join years as y on s.start_date <= y.year_end and s.end_date > y.handover_date
+    where
+        s.chamber = 'upper'
+        -- int_mo_legislators__seats puts undated starts at 1900-01-01 (those in the journal years are dated from
+        -- the senator's first vote there, #522): the first year of any left is unknown
+        and s.start_date > {{ dbt.safe_cast("'1900-01-01'", 'date') }}
 ),
 
 senate_complete_years as (
