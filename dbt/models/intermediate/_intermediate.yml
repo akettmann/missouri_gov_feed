@@ -142,17 +142,20 @@ models:
     falls in (seed sic_naics_sectors): naics_code is then the two-digit sector prefix, naics_description names the
     sector and the SIC code, and naics_source is ''sic''. naics_source is null when the facility has no usable code.
     A real NAICS code, even a non-primary one, is more precise than a two-digit SIC-derived sector, and agrees with
-    it on the sector for about 90% of facilities. Codes tied on tier and program-system count: any other code first,
-    before the construction stormwater-permit noise code NAICS 238910 (a site holds that permit beside its real
-    industry, and an MO-DNR UNKNOWN row mirrors it, which would win the all-tier count, #432); then the one more
-    program systems give across ALL tiers (the same count over primary, unknown and secondary rows; the UNKNOWN-tier
-    rows usually back the right code, #432), then the one in the SIC-derived sector (NAICS 31-33 count as one sector),
-    then a 6-digit code before a shorter one, then the lowest code. The SIC sector counts only as a signal when
-    the SIC code is not itself tied (same tier and program-system count) with a SIC code in a different sector,
-    and is not SIC 1629 (construction stormwater-permit noise). is_government: a federal site, any owner-role organization
-    typed as a government body (municipal, county, state, federal, district, tribal), or a facility or owner named
-    like one ("City of ...", "... County", "... School District"; most organizations are typed UNKNOWN). The *_key
-    columns are company_key names for matching donors. Grain: one row per geocoded EPA FRS facility.'
+    it on the sector for about 90% of facilities. Codes tied on tier and program-system count: the one more program
+    systems give across ALL tiers, not counting MO-DNR and RMP (the same count over primary, unknown and secondary
+    rows; the UNKNOWN-tier rows usually back the right code, #432; an MO-DNR or RMP UNKNOWN row copies what another
+    system reports, so it must not outvote the SIC sector, #513); then the one in the SIC-derived sector (NAICS
+    31-33 count as one sector); then any other code before the construction stormwater-permit noise code NAICS 238910
+    (a site holds that permit beside its real industry, #432), which still wins when the SIC sector is construction;
+    then the all-tier count again with MO-DNR and RMP included (a copy still backs a code when nothing else separates
+    them), then a 6-digit code before a shorter one, then the lowest code. The SIC sector counts only as a signal
+    when the SIC code is not itself tied (same tier and program-system count) with a SIC code in a different sector,
+    and is not construction stormwater-permit noise: SIC 1629, or 1541/1542/1611 given only by NPDES (or its MO-DNR
+    copy), #513. is_government: a federal site, any owner-role organization typed as a government body (municipal,
+    county, state, federal, district, tribal), or a facility or owner named like one ("City of ...", "... County",
+    "... School District"; most organizations are typed UNKNOWN). The *_key columns are company_key names for matching
+    donors. Grain: one row per geocoded EPA FRS facility.'
 - name: int_house_fd__schedule_lines
   description: 'House disclosure PDF text, each line tagged with the schedule it falls under (the nearest preceding
     "Schedule X:" header in the same document). Column-header rows, "None disclosed." and boilerplate drop out.
