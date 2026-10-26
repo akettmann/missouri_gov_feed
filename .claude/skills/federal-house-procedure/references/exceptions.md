@@ -32,10 +32,12 @@ calls (2,905 votes), unless marked "verify".
 - **Failure:** If the rule fails, the underlying bills cannot come up under it. Leadership pulls the
   bill, rewrites the rule, or moves the bill under suspension. Failed rules were historically very
   rare. Recorded rule votes (`HRES` "Providing for consideration...") break down as follows. In the
-  117th, 0 of 72 failed. In the 118th, 7 of 62 failed: H.Res. 463, 680, 712, 869, 947, 994, 1125. In
-  the 119th, 5 of 59 failed: H.Res. 282, 580, 1042, 1175, 1398. Examples include H.Res. 463 (June
+  117th, 0 of 72 failed. In the 118th, 7 of 66 failed: H.Res. 463, 680, 712, 869, 947, 994, 1125. In
+  the 119th, 5 of 62 failed: H.Res. 282, 580, 1042, 1175, 1398. Examples include H.Res. 463 (June
   2023, REINS Act), H.Res. 712 (Sept. 2023, Defense appropriations), H.Res. 1125 (Apr. 2024, FISA
-  reauthorization), and H.Res. 580 (July 2025, FY2026 Defense appropriations).
+  reauthorization), and H.Res. 580 (July 2025). H.Res. 580 covered FY2026 Defense appropriations plus the GENIUS, CLARITY
+  and Anti-CBDC crypto bills (the "crypto week" revolt). It failed on July 15, 2025 and passed the
+  next day after a motion to reconsider.
 - **Self-executing rules / "deem and pass":** Adopting the rule changes bill text or treats another
   measure as passed, with no separate recorded vote on the change. When you see a passage vote on a
   bill whose text changed between committee and floor, check the rule.
@@ -56,8 +58,8 @@ calls (2,905 votes), unless marked "verify".
 
 ## 4. Discharge petition (bypassing leadership)
 
-- **What:** Under Rule XV cl. 2, if a measure has been in committee for 30 legislative days, 218
-  members can sign a petition to discharge it. The usual target is the Rules Committee, holding a
+- **What:** Under Rule XV cl. 2, if a measure has been in committee for 30 legislative days (7 legislative days
+  for a special rule held in the Rules Committee), 218 members can sign a petition to discharge it. The usual target is the Rules Committee, holding a
   special rule that a member has written to bring up the real bill.
 - **Procedure:** Once it has 218 signatures, it is placed on the Discharge Calendar. After 7
   legislative days, any signer can call it up on the 2nd or 4th Monday. The House then votes
@@ -67,8 +69,9 @@ calls (2,905 votes), unless marked "verify".
   bill first on its own terms.
 - **Data:** Six discharge-related roll calls, all in the 119th. Five `On Motion to Discharge` passed
   (H.Res. 432, 780, 965, 518, 1140 in Dec. 2025–June 2026), and one `On Motion to Table the Motion
-  to Discharge Committee` (H.J.Res. 117, Sept. 2025). In the 119th the discharge petition went from
-  a rare threat to a working tool for narrow-majority coalitions.
+  to Discharge Committee` (H.J.Res. 117, Sept. 2025). In the 119th discharge petitions became a
+  more frequent tool for narrow-majority coalitions. They had worked before (Ex-Im Bank
+  reauthorization in 2015, 114th (verify); Social Security Fairness Act in 2024).
 - **A petition can succeed without a discharge roll call.** Once a petition reaches 218 signatures,
   leadership often brings the bill up itself, usually under suspension. That happened with the
   Social Security Fairness Act (118th, Nov. 2024) and the Epstein Files Transparency Act (119th,
@@ -84,8 +87,8 @@ privileged.
   dignity or integrity, such as censure, expulsion, reprimand, and the **motion to vacate the
   chair**. Any member can offer one. The Speaker must schedule it within 2 legislative days, and it
   is often met with a motion to table or refer. Data: `On Motion to Table`, `On Motion to Refer`.
-  An expulsion resolution needs 2/3. For example, H.Res. 773 (Nov. 2023, Santos) failed, and a later
-  expulsion succeeded on Dec. 1, 2023 (verify the roll call).
+  An expulsion resolution needs 2/3. For example, H.Res. 773 (Nov. 2023, Santos) failed, and H.Res. 878
+  expelling Santos passed on Dec. 1, 2023, 311-114 **[data]**.
 - **Impeachment** resolutions are privileged. A member can force a vote, which is usually answered
   with a motion to table or refer.
 - **Statutory expedited procedures:**
@@ -126,12 +129,13 @@ privileged.
 - **Continuing resolutions and shutdowns:** If the twelve regular appropriations are not enacted by
   Oct. 1, a CR (usually an `H.R.`, sometimes an `H.J.Res.`) carries funding forward. A lapse causes a
   shutdown. Shutdowns in this window: Jan. 2018 (about 3 days), Feb. 2018 (hours), Dec. 2018–Jan.
-  2019 (35 days), and Oct.–Nov. 2025, the longest on record (verify the exact dates). Omnibus and
+  2019 (35 days), Oct.–Nov. 2025, the longest on record (verify the exact dates), and a partial shutdown
+  Jan. 31 – Feb. 3, 2026 (verify). Omnibus and
   "minibus" packages bundle several bills together.
 - **Debt limit:** Raised or suspended by ordinary bill, for example the Fiscal Responsibility Act
   (2023). The "Gephardt rule" (Rule XXVIII), which deems a debt-limit change passed when the budget
   resolution is adopted, was restored in the 116th and dropped again in the 118th (verify).
-- **Pay-as-you-go:** House CUTGO (115th, 118th onward) or PAYGO (116th-117th). It creates a point
+- **Pay-as-you-go:** House CUTGO (112th-115th, so also the 114th, and 118th onward) or PAYGO (116th-117th). It creates a point
   of order, and special rules often waive it. Statutory PAYGO is a separate law.
 - **Earmarks:** Banned 2011-2020. "Community Project Funding" returned for FY2022 (117th) with
   disclosure rules.

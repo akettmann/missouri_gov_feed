@@ -39,8 +39,9 @@ cache, so prefer them.
   question first.
 - **Procedural votes are party-line by design.** `On Ordering the Previous Question` passed 194 of 194
   times and `On Motion to Recommit` failed 201 of 202 times in our data. These votes measure party
-  discipline, not policy. Keep them apart from substantive votes in any ideology or "bias" metric
-  (see `fct_bias_indicators`).
+  discipline, not policy. Keep them apart from substantive votes in any ideology or "bias" metric.
+  (`fct_bias_indicators` currently uses only DW-NOMINATE and does not classify `vote_question`, so
+  do not rely on it to separate procedural votes.)
 - **A failed vote is not always a defeat of the policy.** A failed suspension usually comes back under
   a rule. A failed rule means the majority lost control of its own floor, which is a notable event in
   itself. A failed veto override is the last step: the measure is dead.

@@ -26,7 +26,7 @@ The counts come from the 117th-119th cache (2,905 House roll calls).
 
 Notes:
 
-- `vote_result` values are `Passed`, `Failed`, `Agreed to`, or a **surname** for Speaker ballots.
+- `vote_result` values are `Passed`, `Failed`, `Agreed to`, or a **surname** for Speaker ballots (sometimes with the state, for example "Johnson (LA)").
   Normalize these before computing pass rates.
 - `bill_number` is null for Speaker elections, adjournment, and electoral count objections.
 - `vote_desc` can contain mojibake curly quotes (cp1252 ↔ UTF-8). Do not use it as a join key.
