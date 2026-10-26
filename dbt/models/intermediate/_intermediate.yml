@@ -350,16 +350,18 @@ models:
     office).'
 - name: int_officials__identity_terms
   description: 'Who held which legislative seat in which year under which id, before ids are reconciled: the evidence
-    int_officials__person_ids works from. One row per (id as the source gave it, year, office, district) for the
-    years with a House roster, from the House''s own roster (its raw seat-matched key: an Open States id or mohouse:<House
-    member id>) and from Open States seat-terms (both chambers). A term counts for a year when it runs past January
-    15 of it, and terms with an undated start are left out, as in int_officeholders__years. name_key is the id''s
-    own full name. term_start/term_end are the Open States term''s dates exactly as Open States gives them (DATE;
-    end 9999-12-31 while open; null for House roster rows, which carry only a year), so a rule can tell overlap
-    from succession. They are not the January-1 adjusted dates used for the year membership above: those would make
-    a January successor (from Jan 1) overlap a predecessor Open States ends on Jan 6-9. Known edge: the min(start)/max(end)
-    collapse per (alias_id, year, office, district) spans any gap if one id holds the same seat in two separate
-    terms in a year. Grain: one row per (id as sourced, year, office, district).'
+    int_officials__person_ids works from. One row per (id as the source gave it, year, office, district, House member
+    id) for the years with a House roster, from the House''s own roster (its raw seat-matched key: an Open States
+    id or mohouse:<House member id>) and from Open States seat-terms (both chambers). A term counts for a year when
+    it runs past January 15 of it, and terms with an undated start are left out, as in int_officeholders__years.
+    house_member_id is the MO House member id the roster gave the row (null for Open States seat-terms): the House
+    keeps one member id per person across sessions and name changes, so the person-id rule can follow it. name_key
+    is the id''s own full name. term_start/term_end are the Open States term''s dates exactly as Open States gives
+    them (DATE; end 9999-12-31 while open; null for House roster rows, which carry only a year), so a rule can tell
+    overlap from succession. They are not the January-1 adjusted dates used for the year membership above: those
+    would make a January successor (from Jan 1) overlap a predecessor Open States ends on Jan 6-9. Known edge: the
+    min(start)/max(end) collapse per (alias_id, year, office, district) spans any gap if one id holds the same seat
+    in two separate terms in a year. Grain: one row per (id as sourced, year, office, district, House member id).'
 - name: int_officials__name_keys
   description: 'Normalized name variants per current official, for matching sources that only carry names (MEC committees,
     lobbyist reports, Wikidata labels, ratings). One row per (official, variant). Grain: one row per (official,
@@ -389,12 +391,19 @@ models:
     Smith (2019 only, or 2026 only after a special election) inside a Dan Smith successor''s span looks the same
     by year. Dates tell them apart: Kenneth''s term is a 26-day stub that overlaps Ken''s, while a successor''s
     term starts on or after the predecessor''s ends (or is no stub). Undated House-roster rows prove no overlap.
-    A name left with more than one partner (a chain or a fork) is ambiguous and joins nothing. 3. otherwise the
-    id is its own person, basis = self. Among merged ids the person_id is an Open States id over mohouse:, then
-    the one whose service ends latest, then the smaller id. The choice never looks at the latest roster year, so
-    an official''s id does not change when they leave office. Curated rows (official_id_links) take effect only
-    once a maintainer has signed them off (checked_by filled). Grain: one row per id a legislator has been given,
-    with the stable person_id.'
+    A name left with more than one partner (a chain or a fork) is ambiguous and joins nothing. 2c. MO House member
+    id continuity (#151): the House keeps one member id per person across sessions and name changes (Mazzie Boyd,
+    2023, and Mazzie Christensen, 2024-26, are member 2381), so ids that share a House member id are one person
+    whatever their names, basis = member_id_continuity. This is applied after rules 2 and 2b and joins the persons
+    they made, so it also reaches ids the name rules keep apart. It skips an id that carries more than one member
+    id (Open States'' Rick Roeber holds member 2215 and, through a seat-match error, Rebecca Roeber''s 1790, #152:
+    the shared 1790 would join two people) and any id listed as different_people in official_id_links. Only ids
+    with a roster row (a House member id) take part; Senate-only ids rely on names. 3. otherwise the id is its own
+    person, basis = self. Among merged ids the person_id is an Open States id over mohouse:, then the one whose
+    service ends latest, then the smaller id. The choice never looks at the latest roster year, so an official''s
+    id does not change when they leave office. Curated rows (official_id_links) take effect only once a maintainer
+    has signed them off (checked_by filled). Grain: one row per id a legislator has been given, with the stable
+    person_id.'
 - name: int_officials__wikidata
   description: 'Wikidata QID per official: from roster cross-references when present, else a unique exact name match
     against living Missouri officeholders on Wikidata. Grain: one row per official with a Wikidata QID.'
