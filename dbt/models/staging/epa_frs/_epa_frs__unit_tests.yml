@@ -57,7 +57,7 @@ unit_tests:
         - {registry_id: '5', facility_name: CAFE OVERRIDE}
         - {registry_id: '6', facility_name: 100% ALL}
         - {registry_id: '7', facility_name: ZO INC}
-        - {registry_id: '8', facility_name: 'A_B '}
+        - {registry_id: '8', facility_name: A_B}
         - {registry_id: '10', facility_name: 50% FF}
         - {registry_id: '11', facility_name: CAF TWO}
         - {registry_id: '12', facility_name: TRIM EX}
@@ -97,3 +97,63 @@ unit_tests:
         - {registry_id: '2', program_system: RCRAINFO, program_id: P2, affiliation_type: OWNER, org_name: DCOR PLUS}
         - {registry_id: '3', program_system: RCRAINFO, program_id: P3, affiliation_type: OWNER, org_name: DCOR PLUS}
         - {registry_id: '4', program_system: RCRAINFO, program_id: P4, affiliation_type: OWNER, org_name: ACME INC}
+
+  - name: epa_frs_text_loses_stray_commas_and_whitespace
+    model: stg_epa_frs__facilities
+    description: >
+      EPA writes names and addresses with trailing commas ("BUTTERBALL,", "900 WATSON DR,") and tabs. Name, address
+      and city lose leading and trailing commas, semicolons and whitespace and have inner runs of whitespace
+      collapsed to one space, while punctuation that belongs to the text stays ("INC.", "ST. LOUIS", an inner comma
+      before "SUITE 1"). Text that is nothing but separators becomes null (#319).
+    given:
+      - input: source('epa_frs', 'facilities')
+        format: sql
+        rows: |
+            select cast('{"REGISTRY_ID": "1", "PRIMARY_NAME": "BUTTERBALL,", "LOCATION_ADDRESS": "900 WATSON DR,", "CITY_NAME": "BRONAUGH"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "2", "PRIMARY_NAME": "ACME, INC.,", "LOCATION_ADDRESS": "100 MAIN ST, SUITE 1,", "CITY_NAME": "ST. LOUIS,"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "3", "PRIMARY_NAME": " , P P G  INDUSTRIES INC\t\t;", "LOCATION_ADDRESS": "HIGHWAY N\t\t\t", "CITY_NAME": "MILAN"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "4", "PRIMARY_NAME": "#1 STEP PALLETS", "LOCATION_ADDRESS": " , ;", "CITY_NAME": ""}' as varchar) as payload, 'u' as source_url
+      - input: ref('stg_epa_frs__alt_names')
+        format: sql
+        rows: |
+            select cast(null as varchar) as registry_id, cast(null as varchar) as program_system,
+                cast(null as varchar) as program_id, cast(null as varchar) as alt_name
+            where false
+      - input: ref('epa_frs_name_corrections')
+        format: sql
+        rows: |
+            select cast(null as varchar) as record_key, cast(null as varchar) as field,
+                cast(null as varchar) as corrected_value, cast(null as varchar) as source
+            where false
+    expect:
+      rows:
+        - {registry_id: '1', facility_name: BUTTERBALL, address: 900 WATSON DR, city: BRONAUGH}
+        - {registry_id: '2', facility_name: 'ACME, INC.', address: '100 MAIN ST, SUITE 1', city: ST. LOUIS}
+        - {registry_id: '3', facility_name: P P G INDUSTRIES INC, address: HIGHWAY N, city: MILAN}
+        - {registry_id: '4', facility_name: '#1 STEP PALLETS', address: null, city: null}
+
+  - name: epa_frs_org_name_loses_stray_commas_and_whitespace
+    model: stg_epa_frs__organizations
+    description: The same cleanup for an organization (owner) name; "INC." keeps its period (#319).
+    given:
+      - input: source('epa_frs', 'organizations')
+        format: sql
+        rows: |
+            select cast('{"REGISTRY_ID": "1", "PGM_SYS_ACRNM": "X", "PGM_SYS_ID": "P1", "AFFILIATION_TYPE": "OWNER", "ORG_NAME": "ACME INC.,"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"REGISTRY_ID": "2", "PGM_SYS_ACRNM": "X", "PGM_SYS_ID": "P2", "AFFILIATION_TYPE": "OWNER", "ORG_NAME": "DOE\t CO  "}' as varchar) as payload, 'u' as source_url
+      - input: ref('stg_epa_frs__alt_names')
+        format: sql
+        rows: |
+            select cast(null as varchar) as registry_id, cast(null as varchar) as program_system,
+                cast(null as varchar) as program_id, cast(null as varchar) as alt_name
+            where false
+      - input: ref('epa_frs_name_corrections')
+        format: sql
+        rows: |
+            select cast(null as varchar) as record_key, cast(null as varchar) as field,
+                cast(null as varchar) as corrected_value, cast(null as varchar) as source
+            where false
+    expect:
+      rows:
+        - {registry_id: '1', org_name: ACME INC.}
+        - {registry_id: '2', org_name: DOE CO}

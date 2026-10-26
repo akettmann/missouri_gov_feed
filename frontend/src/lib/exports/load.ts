@@ -413,13 +413,14 @@ async function loadAll(): Promise<OfficialBundle[]> {
     for (const r of await query<SiteRow>(`
       select official_id, donor_name_list, cast(donated_amount as double) as donated_amount,
              cast(n_contributions as integer) as n_contributions, first_year, last_year, match_confidence,
-             donor_links, facility_name, city, naics_description, matched_by, frs_url
+             donor_links, facility_name, address, city, naics_description, matched_by, frs_url
       from {fct_jurisdiction_businesses} where is_donor
       order by official_id, donated_amount desc, donor_name_list, facility_name, city`)) {
       const {
         official_id,
         donor_name_list,
         facility_name,
+        address,
         city,
         naics_description,
         matched_by,
@@ -434,7 +435,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
         byDonor.set(key, group);
         districtDonors.set(official_id, [...(districtDonors.get(official_id) ?? []), group]);
       }
-      group.sites.push({ facility_name, city, naics_description, matched_by, frs_url });
+      group.sites.push({ facility_name, address, city, naics_description, matched_by, frs_url });
     }
   }
   const districtIndustries = hasBusinesses
