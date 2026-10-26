@@ -130,6 +130,7 @@ def host_throttle(
     *,
     clock: Callable[[], float] = time.time,
     sleep: Callable[[float], None] = time.sleep,
+    monotonic: Callable[[], float] = time.monotonic,
 ) -> Iterator[None]:
     """Hold the host's lock across a request that starts at least `interval` seconds after the last one any
     process on this machine started.
@@ -179,8 +180,11 @@ def host_throttle(
             last = float("-inf")
         # a stamp in the future (clock set back) must not stall the run for longer than one interval
         last = min(last, clock())
-        # sleep can return early (Windows timer granularity), so check the clock again
-        while (wait := last + interval - clock()) > 0:
+        # The wait is fixed once against the shared wall clock (at most one interval, see above), then counted on the
+        # monotonic clock so a wall clock stepped back mid-wait cannot stretch it. sleep can return early (Windows
+        # timer granularity), so check the clock again.
+        deadline = monotonic() + max(0.0, min(last + interval - clock(), interval))
+        while (wait := deadline - monotonic()) > 0:
             sleep(wait)
         write_atomic(stamp, repr(clock()).encode())
         yield

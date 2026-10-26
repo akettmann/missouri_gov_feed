@@ -139,6 +139,8 @@ class FakeClock:
     def time(self) -> float:
         return self.now
 
+    monotonic = time  # never stepped back, unlike the wall clock tests move by hand
+
     def sleep(self, seconds: float) -> None:
         with self.lock:
             self.now += seconds
@@ -153,7 +155,9 @@ def test_throttle_keeps_requests_an_interval_apart_across_threads(tmp_path, monk
 
     def shard():
         for _ in range(6):
-            with http.host_throttle("revisor.mo.gov", interval, clock=clock.time, sleep=clock.sleep):
+            with http.host_throttle(
+                "revisor.mo.gov", interval, clock=clock.time, sleep=clock.sleep, monotonic=clock.monotonic
+            ):
                 starts.append(clock.time())
 
     threads = [threading.Thread(target=shard) for _ in range(3)]
@@ -172,8 +176,38 @@ def test_throttle_stamp_in_the_future_waits_at_most_one_interval(tmp_path, monke
     monkeypatch.setattr(http, "CACHE_DIR", tmp_path)
     (tmp_path / ".throttle-h.last").write_text("9999999999.0")
     clock = FakeClock()
-    with http.host_throttle("h", 2.0, clock=clock.time, sleep=clock.sleep):
+    with http.host_throttle("h", 2.0, clock=clock.time, sleep=clock.sleep, monotonic=clock.monotonic):
         assert clock.time() == 1002.0
+
+
+def test_throttle_clock_stepped_back_mid_wait_waits_one_interval(tmp_path, monkeypatch):
+    monkeypatch.setattr(http, "CACHE_DIR", tmp_path)
+    (tmp_path / ".throttle-h.last").write_text("1000.0")
+    wall = {"now": 1000.0}
+    mono = {"now": 5.0}
+
+    def sleep(seconds):
+        assert seconds <= 2.0 and mono["now"] < 20, "stalled by the clock step"
+        mono["now"] += seconds
+        wall["now"] -= 3600  # NTP steps the wall clock back an hour while we sleep
+
+    with http.host_throttle("h", 2.0, clock=lambda: wall["now"], sleep=sleep, monotonic=lambda: mono["now"]):
+        assert mono["now"] == 7.0
+
+
+def test_throttle_early_wake_still_waits_the_full_interval(tmp_path, monkeypatch):
+    monkeypatch.setattr(http, "CACHE_DIR", tmp_path)
+    (tmp_path / ".throttle-h.last").write_text("1000.0")
+    clock = FakeClock()
+    sleeps = []
+
+    def early_sleep(seconds):  # wakes at half the requested time, like a coarse timer
+        sleeps.append(seconds)
+        clock.sleep(seconds / 2)
+
+    with http.host_throttle("h", 2.0, clock=clock.time, sleep=early_sleep, monotonic=clock.monotonic):
+        assert clock.time() >= 1002.0 - 1e-9
+    assert len(sleeps) > 1
 
 
 def test_throttle_across_real_processes(tmp_path):
@@ -273,7 +307,7 @@ def test_a_warning_pauses_other_threads_requests_host_wide(tmp_path, monkeypatch
     http.pause_host("revisor.mo.gov", 60, clock=clock.time)  # shard A was warned at t=1000
 
     def shard_b():  # shard B's next request, nothing else holding the lock
-        with http.host_throttle("revisor.mo.gov", 2.0, clock=clock.time, sleep=clock.sleep):
+        with http.host_throttle("revisor.mo.gov", 2.0, clock=clock.time, sleep=clock.sleep, monotonic=clock.monotonic):
             starts.append(clock.time())
 
     t = threading.Thread(target=shard_b, daemon=True)
@@ -281,7 +315,7 @@ def test_a_warning_pauses_other_threads_requests_host_wide(tmp_path, monkeypatch
     t.join(timeout=10)
     assert not t.is_alive(), "shard B never got past the pause"
     assert starts == [pytest.approx(1060.0)]  # waited out the pause, no request in between
-    with http.host_throttle("revisor.mo.gov", 2.0, clock=clock.time, sleep=clock.sleep):
+    with http.host_throttle("revisor.mo.gov", 2.0, clock=clock.time, sleep=clock.sleep, monotonic=clock.monotonic):
         assert clock.time() == 1062.0  # and the pause doesn't linger
 
 
@@ -289,7 +323,7 @@ def test_a_pause_stamp_far_in_the_future_is_capped(tmp_path, monkeypatch):
     monkeypatch.setattr(http, "CACHE_DIR", tmp_path)
     (tmp_path / ".throttle-h.pause").write_text("9999999999.0")  # clock was set back after a pause was written
     clock = FakeClock()
-    with http.host_throttle("h", 2.0, clock=clock.time, sleep=clock.sleep):
+    with http.host_throttle("h", 2.0, clock=clock.time, sleep=clock.sleep, monotonic=clock.monotonic):
         assert clock.time() == 1000.0 + http.THROTTLE_MAX_PAUSE_S
     (tmp_path / ".throttle-h.pause").write_text("9999999999.0")
     http.pause_host("h", 60, clock=lambda: 1000.0)  # a fresh pause replaces the stale far one
