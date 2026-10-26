@@ -7,7 +7,9 @@
 --   from the topical index). Extraordinary-session journals (S1, S2, T1, T2: the prefix does not map to a session
 --   suffix, 2018's S1 is 183 but T1 is 184) match the year's extraordinary sessions (YY3, YY4) instead, where the
 --   bill has a House XML action on the vote date. A Senate bill that has only House-side actions in the XML (the
---   Senate's own steps are not listed) also matches when the vote falls on or before its first recorded action.
+--   Senate's own steps are not listed) also matches when the vote falls on or before its first recorded action,
+--   but only in the special session the vote belongs to: the one whose action-date span holds the vote date, else
+--   the one that starts next (if the vote is after the year's previous special session ended).
 --   A vote that fits no bill, or more than one session, links to nothing.
 --   Re-listed bills (status 'relisted for governor message', int_bills__status) are never linked: the House lists
 --   the previous session's appropriation bill again only to record the governor's Art. IV s.27 message, so it
@@ -69,9 +71,47 @@ special_bill_actions as (
     where {{ dbt.right('a.session_code', 1) }} in ('3', '4')
 ),
 
+special_session_spans as (
+    -- each special session's overall action-date span, and when the year's previous special session (by code) ended
+    select
+        session_code,
+        start_date,
+        end_date,
+        lag(end_date) over (partition by substr(session_code, 1, 2) order by session_code) as prev_end_date
+    from (
+        select
+            session_code,
+            min(action_date) as start_date,
+            max(action_date) as end_date
+        from special_bill_actions
+        group by session_code
+    ) as s
+),
+
+vote_special_sessions as (
+    -- the one special session a vote belongs to: the one whose span holds the vote date, else the one that starts
+    -- next, if the vote is after the year's previous special session ended. The journal prefix is not used (it does
+    -- not map to a session suffix). A vote in two overlapping spans belongs to neither.
+    select
+        v.vote_id,
+        max(s.session_code) as session_code
+    from senate_votes as v
+    inner join special_session_spans as s
+        on
+            s.session_code like v.year_code || '%'
+            and (
+                v.vote_date between s.start_date and s.end_date
+                or (v.vote_date < s.start_date and (s.prev_end_date is null or v.vote_date > s.prev_end_date))
+            )
+    where not v.regular_journal
+    group by v.vote_id
+    having count(distinct s.session_code) = 1
+),
+
 special_session_candidates as (
     -- extraordinary-session journal votes: bills of that year's YY3/YY4 sessions acted on the vote date, or (Senate
-    -- bills, whose Senate-side steps the XML does not list) first acted on in the House on or after the vote date
+    -- bills, whose Senate-side steps the XML does not list) first acted on in the House on or after the vote date,
+    -- if the session is the one the vote belongs to
     select distinct
         v.vote_id,
         a.session_code
@@ -80,8 +120,13 @@ special_session_candidates as (
         on
             v.measure_bill = a.bill
             and a.session_code like v.year_code || '%'
-            and (v.vote_date = a.action_date or (a.bill like 'S%' and v.vote_date <= a.first_action_date))
-    where not v.regular_journal
+    left join vote_special_sessions as vs on v.vote_id = vs.vote_id
+    where
+        not v.regular_journal
+        and (
+            v.vote_date = a.action_date
+            or (a.bill like 'S%' and v.vote_date <= a.first_action_date and vs.session_code = a.session_code)
+        )
 ),
 
 special_session_matches as (
