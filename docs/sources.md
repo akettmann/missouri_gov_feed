@@ -621,8 +621,10 @@ Quirks:
   reconciliation test only compares contests with a total per judge.
 - Typos and layout losses in the PDFs, kept as printed: 2016 "No Votes 252,827 59.5" (the "%" lost; parsed), 2016
   "No Votes 40.9%" (the vote count lost; the judge keeps the Yes figures and `no_votes` is null), and 2018 State
-  Representative District 66 prints its total on two lines ("10,376" and "Total Votes"). Several 2014-2020 ballot
-  measures use an older "Ballot Issue Yes: n Yes: pct%" layout and are not staged.
+  Representative District 66 prints its total on two lines ("10,376" and "Total Votes"). The 2014-2020 ballot
+  measures use an older layout ("Constitutional Amendment 1 Ballot Issue Yes: 499,581 Yes: 50.1%", then "No: 497,091
+  No: 49.9%"). The loader lands those lines unsplit (`kind = other`); `stg_mo_sos_elections__lines` recognises them and
+  gives them the same cells as the other years (#331).
 - Candidate-less ballots: a Yes/No pair named like the contest title is a ballot measure (staged as
   `contest_kind = 'ballot_issue'`, not in a mart); otherwise it is retention.
 - Uncontested means exactly one candidate on the ballot, write-ins not counted (a write-in with 19 votes does not

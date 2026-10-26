@@ -75,8 +75,8 @@ def parse_pdf(pages: list) -> list[dict]:
 
     kind: 'header' (a contest title with "(n of n Precincts Reported)"), 'candidate' (ends with votes and %),
     'total' ("Total Votes ..."), 'party_total' (a party's subtotal in a primary), 'other' (title block, page
-    furniture, and rows in layouts not parsed: the older "Ballot Issue Yes: n" lines and the presidential
-    preference primaries). contest_seq counts headers from 1; lines
+    furniture, and rows in layouts not parsed: the older "Ballot Issue Yes: n" lines, which dbt staging
+    recognises, and the presidential preference primaries). contest_seq counts headers from 1; lines
     before the first header have 0. cells = {name, party, votes, pct}: the words left of the party column,
     the words in it, then the last two words.
     """

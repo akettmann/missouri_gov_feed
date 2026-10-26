@@ -2,7 +2,7 @@
 -- votes, party, the printed percentage and a write-in flag. A retention judge has a "Yes Votes" and a "No Votes"
 -- row; a block of several judges under one header is split with subcontest_seq (it counts the Yes rows so far).
 -- contest_kind: candidate, retention (judge Yes/No), ballot_issue (Yes/No on a measure whose name is the contest
--- title). Rows in layouts the loader doesn't split into cells (older "Ballot Issue Yes: n" lines) are not here.
+-- title), in every layout (the 2014-2020 "Ballot Issue Yes: n" lines are recognised in the lines model).
 with picks as (
     select
         l.line_key,
