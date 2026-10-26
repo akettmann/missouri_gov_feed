@@ -112,6 +112,12 @@ Missouri Ethics Commission exports (opt-in). Source: [sources/mec.puml](sources/
 
 ![mec](sources/mec.svg)
 
+### mo_auditor
+
+Missouri State Auditor audit reports and the performance rating printed in each report. Source: [sources/mo_auditor.puml](sources/mo_auditor.puml)
+
+![mo_auditor](sources/mo_auditor.svg)
+
 ### mo_employee_pay
 
 Missouri state payroll from data.mo.gov. Source: [sources/mo_employee_pay.puml](sources/mo_employee_pay.puml)

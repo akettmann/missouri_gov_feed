@@ -30,6 +30,7 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `mo_employee_pay` | data.mo.gov State Employee Pay | yearly gross pay of legislators, statewide officials and state judges | `MOGOV_LOOKBACK_YEARS` (published from 2007) | |
 | `census_tiger` | Census Bureau TIGER/Line | legislative and congressional district, county and city boundaries | newest vintage | |
 | `epa_frs` | EPA Facility Registry Service | regulated facilities (name, address, coordinates, NAICS, owner) placed in districts; businesses in each official's district that donated to them | current state file (refreshed every few months) | |
+| `mo_auditor` | Missouri State Auditor (auditor.mo.gov) | audit reports of state offices and agencies, counties, cities, courts and schools, with the Auditor's four-level performance rating | reports 1999 to now; ratings from 2012 | |
 | `census_zcta` | Census Bureau Gazetteer | ZIP code area centers and land areas (find-by-ZIP) | newest vintage | |
 
 ## mo_house: Missouri House of Representatives

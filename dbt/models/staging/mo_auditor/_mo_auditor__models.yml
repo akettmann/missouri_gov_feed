@@ -1,0 +1,54 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_mo_auditor__ratings
+  description: 'The performance rating read from each audit report''s PDF, one row per report that was read. `rating`
+    is the word of the sentence "In the areas audited, the overall performance of this entity was <rating>." as
+    the Auditor spells it (null when the PDF has no such sentence: performance audits, special reports). The rating
+    covers only the areas audited. rating_sentence, pdf_url and page are the provenance.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - report_number
+  columns:
+  - name: report_number
+    data_tests:
+    - not_null
+  - name: rating
+    description: Excellent, Good, Fair or Poor. Anything else is a new vocabulary or a mis-read sentence.
+    data_tests:
+    - accepted_values:
+        arguments:
+          values:
+          - Excellent
+          - Good
+          - Fair
+          - Poor
+  - name: extraction_status
+    data_tests:
+    - accepted_values:
+        arguments:
+          values:
+          - ok
+          - no_rating_sentence
+        config:
+          severity: warn
+  - name: n_rating_sentences
+    description: Rating sentences found in the PDF pages scanned; a report states one rating, so more than one is
+      checked.
+- name: stg_mo_auditor__reports
+  description: State Auditor reports from the SearchAudits list, one row per report. report_number is the compact
+    number (2018063); report_number_display the printed one (2018-063). The release timestamp is the Auditor's local
+    clock with no zone, so only its date is kept. A report with a summary PDF links it; the full report url is resolved
+    from the list's relative "~/Repository/Press/..." path (a few reports link off-site).
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - report_number
+  columns:
+  - name: report_number
+    data_tests:
+    - not_null

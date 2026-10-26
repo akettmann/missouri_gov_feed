@@ -1,0 +1,46 @@
+# Unit tests for fct_audit_reports: fixed rows -> exact expected rows.
+version: 2
+
+unit_tests:
+  - name: audit_reports_link_only_statewide_offices_to_the_holder_at_release
+    model: fct_audit_reports
+    description: >
+      Treasurer audit r1 (released 2026) goes to the Treasurer on that date; r2 (released 2022, before Malek took
+      office) has no current-official holder. The Lieutenant Governor audit r3 (June 2026) goes to Wasinger by his
+      Wikidata-style title "Lieutenant Governor of Missouri", and r5 (released 2019) to Kehoe's earlier term in
+      that office. The county audit r4 and an "other" report are never linked, even though a county official
+      holds a matching office title, so a county's rating cannot land on a person.
+    given:
+      - input: ref('int_mo_auditor__reports')
+        rows:
+          - {report_number: r1, entity_type: statewide_office, office: state_treasurer, release_date: '2026-03-01', rating: Good, rating_level: 3, rating_status: ok}
+          - {report_number: r2, entity_type: statewide_office, office: state_treasurer, release_date: '2022-05-01', rating: Fair, rating_level: 2, rating_status: ok}
+          - {report_number: r3, entity_type: statewide_office, office: lt_governor, release_date: '2026-06-20', rating: Good, rating_level: 3, rating_status: ok}
+          - {report_number: r4, entity_type: county, office: null, release_date: '2026-03-01', rating: Poor, rating_level: 1, rating_status: ok}
+          - {report_number: r5, entity_type: statewide_office, office: lt_governor, release_date: '2019-04-01', rating: Fair, rating_level: 2, rating_status: ok}
+          - {report_number: r6, entity_type: other, office: null, release_date: '2026-03-01', rating: null, rating_level: null, rating_status: not_read}
+      - input: ref('statewide_officials')
+        rows:
+          - {office: state_treasurer, office_title: State Treasurer}
+          - {office: lt_governor, office_title: Lieutenant Governor}
+      - input: ref('fct_office_history')
+        rows:
+          - {official_id: malek, office_title: State Treasurer, start_date: '2023-01-09', end_date: '2029-01-08'}
+          - {official_id: wasinger, office_title: Lieutenant Governor of Missouri, start_date: '2025-01-13', end_date: null}
+          - {official_id: wasinger, office_title: Lieutenant Governor, start_date: '2025-01-13', end_date: '2029-01-08'}
+          - {official_id: kehoe, office_title: Lieutenant Governor of Missouri, start_date: '2018-06-18', end_date: '2025-01-13'}
+          - {official_id: a_county_clerk, office_title: County Clerk, start_date: '2020-01-01', end_date: null}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: malek, full_name: Vivek Malek}
+          - {official_id: wasinger, full_name: David Wasinger}
+          - {official_id: kehoe, full_name: Mike Kehoe}
+          - {official_id: a_county_clerk, full_name: A County Clerk}
+    expect:
+      rows:
+        - {report_number: r1, officeholder_at_release_id: malek, officeholder_at_release_name: Vivek Malek}
+        - {report_number: r2, officeholder_at_release_id: null, officeholder_at_release_name: null}
+        - {report_number: r3, officeholder_at_release_id: wasinger, officeholder_at_release_name: David Wasinger}
+        - {report_number: r4, officeholder_at_release_id: null, officeholder_at_release_name: null}
+        - {report_number: r5, officeholder_at_release_id: kehoe, officeholder_at_release_name: Mike Kehoe}
+        - {report_number: r6, officeholder_at_release_id: null, officeholder_at_release_name: null}
