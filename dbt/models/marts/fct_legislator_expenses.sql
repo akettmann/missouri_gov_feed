@@ -147,7 +147,8 @@ select
     e.vendor_name as payee_name,
     e.amount,
     m.match_confidence,
-    e.source_url
+    {{ mogov.socrata_page_url('e.source_url') }} as source_url,
+    e.source_url as source_api_url
 from matched as m
 inner join expenses as e
     on m.fiscal_year = e.fiscal_year and m.vendor_name = e.vendor_name and m.expense_type = e.expense_type
