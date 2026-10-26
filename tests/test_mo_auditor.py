@@ -141,6 +141,10 @@ def _filing(title, number="2012008   ", **extra):
         # county-wide reviews of every district in the county carry no rating sentence
         ("Greene County Fire Protection Districts", False),
         ("St. Louis County Fire Protection District", False),
+        ("St. Louis County Fire Protection Districts / Years Ended December 31, 2006", False),
+        # a single district whose name carries the county is still rated (2013-062)
+        ("Southern Dallas County Fire Protection District", True),
+        ("Western Cass County Fire Protection District", True),
         ("Review of Independent Audits of Fire Protection Districts in Greene County", False),
         # singular and plural financial statement filings are both unrated
         ("St. Clair County Financial Statement", False),
