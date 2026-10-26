@@ -26,7 +26,7 @@ select
     r.vote_result,
     v.vote_cast,
     'https://voteview.com/rollcall/R' || {{ dbt.concat([
-        "case v.chamber when 'House' then 'H' else 'S' end",
+        "case v.chamber when 'House' then 'H' when 'Senate' then 'S' end",
         mogov.zero_pad('v.congress', 3),
         mogov.zero_pad('v.rollnumber', 4),
     ]) }} as source_url

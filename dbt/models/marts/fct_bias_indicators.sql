@@ -16,7 +16,7 @@ with nominate as (
     select
         o.official_id,
         'dw_nominate_dim1' as indicator,
-        case m.chamber when 'House' then 'us_house' else 'us_senate' end as chamber,
+        case m.chamber when 'House' then 'us_house' when 'Senate' then 'us_senate' end as chamber,
         m.nominate_dim1 as value,
         m.congress as period,
         'Voteview DW-NOMINATE, ' || m.chamber || ' ' || {{ mogov.ordinal('m.congress') }}
