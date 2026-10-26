@@ -1,0 +1,27 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_mo_revisor__chapters
+  description: 'One row per RSMo chapter (the Revisor''s table of contents). title_numeral is the title''s roman
+    numeral ("I"), title_name the rest of its heading. Chapter numbers are text: a few carry a letter.'
+- name: stg_mo_revisor__repeals
+  description: 'One row per repealed or transferred RSMo section (the Revisor''s repeals-and-transfers list). note
+    is as printed: "(Repealed L. 1975 H.B. 945 § 1)", "(Transferred 2013; now 29.351)" or "(Transferred 1978 to
+    565.004; repealed 1983)"; transferred_to is the section it moved to. action_date is the date the repeal or transfer
+    took effect; the Revisor dates a repeal that waits on a contingency 1 Jan 2099, which becomes is_contingent
+    with no date. The list also carries repealed constitution sections ("V Section 25"); they are left out here.'
+- name: stg_mo_revisor__sections
+  description: 'One row per RSMo section version listed in force on the Revisor''s chapter pages. A section can
+    have several versions at once (bid = the Revisor''s version id): a later version not yet effective, conflicting
+    enactments of one section in the same year, or an earlier version printed beside one a court held unconstitutional.
+    section_id is the section number as the Revisor prints it ("1.010", "1.1001", "67.1360"). effective_date is
+    the version''s effective date; the Revisor dates a version that waits on a contingency 1 Jan 2099, which becomes
+    is_contingent with no date. held_unconstitutional: the effective line says "(all or part is unconstitutional)".
+    history_note is the session-law history footnote ("(RSMo 1939 § 645, A.L. 1957 p. 587, A.L. 2015 S.B. 239)"),
+    when the first footnote is one.'
+  columns:
+  - name: section_version_id
+    description: section_id/bid; a null here would silently break the not-exists anti-join in fct_statute_sections.
+    data_tests:
+    - not_null

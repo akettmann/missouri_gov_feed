@@ -305,6 +305,9 @@ OPTIONAL_JSON_TABLES = {
     "epa_frs_sic": "epa_frs",  # added to the EPA FRS loader after the first landings (#123); older raw dirs lack it
     "mo_auditor_reports": "mo_auditor",  # a loader that has not run yet in this environment (#288)
     "mo_auditor_ratings": "mo_auditor",
+    "mo_revisor_chapters": "mo_revisor",  # RSMo statutes (#34): a first load takes hours, so builds run without it
+    "mo_revisor_sections": "mo_revisor",
+    "mo_revisor_repeals": "mo_revisor",
     "epa_frs_alt_names": "epa_frs",  # added for U+FFFD name repair (#260); older raw dirs lack it
 }
 
