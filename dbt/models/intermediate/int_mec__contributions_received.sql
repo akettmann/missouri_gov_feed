@@ -3,6 +3,8 @@
 -- don't overlap; see fct_campaign_finance). mec_committee_id is always the receiving committee. A committee
 -- donor is identified only by contributor_committee_name: MEC records no MECID for it.
 -- MECIDs are upper-cased: a few rows carry "c000525" for C000525.
+-- Both feeds are read without their 24-hour notices that a full report itemizes again
+-- (int_tap_mec__contributions, int_mec__contributions_direct; #156).
 with tap as (
     select
         upper(trim(mec_committee_id)) as mec_committee_id,
@@ -17,7 +19,7 @@ with tap as (
         coalesce(contribution_year, cast(extract(year from contribution_date) as {{ dbt.type_int() }}))
             as contribution_year,
         'MEC (via Accountability Project)' as source
-    from {{ ref('stg_tap_mec__contributions') }}
+    from {{ ref('int_tap_mec__contributions') }}
     where mec_committee_id is not null
 ){% if var('mec_direct', false) %}
     ,
@@ -35,7 +37,7 @@ with tap as (
             contribution_date,
             contribution_year,
             'MEC' as source
-        from {{ ref('stg_mec__contributions') }}
+        from {{ ref('int_mec__contributions_direct') }}
         where mec_committee_id is not null
     )
 {% endif %}
