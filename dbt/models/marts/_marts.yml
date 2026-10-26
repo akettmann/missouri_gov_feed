@@ -336,6 +336,11 @@ models:
       - name: chamber
         data_type: varchar
         description: "`state_house`, `state_senate`, `us_house` or `us_senate`."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [state_house, state_senate, us_house, us_senate]
       - name: session_code
         data_type: varchar
         description: MO House session code (YY + type, e.g. 251), Senate journal year, or Congress number.
@@ -418,6 +423,7 @@ models:
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"
+        data_tests: [not_null]
 
   - name: fct_campaign_finance
     description: >
@@ -1856,7 +1862,8 @@ models:
       subsidiaries: "Spire PAC" and "LACLEDE GAS CO"). A company not in the seed that gives under another name
       is missed. Statewide officials have no rows (they serve every area). Grain: one row per (official,
       facility); district_id is the area that puts the facility in the official's jurisdiction. The donor
-      columns (donor_name_list through donor_links) are filled only when is_donor.
+      columns (matched_by through match_confidence) are filled only when is_donor. The donors themselves, and the
+      pages their gifts are filed on, are fct_jurisdiction_business_donors.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -1920,14 +1927,6 @@ models:
           - accepted_values:
               arguments:
                 values: ['same name', 'same company']
-      - name: donor_name_list
-        data_type: varchar
-        description: >
-          Internal, not for display: the matched contributors as filed, joined by chr(31) (the ASCII unit
-          separator, not a printable character), when is_donor. Names are kept as filed, so a ";" or "," inside
-          one stays; chr(31) only ever separates two donors (#350). A consumer must split on chr(31) and never
-          print or export the raw value. The frontend loader splits it into a list and shows the names joined
-          by "; ". Renamed from donor_names so a stale export (which joined with "; ") fails the column guard.
       - name: donated_amount
         data_type: decimal(38,6)
         description: >
@@ -1952,19 +1951,58 @@ models:
           - accepted_values:
               arguments:
                 values: ['high', 'medium']
-      - name: donor_links
-        data_type: varchar
-        description: >
-          One filing-page link per matched donor and page, when is_donor: lines of `<url> <donor name>` joined by a
-          newline (a url never contains a space), ordered by donor name then url. A donor gets a line for every
-          distinct page its gifts to the official are filed on, so a donor that gave through an MEC and an FEC
-          committee keeps both links. An MEC page is the committee that received the money (the committee
-          matched to the official), not filtered to the donor. An FEC page is the donor committee's
-          disbursements filtered to the receiving committee, so it lists the gifts themselves. The frontend labels
-          each link by which one it is (#236, #248). Null when no matched gift has a url.
       - name: frs_url
         data_type: varchar
         description: The facility's EPA FRS detail report.
+
+  - name: fct_jurisdiction_business_donors
+    description: >
+      The donors behind fct_jurisdiction_businesses (#370): for each facility flagged is_donor, the donor
+      organizations tied to it and each filing page their gifts to the official are filed on. A donor that gave
+      through an MEC and an FEC committee, or to two FEC committees, has one row per page, so no single url is
+      picked (#248). A donor with no filing-page url has one row with a null source_url. An MEC page is the
+      committee that received the money (the committee matched to the official), not filtered to the donor; an
+      FEC page is the donor committee's disbursements filtered to the receiving committee, so it lists the gifts
+      themselves. Which regulator a page belongs to is in the url. Names are as filed (a ";" or "," inside one
+      stays), except that line breaks become spaces. Rows have no meaningful order: a consumer sorts. Grain: one
+      row per (official, facility, donor name, source url). The donated totals are on fct_jurisdiction_businesses
+      and repeat per facility.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, registry_id, donor_name, source_url]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }}"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: registry_id
+        data_type: varchar
+        description: >
+          EPA FRS registry id of the facility. (official_id, registry_id) is a row of fct_jurisdiction_businesses
+          with is_donor (assert_business_donors_have_a_business).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_jurisdiction_businesses')
+                field: registry_id
+      - name: donor_name
+        data_type: varchar
+        description: The donor organization as filed in the campaign-finance record (one name per company_key).
+        data_tests: [not_null]
+      - name: source_url
+        data_type: varchar
+        description: >
+          A filing page the donor's gifts to the official are filed on (MEC committee page or FEC disbursements
+          page); null when none of them has a url.
+        data_tests:
+          - dbt_utils.not_empty_string
 
   - name: fct_election_races
     description: >

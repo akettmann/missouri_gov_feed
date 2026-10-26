@@ -433,6 +433,16 @@ Flow: [diagrams/sources/voteview.svg](diagrams/sources/voteview.svg)
 - Window: `MOGOV_VOTEVIEW_CONGRESSES`.
 - Full-chamber files; Missouri members are picked out in dbt.
 
+Quirks:
+- The members file also lists the Presidents, with chamber `President` and ICPSR ids 99912/99913 (two rows each
+  in the loaded congresses). `stg_voteview__members` keeps only House and Senate rows.
+- The votes file carries the President's announced position on some roll calls as vote rows under those same
+  999xx ICPSR ids, with the roll call's chamber (House or Senate; 941 rows in the loaded congresses). They aren't
+  members of a chamber, so `stg_voteview__votes` drops icpsr >= 99000 explicitly. A test on that column fails if
+  the filter goes.
+- The rollcalls file has only House and Senate rows, and the source `accepted_values` tests on all three files
+  flag any new chamber value; staging drops unknown chambers either way.
+
 ## house_fd: U.S. House financial disclosures
 
 Flow: [diagrams/sources/house_fd.svg](diagrams/sources/house_fd.svg)
@@ -899,7 +909,9 @@ offices, shops and most service businesses are missing.
   whitespace runs and cuts leading/trailing commas, semicolons and whitespace from facility name, address, city and
   organization name; "INC." and single inner commas stay. Names that were only separators or empty become null (60
   sites; the sites tables say "unnamed site"). A doubled inner comma becomes one
-  ("LIPPERT FAMILY FARM,, LLC" shows as "LIPPERT FAMILY FARM, LLC") (#381). "K-BAR-L ;;C" (facility 110013336416) is
+  ("LIPPERT FAMILY FARM,, LLC" shows as "LIPPERT FAMILY FARM, LLC") (#381).
+  A single space before a comma goes too ("NEMO FEEDS , LLC" shows as "NEMO FEEDS, LLC", "T 33N ,R 04W" as "T 33N,R 04W") (#399);
+  a run of space-comma pairs collapses to one comma ("A , , B" shows as "A, B"). "K-BAR-L ;;C" (facility 110013336416) is
   left as is: it is likely a shifted-hand typo for "K-BAR-L LLC", not a separator, so it is not rewritten.
 - HTML entities: a few names and addresses carry entities ("D&AMP;A BARRACKS", "HOLCIM &#40;US&#41; INC",
   "LEE&#39;S SUMMIT"; 8 facilities and 1 organization name in the Oct 2026 file). `mogov.clean_registry_text` decodes `&AMP;`,
@@ -921,12 +933,13 @@ offices, shops and most service businesses are missing.
     sites are filed under legal or subsidiary names ("UNION ELECTRIC CO", "LACLEDE GAS", "SOUTHWESTERN BELL
     TELEPHONE", "KANSAS CITY POWER & LIGHT"). The seed covers the largest corporate donors with Missouri sites.
   - In October 2026: 502 (official, facility) pairs by name and 1,541 more by brand, for 122 officials.
-- Each matched site also carries the matched donors' first and last contribution year, the links
-  (`donor_links`: one line per matched donor and filing page, `<url> <donor name>`. A page is the MEC committee
+- Each matched site also carries the matched donors' first and last contribution year, `match_confidence`
+  (`medium` when any of that money was tied to the official by name only) and, in `fct_jurisdiction_business_donors`
+  (one row per official, site, donor and filing page; #370), the donors and their links. A page is the MEC committee
   matched to the official, which is not filtered to the donor, or the FEC disbursements of the donor's committee
   filtered to the receiving committee; a donor filed on both keeps both. Line breaks in a donor name become spaces so a
-  line never splits; in the published sites.csv the cell holds several lines. A donor with no page has no line) and `match_confidence`
-  (`medium` when any of that money was tied to the official by name only).
+  line never splits; the frontend writes them as `<url> <donor name>` lines, which in the published sites.csv sit in one
+  cell. A donor with no page has one row with a null `source_url`.
 - Industry: the NAICS code most of a site's programs give, taking primary codes first (`naics_source` `naics`,
   31% of the geocoded sites in October 2026), then codes FRS leaves UNKNOWN (`naics_unknown`, 2%), then SECONDARY
   ones (`naics_secondary`, 0.1%). A real NAICS code is more precise than a SIC-derived sector, so only a site with

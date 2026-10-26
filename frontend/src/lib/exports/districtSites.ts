@@ -1,7 +1,8 @@
 // The full EPA-regulated site list per district (fct_jurisdiction_businesses), kept out of the per-official
 // JSON: a U.S. House district holds ~10k sites. Each district gets a plain page and a CSV download.
 // The table is read once (one query) and grouped in memory; per-route parquet scans cost minutes.
-import { splitDonorNames } from "../donorLinks";
+import { siteKey } from "../siteDonors";
+import { siteDonors } from "./businessDonors";
 import { districtSlug } from "../siteCsv";
 import { hasExport, query } from "./db";
 import { allOfficials } from "./load";
@@ -29,12 +30,13 @@ function load(): Promise<Loaded | null> {
   loaded ??= (async () => {
     if (!hasExport("fct_jurisdiction_businesses")) return null;
     const slugs = new Map((await allOfficials()).map((b) => [b.official.official_id, b.official.slug]));
+    const donorsBySite = await siteDonors();
     const rows = await query<
-      Omit<SiteRow, "donors"> & { official_id: string; district_id: string; donor_name_list: string | null }
+      Omit<SiteRow, "donors" | "donor_links"> & { official_id: string; district_id: string }
     >(`
       select official_id, district_id, registry_id, facility_name, address, city, postal_code,
-             naics_description, owner_name, parent_company_name, is_donor, matched_by, donor_name_list,
-             match_confidence, donor_links, frs_url
+             naics_description, owner_name, parent_company_name, is_donor, matched_by,
+             match_confidence, frs_url
       from {fct_jurisdiction_businesses}
       order by district_id, is_donor desc, city, facility_name, frs_url`);
 
@@ -44,8 +46,9 @@ function load(): Promise<Loaded | null> {
     const districtOf = new Map<string, string>();
     const sites = new Map<string, SiteRow[]>();
     const seen = new Set<string>();
-    for (const { official_id, district_id, donor_name_list, ...rest } of rows) {
-      const site: SiteRow = { ...rest, donors: splitDonorNames(donor_name_list) };
+    for (const { official_id, district_id, ...rest } of rows) {
+      const found = donorsBySite.get(siteKey(official_id, rest.registry_id));
+      const site: SiteRow = { ...rest, donors: found?.donors ?? [], donor_links: found?.donor_links ?? null };
       for (const [map, key, other, what] of [
         [officialOf, district_id, official_id, "officials"],
         [districtOf, official_id, district_id, "districts"],
