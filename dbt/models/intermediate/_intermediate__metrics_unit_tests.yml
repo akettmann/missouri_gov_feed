@@ -1,0 +1,32 @@
+# Unit tests for the committee-post and judge time-to-disposition metrics (fixed rows -> exact expected rows).
+version: 2
+
+unit_tests:
+  - name: committee_memberships_use_member_pages_and_fill_sessions_without_them_from_the_list
+    model: int_mo_house__committee_memberships
+    description: >
+      A session with member-page rows takes only those (the COMMITTEELIST rows for it are ignored, so no member
+      is counted twice). A session with none (253) is filled from COMMITTEELIST by district, House members only
+      (chamber H): Senate members drop out.
+    given:
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '251', house_member_id: '9001', district_number: 1, person_key: p_one}
+          - {session_code: '253', house_member_id: '9001', district_number: 1, person_key: p_one}
+          - {session_code: '253', house_member_id: '9002', district_number: 2, person_key: p_two}
+      - input: ref('stg_mo_house__member_committees')
+        rows:
+          - {session_code: '251', house_member_id: '9001', committee_name: Budget, position_name: Chair}
+          - {session_code: '251', house_member_id: '9001', committee_name: Subcommittee on Roads, position_name: Member}
+      - input: ref('stg_mo_house__committee_list_members')
+        rows:
+          - {session_code: '251', committee_name: Budget, district_number: 1, position_name: Member, chamber: H}
+          - {session_code: '253', committee_name: Budget, district_number: 1, position_name: Chair, chamber: H}
+          - {session_code: '253', committee_name: Budget, district_number: 2, position_name: Member, chamber: H}
+          - {session_code: '253', committee_name: Budget, district_number: 2, position_name: Member, chamber: S}
+    expect:
+      rows:
+        - {session_code: '251', person_key: p_one, committee_name: Budget, position_name: Chair, source: member_page, is_subcommittee: false}
+        - {session_code: '251', person_key: p_one, committee_name: Subcommittee on Roads, position_name: Member, source: member_page, is_subcommittee: true}
+        - {session_code: '253', person_key: p_one, committee_name: Budget, position_name: Chair, source: committee_list, is_subcommittee: false}
+        - {session_code: '253', person_key: p_two, committee_name: Budget, position_name: Member, source: committee_list, is_subcommittee: false}

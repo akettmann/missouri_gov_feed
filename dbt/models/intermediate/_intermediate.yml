@@ -34,6 +34,12 @@ models:
     matches only count from the judge''s first known judicial start date (fct_office_history, else dim_official.current_term_start);
     without one, panel matches only. Attorney matches start at var case_history_min_year (default 1975): earlier
     namesakes aren''t them. Grain: one row per (official, role, cluster); matched_by says how.'
+- name: int_courtlistener__district_dockets
+  description: 'Federal district-court dockets (E.D. and W.D. Missouri) that have an assigned judge: filed and terminated
+    dates (null when the docket has none) and the days between. A docket whose termination date is before its filing
+    date has a negative duration (a source error): it is kept and flagged with ends_before_filed, and the judge
+    metric leaves it out. The state courts carry no judge or dates in the bulk export, so only the federal districts
+    are here. Grain: one row per docket_id. Grain: one row per federal district docket with an assigned judge.'
 - name: int_courtlistener__judge_disclosure_items
   description: 'Federal judges'' disclosure line items with the report they come from and the judge''s FJC id. Grain:
     one disclosed item per federal judge report.'
@@ -161,6 +167,12 @@ models:
     first name anywhere in the name ("Committee to Elect Caleb Rowden") never matches. When the MEC loader has run,
     its CF12 crosswalk (exact MECID<->candidate) should replace this. Grain: one row per (official, MEC committee)
     with a confidence label.'
+- name: int_mo_house__committee_memberships
+  description: 'House committee and subcommittee memberships per member and session, keyed to the person (person_key
+    from int_mo_house__member_identity). The member pages (stg_mo_house__member_committees) cover every session
+    but 253; for a session with no member-page rows the COMMITTEELIST export fills in (House members only, matched
+    on session + district). Grain: one row per (session, member, committee). Grain: one row per (House session,
+    member, committee).'
 - name: int_mo_house__member_identity
   description: 'Identity for each MO House member per session (House XML is authoritative for the House roster).
     person_key = the stable person id (int_officials__person_ids) of the key the seat match gave: an Open States
