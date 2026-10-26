@@ -1,6 +1,7 @@
 // What each fct_bias_indicators.indicator means and how to draw it. Shared by the profile and methodology
 // pages so the explanation next to a number is always the one on the methodology page.
 
+import { ordinal } from "./awardBadges.ts";
 import { plural } from "./format.ts";
 
 export interface IndicatorMeta {
@@ -73,9 +74,37 @@ export function indicatorMeta(key: string): IndicatorMeta {
   );
 }
 
-/** "Among 90 Missouri House members (2025):" lead of a peer strip's text summary */
-export const peerStripLead = (peerCount: number, where: string, period: string | number | null) =>
-  `Among ${plural(peerCount, `${where} member`, `${where} members`)}${period ? ` (${period})` : ""}:`;
+/** Who a peer strip counts: the Missouri officials tracked here, not the whole chamber. */
+const PEER_NOUNS: Record<string, [string, string]> = {
+  state_house: ["Missouri House member", "Missouri House members"],
+  state_senate: ["Missouri Senate member", "Missouri Senate members"],
+  us_house: ["Missouri U.S. House member", "Missouri U.S. House members"],
+  us_senate: ["Missouri U.S. senator", "Missouri U.S. senators"],
+};
+
+/**
+ * "Among 2 Missouri U.S. senators with a score in the 119th Congress:" lead of a peer strip's text summary.
+ * `period` is a Congress number for DW-NOMINATE (the peers share that Congress) but only the last year served
+ * for Shor-McCarty, whose peers are every career score in the chamber, and null for party unity (all loaded
+ * votes); so only DW-NOMINATE names the period.
+ */
+export const peerStripLead = (
+  peerCount: number,
+  chamber: string,
+  indicator: string,
+  period: number | null,
+) => {
+  const [one, many] = PEER_NOUNS[chamber] ?? [`${chamber} member`, `${chamber} members`];
+  const scope =
+    indicator === "dw_nominate_dim1"
+      ? period == null
+        ? "with a score"
+        : `with a score in the ${ordinal(period)} Congress`
+      : indicator === "shor_mccarty_np"
+        ? "with a career score"
+        : "with a party-unity score";
+  return `Among ${plural(peerCount, one, many)} ${scope}:`;
+};
 
 /** the party-line "breaks" sentence on a legislator's voting section */
 export const breaksText = (n: number) =>

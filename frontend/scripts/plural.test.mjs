@@ -20,9 +20,41 @@ test("plural uses the singular for exactly 1", () => {
 });
 
 test("peer strip lead", () => {
-  assert.equal(peerStripLead(1, "U.S. Senate", "2025"), "Among 1 U.S. Senate member (2025):");
-  assert.equal(peerStripLead(2, "U.S. Senate", null), "Among 2 U.S. Senate members:");
-  assert.equal(peerStripLead(1234, "Missouri House", "2025"), "Among 1,234 Missouri House members (2025):");
+  const lead = (n, chamber, indicator, period) => peerStripLead(n, chamber, indicator, period);
+  // federal: a Congress number, ordinal, counted as Missouri's own members
+  assert.equal(
+    lead(2, "us_senate", "dw_nominate_dim1", 119),
+    "Among 2 Missouri U.S. senators with a score in the 119th Congress:",
+  );
+  assert.equal(
+    lead(1, "us_senate", "dw_nominate_dim1", 112),
+    "Among 1 Missouri U.S. senator with a score in the 112th Congress:",
+  );
+  assert.equal(
+    lead(8, "us_house", "dw_nominate_dim1", 111),
+    "Among 8 Missouri U.S. House members with a score in the 111th Congress:",
+  );
+  assert.equal(
+    lead(1, "us_house", "dw_nominate_dim1", 113),
+    "Among 1 Missouri U.S. House member with a score in the 113th Congress:",
+  );
+  assert.equal(
+    lead(2, "us_house", "dw_nominate_dim1", null),
+    "Among 2 Missouri U.S. House members with a score:",
+  );
+  // state: Shor-McCarty's period is the last year served, not the peer group, so it is not named
+  assert.equal(
+    lead(1234, "state_house", "shor_mccarty_np", 2018),
+    "Among 1,234 Missouri House members with a career score:",
+  );
+  assert.equal(
+    lead(1, "state_senate", "shor_mccarty_np", 2022),
+    "Among 1 Missouri Senate member with a career score:",
+  );
+  assert.equal(
+    lead(2, "state_senate", "party_unity_pct", null),
+    "Among 2 Missouri Senate members with a party-unity score:",
+  );
 });
 
 test("award badge sample sizes", () => {
