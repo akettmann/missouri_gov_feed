@@ -29,10 +29,16 @@ projects", and the testing and documentation best practices.
   in #121. Trino/Athena and Spark < 3.3 are not supported (no `regexp_instr`). Regex patterns are plain POSIX ERE;
   `mogov.regex_literal` handles per-adapter string escaping (Snowflake treats backslash as an escape).
 - sqlfluff with the dbt templater in pre-commit and CI.
-- `indirect_selection: buildable` (dbt_project.yml): a test runs only if every model it reads is selected or upstream
-  of the selection. With dbt's default `eager`, `-s +rpt_awards` ran `assert_official_ids_one_per_person` against a
-  stale `int_officeholders__years` and reported failures a full build doesn't produce (#198). To run such a test, select
-  it (`-s +test_name`) so its parents rebuild.
+- `indirect_selection: buildable` (dbt_project.yml): an unselected test runs only if every model it reads is selected
+  or an ancestor of a selected model. With dbt's default `eager`, `-s +rpt_awards` ran
+  `assert_official_ids_one_per_person` against a stale `int_officeholders__years` and reported failures a full build
+  doesn't produce (#198). `buildable` is a complete guard only for `+model` selections, where the ancestors are
+  rebuilt too. With `model+` or a bare `-s model`, ancestors that are not selected are not rebuilt, so a test that
+  reads one can still run against its old table. Example: `dbt ls -s int_officeholders__years+` includes
+  `assert_official_ids_one_per_person`, which also reads `int_officials__current`; that model is not rebuilt. After
+  changing a model other tests read (e.g. `dim_official` ids), build `model+` together with the parents those tests
+  read (`+model+`, or `@model`), so every model and test that reads it is rebuilt together. To run one test, select it
+  (`-s +test_name`) so its parents rebuild.
 - Ties are broken on stable keys: every `row_number()` / `rank()` that picks a row, and every frontend `order by ... limit`
   or sort that lists the top N, ends its order with a key that is unique within the group, never a lone amount or date,
   so two builds of the same data give byte-identical site output (#226). `scripts/check_site_determinism.py` builds the
