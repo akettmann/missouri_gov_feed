@@ -425,3 +425,39 @@ unit_tests:
     expect:
       rows:
         - {registry_id: F1, donor_names: 'ACME HOLDINGS INC; AMEREN CORPORATION, THE', donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9 ACME HOLDINGS INC\nhttps://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 AMEREN CORPORATION, THE"}
+
+  - name: bias_indicator_detail_wording
+    model: fct_bias_indicators
+    description: >
+      DW-NOMINATE detail carries the English ordinal of the Congress: 111th-113th and 119th take "th" (the
+      teens are never st/nd/rd), 121st and 122nd take "st" and "nd". Party-unity detail starts with the raw chamber
+      key and the lifetime party-line vote count, which SectionIdeology reads as the lookup key.
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: o1, bioguide_id: B1}
+      - input: ref('stg_voteview__members')
+        rows:
+          - {bioguide_id: B1, icpsr: 1, chamber: House, congress: 111, nominate_dim1: 0.1}
+          - {bioguide_id: B1, icpsr: 1, chamber: House, congress: 112, nominate_dim1: 0.1}
+          - {bioguide_id: B1, icpsr: 1, chamber: House, congress: 113, nominate_dim1: 0.1}
+          - {bioguide_id: B1, icpsr: 1, chamber: House, congress: 119, nominate_dim1: 0.1}
+          - {bioguide_id: B1, icpsr: 1, chamber: House, congress: 121, nominate_dim1: 0.1}
+          - {bioguide_id: B1, icpsr: 1, chamber: House, congress: 122, nominate_dim1: 0.1}
+      - input: ref('stg_shor_mccarty__scores')
+        rows: []
+      - input: ref('int_mo_legislators__seats')
+        rows: []
+      - input: ref('fct_party_unity_yearly')
+        rows:
+          - {official_id: o1, chamber: state_house, vote_year: 2020, party_line_votes: 600, with_party_votes: 500}
+          - {official_id: o1, chamber: state_house, vote_year: 2021, party_line_votes: 406, with_party_votes: 400}
+    expect:
+      rows:
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 111, detail: 'Voteview DW-NOMINATE, House 111th Congress'}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 112, detail: 'Voteview DW-NOMINATE, House 112th Congress'}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 113, detail: 'Voteview DW-NOMINATE, House 113th Congress'}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 119, detail: 'Voteview DW-NOMINATE, House 119th Congress'}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 121, detail: 'Voteview DW-NOMINATE, House 121st Congress'}
+        - {official_id: o1, indicator: dw_nominate_dim1, period: 122, detail: 'Voteview DW-NOMINATE, House 122nd Congress'}
+        - {official_id: o1, indicator: party_unity_pct, period: null, detail: 'state_house: 1006 party-line votes'}
