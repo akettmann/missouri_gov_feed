@@ -54,7 +54,7 @@ const fmt = (key: string, v: number | null) =>
           {latest.value !== null && <IndicatorScale indicator={key} value={latest.value} />}
           {strip && strip.peers.length > 1 && <PeerStrip strip={strip} />}
           <p class="small muted">
-            {indicatorDetailText(latest.detail)} ·{" "}
+            {indicatorDetailText(latest.detail, latest)} ·{" "}
             <SourceLink url={latest.source_url} missing="computed from votes in this dataset" />
           </p>
           {rows.length > 1 && (
@@ -75,7 +75,7 @@ const fmt = (key: string, v: number | null) =>
                       <tr>
                         <td>{r.period ?? "all loaded votes"}</td>
                         <td class="num">{fmt(key, r.value)}</td>
-                        <td>{indicatorDetailText(r.detail)}</td>
+                        <td>{indicatorDetailText(r.detail, r)}</td>
                         <td>
                           <SourceLink url={r.source_url} />
                         </td>

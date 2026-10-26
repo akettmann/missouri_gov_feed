@@ -790,6 +790,28 @@ models:
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"
+      - name: first_vote_year
+        data_type: integer
+        description: >
+          Party unity only (null otherwise): the first calendar year in which this official cast a dated party-line
+          vote in `chamber`. Shown in the caption; not part of the `detail` match key.
+        data_tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "is not null"
+                config:
+                  where: "indicator = 'party_unity_pct'"
+      - name: last_vote_year
+        data_type: integer
+        description: >
+          Party unity only (null otherwise): the last calendar year in which this official cast a dated party-line
+          vote in `chamber`.
+        data_tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: ">= first_vote_year"
+                config:
+                  where: "indicator = 'party_unity_pct'"
 
   - name: fct_commercial_ties
     description: >

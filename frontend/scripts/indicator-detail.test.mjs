@@ -22,6 +22,31 @@ test("party unity names the chamber and counts with separators", () => {
   );
 });
 
+test("party unity states the official's own first-last vote year", () => {
+  const d = "state_house: 1006 party-line votes";
+  assert.equal(
+    indicatorDetailText(d, { first_vote_year: 2017, last_vote_year: 2026 }),
+    "Based on 1,006 votes this official cast on party-line roll calls in the Missouri House, 2017–2026",
+  );
+  assert.equal(
+    indicatorDetailText("us_senate: 3 party-line votes", { first_vote_year: 2023, last_vote_year: 2023 }),
+    "Based on 3 votes this official cast on party-line roll calls in the U.S. Senate, 2023",
+  );
+  // missing years (older export) leave the caption as before rather than printing "null"
+  assert.equal(
+    indicatorDetailText(d, { first_vote_year: null, last_vote_year: null }),
+    "Based on 1,006 votes this official cast on party-line roll calls in the Missouri House",
+  );
+  // years never alter other indicators' captions
+  assert.equal(
+    indicatorDetailText("Voteview DW-NOMINATE, House 119th Congress", {
+      first_vote_year: 2017,
+      last_vote_year: 2026,
+    }),
+    "Voteview DW-NOMINATE, U.S. House, 119th Congress",
+  );
+});
+
 test("DW-NOMINATE keeps the Congress ordinal as written", () => {
   assert.equal(
     indicatorDetailText("Voteview DW-NOMINATE, House 119th Congress"),
@@ -47,8 +72,8 @@ test("Shor-McCarty year range gets an en dash; unknown and empty pass through", 
 test("SectionIdeology renders every indicator detail through the formatter", () => {
   const src = readFileSync(new URL("../src/components/SectionIdeology.astro", import.meta.url), "utf8");
   assert.doesNotMatch(src, /\.detail\s*\}/, "raw .detail rendered; wrap it in indicatorDetailText()");
-  assert.match(src, /indicatorDetailText\(latest\.detail\)/);
-  assert.match(src, /indicatorDetailText\(r\.detail\)/);
+  assert.match(src, /indicatorDetailText\(latest\.detail, latest\)/);
+  assert.match(src, /indicatorDetailText\(r\.detail, r\)/);
 });
 
 test("formatter matches the exact Shor-McCarty strings the dbt unit test expects", () => {
