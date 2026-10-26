@@ -1,15 +1,17 @@
 -- Which bill each state vote was on, so votes can be grouped by bill subject (fct_bill_subjects).
 --   House roll calls: the bill XML names the roll-call PDF, which is the vote_id (exact). Roll calls the XML
 --   doesn't name (all votes on Senate bills, some on House bills) fall back to the measure printed on the PDF
---   ("HCS HB 2", "SS SCS SBs 49 & 118"): every bill number it names, matched to that session's bills.
+--   ("HCS HB 2", "SS SCS SBs 49 & 118"): every bill number it names, matched to that session's bills (int_bills__list,
+--   the list fct_bills uses, so special-session Senate bills the House XML lists are matched too).
 --   Senate journal votes: the vote's measure ("HB 2", "SB 974") read from the journal text. Regular-session (R) and
---   veto-session (V) journals match that year's regular session (House bills from the House export, Senate bills
---   from the topical index). Extraordinary-session journals (S1, S2, T1, T2: the prefix does not map to a session
---   suffix, 2018's S1 is 183 but T1 is 184) match the year's extraordinary sessions (YY3, YY4) instead, where the
---   bill has a House XML action on the vote date. A Senate bill that has only House-side actions in the XML (the
---   Senate's own steps are not listed) also matches when the vote falls on or before its first recorded action,
---   but only in the special session the vote belongs to: the one whose action-date span holds the vote date, else
---   the one that starts next (if the vote is after the year's previous special session ended).
+--   veto-session (V) journals match that year's regular session (the bill list fct_bills uses, int_bills__list: House
+--   bills from the House export, Senate bills from the topical index). Extraordinary-session journals (S1, S2, T1,
+--   T2: the prefix does not map to a session suffix, 2018's S1 is 183 but T1 is 184) match the year's
+--   extraordinary sessions (YY3, YY4) instead, where the bill has a House XML action on the vote date. A Senate
+--   bill that has only House-side actions in the XML (the Senate's own steps are not listed) also matches when the
+--   vote falls on or before its first recorded action, but only in the special session the vote belongs to: the one
+--   whose action-date span holds the vote date, else the one that starts next (if the vote is after the year's
+--   previous special session ended).
 --   A vote that fits no bill, or more than one session, links to nothing.
 --   Re-listed bills (status 'relisted for governor message', int_bills__status) are never linked: the House lists
 --   the previous session's appropriation bill again only to record the governor's Art. IV s.27 message, so it
@@ -23,19 +25,14 @@ with relisted as (
 ),
 
 bills as (
+    -- the bill list fct_bills uses (int_bills__list), without the re-listings
     select
-        h.session_code,
-        h.bill
-    from {{ ref('stg_mo_house__bills') }} as h
-    left join relisted as rl on h.session_code = rl.session_code and h.bill = rl.bill
+        l.session_code,
+        l.bill
+    from {{ ref('int_bills__list') }} as l
+    left join relisted as rl on l.session_code = rl.session_code and l.bill = rl.bill
     where rl.bill is null
-    union
-    select
-        t.session_code,
-        t.bill
-    -- no relisted anti-join here: re-listings are House bills and this branch keeps only 'S%'
-    from {{ ref('stg_mo_senate__bill_topics') }} as t
-    where t.bill like 'S%'
+    group by l.session_code, l.bill
 ),
 
 bill_keys as (

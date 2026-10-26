@@ -1,0 +1,52 @@
+version: 2
+
+unit_tests:
+  - name: bill_list_includes_house_listed_senate_bills
+    model: int_bills__list
+    description: >
+      Senate bills the House XML lists as reaching the House (SenateActList) are bills even when the Senate
+      topical index does not list them: 253 SB1 (a special session, which the index never covers) gets a row with
+      the titles, version, last action and effective date the XML gives, and its session year. 251 SB5 is in both
+      the index and the House list and stays one row, keeping the index's short title and link; House bill 253 HB1
+      is unaffected; an index row for a House bill number (HB9) is not a Senate bill. Dropping the
+      third branch, or not anti-joining it to the index, fails this test.
+    given:
+      - input: ref('stg_mo_house__bills')
+        format: sql
+        rows: |
+            select
+                '253' as session_code,
+                2025 as session_year,
+                'HB1' as bill,
+                'HB1' as current_bill_string,
+                'TITLE' as short_title,
+                cast(null as varchar) as long_title,
+                cast(null as varchar) as last_action,
+                cast(null as date) as proposed_effective_date,
+                cast(null as varchar) as source_url
+      - input: ref('stg_mo_senate__bill_topics')
+        format: sql
+        rows: |
+            select '251' as session_code, 2025 as session_year, 'SB5' as bill, 'INDEX TITLE' as description,
+                'http://index/sb5' as bill_url union all
+            select '251', 2025, 'HB9', 'NOT A SENATE BILL', 'http://index/hb9'
+      - input: ref('stg_mo_house__senate_act_bills')
+        format: sql
+        rows: |
+            select
+                '253' as session_code,
+                2025 as session_year,
+                'SB1' as bill,
+                'SS SB 1' as current_bill_string,
+                'APPROPRIATIONS BILL' as short_title,
+                'To appropriate money' as long_title,
+                '06/16/2025 - Delivered' as last_action,
+                cast('2025-07-01' as date) as proposed_effective_date,
+                'Hough, Lincoln' as sponsor_name
+            union all
+            select '251', 2025, 'SB5', 'SB 5', 'HOUSE TITLE', 'HOUSE LONG', 'x', cast('2025-08-28' as date), 'Y'
+    expect:
+      rows:
+        - {session_code: '251', session_year: 2025, bill: SB5, current_bill_string: null, short_title: INDEX TITLE, long_title: null, last_action: null, proposed_effective_date: null, source_url: 'http://index/sb5'}
+        - {session_code: '253', session_year: 2025, bill: HB1, current_bill_string: HB1, short_title: TITLE, long_title: null, last_action: null, proposed_effective_date: null, source_url: null}
+        - {session_code: '253', session_year: 2025, bill: SB1, current_bill_string: SS SB 1, short_title: APPROPRIATIONS BILL, long_title: To appropriate money, last_action: 06/16/2025 - Delivered, proposed_effective_date: 2025-07-01, source_url: null}

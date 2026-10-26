@@ -226,6 +226,17 @@ def test_land_file_writes_gzip_unchanged_and_is_idempotent(raw_dir):
     assert again.sha256 == row.sha256
 
 
+def test_land_file_does_not_rewrite_an_unchanged_gzip(raw_dir, monkeypatch):
+    xml = BILL + b"\n"
+    row = loader._land_file("251", "251-HB10.XML", xml, "https://x/251.zip#251-HB10.xml")
+    writes = []
+    monkeypatch.setattr(loader, "write_atomic", lambda *args: writes.append(args))
+    loader._land_file("251", "251-HB10.XML", xml, row.source_url)
+    assert writes == []  # same bytes: left alone
+    loader._land_file("251", "251-HB10.XML", xml + b"<!-- changed -->", row.source_url)
+    assert len(writes) == 1  # different bytes: rewritten
+
+
 def _land(raw_dir, shard, files):
     with db.TableSink(shard, tables=[p.XmlFile]) as sink:
         for code, name, xml in files:
@@ -321,6 +332,7 @@ FULL_BILL = b"""<ROOT><BillInformation><BillNumber>HB5</BillNumber>
 <FiscalNotes><FiscalNoteLink>http://x/fn2.pdf</FiscalNoteLink><FiscalNoteLink>http://x/fn3.pdf</FiscalNoteLink></FiscalNotes>
 <Witness><WitnessFormsLink>http://x/w1</WitnessFormsLink><WitnessFormLinkDescription>Forms for HB 5</WitnessFormLinkDescription></Witness>
 <Witness><WitnessFormsLink>http://x/w2</WitnessFormsLink></Witness>
+<Witness/>
 <BillText><DocumentName>Introduced</DocumentName><SummaryTextLink>http://x/ts.pdf</SummaryTextLink><Map><MapLink>http://x/map.pdf</MapLink></Map></BillText>
 <Amendment><AmendmentDescription>HA 1</AmendmentDescription><Map><MapLink>http://x/amap.pdf</MapLink></Map></Amendment>
 </BillInformation></ROOT>"""
@@ -346,7 +358,8 @@ def test_bill_summaries_fiscal_notes_witness_links_and_maps_become_rows():
     assert [(w.witness_forms_link, w.witness_form_link_description) for w in out[p.BillWitness]] == [
         ("http://x/w1", "Forms for HB 5"),
         ("http://x/w2", None),
-    ]
+    ]  # the empty <Witness/> between them and after them is not a row (#384)
+    assert [w.witness_index for w in out[p.BillWitness]] == [1, 2]
     (t,) = out[p.BillText]
     assert (t.summary_text_link, t.map_link) == ("http://x/ts.pdf", "http://x/map.pdf")
     assert out[p.BillAmendment][0].map_link == "http://x/amap.pdf"
@@ -428,6 +441,10 @@ def test_senate_act_list_rows_reuse_the_bill_shape_in_their_own_tables():
     ]
     assert [(a.bill, a.sort_value) for a in out[sa[p.BillAmendment]]] == [("SB727", "0507HH")]
     assert [w.bill for w in out[sa[p.BillWitness]]] == ["SB727"]
+    # the sponsor is on the bill row; the twin tables for Sponsor/SubjectIndex children would stay empty (#384)
+    assert p.BillSponsor not in sa and p.BillSubject not in sa
+    assert (out[sa[p.Bill]][0].sponsor_name, out[sa[p.Bill]][0].sponsor_district) == ("Koenig, Andrew", 15)
+    assert not {"mo_house_xml_senate_act_sponsors", "mo_house_xml_senate_act_subjects"} & {t.TABLE for t in p.ROW_TYPES}
     # nothing leaks into the House bill tables that staging reads
     assert not any(out[t] for t in p.BILL_ROW_TYPES)
 

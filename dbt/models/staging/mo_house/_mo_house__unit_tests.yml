@@ -182,6 +182,34 @@ unit_tests:
         - {rollcall_url: u3, session_code: '171', session_day: 35, rollcall_number: 10, vote_date: null}
         - {rollcall_url: u4, session_code: '173', session_day: 1, rollcall_number: 1, vote_date: '2017-09-12'}
 
+  - name: house_witness_forms_keep_links_only_for_house_and_senate_act_bills
+    model: stg_mo_house__bill_witness_forms
+    description: >
+      Only witness rows that carry a link become witness forms: an empty Witness element (both columns null, as
+      the parser used to land them) is dropped. A House bill's rows are matched to the bill by session and file,
+      so the same file name in another session does not bleed in; a Senate bill the House acted on comes in
+      through the SenateActList table under its own bill name. Keeping the empty rows, or reading only one of
+      the two tables, fails this test.
+    given:
+      - input: source('mo_house', 'xml_bills')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast('HB1' as varchar) as bill
+      - input: source('mo_house', 'xml_bill_witnesses')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast(1 as bigint) as witness_index, cast('https://documents.house.mo.gov/w/HB1Testimony.pdf' as varchar) as witness_forms_link, cast('Testimony' as varchar) as witness_form_link_description union all
+            select '251', '251-HB1.XML', 2, null, null union all
+            select '241', '251-HB1.XML', 1, 'https://x/other-session', null
+      - input: source('mo_house', 'xml_senate_act_witnesses')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('SB7' as varchar) as bill, cast(1 as bigint) as witness_index, cast('https://documents.house.mo.gov/w/SB7.pdf' as varchar) as witness_forms_link, cast(null as varchar) as witness_form_link_description
+    expect:
+      rows:
+        - {session_code: '251', bill: HB1, witness_index: 1, witness_forms_url: 'https://documents.house.mo.gov/w/HB1Testimony.pdf', description: Testimony}
+        - {session_code: '251', bill: SB7, witness_index: 1, witness_forms_url: 'https://documents.house.mo.gov/w/SB7.pdf', description: null}
+
   - name: house_rollcalls_whose_header_names_another_session_are_dropped
     model: stg_mo_house__rollcalls
     description: >

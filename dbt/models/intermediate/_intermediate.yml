@@ -2,6 +2,16 @@
 # not this file, then regenerate.
 version: 2
 models:
+- name: int_bills__list
+  description: 'Every Missouri bill and resolution per session, from the three places that list them; fct_bills
+    and fct_vote_bills both read this one list so a bill cannot be in one and not the other. Re-listed appropriation
+    bills are kept here (they are House bills; int_bills__status marks them). House bills  the House XML export:
+    titles, current version, last action Senate bills the Senate topical index (regular sessions): its one-line
+    description as the short title; Senate bills filed under no keyword aren''t listed there and are missing Senate
+    bills the House XML''s SenateActList lists as having reached the House (2024 on), when the topical index does
+    not list them: the special-session Senate bills (the index covers regular sessions only), with the titles, version,
+    last action and effective date the XML gives. Senate bills of older special sessions are missing (#237). A column
+    a source does not give is null.'
 - name: int_bills__status
   description: 'Where each bill in the House XML export stands: House bills, and Senate bills once they reach the
     House (their Senate-side history isn''t in the House XML; a Senate bill listed there has passed the Senate).
@@ -280,21 +290,33 @@ models:
     made the section: "(L. 1945 p. 1428 § 48, A.L. 2003 S.B. 299 & 40)" is enacted in 1945 (session-law page, no
     bill number) and amended in 2003 by SB 299 and SB 40 (combined); "merged with" joins bills that changed the
     same section in one session; "1st Ex. Sess." names an extraordinary session (the Revisor also prints "2d", "3d",
-    "4th", "1st.", "lst" and "Ex. Sess" without its last period). change is enacted (L.), amended (A.L., or "A."
-    in the 1949 revision''s notes) or repealed ("Repealed L."). Acts cited by page ("p. 1428") name no bill and
-    are left out. session_code follows the House XML codes: two-digit year, then 1 for the regular session. The
-    House numbers every special session (codes 2-4, in order), but the Revisor counts only extraordinary sessions
-    that passed bills: 2018''s legislature-called impeachment session (183, resolutions only) isn''t one, so the
-    Revisor''s 2018 "1st Ex. Sess." is House 184. So the Nth extraordinary session is the House''s session named
-    "Nth Extraordinary Session" (stg_mo_house__sessions); for years the House''s list lacks, N + 2 is assumed. A
-    combined act ("H.B. 115 & 99": one substitute that carries several bills'' subjects) names the bills after "&";
-    only the first, the lead bill (is_lead_bill), is the one that passed. The others stay as rows, with combined_into
-    naming the lead, because the act did take their subjects, but they never reached the governor themselves. Parse
-    bounds (macros/session_law_bounds.sql): a note is read up to 60 acts (longest real note: 43, RSMo 301.010),
-    an act up to 10 "merged with" bills (longest: 6) and 6 "&" bills (longest: 3). Parts past a bound would be dropped
-    silently, and notes list acts oldest first, so the newest acts would go; assert_session_law_bounds_not_exceeded
-    fails the build when real data needs more. Grain: one row per (RSMo section version, act, bill) a history or
-    repeal note names.'
+    "4th", "1st.", "lst", "First" ... "Fourth", and "Ex. Sess" without its last period). change is enacted (L.),
+    amended (A.L., or "A." in the 1949 revision''s notes) or repealed ("Repealed L."). Acts cited by page ("p. 1428")
+    name no bill and are left out. session_code follows the House XML codes: two-digit year, then 1 for the regular
+    session. The House numbers every special session (codes 2-4, in order), but the Revisor counts only extraordinary
+    sessions that passed bills: 2018''s legislature-called impeachment session (183, resolutions only) isn''t one,
+    so the Revisor''s 2018 "1st Ex. Sess." is House 184. So the Nth extraordinary session is the House''s session
+    named "Nth Extraordinary Session" (stg_mo_house__sessions); for years the House''s list lacks, N + 2 is assumed.
+    "Extraordinary Session" with no number (1997''s three "Repealed L." notes) is the year''s only numbered session
+    if the other notes name just one (1997: "2d"), else the 1st. A combined act ("H.B. 115 & 99": one substitute
+    that carries several bills'' subjects) names the bills after "&"; only the first, the lead bill (is_lead_bill),
+    is the one that passed. The others stay as rows, with combined_into naming the lead, because the act did take
+    their subjects, but they never reached the governor themselves. A bill after "&" may repeat its bill head ("H.B.
+    237 & H.B. 238 & H.B. 482", "H.B. 5 & S.B. 7"); a bare number takes the type of the bill before it ("H.B. 69
+    & 179 & H.B. 669"). "and" ("H.B. 1270 and H.B. 2032") is ambiguous: the Revisor uses it both for bills of one
+    combined act (2004 "S.B. 968 and S.B. 969" is one act, lead SB 968) and for separate acts ("H.B. 1606 and S.B.
+    743" in 2018, SB 743 also cited alone). A bill after "and" is its own lead bill only when the same year and
+    session cite it as the first bill of an act elsewhere (in any section''s notes); otherwise it is combined like
+    one after "&", into the lead bill of its group (every bill up to the next separate lead). The Revisor''s "H.B.
+    1268 & 1211 and S.B. 966" is HB1211 combined into HB1268, with SB966 a lead only if 2004 cites SB 966 on its
+    own somewhere. The older notes also list several bills of one act after commas ("A.L. 1978 H.B. 971, S.B. 628").
+    A piece that is only a bill ("S.B. 628", "merged with S.B. 5") continues the act before it (same year, session
+    and change), as long as only such pieces come between (or the act is just a year, "A.L. 1985, H.B. 366"); after
+    a page cite ("p. 509") or an RSMo piece there is no act to continue. Parse bounds (macros/session_law_bounds.sql):
+    a note is read up to 60 acts (longest real note: 43, RSMo 301.010), an act up to 10 "merged with" bills (longest:
+    6) and 6 "&"/"and" bills (longest: 4). Parts past a bound would be dropped silently, and notes list acts oldest
+    first, so the newest acts would go; assert_session_law_bounds_not_exceeded fails the build when real data needs
+    more. Grain: one row per (RSMo section version, act, bill) a history or repeal note names.'
 - name: int_mo_senate__votes
   description: 'MO Senate journal votes attributed to people: the senator serving on the vote date with a matching
     surname (and district, when the journal adds one to disambiguate). Ambiguous tokens stay unattributed. A two-word
@@ -328,16 +350,18 @@ models:
     office).'
 - name: int_officials__identity_terms
   description: 'Who held which legislative seat in which year under which id, before ids are reconciled: the evidence
-    int_officials__person_ids works from. One row per (id as the source gave it, year, office, district) for the
-    years with a House roster, from the House''s own roster (its raw seat-matched key: an Open States id or mohouse:<House
-    member id>) and from Open States seat-terms (both chambers). A term counts for a year when it runs past January
-    15 of it, and terms with an undated start are left out, as in int_officeholders__years. name_key is the id''s
-    own full name. term_start/term_end are the Open States term''s dates exactly as Open States gives them (DATE;
-    end 9999-12-31 while open; null for House roster rows, which carry only a year), so a rule can tell overlap
-    from succession. They are not the January-1 adjusted dates used for the year membership above: those would make
-    a January successor (from Jan 1) overlap a predecessor Open States ends on Jan 6-9. Known edge: the min(start)/max(end)
-    collapse per (alias_id, year, office, district) spans any gap if one id holds the same seat in two separate
-    terms in a year. Grain: one row per (id as sourced, year, office, district).'
+    int_officials__person_ids works from. One row per (id as the source gave it, year, office, district, House member
+    id) for the years with a House roster, from the House''s own roster (its raw seat-matched key: an Open States
+    id or mohouse:<House member id>) and from Open States seat-terms (both chambers). A term counts for a year when
+    it runs past January 15 of it, and terms with an undated start are left out, as in int_officeholders__years.
+    house_member_id is the MO House member id the roster gave the row (null for Open States seat-terms): the House
+    keeps one member id per person across sessions and name changes, so the person-id rule can follow it. name_key
+    is the id''s own full name. term_start/term_end are the Open States term''s dates exactly as Open States gives
+    them (DATE; end 9999-12-31 while open; null for House roster rows, which carry only a year), so a rule can tell
+    overlap from succession. They are not the January-1 adjusted dates used for the year membership above: those
+    would make a January successor (from Jan 1) overlap a predecessor Open States ends on Jan 6-9. Known edge: the
+    min(start)/max(end) collapse per (alias_id, year, office, district) spans any gap if one id holds the same seat
+    in two separate terms in a year. Grain: one row per (id as sourced, year, office, district, House member id).'
 - name: int_officials__name_keys
   description: 'Normalized name variants per current official, for matching sources that only carry names (MEC committees,
     lobbyist reports, Wikidata labels, ratings). One row per (official, variant). Grain: one row per (official,
@@ -367,12 +391,19 @@ models:
     Smith (2019 only, or 2026 only after a special election) inside a Dan Smith successor''s span looks the same
     by year. Dates tell them apart: Kenneth''s term is a 26-day stub that overlaps Ken''s, while a successor''s
     term starts on or after the predecessor''s ends (or is no stub). Undated House-roster rows prove no overlap.
-    A name left with more than one partner (a chain or a fork) is ambiguous and joins nothing. 3. otherwise the
-    id is its own person, basis = self. Among merged ids the person_id is an Open States id over mohouse:, then
-    the one whose service ends latest, then the smaller id. The choice never looks at the latest roster year, so
-    an official''s id does not change when they leave office. Curated rows (official_id_links) take effect only
-    once a maintainer has signed them off (checked_by filled). Grain: one row per id a legislator has been given,
-    with the stable person_id.'
+    A name left with more than one partner (a chain or a fork) is ambiguous and joins nothing. 2c. MO House member
+    id continuity (#151): the House keeps one member id per person across sessions and name changes (Mazzie Boyd,
+    2023, and Mazzie Christensen, 2024-26, are member 2381), so ids that share a House member id are one person
+    whatever their names, basis = member_id_continuity. This is applied after rules 2 and 2b and joins the persons
+    they made, so it also reaches ids the name rules keep apart. It skips an id that carries more than one member
+    id (Open States'' Rick Roeber holds member 2215 and, through a seat-match error, Rebecca Roeber''s 1790, #152:
+    the shared 1790 would join two people) and any id listed as different_people in official_id_links. Only ids
+    with a roster row (a House member id) take part; Senate-only ids rely on names. 3. otherwise the id is its own
+    person, basis = self. Among merged ids the person_id is an Open States id over mohouse:, then the one whose
+    service ends latest, then the smaller id. The choice never looks at the latest roster year, so an official''s
+    id does not change when they leave office. Curated rows (official_id_links) take effect only once a maintainer
+    has signed them off (checked_by filled). Grain: one row per id a legislator has been given, with the stable
+    person_id.'
 - name: int_officials__wikidata
   description: 'Wikidata QID per official: from roster cross-references when present, else a unique exact name match
     against living Missouri officeholders on Wikidata. Grain: one row per official with a Wikidata QID.'

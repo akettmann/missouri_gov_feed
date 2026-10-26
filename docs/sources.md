@@ -49,13 +49,15 @@ the only per-member House vote record.
   it, not when the House published it), then typed tables parsed from those files by `mogov.parsers.mo_house`:
   `mo_house_xml_bills` with child tables `_bill_actions` (with printed roll-call totals), `_bill_sponsors`,
   `_bill_texts`, `_bill_amendments`, `_bill_rollcalls`, `_bill_subjects`, `_bill_hearings`, `_bill_summaries`,
-  `_bill_fiscal_notes` and `_bill_witnesses` (witness-form links only); `mo_house_xml_members` with
+  `_bill_fiscal_notes` and `_bill_witnesses` (witness-form links only; empty `<Witness/>` elements are not landed); `mo_house_xml_members` with
   `_member_committees` and `_member_counties`; `mo_house_xml_sessions`, `_committees` and `_committee_members`;
   one row per item of the BillList, MemberList, UpcomingHearingList and CalendarList files plus the lists'
   `NOTICE` text (`_list_notices`); and the SenateActList (the House's actions on Senate bills) as
   `mo_house_xml_senate_act_bills` with child tables `mo_house_xml_senate_act_` + `actions`, `texts`, `amendments`,
-  `rollcalls`, `subjects`, `hearings`, `summaries`, `fiscal_notes`, `witnesses` (each child row carries a `bill`
-  column naming its Senate bill). The roll-call PDFs land as `mo_house_rollcalls` and
+  `rollcalls`, `hearings`, `summaries`, `fiscal_notes`, `witnesses` (each child row carries a `bill`
+  column naming its Senate bill; the list has no sponsor or subject children, the sponsor is on the bill row as
+  `sponsor_name`/`sponsor_district`/`sponsor_link`). Bill, text, amendment, summary, fiscal-note and witness-form
+  links reach `marts.fct_bill_documents`. The roll-call PDFs land as `mo_house_rollcalls` and
   `mo_house_rollcall_votes`.
 - Window: `MOGOV_LOOKBACK_YEARS` (default 10). Roll-call PDFs go back to 2014.
 - Shard units: session codes (XML) and session days (roll-call PDFs).
@@ -92,6 +94,7 @@ Quirks:
   finds no other unread element; the scan script lists them by file kind.
 - The House BillList lists some bills twice (HR1 and HR2 in the odd-year sessions); the loader fetches and lands
   each linked file once.
+- `AmendmentText` is misnamed: it holds the link to the amendment's PDF (`.../bills181/amendpdf/4083H03.02H.pdf`), not text, and is filled on every amendment (8,775 House, 1,023 SenateActList). `MapLink` (the change map) is filled on only a handful, so `stg_mo_house__bill_amendments` stages `amendment_text` as `amendment_url` and `fct_bill_documents` carries both an `amendment` and an `amendment_map` kind.
 - `AmendmentSortValue` looks like `0507HH`, so `mo_house_xml_bill_amendments.sort_value` is text. A value that
   does not fit its column type (an integer or date field holding something else) becomes NULL and is logged
   (`mo_house.value_not_integer` / `mo_house.value_not_date`), and a document lxml had to repair is logged as
@@ -111,10 +114,10 @@ Quirks:
   (`int_mo_house__member_identity`, seed `house_speakers`).
 - A member's seat is matched to an Open States person; when that fails the key is `mohouse:<member id>`.
   Open States also holds some people twice (after a redistricting or a move to the Senate). Both are
-  reconciled to one stable `official_id` per person by `int_officials__person_ids` (same exact name, or names that differ only in the given
+  reconciled to one stable `official_id` per person by `int_officials__person_ids` (the same MO House member id, which follows a name change such as Mazzie Boyd/Christensen, member 2381, #151; otherwise the same exact name, or names that differ only in the given
   name like Steve/Steven or Ken/Kenneth (#228, #263), no conflicting seats, and
   either overlapping dated terms in one seat or a chamber move (years alone cannot tell a duplicate record, Kenneth
-  Jamison's 2025 stub inside Ken's term, from a successor like Danielle after Dan Smith; dates can, using the dates exactly as Open States gives them: the January-1 adjustment used for year membership would make a January successor overlap a predecessor ending Jan 6-9. Known edge: `int_officials__identity_terms` collapses each (id, year, seat) to min(start)/max(end), spanning any gap if one id held the seat in two terms in a year); seed `official_id_links` for statewide officers and judges), #97.
+  Jamison's 2025 stub inside Ken's term, from a successor like Danielle after Dan Smith; dates can, using the dates exactly as Open States gives them: the January-1 adjustment used for year membership would make a January successor overlap a predecessor ending Jan 6-9. Known edge: `int_officials__identity_terms` collapses each (id, year, seat, House member id) to min(start)/max(end), spanning any gap if one id held the seat in two terms in a year); seed `official_id_links` for statewide officers and judges), #97.
 - The site asks clients not to poll its XML more than every 30 minutes. Cached copies keep it well
   under that.
 - Every shard reads every session zip to list the roll calls. In the October 2026 full run, two shards
@@ -167,6 +170,10 @@ Quirks:
   2023 has a null status and outcome, enacted ones included (2017 to 2023: 0 of 4,143 SBs have a status; 2024: 29
   of 796, none enacted because the list stops before the governor). Counts of failed, pending or enacted bills
   therefore leave out Senate bills, almost all of them before 2024; House bills are complete.
+  The same list names the special-session Senate bills (`stg_mo_house__senate_act_bills`, with titles, version, last
+  action and effective date), which the Senate topical index never covers: `int_bills__list` adds those the index lacks
+  (2025's 253 SB 1, 3 and 4), for `fct_bills` and `fct_vote_bills` alike. Senate bills of older special sessions are still
+  missing (#237).
   Quirk: 143 bills (15 to 17 per regular session, 2017 to 2026, none in 2021; e.g. 2024 HB 1 and HB 2) list
   only "Message Received from the Governor, pursuant to Article IV, Section 27" as their action. They are
   re-listings, not new bills: the House repeats the previous regular session's appropriation bills (same bill
@@ -328,12 +335,19 @@ Quirks:
   bill. Bills are joined by `merged with` (several bills changed the section in one session) and `&` (combined
   bills: `S.B. 299 & 40` is one substitute carrying SB 299 and SB 40; only the first, the lead bill, passed, so
   `fct_bill_statute_links.is_lead_bill` is false for the rest and `combined_into` names the lead; the House
-  list shows the others as failed). `, et al.` belongs to the act before it. `S.B` sometimes lacks
-  its last dot.
+  list shows the others as failed). A bill after `&` may repeat its head (`H.B. 237 & H.B. 238`, or another
+  type: `H.B. 5 & S.B. 7`); a bare number takes the type before it. `and` (`H.B. 1270 and H.B. 2032`) is ambiguous:
+  it joins the bills of one combined act (2004 `S.B. 968 and S.B. 969` is one act led by SB 968) and also separate
+  acts (2018 `H.B. 1606 and S.B. 743`, where SB 743 is also cited alone). A bill after `and` is a lead bill only
+  when the same year and session cite it as the first bill of an act elsewhere in the notes; otherwise it is
+  combined into the lead of its group like one after `&`. The old notes also list a second bill after a comma
+  (`A.L. 1978 H.B. 971, S.B. 628`): that piece continues the act before it. `, et al.` belongs to the act before
+  it. `S.B` sometimes lacks its last dot.
 - Extraordinary sessions: the Revisor writes "1st Ex. Sess." and counts only extraordinary sessions that passed
   bills. The House numbers every special session, so 2018's legislature-called impeachment session (House 183,
   resolutions only) makes the Revisor's 2018 "1st Ex. Sess." House session 184. The Revisor also
-  prints "2d", "3d", "4th", "1st." and "Ex. Sess" (no final period) and, once, "lst"; all are read. The model maps
+  prints "2d", "3d", "4th", "1st.", "First", "Ex. Sess" (no final period), "Extraordinary Session" (1997, no
+  number: read as the year's only numbered session, the 2d) and, once, "lst"; all are read. The model maps
   the Nth extraordinary session to the House session named "Nth Extraordinary Session" (`stg_mo_house__sessions`),
   and assumes N + 2 for years that list lacks.
 - A repeal or a new version that waits on a contingency is dated 1 Jan 2099 (repeals by 2026 SB 1233; section
@@ -567,6 +581,9 @@ Quirks:
   items only over `is_latest_version`; the filing list shows all. It assumes an amendment restates the whole
   report, and a House amendment that is a scan with no extractable text never supersedes a readable report.
   Periodic transaction reports, candidate reports and extension requests are separate filings, never collapsed.
+  The Clerk index does not say which report a House amendment amends, so it is taken to amend the latest annual or
+  candidate report the filer filed that year on or before it (a candidate-report amendment supersedes that candidate
+  report only) (#142).
 
 ## courtlistener_case_bulk: case history from bulk files
 

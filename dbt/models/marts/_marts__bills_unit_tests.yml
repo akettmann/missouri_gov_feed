@@ -1,0 +1,86 @@
+version: 2
+
+unit_tests:
+  - name: bills_carry_status_and_outcome_for_house_listed_senate_bills
+    model: fct_bills
+    description: >
+      fct_bills is the bill list (int_bills__list) with subjects, status and outcome joined on (session, bill): a
+      special-session Senate bill (253 SB1) keeps the XML's titles and gets its status and outcome from the actions
+      and its subjects folded in; a bill with no status row keeps null status and outcome.
+    given:
+      - input: ref('int_bills__list')
+        format: sql
+        rows: |
+            select '253' as session_code, 2025 as session_year, 'SB1' as bill, 'SS SB 1' as current_bill_string,
+                'APPROPRIATIONS BILL' as short_title, 'To appropriate money' as long_title,
+                '06/16/2025 - Delivered' as last_action, cast('2025-07-01' as date) as proposed_effective_date,
+                cast(null as varchar) as source_url
+            union all
+            select '251', 2025, 'SB5', null, 'INDEX TITLE', null, null, null, 'http://index/sb5'
+      - input: ref('int_bills__subjects')
+        format: sql
+        rows: |
+            select '253' as session_code, 'SB1' as bill, 'Appropriations' as subject_name union all
+            select '253', 'SB1', 'Housing'
+      - input: ref('int_bills__status')
+        format: sql
+        rows: |
+            select '253' as session_code, 'SB1' as bill, 'truly agreed' as status, 'enacted' as outcome,
+                cast(null as varchar) as relisted_from_session_code
+    expect:
+      rows:
+        - {session_code: '251', bill: SB5, short_title: INDEX TITLE, long_title: null, subjects: null, status: null, outcome: null}
+        - {session_code: '253', bill: SB1, short_title: APPROPRIATIONS BILL, long_title: To appropriate money, subjects: Appropriations; Housing, status: truly agreed, outcome: enacted}
+
+  - name: vote_bills_link_roll_calls_to_house_listed_senate_bills
+    model: fct_vote_bills
+    description: >
+      A House roll call the bill XML does not name is matched by the measure printed on its PDF to the session's
+      bills in int_bills__list, which includes the special-session Senate bills the House XML lists: 253's
+      "SS SB 1" and "SS#2 SCS SB 3" link to SB1 and SB3, but "SS SB 7" (no such bill) and a re-listed House bill's
+      roll call link to nothing. A bill list without the SenateActList branch leaves the two Senate roll calls
+      unlinked and fails this test.
+    given:
+      - input: ref('int_bills__list')
+        format: sql
+        rows: |
+            select '253' as session_code, 2025 as session_year, 'SB1' as bill, cast(null as varchar) as current_bill_string,
+                cast(null as varchar) as short_title, cast(null as varchar) as long_title,
+                cast(null as varchar) as last_action, cast(null as date) as proposed_effective_date,
+                cast(null as varchar) as source_url
+            union all select '253', 2025, 'SB3', null, null, null, null, null, null
+            union all select '253', 2025, 'HB5', null, null, null, null, null, null
+      - input: ref('int_bills__status')
+        format: sql
+        rows: |
+            select '253' as session_code, 'HB5' as bill, 'relisted for governor message' as status,
+                cast(null as varchar) as outcome, '251' as relisted_from_session_code
+      - input: ref('stg_mo_house__rollcalls')
+        format: sql
+        rows: |
+            select 'rc/1' as rollcall_url, '253' as session_code, 'SS SB 1' as measure union all
+            select 'rc/2', '253', 'SS#2 SCS SB 3' union all
+            select 'rc/3', '253', 'SS SB 7' union all
+            select 'rc/4', '253', 'HB 5'
+      - input: ref('stg_mo_house__bill_rollcalls')
+        format: sql
+        rows: |
+            select cast(null as varchar) as rollcall_url, cast(null as varchar) as session_code,
+                cast(null as varchar) as bill, cast(null as varchar) as bill_version
+            where 1 = 0
+      - input: ref('int_mo_senate__votes')
+        format: sql
+        rows: |
+            select cast(null as varchar) as vote_id, cast(null as date) as vote_date, cast(null as varchar) as measure,
+                cast(null as varchar) as source_url
+            where 1 = 0
+      - input: ref('stg_mo_house__bill_actions')
+        format: sql
+        rows: |
+            select cast(null as varchar) as session_code, cast(null as varchar) as bill,
+                cast(null as date) as action_date
+            where 1 = 0
+    expect:
+      rows:
+        - {chamber: state_house, vote_id: rc/1, session_code: '253', bill: SB1, matched_by: measure text}
+        - {chamber: state_house, vote_id: rc/2, session_code: '253', bill: SB3, matched_by: measure text}
