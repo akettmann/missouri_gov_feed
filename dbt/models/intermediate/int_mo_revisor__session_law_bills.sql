@@ -2,13 +2,17 @@
 -- note, split into one row per (section version, act, bill). A history note lists the acts that made the section:
 -- "(L. 1945 p. 1428 § 48, A.L. 2003 S.B. 299 & 40)" is enacted in 1945 (session-law page, no bill number) and
 -- amended in 2003 by SB 299 and SB 40 (combined); "merged with" joins bills that changed the same section in one
--- session; "1st Ex. Sess." names an extraordinary session. change is enacted (L.), amended (A.L., or "A." in the
+-- session; "1st Ex. Sess." names an extraordinary session (the Revisor also prints "2d", "3d", "4th", "1st.", "lst"
+-- and "Ex. Sess" without its last period). change is enacted (L.), amended (A.L., or "A." in the
 -- 1949 revision's notes) or repealed ("Repealed L."). Acts cited by page ("p. 1428") name no bill and are left out.
 -- session_code follows the House XML codes: two-digit year, then 1 for the regular session. The House numbers every
 -- special session (codes 2-4, in order), but the Revisor counts only extraordinary sessions that passed bills: 2018's
 -- legislature-called impeachment session (183, resolutions only) isn't one, so the Revisor's 2018 "1st Ex. Sess." is
--- House 184. So the Nth extraordinary session is the year's Nth special-session code with House bills in the House
--- XML; for years before the export (2017), N + 2 is assumed (2017 and later follow it apart from 2018).
+-- House 184. So the Nth extraordinary session is the House's session named "Nth Extraordinary Session"
+-- (stg_mo_house__sessions); for years the House's list lacks, N + 2 is assumed.
+-- A combined act ("H.B. 115 & 99": one substitute that carries several bills' subjects) names the bills after "&";
+-- only the first, the lead bill (is_lead_bill), is the one that passed. The others stay as rows, with combined_into
+-- naming the lead, because the act did take their subjects, but they never reached the governor themselves.
 {# act: "Repealed L. 2018 ...", "A.L. 2003 ...", "L. 1945 ...", "A. 1949 ..."; bill: "H.B.", "S.B", "S.J.R.", "SJR" #}
 {% set act_head = '^(Repealed )?(A\\.L\\.|L\\.|A\\.) ' %}
 {% set bill_head = '^[HS]\\.? ?[BJC]\\.? ?R?\\.?' %}
@@ -68,11 +72,14 @@ parsed_acts as (
             else 'enacted'
         end as change,
         {{ dbt.safe_cast(mogov.regex_extract('act', act_head ~ '([0-9]{4})', 3), dbt.type_int()) }} as act_year,
-        {{ dbt.safe_cast(mogov.regex_extract('act', '([1-3])(st|nd|rd) Ex\\. Sess\\.', 1), dbt.type_int()) }}
-            as extra_session,
+        {#- "1st", "2nd", "2d", "3d", "4th", "1st." and the OCR "lst" -#}
+        {{ dbt.safe_cast(
+            dbt.replace(mogov.regex_extract('act', '([1-9l])(st|nd|rd|d|th)\\.? Ex\\. ?Sess\\.?', 1), "'l'", "'1'"),
+            dbt.type_int()
+        ) }} as extra_session,
         {#- what follows the year (and the session): the bill references #}
         {{ mogov.regex_replace_all(
-            mogov.regex_replace_all('act', act_head ~ '[0-9]{4} ', ''), '^[1-3](st|nd|rd) Ex\\. Sess\\. ', ''
+            mogov.regex_replace_all('act', act_head ~ '[0-9]{4} ', ''), '^[1-9l](st|nd|rd|d|th)\\.? Ex\\. ?Sess\\.? ', ''
         ) }} as refs
     from acts
     where {{ mogov.regex_matches('act', act_head ~ '[0-9]{4}') }}
@@ -118,7 +125,9 @@ bills as (
         t.extra_session,
         t.ref_index,
         t.bill_type,
-        trim({{ dbt.split_part('t.numbers', "' & '", 's.n') }}) as bill_number
+        trim({{ dbt.split_part('t.numbers', "' & '", 's.n') }}) as bill_number,
+        trim({{ dbt.split_part('t.numbers', "' & '", 1) }}) as lead_number,
+        s.n = 1 as is_lead_bill
     from typed as t
     cross join spine as s
     where
@@ -127,18 +136,15 @@ bills as (
         and {{ dbt.split_part('t.numbers', "' & '", 's.n') }} <> ''
 ),
 
+-- "1st Extraordinary Session" -> 1; the House's "Special Session" (2018's resolutions-only one) isn't counted
 extra_sessions as (
     select
         session_year,
         session_code,
-        row_number() over (partition by session_year order by session_code) as ordinal
-    from (
-        select distinct
-            session_year,
-            session_code
-        from {{ ref('stg_mo_house__bills') }}
-        where right(session_code, 1) <> '1' and bill like 'HB%'
-    ) as codes
+        {{ dbt.safe_cast(mogov.regex_extract('session_of_general_assembly', '^([0-9]+)', 1), dbt.type_int()) }}
+            as ordinal
+    from {{ ref('stg_mo_house__sessions') }}
+    where session_of_general_assembly like '%Extraordinary Session'
 )
 
 select distinct
@@ -157,6 +163,8 @@ select distinct
         )
     end as session_code,
     b.bill_type || b.bill_number as bill,
+    b.is_lead_bill,
+    case when b.is_lead_bill then null else b.bill_type || b.lead_number end as combined_into,
     b.act
 from bills as b
 left join extra_sessions as x on b.act_year = x.session_year and b.extra_session = x.ordinal

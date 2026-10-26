@@ -33,3 +33,32 @@ unit_tests:
         - {section_version_id: '324.406/60569', status: contingent, is_current: false, repeal_pending: true}
         - {section_version_id: '1.010/42', status: in force, is_current: true, repeal_pending: false}
         - {section_version_id: '85.270/1', status: repealed, is_current: false, repeal_pending: false}
+
+  - name: combined_act_bills_are_linked_but_only_the_first_is_the_lead
+    model: fct_bill_statute_links
+    description: >
+      "A.L. 2023 H.B. 115 & 99" is one substitute: HB115 passed and HB99 did not, but both are linked. Only HB115 is
+      the lead bill; HB99 says which bill it was combined into. A bill that leads in one act and trails in another
+      is a lead bill. Without the flag (the old output) a failed bill such as HB99 reads as one that became law.
+    given:
+      - input: ref('int_mo_revisor__session_law_bills')
+        format: sql
+        rows: |
+            select '231' as session_code, 2023 as act_year, 'HB115' as bill, true as is_lead_bill, cast(null as varchar) as combined_into, 's1' as section_id, 's1/1' as section_version_id, 'amended' as change, 'A.L. 2023 H.B. 115 & 99' as act union all
+            select '231', 2023, 'HB99', false, 'HB115', 's1', 's1/1', 'amended', 'A.L. 2023 H.B. 115 & 99' union all
+            select '231', 2023, 'HB7', true, null, 's2', 's2/1', 'amended', 'A.L. 2023 H.B. 7 & 99' union all
+            select '231', 2023, 'HB99', false, 'HB7', 's2', 's2/1', 'amended', 'A.L. 2023 H.B. 7 & 99' union all
+            select '231', 2023, 'HB5', false, 'HB4', 's3', 's3/1', 'amended', 'A.L. 2023 H.B. 4 & 5' union all
+            select '231', 2023, 'HB5', true, null, 's3', 's3/2', 'amended', 'A.L. 2023 H.B. 5'
+      - input: ref('fct_bills')
+        format: sql
+        rows: |
+            select '231' as session_code, 'HB115' as bill union all
+            select '231', 'HB99'
+    expect:
+      rows:
+        - {bill: HB115, section_id: s1, is_lead_bill: true, combined_into: , in_fct_bills: true}
+        - {bill: HB99, section_id: s1, is_lead_bill: false, combined_into: HB115, in_fct_bills: true}
+        - {bill: HB7, section_id: s2, is_lead_bill: true, combined_into: , in_fct_bills: false}
+        - {bill: HB99, section_id: s2, is_lead_bill: false, combined_into: HB7, in_fct_bills: true}
+        - {bill: HB5, section_id: s3, is_lead_bill: true, combined_into: , in_fct_bills: false}

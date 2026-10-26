@@ -1461,6 +1461,16 @@ models:
       - name: section_versions
         data_type: bigint
         description: How many versions of the section cite this act.
+      - name: is_lead_bill
+        data_type: boolean
+        description: >
+          False for a bill named after "&" in a combined act ("A.L. 2023 H.B. 115 & 99": the Revisor cites the one
+          substitute under both numbers). Only the first, the lead bill, passed; the others never reached the
+          governor, and fct_bills shows them as failed (2023 HB99, 2025 HB486, 2026 HB3155). Filter on this to
+          list the bills that became law. A bill that leads in any act is a lead bill.
+      - name: combined_into
+        data_type: varchar
+        description: The lead bill a non-lead bill was combined into (HB115 for 2023 HB99); null for lead bills.
       - name: in_fct_bills
         data_type: boolean
         description: Whether fct_bills has the bill (it covers the House XML export's sessions, 2017 on).

@@ -235,14 +235,18 @@ models:
     and each repeal note, split into one row per (section version, act, bill). A history note lists the acts that
     made the section: "(L. 1945 p. 1428 § 48, A.L. 2003 S.B. 299 & 40)" is enacted in 1945 (session-law page, no
     bill number) and amended in 2003 by SB 299 and SB 40 (combined); "merged with" joins bills that changed the
-    same section in one session; "1st Ex. Sess." names an extraordinary session. change is enacted (L.), amended
-    (A.L., or "A." in the 1949 revision''s notes) or repealed ("Repealed L."). Acts cited by page ("p. 1428") name
-    no bill and are left out. session_code follows the House XML codes: two-digit year, then 1 for the regular session.
-    The House numbers every special session (codes 2-4, in order), but the Revisor counts only extraordinary sessions
+    same section in one session; "1st Ex. Sess." names an extraordinary session (the Revisor also prints "2d", "3d",
+    "4th", "1st.", "lst" and "Ex. Sess" without its last period). change is enacted (L.), amended (A.L., or "A."
+    in the 1949 revision''s notes) or repealed ("Repealed L."). Acts cited by page ("p. 1428") name no bill and
+    are left out. session_code follows the House XML codes: two-digit year, then 1 for the regular session. The
+    House numbers every special session (codes 2-4, in order), but the Revisor counts only extraordinary sessions
     that passed bills: 2018''s legislature-called impeachment session (183, resolutions only) isn''t one, so the
-    Revisor''s 2018 "1st Ex. Sess." is House 184. So the Nth extraordinary session is the year''s Nth special-session
-    code with House bills in the House XML; for years before the export (2017), N + 2 is assumed (2017 and later
-    follow it apart from 2018). Grain: one row per (RSMo section version, act, bill) a history or repeal note names.'
+    Revisor''s 2018 "1st Ex. Sess." is House 184. So the Nth extraordinary session is the House''s session named
+    "Nth Extraordinary Session" (stg_mo_house__sessions); for years the House''s list lacks, N + 2 is assumed. A
+    combined act ("H.B. 115 & 99": one substitute that carries several bills'' subjects) names the bills after "&";
+    only the first, the lead bill (is_lead_bill), is the one that passed. The others stay as rows, with combined_into
+    naming the lead, because the act did take their subjects, but they never reached the governor themselves. Grain:
+    one row per (RSMo section version, act, bill) a history or repeal note names.'
 - name: int_mo_senate__votes
   description: 'MO Senate journal votes attributed to people: the senator serving on the vote date with a matching
     surname (and district, when the journal adds one to disambiguate). Ambiguous tokens stay unattributed. A two-word
