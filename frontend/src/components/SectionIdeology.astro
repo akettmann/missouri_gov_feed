@@ -1,7 +1,7 @@
 ---
 // Section A: each indicator on its own scale with period, detail and source. No composite score.
 import type { Indicator, PeerStrip as PeerStripData } from "../lib/exports/types";
-import { indicatorMeta } from "../lib/indicators";
+import { indicatorDetailText, indicatorMeta } from "../lib/indicators";
 import { href } from "../lib/site";
 import IndicatorScale from "./IndicatorScale.astro";
 import PeerStrip from "./PeerStrip.astro";
@@ -54,7 +54,7 @@ const fmt = (key: string, v: number | null) =>
           {latest.value !== null && <IndicatorScale indicator={key} value={latest.value} />}
           {strip && strip.peers.length > 1 && <PeerStrip strip={strip} />}
           <p class="small muted">
-            {latest.detail} ·{" "}
+            {indicatorDetailText(latest.detail)} ·{" "}
             <SourceLink url={latest.source_url} missing="computed from votes in this dataset" />
           </p>
           {rows.length > 1 && (
@@ -75,7 +75,7 @@ const fmt = (key: string, v: number | null) =>
                       <tr>
                         <td>{r.period ?? "all loaded votes"}</td>
                         <td class="num">{fmt(key, r.value)}</td>
-                        <td>{r.detail}</td>
+                        <td>{indicatorDetailText(r.detail)}</td>
                         <td>
                           <SourceLink url={r.source_url} />
                         </td>

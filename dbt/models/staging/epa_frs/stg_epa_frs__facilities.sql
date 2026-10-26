@@ -2,7 +2,8 @@
 -- a third of the sites) and the federal agency for federal sites. Malformed CSV rows (no REGISTRY_ID) are left
 -- out. A name that still has U+FFFD (EPA lost a letter) is taken from the epa_frs_name_corrections seed if it has a
 -- row, else from the one alternative name of the same registry id that equals it with each run of U+FFFD standing
--- for one character; failing both, the U+FFFD is dropped.
+-- for one character; failing both, the U+FFFD is dropped. Name, address and city have runs of whitespace
+-- collapsed and stray leading/trailing commas, semicolons and spaces cut (EPA writes "BUTTERBALL,", #319).
 with src as (
     select
         {{ mogov.json_str('payload', '$.REGISTRY_ID') }} as registry_id,
@@ -48,10 +49,11 @@ alt_repairs as (
 
 select
     src.registry_id,
-    {{ mogov.fix_replacement_char('src.facility_name', 'coalesce(fixes.corrected_value, alt_repairs.repaired_name)') }}
-        as facility_name,
-    nullif(trim({{ mogov.fix_replacement_char('src.address') }}), '') as address,
-    nullif(src.city, '') as city,
+    {{ mogov.clean_registry_text(
+        mogov.fix_replacement_char('src.facility_name', 'coalesce(fixes.corrected_value, alt_repairs.repaired_name)')
+    ) }} as facility_name,
+    {{ mogov.clean_registry_text(mogov.fix_replacement_char('src.address')) }} as address,
+    {{ mogov.clean_registry_text('src.city') }} as city,
     nullif(src.county, '') as county,
     nullif(src.county_fips, '') as county_fips,
     nullif(src.postal_code, '') as postal_code,

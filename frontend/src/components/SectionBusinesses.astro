@@ -12,7 +12,7 @@ import { donorEntries, donorNamesText } from "../lib/donorLinks";
 import { contributionsText, sitesText } from "../lib/businessCounts";
 import { count, money } from "../lib/format";
 import { href } from "../lib/site";
-import { siteLinkContexts } from "../lib/siteLinkNames";
+import { siteLinkContexts, sitePlace } from "../lib/siteLinkNames";
 
 interface Props {
   bundle: OfficialBundle;
@@ -107,7 +107,9 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
                           {d.sites.map((s) => (
                             <li>
                               {s.facility_name ?? "unnamed site"}
-                              {s.city && <span class="muted">, {s.city}</span>}
+                              {sitePlace(s.address, s.city) && (
+                                <span class="muted">, {sitePlace(s.address, s.city)}</span>
+                              )}
                               {s.naics_description && <span class="muted"> · {s.naics_description}</span>}
                               {s.matched_by === "same company" && (
                                 <span

@@ -22,6 +22,14 @@ function tidy(part: string): string {
     .trim();
 }
 
+/** Where a site is, as shown after its name: "ADDRESS, CITY", whichever parts exist ("" when neither). */
+export function sitePlace(address: string | null | undefined, city: string | null | undefined): string {
+  return [address, city]
+    .map((p) => (p ? tidy(p) : ""))
+    .filter(Boolean)
+    .join(", ");
+}
+
 /** What a screen reader hears: case and spacing differences do not make two names distinct. */
 const keyOf = (name: string): string => name.toLowerCase();
 

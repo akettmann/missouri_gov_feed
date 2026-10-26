@@ -783,10 +783,10 @@ models:
                 where: "indicator = 'party_unity_pct'"
       - name: period
         data_type: integer
-        description: Congress number (DW-NOMINATE), last year served (Shor-McCarty); null for party unity (computed over all loaded votes).
+        description: Congress number (DW-NOMINATE), last year in the Shor-McCarty data (which ends 2022, so capped at 2022 for current members); null for party unity (computed over all loaded votes).
       - name: detail
         data_type: varchar
-        description: Context for the value (chamber, years served, number of party-line votes).
+        description: Context for the value (chamber, Shor-McCarty first-last year in the data and where the data ends, number of party-line votes).
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"

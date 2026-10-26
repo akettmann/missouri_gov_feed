@@ -389,6 +389,7 @@ unit_tests:
               'o1' as official_id,
               'received' as direction,
               'Ameren PAC' as counterparty,
+              -- bare chr(n): unit-test fixtures cannot call macros (#371)
               'AMEREN' || chr(13) || chr(10) || 'CORPORATION' || chr(10) as counterparty_organization,
               'committee' as counterparty_type,
               100 as amount,
@@ -444,7 +445,8 @@ unit_tests:
       - input: ref('company_brands')
         rows:
           - {keyword: unusedbrand, brand: unusedbrand}
-      # sql format: the dict format cannot carry a chr(31) inside a value
+      # sql format: the dict format cannot carry a chr(31) inside a value. Unit-test fixtures render without the
+      # adapter/macro context (no mogov.chr), so these fixtures keep a bare chr(n); BigQuery would need its own (#371)
       - input: ref('fct_campaign_finance')
         format: sql
         rows: |
@@ -472,6 +474,8 @@ unit_tests:
       - input: ref('dim_official')
         rows:
           - {official_id: o1, bioguide_id: B1}
+          - {official_id: o2}
+          - {official_id: o3}
       - input: ref('stg_voteview__members')
         rows:
           - {bioguide_id: B1, icpsr: 1, chamber: House, congress: 103, nominate_dim1: 0.1}
@@ -483,9 +487,13 @@ unit_tests:
           - {bioguide_id: B1, icpsr: 1, chamber: House, congress: 122, nominate_dim1: 0.1}
           - {bioguide_id: B1, icpsr: 1, chamber: House, congress: 123, nominate_dim1: 0.1}
       - input: ref('stg_shor_mccarty__scores')
-        rows: []
+        rows:
+          - {family_name: Doe, first_year: 2009, last_year: 2018, last_chamber: lower, last_district: 1, np_score: -0.5}
+          - {family_name: Roe, first_year: 2015, last_year: 2022, last_chamber: upper, last_district: 2, np_score: 0.7}
       - input: ref('int_mo_legislators__seats')
-        rows: []
+        rows:
+          - {person_id: o2, surname_key: doe, chamber: lower, district_number: 1, start_date: '2009-01-01', end_date: '2018-12-31'}
+          - {person_id: o3, surname_key: roe, chamber: upper, district_number: 2, start_date: '2015-01-01', end_date: '2022-12-31'}
       - input: ref('fct_party_unity_yearly')
         rows:
           - {official_id: o1, chamber: state_house, vote_year: 2020, party_line_votes: 600, with_party_votes: 500}
@@ -500,4 +508,7 @@ unit_tests:
         - {official_id: o1, indicator: dw_nominate_dim1, period: 121, detail: 'Voteview DW-NOMINATE, House 121st Congress'}
         - {official_id: o1, indicator: dw_nominate_dim1, period: 122, detail: 'Voteview DW-NOMINATE, House 122nd Congress'}
         - {official_id: o1, indicator: dw_nominate_dim1, period: 123, detail: 'Voteview DW-NOMINATE, House 123rd Congress'}
+        # data_end_year is the max last_year in the Shor-McCarty data (2022, from Roe), shown for both legislators
+        - {official_id: o2, indicator: shor_mccarty_np, period: 2018, detail: 'Shor-McCarty career ideal point; in the Shor-McCarty data 2009-2018 (data ends 2022)'}
+        - {official_id: o3, indicator: shor_mccarty_np, period: 2022, detail: 'Shor-McCarty career ideal point; in the Shor-McCarty data 2015-2022 (data ends 2022)'}
         - {official_id: o1, indicator: party_unity_pct, period: null, detail: 'state_house: 1006 party-line votes'}

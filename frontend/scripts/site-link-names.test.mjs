@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { registryIdOf, siteLinkContexts } from "../src/lib/siteLinkNames.ts";
+import { registryIdOf, siteLinkContexts, sitePlace } from "../src/lib/siteLinkNames.ts";
 
 const url = (id) => `https://frs.example/facility?p_registry_id=${id}`;
 const site = (facility_name, address, city, id) => ({ facility_name, address, city, frs_url: url(id) });
@@ -70,4 +70,12 @@ test("duplicates without a usable registry id fall back to record N of M", () =>
   assert.equal(new Set(out).size, 4);
   assert.match(out[0], /record 1 of 4$/);
   assert.match(out[1], /record 2 of 4$/);
+});
+
+test("sitePlace joins the address and city that exist, tidied", () => {
+  assert.equal(sitePlace("1 Main St", "Joplin"), "1 Main St, Joplin");
+  assert.equal(sitePlace(null, "Joplin"), "Joplin");
+  assert.equal(sitePlace("900 WATSON DR,", "BRONAUGH"), "900 WATSON DR, BRONAUGH");
+  assert.equal(sitePlace("  ", null), "");
+  assert.equal(sitePlace(undefined, undefined), "");
 });
