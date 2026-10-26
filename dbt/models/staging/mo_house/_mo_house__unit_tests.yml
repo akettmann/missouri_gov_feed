@@ -157,3 +157,27 @@ unit_tests:
         - {session_code: '261', bill: HB2, listed_in: house_bill_list, action_seq: 1, action_date: 2026-02-01, description: 'Reported Do Pass (H)', action_guid: '4'}
         - {session_code: '261', bill: SB834, listed_in: senate_act_list, action_seq: 1, action_date: 2026-03-25, description: 'Reported to the House and First Read (H)', action_guid: '2'}
         - {session_code: '261', bill: SB999, listed_in: senate_act_list, action_seq: 2, action_date: 2026-05-14, description: 'Truly Agreed To and Finally Passed', action_guid: '3'}
+
+  - name: house_rollcalls_dated_outside_their_sessions_year_are_dropped
+    model: stg_mo_house__rollcalls
+    description: >
+      The House leaves the previous session's roll-call PDFs in a session's rollcalls directory (bills171 holds
+      2016 PDFs numbered by 2016 session day, #430). A roll call whose date year differs from the year in its
+      session code (171 = 2017) is dropped; one in its own year stays, as does one whose date didn't parse, and
+      so does a special session (173) dated in its year. Keeping the 2016 PDF, or comparing against the wrong
+      year (a 181 roll call dated 2017), fails this test.
+    given:
+      - input: source('mo_house', 'rollcalls')
+        format: sql
+        rows: |
+            select cast('{"url": "u1", "session_code": "171", "session_day": "35", "rollcall_number": "8", "vote_date": "3/2/2017"}' as varchar) as payload union all
+            select '{"url": "u2", "session_code": "171", "session_day": "35", "rollcall_number": "9", "vote_date": "3/8/2016"}' union all
+            select '{"url": "u3", "session_code": "171", "session_day": "35", "rollcall_number": "10"}' union all
+            select '{"url": "u4", "session_code": "173", "session_day": "1", "rollcall_number": "1", "vote_date": "9/12/2017"}' union all
+            select '{"url": "u5", "session_code": "181", "session_day": "1", "rollcall_number": "1", "vote_date": "1/4/2017"}' union all
+            select '{"url": "u6", "session_code": "171", "session_day": "2", "rollcall_number": "1", "vote_date": "1/5/2017", "error": "not a pdf"}'
+    expect:
+      rows:
+        - {rollcall_url: u1, session_code: '171', session_day: 35, rollcall_number: 8, vote_date: '2017-03-02'}
+        - {rollcall_url: u3, session_code: '171', session_day: 35, rollcall_number: 10, vote_date: null}
+        - {rollcall_url: u4, session_code: '173', session_day: 1, rollcall_number: 1, vote_date: '2017-09-12'}
