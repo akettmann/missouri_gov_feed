@@ -40,6 +40,10 @@ select
         when extract(month from r.start_date) = 1 then {{ dbt.date_trunc('year', 'r.start_date') }}
         else r.start_date
     end as start_date,
-    coalesce(r.end_date, {{ dbt.safe_cast("'9999-12-31'", 'date') }}) as end_date
+    coalesce(r.end_date, {{ dbt.safe_cast("'9999-12-31'", 'date') }}) as end_date,
+    -- the dates exactly as Open States (or the seed) gives them, without the January-1 or 1900 adjustments above:
+    -- what an overlap test between two ids needs (null start when undated; end 9999-12-31 while open)
+    {{ dbt.safe_cast('r.start_date', 'date') }} as source_start_date,
+    coalesce(r.end_date, {{ dbt.safe_cast("'9999-12-31'", 'date') }}) as source_end_date
 from roles as r
 inner join {{ ref('stg_openstates__people') }} as p on r.openstates_id = p.openstates_id
