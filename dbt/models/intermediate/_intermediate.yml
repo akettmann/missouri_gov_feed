@@ -118,6 +118,19 @@ models:
     page header can share a line with the first entry ("Alphabetical list of Missouri Judges Brewer, Craig D. ...",
     #41), so it''s stripped first. Names may use a typographic apostrophe ("O’Hara", #42); it''s normalized to ''
     so the name matches and IDs stay ASCII. Grain: one row per state judge in the Official Manual index.'
+- name: int_jurisdiction_business_donor_matches
+  description: 'One row per (official, facility, donor) tying a donor organization to an EPA-regulated facility
+    in the area of a district-elected official it gave to: the matching behind fct_jurisdiction_businesses (one
+    row per facility) and fct_jurisdiction_business_donors (one row per donor and filing page). See fct_jurisdiction_businesses
+    for what counts as a match. donor_key is the normalized organization name (company_key); donor_name is the name
+    as filed.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - official_id
+        - registry_id
+        - donor_key
 - name: int_mec__committee_names
   description: 'Every name a Missouri committee has filed under, with the years the committee was active (filed
     a report, received or spent money, or was registered for an election), from both MEC feeds. A committee that
@@ -343,6 +356,17 @@ models:
     files (member_key is the ICPSR id). Chamber-wide figures (party majorities, chamber attendance) count from here,
     so they don''t depend on who holds office today. vote_id, chamber and session_code match fct_votes. Grain: one
     row per (chamber, vote, member) for every member, tracked or not.'
+  columns:
+  - name: chamber
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - state_house
+          - state_senate
+          - us_house
+          - us_senate
 - name: int_votes__party_positions
   description: 'Each party''s majority position on every recorded vote, counted over every member who voted (int_votes__member_votes),
     not only the officials tracked today. A party''s position is the side most of its yea/nay voters took; a tie

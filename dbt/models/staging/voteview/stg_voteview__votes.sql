@@ -11,6 +11,12 @@ with typed as (
     where chamber in ('House', 'Senate')
 )
 
+-- Voteview records the President's announced position on some roll calls as a vote row under a
+-- presidential ICPSR id (99912, 99913 in the loaded data; Voteview reserves 99xxx for presidents), with the
+-- chamber of the roll call. They aren't members of either chamber, so they're dropped here explicitly rather
+-- than by the inner join to members downstream (941 rows in the loaded congresses).
+
+
 select
     congress,
     chamber,
@@ -25,3 +31,4 @@ select
         else 'not a member'
     end as vote_cast
 from typed
+where icpsr < 99000

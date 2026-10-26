@@ -179,7 +179,7 @@ district holds about 10,000 EPA-regulated sites). The full list per district or 
 needed) and `dist/districts/<district>/sites.csv`, 201 districts in all; `<district>` is the `district_id` with
 `:` replaced by `-` (`state_house-135`). Donor-tied rows name the donor, link to where the contributions are filed
 and carry the "possible match" badge, so the "Hide possible matches" toggle applies; the CSV has the same columns.
-`lib/exports/districtSites.ts` reads the table once (one query, grouped in memory) and fails the build if a
+`lib/exports/districtSites.ts` reads `fct_jurisdiction_businesses` and `fct_jurisdiction_business_donors` once each (two queries, grouped in memory) and fails the build if a
 district maps to several officials or an official to several districts. Measured on this machine against main
 (about 218k site rows, 402 extra routes): `dist/` 64 MB to 174 MB; peak node memory about 0.6-0.7 GB to about
 1.0 GB; build time 100-121 s on main vs 78-113 s with the pages (three runs; machine load varied more than the

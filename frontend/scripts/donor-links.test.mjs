@@ -3,7 +3,6 @@ import { test } from "node:test";
 import {
   donorEntries,
   donorNamesText,
-  splitDonorNames,
   donorLinkIds,
   donorLinkLabel,
   parseDonorLinks,
@@ -203,14 +202,11 @@ test("donorEntries never folds a donor with no page (#342)", () => {
 });
 
 test("a ';' or ',' inside a donor name stays in that one donor (#350)", () => {
-  const list = "Missouri and Kansas Laborers; PACSMITH, JONES & CO";
-  const names = splitDonorNames(list);
-  assert.deepEqual(names, ["Missouri and Kansas Laborers; PAC", "SMITH, JONES & CO"]);
+  const names = ["Missouri and Kansas Laborers; PAC", "SMITH, JONES & CO"];
   assert.deepEqual(
     donorEntries(names, null).map((e) => e.donor),
     ["Missouri and Kansas Laborers; PAC", "SMITH, JONES & CO"],
   );
   assert.equal(donorNamesText(names), "Missouri and Kansas Laborers; PAC; SMITH, JONES & CO");
-  assert.deepEqual(splitDonorNames(null), []);
   assert.equal(donorNamesText(null), "");
 });
