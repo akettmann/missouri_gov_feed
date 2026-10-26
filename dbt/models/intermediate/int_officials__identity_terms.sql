@@ -18,6 +18,9 @@
 -- the last year it ran past the January 15 handover: Open States gives its end, so the person held the seat that
 -- year, and no first year is invented. That is enough to give the id a person_ids row and to let the name rules
 -- see its name and seat.
+-- An undated id has only that one year of evidence, which weakens rule 2 (a seat conflict needs more than one
+-- shared year) and rule 2b (the chamber-move check compares the first and last year) of int_officials__person_ids
+-- (#519).
 -- Known edge: the min(start)/max(end) collapse per (alias_id, year, office, district) spans any gap if one id holds
 -- the same seat in two separate terms in a year.
 with roster_years as (
