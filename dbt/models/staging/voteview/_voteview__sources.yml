@@ -8,6 +8,12 @@ sources:
   - name: members
     identifier: voteview_members
     description: Voteview member-congress rows (both chambers, loaded congresses) with DW-NOMINATE scores; national.
+    columns:
+    - name: chamber
+      data_tests:
+      - accepted_values:
+          arguments:
+            values: [House, Senate, President]
   - name: rollcalls
     identifier: voteview_rollcalls
     description: 'Voteview roll calls (both chambers, loaded congresses): date, bill, question, result.'
@@ -15,3 +21,9 @@ sources:
     identifier: voteview_votes
     description: Voteview individual votes, one row per (roll call, member) with a cast code; national, filtered
       in dbt.
+    columns:
+    - name: chamber
+      data_tests:
+      - accepted_values:
+          arguments:
+            values: [House, Senate]
