@@ -1,6 +1,6 @@
 // Wording and thresholds for a federal district judge's median time to disposition (fct_judge_time_to_disposition).
 // Pure (imports only the pure format helpers) so node can test it directly. The mart carries no minimum sample size; the page applies one.
-import { plural } from "./format.ts";
+import { count, plural } from "./format.ts";
 
 /** Fewest measured dockets a median is shown for; below it the page shows the count and no median. */
 export const MIN_MEASURED = 30;
@@ -52,4 +52,13 @@ export const measuredDocketsText = (n: number) => plural(n, "docket", "dockets")
 
 /** sentence appended when some dockets end before they were filed */
 export const excludedDocketsText = (n: number) =>
-  `${plural(n, "docket", "dockets")} that end before they were filed (a source error) ${n === 1 ? "is" : "are"} left out.`;
+  n === 1
+    ? `${plural(n, "docket", "dockets")} that ends before it was filed (a source error) is left out.`
+    : `${plural(n, "docket", "dockets")} that end before they were filed (a source error) are left out.`;
+
+/** "N federal dockets" in the method note */
+export const federalDocketsText = (n: number) => plural(n, "federal docket", "federal dockets");
+
+/** "M of N assigned dockets measured" coverage line */
+export const coverageText = (measured: number, assigned: number) =>
+  `${count(measured)} of ${plural(assigned, "assigned docket", "assigned dockets")} measured`;

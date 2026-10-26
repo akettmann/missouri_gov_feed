@@ -4,7 +4,12 @@ import { contributionsText, sitesDescription, sitesText } from "../src/lib/busin
 import { filterStatusText } from "../src/lib/compareFilter.ts";
 import { plural } from "../src/lib/format.ts";
 import { breaksText } from "../src/lib/indicators.ts";
-import { excludedDocketsText, measuredDocketsText } from "../src/lib/timeToDisposition.ts";
+import {
+  coverageText,
+  excludedDocketsText,
+  federalDocketsText,
+  measuredDocketsText,
+} from "../src/lib/timeToDisposition.ts";
 
 test("plural uses the singular for exactly 1", () => {
   assert.equal(plural(1, "case", "cases"), "1 case");
@@ -41,6 +46,16 @@ test("business contributions", () => {
 test("court docket strings", () => {
   assert.equal(measuredDocketsText(1), "1 docket");
   assert.equal(measuredDocketsText(2), "2 dockets");
-  assert.match(excludedDocketsText(1), /^1 docket that end.* is left out\.$/);
-  assert.match(excludedDocketsText(2), /^2 dockets that end.* are left out\.$/);
+  assert.equal(
+    excludedDocketsText(1),
+    "1 docket that ends before it was filed (a source error) is left out.",
+  );
+  assert.equal(
+    excludedDocketsText(2),
+    "2 dockets that end before they were filed (a source error) are left out.",
+  );
+  assert.equal(federalDocketsText(1), "1 federal docket");
+  assert.equal(federalDocketsText(2), "2 federal dockets");
+  assert.equal(coverageText(0, 1), "0 of 1 assigned docket measured");
+  assert.equal(coverageText(1, 2), "1 of 2 assigned dockets measured");
 });
