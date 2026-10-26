@@ -6,6 +6,7 @@ select
     court_id,
     case_name,
     docket_number,
+    federal_dn_case_type,
     assigned_to_id as assigned_to_person_id,
     {{ dbt.safe_cast('date_filed', 'date') }} as date_filed,
     {{ dbt.safe_cast('date_terminated', 'date') }} as date_terminated

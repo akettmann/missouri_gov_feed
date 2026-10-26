@@ -70,7 +70,29 @@ models:
     dates (null when the docket has none) and the days between. A docket whose termination date is before its filing
     date has a negative duration (a source error): it is kept and flagged with ends_before_filed, and the judge
     metric leaves it out. The state courts carry no judge or dates in the bulk export, so only the federal districts
-    are here. Grain: one row per federal district docket with an assigned judge.'
+    are here. case_type comes from the docket-number type: the federal_dn_case_type CourtListener parsed when it
+    has one (empty for about 84% of these dockets), else the type token of the docket number itself ("4:25-cr-00236"
+    is cr). Mapped to civil (cv, and md: multidistrict-litigation master dockets, which carry civil nature-of-suit
+    codes), criminal (cr), miscellaneous (mc, mj, sw, wi, sm, pr: warrants, subpoenas, complaints, special matters
+    and the like, not cases) and other (fp, sc, cn and docket numbers with no type: a few dozen pre-2008 filings
+    the maintainer has not ruled on, #321). The CourtListener type wins where the two disagree: the one such docket
+    (1:00-cr-00008) is a civil suit with a mistyped docket number. Grain: one row per federal district docket with
+    an assigned judge.'
+  columns:
+  - name: docket_id
+    data_tests:
+    - unique
+    - not_null
+  - name: case_type
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - civil
+          - criminal
+          - miscellaneous
+          - other
 - name: int_courtlistener__judge_disclosure_items
   description: 'Federal judges'' disclosure line items with the report they come from and the judge''s FJC id. Grain:
     one disclosed item per federal judge report.'
