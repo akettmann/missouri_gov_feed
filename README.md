@@ -51,7 +51,7 @@ The `reporting` schema reshapes these for the frontend (one model per view, same
 | `rpt_donor_rollup` | money received per donor, donor class (PAC, individual, ...) and year |
 | `rpt_gift_rollup` | lobbyist gifts per principal, category and year |
 | `rpt_interest_vote_overlap` | legislators' votes on bills whose subjects touch an industry that gave them money (co-occurrence, not causation; industries from the `interest_keywords` and `industry_subjects` seeds) |
-| `rpt_officeholders_by_year` | who held each tracked office in each year: everyone serving now for the current year; past holders of the MO House (2017+ rosters), MO Senate (years where Open States dates every seat), Congress and federal courts before it |
+| `rpt_officeholders_by_year` | who held each tracked office in each year: everyone serving now for the current year; past holders of the MO House (2017+ rosters), MO Senate (seats dated from the journal roll calls where Open States cannot), Congress and federal courts before it |
 
 Party majorities (party unity, party breaks) and chamber attendance count every member who voted, not
 only the officials tracked today (`int_votes__member_votes`).

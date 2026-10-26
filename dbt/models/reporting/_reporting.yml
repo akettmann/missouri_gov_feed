@@ -761,7 +761,7 @@ models:
       Who held each tracked office in each year, for the browse page's year control. The current calendar
       year is everyone serving now (dim_official, every office). Earlier years list the past holders of the
       offices with dated rosters only (int_officeholders__years: MO House from its session rosters, MO Senate
-      in years where Open States dates all 34 seats, Congress, federal judges); statewide officers, mayors and
+      dated from the journal roll calls where Open States has no start or a wrong end, Congress, federal judges); statewide officers, mayors and
       state judges have no rows before the current year. A term counts for a year when it runs past January 15.
       Grain: one row per (year, office, person).
     data_tests:

@@ -18,6 +18,9 @@ unit_tests:
       - input: ref('int_mo_legislators__seats')
         rows: []
         format: dict
+      - input: ref('int_mo_senate__votes')
+        rows: []
+        format: dict
       - input: ref('stg_congress__terms')
         rows: []
         format: dict
@@ -53,6 +56,9 @@ unit_tests:
           - {person_id: 'ocd-person/rebecca', chamber: lower, district_number: 34, start_date: '2015-01-01', end_date: '2019-07-30'}
           - {person_id: 'ocd-person/lee', chamber: lower, district_number: 42, start_date: '2015-01-01', end_date: '2020-12-31'}
           - {person_id: 'ocd-person/arthur', chamber: lower, district_number: 18, start_date: '2015-01-01', end_date: '2016-12-31'}
+      - input: ref('int_mo_senate__votes')
+        rows: []
+        format: dict
       - input: ref('stg_congress__terms')
         rows: []
         format: dict
@@ -65,3 +71,147 @@ unit_tests:
         - {year: 2020, official_id: 'ocd-person/lee', office: state_house, session_code: '201'}
         - {year: 2020, official_id: 'mohouse:7', office: state_house, session_code: '201'}
         - {year: 2020, official_id: 'ocd-person/arthur', office: state_house, session_code: '201'}
+
+  - name: officeholders_senate_dated_from_the_journal_roll_calls
+    model: int_officeholders__years
+    description: >
+      Senate seat-terms are dated from the journal roll calls where Open States cannot (#516). 2018, all 34
+      districts. District 1: an undated start (1900-01-01 in the seat table) counts from the senator's first vote,
+      so the senator is listed. District 2: Open States ends the term 2018-12-31 but the senator's last vote was
+      2017-09-13, more than a year earlier, so the term ends there and only the successor is listed. District 3: a
+      term running into the journal years with no vote at all was not held. District 4: a senator who resigned on
+      January 16 and voted last on January 13 stays, as Open States' date is within a year of the last vote and
+      past the January 15 handover. District 5: an undated term with no vote is not listed either. District 6: an
+      undated term whose first vote is in 2019 is not listed for 2018, only the dated holder is.
+    given:
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '181', session_year: 2018, person_key: 'mohouse:1', full_name: Ann Roe, district_number: 1}
+      - input: ref('stg_openstates__people')
+        rows: []
+        format: dict
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: 'p01', full_name: Ann Undated, chamber: upper, district_number: 1, start_date: '1900-01-01', end_date: '2020-12-31', openstates_id: 'p01'}
+          - {person_id: 'p02', full_name: Bob WrongEnd, chamber: upper, district_number: 2, start_date: '2011-01-01', end_date: '2018-12-31', openstates_id: 'p02'}
+          - {person_id: 'p03', full_name: Cat Successor, chamber: upper, district_number: 2, start_date: '2018-01-03', end_date: '9999-12-31', openstates_id: 'p03'}
+          - {person_id: 'p04', full_name: Dan NeverVoted, chamber: upper, district_number: 3, start_date: '2011-01-01', end_date: '2018-12-31', openstates_id: 'p04'}
+          - {person_id: 'p05', full_name: Eve Holder, chamber: upper, district_number: 3, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'p05'}
+          - {person_id: 'p06', full_name: Fay Resigned, chamber: upper, district_number: 4, start_date: '2017-01-01', end_date: '2018-01-16', openstates_id: 'p06'}
+          - {person_id: 'p07', full_name: Gus UndatedNeverVoted, chamber: upper, district_number: 5, start_date: '1900-01-01', end_date: '2018-12-31', openstates_id: 'p07'}
+          - {person_id: 'p08', full_name: Hal Holder, chamber: upper, district_number: 5, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'p08'}
+          - {person_id: 'p10', full_name: Jay Holder, chamber: upper, district_number: 6, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'p10'}
+          - {person_id: 'p11', full_name: Kim Later, chamber: upper, district_number: 6, start_date: '1900-01-01', end_date: '2023-01-04', openstates_id: 'p11'}
+          - {person_id: 'q07', full_name: Filler 7, chamber: upper, district_number: 7, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q07'}
+          - {person_id: 'q08', full_name: Filler 8, chamber: upper, district_number: 8, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q08'}
+          - {person_id: 'q09', full_name: Filler 9, chamber: upper, district_number: 9, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q09'}
+          - {person_id: 'q10', full_name: Filler 10, chamber: upper, district_number: 10, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q10'}
+          - {person_id: 'q11', full_name: Filler 11, chamber: upper, district_number: 11, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q11'}
+          - {person_id: 'q12', full_name: Filler 12, chamber: upper, district_number: 12, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q12'}
+          - {person_id: 'q13', full_name: Filler 13, chamber: upper, district_number: 13, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q13'}
+          - {person_id: 'q14', full_name: Filler 14, chamber: upper, district_number: 14, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q14'}
+          - {person_id: 'q15', full_name: Filler 15, chamber: upper, district_number: 15, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q15'}
+          - {person_id: 'q16', full_name: Filler 16, chamber: upper, district_number: 16, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q16'}
+          - {person_id: 'q17', full_name: Filler 17, chamber: upper, district_number: 17, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q17'}
+          - {person_id: 'q18', full_name: Filler 18, chamber: upper, district_number: 18, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q18'}
+          - {person_id: 'q19', full_name: Filler 19, chamber: upper, district_number: 19, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q19'}
+          - {person_id: 'q20', full_name: Filler 20, chamber: upper, district_number: 20, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q20'}
+          - {person_id: 'q21', full_name: Filler 21, chamber: upper, district_number: 21, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q21'}
+          - {person_id: 'q22', full_name: Filler 22, chamber: upper, district_number: 22, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q22'}
+          - {person_id: 'q23', full_name: Filler 23, chamber: upper, district_number: 23, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q23'}
+          - {person_id: 'q24', full_name: Filler 24, chamber: upper, district_number: 24, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q24'}
+          - {person_id: 'q25', full_name: Filler 25, chamber: upper, district_number: 25, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q25'}
+          - {person_id: 'q26', full_name: Filler 26, chamber: upper, district_number: 26, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q26'}
+          - {person_id: 'q27', full_name: Filler 27, chamber: upper, district_number: 27, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q27'}
+          - {person_id: 'q28', full_name: Filler 28, chamber: upper, district_number: 28, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q28'}
+          - {person_id: 'q29', full_name: Filler 29, chamber: upper, district_number: 29, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q29'}
+          - {person_id: 'q30', full_name: Filler 30, chamber: upper, district_number: 30, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q30'}
+          - {person_id: 'q31', full_name: Filler 31, chamber: upper, district_number: 31, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q31'}
+          - {person_id: 'q32', full_name: Filler 32, chamber: upper, district_number: 32, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q32'}
+          - {person_id: 'q33', full_name: Filler 33, chamber: upper, district_number: 33, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q33'}
+          - {person_id: 'q34', full_name: Filler 34, chamber: upper, district_number: 34, start_date: '2017-01-01', end_date: '9999-12-31', openstates_id: 'q34'}
+      - input: ref('int_mo_senate__votes')
+        rows:
+          - {person_key: 'p01', vote_date: '2017-01-04'}
+          - {person_key: 'p01', vote_date: '2020-12-02'}
+          - {person_key: 'p02', vote_date: '2017-01-04'}
+          - {person_key: 'p02', vote_date: '2017-09-13'}
+          - {person_key: 'p03', vote_date: '2018-01-08'}
+          - {person_key: 'p05', vote_date: '2018-02-01'}
+          - {person_key: 'p06', vote_date: '2017-02-01'}
+          - {person_key: 'p06', vote_date: '2018-01-13'}
+          - {person_key: 'p08', vote_date: '2018-02-01'}
+          - {person_key: 'p10', vote_date: '2018-02-01'}
+          - {person_key: 'p11', vote_date: '2019-01-09'}
+          - {person_key: 'p11', vote_date: '2022-10-04'}
+          - {person_key: 'q07', vote_date: '2018-02-01'}
+          - {person_key: 'q08', vote_date: '2018-02-01'}
+          - {person_key: 'q09', vote_date: '2018-02-01'}
+          - {person_key: 'q10', vote_date: '2018-02-01'}
+          - {person_key: 'q11', vote_date: '2018-02-01'}
+          - {person_key: 'q12', vote_date: '2018-02-01'}
+          - {person_key: 'q13', vote_date: '2018-02-01'}
+          - {person_key: 'q14', vote_date: '2018-02-01'}
+          - {person_key: 'q15', vote_date: '2018-02-01'}
+          - {person_key: 'q16', vote_date: '2018-02-01'}
+          - {person_key: 'q17', vote_date: '2018-02-01'}
+          - {person_key: 'q18', vote_date: '2018-02-01'}
+          - {person_key: 'q19', vote_date: '2018-02-01'}
+          - {person_key: 'q20', vote_date: '2018-02-01'}
+          - {person_key: 'q21', vote_date: '2018-02-01'}
+          - {person_key: 'q22', vote_date: '2018-02-01'}
+          - {person_key: 'q23', vote_date: '2018-02-01'}
+          - {person_key: 'q24', vote_date: '2018-02-01'}
+          - {person_key: 'q25', vote_date: '2018-02-01'}
+          - {person_key: 'q26', vote_date: '2018-02-01'}
+          - {person_key: 'q27', vote_date: '2018-02-01'}
+          - {person_key: 'q28', vote_date: '2018-02-01'}
+          - {person_key: 'q29', vote_date: '2018-02-01'}
+          - {person_key: 'q30', vote_date: '2018-02-01'}
+          - {person_key: 'q31', vote_date: '2018-02-01'}
+          - {person_key: 'q32', vote_date: '2018-02-01'}
+          - {person_key: 'q33', vote_date: '2018-02-01'}
+          - {person_key: 'q34', vote_date: '2018-02-01'}
+      - input: ref('stg_congress__terms')
+        rows: []
+        format: dict
+      - input: ref('stg_fjc__appointments')
+        rows: []
+        format: dict
+    expect:
+      rows:
+        - {year: 2018, official_id: 'mohouse:1', office: state_house, district: '1'}
+        - {year: 2018, official_id: 'p01', office: state_senate, district: '1'}
+        - {year: 2018, official_id: 'p03', office: state_senate, district: '2'}
+        - {year: 2018, official_id: 'p05', office: state_senate, district: '3'}
+        - {year: 2018, official_id: 'p06', office: state_senate, district: '4'}
+        - {year: 2018, official_id: 'p08', office: state_senate, district: '5'}
+        - {year: 2018, official_id: 'p10', office: state_senate, district: '6'}
+        - {year: 2018, official_id: 'q07', office: state_senate, district: '7'}
+        - {year: 2018, official_id: 'q08', office: state_senate, district: '8'}
+        - {year: 2018, official_id: 'q09', office: state_senate, district: '9'}
+        - {year: 2018, official_id: 'q10', office: state_senate, district: '10'}
+        - {year: 2018, official_id: 'q11', office: state_senate, district: '11'}
+        - {year: 2018, official_id: 'q12', office: state_senate, district: '12'}
+        - {year: 2018, official_id: 'q13', office: state_senate, district: '13'}
+        - {year: 2018, official_id: 'q14', office: state_senate, district: '14'}
+        - {year: 2018, official_id: 'q15', office: state_senate, district: '15'}
+        - {year: 2018, official_id: 'q16', office: state_senate, district: '16'}
+        - {year: 2018, official_id: 'q17', office: state_senate, district: '17'}
+        - {year: 2018, official_id: 'q18', office: state_senate, district: '18'}
+        - {year: 2018, official_id: 'q19', office: state_senate, district: '19'}
+        - {year: 2018, official_id: 'q20', office: state_senate, district: '20'}
+        - {year: 2018, official_id: 'q21', office: state_senate, district: '21'}
+        - {year: 2018, official_id: 'q22', office: state_senate, district: '22'}
+        - {year: 2018, official_id: 'q23', office: state_senate, district: '23'}
+        - {year: 2018, official_id: 'q24', office: state_senate, district: '24'}
+        - {year: 2018, official_id: 'q25', office: state_senate, district: '25'}
+        - {year: 2018, official_id: 'q26', office: state_senate, district: '26'}
+        - {year: 2018, official_id: 'q27', office: state_senate, district: '27'}
+        - {year: 2018, official_id: 'q28', office: state_senate, district: '28'}
+        - {year: 2018, official_id: 'q29', office: state_senate, district: '29'}
+        - {year: 2018, official_id: 'q30', office: state_senate, district: '30'}
+        - {year: 2018, official_id: 'q31', office: state_senate, district: '31'}
+        - {year: 2018, official_id: 'q32', office: state_senate, district: '32'}
+        - {year: 2018, official_id: 'q33', office: state_senate, district: '33'}
+        - {year: 2018, official_id: 'q34', office: state_senate, district: '34'}

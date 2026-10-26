@@ -248,6 +248,14 @@ Quirks:
   exists from session 241, so no source lists those bills and a vote on one links to nothing. House bills in
   special sessions link through the House XML actions. From 253 on, Senate bills link through the House XML
   actions (the Senate's own steps are not listed, so the match is by date span).
+- The journals also date Open States' Senate seat-terms (`int_officeholders__years`, #516). 25 senators in office
+  from 2017 have no Open States start date; their first roll-call vote stands in as the start (a bound: the
+  journals begin 2017-01-04, so 23 of the 25 are "seated by 2017-01-04"). It agrees with every dated start (first
+  vote on or just after it) and with the 4-year term rule where the rule applies; it contradicts the rule for six
+  senators whose Open States term ends 2023-01-04 (two consecutive terms). A term Open States ends over a year
+  after the person's last vote ends at that vote (Ryan Silvey, last vote 2017-09-13, listed to 2018-12-31), and a
+  term running into the journal years with no vote (Joseph Keaveny, Eric Schmitt, Kurt Schaefer, David Pearce) is
+  not counted as held. Only the 2025-2026 Official Manual is loaded, so it gives no evidence for earlier years.
 
 ## mo_senate_topics: Missouri Senate topical index
 
