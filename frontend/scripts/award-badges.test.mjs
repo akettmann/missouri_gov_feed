@@ -1,8 +1,16 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { AWARD_ICONS, currentAwards, metricText, ordinal, renderBadges } from "../src/lib/awardBadges.ts";
-import { AWARD_PAIRS } from "../src/lib/exports/awardDefs.ts";
+import {
+  AWARD_ICONS,
+  OFFICE_GROUP_LABELS,
+  currentAwards,
+  metricText,
+  ordinal,
+  renderBadges,
+} from "../src/lib/awardBadges.ts";
+import { AWARD_PAIRS, assertCyclePeriods } from "../src/lib/exports/awardDefs.ts";
 
 const e = (slug, rank, metric, streak_years = null, sample_size = 100) => ({
   rank,
@@ -11,10 +19,18 @@ const e = (slug, rank, metric, streak_years = null, sample_size = 100) => ({
   sample_size,
   streak_years,
 });
-const list = (award, period, entries, office = "state_house", group_size = 62) => ({
+const list = (
+  award,
+  period,
+  entries,
+  office = "state_house",
+  group_size = 62,
+  period_kind = period === "lifetime" ? "lifetime" : "year",
+) => ({
   award,
   office,
   period,
+  period_kind,
   group_size,
   entries,
 });
@@ -136,6 +152,7 @@ test("metricText shows the number with what it is out of", () => {
   assert.equal(metricText("highest_attendance", 99.5, 678), "99.5% of 678 votes");
   assert.equal(metricText("most_committee_money", 50000, 80000), "$50,000 of $80,000 raised");
   assert.equal(metricText("most_party_breaks", 12.5, null), "12.5%");
+  assert.equal(metricText("most_party_breaks", 30.8, 26), "30.8% with party, of 26 party-line votes");
 });
 
 test("badge HTML: icon and X marker aria-hidden, same words as sr-only text, link to the award key", () => {
@@ -184,23 +201,108 @@ test("every page or script that renders an official's name draws badges through 
 
 test("plural office label is circuit-free and does not depend on which judge came last", async () => {
   const { pluralOfficeLabel, singularOfficeLabel } = await import("../src/lib/awardBadges.ts");
-  const a = pluralOfficeLabel("mo_circuit_judge", "Circuit Judge, 22 Judicial Circuit");
-  const b = pluralOfficeLabel("mo_circuit_judge", "Circuit Judge, 45 Judicial Circuit");
+  const a = pluralOfficeLabel("mo_circuit_judge");
+  const b = pluralOfficeLabel("mo_circuit_judge");
   assert.equal(a, "Circuit Judges");
   assert.equal(a, b);
-  assert.equal(
-    pluralOfficeLabel("mo_associate_circuit_judge", "Associate Circuit Judge, 5 Judicial Circuit"),
-    "Associate Circuit Judges",
-  );
-  assert.equal(pluralOfficeLabel("state_senate", "State Senator"), "State Senators");
-  assert.equal(singularOfficeLabel("mo_associate_circuit_judge", "x"), "Associate Circuit Judge");
+  assert.equal(pluralOfficeLabel("mo_associate_circuit_judge"), "Associate Circuit Judges");
+  assert.equal(pluralOfficeLabel("state_senate"), "State Senators");
+  assert.equal(singularOfficeLabel("mo_associate_circuit_judge"), "Associate Circuit Judge");
   assert.equal(singularOfficeLabel("secretary_of_state"), "Secretary of State");
 });
 
-test("unknown office falls back to the title minus its circuit qualifier", async () => {
+test("unknown office is labelled from the key's words only", async () => {
   const { pluralOfficeLabel } = await import("../src/lib/awardBadges.ts");
-  assert.equal(pluralOfficeLabel("new_judge", "Probate Judge, 7 Judicial Circuits"), "Probate Judges");
-  assert.equal(pluralOfficeLabel("new_judge", "Probate Judge, 7th Judicial Circuit"), "Probate Judges");
-  assert.equal(pluralOfficeLabel("county_clerk", "County Clerk"), "County Clerks");
-  assert.equal(pluralOfficeLabel("county_clerk"), "county_clerks");
+  assert.equal(pluralOfficeLabel("new_judge"), "New Judges");
+  assert.equal(pluralOfficeLabel("county_clerk"), "County Clerks");
+  assert.equal(pluralOfficeLabel("kc_mayor"), "Kc Mayors");
+  // known crude plural: not worth a real pluralizer; map the key in OFFICE_GROUP_LABELS instead
+  assert.equal(pluralOfficeLabel("appeals_east"), "Appeals Easts");
+});
+
+test("every office key in dim_official has a plural label", (t) => {
+  const dir = process.env.MOGOV_EXPORTS ?? path.join(process.cwd(), "..", "data", "exports");
+  const file = path.join(dir, "dim_official.csv");
+  if (!existsSync(file)) {
+    t.skip("no exports at MOGOV_EXPORTS");
+    return;
+  }
+  const [head, ...lines] = readFileSync(file, "utf8").trim().split(/\r?\n/);
+  const col = head.split(",").indexOf("office");
+  assert.ok(col >= 0);
+  const keys = new Set();
+  for (const l of lines) {
+    // dim_official quotes fields containing commas; walk the line honouring quotes.
+    const f = [];
+    let cur = "";
+    let q = false;
+    for (const ch of l) {
+      if (ch === '"') q = !q;
+      else if (ch === "," && !q) {
+        f.push(cur);
+        cur = "";
+      } else cur += ch;
+    }
+    f.push(cur);
+    if (f[col]) keys.add(f[col]);
+  }
+  assert.ok(keys.size > 5, "found office keys");
+  const missing = [...keys].filter((k) => !(k in OFFICE_GROUP_LABELS));
+  assert.deepEqual(missing, []);
+});
+
+test("buildOfficeGroups labels an unmapped office from its key words, never a holder's title", async () => {
+  const { buildOfficeGroups } = await import("../src/lib/lookback.ts");
+  const groups = buildOfficeGroups([
+    { office: "mo_circuit_judge", office_title: "Circuit Judge, 22 Judicial Circuit" },
+    { office: "county_clerk", office_title: "County Clerk, 7 Judicial Circuit" },
+    { office: "county_clerk", office_title: "County Clerk, 9 Judicial Circuit" },
+    { office: "kc_mayor", office_title: "Mayor of Kansas City" },
+  ]);
+  assert.deepEqual(groups.find((g) => g.key === "other").offices, [
+    ["county_clerk", "County Clerks"],
+    ["kc_mayor", "Kc Mayors"],
+  ]);
+  assert.deepEqual(groups.find((g) => g.key === "state_courts").offices, [
+    ["mo_circuit_judge", "Circuit judges"],
+  ]);
+});
+
+test("federal money-share badges say the FEC cycle and count cycles, not years", () => {
+  const lists = [
+    list("least_committee_money_share", "2026", [e("rep", 1, 4, 3, 900000)], "us_house", 10, "fec_cycle"),
+    list("least_committee_money_share", "2026", [e("st", 1, 4, 3, 9000)], "state_house"),
+  ];
+  const awards = currentAwards(lists, (o) => o);
+  const fed = awards.get("rep")[0];
+  assert.match(fed[2], /in the 2025–26 cycle:/);
+  assert.doesNotMatch(fed[2], /in 2026/);
+  const html = renderBadges([fed], "");
+  assert.match(html, /3 qualifying cycles in a row/);
+  assert.doesNotMatch(html, /qualifying years/);
+  const state = awards.get("st")[0];
+  assert.match(state[2], /in 2026:/);
+  assert.match(renderBadges([state], ""), /3 qualifying years in a row/);
+});
+
+test("federal calendar-year awards (attendance, most money) stay in years", () => {
+  const awards = currentAwards(
+    [list("most_committee_money", "2026", [e("rep", 1, 5, 2, 9)], "us_house", 10)],
+    (o) => o,
+  );
+  assert.match(awards.get("rep")[0][2], /in 2026:/);
+});
+
+test("a federal money-share list on an odd period (stale export) fails the build with a clear message", () => {
+  const ok = [
+    { office: "us_house", period: "2024", period_kind: "fec_cycle" },
+    { office: "us_senate", period: "lifetime", period_kind: "lifetime" },
+    { office: "state_house", period: "2025", period_kind: "year" },
+    { office: "us_house", period: "2025", period_kind: "year" },
+  ];
+  assert.doesNotThrow(() => assertCyclePeriods(ok));
+  assert.throws(
+    () => assertCyclePeriods([...ok, { office: "us_house", period: "2025", period_kind: "fec_cycle" }]),
+    /stale or inconsistent.*us_house 2025.*re-export/s,
+  );
 });

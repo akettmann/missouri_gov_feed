@@ -48,6 +48,12 @@ models:
     matches only count from the judge''s first known judicial start date (fct_office_history, else dim_official.current_term_start);
     without one, panel matches only. Attorney matches start at var case_history_min_year (default 1975): earlier
     namesakes aren''t them. Grain: one row per (official, role, cluster); matched_by says how.'
+- name: int_courtlistener__district_dockets
+  description: 'Federal district-court dockets (E.D. and W.D. Missouri) that have an assigned judge: filed and terminated
+    dates (null when the docket has none) and the days between. A docket whose termination date is before its filing
+    date has a negative duration (a source error): it is kept and flagged with ends_before_filed, and the judge
+    metric leaves it out. The state courts carry no judge or dates in the bulk export, so only the federal districts
+    are here. Grain: one row per federal district docket with an assigned judge.'
 - name: int_courtlistener__judge_disclosure_items
   description: 'Federal judges'' disclosure line items with the report they come from and the judge''s FJC id. Grain:
     one disclosed item per federal judge report.'
@@ -71,8 +77,11 @@ models:
     that SIC code''s major group falls in (seed sic_naics_sectors): naics_code is then the two-digit sector prefix,
     naics_description names the sector and the SIC code, and naics_source is ''sic''. naics_source is null when
     the facility has no usable code. A real NAICS code, even a non-primary one, is more precise than a two-digit
-    SIC-derived sector, and agrees with it on the sector for 92-98% of facilities. is_government: a federal site,
-    any owner-role organization typed as a government body (municipal, county, state, federal, district, tribal),
+    SIC-derived sector, and agrees with it on the sector for about 90% of facilities. Codes tied on tier and program
+    count go to the one in the SIC-derived sector (NAICS 31-33 count as one sector), then the lowest code. The SIC
+    sector counts only as a signal when the SIC code is not itself tied (same tier and program count) with a SIC
+    code in a different sector, and is not SIC 1629 (construction stormwater-permit noise). is_government: a federal
+    site, any owner-role organization typed as a government body (municipal, county, state, federal, district, tribal),
     or a facility or owner named like one ("City of ...", "... County", "... School District"; most organizations
     are typed UNKNOWN). The *_key columns are company_key names for matching donors. Grain: one row per geocoded
     EPA FRS facility.'
@@ -172,13 +181,26 @@ models:
     first name anywhere in the name ("Committee to Elect Caleb Rowden") never matches. When the MEC loader has run,
     its CF12 crosswalk (exact MECID<->candidate) should replace this. Grain: one row per (official, MEC committee)
     with a confidence label.'
+- name: int_mo_auditor__reports
+  description: 'State Auditor reports with their rating and the kind of entity audited. A report has a rating only
+    when its PDF carried the sentence "the overall performance of this entity was ..." (rating_status ''ok''); ''not_read''
+    means the loader never opened a PDF for it (financial statements, monthly filing reports, follow-ups, reports
+    before the 2012 summaries). rating_level orders the Auditor''s four levels (Excellent 4 ... Poor 1). entity_type:
+    ''statewide_office'' when the title starts with an audited statewide office (seed mo_auditor_statewide_entities),
+    ''county'' for a title ending in " County", else ''other'' (state agencies, cities, courts, schools, districts,
+    statewide reports). Only a statewide office is ever linked to an officeholder. Grain: one row per State Auditor
+    report, with its rating and audited entity type.'
+- name: int_mo_house__committee_memberships
+  description: 'House committee and subcommittee memberships per member and session, keyed to the person (person_key
+    from int_mo_house__member_identity). The member pages (stg_mo_house__member_committees) cover every session
+    but 253; for a session with no member-page rows the COMMITTEELIST export fills in (House members only, matched
+    on session + district). Grain: one row per (House session, member, committee).'
 - name: int_mo_house__member_identity
   description: 'Identity for each MO House member per session (House XML is authoritative for the House roster).
     person_key = the stable person id (int_officials__person_ids) of the key the seat match gave: an Open States
     id when the seat (district + date + surname) matches one person, otherwise mohouse:<House member id>, so people
     missing from Open States still get a key and a person split across several keys gets one. raw_person_key is
-    the key before that. Grain: one row per (House session, member) with a person_key. Grain: one row per (House
-    session, member) with a person_key.'
+    the key before that. Grain: one row per (House session, member) with a person_key.'
 - name: int_mo_house__member_seat_keys
   description: 'Seat-matched key for each MO House member per session (House XML is authoritative for the House
     roster). raw_person_key = Open States id when the seat (district + date + surname) matches one person, otherwise
@@ -199,14 +221,15 @@ models:
     adds the stable person_id. Two corrections to Open States: * a term starting in January counts from January
     1. Open States starts the 2017 class on January 11, but the session (and their votes) began January 4. * seed
     legislator_seat_corrections adds terms Open States lacks or cuts short (senators who left mid-term for statewide
-    office), each with its source. Grain: one row per Open States legislative seat-term, under the id Open States
-    gave.'
+    office), each with its source. source_start_date/source_end_date carry the dates exactly as Open States (or
+    the seed) gives them, without those adjustments (null start when undated; end 9999-12-31 while open). Grain:
+    one row per Open States legislative seat-term, under the id Open States gave.'
 - name: int_mo_legislators__seats
   description: 'Every Missouri legislative seat-term in Open States (current and retired people), keyed for matching:
     chamber, district number, surname key, and date range (open-ended where Open States has no date), plus person_id,
     the stable id of the person holding the seat (int_officials__person_ids). openstates_id stays the id Open States
     gave the term; use person_id wherever a seat holder becomes an official. Rows and corrections are those of int_mo_legislators__seat_terms.
-    Grain: one row per Open States legislative seat-term. Grain: one row per Open States legislative seat-term.'
+    Grain: one row per Open States legislative seat-term.'
 - name: int_mo_revisor__session_law_bills
   description: 'The bills named in the Revisor''s session-law citations: each RSMo section version''s history note
     and each repeal note, split into one row per (section version, act, bill). A history note lists the acts that
@@ -255,8 +278,12 @@ models:
     years with a House roster, from the House''s own roster (its raw seat-matched key: an Open States id or mohouse:<House
     member id>) and from Open States seat-terms (both chambers). A term counts for a year when it runs past January
     15 of it, and terms with an undated start are left out, as in int_officeholders__years. name_key is the id''s
-    own full name. Grain: one row per (alias_id, year, office, district). Grain: one row per (id as sourced, year,
-    office, district).'
+    own full name. term_start/term_end are the Open States term''s dates exactly as Open States gives them (DATE;
+    end 9999-12-31 while open; null for House roster rows, which carry only a year), so a rule can tell overlap
+    from succession. They are not the January-1 adjusted dates used for the year membership above: those would make
+    a January successor (from Jan 1) overlap a predecessor Open States ends on Jan 6-9. Known edge: the min(start)/max(end)
+    collapse per (alias_id, year, office, district) spans any gap if one id holds the same seat in two separate
+    terms in a year. Grain: one row per (id as sourced, year, office, district).'
 - name: int_officials__name_keys
   description: 'Normalized name variants per current official, for matching sources that only carry names (MEC committees,
     lobbyist reports, Wikidata labels, ratings). One row per (official, variant). Grain: one row per (official,
@@ -268,15 +295,28 @@ models:
     in int_officials__identity_terms gets one row: alias_id (as the source gave it) -> person_id (what the pipeline
     calls the person). Rules, in order: 1. seed official_id_links, same_person: a curated id for a person the name
     rule can''t join (statewide officers, judges). basis = curated. 2. ids with the same exact full name (case,
-    punctuation and spacing ignored) are one person, basis = name_continuity, unless two of them hold different
-    seats in more than one shared year. The same seat in the same year is how a split shows (Jean Evans, Joe Adams);
-    different seats across several shared years mean two people, while a single shared year is a hand-over between
-    seats. A pair listed as different_people in official_id_links also keeps that whole name apart. 3. otherwise
-    the id is its own person, basis = self. Among merged ids the person_id is an Open States id over mohouse:, then
-    the one whose service ends latest, then the smaller id. The choice never looks at the latest roster year, so
-    an official''s id does not change when they leave office. Curated rows (official_id_links) take effect only
-    once a maintainer has signed them off (checked_by filled). Grain: one row per alias_id. Grain: one row per id
-    a legislator has been given, with the stable person_id.'
+    punctuation and spacing ignored: "Van Schoiack" and "VanSchoiack" are one name, #228) are one person, basis
+    = name_continuity, unless two of them hold different seats in more than one shared year. The same seat in the
+    same year is how a split shows (Jean Evans, Joe Adams); different seats across several shared years mean two
+    people, while a single shared year is a hand-over between seats. A pair listed as different_people in official_id_links
+    also keeps that whole name apart. 2b. two names that differ only in the given name, one being the start of the
+    other ("Steve"/"Steven" Roberts, "Ken"/"Kenneth" Jamison; #263), are one person when each name belongs to exactly
+    one such pair and the names never hold different seats in the same year (across all ids of both names), and
+    either hold a seat at the same time (their dated terms in one seat overlap: start_a < end_b and start_b < end_a,
+    an open term ending 9999-12-31; the same start day overlaps, one term ending the day the other starts does not),
+    or follow each other within a year in a different chamber (a move, as Roberts went House to Senate). Overlap
+    alone is not enough: Open States often leaves a member who left mid-term with the normal term end, so a special-election
+    successor overlaps on paper (Silvey to 2018-12-31, Lauren Arthur from 2018-09-12, SD17). The shared-seat case
+    also needs one term to sit inside the other, or both to start the same day. Years alone cannot decide the shared-seat
+    case: Kenneth Jamison (2025 only) inside Ken Jamison (2025-26) is a duplicate, but Danielle Smith (2019 only,
+    or 2026 only after a special election) inside a Dan Smith successor''s span looks the same by year. Dates tell
+    them apart: Kenneth''s term is a stub that overlaps Ken''s, while a successor''s term starts on or after the
+    predecessor''s ends. Undated House-roster rows prove no overlap. A name left with more than one partner (a chain
+    or a fork) is ambiguous and joins nothing. 3. otherwise the id is its own person, basis = self. Among merged
+    ids the person_id is an Open States id over mohouse:, then the one whose service ends latest, then the smaller
+    id. The choice never looks at the latest roster year, so an official''s id does not change when they leave office.
+    Curated rows (official_id_links) take effect only once a maintainer has signed them off (checked_by filled).
+    Grain: one row per id a legislator has been given, with the stable person_id.'
 - name: int_officials__wikidata
   description: 'Wikidata QID per official: from roster cross-references when present, else a unique exact name match
     against living Missouri officeholders on Wikidata. Grain: one row per official with a Wikidata QID.'

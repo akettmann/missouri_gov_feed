@@ -2,16 +2,23 @@
 // Awards: the officials at each end of one measured number, within their own office. Each award sits next
 // to its opposite, shows the number and what it's out of, and links to the profile with the sources.
 import Layout from "../layouts/Layout.astro";
-import { AWARD_PAIRS, AWARDS, awardLists, type AwardList } from "../lib/exports/awards";
-import { officialIndex } from "../lib/exports/load";
-import { AWARD_ICONS, pluralOfficeLabel, singularOfficeLabel } from "../lib/awardBadges";
+import {
+  AWARD_PAIRS,
+  AWARDS,
+  awardLists,
+  cycleLabel,
+  isCycleList,
+  officeHasCycles,
+  periodWhen,
+  type AwardList,
+} from "../lib/exports/awards";
+import { AWARD_ICONS, outOfText, pluralOfficeLabel, singularOfficeLabel } from "../lib/awardBadges";
 import { count, money, pct, streakMarker } from "../lib/format";
 import { href } from "../lib/site";
 
 const lists = await awardLists();
-const titles = new Map((await officialIndex()).map((o) => [o.office, o.office_title ?? o.office]));
-const plural = (office: string) => pluralOfficeLabel(office, titles.get(office));
-const singular = (office: string) => singularOfficeLabel(office, titles.get(office));
+const plural = pluralOfficeLabel;
+const singular = singularOfficeLabel;
 const offices = [...new Set((lists ?? []).map((l) => l.office))].sort((a, b) =>
   singular(a).localeCompare(singular(b)),
 );
@@ -21,14 +28,6 @@ const periods = [
 ];
 const byKey = new Map((lists ?? []).map((l) => [`${l.award}|${l.office}|${l.period}`, l]));
 const value = (award: string, v: number) => (AWARDS[award].unit === "money" ? money(v) : pct(v));
-const outOf = (award: string, n: number | null) =>
-  n == null
-    ? ""
-    : AWARDS[award].outOf === "votes"
-      ? `of ${count(n)} votes`
-      : AWARDS[award].outOf === "raised"
-        ? `of ${money(n)} raised`
-        : "";
 const defaultOffice = offices.includes("state_house") ? "state_house" : offices[0];
 ---
 
@@ -52,7 +51,11 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
           Office
           <select name="office">
             {offices.map((o) => (
-              <option value={o} selected={o === defaultOffice}>
+              <option
+                value={o}
+                selected={o === defaultOffice}
+                data-cycles={officeHasCycles(lists ?? [], o) ? "1" : undefined}
+              >
                 {singular(o)}
               </option>
             ))}
@@ -62,16 +65,30 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
           Period
           <select name="period">
             {periods.map((p) => (
-              <option value={p}>{p === "lifetime" ? "All loaded years" : p}</option>
+              <option
+                value={p}
+                data-year={p === "lifetime" ? undefined : p}
+                data-cycle={
+                  p !== "lifetime" && Number(p) % 2 === 0
+                    ? `${p} (money share: ${cycleLabel(p)} FEC cycle)`
+                    : undefined
+                }
+              >
+                {p === "lifetime" ? "All loaded years" : p}
+              </option>
             ))}
           </select>
         </label>
       </form>
 
+      <p class="small muted js-only" id="cycle-note" hidden>
+        The money share for U.S. offices is listed under even years, as two-year FEC cycles.
+      </p>
+
       <noscript>
         <p class="card small muted">
-          The office and period pickers need JavaScript, so this shows {singular(defaultOffice)} for all
-          loaded years.
+          The office and period pickers need JavaScript, so this shows {plural(defaultOffice)} for all loaded
+          years.
         </p>
       </noscript>
 
@@ -101,12 +118,12 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
                             <h2>{AWARDS[list.award].name}</h2>
                             <p class="what">{AWARDS[list.award].title}</p>
                             <p class="small muted">
-                              Among {count(list.group_size)} {plural(list.office)}
-                              {period === "lifetime" ? ", all loaded years" : ` in ${period}`}
+                              Among {count(list.group_size)} {plural(list.office)}{" "}
+                              {periodWhen(period, isCycleList(list))}
                             </p>
                             <ol>
                               {list.entries.map((e) => {
-                                const marker = streakMarker(e.streak_years);
+                                const marker = streakMarker(e.streak_years, isCycleList(list));
                                 return (
                                   <li value={e.rank}>
                                     <a href={href(`/officials/${e.slug}/`)}>{e.name}</a>
@@ -119,7 +136,7 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
                                     <span class="muted small"> {e.party ?? ""}</span>
                                     <span class="v">
                                       {value(list.award, e.metric)}{" "}
-                                      <span class="muted small">{outOf(list.award, e.sample_size)}</span>
+                                      <span class="muted small">{outOfText(list.award, e.sample_size)}</span>
                                     </span>
                                   </li>
                                 );
@@ -141,8 +158,9 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
         <p class="small muted">
           Icons beside an official's name elsewhere on the site mean they hold that award now (the lists above
           are the awards, so they leave the icons off): they rank within the award's cutoff among those with
-          the same office in the latest year loaded (party-break awards use all loaded years). X2, X3 and so
-          on is the number of qualifying years in a row. The icons are placeholders.
+          the same office in the latest year loaded. X2, X3 and so on is the number of qualifying years in a
+          row (qualifying cycles, for the federal money share, which is ranked per two-year FEC cycle). The
+          icons are placeholders.
         </p>
         <dl>
           {AWARD_PAIRS.flat().map((a) => (
@@ -176,6 +194,21 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
       const el = form.elements.namedItem(k);
       if (el instanceof HTMLSelectElement && [...el.options].some((o) => o.value === v)) el.value = v;
     }
+    // Federal offices rank the money share per two-year FEC cycle: say so in the period picker.
+    const officeSel = form.elements.namedItem("office") as HTMLSelectElement;
+    const periodSel = form.elements.namedItem("period") as HTMLSelectElement;
+    const relabel = () => {
+      const federal = officeSel.selectedOptions[0]?.dataset.cycles === "1";
+      for (const o of periodSel.options)
+        if (o.dataset.year) o.textContent = federal ? (o.dataset.cycle ?? o.dataset.year) : o.dataset.year;
+      // Odd years have no federal money-share list: say why instead of leaving the card silently absent.
+      const year = Number(periodSel.value);
+      const note = document.getElementById("cycle-note");
+      if (note) note.hidden = !(federal && Number.isInteger(year) && year % 2 === 1);
+    };
+    periodSel.addEventListener("change", relabel);
+    officeSel.addEventListener("change", relabel);
+    relabel();
     form.addEventListener("change", apply);
     apply();
   }

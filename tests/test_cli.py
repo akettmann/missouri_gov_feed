@@ -99,3 +99,16 @@ def test_build_help_documents_vars_merge_semantics(monkeypatch, capsys):
     with pytest.raises(SystemExit):
         cli.main()
     assert "merged (shallow)" in capsys.readouterr().out
+
+
+def test_run_dbt_placeholder_warning_names_the_loader_to_run(monkeypatch):
+    import structlog.testing
+
+    _dbt_cmd(monkeypatch, ["build"])  # wires the subprocess/raw_exists stubs
+    monkeypatch.setattr(cli.db, "ensure_optional_tables", lambda: ["epa_frs_sic"])
+    with structlog.testing.capture_logs() as logs:
+        assert cli.run_dbt(["build"]) == 0
+    (warning,) = [e for e in logs if e["event"] == "dbt.placeholder"]
+    assert warning["table"] == "raw.epa_frs_sic"
+    assert warning["loader"] == "epa_frs"
+    assert "mogov load epa_frs" in warning["reason"]

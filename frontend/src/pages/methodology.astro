@@ -157,18 +157,95 @@ const tables = freshness();
     </p>
   </section>
 
+  <section class="card" id="per-diem-mileage">
+    <h2>Per diem and mileage</h2>
+    <p>
+      State legislators' profiles show the per diem (legislative daily expense allowance) and in-state mileage
+      the state paid them, from the Missouri Accountability Portal's "State Expenditures" datasets on
+      data.mo.gov (agency LEGISLATURE).
+    </p>
+    <ul>
+      <li>
+        <strong>Years</strong> are state fiscal years, July to June: FY2026 is July 2025 to June 2026.
+      </li>
+      <li>
+        <strong>Amounts</strong> are what the state paid, not what was claimed, and each is one payee's total
+        for the fiscal year and line, not one payment. Per diem is claimed for days attended and mileage
+        follows the distance from the district to the Capitol, so neither measures performance; mileage is
+        shown as context only.
+      </li>
+      <li>
+        <strong>Matching</strong>: the state lists legal names ("ATCHISON, FRANKLIN DARRELL"), so a payee is
+        matched to an official through the state payroll, which prints the same names. A payee whose name fits
+        more than one legislator is left out, and a looser fit (a nickname fit, or a surname shared with
+        another legislator) is flagged "possible match". Only people who hold an office on this site today are
+        matched, so a year can be missing because the payee was not matched, not because nothing was paid.
+      </li>
+    </ul>
+  </section>
+
+  <section class="card" id="pay-per-vote">
+    <h2>Pay per vote attended</h2>
+    <p>
+      Under the attendance chart, each official's pay is divided by the votes they attended, for each calendar
+      year and for the years together. Both halves are counted over the same calendar year, using the date of
+      each vote, so a year's regular and extraordinary sessions are one row and a Congress is split across its
+      two years.
+    </p>
+    <ul>
+      <li>
+        <strong>Votes attended</strong>: recorded votes where the official voted yea, nay or present, the same
+        count attendance is based on. Absences, "not voting" and Senate Rule 91 recusals are not attended, so
+        a recusal does not count here (whether it should is an open question).
+      </li>
+      <li>
+        <strong>Pay</strong>, for Missouri officials: gross pay from the state payroll (data.mo.gov, 2017
+        onward), meaning everything the payroll shows as paid in that calendar year, not the base salary.
+        Several payroll rows in a year, such as a member and a leadership title, are added together. Names on
+        the payroll are matched to officials, and unmatched or ambiguous rows are left out. A year whose pay
+        rests on a name-only match is flagged "possible match", and hiding possible matches also drops it from
+        the total. For members of Congress it is the statutory annual salary of the office, because federal
+        pay is not published per person; the year still in progress is left out until it ends, and a member
+        who joined mid-year is shown with the full annual salary.
+      </li>
+      <li>
+        <strong>Totals</strong>: the sum of pay over the years that have both pay and votes, divided by the
+        votes attended in those same years. A year with votes but no pay counted (all years before 2017, a
+        year the payroll has not published yet, a federal year still in progress, or an official whose payroll
+        rows could not be matched) is shown but left out of the total, and the note under the table says how
+        many years that left out.
+      </li>
+      <li>
+        <strong>A dash</strong> means there is no figure: no pay counted, or no attended vote that year.
+      </li>
+    </ul>
+    <p>
+      The figure divides a whole year's pay by roll-call votes only. It is not an hourly rate or a price per
+      day of work: members also do committee work and constituent work that no vote records, and a chamber
+      with more roll calls in a year gives a smaller number. A Missouri legislator who started or left
+      mid-year has only the pay actually received, so a partial year can look high. For Congress a partial
+      year counts the full annual salary against only the votes cast, which also inflates the figure. Compare
+      it between officials and years with that in mind.
+    </p>
+  </section>
+
   <section class="card" id="awards">
     <h2>Awards</h2>
     <p>
-      Each award ranks one number that also appears on the profiles, among officials holding the same office,
-      and comes with its opposite (lowest and highest attendance, and so on). Ties share a rank. The top five
-      qualify unless an award sets its own cutoff (the awards_threshold setting). An office needs at least
-      five qualifying officials in a period, so single-seat offices like governor have no awards. An official
-      who qualified for the same award in consecutive years gets a marker such as X3 (3 qualifying years in a
-      row). Years the official wasn't ranked for that award (in another office, not eligible for the measure,
-      or too few officials to rank) are skipped: they neither add to nor break the run, so the years in a run
-      can span more calendar years than the number shown. A year ranked outside the cutoff breaks it. Lifetime
-      rankings have no marker.
+      Each award ranks one measured number, among officials holding the same office, and comes with its
+      opposite (lowest and highest attendance, and so on). Ranks use the unrounded figure, so two officials
+      shown at the same rounded percentage can hold different ranks; only exact ties share a rank (this holds
+      for every award, including the lowest share of money from PACs, committees and parties). The top five
+      qualify unless an award sets its own cutoff (the awards_threshold setting). For the attendance and
+      party-unity pairs, which rank one number over one field, each end's cutoff is at most half the field
+      (ties at the cutoff can add more), and an official tied into both lists is left out of both, so nobody
+      holds both ends of a pair in one period. An office needs at least five qualifying officials in a period,
+      so single-seat offices like governor have no awards. An official who qualified for the same award in
+      consecutive years gets a marker such as X3 (3 qualifying years in a row; for the federal money share, 3
+      qualifying cycles in a row). Years the official wasn't ranked for that award (in another office, not
+      eligible for the measure, or too few officials to rank) are skipped: they neither add to nor break the
+      run, so the years in a run can span more calendar years than the number shown. A year ranked outside the
+      cutoff breaks it. Lifetime rankings have no marker.
     </p>
     <ul>
       <li>
@@ -179,11 +256,19 @@ const tables = freshness();
         <strong>Money from PACs, committees and parties</strong>: dollars received from them, and (the
         opposite) the lowest share of all money raised, among officials raising at least $10,000. The Missouri
         Ethics Commission files PACs as committees, so the two are counted together. Name-only matches are
-        left out.
+        left out. For members of Congress the share is per two-year FEC cycle (shown as, for example, "the
+        2025–26 cycle"; the period picker lists it under 2026), so it has no odd-year rows. Its denominator is
+        the FEC's total receipts for the cycle, which include loans and transfers as well as contributions (a
+        known limitation), and a cycle with no FEC total gets no share. The most-money award for federal
+        officials still counts calendar years.
       </li>
       <li>
-        <strong>Party loyalty</strong>: party unity over all loaded votes in the official's current chamber;
-        there is no per-year figure.
+        <strong>Party loyalty</strong>: party unity (the share of party-line votes cast with the official's
+        own party) in the official's current chamber, per calendar year and over all loaded votes, with the
+        number of party-line votes it rests on shown beside it. Needs at least 20 party-line votes in the
+        period (the awards_min_party_line_votes setting, default 20). Maverick needs at least one vote against
+        the party. The lifetime figure is the same number the profile page shows; yearly figures appear with
+        the award only.
       </li>
     </ul>
   </section>

@@ -29,3 +29,8 @@ sources:
   - name: sic
     identifier: epa_frs_sic
     description: One row per (facility, program record, SIC code) (MO_SIC_FILE.CSV).
+  - name: alt_names
+    identifier: epa_frs_alt_names
+    description: >
+      One row per (facility, program record, alternative name) (MO_ALTERNATIVE_NAME_FILE.CSV). Absent from raw
+      directories landed before it joined the loader (an empty placeholder is created by `mogov build`).

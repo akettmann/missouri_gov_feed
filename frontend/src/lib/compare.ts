@@ -1,10 +1,11 @@
 // Side-by-side rows for the compare page, computed from two per-official bundles. Pure (runs in the browser).
 // Every row is one measured or published number; nothing is combined into a score.
-import { businessCounts, donorsText, sitesText } from "./businessCounts";
+import { payPerVote, payPerVoteSources } from "./comparePay.ts";
+import { businessCounts, donorsText, plural, sitesText } from "./businessCounts.ts";
 import type { OfficialBundle } from "./exports/types";
-import { count, HIDE_UNLESS_AVAILABLE, money, pct, statusKind } from "./format";
-import { indicatorMeta } from "./indicators";
-import { withoutMedium } from "./rollups";
+import { count, HIDE_UNLESS_AVAILABLE, money, pct, statusKind } from "./format.ts";
+import { indicatorMeta } from "./indicators.ts";
+import { withoutMedium } from "./rollups.ts";
 
 export interface CompareRow {
   section: string;
@@ -13,6 +14,12 @@ export interface CompareRow {
   values: string[];
   /** short caveat shown under the label */
   note?: string;
+  /** a site path (no base) linked after the note, e.g. the methodology section */
+  noteHref?: string;
+  /** the text of the noteHref link; required with it, so a row cannot pick up another row's wording */
+  noteLinkText?: string;
+  /** per official (same order as values): links to where that cell's figure came from */
+  valueLinks?: { text: string; href: string; context?: string }[][];
 }
 
 const NA = "—";
@@ -68,7 +75,7 @@ function giftCells(b: OfficialBundle, hideMedium: boolean): [string, string] {
     byPrincipal.set(r.lobbyist_principal, (byPrincipal.get(r.lobbyist_principal) ?? 0) + r.total_amount);
   const [top] = [...byPrincipal].sort((x, y) => y[1] - x[1]);
   const sample = b.gifts.sample ? " (sample data)" : "";
-  return [`${money(total)} in ${count(n)} gifts${sample}`, `${top[0]} (${money(top[1])})`];
+  return [`${money(total)} in ${plural(n, "gift", "gifts")}${sample}`, `${top[0]} (${money(top[1])})`];
 }
 
 export function compareRows(bundles: OfficialBundle[], hideMedium: boolean): CompareRow[] {
@@ -94,6 +101,24 @@ export function compareRows(bundles: OfficialBundle[], hideMedium: boolean): Com
   const att = bundles.map(attendance);
   rows.push({ section: "Voting", label: "Attendance, all loaded sessions", values: att.map((a) => a[0]) });
   rows.push({ section: "Voting", label: "Attendance, latest session", values: att.map((a) => a[1]) });
+
+  const pay = bundles.map((b) => payPerVote(b, hideMedium));
+  const payNote =
+    "Pay divided by votes attended. State officials: gross pay from the state payroll. U.S. Congress: the statutory salary of the office. These are different measures, so compare within one basis.";
+  rows.push({
+    section: "Voting",
+    label: "Pay per vote attended, covered years",
+    values: pay.map((x) => x[0]),
+    note: payNote,
+    noteHref: "/methodology/#pay-per-vote",
+    noteLinkText: "How pay per vote is counted",
+    valueLinks: bundles.map(payPerVoteSources),
+  });
+  rows.push({
+    section: "Voting",
+    label: "Pay per vote attended, latest year with pay",
+    values: pay.map((x) => x[1]),
+  });
 
   const m = bundles.map((b) => moneyCells(b, hideMedium));
   rows.push({ section: "Money in", label: "Received, all loaded years", values: m.map((x) => x[0]) });

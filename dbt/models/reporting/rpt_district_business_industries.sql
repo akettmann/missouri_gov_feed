@@ -2,7 +2,8 @@
 -- by NAICS sector (first two digits of naics_code: the site's NAICS code, or for a site with only a SIC code the
 -- NAICS sector that SIC code maps to), with how many of them are tied to a donor. A house district can hold
 -- 1,400 sites and a U.S. House district 10,000, too many to list on a page; the donor sites themselves come
--- from the mart. Sites with neither code (about 44%) are counted under "No industry code".
+-- from the mart. Sites with neither code (about 45% of (official, site) rows) are counted under
+-- "No industry code".
 select
     b.official_id,
     s.sector_code,

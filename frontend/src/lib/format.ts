@@ -22,13 +22,15 @@ export function statusKind(status: string): "available" | "none" | "not-public" 
   return "none";
 }
 
-/** MO House codes are two-digit year + type (1 regular, 2-4 extraordinary); Senate uses the year; Congress its number. */
-export function sessionLabel(chamber: string, code: string): string {
+/**
+ * The one session label. A House session is named by the House itself (dim_house_session: "2025 1st
+ * Extraordinary Session", "2018 Special Session"), because the numbering of its extraordinary sessions is
+ * irregular and no rule on the code works. When the name is missing the label says so ("session code 261")
+ * rather than guessing a number. The Senate's session is its year; Congress its number.
+ */
+export function sessionLabel(chamber: string, code: string, houseName?: string | null): string {
   if (chamber.startsWith("us_")) return `${code}th Congress`;
-  if (chamber === "state_house" && /^\d{3}$/.test(code)) {
-    const year = `20${code.slice(0, 2)}`;
-    return code[2] === "1" ? `${year} regular` : `${year} extraordinary ${Number(code[2]) - 1}`;
-  }
+  if (chamber === "state_house") return houseName || `session code ${code}`;
   return code;
 }
 
@@ -105,10 +107,16 @@ export function yearRanges(years: number[]): string {
   return out.join(", ");
 }
 
-/** Streak marker for an award: "X3" with a spoken label "3 qualifying years in a row"; null below 2 (no marker). */
-export function streakMarker(years: number | null | undefined): { text: string; label: string } | null {
+/**
+ * Streak marker for an award: "X3" with a spoken label "3 qualifying years in a row" (or "3 qualifying cycles
+ * in a row" when the streak counts two-year FEC cycles); null below 2 (no marker).
+ */
+export function streakMarker(
+  years: number | null | undefined,
+  cycles = false,
+): { text: string; label: string } | null {
   if (years == null || years < 2) return null;
-  return { text: `X${years}`, label: `${years} qualifying years in a row` };
+  return { text: `X${years}`, label: `${years} qualifying ${cycles ? "cycles" : "years"} in a row` };
 }
 
 /** Plain names for the roster sources behind rpt_officeholders_by_year; unknown values show as given. */

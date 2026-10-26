@@ -1,0 +1,178 @@
+# Unit tests for the election marts (#287): fixed staged results -> exact expected races and retention rows.
+# Kept apart from _marts__unit_tests.yml.
+version: 2
+
+unit_tests:
+  - name: election_races_margin_uncontested_write_ins_and_winner_link
+    model: fct_election_races
+    description: >
+      Governor 2024: write-ins count in the total and the shares but not as a candidate or runner-up, margin is
+      winner minus runner-up in votes and in points of the total. A lone candidate with a write-in is uncontested
+      (no runner-up, no margin) and links to the current official despite the "Jr." suffix; the same name in
+      another district does not link. A retention contest never becomes a race.
+    given:
+      - input: ref('stg_mo_sos_elections__results')
+        format: csv
+        rows: |
+          election_key,election_type,election_date,contest_seq,subcontest_seq,contest_title,office,district,contest_kind,choice_kind,choice_name,party,is_write_in,votes,pct_printed,has_party_totals,precincts_reported,precincts_total,pdf_url
+          e1,general,2024-11-05,1,0,Governor,Governor,,candidate,candidate,Pat Doe,Republican,false,600,60.0,false,10,10,u
+          e1,general,2024-11-05,1,0,Governor,Governor,,candidate,candidate,Lee Roe,Democratic,false,300,30.0,false,10,10,u
+          e1,general,2024-11-05,1,0,Governor,Governor,,candidate,candidate,Ann Moe,Write-in,true,100,10.0,false,10,10,u
+          e1,general,2024-11-05,2,0,State Representative - District 5,State Representative,5,candidate,candidate,Sam Roe Jr.,Republican,false,100,99.0,false,4,4,u
+          e1,general,2024-11-05,2,0,State Representative - District 5,State Representative,5,candidate,candidate,Zed Writein,Write-in,true,1,1.0,false,4,4,u
+          e1,general,2024-11-05,3,0,State Representative - District 6,State Representative,6,candidate,candidate,Sam Roe,Republican,false,50,100.0,false,4,4,u
+          e1,general,2024-11-05,4,1,Missouri Supreme Court,Missouri Supreme Court,,retention,yes,Judge A,,false,70,70.0,false,4,4,u
+          e1,general,2024-11-05,4,1,Missouri Supreme Court,Missouri Supreme Court,,retention,no,Judge A,,false,30,30.0,false,4,4,u
+      - input: ref('int_officials__current')
+        format: csv
+        rows: |
+          official_id,office,district
+          off_gov,governor,
+          off_rep5,state_house,5
+      - input: ref('int_officials__name_keys')
+        format: csv
+        rows: |
+          official_id,variant_key
+          off_gov,pat doe
+          off_rep5,sam roe
+      - input: ref('election_office_keys')
+        format: csv
+        rows: |
+          office,official_office
+          Governor,governor
+          State Representative,state_house
+          U.S. Senator,us_senate
+    expect:
+      format: csv
+      rows: |
+        contest_seq,candidates,is_uncontested,total_votes,write_in_votes,write_in_share,winner_name,winner_votes,winner_share,runner_up_name,runner_up_votes,margin_votes,margin_pct,winner_official_id
+        1,2,false,1000,100,10.00,Pat Doe,600,60.00,Lee Roe,300,300,30.00,off_gov
+        2,1,true,101,1,0.99,Sam Roe Jr.,100,99.01,,,,,off_rep5
+        3,1,true,50,0,0.00,Sam Roe,50,100.00,,,,,
+
+  - name: election_races_primary_is_one_race_per_party_ballot
+    model: fct_election_races
+    description: >
+      A primary contest lists several parties' candidates: each party's ballot is its own race, so a lone
+      Republican is uncontested while the two Democrats have a margin within their own ballot.
+    given:
+      - input: ref('stg_mo_sos_elections__results')
+        format: csv
+        rows: |
+          election_key,election_type,election_date,contest_seq,subcontest_seq,contest_title,office,district,contest_kind,choice_kind,choice_name,party,is_write_in,votes,pct_printed,has_party_totals,precincts_reported,precincts_total,pdf_url
+          p1,primary,2024-08-06,1,0,U.S. Senator,U.S. Senator,,candidate,candidate,Rita Rep,Republican,false,500,100.0,true,9,9,u
+          p1,primary,2024-08-06,1,0,U.S. Senator,U.S. Senator,,candidate,candidate,Dan Dem,Democratic,false,150,75.0,true,9,9,u
+          p1,primary,2024-08-06,1,0,U.S. Senator,U.S. Senator,,candidate,candidate,Dee Dem,Democratic,false,50,25.0,true,9,9,u
+      - input: ref('int_officials__current')
+        format: csv
+        rows: |
+          official_id,office,district
+          off_x,us_senate,
+      - input: ref('int_officials__name_keys')
+        format: csv
+        rows: |
+          official_id,variant_key
+          off_x,somebody else
+      - input: ref('election_office_keys')
+        format: csv
+        rows: |
+          office,official_office
+          U.S. Senator,us_senate
+    expect:
+      format: csv
+      rows: |
+        race_party,candidates,is_uncontested,total_votes,winner_name,winner_votes,winner_share,runner_up_name,margin_votes,margin_pct,winner_official_id
+        Republican,1,true,500,Rita Rep,500,100.00,,,,
+        Democratic,2,false,200,Dan Dem,150,75.00,Dee Dem,100,50.00,
+
+  - name: election_races_special_election_on_primary_day_is_one_race_across_parties
+    model: fct_election_races
+    description: >
+      A special election held on primary day prints no Party Total lines (has_party_totals false): its candidates
+      are one race, so the leading candidate beats the other party's candidate by a margin instead of each party's
+      lone candidate being a separate uncontested race. The ordinary primary contest with Party Totals (the same
+      district) still splits by party.
+    given:
+      - input: ref('stg_mo_sos_elections__results')
+        format: csv
+        rows: |
+          election_key,election_type,election_date,contest_seq,subcontest_seq,contest_title,office,district,contest_kind,choice_kind,choice_name,party,is_write_in,votes,pct_printed,has_party_totals,precincts_reported,precincts_total,pdf_url
+          p1,primary,2014-08-05,1,0,State Representative - District 67,State Representative,67,candidate,candidate,Gus Green,Democratic,false,300,100.0,true,9,9,u
+          p1,primary,2014-08-05,1,0,State Representative - District 67,State Representative,67,candidate,candidate,Rex Strick,Republican,false,60,100.0,true,9,9,u
+          p1,primary,2014-08-05,2,0,"State Representative - District 67, unexpired",State Representative,67,candidate,candidate,Gus Green,Democratic,false,600,70.0,false,9,9,u
+          p1,primary,2014-08-05,2,0,"State Representative - District 67, unexpired",State Representative,67,candidate,candidate,Rex Strick,Republican,false,200,23.3,false,9,9,u
+          p1,primary,2014-08-05,2,0,"State Representative - District 67, unexpired",State Representative,67,candidate,candidate,Lou Coleman,Libertarian,false,60,6.7,false,9,9,u
+      - input: ref('int_officials__current')
+        format: csv
+        rows: |
+          official_id,office,district
+          off_x,state_house,1
+      - input: ref('int_officials__name_keys')
+        format: csv
+        rows: |
+          official_id,variant_key
+          off_x,somebody else
+      - input: ref('election_office_keys')
+        format: csv
+        rows: |
+          office,official_office
+          State Representative,state_house
+    expect:
+      format: csv
+      rows: |
+        contest_seq,race_party,candidates,is_uncontested,total_votes,winner_name,winner_votes,runner_up_name,runner_up_votes,margin_votes
+        1,Democratic,1,true,300,Gus Green,300,,,
+        1,Republican,1,true,60,Rex Strick,60,,,
+        2,,3,false,860,Gus Green,600,Rex Strick,200,400
+
+  - name: judicial_retention_pairs_yes_and_no_and_applies_the_majority_rule
+    model: fct_judicial_retention
+    description: >
+      Each judge's Yes and No rows become one row; a judge is retained with more Yes than No votes, not by the rounded printed share (50.0 either way; a missing
+      share still decides), falling back to the printed share when No is lost (49.9 is not); a lost No
+      line leaves no_votes and no_pct null. A current Supreme Court judge with the same name links; candidates
+      and ballot measures are not retention rows.
+    given:
+      - input: ref('stg_mo_sos_elections__results')
+        format: csv
+        rows: |
+          election_key,election_type,election_date,contest_seq,subcontest_seq,contest_title,office,district,contest_kind,choice_kind,choice_name,party,is_write_in,votes,pct_printed,has_party_totals,precincts_reported,precincts_total,pdf_url
+          e1,general,2024-11-05,1,1,Missouri Supreme Court,Missouri Supreme Court,,retention,yes,Kelly C. Broniec,,false,600,60.0,false,10,10,u
+          e1,general,2024-11-05,1,1,Missouri Supreme Court,Missouri Supreme Court,,retention,no,Kelly C. Broniec,,false,400,40.0,false,10,10,u
+          e1,general,2024-11-05,2,1,Court of Appeals - Eastern District,Court of Appeals,,retention,yes,Judge B,,false,499,49.9,false,10,10,u
+          e1,general,2024-11-05,2,1,Court of Appeals - Eastern District,Court of Appeals,,retention,no,Judge B,,false,501,50.1,false,10,10,u
+          e1,general,2024-11-05,2,2,Court of Appeals - Eastern District,Court of Appeals,,retention,yes,Judge C,,false,591,59.1,false,10,10,u
+          e1,general,2024-11-05,2,3,Court of Appeals - Eastern District,Court of Appeals,,retention,yes,Judge D,,false,5001,50.0,false,10,10,u
+          e1,general,2024-11-05,2,3,Court of Appeals - Eastern District,Court of Appeals,,retention,no,Judge D,,false,4999,50.0,false,10,10,u
+          e1,general,2024-11-05,2,4,Court of Appeals - Eastern District,Court of Appeals,,retention,yes,Judge E,,false,4999,50.0,false,10,10,u
+          e1,general,2024-11-05,2,4,Court of Appeals - Eastern District,Court of Appeals,,retention,no,Judge E,,false,5001,50.0,false,10,10,u
+          e1,general,2024-11-05,2,5,Court of Appeals - Eastern District,Court of Appeals,,retention,yes,Judge F,,false,700,,false,10,10,u
+          e1,general,2024-11-05,2,5,Court of Appeals - Eastern District,Court of Appeals,,retention,no,Judge F,,false,300,,false,10,10,u
+          e1,general,2024-11-05,3,1,Amendment 1,Amendment 1,,ballot_issue,yes,Amendment 1,,false,5,50.0,false,10,10,u
+          e1,general,2024-11-05,4,0,Governor,Governor,,candidate,candidate,Pat Doe,Republican,false,5,100.0,false,10,10,u
+      - input: ref('int_officials__current')
+        format: csv
+        rows: |
+          official_id,office
+          judge_k,mo_supreme_court
+      - input: ref('int_officials__name_keys')
+        format: csv
+        rows: |
+          official_id,variant_key
+          judge_k,kelly c broniec
+      - input: ref('election_office_keys')
+        format: csv
+        rows: |
+          office,official_office
+          Missouri Supreme Court,mo_supreme_court
+          Court of Appeals,mo_court_of_appeals
+    expect:
+      format: csv
+      rows: |
+        contest_seq,subcontest_seq,judge_name,yes_votes,no_votes,yes_pct,no_pct,is_retained,judge_official_id
+        1,1,Kelly C. Broniec,600,400,60.0,40.0,true,judge_k
+        2,1,Judge B,499,501,49.9,50.1,false,
+        2,2,Judge C,591,,59.1,,true,
+        2,3,Judge D,5001,4999,50.0,50.0,true,
+        2,4,Judge E,4999,5001,50.0,50.0,false,
+        2,5,Judge F,700,300,,,true,

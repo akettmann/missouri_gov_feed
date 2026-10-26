@@ -2,8 +2,7 @@
 -- chamber, district number, surname key, and date range (open-ended where Open States has no date), plus
 -- person_id, the stable id of the person holding the seat (int_officials__person_ids). openstates_id stays the id
 -- Open States gave the term; use person_id wherever a seat holder becomes an official.
--- Rows and corrections are those of int_mo_legislators__seat_terms. Grain: one row per Open States legislative
--- seat-term.
+-- Rows and corrections are those of int_mo_legislators__seat_terms.
 select
     t.openstates_id,
     t.full_name,

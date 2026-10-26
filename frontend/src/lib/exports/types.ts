@@ -1,6 +1,10 @@
 // Shapes of the per-official bundle the build emits (one prerendered page + one JSON per official).
 // Column names follow the dbt marts / planned rpt_* contracts so a real export can replace a fixture as-is.
 
+import type { PayVoteRow } from "../attendancePay";
+import type { LegislatorExpenseRow } from "../legislatorExpenses";
+import type { CommitteeSession } from "../committeePosts";
+
 export type Confidence = string; // 'exact id' | 'exact (MEC crosswalk)' | 'high' | 'medium' | ...
 
 export interface Official {
@@ -162,6 +166,8 @@ export interface PeerStrip {
 export interface PartyBreak {
   chamber: string;
   session_code: string;
+  /** the House's name for the session (dim_house_session); null for other chambers or an unlisted session */
+  session_name: string | null;
   vote_date: string;
   measure: string | null;
   vote_description: string | null;
@@ -179,6 +185,8 @@ export interface PartyBreak {
 export interface AttendanceRow {
   chamber: string;
   session_code: string;
+  /** the House's name for the session (dim_house_session); null for other chambers or an unlisted session */
+  session_name: string | null;
   first_vote_date: string | null;
   last_vote_date: string | null;
   votes_recorded: number;
@@ -251,7 +259,8 @@ export interface DistrictDonor {
   last_year: number | null;
   /** about who received the money (medium = tied to the official by name only), not the site match */
   match_confidence: string;
-  contributions_url: string | null;
+  /** one `<url> <donor name>` line per donor and filing page; see lib/donorLinks parseDonorLinks */
+  donor_links: string | null;
   sites: {
     facility_name: string | null;
     city: string | null;
@@ -277,6 +286,18 @@ export interface Dataset<T> {
   rows: T[];
 }
 
+/** One fct_judge_time_to_disposition row: median days from filing to termination of the dockets assigned to a judge. */
+export interface TimeToDisposition {
+  cl_person_id: string;
+  court_id: string;
+  dockets_assigned: number;
+  dockets_with_both_dates: number;
+  dockets_ends_before_filed: number;
+  dockets_measured: number;
+  share_with_both_dates: number;
+  median_days_to_disposition: number | null;
+}
+
 export interface OfficialBundle {
   official: Official;
   coverage: CoverageItem[];
@@ -287,13 +308,19 @@ export interface OfficialBundle {
     /** null when the rpt_* export is missing (section says so instead of showing nothing) */
     party_breaks: PartyBreak[] | null;
     attendance: AttendanceRow[] | null;
+    /** rpt_attendance_pay: pay per vote attended by year and in total; null when the export is missing */
+    attendance_pay: PayVoteRow[] | null;
     /** the subjects with the most roll calls (top 20) */
     by_subject: SubjectVotes[] | null;
   };
   /** null when the rpt_interest_vote_overlap export is missing */
   overlap: InterestOverlap[] | null;
+  /** House committee posts by session, newest first; null when either committee export is missing */
+  committees: CommitteeSession[] | null;
   courts: {
     status: string;
+    /** federal district judges only (fct_judge_time_to_disposition); null for everyone else or when the export is missing */
+    time_to_disposition: TimeToDisposition | null;
     /** cases per filing year and role; null when the export is missing */
     by_year: { year: number; role: string; cases: number }[] | null;
     total: number;
@@ -323,6 +350,8 @@ export interface OfficialBundle {
     committee_trails: CommitteeTrail[] | null;
   };
   gifts: Dataset<GiftRollupRow>;
+  /** per diem and mileage by state fiscal year (fct_legislator_expenses); null when the export is missing or empty (state expenditures not loaded) */
+  expenses: LegislatorExpenseRow[] | null;
   /**
    * Businesses in the official's district or city; null when either export is missing. Officials elected
    * statewide (and judges) have no area, so both lists are empty.
@@ -406,7 +435,7 @@ export interface SiteRow {
   /** donor names as filed, "; "-separated */
   donor_names: string | null;
   match_confidence: "high" | "medium" | null;
-  /** where the matched contributions are filed */
-  contributions_url: string | null;
+  /** where each matched donor's contributions are filed: `<url> <donor name>` lines, see parseDonorLinks */
+  donor_links: string | null;
   frs_url: string | null;
 }

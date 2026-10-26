@@ -70,7 +70,7 @@ const path = (polygons: Ring[][]) =>
           data-cos={COS}
         >
           {data.map.map((c) => (
-            <path d={path(c.polygons)}>
+            <path d={path(c.polygons)} data-id={c.district_id}>
               <title>{c.name}</title>
             </path>
           ))}
@@ -83,7 +83,7 @@ const path = (polygons: Ring[][]) =>
       </div>
       <!-- hidden until the script runs, so without JavaScript the empty card never shows -->
       <div class="card results empty" id="results" hidden>
-        <h2>Your officials</h2>
+        <h2 id="results-title">Your officials</h2>
         <div id="groups">
           <p class="muted placeholder">
             Your officials will appear here once you enter a ZIP code, share your location, or click the map,
@@ -102,7 +102,8 @@ const path = (polygons: Ring[][]) =>
 </Layout>
 
 <script>
-  import { lookup, lookupZip, type Lookup } from "../scripts/find";
+  import { lookup, lookupCounty, lookupZip, type Lookup } from "../scripts/find";
+  import { countyDistrictId, countyFips, findHref, parseFindParams, withShareNote } from "../lib/findUrl";
 
   const map = document.querySelector<SVGSVGElement>("#map");
   const status = document.getElementById("status")!;
@@ -121,16 +122,44 @@ const path = (polygons: Ring[][]) =>
     pin.setAttribute("cx", String((lon - Number(d.minLon)) * Number(d.cos) * Number(d.k)));
     pin.setAttribute("cy", String((Number(d.maxLat) - lat) * Number(d.k)));
   }
+  /** "exact": a point or ZIP result ("Your officials"); otherwise the county view, outlined on the map. */
+  function setMode(countyId: string | null, title = "Your officials") {
+    document.getElementById("results-title")!.textContent = title;
+    map?.querySelector(".picked")?.classList.remove("picked");
+    if (countyId) {
+      if (pin) pin.setAttribute("cx", "-20");
+      [...(map?.querySelectorAll("path") ?? [])]
+        .find((p) => p.dataset.id === countyId)
+        ?.classList.add("picked");
+    }
+  }
   function showResults() {
     const results = document.getElementById("results")!;
     results.classList.remove("empty");
     results.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  /** Keep the address bar linkable without adding a history entry per pick. Never holds coordinates. */
+  function remember(sel: Parameters<typeof findHref>[1]) {
+    try {
+      history.replaceState(null, "", findHref(import.meta.env.BASE_URL, sel) + location.hash);
+    } catch {
+      // sandboxed or file: contexts may refuse; the lookup itself still works
+    }
+  }
+
   async function choose(lon: number, lat: number) {
     placePin(lon, lat);
     status.textContent = "Looking up districts…";
-    lookup(await load(), lon, lat, document.getElementById("groups")!, status);
+    const county = lookup(await load(), lon, lat, document.getElementById("groups")!, status);
+    const fips = county && countyFips(county);
+    setMode(null);
+    if (fips) {
+      remember({ kind: "county", fips });
+      status.textContent = withShareNote(status.textContent ?? "", "county");
+    } else {
+      remember({ kind: "none" });
+    }
     showResults();
   }
 
@@ -142,9 +171,48 @@ const path = (polygons: Ring[][]) =>
     }
     status.textContent = "Looking up districts…";
     const point = lookupZip(await load(), zip, document.getElementById("groups")!, status);
-    if (point) placePin(...point);
+    setMode(null);
+    if (point) {
+      placePin(...point);
+      remember({ kind: "zip", zip });
+      status.textContent = withShareNote(status.textContent ?? "", "zip");
+    } else {
+      remember({ kind: "none" });
+    }
     showResults();
   });
+
+  // A shared link (?county=29001 or ?zip=65101) runs its lookup on load.
+  async function restore() {
+    if (!/[?&](county|zip)=/.test(location.search)) return;
+    const d: Lookup = await load();
+    const counties = new Set(
+      d.shapes.flatMap((s) => (countyFips(s.district_id) ? [countyFips(s.district_id)!] : [])),
+    );
+    const sel = parseFindParams(location.search, counties);
+    if (sel.kind === "invalid") {
+      status.textContent = `${sel.message} Enter a ZIP code, use your location, or click the map.`;
+      return;
+    }
+    const groups = document.getElementById("groups")!;
+    if (sel.kind === "zip") {
+      (document.getElementById("zip") as HTMLInputElement).value = sel.zip;
+      const point = lookupZip(d, sel.zip, groups, status);
+      setMode(null);
+      if (point) {
+        placePin(...point);
+        status.textContent = `Restored from link. ${status.textContent}${/[.!?]$/.test(status.textContent ?? "") ? "" : "."}`;
+      }
+      showResults();
+    } else if (sel.kind === "county") {
+      const title = lookupCounty(d, sel.fips, groups, status);
+      if (!title) return;
+      setMode(countyDistrictId(sel.fips), title);
+      status.textContent = `Restored from link. ${status.textContent} Click the map or enter a ZIP code for your own officials.`;
+      showResults();
+    }
+  }
+  restore().catch(() => (status.textContent = "Couldn't load the lookup data. Reload to try again."));
 
   map?.addEventListener("click", (e) => {
     const pt = map.createSVGPoint();
@@ -202,6 +270,11 @@ const path = (polygons: Ring[][]) =>
   }
   #map path:hover {
     fill: var(--hairline);
+  }
+  #map path.picked {
+    fill: var(--hairline);
+    stroke: var(--ink);
+    stroke-width: 2;
   }
   #pin {
     fill: var(--ink);

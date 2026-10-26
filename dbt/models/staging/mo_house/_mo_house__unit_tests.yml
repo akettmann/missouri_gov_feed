@@ -1,7 +1,28 @@
-# Unit tests for MO House staging models: fixed source rows -> exact expected rows.
+# Unit tests for the MO House staging models: fixed source rows -> exact expected rows.
 version: 2
 
 unit_tests:
+  - name: house_sessions_use_the_houses_names_and_newest_list_wins
+    model: stg_mo_house__sessions
+    description: >
+      Names come from the House's SESSIONLIST, not from the code: 253 is the 2025 1st Extraordinary Session, 183
+      the 2018 Special Session and 184 the 2018 1st Extraordinary Session (the last digit follows no rule).
+      Every session's list repeats the history, so the same session appears in two lists; one row per session,
+      taken from the newest list (254 renames 2025 "extraordinary" in the old list). Other list types are
+      ignored. Deriving the name from the code, or keeping both copies, fails this test.
+    given:
+      - input: source('mo_house', 'lists')
+        format: sql
+        rows: |
+            select cast('{"session_code": "253", "list": "SESSIONLIST", "doc": {"Session": [{"ID": ["253"], "Name": ["2025 Extraordinary Session"], "SessionYear": ["2025"], "SessionCode": ["S1"], "GeneralAssembly": ["103rd General Assembly"], "SessionOfGeneralAssembly": ["1st Extraordinary Session"]}, {"ID": ["184"], "Name": ["2018 1st Extraordinary Session"], "SessionYear": ["2018"], "SessionCode": ["S2"], "GeneralAssembly": ["99th General Assembly"], "SessionOfGeneralAssembly": ["1st Extraordinary Session"]}]}}' as varchar) as payload union all
+            select cast('{"session_code": "254", "list": "SESSIONLIST", "doc": {"Session": [{"ID": ["253"], "Name": ["2025 1st Extraordinary Session"], "SessionYear": ["2025"], "SessionCode": ["S1"], "GeneralAssembly": ["103rd General Assembly"], "SessionOfGeneralAssembly": ["1st Extraordinary Session"]}, {"ID": ["183"], "Name": ["2018 Special Session"], "SessionYear": ["2018"], "SessionCode": ["S1"], "GeneralAssembly": ["99th General Assembly"], "SessionOfGeneralAssembly": ["1st Special Session"]}]}}' as varchar) as payload union all
+            select cast('{"session_code": "254", "list": "COMMITTEELIST", "doc": {"Committee": []}}' as varchar) as payload
+    expect:
+      rows:
+        - {session_code: '253', session_name: 2025 1st Extraordinary Session, session_year: 2025, session_type: S1, general_assembly: 103rd General Assembly, session_of_general_assembly: 1st Extraordinary Session}
+        - {session_code: '184', session_name: 2018 1st Extraordinary Session, session_year: 2018, session_type: S2, general_assembly: 99th General Assembly, session_of_general_assembly: 1st Extraordinary Session}
+        - {session_code: '183', session_name: 2018 Special Session, session_year: 2018, session_type: S1, general_assembly: 99th General Assembly, session_of_general_assembly: 1st Special Session}
+
   - name: senate_act_list_stages_every_senate_bill
     model: stg_mo_house__bill_actions
     description: >

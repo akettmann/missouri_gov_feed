@@ -29,6 +29,36 @@ unit_tests:
         - {official_id: o_dan_jones, recipient_raw: 'JONES, DANIEL', match_confidence: medium}
         - {official_id: o_dan_jones, recipient_raw: 'JONES, DAN', match_confidence: high}
 
+  - name: party_unity_yearly_counts_party_line_votes_by_year_and_party_held
+    model: fct_party_unity_yearly
+    description: >
+      Only yea/nay votes on party-line votes count. m votes in 2023 on three votes: v1 (party-line, Republican
+      majority yea, Democratic majority nay), v2 (not party-line, both parties yea) and v3 (party-line, absent
+      so no vote cast). m cast yea as a Republican on v1 (with the party), then in 2024 switched to Democratic
+      and cast yea on v4 (party-line, Democratic majority nay): against the party. The party at the vote
+      decides the side, so the switch gives 1 of 1 in 2023 and 0 of 1 in 2024. An undated vote lands in a
+      null year. Counting v2, v3, or judging 2024 by the old party fails this test.
+    given:
+      - input: ref('fct_votes')
+        rows:
+          - {official_id: m, chamber: state_house, vote_id: v1, vote_date: 2023-02-01, vote_cast: yea, party_at_vote: Republican}
+          - {official_id: m, chamber: state_house, vote_id: v2, vote_date: 2023-02-02, vote_cast: yea, party_at_vote: Republican}
+          - {official_id: m, chamber: state_house, vote_id: v3, vote_date: 2023-02-03, vote_cast: absent, party_at_vote: Republican}
+          - {official_id: m, chamber: state_house, vote_id: v4, vote_date: 2024-02-01, vote_cast: yea, party_at_vote: Democratic}
+          - {official_id: m, chamber: state_house, vote_id: v5, vote_date: null, vote_cast: nay, party_at_vote: Democratic}
+      - input: ref('int_votes__party_positions')
+        rows:
+          - {chamber: state_house, vote_id: v1, republican_position: yea, democratic_position: nay, is_party_line: true}
+          - {chamber: state_house, vote_id: v2, republican_position: yea, democratic_position: yea, is_party_line: false}
+          - {chamber: state_house, vote_id: v3, republican_position: yea, democratic_position: nay, is_party_line: true}
+          - {chamber: state_house, vote_id: v4, republican_position: yea, democratic_position: nay, is_party_line: true}
+          - {chamber: state_house, vote_id: v5, republican_position: yea, democratic_position: nay, is_party_line: true}
+    expect:
+      rows:
+        - {official_id: m, chamber: state_house, vote_year: 2023, party_line_votes: 1, with_party_votes: 1}
+        - {official_id: m, chamber: state_house, vote_year: 2024, party_line_votes: 1, with_party_votes: 0}
+        - {official_id: m, chamber: state_house, vote_year: null, party_line_votes: 1, with_party_votes: 1}
+
   - name: commercial_ties_skip_garbled_disclosure_items
     model: fct_commercial_ties
     description: >
@@ -115,6 +145,46 @@ unit_tests:
         - {counterparty: Missouri Chamber PAC, amount: 100, counterparty_mec_committee_id: null, counterparty_link_confidence: null}
         - {counterparty: Twin PAC, amount: 200, counterparty_mec_committee_id: null, counterparty_link_confidence: null}
         - {counterparty: Ann Doe, amount: 50, counterparty_mec_committee_id: null, counterparty_link_confidence: null}
+
+  - name: campaign_finance_fec_received_links_donor_disbursements
+    model: fct_campaign_finance
+    description: >
+      An FEC "received" row links the donor committee's disbursements page narrowed to the receiving committee
+      (its outgoing money, which includes the gift), not its receipts page, which would never show the gift; a
+      "given" row links the giving committee's disbursements narrowed to the recipient committee (#236).
+    overrides:
+      vars:
+        mec_direct: false
+    given:
+      - input: ref('int_mec__official_committees')
+        rows: []
+      - input: ref('stg_tap_mec__contributions')
+        rows: []
+      - input: ref('int_mec__donor_committees')
+        rows: []
+      - input: ref('stg_tap_mec__expenditures')
+        rows: []
+      - input: ref('dim_official')
+        rows:
+          - {official_id: o1, bioguide_id: B1}
+      - input: ref('stg_congress__fec_ids')
+        rows:
+          - {bioguide_id: B1, fec_candidate_id: H0MO00001}
+      - input: ref('stg_fec__candidate_committees')
+        rows:
+          - {candidate_id: H0MO00001, committee_id: C00000001}
+      - input: ref('stg_fec__committee_contributions')
+        rows:
+          - {sub_id: 11, giving_committee_id: C00000099, candidate_id: H0MO00001, recipient_committee_id: C00000001, transaction_kind: direct contribution, amount: 500}
+          - {sub_id: 12, giving_committee_id: C00000001, candidate_id: H0MO00002, recipient_committee_id: C00000002, transaction_kind: direct contribution, amount: 250}
+      - input: ref('stg_fec__committees')
+        rows: []
+      - input: ref('fec_committee_types')
+        rows: []
+    expect:
+      rows:
+        - {direction: received, source_record_id: 'fec:11', source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C00000099&recipient_name=C00000001'}
+        - {direction: given, source_record_id: 'fec:12', source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C00000001&recipient_name=C00000002'}
 
   - name: campaign_finance_tap_contribution_and_expenditure_ids_do_not_collide
     model: fct_campaign_finance
@@ -219,3 +289,139 @@ unit_tests:
         - {disclosure_item_id: 'courtlistener:t1', report_version: 0, is_latest_version: false}
         - {disclosure_item_id: 'courtlistener:t2', report_version: 1, is_latest_version: true}
         - {disclosure_item_id: 'courtlistener:t3', report_version: 0, is_latest_version: true}
+
+  - name: county_districts_ignore_edge_noise_and_keep_real_overlaps
+    model: fct_county_districts
+    description: >
+      Districts count for a county only when they overlap it by more than 0.1 km2, so boundaries that share an
+      edge (state_senate:2, touching along x=-92), sit a hair away from it (state_house:4), or poke 0.5 m past
+      it from a slightly misaligned layer (state_house:3, 0.04 km2) are dropped, however finely a grid would
+      have sampled the seam. A long thin strip (state_house:6 overlaps the county by about 100 m x 77 km, 8 km2,
+      well over the area threshold) is dropped by the inward-buffer rule, but narrow genuine overlaps about
+      500 m wide, running north-south (state_house:7) or east-west (state_house:8), are kept, so a buffer that
+      is far too large fails. A non-current district is ignored. A city counts only when it covers the whole
+      county (place:2999999), not when it is a small part of it (place:2999998).
+    given:
+      - input: ref('dim_district')
+        rows:
+          - {district_id: 'county:29901', district_type: county, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-93,38],[-92,38],[-92,39],[-93,39],[-93,38]]]}'}
+          - {district_id: 'us_house:119:1', district_type: us_house, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-94,37],[-91,37],[-91,40],[-94,40],[-94,37]]]}'}
+          - {district_id: 'state_senate:1', district_type: state_senate, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-93.5,38],[-92.5,38],[-92.5,39],[-93.5,39],[-93.5,38]]]}'}
+          - {district_id: 'state_house:1', district_type: state_house, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-93.5,38],[-92.5,38],[-92.5,39],[-93.5,39],[-93.5,38]]]}'}
+          - {district_id: 'state_house:2', district_type: state_house, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-92.5,38],[-92,38],[-92,39],[-92.5,39],[-92.5,38]]]}'}
+          - {district_id: 'state_house:3', district_type: state_house, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-92.000005,38],[-91,38],[-91,39],[-92.000005,39],[-92.000005,38]]]}'}
+          - {district_id: 'state_house:4', district_type: state_house, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-91.99999,38],[-91,38],[-91,39],[-91.99999,39],[-91.99999,38]]]}'}
+          - {district_id: 'state_house:5', district_type: state_house, is_current: false, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-93,38],[-92,38],[-92,39],[-93,39],[-93,38]]]}'}
+          - {district_id: 'place:2999999', district_type: place, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-93,38],[-92,38],[-92,39],[-93,39],[-93,38]]]}'}
+          - {district_id: 'place:2999998', district_type: place, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-92.9,38.1],[-92.8,38.1],[-92.8,38.2],[-92.9,38.2],[-92.9,38.1]]]}'}
+          - {district_id: 'state_senate:2', district_type: state_senate, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-92,38],[-91,38],[-91,39],[-92,39],[-92,38]]]}'}
+          - {district_id: 'state_house:6', district_type: state_house, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-92.0012,38.2],[-91,38.2],[-91,38.9],[-92.0012,38.9],[-92.0012,38.2]]]}'}
+          - {district_id: 'state_house:7', district_type: state_house, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-92.00574,38.2],[-91,38.2],[-91,38.9],[-92.00574,38.9],[-92.00574,38.2]]]}'}
+          - {district_id: 'state_house:8', district_type: state_house, is_current: true, interior_lat: 38.5, geometry_geojson: '{"type":"Polygon","coordinates":[[[-92.9,38.99548],[-92.1,38.99548],[-92.1,40],[-92.9,40],[-92.9,38.99548]]]}'}
+    expect:
+      rows:
+        - {county_id: 'county:29901', district_id: 'us_house:119:1', district_type: us_house}
+        - {county_id: 'county:29901', district_id: 'state_senate:1', district_type: state_senate}
+        - {county_id: 'county:29901', district_id: 'state_house:1', district_type: state_house}
+        - {county_id: 'county:29901', district_id: 'state_house:2', district_type: state_house}
+        - {county_id: 'county:29901', district_id: 'state_house:7', district_type: state_house}
+        - {county_id: 'county:29901', district_id: 'state_house:8', district_type: state_house}
+        - {county_id: 'county:29901', district_id: 'place:2999999', district_type: place}
+
+  - name: jurisdiction_businesses_give_every_donor_its_own_link
+    model: fct_jurisdiction_businesses
+    description: >
+      A site tied to several donors lists one `<url> <donor name>` line per donor and per distinct filing page, so
+      each donor gets its own link. A donor filed on both an MEC and an FEC page keeps both: no single url is
+      picked by min(), which would silently prefer fec.gov over mec.mo.gov (#248). Gifts from individuals do not
+      count, and a site with no donor has no links.
+    given:
+      - input: ref('fct_official_districts')
+        rows:
+          - {official_id: o1, district_id: 'state_house:1', relation: elected from}
+      - input: ref('fct_district_facilities')
+        rows:
+          - {district_id: 'state_house:1', registry_id: F1, facility_name: Plant One, is_government: false}
+          - {district_id: 'state_house:1', registry_id: F2, facility_name: Plant Two, is_government: false}
+      - input: ref('int_epa_frs__facilities')
+        rows:
+          - {registry_id: F1, facility_key: plant one, owner_key: ameren, parent_company_key: acme holdings}
+          - {registry_id: F2, facility_key: plant two, owner_key: nobody, parent_company_key: null}
+      - input: ref('company_brands')
+        rows:
+          - {keyword: unusedbrand, brand: unusedbrand}
+      - input: ref('fct_campaign_finance')
+        rows:
+          - {official_id: o1, direction: received, counterparty: Ameren Corp PAC, counterparty_organization: AMEREN CORPORATION, counterparty_type: committee, amount: 100, transaction_date: '2020-03-01', match_confidence: high, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9'}
+          - {official_id: o1, direction: received, counterparty: Ameren Corp PAC, counterparty_organization: AMEREN CORPORATION, counterparty_type: committee, amount: 50, transaction_date: '2021-03-01', match_confidence: high, source_url: 'https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C221944'}
+          - {official_id: o1, direction: received, counterparty: Acme Holdings PAC, counterparty_organization: ACME HOLDINGS INC, counterparty_type: committee, amount: 70, transaction_date: '2022-03-01', match_confidence: high, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9'}
+          - {official_id: o1, direction: received, counterparty: Pat Doe, counterparty_organization: AMEREN CORPORATION, counterparty_type: individual, amount: 900, transaction_date: '2022-04-01', match_confidence: high, source_url: 'https://example.test/individual'}
+    expect:
+      rows:
+        - {registry_id: F1, is_donor: true, donated_amount: 220, n_contributions: 3, donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9 ACME HOLDINGS INC\nhttps://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 AMEREN CORPORATION\nhttps://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=C221944 AMEREN CORPORATION"}
+        - {registry_id: F2, is_donor: false, donated_amount: null, n_contributions: null, donor_links: null}
+
+  - name: jurisdiction_businesses_donor_names_hold_no_line_breaks
+    model: fct_jurisdiction_businesses
+    description: >
+      A raw donor name with a CR/LF inside would split its donor_links line in two. The model turns each into a
+      space and trims, so every line stays `<url> <donor name>` (#268).
+    given:
+      - input: ref('fct_official_districts')
+        rows:
+          - {official_id: o1, district_id: 'state_house:1', relation: elected from}
+      - input: ref('fct_district_facilities')
+        rows:
+          - {district_id: 'state_house:1', registry_id: F1, facility_name: Plant One, is_government: false}
+          - {district_id: 'state_house:1', registry_id: F2, facility_name: Plant Two, is_government: false}
+      - input: ref('int_epa_frs__facilities')
+        rows:
+          - {registry_id: F1, facility_key: plant one, owner_key: ameren, parent_company_key: acme holdings}
+          - {registry_id: F2, facility_key: plant two, owner_key: nobody, parent_company_key: null}
+      - input: ref('company_brands')
+        rows:
+          - {keyword: unusedbrand, brand: unusedbrand}
+      # sql format: the dict format folds line breaks into spaces, which would hide the very thing under test
+      - input: ref('fct_campaign_finance')
+        format: sql
+        rows: |
+          select
+              'o1' as official_id,
+              'received' as direction,
+              'Ameren PAC' as counterparty,
+              'AMEREN' || chr(13) || chr(10) || 'CORPORATION' || chr(10) as counterparty_organization,
+              'committee' as counterparty_type,
+              100 as amount,
+              cast('2020-03-01' as date) as transaction_date,
+              'high' as match_confidence,
+              'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9' as source_url
+    expect:
+      rows:
+        - {registry_id: F1, is_donor: true, donor_names: AMEREN CORPORATION, donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 AMEREN CORPORATION"}
+        - {registry_id: F2, is_donor: false, donor_names: null, donor_links: null}
+
+  - name: jurisdiction_businesses_donor_names_hold_no_semicolons
+    model: fct_jurisdiction_businesses
+    description: >
+      donor_names is '; '-joined and the frontend splits it back, so a raw donor name with a ';' in it would show
+      as two donors. The model turns each ';' into a comma (#276). Two donors still join with '; '.
+    given:
+      - input: ref('fct_official_districts')
+        rows:
+          - {official_id: o1, district_id: 'state_house:1', relation: elected from}
+      - input: ref('fct_district_facilities')
+        rows:
+          - {district_id: 'state_house:1', registry_id: F1, facility_name: Plant One, is_government: false}
+      - input: ref('int_epa_frs__facilities')
+        rows:
+          - {registry_id: F1, facility_key: plant one, owner_key: ameren corporation the, parent_company_key: acme holdings}
+      - input: ref('company_brands')
+        rows:
+          - {keyword: unusedbrand, brand: unusedbrand}
+      - input: ref('fct_campaign_finance')
+        rows:
+          - {official_id: o1, direction: received, counterparty: x, counterparty_organization: 'AMEREN CORPORATION; THE', counterparty_type: committee, amount: 100, transaction_date: '2020-03-01', match_confidence: high, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9'}
+          - {official_id: o1, direction: received, counterparty: x, counterparty_organization: ACME HOLDINGS INC, counterparty_type: committee, amount: 70, transaction_date: '2022-03-01', match_confidence: high, source_url: 'https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9'}
+    expect:
+      rows:
+        - {registry_id: F1, donor_names: 'ACME HOLDINGS INC; AMEREN CORPORATION, THE', donor_links: "https://www.fec.gov/data/disbursements/?committee_id=C2&recipient_name=C9 ACME HOLDINGS INC\nhttps://www.fec.gov/data/disbursements/?committee_id=C1&recipient_name=C9 AMEREN CORPORATION, THE"}

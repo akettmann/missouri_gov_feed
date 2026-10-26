@@ -398,7 +398,7 @@ export const VIZ: Record<string, VizSpec> = {
     ],
     rows: (b) =>
       (b.voting.attendance ?? []).map((r) => ({
-        session: sessionLabel(r.chamber, r.session_code),
+        session: sessionLabel(r.chamber, r.session_code, r.session_name),
         official: r.attendance_pct,
         chamber: r.chamber_attendance_pct,
         recorded: r.votes_recorded,
@@ -427,7 +427,7 @@ export const VIZ: Record<string, VizSpec> = {
     ],
     rows: (b) =>
       (b.voting.attendance ?? []).map((r) => ({
-        session: sessionLabel(r.chamber, r.session_code),
+        session: sessionLabel(r.chamber, r.session_code, r.session_name),
         ...missedShares(r),
         recorded: r.votes_recorded,
       })),

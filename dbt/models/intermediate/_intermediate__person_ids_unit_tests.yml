@@ -206,3 +206,303 @@ unit_tests:
       rows:
         - {session_code: '171', district_number: 30, raw_person_key: 'mohouse:476', person_key: ocd-person/cierpiot}
         - {session_code: '171', district_number: 31, raw_person_key: 'mohouse:999', person_key: 'mohouse:999'}
+
+
+  - name: person_ids_ignore_spacing_inside_a_surname
+    model: int_officials__person_ids
+    description: >
+      The House roster spells Dean Van Schoiack with a space and Open States without (#228). Same seat, same years:
+      one person, and the Open States id wins over the roster fallback key.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: 'mohouse:2243', year: 2025, office: state_house, district: '9', name_key: dean van schoiack}
+          - {alias_id: 'mohouse:2243', year: 2026, office: state_house, district: '9', name_key: dean van schoiack}
+          - {alias_id: ocd-person/vanschoiack, year: 2025, office: state_house, district: '9', name_key: dean vanschoiack}
+          - {alias_id: ocd-person/vanschoiack, year: 2026, office: state_house, district: '9', name_key: dean vanschoiack}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: 'mohouse:2243', person_id: ocd-person/vanschoiack, basis: name_continuity}
+        - {alias_id: ocd-person/vanschoiack, person_id: ocd-person/vanschoiack, basis: self}
+
+  - name: person_ids_join_a_given_name_variant_across_chambers
+    model: int_officials__person_ids
+    description: >
+      Open States keeps Steve Roberts' House years (as "Steven", 2017-20) and Senate years (2021+) as two people
+      (#263). The names differ only in the given name, one starting with the other, the seats never clash and the
+      second begins the year after the first ends: one person, and the id that served last is kept.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/roberts-house, year: 2019, office: state_house, district: '77', name_key: steven roberts}
+          - {alias_id: ocd-person/roberts-house, year: 2020, office: state_house, district: '77', name_key: steven roberts}
+          - {alias_id: ocd-person/roberts-senate, year: 2021, office: state_senate, district: '5', name_key: steve roberts}
+          - {alias_id: ocd-person/roberts-senate, year: 2026, office: state_senate, district: '5', name_key: steve roberts}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/roberts-house, person_id: ocd-person/roberts-senate, basis: name_continuity}
+        - {alias_id: ocd-person/roberts-senate, person_id: ocd-person/roberts-senate, basis: self}
+
+  - name: person_ids_join_a_given_name_variant_in_the_same_seat
+    model: int_officials__person_ids
+    description: >
+      Two Open States records for the same seat under "Ken" and "Kenneth" Jamison are one person: Kenneth's stub term (2025-01-08 to 2025-02-03, dates as Open States gives them) overlaps in time with Ken's term from 2025-01-08.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/jamison-ken, year: 2025, office: state_house, district: '15', name_key: ken jamison, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/jamison-ken, year: 2026, office: state_house, district: '15', name_key: ken jamison, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/jamison-kenneth, year: 2025, office: state_house, district: '15', name_key: kenneth jamison, term_start: '2025-01-08', term_end: '2025-02-03'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/jamison-ken, person_id: ocd-person/jamison-ken, basis: self}
+        - {alias_id: ocd-person/jamison-kenneth, person_id: ocd-person/jamison-ken, basis: name_continuity}
+
+  - name: person_ids_keep_a_same_seat_successor_with_a_hand_over_year_apart
+    model: int_officials__person_ids
+    description: >
+      Dan Smith (HD10 2018-2019) and his successor Danielle Smith (HD10 2019-2021) both appear in 2019 in the same
+      seat, but Dan's term ends the day Danielle's starts, which is succession, not overlap, so they are two people.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/dan, year: 2018, office: state_house, district: '10', name_key: dan smith, term_start: '2017-01-04', term_end: '2019-01-09'}
+          - {alias_id: ocd-person/dan, year: 2019, office: state_house, district: '10', name_key: dan smith, term_start: '2017-01-04', term_end: '2019-01-09'}
+          - {alias_id: ocd-person/danielle, year: 2019, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/danielle, year: 2020, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/danielle, year: 2021, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/dan, person_id: ocd-person/dan, basis: self}
+        - {alias_id: ocd-person/danielle, person_id: ocd-person/danielle, basis: self}
+
+  - name: person_ids_keep_a_successor_who_holds_only_the_first_year_of_the_seat_apart
+    model: int_officials__person_ids
+    description: >
+      Dan Smith (HD10 2019 only, term ending 2019-01-09) and Danielle Smith (HD10 2019-2021, term from 2019-01-09)
+      share one seat-year and Dan's years sit inside Danielle's, but the terms only touch, so they are two people.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/dan, year: 2019, office: state_house, district: '10', name_key: dan smith, term_start: '2017-01-04', term_end: '2019-01-09'}
+          - {alias_id: ocd-person/danielle, year: 2019, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/danielle, year: 2020, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/danielle, year: 2021, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/dan, person_id: ocd-person/dan, basis: self}
+        - {alias_id: ocd-person/danielle, person_id: ocd-person/danielle, basis: self}
+
+  - name: person_ids_keep_a_mid_year_special_election_successor_apart
+    model: int_officials__person_ids
+    description: >
+      Dan Smith (HD10 2023-2026, term ending 2026-03-10) and Danielle Smith (HD10 2026 only, from the special
+      election on 2026-03-10) are two people: Danielle's year sits inside Dan's but the terms only touch.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/dan, year: 2023, office: state_house, district: '10', name_key: dan smith, term_start: '2023-01-04', term_end: '2026-03-10'}
+          - {alias_id: ocd-person/dan, year: 2024, office: state_house, district: '10', name_key: dan smith, term_start: '2023-01-04', term_end: '2026-03-10'}
+          - {alias_id: ocd-person/dan, year: 2025, office: state_house, district: '10', name_key: dan smith, term_start: '2023-01-04', term_end: '2026-03-10'}
+          - {alias_id: ocd-person/dan, year: 2026, office: state_house, district: '10', name_key: dan smith, term_start: '2023-01-04', term_end: '2026-03-10'}
+          - {alias_id: ocd-person/danielle, year: 2026, office: state_house, district: '10', name_key: danielle smith, term_start: '2026-03-10', term_end: '9999-12-31'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/dan, person_id: ocd-person/dan, basis: self}
+        - {alias_id: ocd-person/danielle, person_id: ocd-person/danielle, basis: self}
+
+  - name: person_ids_keep_given_name_variants_serving_at_once_apart
+    model: int_officials__person_ids
+    description: >
+      A Steve and a Steven Roberts who share a seat in one year but hold different seats in another (HD10 in 2024,
+      then HD10 and SD5 in 2025) are two people, not one.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/steve, year: 2024, office: state_house, district: '10', name_key: steve roberts}
+          - {alias_id: ocd-person/steve, year: 2025, office: state_house, district: '10', name_key: steve roberts}
+          - {alias_id: ocd-person/steven, year: 2024, office: state_house, district: '10', name_key: steven roberts}
+          - {alias_id: ocd-person/steven, year: 2025, office: state_senate, district: '5', name_key: steven roberts}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/steve, person_id: ocd-person/steve, basis: self}
+        - {alias_id: ocd-person/steven, person_id: ocd-person/steven, basis: self}
+
+  - name: person_ids_keep_given_name_variants_far_apart_apart
+    model: int_officials__person_ids
+    description: >
+      A Ken and a Kenneth Jamison separated by a gap of years, in different seats, are not joined on the name alone.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/ken, year: 2017, office: state_house, district: '15', name_key: ken jamison}
+          - {alias_id: ocd-person/ken, year: 2018, office: state_house, district: '15', name_key: ken jamison}
+          - {alias_id: ocd-person/kenneth, year: 2023, office: state_house, district: '40', name_key: kenneth jamison}
+          - {alias_id: ocd-person/kenneth, year: 2024, office: state_house, district: '40', name_key: kenneth jamison}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/ken, person_id: ocd-person/ken, basis: self}
+        - {alias_id: ocd-person/kenneth, person_id: ocd-person/kenneth, basis: self}
+
+  - name: person_ids_join_no_given_name_variant_with_two_candidates
+    model: int_officials__person_ids
+    description: >
+      "Sam Lee" could continue either "Samuel Lee" or "Sammy Lee": a name with more than one variant partner joins
+      nothing.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/sam, year: 2019, office: state_house, district: '1', name_key: sam lee}
+          - {alias_id: ocd-person/samuel, year: 2020, office: state_house, district: '1', name_key: samuel lee}
+          - {alias_id: ocd-person/sammy, year: 2020, office: state_house, district: '1', name_key: sammy lee}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/sam, person_id: ocd-person/sam, basis: self}
+        - {alias_id: ocd-person/samuel, person_id: ocd-person/samuel, basis: self}
+        - {alias_id: ocd-person/sammy, person_id: ocd-person/sammy, basis: self}
+
+  - name: person_ids_keep_a_signed_different_people_pair_apart_across_given_name_variants
+    model: int_officials__person_ids
+    description: >
+      A signed different_people link keeps a name out of the given-name variant rule too.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/steven, year: 2019, office: state_house, district: '77', name_key: steven roberts}
+          - {alias_id: ocd-person/steve, year: 2020, office: state_senate, district: '5', name_key: steve roberts}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: ocd-person/steven, person_id: ocd-person/steve, relation: different_people, checked_by: maintainer}
+    expect:
+      rows:
+        - {alias_id: ocd-person/steven, person_id: ocd-person/steven, basis: self}
+        - {alias_id: ocd-person/steve, person_id: ocd-person/steve, basis: self}
+
+  - name: person_ids_keep_given_name_variants_apart_when_another_id_holds_a_different_seat
+    model: int_officials__person_ids
+    description: >
+      The seat check covers every id of both names. A second "Steven Smith" id (HD10 in 2017-18) does not clash with
+      "Steve Smith" (SD5, 2019-20) on its own, but the first "Steven Smith" id (one person with a2, same seat) also holds HD10 in 2019-20, the same
+      years Steve sits in SD5: the two names would put one person in two seats, so nothing is joined.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: 'mohouse:1', year: 2017, office: state_house, district: '10', name_key: steven smith}
+          - {alias_id: 'mohouse:1', year: 2019, office: state_house, district: '10', name_key: steven smith}
+          - {alias_id: 'mohouse:1', year: 2020, office: state_house, district: '10', name_key: steven smith}
+          - {alias_id: ocd-person/a2, year: 2017, office: state_house, district: '10', name_key: steven smith}
+          - {alias_id: ocd-person/a2, year: 2018, office: state_house, district: '10', name_key: steven smith}
+          - {alias_id: ocd-person/b, year: 2019, office: state_senate, district: '5', name_key: steve smith}
+          - {alias_id: ocd-person/b, year: 2020, office: state_senate, district: '5', name_key: steve smith}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: 'mohouse:1', person_id: ocd-person/a2, basis: name_continuity}
+        - {alias_id: ocd-person/a2, person_id: ocd-person/a2, basis: self}
+        - {alias_id: ocd-person/b, person_id: ocd-person/b, basis: self}
+
+  - name: person_ids_keep_a_successor_in_the_same_seat_apart
+    model: int_officials__person_ids
+    description: >
+      Dan Smith in HD10 until 2020 and Danielle Smith in HD10 from 2021 share no year and sit in the same chamber:
+      a successor whose given name starts with the predecessor's (Missouri precedent: Roeber, HD34), not one
+      person. Only a move between chambers a year apart joins variants with no shared seat-year.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/dan, year: 2019, office: state_house, district: '10', name_key: dan smith, term_start: '2017-01-04', term_end: '2019-01-09'}
+          - {alias_id: ocd-person/dan, year: 2020, office: state_house, district: '10', name_key: dan smith}
+          - {alias_id: ocd-person/danielle, year: 2021, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/dan, person_id: ocd-person/dan, basis: self}
+        - {alias_id: ocd-person/danielle, person_id: ocd-person/danielle, basis: self}
+
+  - name: identity_terms_carry_open_states_dates_untruncated
+    model: int_officials__identity_terms
+    description: >
+      A January start counts from January 1 for year membership, but term_start/term_end keep the dates Open States
+      gives (Dan Smith to 2019-01-09, Danielle Smith from 2019-01-09), so a January successor does not overlap a
+      predecessor Open States ends a few days into the month. The House roster row carries no dates.
+    given:
+      - input: ref('int_mo_house__member_seat_keys')
+        rows:
+          - {raw_person_key: 'mohouse:9', session_year: 2018, district_number: 99, full_name: Zed Zed, openstates_id: null}
+          - {raw_person_key: 'mohouse:9', session_year: 2019, district_number: 99, full_name: Zed Zed, openstates_id: null}
+          - {raw_person_key: 'mohouse:9', session_year: 2020, district_number: 99, full_name: Zed Zed, openstates_id: null}
+      - input: ref('stg_openstates__people')
+        rows: []
+      - input: ref('int_mo_legislators__seat_terms')
+        rows:
+          - {openstates_id: ocd-person/dan, chamber: lower, district_number: 10, full_name: Dan Smith, start_date: '2017-01-01', end_date: '2019-01-09', source_start_date: '2017-01-04', source_end_date: '2019-01-09'}
+          - {openstates_id: ocd-person/danielle, chamber: lower, district_number: 10, full_name: Danielle Smith, start_date: '2019-01-01', end_date: '2021-01-06', source_start_date: '2019-01-09', source_end_date: '2021-01-06'}
+    expect:
+      rows:
+        - {alias_id: 'mohouse:9', year: 2018, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: 'mohouse:9', year: 2019, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: 'mohouse:9', year: 2020, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: ocd-person/dan, year: 2018, office: state_house, district: '10', name_key: dan smith, term_start: '2017-01-04', term_end: '2019-01-09'}
+        - {alias_id: ocd-person/danielle, year: 2019, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
+        - {alias_id: ocd-person/danielle, year: 2020, office: state_house, district: '10', name_key: danielle smith, term_start: '2019-01-09', term_end: '2021-01-06'}
+
+  - name: person_ids_keep_a_mid_term_departure_successor_apart
+    model: int_officials__person_ids
+    description: >
+      Dan Smith (HD10, term to 2018-12-31) and Danielle Smith (HD10 from 2018-09-12, a special-election successor)
+      overlap on paper because Open States leaves a member who left mid-term with the normal term end. Neither term
+      sits inside the other and they start on different days, so they are two people (the shape of Silvey to
+      2018-12-31 and Lauren Arthur from 2018-09-12, SD17).
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/dan, year: 2017, office: state_house, district: '10', name_key: dan smith, term_start: '2015-01-07', term_end: '2018-12-31'}
+          - {alias_id: ocd-person/dan, year: 2018, office: state_house, district: '10', name_key: dan smith, term_start: '2015-01-07', term_end: '2018-12-31'}
+          - {alias_id: ocd-person/danielle, year: 2018, office: state_house, district: '10', name_key: danielle smith, term_start: '2018-09-12', term_end: '2022-12-31'}
+          - {alias_id: ocd-person/danielle, year: 2019, office: state_house, district: '10', name_key: danielle smith, term_start: '2018-09-12', term_end: '2022-12-31'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/dan, person_id: ocd-person/dan, basis: self}
+        - {alias_id: ocd-person/danielle, person_id: ocd-person/danielle, basis: self}
+
+  - name: identity_terms_collapse_two_terms_of_one_id_in_a_seat_to_one_span
+    model: int_officials__identity_terms
+    description: >
+      Known edge: one id holding the same seat in two separate terms in a year (2019-01-09 to 2019-03-01, then
+      2019-09-01 to 2019-12-31) becomes one row spanning min(start) to max(end), gap included.
+    given:
+      - input: ref('int_mo_house__member_seat_keys')
+        rows:
+          - {raw_person_key: 'mohouse:9', session_year: 2019, district_number: 99, full_name: Zed Zed, openstates_id: null}
+      - input: ref('stg_openstates__people')
+        rows: []
+      - input: ref('int_mo_legislators__seat_terms')
+        rows:
+          - {openstates_id: ocd-person/gap, chamber: lower, district_number: 10, full_name: Gap Person, start_date: '2019-01-01', end_date: '2019-03-01', source_start_date: '2019-01-09', source_end_date: '2019-03-01'}
+          - {openstates_id: ocd-person/gap, chamber: lower, district_number: 10, full_name: Gap Person, start_date: '2019-09-01', end_date: '2019-12-31', source_start_date: '2019-09-01', source_end_date: '2019-12-31'}
+    expect:
+      rows:
+        - {alias_id: 'mohouse:9', year: 2019, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: ocd-person/gap, year: 2019, office: state_house, district: '10', name_key: gap person, term_start: '2019-01-09', term_end: '2019-12-31'}

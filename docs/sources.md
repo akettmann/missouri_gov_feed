@@ -29,8 +29,11 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `wikidata` | Wikidata | past offices, occupations, employers, relatives and the organizations they lead | as edited | `MOGOV_CONTACT` |
 | `shor_mccarty` | Harvard Dataverse | state legislator ideology scores | 1993–2022 | |
 | `mo_employee_pay` | data.mo.gov State Employee Pay | yearly gross pay of legislators, statewide officials and state judges | `MOGOV_LOOKBACK_YEARS` (published from 2007) | |
+| `mo_sos_elections` | Missouri Secretary of State official returns | race results, margins, uncontested races, judicial retention votes | general and primary elections, Aug 2012 on | |
+| `mo_state_expenditures` | data.mo.gov State Expenditures | what each state agency paid each payee per fiscal year: legislators' per diem and mileage, payments to vendors | `MOGOV_LOOKBACK_YEARS` (fiscal years; published from 2000) | |
 | `census_tiger` | Census Bureau TIGER/Line | legislative and congressional district, county and city boundaries | newest vintage | |
 | `epa_frs` | EPA Facility Registry Service | regulated facilities (name, address, coordinates, NAICS, owner) placed in districts; businesses in each official's district that donated to them | current state file (refreshed every few months) | |
+| `mo_auditor` | Missouri State Auditor (auditor.mo.gov) | audit reports of state offices and agencies, counties, cities, courts and schools, with the Auditor's four-level performance rating | reports 1999 to now; ratings from 2012 | |
 | `census_zcta` | Census Bureau Gazetteer | ZIP code area centers and land areas (find-by-ZIP) | newest vintage | |
 
 ## mo_house: Missouri House of Representatives
@@ -49,6 +52,7 @@ Quirks:
 - Session codes are two-digit year plus type: `1` regular, `2`–`4` extraordinary. Unknown codes return
   HTTP 200 with an HTML page, not a 404. The loader probes all four types per year and treats HTML as
   "no such session".
+- Session names (`dim_house_session`): the last digit of a code does not say which extraordinary session it is (183 is the 2018 "Special Session", 184 its "1st Extraordinary Session", 253 and 254 the 2025 1st and 2nd). The `SESSIONLIST` file in every session zip carries the House's own names for the whole history, and the frontend labels sessions from it; the open regular session has no zip, so the loader fetches its `SessionList` directly. A session with no name yet shows as "session code NNN".
 - The open session has no zip yet, so the loader walks the list files and fetches per-member and
   per-bill XML.
 - Vote tokens are printed surnames, sometimes with a district ("SMITH 46"), plus "MR SPEAKER".
@@ -56,8 +60,10 @@ Quirks:
   (`int_mo_house__member_identity`, seed `house_speakers`).
 - A member's seat is matched to an Open States person; when that fails the key is `mohouse:<member id>`.
   Open States also holds some people twice (after a redistricting or a move to the Senate). Both are
-  reconciled to one stable `official_id` per person by `int_officials__person_ids` (same exact name and no
-  conflicting seats; seed `official_id_links` for statewide officers and judges), #97.
+  reconciled to one stable `official_id` per person by `int_officials__person_ids` (same exact name, or names that differ only in the given
+  name like Steve/Steven or Ken/Kenneth (#228, #263), no conflicting seats, and
+  either overlapping dated terms in one seat or a chamber move (years alone cannot tell a duplicate record, Kenneth
+  Jamison's 2025 stub inside Ken's term, from a successor like Danielle after Dan Smith; dates can, using the dates exactly as Open States gives them: the January-1 adjustment used for year membership would make a January successor overlap a predecessor ending Jan 6-9. Known edge: `int_officials__identity_terms` collapses each (id, year, seat) to min(start)/max(end), spanning any gap if one id held the seat in two terms in a year); seed `official_id_links` for statewide officers and judges), #97.
 - The site asks clients not to poll its XML more than every 30 minutes. Cached copies keep it well
   under that.
 - Every shard reads every session zip to list the roll calls. In the October 2026 full run, two shards
@@ -84,6 +90,17 @@ Quirks:
   links none in). That found 6,449 roll calls, 1,526 on Senate measures. Misses are cached for good once
   the session's year is over and re-checked daily before that. The first probe took about 8 minutes per
   shard with 4 shards.
+- Committee posts (`fct_committee_memberships`, `fct_committee_posts`): the member XML page lists each
+  member's committees and subcommittees with a position (Chair, Vice-Chair, Co-Chair, Ranking Minority
+  Member, Member), in every session from 2017 except 253, whose pages list none. For 253 the
+  `COMMITTEELIST` list (memberships only for 231, 241, 251, 253 and 254) fills in, matched on district.
+  `COMMITTEELIST` also lists Senate members (chamber `S`) and a few `N/A` rows; only `H` is used. The
+  snapshot is end-of-session, and the dbt marts keep only people in `dim_official`, so older sessions have
+  few rows (9 officials in 2017, 151 in 2026). Committee names change between sessions. The metric counts
+  full-committee chairs separately from subcommittee chairs.
+  The `COMMITTEELIST` lists carry no Co-Chair seats at all (2025 regular session: member pages show 3 co-chair posts the list lacks), and 253's list names fewer committees than 251 or 254 (no Conference Committee on Budget, 22 seats; neither of the two property tax special committees, 40 seats), so 253 shows 617 committee seats against 697 in 251 and 685 in 254. The joint committees are in the list. The profile says so under the 253 row.
+- Bill sponsorship success (share of a member's sponsored bills that passed) is not built yet: it needs the
+  bill status from #34, which is in flight in another session.
 - PDF text extraction is cached by PDF content (`data/cache/pdftext/`). Before that, a re-run spent
   3–10 minutes per shard re-parsing PDFs that were already downloaded.
 - Bill status (`fct_bills.status`, `outcome`; `int_bills__status`) comes from each bill's `Action` list. The
@@ -367,8 +384,8 @@ Quirks:
 Flow: [diagrams/sources/senate_efd.svg](diagrams/sources/senate_efd.svg)
 
 - Lands: `senate_efd_filings`, `senate_efd_rows`.
-- Enable with `MOGOV_ACCEPT_SENATE_EFD_TERMS=1`, which accepts the use statement (5 U.S.C. app.
-  105(c)) on your behalf.
+- Enable with `MOGOV_ACCEPT_SENATE_EFD_TERMS=1`, which accepts the use statement (5 U.S.C. § 13107(c),
+  formerly 5 U.S.C. app. § 105(c)) on your behalf.
 
 Quirks:
 - Requests are CSRF-protected, so the loader accepts the use statement and then searches.
@@ -378,6 +395,29 @@ Quirks:
   Denied"), because a plain HTTP client can't pass its browser check. The loader now fails right there with a
   clear error instead of on the next call. It is blocked until the maintainer decides how to proceed
   (see #161). Meanwhile `mogov run --allow-failed-loader senate_efd` builds on the last landed data.
+
+### Alternatives to the eFD scrape (research for #185, checked 2026-10-25)
+
+No free or openly licensed alternative is both current and covers annual reports (LegiStorm, a paid
+subscription, may; its format and terms are unverified). Recommendation: keep the manual import (#190) as the
+working path and ask the Senate Office of Public Records for a sanctioned feed (#277).
+
+| Candidate | Covers | Freshness | Access | Terms | Fit |
+|---|---|---|---|---|---|
+| Senate Office of Public Records (OPR) | everything in eFD | live | no bulk/API/allowlist is published; contact OPRGeneral@sec.senate.gov, (202) 224-0322 | 5 U.S.C. § 13107(c) use limits apply (no unlawful purpose, commercial purpose other than news/communications media, credit rating, or soliciting money) | the only official route; maintainer must ask |
+| `jeremiak/us-senate-financial-disclosure-data` (GitHub) | only `output/transactions.csv`: transaction rows from PTRs and from annual reports' transaction section (no assets, income, liabilities, positions, gifts or travel); 1,824 report ids, 2012 to 2020 filings | last push 2024-01-15; the CSV's newest filing is 2020-06; `reports.json` is broken (3,381 entries, 31 unique) | git clone, no key | CC-BY-SA-4.0 (share-alike), underlying data still subject to § 13107(c) | `report-id` is the eFD UUID, so ids map after lowercasing; stale, useful only as a 2012-2020 cross-check of transactions |
+| `timothycarambat/senate-stock-watcher-data` (GitHub) | PTRs only | last push 2021-03-16; no licence | git clone | none stated | stale, PTRs only |
+| Disclosed Capitol | PTRs (annual reports unclear) | claims minutes | API key, credits, rate limits | bulk resale barred; personal/news use only without written permission | paid, restrictive; do not build on it |
+| [Financial Modeling Prep](https://site.financialmodelingprep.com/developer/docs) `senate-latest` | PTR trades | not verified | API key, paid tiers | commercial vendor terms, not read | PTRs only; not evaluated further |
+| [Quiver Quantitative](https://pypi.org/project/quiverquant/) | congressional trades | not verified | API key, $30/month per the quiverquant PyPI README v0.2.6 (2026-05-07) | terms page not retrievable | PTR trades only |
+| [LegiStorm](https://www.legistorm.com) | Senate PFDs indexed by member, reportedly incl. annual, amendments, termination, new-hire and PTRs; a 2026 Annual report appears on Grassley's page | current | paid subscription | not read | format and terms unverified; possible but needs a subscription decision (see needs-user issue) |
+| Capitol Trades | trades | not verified | no public API; scraping only | terms not retrievable | not usable |
+| OpenSecrets personal finances | members' assets and liabilities | bulk CSV last seen for 2004-2007 (2009 notice) | site closed to our fetch; current terms unverified | CC BY-NC-SA in 2009; commercial use by fee | not verified current |
+
+Notes: every third-party feed re-publishes eFD data, so the § 13107(c) use limits likely apply to it (a legal
+question for the maintainer / OPR). The only candidate with a stable id that maps to our `url` column is jeremiak's
+`report-id`. Third-party feeds carry PTR trades but not annual-report sections (assets, income, liabilities,
+positions, gifts, travel) that `stg_senate_efd__items` needs.
 
 ## courtlistener_bulk: judges and judicial disclosures
 
@@ -433,6 +473,10 @@ Quirks:
   dbt var `case_history_min_year` (default 1975).
 - In the 2026-09 snapshot, 8th Circuit (ca8) opinions stop in August 2019. The API loader covers later
   ones.
+- Time to disposition (`fct_judge_time_to_disposition`): only the federal districts (`moed`, `mowd`) have a
+  judge (`assigned_to_id`) and filing and termination dates on a docket; the state courts (`mo`, `moctapp`)
+  have none, and `ca8` has no judge. Of 173,882 district dockets with a judge, 165,797 have both dates; 93
+  of those end before they were filed (a source error) and are left out of the median.
 - The filtered CSVs are cached per snapshot (`data/cache/courtlistener/mo-*.csv`), so re-runs within
   a quarter are quick. Cases can be up to three months stale; `courtlistener_cases` tops up.
 
@@ -598,10 +642,148 @@ Quirks:
   never count. Add a title to the seed if the payroll renames a position.
 - Names are legal names, "LAST, FIRST M": "LUETKEMEYER, ANTON H" is Tony Luetkemeyer, and "BLACK, JAMES R"
   is Rusty Black. Legislators are therefore matched by surname, chamber and year against the seat history,
-  when exactly one member fits. Others are matched by name. In October 2026, 2025 pay matched 147 of 155
-  representatives and 32 of 33 senators; the rest share a surname with a colleague and use a nickname.
+  when exactly one member fits. The payroll prints suffixes inside the surname ("BRATTIN JR.", "HADEN DVM"),
+  legal compound surnames ("WALSH MOORE, BRIDGET" is Bridget Moore, "SCOBEE POUCHE, SEAN" is Sean Pouche),
+  and "VANSCHOIACK" for the House roster's "Van Schoiack"; all are compared without those differences.
+  Members who share a surname are paired by first name (Ed = EDWIN, Patty = PATRICIA); one member and one payee
+  left over once the others are paired also pair, at `medium` (Mike Jones = "JONES, MICHAEL J"). A payee also pairs, at `medium`, with the member whose usual
+  name is the payee's middle initial when nobody else fits that way: "SMITH, DAVID C" is David Cody Smith, known as
+  Cody Smith (R, HD163), and "SMITH, DAVID T" is David (Tyson) Smith (D, HD45 then HD46, from 2021). Others are
+  matched by name. Open States gives some seats no start date (stored as
+  1900-01-01), so a seat counts from the member's first roster year in that chamber (House or Senate, each on its own) instead, and a by-name match of
+  legislator pay is held to the years the member sat, unless nobody else holds the surname that year (a final
+  check after a term, or earlier service Open States records as another person: Steve Roberts' 2017-20 House
+  pay stays his because the "Steven" and "Steve" Roberts records are now one person, #263). A payee whose
+  first name fits a member whose seat ended the December before, and who earned under half the year's top pay, is
+  that member's final check and does not compete for the seats held now ("BLACK, LINDA R." 2017 beside Rusty
+  Black's "BLACK, JAMES R"). In October 2026, 2025 pay
+  matched all 155 representatives and all 33 senators.
 - The current year's dataset appears in January of the following year.
 - Federal officials (Congress, federal judges) are paid by the U.S. and are not in this source.
+
+## mo_sos_elections: Missouri Secretary of State official election returns
+
+Flow: [diagrams/sources/mo_sos_elections.svg](diagrams/sources/mo_sos_elections.svg)
+
+The Secretary of State's certified returns (https://www.sos.mo.gov/elections/results): one statewide "Grand
+Totals" PDF per general and primary election, as announced by the Board of State Canvassers. Each race lists
+its candidates with party, votes and percentage of votes, and "n of n Precincts Reported". Judicial retention
+(Supreme Court, Court of Appeals, and circuit judges under the nonpartisan plan) is a Yes Votes / No Votes pair per judge.
+Two marts come from it: `fct_election_races` (winner, runner-up, margin, uncontested flag, write-in share;
+serves the uncontested-wins award in #28) and `fct_judicial_retention` (Yes and No votes, Yes %).
+
+- Lands: `mo_sos_election_rows`, one row per printed PDF line: the PDF url, page and line, the verbatim text, a
+  structural `kind` (contest `header`, `candidate`, `total`, `party_total`, `other`), the contest's sequence number in
+  the PDF and, for candidate rows, the cells (name, party, votes, % as printed). Nothing is cleaned in Python; parsing
+  numbers, write-in flags and contest types is dbt (`stg_mo_sos_elections__*`).
+- Coverage: the 14 general and primary elections from August 2012 to November 2024 (7 generals, 7 primaries; about
+  17,700 lines). The election list is read from the results page on every run, so each new canvassed election is picked
+  up by re-running the loader. Not loaded: presidential preference primaries (a different layout with no party
+  column, party codes and "Last, First" names; the March 2020 PDF has no text layer at all), the single-district
+  special-election PDFs, the "Results by County" PDFs, the 1996-2011 results (a separate page, not verified), the
+  precinct files (sold by the Elections Division) and Election Night Reporting (`enr.sos.mo.gov`, JavaScript with no
+  downloads). The August 2026 primary is on Election Night Reporting only until its PDF is posted.
+- Terms: none stated on the site. The loader sends the project User-Agent, fetches one PDF at a time with a
+  2 second delay, and caches PDFs for good once an election is four months old (the newest is re-checked daily).
+- Shard units: elections (one PDF each); the PDFs are small (about 1 MB), so a full run takes about 90 seconds.
+
+Quirks:
+- Column positions, not text, separate the name from the party: the loader clusters words into lines and splits a
+  candidate row at the party column (left of the header's "Party" word minus 30 points). Names with commas or
+  suffixes ("Emanuel Cleaver, II", "John A. Hartwig, Jr.") stay whole.
+- A president/vice-president ticket wraps onto the next line in some years, so the running mate's last name can be
+  missing or on a separate `other` line ("Hillary Rodham Clinton, Timothy", then "Michael Kaine").
+- In a primary a contest lists every party's candidates with "Party Total" lines; percentages are within the party.
+  Each party's ballot is one race in `fct_election_races` (`race_party`), and "Total Votes" spans all parties.
+- A Court of Appeals header can list several judges (2014-2022), each a Yes row followed by a No row. `subcontest_seq`
+  counts the Yes rows. In 2022 the PDF prints a single "Total Votes" for four judges (the first judge's), so the
+  reconciliation test only compares contests with a total per judge.
+- Typos and layout losses in the PDFs, kept as printed: 2016 "No Votes 252,827 59.5" (the "%" lost; parsed), 2016
+  "No Votes 40.9%" (the vote count lost; the judge keeps the Yes figures and `no_votes` is null), and 2018 State
+  Representative District 66 prints its total on two lines ("10,376" and "Total Votes"). The 2014-2020 ballot
+  measures use an older layout ("Constitutional Amendment 1 Ballot Issue Yes: 499,581 Yes: 50.1%", then "No: 497,091
+  No: 49.9%"). The loader lands those lines unsplit (`kind = other`); `stg_mo_sos_elections__lines` recognises them and
+  gives them the same cells as the other years (#331).
+- 2014 primary Constitutional Amendment 1 (right to farm): the printed Yes 499,581 / No 497,091 lines are pre-recount
+  and uncertified. The certified recount gave Yes 499,963 / No 497,588, and the printed Total Votes 997,551 is the
+  recount total. A ballot-measure mart must not treat the staged Yes/No rows as certified for this measure. Amendment 9
+  on the same page (729,750 + 246,515 = 976,265, printed 976,267) is a 2-vote inconsistency in the PDF itself.
+- Candidate-less ballots: a Yes/No pair named like the contest title is a ballot measure (staged as
+  `contest_kind = 'ballot_issue'`, not in a mart); otherwise it is retention.
+- Uncontested means exactly one candidate on the ballot, write-ins not counted (a write-in with 19 votes does not
+  make the race contested). `write_in_share` carries the write-in votes for the 5% rule. In a primary it is per party
+  ballot. Races whose only entries are write-ins are dropped. Winner is the top vote getter; the PDFs do not print the
+  number of seats, so a vote-for-two race would show its second seat as the runner-up.
+- Margin is winner minus runner-up (write-ins excluded) in votes and in points of the race's total votes
+  (`margin_pct`), null when uncontested. Retention is `is_retained` when Yes votes exceed No votes (the printed Yes share above 50 where the No line is lost).
+- Links to officials: `winner_official_id` / `judge_official_id` are set only when the winner is a current official
+  with the same name in the same office and district (suffixes ignored, Supreme Court and Court of Appeals judges by
+  name); losers, former officials and circuit judges are unlinked. Officials who moved districts after redistricting
+  therefore do not link for older elections.
+- Checks: contest vote sums equal the PDF's printed totals where a total exists (3,481 of 3,486 contests and judges),
+  printed percentages sum to 100 within rounding, and figures copied from the 2024 general PDF (Governor, U.S.
+  Senator, State Representative districts 33 and 34, Broniec 63.1% and Gooch 62.2%) are asserted exactly.
+- Special elections on primary day: the 2014-08-05 primary PDF also holds three special elections for unexpired terms
+  (State Representative districts 67, 120 and 151, titled "..., unexpired"). They print no "Party Total" lines and
+  their percentages sum to 100 across the whole contest, so they are one race across parties (`race_party` is null),
+  not one uncontested race per party. A primary contest is split by party only when it prints Party Total lines
+  (`stg_mo_sos_elections__contests.has_party_totals`).
+- The 2020 general PDF's header reads "Unofficial Election Returns" even though it is the Secretary of State's
+  Grand Totals file for that election; the loader does not rely on the header.
+- A candidate or contest name that wraps onto a second PDF line can be cut off at the first line (the second line
+  is not rejoined). Examples: 2018 primary "William Christopher (Chris) McDonough", 2018 general "Martin Luther
+  Dzerzhinsky Lindstedt", and the 2020 header "Associate Circuit Judge - Circuit 22 - Div 24 & 29".
+
+## mo_state_expenditures: Missouri state expenditures
+
+Flow: [diagrams/sources/mo_state_expenditures.svg](diagrams/sources/mo_state_expenditures.svg)
+
+data.mo.gov's "<fiscal year> State Expenditures" datasets (the Missouri Accountability Portal's spending data):
+for each fiscal year (July to June), the total each state agency paid each payee per category and detail line.
+Under the agency `LEGISLATURE` it lists every legislator's per diem (`LEGISLATIVE DAILY EXPENSE ALLOWANCE`) and
+`IN-STATE MILEAGE`; every other agency's rows are payments to vendors and people. `fct_legislator_expenses`
+pairs the legislators with officials.
+
+- Lands: `mo_state_expenditures`, one JSON row per dataset row exactly as the API serves it (`fiscal_year`,
+  `agency_name`, `category_description`, `detail_description`, `vendor_name`, `payments_total`, all text), keyed
+  `<fiscal year>:<n>` in `:id` order. All agencies land, about 100,000 to 130,000 rows a year, so the vendor
+  payments are on hand for later use. Optional like the other stage-1 JSON tables: `mogov build` creates an
+  empty placeholder when it has not been loaded.
+- Window: `MOGOV_LOOKBACK_YEARS`, counted as fiscal-year numbers (2017 to 2026 by default: about 1.1M rows).
+  Shard units: fiscal years (one dataset each; ids from the Socrata catalog). Pages of 50,000 rows with a
+  half-second pause; a page that comes back short fails the run rather than landing a partial year.
+- Terms: no licence field on the datasets. The state's data policy (https://mo.gov/data-policy) says the user
+  accepts the data as is, at their own risk, and that "applications using data supplied by this site must
+  include" its disclaimer: "The data made available here has been modified for use from its original source,
+  which is the State of Missouri. THE STATE OF MISSOURI MAKES NO REPRESENTATIONS OR WARRANTY AS TO THE
+  COMPLETENESS, ACCURACY, TIMELINESS, OR CONTENT OF ANY DATA MADE AVAILABLE THROUGH THIS SITE..." (full text on
+  that page). The site that shows this data, and the State Employee Pay data above, must carry that notice;
+  the frontend footer (`Layout.astro`) carries it on every page.
+
+Quirks:
+- A row is one payee's annual total for one agency and detail line, not one payment. FY2023 `LEGISLATURE` has
+  240 per diem rows ($1,799,338.96) and 295 in-state mileage rows ($880,139.52), one per payee.
+- Negative totals are refunds and corrections and are kept (the smallest is -$18,418). No legislator per diem or
+  mileage row has been negative. The largest total is $11.24B (the Medicaid recipient line, FY2026), so the
+  sanity test allows $20B.
+- Payees are people and vendors in one column (`vendor_name`), mixed with lines such as "PROCUREMENT CARD
+  PAYMENT". Legislators appear under their full legal name, "ATCHISON, FRANKLIN DARRELL", where the payroll
+  prints "ATCHISON, FRANKLIN D". Payees therefore pair with officials through the payroll names already matched
+  in `fct_salaries` (same legal-name form), not through the officials' own names: surname without suffixes plus
+  a fitting first name, middle initials that agree when both sides carry one ("SMITH, DAVID T" is not "SMITH,
+  DAVID C"), and a payroll row in the fiscal year's calendar years (fiscal year 2023 is July 2022 to June 2023,
+  so 2022 or 2023 payroll). One best-fitting official and one payee per official, line and year are required;
+  otherwise the payee is left out. `high` means equal first names and either a shared middle initial or a
+  surname no other legislator on the payroll holds that year; nicknames ("DAVE" for David) and shared surnames
+  without a middle initial are `medium`.
+- Because the payroll rows come from `fct_salaries`, which covers current officials, former legislators' per
+  diem is not linked. In October 2026, fiscal year 2026 paired 176 of 193 per diem payees (162 high), fiscal year
+  2025 paired 177 of 241, and the share falls to 19 of 229 for fiscal year 2017. Unpaired payees are former members.
+- The portal serves an occasional sparse row with only some columns set (FY2025 has `fiscal_year: "KEVIN KRAUS"`
+  and `agency_name: "11408"`). It lands as published and staging drops it.
+- Datasets are replaced when the state republishes them (FY2023 `rowsUpdatedAt` 2024-09-26), so a run replaces
+  the whole fiscal year. The fiscal year numbered 2026 ended in June 2026; the next appears after it closes.
+- Per diem is claimed per day attended and mileage follows distance, so neither is a measure of performance.
 
 ## epa_frs: EPA Facility Registry Service
 
@@ -619,11 +801,31 @@ business registry has no bulk export, the Missouri Accountability Portal's vendo
 (see Quirks), and Census County Business Patterns has counts but no names. FRS covers regulated sites only, so
 offices, shops and most service businesses are missing.
 
-- Lands: `epa_frs_facilities`, `epa_frs_organizations`, `epa_frs_naics`, `epa_frs_sic`, one row per CSV row of
-  `MO_FACILITY_FILE.CSV`, `MO_ORGANIZATION_FILE.CSV`, `MO_NAICS_FILE.CSV` and `MO_SIC_FILE.CSV` from the Missouri state file
+- Lands: `epa_frs_facilities`, `epa_frs_organizations`, `epa_frs_naics`, `epa_frs_sic`, `epa_frs_alt_names`, one row per CSV row of
+  `MO_FACILITY_FILE.CSV`, `MO_ORGANIZATION_FILE.CSV`, `MO_NAICS_FILE.CSV`, `MO_SIC_FILE.CSV` and `MO_ALTERNATIVE_NAME_FILE.CSV` from the Missouri state file
   (`https://ordsext.epa.gov/FLA/www3/state_files/state_combined_mo.zip`, about 35 MB). The payload is the row
   as a JSON object keyed by the CSV header.
-- Shard units: the four CSV files. The zip is downloaded once and shared.
+- Shard units: the five CSV files. The zip is downloaded once and shared.
+- U+FFFD in EPA's own file: the state zip already contains the replacement character (bytes EF BF BD) in a few
+  names and addresses (4 in `MO_FACILITY_FILE.CSV`, 2 in `MO_ORGANIZATION_FILE.CSV`, 8 in the alternative-name file),
+  where EPA lost a non-ASCII letter. The loader decodes strictly, so it adds none; raw stays as EPA sent it.
+  EPA's other records spell the same words without an accent ("DECOR PLUS", "MARBLE DECOR INC" in its program and
+  alternative-name files), so nothing attests "DÉCOR". Staging repairs a name that has U+FFFD in this order: a row of the
+  `epa_frs_name_corrections` seed (a maintainer override; each row cites the EPA record that attests it), else the
+  alternative name from `stg_epa_frs__alt_names` (`MO_ALTERNATIVE_NAME_FILE`, one row per program record) with the same
+  registry id (organizations: the same registry id, program system and program id) that equals the damaged name with
+  each run of U+FFFD standing for exactly one character (`mogov.damaged_name_pattern`; "D�COR PLUS" matches
+  "DECOR PLUS", "MARBLE D��COR INC" matches "MARBLE DECOR INC", "DECORATING PLUS" does not), when exactly one distinct
+  alternative name fits; with none or two different fits, the U+FFFD is dropped. The generic rule covers all three
+  damaged names seen so far (the facilities DECOR PLUS and MARBLE DECOR INC, and the DECOR PLUS owner and operator
+  rows). The seed still holds those three known cases, so a raw directory without alternative names builds with the
+  same names; once alternative names are loaded its rows are redundant and can be retired, and it stays for a future
+  name the alternatives cannot repair. The 2026-10 address
+  with U+FFFD ("17123 HWY 60�") has no alternative and just loses the character. `assert_replacement_char_fixed`
+  fails if one survives; `assert_epa_frs_name_correction_keys_exist` fails if a seed row matches no staged row. A raw
+  directory landed before `epa_frs_alt_names` existed gets an empty placeholder from `mogov build`; the seed covers the
+  known cases until `mogov load epa_frs` is re-run (a new damaged name would then lose its letter).
+  `stg_epa_frs__alt_names` mirrors raw, so alternative names containing U+FFFD stay there; the repairs never use them.
 - `epa_frs_sic` joined the loader after the other three. A raw directory landed before that has no SIC table;
   `mogov build` then creates an empty placeholder (like the other late-added or optional JSON tables in
   `db.OPTIONAL_JSON_TABLES`), so the SIC fallback finds no codes and those sites show no industry until the
@@ -640,9 +842,12 @@ offices, shops and most service businesses are missing.
     sites are filed under legal or subsidiary names ("UNION ELECTRIC CO", "LACLEDE GAS", "SOUTHWESTERN BELL
     TELEPHONE", "KANSAS CITY POWER & LIGHT"). The seed covers the largest corporate donors with Missouri sites.
   - In October 2026: 502 (official, facility) pairs by name and 1,541 more by brand, for 122 officials.
-- Each matched site also carries the matched donors' first and last contribution year, the receiving
-  committee's filing page (`contributions_url`) and `match_confidence` (`medium` when any of that money was tied
-  to the official by name only).
+- Each matched site also carries the matched donors' first and last contribution year, the links
+  (`donor_links`: one line per matched donor and filing page, `<url> <donor name>`. A page is the MEC committee
+  matched to the official, which is not filtered to the donor, or the FEC disbursements of the donor's committee
+  filtered to the receiving committee; a donor filed on both keeps both. Line breaks in a donor name become spaces so a
+  line never splits; in the published sites.csv the cell holds several lines. A donor with no page has no line) and `match_confidence`
+  (`medium` when any of that money was tied to the official by name only).
 - Industry: the NAICS code most of a site's programs give, taking primary codes first (`naics_source` `naics`,
   31% of the geocoded sites in October 2026), then codes FRS leaves UNKNOWN (`naics_unknown`, 2%), then SECONDARY
   ones (`naics_secondary`, 0.1%). A real NAICS code is more precise than a SIC-derived sector, so only a site with
@@ -652,7 +857,10 @@ offices, shops and most service businesses are missing.
   across sectors) to NAICS sector. That gives a sector, not a NAICS code: `int_epa_frs__facilities.naics_code`
   then holds the two-digit sector prefix and `naics_source` is `sic` (23%). Together they cover 56% of the
   geocoded sites; the rest have neither code. Where a site has both, the non-primary NAICS code and the SIC
-  sector agree on the sector for 92% (UNKNOWN) to 98% (SECONDARY) of sites.
+  sector agree on the sector for about 90% of sites; among codes tied on tier and program count, the one in the SIC sector (NAICS 31-33 count as one sector) wins.
+  The SIC sector is ignored for that tie-break when the site's SIC code is itself tied on tier and program count
+  with a SIC code in another sector (the lowest code was picked arbitrarily), and for SIC 1629. This changes the
+  NAICS code of 56 facilities against the lowest-code rule.
   About 10,400 of the SIC-filled facilities are SIC 1629 (heavy construction), likely construction stormwater
   permits. Every seed row was checked in October 2026 against the Census 1987 SIC to 2002 NAICS concordance,
   carried to 2022 NAICS through the Census 2002-2007, 2007-2012, 2012-2017 and 2017-2022 concordances, and
@@ -664,8 +872,9 @@ offices, shops and most service businesses are missing.
   hand table stays rather than a generated one: the concordance has 1,000+ SIC codes mapping to six-digit
   industries and needs a four-file NAICS vintage chain, far more than a sector label needs.
 - `rpt_district_business_industries` counts each official's sites by NAICS sector (`naics_sectors` seed, from
-  the first two digits of `naics_code`, which for a SIC-derived site is already the sector prefix). The profile page ships only the donor sites plus these counts: a
-  U.S. House district holds up to ~10,500 sites, too many for the per-official JSON budget.
+  the first two digits of `naics_code`, which for a SIC-derived site is already the sector prefix). The profile
+  page ships only the donor sites plus these counts: a U.S. House district holds up to ~10,500 sites, too many
+  for the per-official JSON budget.
 
 Quirks:
 - A few rows fuse two records onto one line (a closing quote is missing: `...,"O"110015893693",...`). DuckDB's
@@ -674,9 +883,9 @@ Quirks:
   under `_fields` and drop out in staging.
 - About a third of the sites (36k of 112k in October 2026) have no coordinates and so no district. 54 have
   coordinates outside Missouri.
-- About 44% of geocoded sites have neither a NAICS nor a SIC code (see Industry above), so for many officials
-  the largest per-sector group is "No industry code". FRS programs often leave the NAICS code blank, which is
-  why the SIC fallback exists.
+- About 44% of geocoded sites have neither a NAICS nor a SIC code (see Industry above), so for almost every
+  official (198 of 201 in October 2026) the largest per-sector group is "No industry code". FRS programs often
+  leave the NAICS code blank, which is why the SIC fallback exists.
 - Organization types are mostly `UNKNOWN`, so government sites are also recognized by name ("City of ...",
   "... County", "... School District", "Public Works") as well as by a government org type or federal agency.
 - One owner per facility is kept: owner/operator, then owner, operator, permittee, preferring a known org
@@ -686,3 +895,26 @@ Quirks:
 - Missouri Accountability Portal (mapyourtaxes.mo.gov, also the "State Expenditures" datasets on data.mo.gov)
   was checked for the same purpose and not used: its files have agency, category, vendor name (cut at 30
   characters) and amount per fiscal year, with no vendor address, and include employees' reimbursements.
+
+## mo_auditor: Missouri State Auditor audit reports
+
+Flow: [diagrams/sources/mo_auditor.svg](diagrams/sources/mo_auditor.svg)
+
+- Site: https://auditor.mo.gov/AuditReport/Reports, backed by the JSON list `/AuditReport/SearchAudits`. No auth. The loader
+  keeps to about 1 request a second.
+- Lands: `mo_auditor_reports` (the list rows verbatim plus `search_year`) and `mo_auditor_ratings` (the rating sentence read
+  from a PDF, with its url, page and extraction status). First full run: 3,494 reports (1999 to 2026), 1,125 PDFs read,
+  about 30 minutes.
+- Quirks:
+  - An unfiltered list call returns only the newest 1,000 rows, so the loader asks one year at a time and fails loudly if a
+    year ever reaches 1,000.
+  - The rating is not in the list. It is the sentence "In the areas audited, the overall performance of this entity was
+    Good." in the one-page Citizens Summary PDF (`citz_sum_fk`) or, when there is none, in the first pages of the full
+    report. pdfplumber sometimes splits a word of that sentence, so the match ignores spaces.
+  - Ratings start in 2012. Financial statements, monthly filing reports, follow-ups, property tax rate filings and
+    compilations are never rated and are not downloaded. Performance audits and special reports have no sentence (status
+    `no_rating_sentence`). A few 2012-2014 summaries left the template unfilled ("was XXXX"); staging gives them no rating
+    (`placeholder_rating`).
+  - The ratings cover only the areas audited. A county's rating is the county's, never one official's: only audits of a
+    statewide office (seed `mo_auditor_statewide_entities`) are linked to an officeholder, and then only to whoever held
+    the office on the release date ("in office when published", not "audited"), and only for current officials.

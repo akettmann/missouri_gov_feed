@@ -1,8 +1,15 @@
 // rpt_awards for the awards page: each award ranks one measured number within one office, paired with its
 // opposite. The ranking itself is done in dbt; this only attaches names and links.
+import {
+  assertKnownPeriodKinds,
+  assertPeriodKindColumn,
+  awardCyclesGate,
+  legacyPeriodKind,
+  type PeriodKind,
+} from "./awardDefs";
 import { hasExport, query } from "./db";
 import { currentAwards, pluralOfficeLabel, type Badge } from "../awardBadges";
-import { allOfficials, officialIndex } from "./load";
+import { allOfficials } from "./load";
 
 export interface AwardEntry {
   rank: number;
@@ -18,11 +25,25 @@ export interface AwardList {
   award: string;
   office: string;
   period: string;
+  /** From rpt_awards.period_kind: a calendar year, a two-year FEC cycle (even end year) or lifetime. */
+  period_kind: PeriodKind;
   group_size: number;
   entries: AwardEntry[];
 }
 
-export { AWARD_PAIRS, AWARDS } from "./awardDefs";
+export {
+  AWARD_PAIRS,
+  AWARDS,
+  assertCyclePeriods,
+  assertKnownPeriodKinds,
+  assertPeriodKindColumn,
+  awardCyclesGate,
+  skipAwardCyclesCheck,
+  cycleLabel,
+  isCycleList,
+  officeHasCycles,
+  periodWhen,
+} from "./awardDefs";
 
 let cache: Promise<AwardList[] | null> | undefined;
 
@@ -34,11 +55,20 @@ export function awardLists(): Promise<AwardList[] | null> {
 
 async function load(): Promise<AwardList[] | null> {
   if (!hasExport("rpt_awards")) return null;
+  const columns = await query<{ column_name: string }>(
+    "select column_name from (describe select * from {rpt_awards})",
+  );
+  const hasKind = assertPeriodKindColumn(
+    columns.map((c) => c.column_name),
+    process.env,
+    console.warn,
+  );
   const officials = new Map((await allOfficials()).map((b) => [b.official.official_id, b.official]));
   const rows = await query<{
     award: string;
     office: string;
     period: string;
+    period_kind: PeriodKind;
     award_rank: number;
     official_id: string;
     metric: number;
@@ -46,7 +76,7 @@ async function load(): Promise<AwardList[] | null> {
     group_size: number;
     streak_years: number | null;
   }>(`
-    select award, office, period, cast(award_rank as integer) as award_rank, official_id,
+    select award, office, period, ${hasKind ? "period_kind" : "cast(null as varchar) as period_kind"}, cast(award_rank as integer) as award_rank, official_id,
            cast(metric as double) as metric, cast(sample_size as double) as sample_size,
            cast(group_size as integer) as group_size, cast(streak_years as integer) as streak_years
     from {rpt_awards} order by award, office, period, award_rank`);
@@ -55,10 +85,12 @@ async function load(): Promise<AwardList[] | null> {
     const o = officials.get(r.official_id);
     if (!o) continue;
     const key = `${r.award}|${r.office}|${r.period}`;
+    const kind = hasKind ? r.period_kind : legacyPeriodKind(r.award, r.office, r.period);
     const list = lists.get(key) ?? {
       award: r.award,
       office: r.office,
       period: r.period,
+      period_kind: kind,
       group_size: r.group_size,
       entries: [],
     };
@@ -73,17 +105,16 @@ async function load(): Promise<AwardList[] | null> {
     });
     lists.set(key, list);
   }
-  return [...lists.values()];
+  const out = [...lists.values()];
+  assertKnownPeriodKinds(out);
+  awardCyclesGate(out, process.env, console.warn);
+  return out;
 }
 
 let currentCache: Promise<Map<string, Badge[]>> | undefined;
 
 /** slug -> the awards that official holds now (empty map when the export is missing). */
 export function currentAwardsBySlug(): Promise<Map<string, Badge[]>> {
-  currentCache ??= Promise.all([awardLists(), officialIndex()]).then(([lists, index]) => {
-    const titles = new Map(index.map((o) => [o.office, o.office_title]));
-    const label = (office: string) => pluralOfficeLabel(office, titles.get(office));
-    return currentAwards(lists ?? [], label);
-  });
+  currentCache ??= awardLists().then((lists) => currentAwards(lists ?? [], pluralOfficeLabel));
   return currentCache;
 }

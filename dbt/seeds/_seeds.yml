@@ -165,6 +165,17 @@ seeds:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [industry, subject_name]
+  - name: election_office_keys
+    description: >
+      Maps an office as titled in the Secretary of State's election returns (the part of a contest title before
+      " - ", as fct_election_races.office) to the dim_official office of the same elected position, so a winner
+      can be linked to the current official. Judges are linked only for the Supreme Court and Court of Appeals.
+      Add a title if the returns rename one (the 2012-2018 files print "Lt. Governor" and "Treasurer").
+    columns:
+      - name: office
+        data_tests: [unique, not_null]
+      - name: official_office
+        data_tests: [not_null]
   - name: mo_payroll_office_titles
     description: >
       The position titles on Missouri's state payroll (mo_employee_pay) that are elected or judicial offices,
@@ -246,3 +257,53 @@ seeds:
         description: Maintainer who reviewed the row; empty until reviewed.
       - name: checked_on
         description: Date the maintainer reviewed the row; empty until reviewed.
+  - name: epa_frs_name_corrections
+    description: >
+      Maintainer overrides for EPA FRS names whose raw text contains U+FFFD (EPA's file lost a non-ASCII letter).
+      Staging repairs these by itself from the MO_ALTERNATIVE_NAME_FILE (stg_epa_frs__alt_names: the one alternative
+      name that equals the damaged name with each run of U+FFFD standing for one character), which covers the three
+      names seen so far (DECOR PLUS twice, MARBLE DECOR INC). The seed still holds those three cases so a raw
+      directory landed before the alternative-name table existed (mogov build gives it an empty placeholder) repairs
+      them too; once alternative names are loaded the rows are redundant (they agree with the alternative names) and
+      can be retired. Add a row only when the alternative names cannot repair a name (none, or two different
+      matches); a row wins over the alternative name.
+      Every row cites the EPA record that attests the value, never a guess. Applied in stg_epa_frs__facilities
+      (record_key = registry_id) and stg_epa_frs__organizations (record_key = registry_id|program_system|program_id)
+      only while the raw text still contains U+FFFD, and to every organization row on that key, so a row must not be
+      used where two affiliations on one program record have different names. Any other U+FFFD is dropped.
+    config:
+      column_types: {record_key: varchar, field: varchar, corrected_value: varchar, source: varchar}
+    columns:
+      - name: record_key
+        data_tests: [unique, not_null]
+      - name: field
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [facility_name, org_name]
+      - name: corrected_value
+        data_tests: [not_null]
+      - name: source
+        data_tests: [not_null]
+  - name: mo_auditor_statewide_entities
+    description: >
+      Audit report titles that audit a statewide elected office, matched as a case-insensitive prefix of the
+      Auditor's report title (titles vary by year: "Office of State Treasurer", "Office of the State Treasurer/
+      Year Ended June 30, 2011", "State Treasurer's Office"). `office` is the key in statewide_officials. Only
+      these audits are linked to an officeholder (fct_audit_reports); a county audit never is, because the
+      Auditor's summary says the rating "does not indicate the performance of any one elected official".
+      Add a prefix when a new title form appears (assert_audit_statewide_titles_map_to_one_office checks that
+      none matches two offices).
+    config:
+      column_types: {title_prefix: varchar, office: varchar}
+    columns:
+      - name: title_prefix
+        data_tests: [unique, not_null]
+      - name: office
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('statewide_officials')
+                field: office

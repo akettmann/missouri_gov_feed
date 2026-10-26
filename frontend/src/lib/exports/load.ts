@@ -4,6 +4,9 @@
 import { createHash } from "node:crypto";
 import { DONOR_GROUP_SQL } from "../rollups";
 import { exportedAt, hasExport, query } from "./db";
+import { buildCommitteeSessions, type PostCounts, type TitledMembership } from "../committeePosts";
+import { payYearsGate, type PayVoteRow } from "../attendancePay";
+import { loadLegislatorExpenses } from "./legislatorExpenses";
 import { groupPast, linkSameName, type RosterRow } from "./past";
 import { sampleDonorCycles, sampleGiftRollup, sampleTopDonors } from "./fixtures";
 import type {
@@ -31,6 +34,7 @@ import type {
   PastPerson,
   PeerStrip,
   SubjectVotes,
+  TimeToDisposition,
   TopDonorRow,
 } from "./types";
 
@@ -186,9 +190,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
     Pick<CommitteeTrail, "committee_name" | "committee_total_amount" | "source_url" | "donors">
   >();
   if (hasTrails && trailRows.length > 0) {
-    const ids = [...new Set(trailRows.map((t) => t.mec_committee_id))].map(
-      (id) => `'${id.replaceAll("'", "''")}'`,
-    );
+    const ids = [...new Set(trailRows.map((t) => t.mec_committee_id))];
     for (const r of await query<
       CommitteeDonorRow & {
         mec_committee_id: string;
@@ -196,14 +198,17 @@ async function loadAll(): Promise<OfficialBundle[]> {
         committee_total_amount: number;
         source_url: string;
       }
-    >(`
+    >(
+      `
       select mec_committee_id, committee_name, cast(committee_total_amount as double) as committee_total_amount,
              source_url, cast(donor_rank as integer) as donor_rank, donor_class, donor_name,
              cast(total_amount as double) as total_amount, cast(contribution_count as integer) as contribution_count,
              first_year, last_year, trail_status, donor_mec_committee_id
       from {rpt_committee_donors}
-      where mec_committee_id in (${ids.join(", ")})
-      order by mec_committee_id, donor_rank nulls last`)) {
+      where mec_committee_id in (${ids.map(() => "?").join(", ")})
+      order by mec_committee_id, donor_rank nulls last`,
+      ids,
+    )) {
       const { mec_committee_id, committee_name, committee_total_amount, source_url, ...donor } = r;
       const entry = committeeDonors.get(mec_committee_id) ?? {
         committee_name,
@@ -255,6 +260,27 @@ async function loadAll(): Promise<OfficialBundle[]> {
     peerRows.map(({ party: _party, ...r }) => ({ ...r, peers: peerValues.get(r.peer_group) ?? [] })),
   );
 
+  // The House's own session names (dim_house_session); a missing export or session leaves the label honest ("session code NNN")
+  if (!hasExport("dim_house_session")) {
+    console.warn(
+      "dim_house_session is missing from the exports, so House sessions are labelled by session code instead of the House's session name. Re-export: `uv run mogov build`, then `uv run mogov export --format parquet`.",
+    );
+  }
+  const houseSessionNames = new Map<string, string>(
+    hasExport("dim_house_session")
+      ? (
+          await query<{ session_code: string; session_name: string }>(
+            `select session_code, session_name from {dim_house_session}`,
+          )
+        ).map((r) => [r.session_code, r.session_name])
+      : [],
+  );
+  const withSessionName = <T extends { chamber: string; session_code: string }>(rows: T[]) =>
+    rows.map((r) => ({
+      ...r,
+      session_name: r.chamber === "state_house" ? (houseSessionNames.get(r.session_code) ?? null) : null,
+    }));
+
   const breaks = hasExport("rpt_party_breaks")
     ? groupBy(
         await query<PartyBreak & { official_id: string }>(`
@@ -278,6 +304,17 @@ async function loadAll(): Promise<OfficialBundle[]> {
                  cast(not_voting as integer) as not_voting,
                  cast(recused_from_voting as integer) as recused_from_voting, attendance_pct, chamber_attendance_pct
           from {rpt_attendance} order by first_vote_date`),
+      )
+    : null;
+
+  const attendancePay = hasExport("rpt_attendance_pay")
+    ? groupBy(
+        await query<PayVoteRow & { official_id: string }>(`
+          select official_id, chamber, period, cast(calendar_year as integer) as calendar_year,
+                 cast(voting_years as integer) as voting_years, cast(covered_years as integer) as covered_years,
+                 cast(votes_recorded as integer) as votes_recorded, cast(votes_attended as integer) as votes_attended,
+                 cast(pay_amount as double) as pay_amount, pay_basis, match_confidence, pay_source_url, dollars_per_vote_attended
+          from {rpt_attendance_pay} order by calendar_year`),
       )
     : null;
 
@@ -364,7 +401,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
 
   // A U.S. House district holds up to ~10k EPA sites: ship only the ones tied to a donor (a few hundred at
   // most), grouped under their donor, plus the per-sector counts. A site's donor columns repeat the totals
-  // for its set of donors, so rows sharing donor_names carry the same amount, years and link.
+  // for its set of donors, so rows sharing donor_names carry the same amount, years and links.
   const hasBusinesses =
     hasExport("fct_jurisdiction_businesses") && hasExport("rpt_district_business_industries");
   const districtDonors = new Map<string, DistrictDonor[]>();
@@ -374,7 +411,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
     for (const r of await query<SiteRow>(`
       select official_id, donor_names, cast(donated_amount as double) as donated_amount,
              cast(n_contributions as integer) as n_contributions, first_year, last_year, match_confidence,
-             contributions_url, facility_name, city, naics_description, matched_by, frs_url
+             donor_links, facility_name, city, naics_description, matched_by, frs_url
       from {fct_jurisdiction_businesses} where is_donor
       order by official_id, donated_amount desc, donor_names, facility_name, city`)) {
       const { official_id, facility_name, city, naics_description, matched_by, frs_url, ...donor } = r;
@@ -397,6 +434,32 @@ async function loadAll(): Promise<OfficialBundle[]> {
           order by official_id, sector_code is null, n_sites desc, sector_name`),
       )
     : null;
+
+  // House committee posts: counts from fct_committee_posts, committee names from the titled memberships only
+  const committeeSessions =
+    hasExport("fct_committee_posts") && hasExport("fct_committee_memberships")
+      ? buildCommitteeSessions(
+          await query<PostCounts>(`
+            select official_id, session_code, cast(session_year as integer) as session_year,
+                   cast(committees_held as integer) as committees_held, cast(chair_posts as integer) as chair_posts,
+                   cast(vice_chair_posts as integer) as vice_chair_posts,
+                   cast(co_chair_posts as integer) as co_chair_posts, cast(ranking_posts as integer) as ranking_posts
+            from {fct_committee_posts}`),
+          await query<TitledMembership>(`
+            select official_id, session_code, committee_name, position_name, is_subcommittee
+            from {fct_committee_memberships} where position_name <> 'Member'`),
+          process.env,
+          console.warn,
+          houseSessionNames,
+          new Set(
+            (
+              await query<{ session_code: string }>(
+                `select distinct session_code from {fct_committee_memberships} where source = 'committee_list'`,
+              )
+            ).map((r) => r.session_code),
+          ),
+        )
+      : null;
 
   // a federal appellate judge has ~6k cases: ship yearly counts plus the most recent ones
   const RECENT_CASES = 50;
@@ -430,6 +493,22 @@ async function loadAll(): Promise<OfficialBundle[]> {
           where rank <= ${RECENT_CASES} order by official_id, rank`),
       )
     : null;
+
+  const expenses = await loadLegislatorExpenses();
+  // federal district judges: one row per CourtListener judge, joined to the official by official_id
+  const dispositions = hasExport("fct_judge_time_to_disposition")
+    ? new Map(
+        (
+          await query<TimeToDisposition & { official_id: string }>(`
+            select official_id, cl_person_id, court_id, cast(dockets_assigned as integer) as dockets_assigned,
+                   cast(dockets_with_both_dates as integer) as dockets_with_both_dates,
+                   cast(dockets_ends_before_filed as integer) as dockets_ends_before_filed,
+                   cast(dockets_measured as integer) as dockets_measured,
+                   share_with_both_dates, median_days_to_disposition
+            from {fct_judge_time_to_disposition} where official_id is not null`)
+        ).map((r) => [r.official_id, r]),
+      )
+    : new Map<string, TimeToDisposition>();
 
   return profiles
     .sort((a, b) => (SORT_LEVEL[a.level] ?? 9) - (SORT_LEVEL[b.level] ?? 9))
@@ -478,13 +557,16 @@ async function loadAll(): Promise<OfficialBundle[]> {
         peers: (peers.get(id) ?? []) as PeerStrip[],
         voting: {
           status: status("votes"),
-          party_breaks: breaks ? ((breaks.get(id) ?? []) as PartyBreak[]) : null,
-          attendance: attendance ? ((attendance.get(id) ?? []) as AttendanceRow[]) : null,
+          party_breaks: breaks ? (withSessionName(breaks.get(id) ?? []) as PartyBreak[]) : null,
+          attendance: attendance ? (withSessionName(attendance.get(id) ?? []) as AttendanceRow[]) : null,
+          attendance_pay: attendancePay ? ((attendancePay.get(id) ?? []) as PayVoteRow[]) : null,
           by_subject: subjects ? ((subjects.get(id) ?? []) as SubjectVotes[]) : null,
         },
         overlap: hasOverlap ? ((overlap.get(id) ?? []) as InterestOverlap[]) : null,
+        committees: committeeSessions ? (committeeSessions.get(id) ?? []) : null,
         courts: {
           status: status("cases"),
+          time_to_disposition: dispositions.get(id) ?? null,
           by_year: caseYears
             ? ((caseYears.get(id) ?? []) as { year: number; role: string; cases: number }[])
             : null,
@@ -501,6 +583,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
           committee_trails: trails ? ((trails.get(id) ?? []) as CommitteeTrail[]) : null,
         },
         gifts,
+        expenses: expenses ? (expenses.get(id) ?? []) : null,
         businesses: districtIndustries
           ? {
               donors: districtDonors.get(id) ?? [],
@@ -519,11 +602,29 @@ async function loadAll(): Promise<OfficialBundle[]> {
     });
 }
 
+/**
+ * Fails the build when an official's pay-per-vote year rows do not add up to the dbt total, which means
+ * rpt_attendance and rpt_attendance_pay were exported from different builds: the years label would be wrong.
+ */
+function assertPayYearsConsistent(bundles: OfficialBundle[]): OfficialBundle[] {
+  const bad = payYearsGate(bundles, process.env, console.warn);
+  if (bad.length) {
+    const shown = bad.slice(0, 20).map((m) => `  ${m}`);
+    throw new Error(
+      `Pay per vote: year rows do not match the dbt total for ${bad.length} official(s); rebuild and ` +
+        `re-export rpt_attendance and rpt_attendance_pay together (mogov build, mogov export), or set ` +
+        `MOGOV_SKIP_PAY_YEARS_CHECK=1 to build anyway.` +
+        ["", ...shown].join("\n"),
+    );
+  }
+  return bundles;
+}
+
 let cache: Promise<OfficialBundle[]> | undefined;
 
 /** Every official's bundle; computed once per build and shared by pages and JSON endpoints. */
 export function allOfficials(): Promise<OfficialBundle[]> {
-  cache ??= loadAll();
+  cache ??= loadAll().then(assertPayYearsConsistent);
   return cache;
 }
 
@@ -583,7 +684,11 @@ export function freshness(): { table: string; exported_at: string | null; sample
     "rpt_gift_rollup",
     "rpt_indicator_peers",
     "rpt_party_breaks",
+    "fct_committee_posts",
+    "fct_committee_memberships",
     "rpt_attendance",
+    "rpt_attendance_pay",
+    "dim_house_session",
     "rpt_votes_by_subject",
     "rpt_interest_vote_overlap",
     "fct_jurisdiction_businesses",

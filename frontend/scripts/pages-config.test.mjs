@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import { existsSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { test } from "node:test";
 import { stripTrailingSlash, withBase } from "../src/lib/basePath.ts";
 import { extractLinks, resolveFile } from "./link-check.mjs";
@@ -13,6 +16,10 @@ import {
   pushUrl,
   redactUrl,
   repoFromRemote,
+  beginPush,
+  failureReport,
+  InterruptedError,
+  isInterruptExit,
   withTempDir,
 } from "./pages-config.mjs";
 
@@ -53,6 +60,148 @@ test("repoFromRemote handles https and ssh", () => {
     "akettmann/missouri_gov_feed",
   );
   assert.equal(repoFromRemote("https://example.com/x/y"), null);
+  assert.equal(repoFromRemote("ssh://git@github.com/a/b"), "a/b");
+  assert.equal(repoFromRemote("https://user:tok@github.com/a/b.git"), "a/b");
+});
+
+test("repoFromRemote anchors the host and rejects dot names", () => {
+  assert.equal(repoFromRemote("https://evil.example/github.com/x/y.git"), null);
+  assert.equal(repoFromRemote("C:/x/github.com/a/b"), null);
+  assert.equal(repoFromRemote("/home/me/github.com:a/b"), null);
+  assert.equal(repoFromRemote("https://evil.example/x@github.com/a/b"), null);
+  assert.equal(repoFromRemote("https://evil.com\\@github.com/a/b"), null);
+  assert.equal(repoFromRemote("https://github.com/a/.."), null);
+  assert.equal(repoFromRemote("https://github.com/../b"), null);
+  assert.throws(() => pagesTarget("a/.."));
+});
+
+const tick = () => new Promise((resolve) => setImmediate(resolve));
+
+test("withTempDir: a SIGINT delivered while fn awaits rejects with InterruptedError and removes the dir, unless keep", async () => {
+  for (const keep of [false, true]) {
+    const proc = new EventEmitter();
+    let made;
+    await assert.rejects(
+      withTempDir(
+        "mogov-sigint-",
+        async (dir) => {
+          made = dir;
+          await tick();
+          proc.emit("SIGINT"); // arrives on a later turn of the event loop, as a real signal does
+          await new Promise((r) => setTimeout(r, 2000)); // fn is still busy; the interrupt must win the race
+        },
+        { keep, proc },
+      ),
+      InterruptedError,
+    );
+    assert.equal(existsSync(made), keep);
+    assert.equal(proc.listenerCount("SIGINT"), 0);
+    if (keep) rmSync(made, { recursive: true, force: true });
+  }
+});
+
+test("withTempDir: a SIGINT pending across a synchronous step is only delivered by a yield, and guard.check() yields", async () => {
+  const proc = new EventEmitter();
+  let pushed = false;
+  await assert.rejects(
+    withTempDir(
+      "mogov-pending-",
+      async (_dir, guard) => {
+        // Like a blocking synchronous step (e.g. the dist scan): the signal arrives while the loop is blocked, so its listener cannot
+        // run until the loop turns. Model that with an emit queued for the next turn.
+        setImmediate(() => proc.emit("SIGINT"));
+        const t = Date.now();
+        while (Date.now() - t < 20); // synchronous work; nothing is delivered yet
+        assert.equal(guard.interrupted, false);
+        await guard.check(); // the yield delivers the signal, then check() throws
+        pushed = true;
+      },
+      { proc },
+    ),
+    InterruptedError,
+  );
+  assert.equal(pushed, false);
+  assert.equal(proc.listenerCount("SIGINT"), 0);
+});
+
+test("withTempDir: a further SIGINT during the dir removal is still caught (the listener outlives the removal)", async () => {
+  const proc = new EventEmitter();
+  const seen = [];
+  const remove = (dir, o) => {
+    seen.push(proc.listenerCount("SIGINT")); // a Ctrl+C now must hit our listener, not Node's kill-the-process default
+    assert.equal(proc.emit("SIGINT"), true);
+    rmSync(dir, o);
+  };
+  await assert.rejects(
+    withTempDir(
+      "mogov-twice-",
+      async () => {
+        await tick();
+        proc.emit("SIGINT");
+        proc.emit("SIGINT"); // second Ctrl+C before cleanup: ignored
+        await new Promise((r) => setTimeout(r, 2000));
+      },
+      { proc, remove },
+    ),
+    InterruptedError,
+  );
+  assert.deepEqual(seen, [1]);
+  assert.equal(proc.listenerCount("SIGINT"), 0);
+});
+
+test("isInterruptExit recognises SIGINT, 130 and the Windows Ctrl+C status", () => {
+  assert.equal(isInterruptExit(130, null), true);
+  assert.equal(isInterruptExit(3221225786, null), true);
+  assert.equal(isInterruptExit(null, "SIGINT"), true);
+  assert.equal(isInterruptExit(1, null), false);
+  assert.equal(isInterruptExit(0, null), false);
+});
+
+test("withTempDir leaves no SIGINT listener behind when nothing interrupts", async () => {
+  const proc = new EventEmitter();
+  await withTempDir("mogov-nolistener-", async () => assert.equal(proc.listenerCount("SIGINT"), 1), { proc });
+  assert.equal(proc.listenerCount("SIGINT"), 0);
+  await assert.rejects(
+    withTempDir(
+      "mogov-nolistener-",
+      async () => {
+        throw new Error("boom");
+      },
+      { proc },
+    ),
+    /boom/,
+  );
+  assert.equal(proc.listenerCount("SIGINT"), 0);
+});
+
+test("withTempDir in a real process: SIGINT during an async step removes the dir; the caller exits 130", () => {
+  // Windows cannot deliver a console Ctrl+C to a child from node, so the child raises SIGINT on the real
+  // process object after an await; the real listener, real process.exit and real filesystem are exercised.
+  const script = `
+    import { existsSync } from "node:fs";
+    import { withTempDir, InterruptedError } from ${JSON.stringify(pathToFileURL(path.join(import.meta.dirname, "pages-config.mjs")).href)};
+    let made;
+    try {
+      await withTempDir("mogov-child-", async (dir) => {
+        made = dir;
+        console.log(dir);
+        await new Promise((r) => setTimeout(r, 50));
+        process.emit("SIGINT");
+        await new Promise((r) => setTimeout(r, 5000));
+        console.log("NOT-INTERRUPTED");
+      });
+    } catch (e) {
+      console.log(e instanceof InterruptedError ? "GONE=" + !existsSync(made) : "other");
+      process.exit(130);
+    }
+  `;
+  const r = spawnSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8" });
+  assert.equal(r.status, 130, r.stderr);
+  assert.doesNotMatch(r.stdout, /NOT-INTERRUPTED/);
+  assert.match(r.stdout, /GONE=true/);
+  const dir = r.stdout.trim().split(/\r?\n/)[0];
+  assert.match(dir, /mogov-child-/);
+  assert.equal(existsSync(dir), false);
 });
 
 test("checkLimits flags oversize files and sites", () => {
@@ -98,17 +247,17 @@ test("pushUrl and redactUrl", () => {
   assert.equal(redactUrl("git@github.com:a/b.git"), "git@github.com:a/b.git");
 });
 
-test("withTempDir removes the dir after success and after a throw, unless keep", () => {
+test("withTempDir removes the dir after success and after a throw, unless keep", async () => {
   let seen;
-  withTempDir("mogov-test-", (d) => (seen = d));
+  await withTempDir("mogov-test-", (d) => (seen = d));
   assert.equal(existsSync(seen), false);
   const failing = (d) => {
     seen = d;
     throw new Error("git failed");
   };
-  assert.throws(() => withTempDir("mogov-test-", failing), /git failed/);
+  await assert.rejects(withTempDir("mogov-test-", failing), /git failed/);
   assert.equal(existsSync(seen), false);
-  withTempDir("mogov-test-", (d) => (seen = d), { keep: true });
+  await withTempDir("mogov-test-", (d) => (seen = d), { keep: true });
   assert.equal(existsSync(seen), true);
   rmSync(seen, { recursive: true, force: true });
 });
@@ -139,4 +288,86 @@ test("resolveFile: a file that exists only under the wrong prefix is not found",
   const stat = () => ({ isDirectory: () => false });
   assert.equal(resolveFile("dist", "/b", "/b/a/", exists, stat), null);
   assert.ok(resolveFile("dist", "", "/b/a/", exists, stat));
+});
+
+test("withTempDir: a failing dir removal after an interrupt keeps the interrupt and warns naming the dir", async () => {
+  const proc = new EventEmitter();
+  const warnings = [];
+  let dir;
+  await assert.rejects(
+    withTempDir(
+      "mogov-ebusy-",
+      async (d) => {
+        dir = d;
+        setImmediate(() => proc.emit("SIGINT"));
+        await new Promise(() => {});
+      },
+      {
+        proc,
+        remove: () => {
+          throw new Error("EBUSY");
+        },
+        warn: (m) => warnings.push(m),
+      },
+    ),
+    InterruptedError,
+  );
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /EBUSY/);
+  assert.ok(warnings[0].includes(dir));
+  assert.equal(proc.listenerCount("SIGINT"), 0);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("withTempDir: a failing dir removal after a clean run is still an error", async () => {
+  const proc = new EventEmitter();
+  let dir;
+  await assert.rejects(
+    withTempDir(
+      "mogov-ebusy2-",
+      async (d) => {
+        dir = d;
+      },
+      {
+        proc,
+        remove: () => {
+          throw new Error("EBUSY");
+        },
+      },
+    ),
+    /EBUSY/,
+  );
+  assert.equal(proc.listenerCount("SIGINT"), 0);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("failureReport: message and exit code per failure kind and push state", () => {
+  assert.deepEqual(failureReport(new InterruptedError(), false), {
+    message: "Interrupted; nothing was pushed.",
+    code: 130,
+  });
+  const during = failureReport(new InterruptedError(), true);
+  assert.match(during.message, /push may or may not have completed/);
+  assert.equal(during.code, 130);
+  assert.deepEqual(failureReport(new Error("boom"), true), { message: "boom", code: 1 });
+});
+
+test("beginPush: marks the push started only when no interrupt is pending", async () => {
+  let started = false;
+  await beginPush({ check: async () => {} }, () => (started = true));
+  assert.equal(started, true);
+
+  started = false;
+  await assert.rejects(
+    beginPush(
+      {
+        check: async () => {
+          throw new InterruptedError();
+        },
+      },
+      () => (started = true),
+    ),
+    InterruptedError,
+  );
+  assert.equal(started, false);
 });

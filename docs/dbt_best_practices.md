@@ -29,6 +29,10 @@ projects", and the testing and documentation best practices.
   in #121. Trino/Athena and Spark < 3.3 are not supported (no `regexp_instr`). Regex patterns are plain POSIX ERE;
   `mogov.regex_literal` handles per-adapter string escaping (Snowflake treats backslash as an escape).
 - sqlfluff with the dbt templater in pre-commit and CI.
+- `indirect_selection: buildable` (dbt_project.yml): a test runs only if every model it reads is selected or upstream
+  of the selection. With dbt's default `eager`, `-s +rpt_awards` ran `assert_official_ids_one_per_person` against a
+  stale `int_officeholders__years` and reported failures a full build doesn't produce (#198). To run such a test, select
+  it (`-s +test_name`) so its parents rebuild.
 - Optional inputs gate their models with vars (`mec_direct`, `cl_case_bulk`) instead of failing.
 - A bare `dbt build` can't silently drop optional models: an `on-run-start` hook
   (`macros/optional_inputs.sql`) fails when `mec_direct` / `cl_case_bulk` is off but the raw table exists.

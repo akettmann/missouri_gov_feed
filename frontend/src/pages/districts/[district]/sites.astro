@@ -5,12 +5,14 @@
 import AwardBadges from "../../../components/AwardBadges.astro";
 import type { GetStaticPaths } from "astro";
 import ConfidenceBadge from "../../../components/ConfidenceBadge.astro";
+import DonorLinks from "../../../components/DonorLinks.astro";
 import ConfidenceToggle from "../../../components/ConfidenceToggle.astro";
 import Layout from "../../../layouts/Layout.astro";
 import { districtSiteLists, districtSites } from "../../../lib/exports/districtSites";
 import { allOfficials } from "../../../lib/exports/load";
 import { count, officeLine } from "../../../lib/format";
 import { href } from "../../../lib/site";
+import { siteLinkContexts } from "../../../lib/siteLinkNames";
 
 export const getStaticPaths = (async () => {
   const lists = await districtSiteLists();
@@ -24,6 +26,7 @@ export const getStaticPaths = (async () => {
 const { list, official } = Astro.props;
 const sites = await districtSites(list.district_id);
 const area = officeLine(official);
+const recordContexts = siteLinkContexts(sites);
 ---
 
 <Layout
@@ -47,6 +50,11 @@ const area = officeLine(official);
       </a>{" "}
       · <a href={href(`/officials/${official.slug}/#businesses`)}>Back to the profile</a>
     </p>
+    <p class="small muted">
+      In the CSV, <code>donor_links</code> holds one line per donor and filing page inside one quoted cell,
+      each as <code>&lt;url&gt; &lt;donor name&gt;</code>, separated by line breaks. A donor with no filing
+      page has no line there; <code>donor_names</code> lists every matched donor, separated by "; ".
+    </p>
     <p class="small">
       <ConfidenceToggle />
     </p>
@@ -69,7 +77,7 @@ const area = officeLine(official);
           </tr>
         </thead>
         <tbody>
-          {sites.map((s) => (
+          {sites.map((s, si) => (
             <tr data-confidence={s.match_confidence === "medium" ? "medium" : undefined}>
               <td>{s.facility_name ?? "unnamed site"}</td>
               <td>
@@ -80,13 +88,11 @@ const area = officeLine(official);
               <td>
                 {s.is_donor ? (
                   <>
-                    {s.contributions_url ? (
-                      <a href={s.contributions_url} rel="noopener noreferrer">
-                        {s.donor_names}
-                      </a>
-                    ) : (
-                      s.donor_names
-                    )}{" "}
+                    <DonorLinks
+                      donorNames={s.donor_names}
+                      donorLinks={s.donor_links}
+                      idPrefix={`site${si}`}
+                    />{" "}
                     <ConfidenceBadge confidence={s.match_confidence} />
                     <span class="muted small">
                       {" "}
@@ -101,7 +107,7 @@ const area = officeLine(official);
                 {s.frs_url && (
                   <a href={s.frs_url} rel="noopener noreferrer" target="_blank">
                     EPA record
-                    <span class="sr-only"> for {s.facility_name ?? "unnamed site"}</span>
+                    <span class="sr-only"> {recordContexts[si]}</span>
                     <span aria-hidden="true">↗</span>
                   </a>
                 )}
