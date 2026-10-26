@@ -238,7 +238,9 @@ unit_tests:
       date: a lower amendment number filed later does not supersede a higher one. The base must have been filed
       on or before the amendment (a candidate report amended before the annual report was filed is not
       re-pointed at the annual report), and in the same filing year (a later year's candidate report filed
-      before the amendment is not its base).
+      before the amendment is not its base). Several House amendments of one report are numbered by filing date
+      (1, 2, ...), and the latest wins; same-day amendments are ordered by numeric doc id, not url string order,
+      where 100 sorts before 20 (#463).
     given:
       - input: ref('dim_official')
         rows:
@@ -250,6 +252,7 @@ unit_tests:
           - {official_id: h6, office: us_house, district: 6, family_name: Black}
           - {official_id: h7, office: us_house, district: 7, family_name: Red}
           - {official_id: h8, office: us_house, district: 8, family_name: Gray}
+          - {official_id: h9, office: us_house, district: 9, family_name: Blue}
       - input: ref('stg_senate_efd__items')
         rows:
           - {last_name: Smith, filing_title: Annual Report for CY 2022, submitted_date: '2023-05-15', row_key: a0, document_url: u_a0}
@@ -283,6 +286,10 @@ unit_tests:
           - {doc_id: n1, filing_year: 2023, filing_kind: candidate report, filing_date: '2023-10-01', state_district: MO08, last_name: Gray, document_url: u_n1}
           - {doc_id: n2, filing_year: 2024, filing_kind: candidate report, filing_date: '2024-06-20', state_district: MO08, last_name: Gray, document_url: u_n2}
           - {doc_id: n3, filing_year: 2023, filing_kind: amended report, filing_date: '2024-06-20', state_district: MO08, last_name: Gray, document_url: u_n3}
+          - {doc_id: '9001', filing_year: 2023, filing_kind: annual report, filing_date: '2024-05-01', state_district: MO09, last_name: Blue, document_url: 'https://x/9001.pdf'}
+          - {doc_id: '100', filing_year: 2023, filing_kind: amended report, filing_date: '2024-06-01', state_district: MO09, last_name: Blue, document_url: 'https://x/100.pdf'}
+          - {doc_id: '20', filing_year: 2023, filing_kind: amended report, filing_date: '2024-06-01', state_district: MO09, last_name: Blue, document_url: 'https://x/20.pdf'}
+          - {doc_id: '30', filing_year: 2023, filing_kind: amended report, filing_date: '2024-05-15', state_district: MO09, last_name: Blue, document_url: 'https://x/30.pdf'}
       - input: ref('int_house_fd__schedule_lines')
         rows:
           - {doc_id: d1, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
@@ -304,6 +311,10 @@ unit_tests:
           - {doc_id: n1, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
           - {doc_id: n2, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
           - {doc_id: n3, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: '9001', page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: '100', page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: '20', page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: '30', page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
       - input: ref('int_judges__federal')
         rows:
           - {official_id: j1, fjc_nid: 7}
@@ -346,6 +357,10 @@ unit_tests:
         - {disclosure_item_id: 'house:n2:1:1', report_version: 0, is_latest_version: true}
         - {disclosure_item_id: 'house:n3:1:1', report_version: 1, is_latest_version: true}
         - {disclosure_item_id: 'house:e2', report_version: 1, is_latest_version: false}
+        - {disclosure_item_id: 'house:9001:1:1', report_version: 0, is_latest_version: false}
+        - {disclosure_item_id: 'house:30:1:1', report_version: 1, is_latest_version: false}
+        - {disclosure_item_id: 'house:20:1:1', report_version: 2, is_latest_version: false}
+        - {disclosure_item_id: 'house:100:1:1', report_version: 3, is_latest_version: true}
         - {disclosure_item_id: 'courtlistener:t1', report_version: 0, is_latest_version: false}
         - {disclosure_item_id: 'courtlistener:t2', report_version: 1, is_latest_version: true}
         - {disclosure_item_id: 'courtlistener:t3', report_version: 0, is_latest_version: true}
