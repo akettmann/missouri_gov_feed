@@ -231,13 +231,20 @@ unit_tests:
       is_latest_version. Two AO-10 pdfs for one judge-year (`..._1.pdf` is the duplicate) likewise. A House
       amended report supersedes the annual report, unless it is a scan with no extractable text. Different
       report years, and kinds that are separate filings (periodic transaction reports, Senate candidate
-      reports, which carry no year), are never collapsed (#84).
+      reports, which carry no year), are never collapsed (#84). A House amended report amends the latest
+      annual or candidate report the filer had filed that year by then: one amending a candidate report joins
+      that report's group (it supersedes the candidate report and leaves the annual report alone), and one
+      filed after both a candidate and an annual report amends the annual report (#142). Version beats filing
+      date: a lower amendment number filed later does not supersede a higher one.
     given:
       - input: ref('dim_official')
         rows:
           - {official_id: s1, office: us_senate, family_name: Smith}
           - {official_id: h1, office: us_house, district: 1, family_name: Jones}
           - {official_id: h2, office: us_house, district: 2, family_name: Brown}
+          - {official_id: h4, office: us_house, district: 4, family_name: Green}
+          - {official_id: h5, office: us_house, district: 5, family_name: White}
+          - {official_id: h6, office: us_house, district: 6, family_name: Black}
       - input: ref('stg_senate_efd__items')
         rows:
           - {last_name: Smith, filing_title: Annual Report for CY 2022, submitted_date: '2023-05-15', row_key: a0, document_url: u_a0}
@@ -246,6 +253,9 @@ unit_tests:
           - {last_name: Smith, filing_title: Annual Report for CY 2021, submitted_date: '2022-05-16', row_key: b0, document_url: u_b0}
           - {last_name: Smith, filing_title: Candidate Report, submitted_date: '2017-11-07', row_key: c0, document_url: u_c0}
           - {last_name: Smith, filing_title: Candidate Report  (Amendment 1), submitted_date: '2018-01-22', row_key: c1, document_url: u_c1}
+          - {last_name: Smith, filing_title: Annual Report for CY 2020, submitted_date: '2021-05-17', row_key: f0, document_url: u_f0}
+          - {last_name: Smith, filing_title: Annual Report for CY 2020 (Amendment 2), submitted_date: '2021-06-01', row_key: f2, document_url: u_f2}
+          - {last_name: Smith, filing_title: Annual Report for CY 2020 (Amendment 1), submitted_date: '2021-09-01', row_key: f1, document_url: u_f1}
       - input: ref('stg_house_fd__filings')
         rows:
           - {doc_id: d1, filing_year: 2023, filing_kind: annual report, filing_date: '2024-08-12', state_district: MO01, last_name: Jones, document_url: u_d1}
@@ -254,6 +264,14 @@ unit_tests:
           - {doc_id: d4, filing_year: 2023, filing_kind: periodic transaction report, filing_date: '2023-07-01', state_district: MO01, last_name: Jones, document_url: u_d4}
           - {doc_id: e1, filing_year: 2015, filing_kind: annual report, filing_date: '2016-05-16', state_district: MO02, last_name: Brown, document_url: u_e1}
           - {doc_id: e2, filing_year: 2015, filing_kind: amended report, filing_date: '2016-08-01', state_district: MO02, last_name: Brown, document_url: u_e2}
+          - {doc_id: g1, filing_year: 2023, filing_kind: candidate report, filing_date: '2023-11-13', state_district: MO04, last_name: Green, document_url: u_g1}
+          - {doc_id: g2, filing_year: 2023, filing_kind: amended report, filing_date: '2024-06-21', state_district: MO04, last_name: Green, document_url: u_g2}
+          - {doc_id: i1, filing_year: 2023, filing_kind: annual report, filing_date: '2024-05-15', state_district: MO05, last_name: White, document_url: u_i1}
+          - {doc_id: i2, filing_year: 2023, filing_kind: candidate report, filing_date: '2024-06-01', state_district: MO05, last_name: White, document_url: u_i2}
+          - {doc_id: i3, filing_year: 2023, filing_kind: amended report, filing_date: '2024-07-01', state_district: MO05, last_name: White, document_url: u_i3}
+          - {doc_id: k1, filing_year: 2023, filing_kind: candidate report, filing_date: '2023-03-01', state_district: MO06, last_name: Black, document_url: u_k1}
+          - {doc_id: k2, filing_year: 2023, filing_kind: annual report, filing_date: '2024-05-15', state_district: MO06, last_name: Black, document_url: u_k2}
+          - {doc_id: k3, filing_year: 2023, filing_kind: amended report, filing_date: '2024-08-01', state_district: MO06, last_name: Black, document_url: u_k3}
       - input: ref('int_house_fd__schedule_lines')
         rows:
           - {doc_id: d1, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
@@ -261,6 +279,14 @@ unit_tests:
           - {doc_id: d3, page: 1, line_no: 1, schedule: 'B: transactions', line_text: trade}
           - {doc_id: d4, page: 1, line_no: 1, schedule: 'B: transactions', line_text: trade}
           - {doc_id: e1, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: g1, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: g2, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: i1, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: i2, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: i3, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: k1, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: k2, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: k3, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
       - input: ref('int_judges__federal')
         rows:
           - {official_id: j1, fjc_nid: 7}
@@ -285,6 +311,17 @@ unit_tests:
         - {disclosure_item_id: 'house:d3:1:1', report_version: 0, is_latest_version: true}
         - {disclosure_item_id: 'house:d4:1:1', report_version: 0, is_latest_version: true}
         - {disclosure_item_id: 'house:e1:1:1', report_version: 0, is_latest_version: true}
+        - {disclosure_item_id: 'senate:f0', report_version: 0, is_latest_version: false}
+        - {disclosure_item_id: 'senate:f1', report_version: 1, is_latest_version: false}
+        - {disclosure_item_id: 'senate:f2', report_version: 2, is_latest_version: true}
+        - {disclosure_item_id: 'house:g1:1:1', report_version: 0, is_latest_version: false}
+        - {disclosure_item_id: 'house:g2:1:1', report_version: 1, is_latest_version: true}
+        - {disclosure_item_id: 'house:i1:1:1', report_version: 0, is_latest_version: true}
+        - {disclosure_item_id: 'house:i2:1:1', report_version: 0, is_latest_version: false}
+        - {disclosure_item_id: 'house:i3:1:1', report_version: 1, is_latest_version: true}
+        - {disclosure_item_id: 'house:k1:1:1', report_version: 0, is_latest_version: true}
+        - {disclosure_item_id: 'house:k2:1:1', report_version: 0, is_latest_version: false}
+        - {disclosure_item_id: 'house:k3:1:1', report_version: 1, is_latest_version: true}
         - {disclosure_item_id: 'house:e2', report_version: 1, is_latest_version: false}
         - {disclosure_item_id: 'courtlistener:t1', report_version: 0, is_latest_version: false}
         - {disclosure_item_id: 'courtlistener:t2', report_version: 1, is_latest_version: true}

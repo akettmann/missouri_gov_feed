@@ -577,6 +577,9 @@ Quirks:
   items only over `is_latest_version`; the filing list shows all. It assumes an amendment restates the whole
   report, and a House amendment that is a scan with no extractable text never supersedes a readable report.
   Periodic transaction reports, candidate reports and extension requests are separate filings, never collapsed.
+  The Clerk index does not say which report a House amendment amends, so it is taken to amend the latest annual or
+  candidate report the filer filed that year on or before it (a candidate-report amendment supersedes that candidate
+  report only) (#142).
 
 ## courtlistener_case_bulk: case history from bulk files
 
