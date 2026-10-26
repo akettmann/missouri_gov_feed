@@ -17,13 +17,6 @@ const x = (v: number) => PAD + ((Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo)
 const jitter = (i: number) => ((i * 37) % 11) - 5;
 const fmt = (v: number | null) =>
   v == null ? "—" : strip.indicator === "party_unity_pct" ? `${v.toFixed(1)}%` : v.toFixed(2);
-const CHAMBERS: Record<string, string> = {
-  state_house: "Missouri House",
-  state_senate: "Missouri Senate",
-  us_house: "U.S. House",
-  us_senate: "U.S. Senate",
-};
-const where = CHAMBERS[strip.chamber] ?? strip.chamber;
 // party medians are short ticks above (Republican) and below (Democratic) the line; their labels live in the
 // HTML key, because SVG text scales with the card and is unreadable on phones or oversized on desktop
 const medians = [
@@ -31,7 +24,7 @@ const medians = [
   { label: "Democratic median", value: strip.democratic_median, y1: 50, y2: 62 },
 ].filter((m) => m.value != null);
 const summary =
-  peerStripLead(strip.peer_count, where, strip.period) +
+  peerStripLead(strip.peer_count, strip.chamber, strip.indicator, strip.period) +
   " " +
   `this official ${fmt(strip.value)}, median ${fmt(strip.peer_median)}` +
   medians.map((m) => `, ${m.label} ${fmt(m.value)}`).join("") +
