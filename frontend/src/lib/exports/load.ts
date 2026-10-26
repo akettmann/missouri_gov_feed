@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { DONOR_GROUP_SQL } from "../rollups";
 import { groupBySiteDonors, siteKey } from "../siteDonors";
 import { siteDonors } from "./businessDonors";
+import { overlapExamplesSql } from "./overlapQuery";
 import { trailRowsSql } from "./trailQuery";
 import { exportedAt, hasExport, query } from "./db";
 import { buildCommitteeSessions, type PostCounts, type TitledMembership } from "../committeePosts";
@@ -386,14 +387,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
     for (const r of await query<
       InterestOverlap["examples"][number] & { official_id: string; industry: string }
     >(`
-      select official_id, industry, cast(vote_date as varchar) as vote_date, bill, short_title, vote_cast,
-             vote_source_url, bill_source_url
-      from (
-        select *, row_number() over (partition by official_id, industry order by vote_date desc, bill, vote_id, chamber) as rank
-        from {rpt_interest_vote_overlap}
-      ) ranked
-      where rank <= 5
-      order by official_id, industry, rank`)) {
+      ${overlapExamplesSql(5, "{rpt_interest_vote_overlap}")}`)) {
       const { official_id, industry, ...ex } = r;
       const key = `${official_id}|${industry}`;
       examples.set(key, [...(examples.get(key) ?? []), ex]);
