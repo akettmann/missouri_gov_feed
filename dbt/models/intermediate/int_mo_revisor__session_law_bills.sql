@@ -51,6 +51,7 @@ with notes as (
     select
         section_id,
         section_version_id,
+        'history' as note_kind,
         history_note as note
     from {{ ref('stg_mo_revisor__sections') }}
     where history_note is not null
@@ -60,6 +61,7 @@ with notes as (
     select
         section_id,
         section_version_id,
+        'repeal' as note_kind,
         note
     from {{ ref('stg_mo_revisor__repeals') }}
     where change_kind = 'repealed'
@@ -69,6 +71,7 @@ normalized as (
     select
         section_id,
         section_version_id,
+        note_kind,
         -- one separator between acts; "et al." belongs to the act before it
         {{ mogov.normalize_session_law_note('note') }} as note
     from notes
@@ -83,6 +86,7 @@ acts as (
     select
         o.section_id,
         o.section_version_id,
+        o.note_kind,
         s.n as act_index,
         trim({{ mogov.split_part_at('o.note', "', '", 's.n', max_acts) }}) as act
     from normalized as o
@@ -95,6 +99,7 @@ acts_marked as (
     select
         section_id,
         section_version_id,
+        note_kind,
         act_index,
         act like '@%' as after_and_l,
         {{ mogov.regex_replace_all('act', '^@', '') }} as act
@@ -115,22 +120,25 @@ last_break as (
     select
         c.section_id,
         c.section_version_id,
+        c.note_kind,
         c.act_index,
         max(b.act_index) as break_index
     from acts_flagged as c
     inner join acts_flagged as b
         on
             c.section_version_id = b.section_version_id
+            and c.note_kind = b.note_kind
             and c.act_index > b.act_index
             and not b.is_continuation
     where c.is_continuation
-    group by c.section_id, c.section_version_id, c.act_index
+    group by c.section_id, c.section_version_id, c.note_kind, c.act_index
 ),
 
 acts_resolved as (
     select
         section_id,
         section_version_id,
+        note_kind,
         act_index,
         after_and_l,
         act
@@ -142,6 +150,7 @@ acts_resolved as (
     select
         c.section_id,
         c.section_version_id,
+        c.note_kind,
         c.act_index,
         h.after_and_l,
         -- the head's "A.L. 1978" (and session), then the continuing piece
@@ -149,9 +158,15 @@ acts_resolved as (
         || ' ' || {{ mogov.regex_replace_all('c.act', '^merged with ', '') }} as act
     from acts_flagged as c
     inner join last_break as l
-        on c.section_version_id = l.section_version_id and c.act_index = l.act_index
+        on
+            c.section_version_id = l.section_version_id
+            and c.note_kind = l.note_kind
+            and c.act_index = l.act_index
     inner join acts_flagged as h
-        on l.section_version_id = h.section_version_id and l.break_index = h.act_index
+        on
+            l.section_version_id = h.section_version_id
+            and l.note_kind = h.note_kind
+            and l.break_index = h.act_index
     where
         c.is_continuation
         and h.is_head
@@ -178,7 +193,7 @@ anchored as (
     select
         *,
         max(case when not after_and_l then act_index end) over (
-            partition by section_id, section_version_id
+            partition by section_id, section_version_id, note_kind
             order by act_index
         ) as anchor_index
     from own_change
@@ -196,6 +211,7 @@ inherited_change as (
         on
             a.section_id = p.section_id
             and a.section_version_id = p.section_version_id
+            and a.note_kind = p.note_kind
             and a.anchor_index = p.act_index
 ),
 
@@ -203,6 +219,7 @@ parsed_acts as (
     select
         section_id,
         section_version_id,
+        note_kind,
         act_index,
         act,
         final_change as change,
@@ -246,6 +263,7 @@ sessioned as (
     select
         n.section_id,
         n.section_version_id,
+        n.note_kind,
         n.act_index,
         n.act,
         n.change,
@@ -263,6 +281,7 @@ merged as (
     select
         a.section_id,
         a.section_version_id,
+        a.note_kind,
         a.act_index,
         a.act,
         a.change,
@@ -294,6 +313,7 @@ items as (
     select
         t.section_id,
         t.section_version_id,
+        t.note_kind,
         t.act_index,
         t.act,
         t.change,
@@ -320,7 +340,7 @@ item_types as (
         {{ mogov.regex_extract('item', '([0-9]+)$', 1) }} as number,
         -- the nearest item at or before this one that has a bill head
         max(case when {{ mogov.regex_matches('item', bill_head ~ '[0-9]') }} then item_n end) over (
-            partition by section_id, section_version_id, act_index, ref_index
+            partition by section_id, section_version_id, note_kind, act_index, ref_index
             order by item_n
         ) as head_item
     from items
@@ -335,6 +355,7 @@ item_bills as (
         on
             i.section_id = h.section_id
             and i.section_version_id = h.section_version_id
+            and i.note_kind = h.note_kind
             and i.act_index = h.act_index
             and i.ref_index = h.ref_index
             and i.head_item = h.item_n
@@ -357,7 +378,7 @@ item_groups as (
         -- the item that starts this item's group of combined bills: item 1, or a bill after "and" that is also cited
         -- as the first bill of an act elsewhere in its year and session
         max(case when b.item_n = 1 or (b.after_and and c.number is not null) then b.item_n end) over (
-            partition by b.section_id, b.section_version_id, b.act_index, b.ref_index
+            partition by b.section_id, b.section_version_id, b.note_kind, b.act_index, b.ref_index
             order by b.item_n
         ) as group_start
     from item_bills as b
@@ -373,6 +394,7 @@ bills as (
     select
         b.section_id,
         b.section_version_id,
+        b.note_kind,
         b.act_index,
         b.act,
         b.change,
@@ -388,6 +410,7 @@ bills as (
         on
             b.section_id = l.section_id
             and b.section_version_id = l.section_version_id
+            and b.note_kind = l.note_kind
             and b.act_index = l.act_index
             and b.ref_index = l.ref_index
             and b.group_start = l.item_n
