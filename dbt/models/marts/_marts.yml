@@ -1567,8 +1567,9 @@ models:
   - name: fct_bill_sponsors
     description: >
       Sponsors, co-sponsors, handlers and House/Senate conferees of each House bill, as the House lists them,
-      matched to officials where the district and surname agree. Grain: one row per (session, bill, sponsor
-      type, sponsor name).
+      matched to officials where the district and surname agree. Re-listed appropriation bills (fct_bills status
+      "relisted for governor message") are excluded: they repeat the original's sponsors only to record the
+      governor's message. Grain: one row per (session, bill, sponsor type, sponsor name).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -1601,7 +1602,9 @@ models:
       Which bill a state vote was on. House roll calls are linked exactly where the bill XML names the roll-call
       PDF (the vote_id); the rest (votes on Senate bills, some on House bills) through every bill number in the
       measure printed on the PDF ("HCS HB 2", "SS SCS SBs 49 & 118" -> SB 49 and SB 118) in the same session. Senate journal votes
-      through the measure in the journal text ("HB 2", "SB 974") and the year's regular session. Grain: one row
+      through the measure in the journal text ("HB 2", "SB 974") and the year's regular session. Re-listed
+      appropriation bills (fct_bills status "relisted for governor message") are never linked: they have no floor
+      action, so a vote naming one links to nothing rather than to the stub. Grain: one row
       per (chamber, vote, bill, bill version).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
