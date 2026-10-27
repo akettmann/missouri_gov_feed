@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mostRecentBillsLabel, recusedCell, voteLinkLabel } from "../src/lib/overlapLabels.ts";
+import {
+  mixedChamberNote,
+  mostRecentBillsLabel,
+  recusedCell,
+  voteLinkLabel,
+} from "../src/lib/overlapLabels.ts";
 
 test("one example reads singular, several plural", () => {
   assert.equal(mostRecentBillsLabel(1), "1 most recent bill");
@@ -40,4 +45,18 @@ test("recused cell: senate-only plain number, mixed rows name their Senate roll 
   assert.equal(recusedCell(2, 10, 10), "2");
   assert.equal(recusedCell(0, 39, 444), "0 of 39 Senate");
   assert.equal(recusedCell(null, 0, 12), "\u2014");
+});
+
+test("two-chamber sentence appears only for a mixed row and quotes that row's numbers", () => {
+  const senate = { recused: 1, senate_roll_calls: 4, roll_calls: 4 };
+  const house = { recused: null, senate_roll_calls: 0, roll_calls: 7 };
+  const mixed = { recused: 0, senate_roll_calls: 12, roll_calls: 30 };
+  assert.equal(mixedChamberNote([]), null);
+  assert.equal(mixedChamberNote([senate, senate]), null);
+  assert.equal(mixedChamberNote([house]), null);
+  assert.equal(mixedChamberNote([senate, house]), null);
+  const note = mixedChamberNote([senate, mixed]);
+  assert.match(note, /served in both chambers/);
+  assert.match(note, /"0 of 12 Senate"/);
+  assert.doesNotMatch(note, /39/);
 });

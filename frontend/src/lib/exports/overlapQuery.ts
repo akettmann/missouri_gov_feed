@@ -57,15 +57,15 @@ export function overlapExamplesSql(examples: number, overlap: string): string {
       order by official_id, industry, vote_date desc, bill, session_code`;
 }
 
-/**
- * SQL for the per (official, industry) recused count, over rpt_interest_vote_overlap rows. Only the MO Senate
- * records recusals, so a group with no state_senate vote yields null ("not recorded"), never 0 (#154).
- */
 /** The Senate roll calls among a group's votes: the only ones the recused count can speak for. */
 export function senateRollCallsSql(): string {
   return `cast(count(distinct case when chamber = 'state_senate' then vote_id end) as integer)`;
 }
 
+/**
+ * SQL for the per (official, industry) recused count, over rpt_interest_vote_overlap rows. Only the MO Senate
+ * records recusals, so a group with no state_senate vote yields null ("not recorded"), never 0 (#154).
+ */
 export function recusedSql(): string {
   return `case when bool_or(chamber = 'state_senate')
           then cast(count(distinct case when vote_cast = 'recused' then vote_id end) as integer) end`;
