@@ -6,7 +6,7 @@ import {
   buildSponsorshipSessions,
   countWithShare,
   sharePct,
-  summaryLine,
+  inProgressNote,
 } from "../src/lib/sponsorshipOutcomes.ts";
 
 const row = (official_id, session_code, extra = {}) => ({
@@ -55,23 +55,10 @@ test("a session still open is labelled in progress, and a finished one is not", 
   ];
   const [open, done] = buildSponsorshipSessions(rows, NAMES).get("a");
   assert.equal(open.in_progress, true);
-  assert.match(open.summary, /session in progress/);
+  assert.match(inProgressNote(open), /session in progress/);
   assert.equal(done.in_progress, false);
-  assert.doesNotMatch(done.summary, /in progress/);
+  assert.equal(inProgressNote(done), "");
   assert.equal(open.label, "2025 Regular Session");
-});
-
-test("summary wording names what each number counts", () => {
-  assert.equal(
-    summaryLine(row("a", "241")),
-    "Sponsored 10 bills, 10 decided; 4 passed the House; 2 became law",
-  );
-  assert.equal(
-    summaryLine(
-      row("a", "241", { bills_sponsored: 1, bills_decided: 0, bills_passed_house: 0, bills_became_law: 0 }),
-    ),
-    "Sponsored 1 bill; none decided yet",
-  );
 });
 
 test("sessions are grouped per official, newest first, and an unnamed session says so", () => {
@@ -95,4 +82,11 @@ test("the section says Not available yet for a missing export, and carries the c
   assert.match(src, /<SourceLink url=\{s\.source_url\}/);
   const load = readFileSync(new URL("../src/lib/exports/load.ts", import.meta.url), "utf8");
   assert.match(load, /hasExport\("fct_sponsorship_outcomes"\)\s*\? buildSponsorshipSessions/);
+});
+
+test("the section renders the in-progress note and no longer ships an unused summary", () => {
+  const src = readFileSync(new URL("../src/components/SectionSponsorship.astro", import.meta.url), "utf8");
+  assert.match(src, /inProgressNote\(s\)/);
+  const [s] = buildSponsorshipSessions([row("a", "251", { is_session_over: false })]).get("a");
+  assert.equal("summary" in s, false);
 });

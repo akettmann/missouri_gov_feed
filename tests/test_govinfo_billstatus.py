@@ -125,6 +125,26 @@ def test_congress_comes_from_the_date(day, congress):
 
 
 @pytest.mark.parametrize(
+    ("day", "expected"),
+    [
+        (date(2026, 10, 27), [117, 118, 119]),
+        (date(2027, 1, 2), [117, 118, 119]),  # the 120th has not begun
+        (date(2027, 1, 3), [117, 118, 119, 120]),
+        (date(2029, 6, 1), [117, 118, 119, 120, 121]),
+    ],
+)
+def test_default_congresses_end_at_the_congress_in_session(day, expected):
+    assert loader.default_congresses(day) == expected
+
+
+def test_load_uses_the_date_derived_default_when_nothing_is_configured(site, monkeypatch):
+    monkeypatch.setattr(loader, "CONGRESSES", None)
+    monkeypatch.setattr(loader, "default_congresses", lambda day: [118])
+    loader.load(db.UNSHARDED)
+    assert sorted(site) == sorted(loader.zip_url(118, t) for t in ("hjres", "sjres", "sres"))
+
+
+@pytest.mark.parametrize(
     ("configured", "expected"),
     [
         ([118, 119], {"sjres119": 86400, "sjres118": 30 * 86400}),
@@ -255,3 +275,14 @@ def test_nested_elements_never_stand_in_for_a_missing_bill_field():
     row = parser.parse_bill(xml, "f.xml")["bills"][0][1]
     assert row["bill_type"] is None  # the action's <type> is not the bill's
     assert row["title"] is None
+
+
+def test_reserved_bill_with_billtype_and_billnumber_keeps_its_real_id():
+    # The real 117th-Congress H.R. 2 ("Reserved for the Speaker"): this older export names the type and number
+    # `billType` / `billNumber`. It used to parse to bill_id '117--None', colliding with the other reserved bills.
+    rows = parser.parse_bill((FIXTURES / "BILLSTATUS-117hr2.xml").read_bytes(), "BILLSTATUS-117hr2.xml")
+    ((_, row),) = rows["bills"]
+    assert row["bill_id"] == "117-hr-2"
+    assert (row["congress"], row["bill_type"], row["number"]) == ("117", "HR", "2")
+    assert row["title"] == "Reserved for the Speaker."
+    assert [k for k, _ in rows["actions"]] == ["117-hr-2#0", "117-hr-2#1"]
