@@ -457,6 +457,8 @@ OPTIONAL_JSON_TABLES = {
     "mo_revisor_sections": "mo_revisor",
     "mo_revisor_repeals": "mo_revisor",
     "epa_frs_alt_names": "epa_frs",  # added for U+FFFD name repair (#260); older raw dirs lack it
+    "mo_senate_bill_list": "mo_senate_bills",  # a slow loader (~1 request/s per bill, #585): builds run without it
+    "mo_senate_bill_actions": "mo_senate_bills",
 }
 
 

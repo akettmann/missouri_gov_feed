@@ -3,7 +3,7 @@
 version: 2
 sources:
 - name: mo_senate
-  description: Missouri Senate daily journal PDFs, parsed into per-senator vote rows, and the Senate topical index (subject keywords per bill).
+  description: Missouri Senate daily journal PDFs, parsed into per-senator vote rows, the Senate topical index (subject keywords per bill), and the Senate's own bill list with each bill's action history.
   tables:
   - name: journals
     identifier: mo_senate_journals
@@ -41,3 +41,11 @@ sources:
         error_after:
           count: 32
           period: day
+  # Optional: filled by `mogov load mo_senate_bills` (slow, ~1 request/s); `mogov build` creates empty placeholders
+  # until then (db.OPTIONAL_JSON_TABLES), so no freshness check.
+  - name: bill_list
+    identifier: mo_senate_bill_list
+    description: One row per Senate bill or resolution of a session (regular or extraordinary) in senate.mo.gov's bill list; the page's JSON object as printed, plus year and session_type.
+  - name: bill_actions
+    identifier: mo_senate_bill_actions
+    description: One row per action in a Senate bill's history on senate.mo.gov (newest first), with the journal page that records it.

@@ -1,8 +1,9 @@
 -- Missouri bills and resolutions per session, with their subject index terms folded into one text column
 -- for display; fct_bill_subjects has one row per term for grouping. The bill list is int_bills__list: House bills
--- from the House XML export, Senate bills from the Senate topical index (regular sessions; Senate bills filed under
--- no keyword are missing) and the Senate bills the House XML's SenateActList lists that the index does not (the
--- special-session Senate bills, 2024 on; older special sessions' Senate bills are missing, #237).
+-- from the House XML export, Senate bills from the Senate's own bill list (senate.mo.gov, regular and special
+-- sessions: every Senate bill, including those under no topical-index keyword; #586), then for a session whose Senate
+-- list is not loaded the Senate topical index (regular sessions; bills under no keyword are missing) and the Senate
+-- bills the House XML's SenateActList lists that neither has (2024 on).
 -- status and outcome come from the House XML's actions (int_bills__status): null for Senate bills that never
 -- reached the House, whose actions aren't loaded: every Senate bill before 2024, since the House's list of Senate
 -- bills exists only for 2024 and later.
