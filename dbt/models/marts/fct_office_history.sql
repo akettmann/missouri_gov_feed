@@ -104,6 +104,47 @@ courtlistener as (
     from {{ ref('int_courtlistener__official_positions') }}
 ),
 
+-- Earlier stretches of the statewide offices a current official has held (#741): Malek's 2023 appointment as Treasurer
+-- before the term he was elected to in 2025, Fitzpatrick's 2019-2023 Treasurer term, Schmitt as Attorney General.
+-- Derived from the Official Manual listings with exact dates from statewide_office_handovers (int_statewide__terms),
+-- not from a second hand-kept list. The open term ends where the seed's current term starts; when it starts on the
+-- same day the seed row already says it. Skipped when Wikidata or Open States already records a term starting the
+-- same day under its own title (Wikidata calls the office "Missouri State Treasurer"), so one term is not listed twice.
+statewide_past as (
+    select
+        t.official_id,
+        s.office_title,
+        cast(null as {{ dbt.type_string() }}) as district,
+        'ocd-jurisdiction/country:us/state:mo/government' as jurisdiction,
+        t.term_start as start_date,
+        case when t.term_end_year is null then s.term_start else t.term_end end as end_date,
+        'official manual statewide listing' as source,
+        2 as source_rank
+    from {{ ref('int_statewide__terms') }} as t
+    inner join {{ ref('statewide_officials') }} as s on t.office = s.office
+    where
+        t.official_id is not null
+        -- only terms from 2000 on, the years the handover seed covers: a name match with a nineteenth-century governor
+        -- (a current legislator named Ben Brown against Benjamin Gratz Brown) is a different person
+        and t.term_start_year >= 2000
+        and t.term_start < case when t.term_end_year is null then s.term_start else t.term_end end
+        and not exists (
+            select 1
+            from (
+                select
+                    official_id,
+                    start_date
+                from wikidata
+                union all
+                select
+                    official_id,
+                    start_date
+                from os
+            ) as known
+            where known.official_id = t.official_id and known.start_date = t.term_start
+        )
+),
+
 -- State judges: appointment / election sentences from their Official Manual biography
 judge_bio_events as (
     {% for label, pattern in [
@@ -134,6 +175,8 @@ all_terms as (
     select {{ cols }} from congress
     union all
     select {{ cols }} from statewide
+    union all
+    select {{ cols }} from statewide_past
     union all
     select {{ cols }} from judges
     union all

@@ -744,6 +744,8 @@ unit_tests:
         rows: []
       - input: ref('statewide_officials')
         rows: []
+      - input: ref('int_statewide__terms')
+        rows: []
       - input: ref('stg_fjc__appointments')
         rows: []
       - input: ref('int_officials__wikidata')

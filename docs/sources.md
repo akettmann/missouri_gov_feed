@@ -1192,6 +1192,9 @@ Chapter PDFs (executive, legislative, judicial), one row per text line.
 - Besides biographies and the judges, dbt reads the executive chapter's "Historical Listing" tables (every governor,
   lieutenant governor, secretary of state, auditor, treasurer and attorney general since 1820, terms in whole years)
   into `int_bluebook__statewide_officeholders`.
+  `int_statewide__terms` dates those terms (seed `statewide_office_handovers`, else the second Monday of January) and links
+  each to the current official of the same name; `fct_office_history` lists the earlier statewide terms of current
+  officials from it (terms from 2000 on; Malek's 2023 appointment as Treasurer, Fitzpatrick's 2019-2023 Treasurer term).
 
 Quirks:
 - PDF file names differ between editions. Links are scraped from the edition page, with a fallback to

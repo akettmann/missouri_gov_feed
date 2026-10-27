@@ -1,0 +1,78 @@
+# Unit tests for int_statewide__terms: Official Manual terms in whole years -> exact start / end dates and the current
+# official who served them.
+version: 2
+
+unit_tests:
+  - name: statewide_terms_turn_over_on_the_second_monday_of_january
+    model: int_statewide__terms
+    description: >
+      The regular hand-over: governors turn over on 2025-01-13 (second Monday), the auditor on 2023-01-09, not on
+      January 15. A term ends on a second Monday only in its own last year when that is an inauguration year (Parson's
+      2018-2025 term ends 2025-01-13; Galloway's 2015-2023 auditor term ends 2023-01-09). An open term
+      ends 9999-12-31. A term that ends in a year with no inauguration (Greitens, 2018) and has no seed row ends on
+      December 31, which the coverage test flags.
+    given:
+      - input: ref('int_bluebook__statewide_officeholders')
+        rows:
+          - {office: governor, full_name: Michael L. Parson, party: R, term_start_year: 2018, term_end_year: 2025}
+          - {office: governor, full_name: Mike Kehoe, party: R, term_start_year: 2025, term_end_year: null}
+          - {office: governor, full_name: Eric Greitens, party: R, term_start_year: 2017, term_end_year: 2018}
+          - {office: state_auditor, full_name: Nicole Galloway, party: D, term_start_year: 2015, term_end_year: 2023}
+          - {office: state_auditor, full_name: Scott Fitzpatrick, party: R, term_start_year: 2023, term_end_year: null}
+      - input: ref('statewide_office_handovers')
+        rows:
+          - {office: governor, family_name: nobody, term_start_year: 1900, term_start: null, term_end: null}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: x, variant_key: nobody, given_key: nobody, family_key: nobody}
+    expect:
+      rows:
+        - {office: governor, full_name: Michael L. Parson, term_start: '2018-01-08', term_end: '2025-01-13'}
+        - {office: governor, full_name: Mike Kehoe, term_start: '2025-01-13', term_end: '9999-12-31'}
+        - {office: governor, full_name: Eric Greitens, term_start: '2017-01-09', term_end: '2018-12-31'}
+        - {office: state_auditor, full_name: Nicole Galloway, term_start: '2015-01-12', term_end: '2023-01-09'}
+        - {office: state_auditor, full_name: Scott Fitzpatrick, term_start: '2023-01-09', term_end: '9999-12-31'}
+
+  - name: statewide_terms_use_dated_handovers_and_name_variants
+    model: int_statewide__terms
+    description: >
+      A seed row matched on (office, start year, family name) gives the exact dates: Hawley left on 2019-01-03, Greitens
+      resigned 2018-06-01 and Parson began that day; a blank date keeps the convention for that side. The 2015
+      auditors: Schweich ended on his death (2015-02-26), Watson served the interim to 2015-04-27, and Galloway
+      began that day, not on the 2015 inauguration day. Hawley is printed "Josh Hawley" in the Manual while the official
+      is "Joshua Hawley" with the variant "Josh Hawley", so he gets his official_id from the variant key; a name that
+      fits two officials (Eric Schmitt) stays null.
+    given:
+      - input: ref('int_bluebook__statewide_officeholders')
+        rows:
+          - {office: attorney_general, full_name: Josh Hawley, party: R, term_start_year: 2017, term_end_year: 2019}
+          - {office: attorney_general, full_name: Eric Schmitt, party: R, term_start_year: 2019, term_end_year: 2023}
+          - {office: governor, full_name: Eric Greitens, party: R, term_start_year: 2017, term_end_year: 2018}
+          - {office: governor, full_name: Michael L. Parson, party: R, term_start_year: 2018, term_end_year: 2025}
+          - {office: state_auditor, full_name: Thomas A. Schweich, party: R, term_start_year: 2011, term_end_year: 2015}
+          - {office: state_auditor, full_name: John D. Watson, party: D, term_start_year: 2015, term_end_year: 2015}
+          - {office: state_auditor, full_name: Nicole Galloway, party: D, term_start_year: 2015, term_end_year: 2023}
+      - input: ref('statewide_office_handovers')
+        rows:
+          - {office: attorney_general, family_name: Hawley, term_start_year: 2017, term_start: null, term_end: '2019-01-03'}
+          - {office: attorney_general, family_name: Schmitt, term_start_year: 2019, term_start: '2019-01-03', term_end: '2023-01-03'}
+          - {office: governor, family_name: Greitens, term_start_year: 2017, term_start: null, term_end: '2018-06-01'}
+          - {office: governor, family_name: Parson, term_start_year: 2018, term_start: '2018-06-01', term_end: null}
+          - {office: state_auditor, family_name: Schweich, term_start_year: 2011, term_start: null, term_end: '2015-02-26'}
+          - {office: state_auditor, family_name: Watson, term_start_year: 2015, term_start: '2015-02-27', term_end: '2015-04-27'}
+          - {office: state_auditor, family_name: Galloway, term_start_year: 2015, term_start: '2015-04-27', term_end: null}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: hawley_id, variant_key: joshua hawley, given_key: joshua, family_key: hawley}
+          - {official_id: hawley_id, variant_key: josh hawley, given_key: joshua, family_key: hawley}
+          - {official_id: schmitt_a, variant_key: eric schmitt, given_key: eric, family_key: schmitt}
+          - {official_id: schmitt_b, variant_key: eric schmitt, given_key: eric, family_key: schmitt}
+    expect:
+      rows:
+        - {office: attorney_general, full_name: Josh Hawley, term_start: '2017-01-09', term_end: '2019-01-03', official_id: hawley_id}
+        - {office: attorney_general, full_name: Eric Schmitt, term_start: '2019-01-03', term_end: '2023-01-03', official_id: null}
+        - {office: governor, full_name: Eric Greitens, term_start: '2017-01-09', term_end: '2018-06-01', official_id: null}
+        - {office: governor, full_name: Michael L. Parson, term_start: '2018-06-01', term_end: '2025-01-13', official_id: null}
+        - {office: state_auditor, full_name: Thomas A. Schweich, term_start: '2011-01-10', term_end: '2015-02-26', official_id: null}
+        - {office: state_auditor, full_name: John D. Watson, term_start: '2015-02-27', term_end: '2015-04-27', official_id: null}
+        - {office: state_auditor, full_name: Nicole Galloway, term_start: '2015-04-27', term_end: '2023-01-09', official_id: null}
