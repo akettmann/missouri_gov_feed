@@ -4,6 +4,7 @@
 import type { PayVoteRow } from "../attendancePay";
 import type { LegislatorExpenseRow } from "../legislatorExpenses";
 import type { CommitteeSession } from "../committeePosts";
+import type { SponsorshipSession } from "../sponsorshipOutcomes";
 
 export type Confidence = string; // 'exact id' | 'exact (MEC crosswalk)' | 'high' | 'medium' | ...
 
@@ -333,6 +334,8 @@ export interface OfficialBundle {
   overlap: InterestOverlap[] | null;
   /** House committee posts by session, newest first; null when either committee export is missing */
   committees: CommitteeSession[] | null;
+  /** House bill sponsorship outcomes by session, newest first; null when the fct_sponsorship_outcomes export is missing */
+  sponsorship: SponsorshipSession[] | null;
   courts: {
     status: string;
     /** federal district judges only (fct_judge_time_to_disposition): one entry per case type the judge has dockets of, civil first; null for everyone else or when the export is missing */
