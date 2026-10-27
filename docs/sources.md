@@ -157,15 +157,20 @@ Quirks:
   dropped ("PRICE" is Wiley Price IV in 2019-2022, Tiffany Price from 2025), and a district is added only while two
   members share a surname ("EVANS 99" / "EVANS 154" until Jean Evans left on 2019-02-05, then a bare "EVANS" is
   David Evans). The roster is an end-of-session list, so a member who left mid-session is missing from their last
-  session (Rory Rowland in 2022). `int_mo_house__votes` handles all of these (#539): a whole-surname match beats a
-  last-word one, and the Open States seat dates break a tie between same-surname members only when exactly one
-  seat covers the vote date.
+  session (Rory Rowland in 2022). `int_mo_house__votes` handles all of these (#539, #581). Members of the vote's
+  own session come first, and among them the better name fit wins: the whole surname, then the surname without
+  its suffix (so "PRICE" is Price, not Price IV), then the last word of a compound surname. Only when no member of
+  the session fits does it look at other sessions' lists. There a person whose dated Open States seat missed the
+  vote date is ruled out, even when alone, and one whose seat covered the date outranks one with no dated seat.
+  Last, the seat dates break a tie between the remaining candidates only when one of their seats covers the vote
+  date. The full rules, their tests and the open cases (#565, #629) are in [person_ids.md](person_ids.md).
 - A member's seat is matched to an Open States person (district, date and surname; when several same-surname terms overlap, the one whose name starts with the member's given name); when that fails the key is `mohouse:<member id>`.
   Open States also holds some people twice (after a redistricting or a move to the Senate). Both are
   reconciled to one stable `official_id` per person by `int_officials__person_ids` (the same MO House member id, which follows a name change such as Mazzie Boyd/Christensen, member 2381, #151; otherwise the same exact name, or names that differ only in the given
   name like Steve/Steven or Ken/Kenneth (#228, #263), no conflicting seats, and
   either overlapping dated terms in one seat or a chamber move (years alone cannot tell a duplicate record, Kenneth
-  Jamison's 2025 stub inside Ken's term, from a successor like Danielle after Dan Smith; dates can, using the dates exactly as Open States gives them: the January-1 adjustment used for year membership would make a January successor overlap a predecessor ending Jan 6-9. Known edge: `int_officials__identity_terms` collapses each (id, year, seat, House member id) to min(start)/max(end), spanning any gap if one id held the seat in two terms in a year); seed `official_id_links` for statewide officers and judges), #97.
+  Jamison's 2025 stub inside Ken's term, from a successor like Danielle after Dan Smith; dates can, using the dates exactly as Open States gives them: the January-1 adjustment used for year membership would make a January successor overlap a predecessor ending Jan 6-9. Known edge: `int_officials__identity_terms` collapses each (id, year, seat, House member id) to min(start)/max(end), spanning any gap if one id held the seat in two terms in a year); seed `official_id_links` for statewide officers and judges), #97. The rules in precedence order, with the
+  known bad inputs and a registry of the people each case covers, are in [person_ids.md](person_ids.md).
 - The site asks clients not to poll its XML more than every 30 minutes. Cached copies keep it well
   under that.
 - Every shard reads every session zip to list the roll calls. In the October 2026 full run, two shards
@@ -1062,6 +1067,9 @@ Flow: [diagrams/sources/openstates_people.svg](diagrams/sources/openstates_peopl
 
 Quirks:
 - The flat CSV carries Wikidata QIDs that the YAML often lacks.
+- Seat-term dates are often missing or wrong: undated starts, placeholder January-1 starts, ends that are
+  really mid-term departures, and duplicate records for one person. How the pipeline joins Open States records
+  to one person despite this is in [person_ids.md](person_ids.md).
 
 ## congress_legislators: unitedstates/congress-legislators
 
