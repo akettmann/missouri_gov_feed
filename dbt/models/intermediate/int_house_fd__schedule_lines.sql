@@ -4,6 +4,10 @@
 -- that feed commercial ties (C, E, F, J) so a wrapped tail never becomes a tie of its own (#599), and on A, B, D and H
 -- so a wrapped entry is not counted as several disclosure items (#641).
 -- PDFs from 2021 on extract their small-caps text with NUL characters; the words are restored first (#576).
+{# a line whose first "$" is a low end with no high end ("... $250,001 -"), and one whose last "$" is
+   ("... Interest $201 -") #}
+{% set first_low_only = '^[^$]*\\$[0-9,]+ -( [^$0-9]|$)' %}
+{% set last_low_only = '\\$[0-9,]+ -( [^$0-9]*)?$' %}
 with lines as (
     select
         doc_id,
@@ -192,13 +196,36 @@ continued as (
             or (
                 substr(f.schedule, 1, 1) in ('A', 'B', 'D')
                 and (
-                    {{ mogov.regex_matches('f.prev_text', '^[^$]*\\$[0-9,]+ -( [^$0-9]|$)') }}
+                    {{ mogov.regex_matches('f.prev_text', first_low_only) }}
                     -- the checkbox glyphs of the first line wrap onto a line of their own before the asset name
                     or (
                         {{ mogov.regex_matches('f.prev_text', '^(gfedcb? ?)+$') }}
-                        and {{ mogov.regex_matches('f.prev2_text', '^[^$]*\\$[0-9,]+ -( [^$0-9]|$)') }}
+                        and {{ mogov.regex_matches('f.prev2_text', first_low_only) }}
                     )
                 )
+                and {{ mogov.regex_matches('f.line_text', '\\$[0-9]') }}
+                and not {{ mogov.regex_matches('f.line_text', '\\$[0-9,]+ -( |$)') }}
+            )
+            -- A: the value range is complete and the income range wrapped after its low end ("$15,001 - $50,000
+            -- Interest $201 -" / "Clark Cnty WA Sch Dist $1,000"); the glyphs may sit between the two lines
+            or (
+                substr(f.schedule, 1, 1) = 'A'
+                and (
+                    {{ mogov.regex_matches('f.prev_text', last_low_only) }}
+                    or (
+                        {{ mogov.regex_matches('f.prev_text', '^(gfedcb? ?)+$') }}
+                        and {{ mogov.regex_matches('f.prev2_text', last_low_only) }}
+                    )
+                )
+                and {{ mogov.regex_matches('f.line_text', '\\$[0-9]') }}
+                and not {{ mogov.regex_matches('f.line_text', '\\$[0-9,]+ -( |$)|Over \\$') }}
+            )
+            -- A: the value "Over" (the amount wrapped to the next line, with the asset name): "Equity Trust CO => Over
+            -- None" / "Berkshire Hathaway Inc. New (BRK.B) $50,000,000"
+            or (
+                substr(f.schedule, 1, 1) = 'A'
+                and {{ mogov.regex_matches('f.prev_text', '(^| )Over( None)?$') }}
+                and not {{ mogov.regex_matches('lower(f.prev_text)', '^(location|description|comments):') }}
                 and {{ mogov.regex_matches('f.line_text', '\\$[0-9]') }}
                 and not {{ mogov.regex_matches('f.line_text', '\\$[0-9,]+ -( |$)') }}
             )
@@ -248,9 +275,10 @@ select
     end as owner_code,
     case
         when
-            {{ mogov.regex_matches('e.line_text', '^[^$]*\\$[0-9,]+ -( [^$0-9]|$)') }}
-            -- "None" before the first "$": the asset's value is None and that "$" starts the income range
-            and not {{ mogov.regex_matches('e.line_text', '^([^$]* )?None [^$]*\\$') }}
+            {{ mogov.regex_matches('e.line_text', first_low_only) }}
+            -- "None" / "Undetermined" before the first "$": that is the asset's value and the "$" starts the income
+            -- range
+            and not {{ mogov.regex_matches('e.line_text', '^([^$]* )?(None|Undetermined) [^$]*\\$') }}
             and e.line_text != j.line_text
             then
                 {{ mogov.regex_extract('e.line_text', '(\\$[0-9,]+)') }}
@@ -258,9 +286,10 @@ select
                     ' - ' || {{ mogov.regex_extract('substr(j.line_text, length(e.line_text) + 2)', '(\\$[0-9,]+)') }},
                     ''
                 )
-        when {{ mogov.regex_matches('e.line_text', '(^| )Over$') }}
-            then {{ mogov.regex_extract('j.line_text', '(Over \\$[0-9,]+)') }}
-        else {{ mogov.regex_extract('e.line_text', '(\\$[0-9,]+( - \\$[0-9,]+)?|Over \\$[0-9,]+|None)') }}
+        -- "Over" with the amount on the next line ("Over" / "$1,000,000", or A's "Over None" / "... $50,000,000")
+        when {{ mogov.regex_matches('e.line_text', '(^| )Over( None)?$') }} and e.line_text != j.line_text
+            then 'Over ' || {{ mogov.regex_extract('substr(j.line_text, length(e.line_text) + 2)', '(\\$[0-9,]+)') }}
+        else {{ mogov.regex_extract('e.line_text', '(\\$[0-9,]+( - \\$[0-9,]+)?|Over \\$[0-9,]+|None|Undetermined)') }}
     end as amount_range
 from entries as e
 inner join joined as j on e.doc_id = j.doc_id and e.seq = j.entry_seq
