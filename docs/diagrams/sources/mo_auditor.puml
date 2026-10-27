@@ -13,7 +13,7 @@ else (no: financial statements, monthly reports,\nfollow-ups, before 2012)
 endif
 :dbt staging: dates, links, rating title-cased;
 :dbt: entity type (statewide office by title prefix seed,\ncounty by title) and rating_level 4..1 (int_mo_auditor__reports);
-:statewide office audits only: officeholder when released,\nfrom fct_office_history -> fct_audit_reports;
+:dbt: audit period from the title (when it names one);\nstatewide office audits only: everyone who held the office\nduring the period (else the year before release), from the\nOfficial Manual's historical listings -> fct_audit_report_officeholders;
 note right: a county rating is never attached to a person
 stop
 @enduml

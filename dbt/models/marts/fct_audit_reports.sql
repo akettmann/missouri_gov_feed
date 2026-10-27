@@ -1,28 +1,16 @@
--- One row per State Auditor report with its performance rating, for the report's audited entity. The officeholder is
--- linked only for audits of a statewide office, to whoever held that office on the release date, and only when
--- that person is a current official (fct_office_history holds current officials' careers). The audit may
--- cover the predecessor's term, so the link is "in office when published", not "audited". County audits are
--- never linked to officials: the Auditor's own summary says a county rating "does not indicate the performance
--- of any one elected official or county office".
+-- One row per State Auditor report with its performance rating, for the report's audited entity. The officeholders an
+-- audit of a statewide office is credited to are in fct_audit_report_officeholders (everyone in office during the
+-- audit period, or in the window before release where the title names no period): there can be several, so
+-- they are rows there, and this table carries only how many and on what basis. County audits are never linked to
+-- officials: the Auditor's own summary says a county rating "does not indicate the performance of any one elected
+-- official or county office".
 with holders as (
     select
-        r.report_number,
-        h.official_id,
-        d.full_name,
-        row_number() over (partition by r.report_number order by h.start_date desc, h.official_id asc) as rn
-    from {{ ref('int_mo_auditor__reports') }} as r
-    inner join {{ ref('statewide_officials') }} as s on r.office = s.office
-    inner join {{ ref('fct_office_history') }} as h
-        on
-            lower(h.office_title) in (
-                lower(s.office_title),
-                'missouri ' || lower(s.office_title),
-                lower(s.office_title) || ' of missouri'
-            )
-            and r.release_date >= h.start_date
-            and (h.end_date is null or r.release_date <= h.end_date)
-    inner join {{ ref('dim_official') }} as d on h.official_id = d.official_id
-    where r.entity_type = 'statewide_office'
+        report_number,
+        max(link_basis) as officeholder_link_basis,
+        {{ dbt.safe_cast('count(*)', dbt.type_int()) }} as officeholder_count
+    from {{ ref('fct_audit_report_officeholders') }}
+    group by report_number
 )
 
 select
@@ -33,6 +21,8 @@ select
     r.title,
     r.entity_type,
     r.office,
+    r.audit_period_start,
+    r.audit_period_end,
     r.rating,
     r.rating_level,
     r.rating_status,
@@ -41,7 +31,7 @@ select
     r.rating_pdf_url,
     r.full_report_url,
     r.citizens_summary_url,
-    h.official_id as officeholder_at_release_id,
-    h.full_name as officeholder_at_release_name
+    h.officeholder_link_basis,
+    coalesce(h.officeholder_count, 0) as officeholder_count
 from {{ ref('int_mo_auditor__reports') }} as r
-left join holders as h on r.report_number = h.report_number and h.rn = 1
+left join holders as h on r.report_number = h.report_number

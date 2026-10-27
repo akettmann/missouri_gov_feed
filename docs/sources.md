@@ -149,6 +149,14 @@ Quirks:
 - Vote tokens are printed surnames, sometimes with a district ("SMITH 46"), plus "MR SPEAKER".
   Some names are truncated ("FOUNTAIN HENDERS"). dbt matches them to members
   (`int_mo_house__member_identity`, seed `house_speakers`).
+- Tokens do not always spell the roster surname: a compound surname is printed by its last word ("REHDER" is Holly
+  Thompson Rehder, "REISCH" is Cheri Toalson Reisch, "COURTWAY" is Cyndi Buchheit-Courtway), a generational suffix is
+  dropped ("PRICE" is Wiley Price IV in 2019-2022, Tiffany Price from 2025), and a district is added only while two
+  members share a surname ("EVANS 99" / "EVANS 154" until Jean Evans left on 2019-02-05, then a bare "EVANS" is
+  David Evans). The roster is an end-of-session list, so a member who left mid-session is missing from their last
+  session (Rory Rowland in 2022). `int_mo_house__votes` handles all of these (#539): a whole-surname match beats a
+  last-word one, and the Open States seat dates break a tie between same-surname members only when exactly one
+  seat covers the vote date.
 - A member's seat is matched to an Open States person (district, date and surname; when several same-surname terms overlap, the one whose name starts with the member's given name); when that fails the key is `mohouse:<member id>`.
   Open States also holds some people twice (after a redistricting or a move to the Senate). Both are
   reconciled to one stable `official_id` per person by `int_officials__person_ids` (the same MO House member id, which follows a name change such as Mazzie Boyd/Christensen, member 2381, #151; otherwise the same exact name, or names that differ only in the given
@@ -372,6 +380,13 @@ of their own.
   row per bill), then `fct_statute_sections` and `fct_bill_statute_links`.
 
 Quirks:
+- **Cross-chamber combined acts.** Five acts join a Senate and a House bill with "&" or "and" ("A.L. 1977 S.B. 111
+  & H.B. 130"; 1998 and 2005 use "and"), all before 2017: 1977 SB 111 and HB 130 (6 sections), 1981 HB 519 and SB 16 (1), 1982 SB 649 and HB 1096 (1),
+  1998 SB 820 and HB 1587 (1), 2005 HB 353 and SB 254 (2). The section text never names the bill, so the
+  combined-act reading (the first bill passed, the other's subject went into it) can't be confirmed from the
+  Revisor; it needs the journals. The data argues against it for some: HB 130 (1977) and SB 16 (1981) are the lead
+  bill of 53 and 259 other sections, and HB 1096 (1982) leads 5 others. The model still reads these
+  as combined (issue #571); `assert_cross_chamber_combined_acts_are_known` pins the five so a new one gets looked at (it warns; add the act to the `known` CTE in that test after a spot-check).
 - **Rate limit.** The site blocks an IP address that sends requests less than a second apart several times in
   30 seconds. First it serves a warning page with status 200 in place of the page asked for (the same page it
   serves for a page that doesn't exist). If requests keep coming, every request from that IP, browsers
@@ -630,6 +645,9 @@ Quirks:
   the exact NUL counts (macro `mogov.house_fd_restore_text`) and strips any NUL left, so no NUL reaches the
   marts. Before this fix no 2022+ report (and 8 of 25 in 2021) produced a schedule line (#576); a sanity test now
   fails if under 90% of a year's text PDFs do.
+- Index type `H` is the New Filer Report (PDF header `Filing Type: New Filer Report`), filed by new members; a
+  separate report from that year's Annual Report (O). The loader reads it like O/A/P/C/T. Other index types
+  (D, X, G, E, B, W) are not downloaded.
 
 ## senate_efd: U.S. Senate eFD (opt-in)
 
@@ -702,12 +720,15 @@ Quirks:
   among the amendments of its report (ties: numeric doc id).
   The Clerk index does not say which report a House amendment amends, so it is taken to amend the latest annual,
   candidate or termination report the filer filed that year on or before it (an amendment of a candidate or
-  termination report supersedes that report only) (#142, #463). Index type H is a base of the same tier as an
-  annual report: on the Clerk index it is very likely a new member's first annual report, not a "new-filer notice"
-  (of 346 H filings only 3 have an O for the same filer and year, 233 have an extension request X that year, the H
-  counts follow the freshman classes of election years, and they are filed May to September of the next year;
-  Missouri freshmen Alford and Burlison (2022), Onder and Bell (2024) each have an X then an H in August and no
-  O). Periodic transaction reports and the remaining "other" kinds (W withdrawal, B, E, G) are never a base.
+  termination report supersedes that report only) (#142, #463). Index type H is a New Filer Report (the PDF header says
+  "Filing Type: New Filer Report"; e.g. Carey OH15 #10050139, Alford MO04 #10051960), a separate report from the
+  Annual Report (O) of the same year, so it is a base like a candidate report: an amendment filed after an H amends
+  it and supersedes it, while an H and an O of one year are both kept latest (Carey OH15 2022, Wied WI08 2025; for
+  O, A, H, A as in Miller WV03 2018 the first A supersedes the O and the second the H). Whether both should be
+  latest, and which report a later amendment amends, is open (#572). Of 346 H filings only 3 have an O for the same
+  filer and year, 233 have an extension request X that year, and the H counts follow the freshman classes of
+  election years (Missouri freshmen Alford and Burlison (2022), Onder and Bell (2024) each have an X then an H in
+  August and no O). Periodic transaction reports and the remaining "other" kinds (W withdrawal, B, E, G) are never a base.
   The "Period Covered: mm/dd/yyyy-mm/dd/yyyy" line in the amendment's PDF text (`int_house_fd__period_covered`;
   candidate reports and their amendments carry it, annual and termination reports do not) refines this: the base
   covering through the same last day wins, and an amendment with such a line is taken for an amendment of an
@@ -790,6 +811,9 @@ Chapter PDFs (executive, legislative, judicial), one row per text line.
 
 - Lands: `bluebook_lines`.
 - Window: `MOGOV_BLUEBOOK_EDITIONS`.
+- Besides biographies and the judges, dbt reads the executive chapter's "Historical Listing" tables (every governor,
+  lieutenant governor, secretary of state, auditor, treasurer and attorney general since 1820, terms in whole years)
+  into `int_bluebook__statewide_officeholders`.
 
 Quirks:
 - PDF file names differ between editions. Links are scraped from the edition page, with a fallback to
@@ -1218,5 +1242,13 @@ Flow: [diagrams/sources/mo_auditor.svg](diagrams/sources/mo_auditor.svg)
     The "Report on Internal Control..." companions of the annual financial report have a Citizens Summary, which is still read
     (status `no_rating_sentence`).
   - The ratings cover only the areas audited. A county's rating is the county's, never one official's: only audits of a
-    statewide office (seed `mo_auditor_statewide_entities`) are linked to an officeholder, and then only to whoever held
-    the office on the release date ("in office when published", not "audited"), and only for current officials.
+    statewide office (seed `mo_auditor_statewide_entities`) are linked to officeholders, in `fct_audit_report_officeholders`
+    (#323, policy #333: everyone in office during the years the audit covers). Former holders come from the Official
+    Manual's "Historical Listing" tables (`int_bluebook__statewide_officeholders`; whole years only). The period is read
+    from the title when it names one ("Year Ended June 30, 2015", "Period July 1, 2022 through January 9, 2023"; 26 of 78
+    statewide-office audits); the Auditor's other titles ("Office of Governor") name no period, and the PDFs are not
+    parsed for it, so those audits are linked to everyone in office from January 1 of the year before the release to the
+    release date (`link_basis` = `release_window`). That is a bounded guess at the period, not the period: say "in
+    office around the time of the audit", never "audited". A mid-term change (Parson, June 2018) has no date in the
+    Manual, so both people are credited for the year. Sub-unit audits ("Office of Attorney General - Missouri Office of
+    Prosecution Services", "...Medicaid Fraud Control Unit") match the office prefix and count as the office's (#333).

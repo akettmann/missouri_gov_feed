@@ -191,6 +191,44 @@ Optional build-time environment: `PUBLIC_SITE_URL` (canonical site URL), `PUBLIC
 site at the root, set by `deploy:pages`), `PUBLIC_REPORT_ERROR_URL`
 (where "Report an error" goes; default: a prefilled GitHub issue on this repo).
 
+### Checking that the site build is deterministic (#226, #459)
+
+Two builds of the same data must give byte-identical output, including on tied rows (a ranking that ends on a tie
+without a tiebreaker). `scripts/check_site_determinism.py` builds the site twice and diffs every file; with
+`--shuffle` the second build reads a copy of the exports with their rows in random order, which exposes ties that the
+engine happened to read the same way twice:
+
+```
+uv run python scripts/check_site_determinism.py --shuffle     # exit 1 and a file list on any difference
+```
+
+It runs on the local exports and takes two site builds (minutes), so there is no GitHub Actions job for it: CI has no
+`data/exports` (local and gitignored), and a fixture export covering the roughly 90 tables the site reads would not
+hold real ties. Run it by hand after touching a ranking, a sort or an award, and on a schedule on the machine that
+holds the exports, after the weekly `mogov run` and `mogov export` (see [sync](sync.md)). For example, Windows Task
+Scheduler (weekly, Sunday 06:00; adjust the path):
+
+```
+schtasks /create /tn mogov-determinism /sc weekly /d SUN /st 06:00 /tr "cmd /c cd /d C:\path\to\missouri_gov_feed && uv run python scripts/check_site_determinism.py --shuffle >> data\determinism.log 2>&1"
+```
+
+or cron: `0 6 * * 0 cd ~/missouri_gov_feed && uv run python scripts/check_site_determinism.py --shuffle >> data/determinism.log 2>&1`.
+A scheduler does not run with your shell's PATH, so a scheduled run can fail silently (the log stays empty or holds
+only "command not found"). cron's PATH is usually just `/usr/bin:/bin`, which lacks `uv` (installed to
+`~/.local/bin`) and `pnpm`; set PATH on the line itself (adjust the pnpm directory, see `command -v pnpm`):
+
+```
+0 6 * * 0 PATH="$HOME/.local/bin:$HOME/.local/share/pnpm:$PATH" && cd ~/missouri_gov_feed && uv run python scripts/check_site_determinism.py --shuffle >> data/determinism.log 2>&1
+```
+
+`schtasks /create` without `/ru` makes the task run only while you are logged on. To have it run whether or not you are
+logged on, add `/ru <your user> /rp *` (prompts once for your password; `/rp *` is a documented way to ask for it and
+keeps it off the command line), and use full paths in `/tr` if `uv` or `pnpm` is not on the system PATH (user PATH
+entries are not always loaded for a non-interactive task).
+
+A non-zero exit means a tie needs a tiebreaker; fix the model or page, do not skip the check. What CI does cover is the
+script's compare and shuffle logic (`tests/test_site_determinism.py`: a tied sort is flagged, a total order passes).
+
 ### Publishing to Google Cloud Storage
 
 The build is plain static files, so any static host works; the repo ships a script for a GCS bucket.

@@ -123,6 +123,9 @@ cd frontend && pnpm build
 methodology page's "data freshness" table shows each export's timestamp. `pnpm build` finishes by running the size budgets (`pnpm sizes`) and exits non-zero if a payload is over
 budget or a budgeted file is missing from the output, because a new source can push one official's JSON over the per-page budget.
 Set `MOGOV_SKIP_SIZE_BUDGET=1` (exactly `1`) to skip the check; `pnpm deploy:pages` and `pnpm deploy:gcs` run the same check before publishing and honour the same variable (the budgets are still enforced by a plain `pnpm sizes` unless it is set there too).
+
+After a sync that touched rankings or sorts, run the tie check (`uv run python scripts/check_site_determinism.py --shuffle`, minutes; scheduled locally, see [environment](environment.md#checking-that-the-site-build-is-deterministic-226-459)).
+
 Separately, the build fails if the pay-per-vote year rows (`rpt_attendance_pay`) do not add up to their dbt total for any official, which means `rpt_attendance` and `rpt_attendance_pay` were exported from different builds; re-run `mogov build` and `mogov export` together. `MOGOV_SKIP_PAY_YEARS_CHECK=1` (exactly `1`) skips that check and logs that it did.
 
 The frontend words award periods from `rpt_awards.period_kind` (`year`, `fec_cycle`, `lifetime`); the build fails when the export has no such column or when a `fec_cycle` list has an odd period (a stale export); re-run `uv run mogov build` and `uv run mogov export`. `MOGOV_SKIP_AWARD_CYCLES_CHECK=1` (exactly `1`) skips the odd-period guard and also lets a stale export without `period_kind` build, inferring the kind from award and office (federal `least_committee_money_share` is a cycle) with a warning (re-export to stop inferring).

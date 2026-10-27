@@ -8,7 +8,7 @@ falls back to the 2019+ naming scheme);
 :per page: two-column if (almost) no words
 straddle the midline, else one column;
 :one row per text line (edition, chapter, page, column);
-note right: dbt splits lines into per-person biographies
+note right: dbt splits lines into per-person biographies,\nand the executive chapter's Historical Listings into\nstatewide officeholders (int_bluebook__statewide_officeholders)
 :bluebook_lines;
 stop
 @enduml

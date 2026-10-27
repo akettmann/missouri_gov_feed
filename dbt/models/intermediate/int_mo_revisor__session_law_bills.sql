@@ -27,6 +27,8 @@
 -- only a bill ("S.B. 628", "merged with S.B. 5") continues the act before it (same year, session and change), as
 -- long as only such pieces come between (or the act is just a year, "A.L. 1985, H.B. 366"); after a page cite
 -- ("p. 509") or an RSMo piece there is no act to continue.
+-- A section cite may follow a bill ("H.B. 1574 § 6 and S.B. 721 § 2", "H.B. 1807, et al. § 301.4044 and S.B. 480"):
+-- it is read past, so the bill after "and" is kept; the typo ".S.B. 58" (stray period) is read as "S.B. 58".
 -- Parse bounds (macros/session_law_bounds.sql): a note is read up to 60 acts (longest real note: 43, RSMo 301.010), an
 -- act up to 10 "merged with" bills (longest: 6) and 6 "&"/"and" bills (longest: 4). Parts past a bound would be dropped
 -- silently, and notes list acts oldest first, so the newest acts would go; assert_session_law_bounds_not_exceeded
@@ -296,17 +298,31 @@ merged as (
         and {{ mogov.split_part_at('a.refs', "' merged with '", 's.n', max_merged) }} <> ''
 ),
 
+-- "H.B. 1574 § 6 and S.B. 721 § 2" (a section cite, with its "et al." and "subsec.", between bills joined by "and")
+-- reads as "H.B. 1574 and S.B. 721"; the typo ".S.B. 58" (stray period) loses it. Without this the second bill is
+-- dropped, as numbers stops at the first section cite.
+bills_joined as (
+    select
+        *,
+        {{ mogov.regex_replace_all(
+            dbt.replace('ref', "' and .'", "' and '"),
+            '( et al\.)? § [0-9A-Za-z.]+( subsec\. [0-9A-Za-z]+)? and ',
+            ' and '
+        ) }} as joined_ref
+    from merged
+),
+
 typed as (
     select
         *,
         -- "299 & 40 § A Revision" -> "299 & 40"; "H.B. 1270 and H.B. 2032" -> "H.B. 1270 & @H.B. 2032" (@ marks a bill
         -- after "and": a lead bill only if cited as one elsewhere, see cited_leads)
         {{ dbt.replace(
-            mogov.regex_extract('ref', '^(' ~ bill_item ~ '[0-9]+( (&|and) (' ~ bill_item ~ ')?[0-9]+)*)', 1),
+            mogov.regex_extract('joined_ref', '^(' ~ bill_item ~ '[0-9]+( (&|and) (' ~ bill_item ~ ')?[0-9]+)*)', 1),
             "' and '",
             "' & @'"
         ) }} as numbers
-    from merged
+    from bills_joined
 ),
 
 items as (
