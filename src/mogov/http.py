@@ -1,10 +1,12 @@
 """HTTP client with an on-disk cache so re-runs don't re-hit public servers."""
 
 import contextlib
+import glob
 import hashlib
 import json
 import os
 import time
+import uuid
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
@@ -51,10 +53,31 @@ def replace_file(tmp: Path, dest: Path, attempts: int = 10) -> None:
             time.sleep(0.1 * (attempt + 1))
 
 
+PART_STALE_S = 86400  # a .part file untouched this long belongs to a run that crashed
+
+
+def tmp_sibling(path: Path) -> Path:
+    """A temp name next to `path` that no other writer can pick. The pid alone is not unique: containers of one
+    Cloud Run job (or a Docker volume) share a directory yet each can be pid 1, and a failed writer deletes
+    its temp file. Crashed writers leave these behind; sweep_stale_parts removes the old ones."""
+    return path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.part")
+
+
+def sweep_stale_parts(path: Path, *, now: float | None = None) -> None:
+    """Delete crashed writers' temp files for `path` that nothing has touched for PART_STALE_S."""
+    now = time.time() if now is None else now
+    for old in path.parent.glob(f".{glob.escape(path.name)}.*.part"):
+        with contextlib.suppress(OSError):
+            if now - old.stat().st_mtime > PART_STALE_S:
+                old.unlink()
+
+
 def write_atomic(path: Path, content: bytes) -> None:
-    """Shards share the cache; never let another process read a half-written entry."""
+    """Shards share the cache; never let another process read a half-written entry. Failure removes only this
+    call's own temp file. Small files only: stale temp files from crashes are not swept here (a directory scan
+    per write); the large-download path (_stream) sweeps."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.part")
+    tmp = tmp_sibling(path)
     try:
         tmp.write_bytes(content)
         replace_file(tmp, path)
@@ -340,7 +363,8 @@ def fetch_to_file(url: str, dest: Path, *, max_age: float | None = 86400) -> Pat
 
 
 def _stream(url: str, dest: Path, lock: Path) -> None:
-    tmp = dest.with_name(f".{dest.name}.{os.getpid()}.part")
+    sweep_stale_parts(dest)
+    tmp = tmp_sibling(dest)
     touched = time.time()
     obs.http_requests.add(1, {"host": httpx.URL(url).host, "cache_hit": False})
     try:

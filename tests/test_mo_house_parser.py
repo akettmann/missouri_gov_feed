@@ -462,3 +462,15 @@ def test_senate_act_tables_are_distinct_and_typed(raw_dir):
     cols = {r[0]: r[1] for r in duckdb.sql(sql).fetchall()}
     assert cols["bill"] == "VARCHAR"
     assert cols["pub_date"] == "DATE"
+
+
+def test_landed_files_tolerates_two_shard_counts_coexisting(raw_dir):
+    """A shard-count change keeps the old-count part until the new count has fully landed (#712)."""
+    codes = ["251", "252", "241", "242", "231", "232", "221", "222", "211", "212"]
+    files = [(c, f"{c}-HB1.XML", BILL) for c in codes]
+    _land(raw_dir, db.UNSHARDED, files)
+    new = db.Shard(0, 2)
+    _land(raw_dir, new, [f for f in files if new.owns(f[0])])
+    assert len(list((raw_dir / p.XmlFile.TABLE).glob("*.parquet"))) == 2  # both counts present
+    got = p.landed_files(new)
+    assert len(got) == len({(c, n) for c, n, _ in got}) == len([c for c in codes if new.owns(c)])

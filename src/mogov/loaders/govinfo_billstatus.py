@@ -3,9 +3,10 @@
 https://www.govinfo.gov/bulkdata/BILLSTATUS/{congress}/{type}/BILLSTATUS-{congress}-{type}.zip is one zip per
 Congress and bill type (hr, s, hjres, sjres, hconres, sconres, hres, sres); each member is one bill's XML. No key
 and no robots.txt rule against /bulkdata. The newest Congress's zips are rebuilt as bills move, so they are
-re-downloaded daily; a finished Congress's zips are re-read monthly. "Newest" is the Congress in session today
-(from the date), whatever MOGOV_BILLSTATUS_CONGRESSES lists. The zips are cached under CACHE_DIR
-(`<MOGOV_DATA_DIR>/cache`); on Cloud Run Jobs that is the mounted bucket, so the re-fetch rules hold across runs.
+re-downloaded daily, and so are the outgoing Congress's until March 1 (late signings); older zips are re-read
+monthly. "Newest" is the Congress in session today (from the date), whatever MOGOV_BILLSTATUS_CONGRESSES lists.
+The date is read once per run. The zips are cached under CACHE_DIR (`<MOGOV_DATA_DIR>/cache`);
+on Cloud Run Jobs that is the mounted bucket, so the re-fetch rules hold across runs.
 
 Each XML file is landed unchanged as gzip under RAW_DIR/govinfo_billstatus_xml/<congress>/<type>/ and described in
 `govinfo_billstatus_files` (path, URL, size, hash, landing time); `mogov.parsers.govinfo_billstatus` parses the same
@@ -52,10 +53,23 @@ def congress_on(day: date) -> int:
     return (year - 1789) // 2 + 1
 
 
-def current_congress() -> int:
-    """Today's Congress, from the date, not from which Congresses are configured: a run that leaves out the
-    newest Congress must not mistake an older one for the live one."""
-    return congress_on(datetime.now(UTC).date())
+DAILY = 86400
+MONTHLY = 30 * 86400
+OUTGOING_GRACE_END = (3, 1)  # (month, day): the outgoing Congress keeps its daily refresh until this date
+
+
+def max_age(congress: int, day: date) -> int:
+    """Seconds a cached zip stays fresh on `day`. The Congress in session (from the date, not from which Congresses
+    are configured: a run that leaves out the newest one must not mistake an older one for the live one) is daily.
+    So is the one just ended until March 1 of the new Congress's first year: signings, vetoes and Public Law
+    numbers for the last bills often land after January 3. Every other Congress is monthly."""
+    current = congress_on(day)
+    if congress == current:
+        return DAILY
+    first_year = 1789 + 2 * (current - 1)  # a Congress starts in the odd year after 1788 + 2n
+    if congress == current - 1 and day.year == first_year and (day.month, day.day) < OUTGOING_GRACE_END:
+        return DAILY
+    return MONTHLY
 
 
 def default_congresses(day: date) -> list[int]:
@@ -92,17 +106,17 @@ def land_file(congress: int, bill_type: str, name: str, xml: bytes, url: str) ->
 @loader("govinfo_billstatus", service="www.govinfo.gov", slow=True)
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: one zip per (congress, bill type). Streams each zip member by member."""
-    units = [(c, t) for c in (CONGRESSES or default_congresses(datetime.now(UTC).date())) for t in BILL_TYPES]
+    today = datetime.now(UTC).date()  # read once: a run straddling midnight must not see two "current" Congresses
+    units = [(c, t) for c in (CONGRESSES or default_congresses(today)) for t in BILL_TYPES]
     mine = shard.take(units, key=lambda u: f"{u[0]}-{u[1]}")
-    current = current_congress()
     progress = obs.Progress("zips", len(mine), log)
     with db.JsonSink(shard, source_url=BASE, tables=TABLES) as sink:
         for congress, bill_type in mine:
             url = zip_url(congress, bill_type)
             dest = CACHE_DIR / "govinfo_billstatus" / f"BILLSTATUS-{congress}-{bill_type}.zip"
-            max_age = 86400 if congress == current else 30 * 86400
+            age = max_age(congress, today)
             try:
-                fetch_to_file(url, dest, max_age=max_age)
+                fetch_to_file(url, dest, max_age=age)
             except httpx.HTTPStatusError as e:
                 if e.response.status_code != 404:
                     raise

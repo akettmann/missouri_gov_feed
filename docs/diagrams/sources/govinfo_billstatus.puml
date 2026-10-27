@@ -8,7 +8,7 @@ MOGOV_BILLSTATUS_CONGRESSES x MOGOV_BILLSTATUS_TYPES
 note right: each zip is downloaded by exactly one shard
 repeat
   :GET govinfo.gov/bulkdata/BILLSTATUS/CONGRESS/TYPE/BILLSTATUS-CONGRESS-TYPE.zip
-  (streamed to the cache; newest Congress daily, older monthly);
+  (streamed to the cache; newest Congress daily, and the outgoing one until Mar 1; older monthly);
   if (404?) then (yes)
     :log and skip the unit;
   else (zip)
