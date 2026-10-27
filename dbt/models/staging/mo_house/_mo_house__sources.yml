@@ -1,9 +1,9 @@
 # Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
 # default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
 # The mo_house_xml_* tables are written by mogov.parsers.mo_house from the gzipped XML files that the
-# loader lands unchanged (listed in mo_house_xml_files). Other parsed tables (mo_house_xml_bill_hearings,
+# loader lands unchanged (listed in mo_house_xml_files). Other parsed tables (
 # _member_counties, _bill_list, _member_list, _upcoming_hearings, _calendar_bills, _list_notices and the
-# SenateActList's _hearings and _rollcalls) are landed too but not read by any model yet (#384).
+# SenateActList's _rollcalls) are landed too but not read by any model yet (#384).
 # (The SenateActList carries no sponsors or subjects: its bill row names the sponsor.)
 version: 2
 sources:
@@ -157,6 +157,30 @@ sources:
   - name: xml_bill_witnesses
     identifier: mo_house_xml_bill_witnesses
     description: "One row per witness-form link on a bill. Links only: the forms name citizens and are not fetched. Empty Witness elements are not landed."
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: xml_bill_hearings
+    identifier: mo_house_xml_bill_hearings
+    description: "One row per committee hearing noticed for a bill (the Hearings element of the bill XML): committee, notice date, notice time (00:00 when only the free-text alt_time is given), location and the committee's comments."
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: xml_senate_act_hearings
+    identifier: mo_house_xml_senate_act_hearings
+    description: "SenateActList twin of xml_bill_hearings (bill names the Senate bill)."
     config:
       loaded_at_field: loaded_at
       freshness:
