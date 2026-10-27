@@ -866,8 +866,10 @@ Quirks:
   least 3 letters (2 for "Ed" / "Education"): "Assoc" / "Associates", "Ins" / "Insurance", "Technical Ed" /
   "Technical Education". Person surnames are not on the list, so "John Hill" / "John Hillhouse", "Smith Alex" /
   "Smith Alexandra", "John Smith" / "John Smithson" and "Committee to Elect John Smith" / "... Smithson" stay unpaired,
-  and Roman numerals and 1-2 letter words must be equal ("Holding III" / "Holdings II"). An organisation abbreviated
-  in a way the list does not cover (a misspelling, "Mfg") is not paired by this rule. The typo rule (#735) only pairs names whose differing words are 5+ letters in both names, so a change to a short
+  and Roman numerals and 1-2 letter words must be equal ("Holding III" / "Holdings II"). Two different abbreviations of one word also pair (#740), through a map in the macro
+  `org_word_abbreviation` ("Ass" / "Assoc" / "Assn" / "Association", "Ed" / "Edu" / "Educ", "Int" / "Intl", "Com" / "Comm",
+  "Telecom" / "Telecomm", "Govt" / "Government"). An organisation abbreviated in a way the list and the map do not cover
+  (a misspelling, "Mfg") is not paired by this rule. The typo rule (#735) only pairs names whose differing words are 5+ letters in both names, so a change to a short
   word ("Citizens for Ann Smith" / "Citizens for Anne Smith", "Joan" / "John", "Sara" / "Sarah") is two people and both
   lines stay; "Fran Froelich" / "Fran Froehlich" and "Lathrop GPM" / "Lanthrop GPM" still pair. Spacing
   variants that change the word count or a short word ("Century Link" / "CenturyLink", "Fire Fighters" / "Firefighters",
@@ -1080,7 +1082,13 @@ Quirks:
   low end ("... $250,001 -" / "Road $500,000", or in the 2021+ layout "$500,001 - Dividends $2,501 -" / the asset
   name with "$1,000,000 $5,000"), and "Over" / "$1,000,000" reads "Over $1,000,000". When the asset's value is
   "None" ("... JT None Interest $1,001 - ..."), the first `$` on the line is the income range, not the asset's value,
-  and `amount_range` is `None`. Residual cases that still split:
+  and `amount_range` is `None`; the same for "Undetermined" (pensions, annuities, royalties: 47 A rows), which
+  `amount_range` reads as `Undetermined`. On A an income range wrapped after a complete value range joins too
+  ("Fidelity Trust => JT $15,001 - $50,000 Interest $201 -" / "Clark Cnty WA Sch Dist $1,000": the tail holds the
+  income high end and the asset name; the glyph line may sit between; 245 rows in all), and so does a value of
+  "Over" (or "Over None") with the amount on the next line ("Equity Trust CO => Over None" / "Berkshire Hathaway Inc.
+  New (BRK.B) $50,000,000" reads `Over $50,000,000`; `Location:` / `Description:` / `Comments:` lines ending on
+  "Over" are not heads). Residual cases that still split:
   an A asset name wrapped with no structural signal ("Fidelity Managed Income II III [HE]" / "Unit Cl I [HE]"), PTR
   (`P`) rows, which are not joined at all, and a few A `DESCRIPTION:` lines that join through the open-parenthesis
   rule.

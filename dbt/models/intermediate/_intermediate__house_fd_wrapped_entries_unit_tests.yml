@@ -17,6 +17,11 @@ unit_tests:
       the checkbox glyphs possibly between): "$50,001 -" / "$100,000", "$250,001 -" / "Residence
       $500,000" (a description wrapped with the range), "Over" / "$1,000,000". Owner codes exist on A, B and D only (on D
       at the start of the line): "Washington, DC" in a Schedule H itinerary or in a D creditor's name is a city.
+      "Undetermined" before the first "$" is the asset's value (like "None"): amount_range is "Undetermined" and the
+      "$" range is the income. An income range wrapped after a complete value range ("... $15,001 - $50,000 Interest
+      $201 -" / "Clark Cnty WA Sch Dist $1,000", glyph line possibly between) joins, but a line with its own range, or
+      a head whose income range is complete, does not. A value "Over None" with the amount on the next line reads
+      "Over $50,000,000"; a "Description: ... Roll Over" line is not such a head.
       Schedule H: a line with no date is the wrapped sponsor / itinerary of the entry above. The head line's page and
       line number stay the row's identity.
     given:
@@ -45,6 +50,23 @@ unit_tests:
           select 'w', 'u_w', true, 1, 20, 'Grain Bin $250,000' union all
           select 'w', 'u_w', true, 1, 21, 'Rental Trust ⇒ JT $50,001 - None Interest $1,001 -' union all
           select 'w', 'u_w', true, 1, 22, 'Rental Property [RP] $100,000 $5,000' union all
+          select 'w', 'u_w', true, 1, 23, 'State of Missouri Pension [DB] Undetermined Pension $5,001 - $15,000' union all
+          select 'w', 'u_w', true, 1, 24, 'John Hancock Life [FN] SP Undetermined annuity Payment $1,001 - gfedc' union all
+          select 'w', 'u_w', true, 1, 25, 'Annuity Contract $2,500' union all
+          select 'w', 'u_w', true, 1, 26, 'Alford LLC [OL] Undetermined None' union all
+          select 'w', 'u_w', true, 1, 27, 'Fidelity Trust ⇒ JT $15,001 - $50,000 Interest $201 - gfedc' union all
+          select 'w', 'u_w', true, 1, 28, 'Clark Cnty WA Sch Dist $1,000' union all
+          select 'w', 'u_w', true, 1, 29, 'Edward Jones Acct ⇒ $1,001 - $15,000 Dividends $201 -' union all
+          select 'w', 'u_w', true, 1, 30, 'gfedc' union all
+          select 'w', 'u_w', true, 1, 31, 'Duke Energy (DUK) [ST] $1,000' union all
+          select 'w', 'u_w', true, 1, 32, 'Complete Acct ⇒ $1,001 - $15,000 Dividends $201 - $1,000' union all
+          select 'w', 'u_w', true, 1, 33, 'Wrap Head Acct ⇒ $1,001 - $15,000 Dividends $201 -' union all
+          select 'w', 'u_w', true, 1, 34, 'Own Range Fund [MF] $15,001 - $50,000 Tax-Deferred' union all
+          select 'w', 'u_w', true, 1, 35, 'Equity Trust CO ⇒ Over None' union all
+          select 'w', 'u_w', true, 1, 36, 'Berkshire Hathaway Inc. New (BRK.B) $50,000,000' union all
+          select 'w', 'u_w', true, 1, 37, 'Next Co ⇒ $1,001 - $15,000 Tax-Deferred' union all
+          select 'w', 'u_w', true, 1, 38, 'Description: 401K & IRA Roll Over' union all
+          select 'w', 'u_w', true, 1, 39, 'MOST 529 Funds $2,500' union all
           select 'w', 'u_w', true, 2, 1, 'Schedule B: Transactions' union all
           select 'w', 'u_w', true, 2, 2, '$200?' union all
           select 'w', 'u_w', true, 2, 3, 'Fidelity Trust ⇒ JT 09/5/2019 S $100,001 -' union all
@@ -87,6 +109,18 @@ unit_tests:
         - {doc_id: w, page: 1, line_no: 17, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$15,001 - $50,000', line_text: 'Own Range Fund [MF] $15,001 - $50,000'}
         - {doc_id: w, page: 1, line_no: 18, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$100,001 - $250,000', line_text: 'Sam Farms $100,001 - Grain Bin $250,000'}
         - {doc_id: w, page: 1, line_no: 21, schedule: 'A: assets & unearned income', owner_code: JT, amount_range: '$50,001 - $100,000', line_text: 'Rental Trust ⇒ JT $50,001 - None Interest $1,001 - Rental Property [RP] $100,000 $5,000'}
+        - {doc_id: w, page: 1, line_no: 23, schedule: 'A: assets & unearned income', owner_code: null, amount_range: Undetermined, line_text: 'State of Missouri Pension [DB] Undetermined Pension $5,001 - $15,000'}
+        - {doc_id: w, page: 1, line_no: 24, schedule: 'A: assets & unearned income', owner_code: SP, amount_range: Undetermined, line_text: 'John Hancock Life [FN] SP Undetermined annuity Payment $1,001 - gfedc Annuity Contract $2,500'}
+        - {doc_id: w, page: 1, line_no: 26, schedule: 'A: assets & unearned income', owner_code: null, amount_range: Undetermined, line_text: 'Alford LLC [OL] Undetermined None'}
+        - {doc_id: w, page: 1, line_no: 27, schedule: 'A: assets & unearned income', owner_code: JT, amount_range: '$15,001 - $50,000', line_text: 'Fidelity Trust ⇒ JT $15,001 - $50,000 Interest $201 - gfedc Clark Cnty WA Sch Dist $1,000'}
+        - {doc_id: w, page: 1, line_no: 29, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Edward Jones Acct ⇒ $1,001 - $15,000 Dividends $201 - gfedc Duke Energy (DUK) [ST] $1,000'}
+        - {doc_id: w, page: 1, line_no: 32, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Complete Acct ⇒ $1,001 - $15,000 Dividends $201 - $1,000'}
+        - {doc_id: w, page: 1, line_no: 33, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Wrap Head Acct ⇒ $1,001 - $15,000 Dividends $201 -'}
+        - {doc_id: w, page: 1, line_no: 34, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$15,001 - $50,000', line_text: 'Own Range Fund [MF] $15,001 - $50,000 Tax-Deferred'}
+        - {doc_id: w, page: 1, line_no: 35, schedule: 'A: assets & unearned income', owner_code: null, amount_range: 'Over $50,000,000', line_text: 'Equity Trust CO ⇒ Over None Berkshire Hathaway Inc. New (BRK.B) $50,000,000'}
+        - {doc_id: w, page: 1, line_no: 37, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Next Co ⇒ $1,001 - $15,000 Tax-Deferred'}
+        - {doc_id: w, page: 1, line_no: 38, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Description: 401K & IRA Roll Over'}
+        - {doc_id: w, page: 1, line_no: 39, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$2,500', line_text: 'MOST 529 Funds $2,500'}
         - {doc_id: w, page: 2, line_no: 3, schedule: 'B: transactions', owner_code: JT, amount_range: '$100,001 - $250,000', line_text: 'Fidelity Trust ⇒ JT 09/5/2019 S $100,001 - Vanguard Windsor II [MF] (partial) $250,000'}
         - {doc_id: w, page: 2, line_no: 5, schedule: 'B: transactions', owner_code: SP, amount_range: '$1,001 - $15,000', line_text: 'Enterprise 401k - SP Monthly P $1,001 - $15,000 Dodge & Cox Stock Fund [MF]'}
         - {doc_id: w, page: 2, line_no: 7, schedule: 'B: transactions', owner_code: null, amount_range: null, line_text: 'Description: Inherited Asset'}
