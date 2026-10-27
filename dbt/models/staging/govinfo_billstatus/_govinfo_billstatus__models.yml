@@ -67,6 +67,71 @@ models:
           values:
           - House
           - Senate
+- name: stg_govinfo_billstatus__committee_activities
+  description: 'Dated steps of a federal bill in a committee or subcommittee, from the GovInfo BILLSTATUS bulk XML:
+    one row per (bill, committee or subcommittee, activity). activity is the label as published ("Referred to",
+    "Markup by", "Reported by", "Hearings by", "Discharged from"); the wording differs between the House and Senate
+    and over time ("Referred To" vs "Referred to"), so match it case-insensitively. position / subposition point
+    at the row in stg_govinfo_billstatus__committees (subposition is null for a full committee).'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - bill_id
+        - position
+        - subposition
+        - activity_position
+  columns:
+  - name: bill_id
+    data_tests:
+    - not_null
+  - name: activity
+    data_tests:
+    - not_null
+  - name: activity_date
+    description: Never in the future and never before 2003 (the first Congress loaded, the 108th, starts then).
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: cast('2003-01-01' as date)
+          max_value: current_date
+          inclusive: true
+- name: stg_govinfo_billstatus__committees
+  description: 'Committees (and subcommittees) federal bills were referred to, from the GovInfo BILLSTATUS bulk
+    XML: one row per (bill, committee) and one per (bill, subcommittee). A subcommittee row has subposition set
+    and parent_system_code naming its committee; the file gives it no chamber, so it takes its parent''s. system_code
+    is Congress.gov''s committee code (hsba00 House Financial Services; a subcommittee code ends in a non-zero number,
+    hsif03). The dated steps (referred, markup, reported) are in stg_govinfo_billstatus__committee_activities.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - bill_id
+        - position
+        - subposition
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: (parent_system_code is not null) = is_subcommittee
+  columns:
+  - name: bill_id
+    data_tests:
+    - not_null
+  - name: system_code
+    data_tests:
+    - not_null
+  - name: name
+    data_tests:
+    - not_null
+  - name: chamber
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - House
+          - Senate
+          - Joint
 - name: stg_govinfo_billstatus__cosponsors
   description: Federal bill cosponsors from the GovInfo BILLSTATUS bulk XML, one row per (bill, cosponsor). A cosponsor
     who later withdrew keeps the row with sponsorship_withdrawn_date set. is_original_cosponsor is true when the
@@ -134,6 +199,78 @@ models:
           values:
           - House
           - Senate
+- name: stg_govinfo_billstatus__related_bill_relationships
+  description: 'How a federal bill relates to one of its related bills, from the GovInfo BILLSTATUS bulk XML: one
+    row per (bill, related bill, relationship). relationship_type is as published ("Identical bill", "Related bill",
+    "Procedurally related", ...) and identified_by says who made the link (CRS, or the House or Senate itself).
+    related_position is the position of the row in stg_govinfo_billstatus__related_bills.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - bill_id
+        - related_position
+        - position
+  columns:
+  - name: bill_id
+    data_tests:
+    - not_null
+  - name: relationship_type
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - Identical bill
+          - Related bill
+          - Procedurally related
+          - Procedurally-related
+          - Bill replaced by
+          - Bill replaces
+- name: stg_govinfo_billstatus__related_bills
+  description: 'Bills a federal bill is related to, from the GovInfo BILLSTATUS bulk XML: one row per (bill, related
+    bill). related_bill_id has the same form as bill_id ("118-hjres-125"), so it joins stg_govinfo_billstatus__bills
+    when the related bill''s Congress is loaded. The kind of relationship (identical, related, procedurally related,
+    a bill folded into another) is in stg_govinfo_billstatus__related_bill_relationships: one related bill can carry
+    several. A relation is usually (about 87% in the 118th hjres/sjres) also listed on the other bill; do not assume
+    it.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - bill_id
+        - related_bill_id
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: related_bill_id <> bill_id
+  columns:
+  - name: bill_id
+    data_tests:
+    - not_null
+  - name: related_bill_type
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - hr
+          - s
+          - hjres
+          - sjres
+          - hconres
+          - sconres
+          - hres
+          - sres
+  - name: related_congress
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 100
+          max_value: 125
+  - name: related_number
+    data_tests:
+    - not_null
 - name: stg_govinfo_billstatus__sponsors
   description: Federal bill sponsors from the GovInfo BILLSTATUS bulk XML, one row per (bill, sponsor). bioguide_id
     joins congress_legislators; state and district are the member's at the time of the bill (district is null for
@@ -149,5 +286,23 @@ models:
     data_tests:
     - not_null
   - name: bioguide_id
+    data_tests:
+    - not_null
+- name: stg_govinfo_billstatus__subjects
+  description: 'CRS legislative subject terms of federal bills, from the GovInfo BILLSTATUS bulk XML: one row per
+    (bill, subject). The terms are the Congressional Research Service''s controlled vocabulary ("Taxation", "Health
+    care coverage and access"); a bill''s single broader policy area is policy_area in stg_govinfo_billstatus__bills.
+    The CRS tags a bill only after it is introduced, so a new bill can have none yet.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - bill_id
+        - subject
+  columns:
+  - name: bill_id
+    data_tests:
+    - not_null
+  - name: subject
     data_tests:
     - not_null

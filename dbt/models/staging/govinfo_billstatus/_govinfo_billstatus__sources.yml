@@ -39,3 +39,19 @@ sources:
   - name: laws
     identifier: govinfo_billstatus_laws
     description: One row per Public Law number a bill became (payload JSON).
+  - name: committees
+    identifier: govinfo_billstatus_committees
+    description: One row per committee a bill was referred to and one per subcommittee (payload JSON); subcommittee
+      rows name their parent committee.
+  - name: committee_activities
+    identifier: govinfo_billstatus_committee_activities
+    description: One row per dated activity of a bill in a committee or subcommittee (payload JSON).
+  - name: subjects
+    identifier: govinfo_billstatus_subjects
+    description: One row per CRS legislative subject term of a bill (payload JSON).
+  - name: related_bills
+    identifier: govinfo_billstatus_related_bills
+    description: One row per related bill a bill lists (payload JSON).
+  - name: related_bill_relationships
+    identifier: govinfo_billstatus_related_bill_relationships
+    description: One row per relationship type a related bill carries (payload JSON).
