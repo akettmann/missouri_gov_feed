@@ -60,7 +60,12 @@ def load(shard: db.Shard) -> dict[str, int]:
             except Exception as exc:
                 sink.add("house_fd_pdf_lines", url, {"doc_id": rec["DocID"], "url": url, "error": str(exc)})
                 continue
-            texts = list(enumerate(pdftext.page_texts(pdf_bytes, layout=False), 1))
+            try:
+                texts = list(enumerate(pdftext.page_texts(pdf_bytes, layout=False), 1))
+            except pdftext.ExtractTimeout as exc:  # a pathological PDF must not stop the run; it lands as an error
+                log.warning("house_fd.extract_timeout", url=url, error=str(exc))
+                sink.add("house_fd_pdf_lines", url, {"doc_id": rec["DocID"], "url": url, "error": str(exc)})
+                continue
             if not any(t.strip() for _, t in texts):
                 sink.add("house_fd_pdf_lines", url, {"doc_id": rec["DocID"], "url": url, "has_text": False})
                 continue

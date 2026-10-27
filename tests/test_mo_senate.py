@@ -151,3 +151,26 @@ def test_excused_after_vacancies_past_an_odd_page_header():
     rows = parse_journal(text)
     excused = [r for r in rows if r["category"] == "Excused from voting"]
     assert [(r["name"], r["declared_count"], r["vacancies"]) for r in excused] == [("Williams", 1, 0)]
+
+
+def test_extract_timeout_lands_as_an_error_row_and_the_run_goes_on(tmp_path, monkeypatch):
+    import json
+
+    import duckdb
+
+    from mogov import db
+    from mogov.loaders import mo_senate
+
+    def slow(data):
+        raise mo_senate.pdftext.ExtractTimeout("text extraction ran past 1 s after 3 pages")
+
+    monkeypatch.setattr(db, "RAW_DIR", tmp_path)
+    monkeypatch.setattr(mo_senate, "window_years", lambda: [2024])
+    monkeypatch.setattr(mo_senate, "_journal_urls", lambda year: ["https://x/a.pdf", "https://x/b.pdf"])
+    monkeypatch.setattr(mo_senate, "fetch", lambda url, **_: b"%PDF-fake")
+    monkeypatch.setattr(mo_senate.pdftext, "page_texts", slow)
+    mo_senate.load(db.UNSHARDED)
+    rows = duckdb.sql(f"select payload from read_parquet('{db.raw_glob('mo_senate_journals')}')").fetchall()
+    payloads = sorted((json.loads(p) for (p,) in rows), key=lambda p: p["url"])
+    assert [p["url"] for p in payloads] == ["https://x/a.pdf", "https://x/b.pdf"]
+    assert all("ran past" in p["error"] for p in payloads)
