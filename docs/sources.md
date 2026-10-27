@@ -891,6 +891,7 @@ Quirks:
 - `isOriginalCosponsor` is the text `True`/`False`; a cosponsor who later withdrew keeps their row with
   `sponsorshipWithdrawnDate` set (the mart drops them). `district` is present for House members only.
 - Sponsors carry the member's state at the time of the bill; a member who changed states has rows under both.
+- Eleven reserved 117th House bills (hr2, hr9-17, hr20; "Reserved for the Speaker." / "...Minority Leader.") use `<billType>` and `<billNumber>` where every other file uses `<type>` and `<number>`. The parser reads either, so they keep their real id (`117-hr-2`); they are real bills with no sponsors, cosponsors or votes, and are recognizable by that title.
 - Rate: the loader makes one request per zip (24 for the default window), not per bill.
 
 ## house_fd: U.S. House financial disclosures

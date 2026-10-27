@@ -255,3 +255,14 @@ def test_nested_elements_never_stand_in_for_a_missing_bill_field():
     row = parser.parse_bill(xml, "f.xml")["bills"][0][1]
     assert row["bill_type"] is None  # the action's <type> is not the bill's
     assert row["title"] is None
+
+
+def test_reserved_bill_with_billtype_and_billnumber_keeps_its_real_id():
+    # The real 117th-Congress H.R. 2 ("Reserved for the Speaker"): this older export names the type and number
+    # `billType` / `billNumber`. It used to parse to bill_id '117--None', colliding with the other reserved bills.
+    rows = parser.parse_bill((FIXTURES / "BILLSTATUS-117hr2.xml").read_bytes(), "BILLSTATUS-117hr2.xml")
+    ((_, row),) = rows["bills"]
+    assert row["bill_id"] == "117-hr-2"
+    assert (row["congress"], row["bill_type"], row["number"]) == ("117", "HR", "2")
+    assert row["title"] == "Reserved for the Speaker."
+    assert [k for k, _ in rows["actions"]] == ["117-hr-2#0", "117-hr-2#1"]

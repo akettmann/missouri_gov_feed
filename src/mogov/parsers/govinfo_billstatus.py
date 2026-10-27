@@ -61,7 +61,11 @@ def parse_bill(xml: bytes, file_name: str, errors: list[str] | None = None) -> d
     bill = child(root, "bill")
     if bill is None:
         raise ValueError(f"{file_name}: no <bill> element")
-    congress, bill_type, number = text(bill, "congress"), text(bill, "type"), text(bill, "number")
+    # The 11 reserved 117th House bills (hr2, hr9-17, hr20) are an older export that names these `billType` and
+    # `billNumber`; every other file uses `type` and `number`.
+    congress = text(bill, "congress")
+    bill_type = text(bill, "type") or text(bill, "billType")
+    number = text(bill, "number") or text(bill, "billNumber")
     bid = bill_id(congress, bill_type, number)
     out: dict[str, list[Row]] = {name: [] for name in TABLES}
     latest = child(bill, "latestAction")
