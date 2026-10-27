@@ -855,6 +855,19 @@ rule against `/bulkdata`, US government work (the page states no licence). Congr
   law relieves a named person or entity; the 118th Congress's hr/s/sjres/hconres bills have 269 public and no
   private laws. `became_law` is true for either type, so read `law_type` before calling a law broad policy. A
   bill with two laws shows the earliest by number (compared as integers).
+- Stage and veto outcomes: `int_federal_bills__stage` (one row per bill) reads how far each bill got from the
+  Library of Congress's coded copy of each action (`source_system` 'Library of Congress'; the chamber's own copy is
+  ignored): 8000/17000 passed the House/Senate, 28000 presented, 31000 vetoed, 32000/34000 passed over the veto,
+  33000/35000 failed of passage over the veto, 36000/41000 became Public/Private Law, E30000 "Signed by President".
+  `stage` runs introduced, committee_reported_or_discharged, passed_one_chamber, passed_both_chambers (each chamber
+  passed a version; texts may still differ), presented_to_president, then vetoed, pocket_vetoed, veto_overridden or
+  became_law; a simple resolution agreed to in its own chamber is `agreed_to`. `president_outcome` separates signed
+  from became_law_without_signature (law with no "Signed by President" action; the House's own copy says "Sent to
+  Archivist of the United States unsigned") and `veto_result` says whether an override failed in the House or the
+  Senate. 118th and 119th (loaded 2026-10-27): 412 laws (274 + 138), 15 vetoes (118th: 13; 119th: 2), every veto
+  sustained or never put to an override vote, no override and no pocket veto in these two Congresses (the pocket
+  veto is read from action text, since no code is known for it, so it is unverified on real data). Whether a bill
+  "succeeded" is left to the reader (#622).
 - Cache: the zips of the Congress in session today (derived from the date, not from the configured list) are
   re-read daily (bills move all the time), others monthly. The cache is `<MOGOV_DATA_DIR>/cache`, which on Cloud Run
   Jobs is the mounted bucket (see environment.md), so the schedule holds across runs. A 404 for a zip
@@ -863,11 +876,13 @@ rule against `/bulkdata`, US government work (the page states no licence). Congr
 Quirks:
 - Outcome is only the `<laws>` list. The latest-action text is a free-text field and a bill can fail, be vetoed,
   or be folded into another bill with the same words; `became_law` therefore means "carries a Public Law number".
-  Vetoes, veto overrides and pocket vetoes appear only as actions (type `Veto`, `President`, `BecameLaw`) and are
-  not modelled yet.
+  Vetoes, veto overrides and pocket vetoes appear only as actions (type `Veto`, `President`, `BecameLaw`); they
+  are read in `int_federal_bills__stage` (see "Stage and veto outcomes" above), by action code, not text.
 - `<legislationUrl>` is present on only about a third of the files (S.J.Res. 118th: 47 of 122; H.Res.: 335 of
   1,627), so `stg_govinfo_billstatus__bills` builds the congress.gov link from the type, Congress and number
   when it is missing.
+- A few files list a law number but no matching action (119-hr-766: Public Law 119-120, actions end at referral);
+  `int_federal_bills__stage` trusts the laws list for `became_law` and leaves its dates and outcome empty.
 - Each action is often listed twice: the chamber's own and the Library of Congress's coded copy (`sourceSystem`
   names which). Roll calls cited by both appear twice in `_recorded_votes`. Count distinct roll calls, not rows.
 - `isOriginalCosponsor` is the text `True`/`False`; a cosponsor who later withdrew keeps their row with
