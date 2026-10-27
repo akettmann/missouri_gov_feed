@@ -684,3 +684,64 @@ def test_persistent_rejection_raises_and_keeps_the_previous_landing(monkeypatch,
     with pytest.raises(m.TooManyRejectedFragments):
         m.load(db.Shard())
     assert {t: _landed(t) for t in before} == before
+
+
+def _many_bills(monkeypatch, n):
+    """Make the session list n copies of a real bill row with distinct billIds (1..n), in list order."""
+    template = m.parse_bill_list(LIST_2025_R)[0]
+    bills = [{**template, "billId": i} for i in range(1, n + 1)]
+    monkeypatch.setattr(m, "session_lists", lambda year: [("R", bills)])
+
+
+def _reject_ids(bad, only=None):
+    return lambda p: p["billId"] in bad and (only is None or p["handler"] in only)
+
+
+def _pairs(n_pairs, gap):
+    """Bill ids rejected in adjacent pairs, with `gap` good bills between pairs."""
+    return {i for k in range(n_pairs) for i in (1 + k * (gap + 2), 2 + k * (gap + 2))}
+
+
+def test_rejections_in_pairs_with_good_bills_between_publish(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=False)
+    _many_bills(monkeypatch, 200)
+    bad = _pairs(4, 10)  # 8 rejected bills (over max(3, 5%)? 5% of 200 = 10, so under), never 3 in a row
+    assert len(bad) == 8
+    monkeypatch.setattr(m, "_get", _fake_get(_reject_ids(bad, {"Actions"})))
+    counts = m.load(db.Shard())
+    assert counts[m.BILLS_TABLE] == 200
+
+
+def test_three_rejected_bills_in_a_row_raise_even_in_a_large_list(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=False)
+    _many_bills(monkeypatch, 200)
+    monkeypatch.setattr(m, "_get", _fake_get(_reject_ids(_pairs(2, 10) | {50, 51, 52}, {"Actions"})))
+    with pytest.raises(m.TooManyRejectedFragments):
+        m.load(db.Shard())
+
+
+def test_the_run_of_rejected_bills_restarts_after_a_good_bill(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=False)
+    _many_bills(monkeypatch, 200)
+    # 2, good, 2, good, 2: six rejected in all, but never three adjacent
+    monkeypatch.setattr(m, "_get", _fake_get(_reject_ids({1, 2, 4, 5, 7, 8}, {"Actions"})))
+    assert m.load(db.Shard())[m.BILLS_TABLE] == 200
+
+
+def test_every_tab_rejected_on_two_adjacent_bills_counts_bills_not_tabs(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=True)
+    _many_bills(monkeypatch, 10)
+    # 2 bills x 5 tabs = 10 rejected tabs, but only 2 bills
+    monkeypatch.setattr(m, "_get", _fake_get(_reject_ids({4, 5})))
+    assert m.load(db.Shard())[m.BILLS_TABLE] == 10
+
+
+def test_the_share_limit_scales_with_the_list_49_of_1000_publish_50_raise(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=False)
+    _many_bills(monkeypatch, 1000)
+    scattered = [i * 20 for i in range(1, 51)]  # never adjacent
+    monkeypatch.setattr(m, "_get", _fake_get(_reject_ids(set(scattered[:49]), {"Actions"})))
+    assert m.load(db.Shard())[m.BILLS_TABLE] == 1000
+    monkeypatch.setattr(m, "_get", _fake_get(_reject_ids(set(scattered), {"Actions"})))
+    with pytest.raises(m.TooManyRejectedFragments):
+        m.load(db.Shard())
