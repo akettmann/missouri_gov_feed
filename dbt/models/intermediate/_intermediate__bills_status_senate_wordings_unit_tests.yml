@@ -1,0 +1,74 @@
+# Unit tests for the Senate action wordings added in #715 (withdrawal, veto override, anchored-pattern misses):
+# fixed senate.mo.gov action rows -> exact status per bill. The mapping seed is mocked with the rows these cases use;
+# assert_senate_action_flags_map_known_wordings checks the real seed against real wordings.
+version: 2
+
+unit_tests:
+  - name: bill_status_from_senate_withdrawal_override_and_misses
+    model: int_bills__status
+    description: >
+      Fixed wordings, "today" pinned to 2026-10-25. SB20 "Bill Withdrawn" after "Prefiled" (2024 SB 961): withdrawn,
+      failed. SB21 vetoed then "Legislature voted to override Governor's veto" (2016 SB 656): veto overridden,
+      enacted. SB22 vetoed and only "Motion to override Governor's veto S adopted": still vetoed (one chamber's
+      motion is not the override). SB23 "SCS Reported from S ..." (2018 SB 988, prefix before the verb): reported do
+      pass. SR24 "Resolution S defeated" (2024 SR 552): defeated. SB25 "Defeated on Third Reading" then reconsidered
+      and "S Third Read and Passed" (2024 SB 1351): passed one chamber, not defeated. SB26 "Defeated on Third Reading"
+      alone: defeated. SCR27 "Resolutions Calendar - Reported from Committee" (2024 SCR 36): reported do pass.
+    overrides:
+      vars:
+        as_of_date: '2026-10-25'
+    given:
+      - input: ref('stg_mo_house__bills')
+        format: sql
+        rows: |
+            select '261' as session_code, 'SB20' as bill, 'SB 20' as current_bill_string
+      - input: ref('stg_mo_house__bill_actions')
+        format: sql
+        rows: |
+            select '261' as session_code, 'SB20' as bill, 'senate_act_list' as listed_in, cast('2026-05-14' as date) as action_date, 'Signed by House Speaker (H)' as description where 1 = 0
+      - input: ref('stg_mo_senate__bill_actions')
+        format: sql
+        rows: |
+            select '261' as session_code, 'SB20' as bill, cast('2025-12-01' as date) as action_date, 'Prefiled' as action union all
+            select '261', 'SB20', cast('2025-12-04' as date), 'Bill Withdrawn' union all
+            select '261', 'SB21', cast('2026-05-13' as date), 'Truly Agreed To and Finally Passed' union all
+            select '261', 'SB21', cast('2026-06-27' as date), 'Vetoed by Governor' union all
+            select '261', 'SB21', cast('2026-09-14' as date), 'Motion to override Governor''s veto S adopted (Munzlinger)' union all
+            select '261', 'SB21', cast('2026-09-14' as date), 'Motion to override Governor''s veto H adopted' union all
+            select '261', 'SB21', cast('2026-09-14' as date), 'Legislature voted to override Governor''s veto' union all
+            select '261', 'SB22', cast('2026-05-13' as date), 'Truly Agreed To and Finally Passed' union all
+            select '261', 'SB22', cast('2026-06-27' as date), 'Vetoed by Governor' union all
+            select '261', 'SB22', cast('2026-09-14' as date), 'Motion to override Governor''s veto S adopted (Munzlinger)' union all
+            select '261', 'SB23', cast('2026-02-15' as date), 'Second Read and Referred S Professional Registration Committee' union all
+            select '261', 'SB23', cast('2026-04-30' as date), 'SCS Reported from S Professional Registration Committee' union all
+            select '261', 'SR24', cast('2026-01-04' as date), 'S Offered' union all
+            select '261', 'SR24', cast('2026-01-10' as date), 'SA 1 S defeated' union all
+            select '261', 'SR24', cast('2026-01-10' as date), 'Resolution S defeated' union all
+            select '261', 'SB25', cast('2026-04-04' as date), 'Defeated on Third Reading' union all
+            select '261', 'SB25', cast('2026-04-09' as date), 'S Third Read and Passed' union all
+            select '261', 'SB26', cast('2026-04-04' as date), 'Defeated on Third Reading' union all
+            select '261', 'SCR27', cast('2026-03-28' as date), 'S Offered' union all
+            select '261', 'SCR27', cast('2026-05-17' as date), 'Resolutions Calendar - Reported from Committee'
+      - input: ref('mo_senate_action_flags')
+        format: sql
+        rows: |
+            select '%Reported from S %' as action_pattern, 'any' as bill_type, 'reported' as flag union all
+            select 'Resolutions Calendar - Reported from Committee', 'any', 'reported' union all
+            select 'Second Read and Referred S %', 'any', 'referred' union all
+            select '%S Third Read and Passed%', 'any', 'passed_senate' union all
+            select 'Defeated on Third Reading%', 'any', 'defeated' union all
+            select 'Resolution S defeated', 'any', 'defeated' union all
+            select 'Bill Withdrawn', 'any', 'withdrawn' union all
+            select 'Truly Agreed To and Finally Passed', 'any', 'truly_agreed' union all
+            select 'Vetoed by Governor%', 'any', 'vetoed' union all
+            select 'Legislature voted to override Governor%', 'any', 'veto_overridden'
+    expect:
+      rows:
+        - {session_code: '261', bill: SB20, status: withdrawn, outcome: failed}
+        - {session_code: '261', bill: SB21, status: veto overridden, outcome: enacted}
+        - {session_code: '261', bill: SB22, status: vetoed, outcome: vetoed}
+        - {session_code: '261', bill: SB23, status: reported do pass, outcome: failed}
+        - {session_code: '261', bill: SR24, status: defeated, outcome: failed}
+        - {session_code: '261', bill: SB25, status: passed one chamber, outcome: failed}
+        - {session_code: '261', bill: SB26, status: defeated, outcome: failed}
+        - {session_code: '261', bill: SCR27, status: reported do pass, outcome: failed}
