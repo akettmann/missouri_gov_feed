@@ -404,7 +404,7 @@ Quirks:
   agreed texts whose bill the Revisor also links, 891 of 918 repealed or amended sections are in
   `fct_bill_statute_links` (`assert_bill_text_repeals_agree_with_revisor_links`, warn). 2026 HB 3279 renumbers
   620.580-620.592 to 173.4000-173.4012 and the Revisor credits it only with the new numbers (a moved section's
-  repeal note reads `(Transferred 2026; now 173.4000)`, no bill), so `fct_bill_text_revisor_agreement` counts a
+  repeal note reads `(Transferred 2026; now 173.4000)`, no bill), so `int_mo_house__bill_text_revisor_agreement` counts a
   repealed section the Revisor lists as transferred to a section credited to the same bill (7 of 7; it was 0 of 7).
   A mid-list `relating to` (`To repeal section 1.010, relating to x, and section 2.020, ...`) does not end the
   repeal list when another `section N` follows before `to enact`; none of 714 real titles has one, so this is

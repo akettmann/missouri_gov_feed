@@ -458,6 +458,16 @@ models:
     2008" both: the earliest start and the latest end Most titles say nothing ("Office of Governor"); both are then
     null. A date is "Month d, yyyy"; the month name''s first three letters give the month (mogov.month_name_date).
     Grain: one row per State Auditor report, with its rating and audited entity type.'
+- name: int_mo_house__bill_text_revisor_agreement
+  description: 'How well the sections a bill''s truly agreed text (version T) repeals or amends match the sections
+    the Revisor''s history notes credit that bill with changing (fct_bill_statute_links). One row per bill that
+    became law in the Revisor''s notes and whose T text names at least one such section; assert_bill_text_repeals_agree_with_revisor_links
+    warns on the low ones. Bills the Revisor has no links for (not yet in the statutes, or failed) have no row.
+    A bill that renumbers sections (HB 3279, 2026: 620.580-620.592 moved to 173.4000-173.4012) is credited by the
+    Revisor only with the new numbers, because a moved section''s repeal note says "(Transferred 2026; now 173.4000)"
+    with no bill. A repealed section the Revisor lists as transferred to a section credited to the same bill therefore
+    counts as agreeing (via_transfer). The transfer is read from the Revisor''s repeal list, not guessed from the
+    text. Grain: one row per bill with Revisor links and a T text naming sections.'
 - name: int_mo_house__bill_text_statute_refs
   description: 'The RSMo sections each House bill text version names in its enacting title and Section A (stg_mo_house__statute_refs),
     one row per (text version, bill, action, ordinal, section) with ranges expanded: "sections 2.020 to 2.040" becomes

@@ -1,9 +1,9 @@
-# Unit tests for fct_bill_text_revisor_agreement: fixed links -> exact agreement counts.
+# Unit tests for int_mo_house__bill_text_revisor_agreement: fixed links -> exact agreement counts.
 version: 2
 
 unit_tests:
   - name: bill_text_revisor_agreement_counts_renumbered_sections
-    model: fct_bill_text_revisor_agreement
+    model: int_mo_house__bill_text_revisor_agreement
     description: >
       HB1 repeals three sections the Revisor credits to it under the same number plus one it does not credit
       (genuine disagreement, 3 of 4 agree). HB2 moves 5.010 and 5.020 to 9.010 and 9.020, which the Revisor credits
@@ -46,6 +46,6 @@ unit_tests:
     expect:
       format: sql
       rows: |
-          select cast('261' as varchar) as session_code, cast('HB1' as varchar) as bill, cast(4 as bigint) as text_sections, cast(3 as hugeint) as linked_directly, cast(0 as hugeint) as linked_via_transfer, cast(3 as hugeint) as also_in_revisor_links union all
+          select cast('261' as varchar) as session_code, cast('HB1' as varchar) as bill, cast(4 as bigint) as text_sections, cast(3 as bigint) as linked_directly, cast(0 as bigint) as linked_via_transfer, cast(3 as bigint) as also_in_revisor_links union all
           select '261', 'HB2', 2, 0, 2, 2 union all
           select '261', 'HB3', 4, 0, 0, 0

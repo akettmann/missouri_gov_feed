@@ -56,9 +56,9 @@ select
     session_code,
     bill,
     count(*) as text_sections,
-    sum(direct_link) as linked_directly,
-    sum(case when direct_link = 0 and via_transfer = 1 then 1 else 0 end) as linked_via_transfer,
-    sum(case when direct_link = 1 or via_transfer = 1 then 1 else 0 end) as also_in_revisor_links
+    cast(sum(direct_link) as bigint) as linked_directly,
+    cast(sum(case when direct_link = 0 and via_transfer = 1 then 1 else 0 end) as bigint) as linked_via_transfer,
+    cast(sum(case when direct_link = 1 or via_transfer = 1 then 1 else 0 end) as bigint) as also_in_revisor_links
 from matched as m
 where
     exists (
