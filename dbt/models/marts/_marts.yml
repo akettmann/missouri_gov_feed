@@ -504,8 +504,11 @@ models:
 
   - name: fct_federal_vote_bills
     description: >
-      Which federal bill each House or Senate roll call decided, read from the roll calls the GovInfo BILLSTATUS
-      bill actions cite and joined to Voteview. BILLSTATUS numbers a roll call by the chamber clerk's number within
+      Which federal bill each House or Senate roll call was taken on, read from the roll calls the GovInfo BILLSTATUS
+      bill actions cite and joined to Voteview. The vote is not always on the bill itself: many are procedural
+      (motion to recommit, ordering the previous question on the rule's H.Res., motion to proceed, cloture, tabling),
+      so read `vote_question` before calling a row a vote for or against the bill. Amendment roll calls are not
+      linked (BILLSTATUS keeps them under `<amendments>`, which is not parsed yet, #738). BILLSTATUS numbers a roll call by the chamber clerk's number within
       the session; Voteview's `rollnumber` runs across the Congress, so the join uses Voteview's `clerk_rollnumber`
       and `session`. Only roll calls both sources know are listed: it covers the loaded BILLSTATUS Congresses and
       bill types, so a roll call absent here means no bill was found, not that none exists (votes on nominations,
