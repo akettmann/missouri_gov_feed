@@ -228,3 +228,66 @@ unit_tests:
         - {record_id: f4}
         - {record_id: n5}
         - {record_id: f5}
+
+  - name: direct_contributions_keep_notices_whose_full_report_line_differs
+    model: int_mec__contributions_direct
+    description: >
+      MEC direct export, the cases where a notice must survive (#554): a full-report line with a different amount (a),
+      date (b), committee (c) or donor (d) is not the same gift. Rows missing a date or amount are never matched (e, f).
+      The one-to-one rank (g): two equal notices against one full-report line lose one notice only. A true repeat
+      gift, the same amount from the same donor the same day on two notices and two full-report lines, keeps both
+      gifts (h). A full-report line alone is never dropped (i).
+    overrides:
+      vars:
+        mec_direct: true
+    given:
+      - input: ref('stg_mec__contributions')
+        rows:
+          # a
+          - {record_id: na, mec_committee_id: E1, contributor_name: Pat Doe, amount: 5000, contribution_date: 2026-08-02, report: '24 Hour Expenditure Report-8/4/2026 Primary'}
+          - {record_id: fa, mec_committee_id: E1, contributor_name: Pat Doe, amount: 5001, contribution_date: 2026-08-02, report: October Quarterly Report}
+          # b
+          - {record_id: nb, mec_committee_id: E2, contributor_name: Pat Doe, amount: 5000, contribution_date: 2026-08-02, report: '24 Hour Expenditure Report-8/4/2026 Primary'}
+          - {record_id: fb, mec_committee_id: E2, contributor_name: Pat Doe, amount: 5000, contribution_date: 2026-08-03, report: October Quarterly Report}
+          # c
+          - {record_id: nc, mec_committee_id: E3, contributor_name: Pat Doe, amount: 5000, contribution_date: 2026-08-02, report: '24 Hour Expenditure Report-8/4/2026 Primary'}
+          - {record_id: fc, mec_committee_id: E4, contributor_name: Pat Doe, amount: 5000, contribution_date: 2026-08-02, report: October Quarterly Report}
+          # d
+          - {record_id: nd, mec_committee_id: E5, contributor_name: Pat Doe, amount: 5000, contribution_date: 2026-08-02, report: '24 Hour Expenditure Report-8/4/2026 Primary'}
+          - {record_id: fd, mec_committee_id: E5, contributor_name: Sam Roe, amount: 5000, contribution_date: 2026-08-02, report: October Quarterly Report}
+          # e
+          - {record_id: ne, mec_committee_id: E6, contributor_name: No Date, amount: 5000, contribution_date: null, report: '24 Hour Expenditure Report-8/4/2026 Primary'}
+          - {record_id: fe, mec_committee_id: E6, contributor_name: No Date, amount: 5000, contribution_date: null, report: October Quarterly Report}
+          # f
+          - {record_id: nf, mec_committee_id: E7, contributor_name: No Amount, amount: null, contribution_date: 2026-08-02, report: '24 Hour Expenditure Report-8/4/2026 Primary'}
+          - {record_id: ff, mec_committee_id: E7, contributor_name: No Amount, amount: null, contribution_date: 2026-08-02, report: October Quarterly Report}
+          # g
+          - {record_id: ng1, mec_committee_id: E8, contributor_name: Dup Notice, amount: 6000, contribution_date: 2026-08-02, report: '24 Hour Expenditure Report-8/4/2026 Primary'}
+          - {record_id: ng2, mec_committee_id: E8, contributor_name: Dup Notice, amount: 6000, contribution_date: 2026-08-02, report: '24 Hour Expenditure Report-8/4/2026 Primary'}
+          - {record_id: fg, mec_committee_id: E8, contributor_name: Dup Notice, amount: 6000, contribution_date: 2026-08-02, report: October Quarterly Report}
+          # h
+          - {record_id: nh1, mec_committee_id: E9, contributor_name: Twice Giver, amount: 7000, contribution_date: 2026-08-02, report: '24 Hour Expenditure Report-8/4/2026 Primary'}
+          - {record_id: nh2, mec_committee_id: E9, contributor_name: Twice Giver, amount: 7000, contribution_date: 2026-08-02, report: '24 Hour Expenditure Report-8/4/2026 Primary'}
+          - {record_id: fh1, mec_committee_id: E9, contributor_name: Twice Giver, amount: 7000, contribution_date: 2026-08-02, report: October Quarterly Report}
+          - {record_id: fh2, mec_committee_id: E9, contributor_name: Twice Giver, amount: 7000, contribution_date: 2026-08-02, report: October Quarterly Report}
+          # i
+          - {record_id: fi, mec_committee_id: E10, contributor_name: Lone Line, amount: 5000, contribution_date: 2026-08-02, report: October Quarterly Report}
+    expect:
+      rows:
+        - {record_id: na}
+        - {record_id: fa}
+        - {record_id: nb}
+        - {record_id: fb}
+        - {record_id: nc}
+        - {record_id: fc}
+        - {record_id: nd}
+        - {record_id: fd}
+        - {record_id: ne}
+        - {record_id: fe}
+        - {record_id: nf}
+        - {record_id: ff}
+        - {record_id: ng2}
+        - {record_id: fg}
+        - {record_id: fh1}
+        - {record_id: fh2}
+        - {record_id: fi}
