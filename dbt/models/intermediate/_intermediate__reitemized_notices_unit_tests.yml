@@ -80,12 +80,130 @@ unit_tests:
         - {record_id: n9c}
         - {record_id: f9c}
 
+  - name: tap_contributions_drop_24_hour_notices_for_the_same_donor_spelled_differently
+    model: int_tap_mec__contributions
+    description: >
+      Second tier of the notice dedupe (#542): a committee/date/amount with exactly one leftover notice and exactly one
+      leftover full-report line, same city and state, is one gift when the donor names are the same after dropping
+      MO/Missouri, stop words, legal forms and initials (a-e), or a typo apart on names of 10+ characters with the same
+      digits (f). Kept: different local numbers (g), different donors (h), short names (i), a different city, state or
+      no city (j, k, l), two similar full-report lines or two notices (m, n), a donor-less full-report line (o), a
+      notice whose full-report line an exact match already used (p), a different amount or date (q).
+    given:
+      - input: ref('stg_tap_mec__contributions')
+        rows:
+          # a
+          - {record_id: na, mec_committee_id: D1, contributor_name: James Nutter, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fa, mec_committee_id: D1, contributor_name: James B Nutter, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          # b
+          - {record_id: nb, mec_committee_id: D2, contributor_name: MO Soybean Association, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fb, mec_committee_id: D2, contributor_name: Missouri Soybean Association, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          # c
+          - {record_id: nc, mec_committee_id: D3, contributor_name: deVries and Associates, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fc, mec_committee_id: D3, contributor_name: DeVries and Associates, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          # d
+          - {record_id: nd, mec_committee_id: D4, contributor_name: Democratic Federal Committee of St. Louis City PAC, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fd, mec_committee_id: D4, contributor_name: Democratic Federal Committee St. Louis City PAC, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          # e
+          - {record_id: ne, mec_committee_id: D5, contributor_name: E Henry Properties, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fe, mec_committee_id: D5, contributor_name: E Henry Properties LLC, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          # f
+          - {record_id: nf, mec_committee_id: D6, contributor_name: Lathrop GPM, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: ff, mec_committee_id: D6, contributor_name: Lanthrop GPM, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          # g
+          - {record_id: ng, mec_committee_id: D7, contributor_name: LIUNA Local 110 PAC Fund, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fg, mec_committee_id: D7, contributor_name: LIUNA Local 100 PAC Fund, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          # h
+          - {record_id: nh, mec_committee_id: D8, contributor_name: Brooner Construction Crane, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fh, mec_committee_id: D8, contributor_name: Nor Am Ice and Cold Storage, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          # i
+          - {record_id: ni, mec_committee_id: D9, contributor_name: Jon Doe, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fi, mec_committee_id: D9, contributor_name: Jan Doe, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          # j
+          - {record_id: nj, mec_committee_id: D10, contributor_name: Missouri Growth PAC, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fj, mec_committee_id: D10, contributor_name: MO GROWTH PAC, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Perryville, contributor_state: MO}
+          # k
+          - {record_id: nk, mec_committee_id: D11, contributor_name: Missouri Growth PAC, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fk, mec_committee_id: D11, contributor_name: MO GROWTH PAC, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: KS}
+          # l
+          - {record_id: nl, mec_committee_id: D12, contributor_name: Missouri Growth PAC, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary'}
+          - {record_id: fl, mec_committee_id: D12, contributor_name: MO GROWTH PAC, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report}
+          # m: two similar full-report lines for one notice -> kept
+          - {record_id: nm, mec_committee_id: D13, contributor_name: James Nutter, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fm1, mec_committee_id: D13, contributor_name: James B Nutter, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fm2, mec_committee_id: D13, contributor_name: Jim Nutter, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          # n: two notices for one full-report line -> both kept
+          - {record_id: nn1, mec_committee_id: D14, contributor_name: James Nutter, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nn2, mec_committee_id: D14, contributor_name: Jamie Nutter, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fn, mec_committee_id: D14, contributor_name: James B Nutter, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          # o: a full-report line without a donor name blocks the match -> kept
+          - {record_id: no, mec_committee_id: D15, contributor_name: Missouri Growth PAC, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fo1, mec_committee_id: D15, contributor_name: MO GROWTH PAC, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fo2, mec_committee_id: D15, contributor_name: null, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          # p: the exact match claims its full-report line first; the near-miss notice has none left -> kept
+          - {record_id: np1, mec_committee_id: D16, contributor_name: Pat Roe Holdings, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: np2, mec_committee_id: D16, contributor_name: Pat Roe Holding, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fp, mec_committee_id: D16, contributor_name: Pat Roe Holdings, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          # q: a different amount or date never pairs; a full-report line alone is never dropped
+          - {record_id: nq1, mec_committee_id: D17, contributor_name: James Nutter, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fq1, mec_committee_id: D17, contributor_name: James B Nutter, amount: 5001, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nq2, mec_committee_id: D17, contributor_name: James Nutter, amount: 5000, contribution_date: 2020-07-29, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fq2, mec_committee_id: D17, contributor_name: James B Nutter, amount: 5000, contribution_date: 2020-07-30, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          # r: three letters apart is too far, however long the name
+          - {record_id: nr, mec_committee_id: D18, contributor_name: Committee to Elect Jamie Burger HD, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fr, mec_committee_id: D18, contributor_name: Committee to Elect Jamie Burger, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          # s: the exact pair is set aside first, so the leftover notice and full-report line pair up
+          - {record_id: ns1, mec_committee_id: D19, contributor_name: Pat Roe Holdings, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: ns2, mec_committee_id: D19, contributor_name: James Nutter, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fs1, mec_committee_id: D19, contributor_name: Pat Roe Holdings, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fs2, mec_committee_id: D19, contributor_name: James B Nutter, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+    expect:
+      rows:
+        - {record_id: fa}
+        - {record_id: fb}
+        - {record_id: fc}
+        - {record_id: fd}
+        - {record_id: fe}
+        - {record_id: ff}
+        - {record_id: ng}
+        - {record_id: fg}
+        - {record_id: nh}
+        - {record_id: fh}
+        - {record_id: ni}
+        - {record_id: fi}
+        - {record_id: nj}
+        - {record_id: fj}
+        - {record_id: nk}
+        - {record_id: fk}
+        - {record_id: nl}
+        - {record_id: fl}
+        - {record_id: nm}
+        - {record_id: fm1}
+        - {record_id: fm2}
+        - {record_id: nn1}
+        - {record_id: nn2}
+        - {record_id: fn}
+        - {record_id: no}
+        - {record_id: fo1}
+        - {record_id: fo2}
+        - {record_id: np2}
+        - {record_id: fp}
+        - {record_id: nq1}
+        - {record_id: fq1}
+        - {record_id: nq2}
+        - {record_id: fq2}
+        - {record_id: nr}
+        - {record_id: fr}
+        - {record_id: fs1}
+        - {record_id: fs2}
+
   - name: direct_contributions_drop_24_hour_notices_reitemized_in_full_report
     model: int_mec__contributions_direct
     description: >
       The same rule for the MEC direct export: a "24 Hour" notice is dropped when the same committee's full report
       itemizes the same gift (donor compared by name_key); a notice with no full-report line, and two equal gifts in
-      full reports, are kept.
+      full reports, are kept. The second tier (#542) applies too: "Platte Rentals and Supply" / "Platte Rental and Supply"
+      in the same city is one gift, the same names in different cities are not.
     overrides:
       vars:
         mec_direct: true
@@ -97,9 +215,16 @@ unit_tests:
           - {record_id: n2, mec_committee_id: C2, contributor_name: Lone Giver, amount: 9000, contribution_date: 2026-08-02, report: '24 Hour Expenditure Report-8/4/2026 Primary'}
           - {record_id: f3a, mec_committee_id: C3, contributor_name: Twice Giver, amount: 100, contribution_date: 2026-08-02, report: October Quarterly Report}
           - {record_id: f3b, mec_committee_id: C3, contributor_name: Twice Giver, amount: 100, contribution_date: 2026-08-02, report: October Quarterly Report}
+          - {record_id: n4, mec_committee_id: C4, contributor_name: Platte Rentals and Supply, amount: 4500, contribution_date: 2026-08-02, report: '24 Hour Expenditure Report-8/4/2026 Primary', contributor_city: Parkville, contributor_state: MO}
+          - {record_id: f4, mec_committee_id: C4, contributor_name: Platte Rental & Supply, amount: 4500, contribution_date: 2026-08-02, report: '30 Day After Primary Election-8/4/2026', contributor_city: Parkville, contributor_state: MO}
+          - {record_id: n5, mec_committee_id: C5, contributor_name: Platte Rentals and Supply, amount: 4500, contribution_date: 2026-08-02, report: '24 Hour Expenditure Report-8/4/2026 Primary', contributor_city: Parkville, contributor_state: MO}
+          - {record_id: f5, mec_committee_id: C5, contributor_name: Platte Rental & Supply, amount: 4500, contribution_date: 2026-08-02, report: '30 Day After Primary Election-8/4/2026', contributor_city: Kansas City, contributor_state: MO}
     expect:
       rows:
         - {record_id: f1}
         - {record_id: n2}
         - {record_id: f3a}
         - {record_id: f3b}
+        - {record_id: f4}
+        - {record_id: n5}
+        - {record_id: f5}
