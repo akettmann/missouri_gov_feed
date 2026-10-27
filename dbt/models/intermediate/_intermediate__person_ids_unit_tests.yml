@@ -1142,3 +1142,51 @@ unit_tests:
         - {alias_id: ocd-person/lee, person_id: ocd-person/lee, basis: self}
         - {alias_id: 'mohouse:7', person_id: ocd-person/lee, basis: name_continuity}
         - {alias_id: ocd-person/wu, person_id: ocd-person/lee, basis: curated}
+
+  - name: person_ids_take_the_smallest_resolved_target_of_two_curated_links
+    model: int_officials__person_ids
+    description: >
+      Two signed same_person rows send one person (ocd-person/wu) to different ids: one to the fallback key mohouse:7,
+      which the name rule merged into ocd-person/lee, and one to ocd-person/zz. Each target is resolved to its
+      person's chosen id first and the smaller resolved id wins (ocd-person/lee over ocd-person/zz), not the smaller
+      id as written (mohouse:7). The seed error itself is caught by assert_signed_same_person_links_end_in_one_person
+      (#691).
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/lee, year: 2019, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: 'mohouse:7', year: 2019, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: ocd-person/wu, year: 2025, office: state_senate, district: '3', name_key: ann wu}
+          - {alias_id: ocd-person/zz, year: 2025, office: state_senate, district: '4', name_key: ann zz}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: ocd-person/wu, person_id: 'mohouse:7', relation: same_person, checked_by: maintainer, checked_on: '2026-01-01'}
+          - {alias_id: ocd-person/wu, person_id: ocd-person/zz, relation: same_person, checked_by: maintainer, checked_on: '2026-01-01'}
+    expect:
+      rows:
+        - {alias_id: ocd-person/lee, person_id: ocd-person/lee, basis: self}
+        - {alias_id: 'mohouse:7', person_id: ocd-person/lee, basis: name_continuity}
+        - {alias_id: ocd-person/wu, person_id: ocd-person/lee, basis: curated}
+        - {alias_id: ocd-person/zz, person_id: ocd-person/zz, basis: self}
+
+  - name: person_ids_keep_the_chosen_id_when_curated_links_join_ids_already_one_person
+    model: int_officials__person_ids
+    description: >
+      Signed same_person rows in both directions between two ids the name rule already joined (as Stephen Webber's
+      row names two ids of one person): the person keeps the id the rules chose (ocd-person/lee, not the fallback key
+      mohouse:7 either row names), and every id of it becomes basis curated (#691).
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/lee, year: 2019, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: 'mohouse:7', year: 2019, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: ocd-person/wu, year: 2025, office: state_senate, district: '3', name_key: ann wu}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: 'mohouse:7', person_id: ocd-person/lee, relation: same_person, checked_by: maintainer, checked_on: '2026-01-01'}
+          - {alias_id: ocd-person/lee, person_id: 'mohouse:7', relation: same_person, checked_by: maintainer, checked_on: '2026-01-01'}
+    expect:
+      rows:
+        - {alias_id: ocd-person/lee, person_id: ocd-person/lee, basis: curated}
+        - {alias_id: 'mohouse:7', person_id: ocd-person/lee, basis: curated}
+        - {alias_id: ocd-person/wu, person_id: ocd-person/wu, basis: self}
