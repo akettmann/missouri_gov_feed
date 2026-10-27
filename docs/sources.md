@@ -182,6 +182,14 @@ Quirks:
   (`matched_by = 'measure text'`). In October 2026 5,274 of 6,449 roll calls were linked; most of the rest
   are procedural (approve journal, quorum calls, rules, previous question).
 - Bill sponsors list senators (conferees, handlers) with district 200 + their senate district.
+  The XML lists a member's *latest* district in every session, so a representative who later moved to the Senate
+  has his House-era sponsor, co-sponsor, handler and House-conferee rows listed as 200 + a senate district
+  (Mike Moon on 191-HB161: 229). `fct_bill_sponsors` reads those rows as House rows when the bill is a House bill
+  (or the row is a handler or House conferee) and matches them to the session's House roster on surname and given
+  name, provided that person later held the listed senate seat (#646, 1,559 rows; 1,266 of them now reach an
+  official, 776 as primary sponsor, the other 293 are former members). The district shown is then the roster's.
+  Senate conferees, and sponsors of Senate bills, keep the listed-district reading. The redistricting match
+  (members whose House district number changed) also requires the given name (#647).
 - The bill XML only links roll calls nested under a House bill. It misses House votes on Senate bills
   (third reading, conference reports) and procedural votes ("APPROVE JOURNAL", "QUORUM", "PQ"). Until
   October 2026 the loader found PDFs only through the XML: 3,873 roll calls, 108 of them on Senate
@@ -233,8 +241,8 @@ Quirks:
   with `no governor action recorded` is decided but not counted as law) and the two shares over `bills_decided`
   (null when it is 0). Resolutions (HR, HCR) and Senate sponsors are left out. Appropriation bills are kept
   (the Budget chair sponsors them and almost all pass). Only current officials (`dim_official`) have an
-  `official_id`, so former members are absent: for 2017 only 32 of 1,205 House primary-sponsor rows match, for
-  2026 2,044 of 2,086. A member with House and Senate careers has rows for House sessions only.
+  `official_id`, so former members are absent: for 2017 only 136 of 1,263 House primary-sponsor rows match (October 2026), for
+  2026 1,982 of 2,022. A member with House and Senate careers has rows for House sessions only.
   Survivorship: the earliest sessions (2017-2018) hold only members still in office today, mostly long-serving
   leaders, so their shares are not comparable with recent sessions. The profile page ("Bills sponsored in the
   House") shows the counts with their n, a percent only when `bills_decided >= 5`, and this caveat.
