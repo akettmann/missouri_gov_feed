@@ -57,6 +57,7 @@ Layout under `data/` (override the root with `MOGOV_DATA_DIR`):
 | `data/raw/<table>/part-<i>-of-<N>.parquet` | Raw landings, one part per loader shard (`MOGOV_RAW_DIR`)                    |
 | `data/raw/mo_house_xml/<session>/*.gz`     | Raw files landed unchanged, gzipped; `mo_house_xml_files` records each path  |
 | `data/raw/govinfo_billstatus_xml/<congress>/<type>/*.gz` | Federal bill XML landed unchanged, gzipped; `govinfo_billstatus_files` records each path |
+| `data/raw/mo_house_pdf/<session>/<kind>/*.pdf` | House bill document PDFs landed unchanged (3-6 GB); `mo_house_pdf_files` records each |
 | `data/mogov.duckdb`                        | dbt warehouse (`MOGOV_DB`)                                                   |
 | `data/exports/`                            | `mogov export` output                                                        |
 
@@ -347,7 +348,7 @@ Loaders that talk to different services run at the same time. Each loader names 
 (`mogov list` shows it), and the work is split into jobs of (one service's loaders, one shard). A pool of
 `--workers` processes runs the jobs (default `$MOGOV_WORKERS`, else the larger of the shard count and
 min(CPUs, 8)). Loaders of the same service run one after another within a shard, so a site never sees
-more than one request stream per shard. Slow loaders (`mo_senate`, `mo_house`, `house_fd`, `mec`, `fec`,
+more than one request stream per shard. Slow loaders (`mo_senate`, `mo_house`, `mo_house_pdf`, `house_fd`, `mec`, `fec`,
 `courtlistener_case_bulk`) start first. Each worker can use up to `MOGOV_DUCKDB_MEMORY` (default 3GB) while
 it lands a table, so lower that or `--workers` on a small machine.
 

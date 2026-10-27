@@ -16,6 +16,9 @@
 --            recorded (truly agreed in an earlier year, but the export lists no governor action; Senate bills'
 --            lists can stop at the speaker's signature), pending (session still open), failed (session over
 --            without passing).
+--   passed_house  true when the actions record the House's Third Read and Passed (or Adopted); a bill that passed the
+--            House and then stopped (withdrawn, defeated in the Senate) is still true. A Senate bill's House
+--            action counts only when it was amended and passed again here; false for most Senate bills in this export.
 --   relisted_from_session_code  for a relisting, the previous regular session whose bill (same number and bill
 --            string) it repeats; null for other bills, and for a relisting whose original isn't loaded
 --            (2017's 15 repeat the 2016 session, 161).
@@ -154,6 +157,7 @@ select
         else 'failed'
     end as outcome,
     s.is_session_over,
+    s.passed_house = 1 as passed_house,
     s.last_action_date,
     l.relisted_from_session_code
 from staged_status as s

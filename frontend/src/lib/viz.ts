@@ -334,7 +334,7 @@ export const VIZ: Record<string, VizSpec> = {
     stackKeys: [
       { key: "yea", label: "Yea" },
       { key: "nay", label: "Nay" },
-      { key: "other", label: "Present / absent" },
+      { key: "other", label: "Anything other than yea or nay" },
     ],
     count: true,
     usesConfidence: false,
@@ -344,7 +344,7 @@ export const VIZ: Record<string, VizSpec> = {
       { key: "roll_calls", label: "Roll calls", num: true },
       { key: "yea", label: "Yea", num: true },
       { key: "nay", label: "Nay", num: true },
-      { key: "other", label: "Present / absent", num: true },
+      { key: "other", label: "Anything other than yea or nay", num: true },
     ],
     rows: (b) =>
       (b.voting.by_subject ?? []).map((r) => ({

@@ -35,12 +35,14 @@ models:
     to voters (truly agreed joint resolutions), adopted (resolutions), awaiting governor (truly agreed this year,
     no governor action yet), no governor action recorded (truly agreed in an earlier year, but the export lists
     no governor action; Senate bills'' lists can stop at the speaker''s signature), pending (session still open),
-    failed (session over without passing). relisted_from_session_code  for a relisting, the previous regular session
-    whose bill (same number and bill string) it repeats; null for other bills, and for a relisting whose original
-    isn''t loaded (2017''s 15 repeat the 2016 session, 161). A session is over once its year has ended; a regular
-    session also once June starts (it adjourns in mid-May) and an extraordinary session 30 days after its last action.
-    var as_of_date pins "today" (unit tests). Grain: one row per (session, bill) in the House XML export, House
-    and Senate bills.'
+    failed (session over without passing). passed_house  true when the actions record the House''s Third Read and
+    Passed (or Adopted); a bill that passed the House and then stopped (withdrawn, defeated in the Senate) is still
+    true. A Senate bill''s House action counts only when it was amended and passed again here; false for most Senate
+    bills in this export. relisted_from_session_code  for a relisting, the previous regular session whose bill (same
+    number and bill string) it repeats; null for other bills, and for a relisting whose original isn''t loaded (2017''s
+    15 repeat the 2016 session, 161). A session is over once its year has ended; a regular session also once June
+    starts (it adjourns in mid-May) and an extraordinary session 30 days after its last action. var as_of_date pins
+    "today" (unit tests). Grain: one row per (session, bill) in the House XML export, House and Senate bills.'
 - name: int_bills__subjects
   description: 'Subject index terms per bill from both chambers'' indexes. A House bill keeps the House XML''s own
     terms (2024 sessions on); the Senate topical index fills in House bills without them (earlier sessions, when
@@ -384,11 +386,13 @@ models:
     truncates) and, when the token carries one, same district. The PDF prints a compound surname by its last word
     ("REHDER" for Holly Thompson Rehder) and drops a generational suffix ("PRICE" for Wiley Price IV), so those
     spellings match too. The Speaker comes from the house_speakers seed. Members who left mid-session are missing
-    from that session''s (end-of-session) list, so a second pass matches against every session''s members. Keys
-    ignore spaces ("VANSCHOIACK" = "Van Schoiack"). When several people still fit a token, the Open States seat
-    dates break the tie: a person whose seat did not cover the vote date is dropped if another candidate''s did
-    ("EVANS" after Jean Evans left on 2019-02-05 is David Evans). Tokens still matching zero or several people stay
-    unattributed rather than guessed. Grain: one row per (House roll call, attributed person).'
+    from that session''s (end-of-session) list, so a second pass matches against every session''s members; there
+    a person whose dated seat missed the vote date is ruled out even if alone, and one whose seat covered it outranks
+    one with no dated seat. In a session the exact surname beats the suffix-stripped one ("PRICE" is Price not Price
+    IV). Keys ignore spaces ("VANSCHOIACK" = "Van Schoiack"). When several people still fit a token, the Open States
+    seat dates break the tie: a person whose seat did not cover the vote date is dropped if another candidate''s
+    did ("EVANS" after Jean Evans left on 2019-02-05 is David Evans). Tokens still matching zero or several people
+    stay unattributed rather than guessed. Grain: one row per (House roll call, attributed person).'
 - name: int_mo_legislators__final_checks
   description: 'Legislator payroll rows that are a departed member''s final check: a small payment to a payee whose
     surname and first name fit a member of the same chamber whose seat ended the December before the pay year, or
