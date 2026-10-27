@@ -1,6 +1,6 @@
 // Bill sponsorship outcomes per House member and session (fct_sponsorship_outcomes): counts from the House's own
 // bill actions, each shown with its n. Pure helpers so the wording and the share rule are tested on fixed rows.
-import { count, plural, sessionLabel } from "./format.ts";
+import { count, sessionLabel } from "./format.ts";
 
 /** A share is shown as a percent only when at least this many bills were decided; under it, counts only. */
 export const MIN_DECIDED_FOR_SHARE = 5;
@@ -33,8 +33,6 @@ export interface SponsorshipSession {
   /** whole-percent shares of the decided bills; null when fewer than MIN_DECIDED_FOR_SHARE bills were decided */
   passed_house_pct: number | null;
   became_law_pct: number | null;
-  /** one sentence in the issue's words, counts only */
-  summary: string;
   source_url: string;
 }
 
@@ -44,17 +42,12 @@ export function sharePct(part: number, whole: number): number | null {
   return Math.round((part / whole) * 100);
 }
 
-/** "Sponsored 12 bills; 3 passed the House; 1 became law", with the decided n and the in-progress state spelled out. */
-export function summaryLine(r: SponsorshipRow): string {
-  const bills = plural(r.bills_sponsored, "bill", "bills");
-  if (r.bills_decided === 0) {
-    return `Sponsored ${bills}; none decided yet${r.is_session_over ? "" : " (session in progress)"}`;
-  }
-  return (
-    `Sponsored ${bills}, ${count(r.bills_decided)} decided; ${count(r.bills_passed_house)} passed the House; ` +
-    `${count(r.bills_became_law)} became law` +
-    (r.is_session_over ? "" : " (session in progress)")
-  );
+/** The note shown beside a session that is still running. */
+export const IN_PROGRESS_NOTE = " (session in progress: undecided bills not counted)";
+
+/** The note to show after a session's label: the in-progress one while the session runs, else empty. */
+export function inProgressNote(s: Pick<SponsorshipSession, "in_progress">): string {
+  return s.in_progress ? IN_PROGRESS_NOTE : "";
 }
 
 /** Per official, newest session first. */
@@ -76,7 +69,6 @@ export function buildSponsorshipSessions(
       bills_became_law: r.bills_became_law,
       passed_house_pct: sharePct(r.bills_passed_house, r.bills_decided),
       became_law_pct: sharePct(r.bills_became_law, r.bills_decided),
-      summary: summaryLine(r),
       source_url: r.source_url,
     };
     out.set(r.official_id, [...(out.get(r.official_id) ?? []), s]);
