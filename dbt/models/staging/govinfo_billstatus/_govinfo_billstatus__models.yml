@@ -71,8 +71,10 @@ models:
   description: 'Dated steps of a federal bill in a committee or subcommittee, from the GovInfo BILLSTATUS bulk XML:
     one row per (bill, committee or subcommittee, activity). activity is the label as published ("Referred to",
     "Markup by", "Reported by", "Hearings by", "Discharged from"); the wording differs between the House and Senate
-    and over time ("Referred To" vs "Referred to"), so match it case-insensitively. position / subposition point
-    at the row in stg_govinfo_billstatus__committees (subposition is null for a full committee).'
+    and over time ("Referred To" vs "Referred to", "Markup by" vs "Markup By"), so filter on activity_normalized
+    (lower case, hyphens as spaces, trimmed). activity_date is null only for "Bills of Interest - Exchange of Letters",
+    which the file publishes without a date. position / subposition point at the row in stg_govinfo_billstatus__committees
+    (subposition is null for a full committee).'
   data_tests:
   - dbt_utils.unique_combination_of_columns:
       arguments:
@@ -81,17 +83,41 @@ models:
         - position
         - subposition
         - activity_position
+  - dbt_utils.expression_is_true:
+      name: stg_govinfo_billstatus__committee_activities_date_null_only_for_exchange_of_letters
+      arguments:
+        expression: activity_date is not null or activity_normalized = 'bills of interest   exchange of letters'
   columns:
   - name: bill_id
     data_tests:
     - not_null
   - name: activity
+    description: The label as published; its case and wording vary (see activity_normalized).
     data_tests:
     - not_null
+  - name: activity_normalized
+    description: activity in lower case with hyphens as spaces and trimmed ("Markup By" and "Markup by" are both
+      "markup by"). Filter on this one.
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - referred to
+          - markup by
+          - reported by
+          - reported original measure
+          - hearings by
+          - hearings by (full committee)
+          - hearings by (subcommittee)
+          - discharged from
+          - bills of interest   exchange of letters
+          - unknown
   - name: activity_date
     description: Never in the future and never before 2003 (the first Congress loaded, the 108th, starts then).
+      Null only for "Bills of Interest - Exchange of Letters", which the file publishes without a date (44 rows
+      in the 118th hr and s).
     data_tests:
-    - not_null
     - dbt_utils.accepted_range:
         arguments:
           min_value: cast('2003-01-01' as date)
@@ -203,7 +229,10 @@ models:
   description: 'How a federal bill relates to one of its related bills, from the GovInfo BILLSTATUS bulk XML: one
     row per (bill, related bill, relationship). relationship_type is as published ("Identical bill", "Related bill",
     "Procedurally related", ...) and identified_by says who made the link (CRS, or the House or Senate itself).
-    related_position is the position of the row in stg_govinfo_billstatus__related_bills.'
+    related_position is the position of the row in stg_govinfo_billstatus__related_bills. relationship_type_normalized
+    is lower case with hyphens as spaces ("Procedurally-related" = "Procedurally related"); filter on it. CRS sometimes
+    lists a bill as related to itself; those rows are dropped here and in the related bills model, so related_position
+    gaps are expected.'
   data_tests:
   - dbt_utils.unique_combination_of_columns:
       arguments:
@@ -216,24 +245,30 @@ models:
     data_tests:
     - not_null
   - name: relationship_type
+    description: The label as published; its wording varies ("Procedurally related" and "Procedurally-related").
+    data_tests:
+    - not_null
+  - name: relationship_type_normalized
+    description: relationship_type in lower case with hyphens as spaces and trimmed. Filter on this one.
     data_tests:
     - not_null
     - accepted_values:
         arguments:
           values:
-          - Identical bill
-          - Related bill
-          - Procedurally related
-          - Procedurally-related
-          - Bill replaced by
-          - Bill replaces
+          - identical bill
+          - related bill
+          - procedurally related
+          - text similarities
+          - related document
+          - bill replaced by
+          - bill replaces
 - name: stg_govinfo_billstatus__related_bills
   description: 'Bills a federal bill is related to, from the GovInfo BILLSTATUS bulk XML: one row per (bill, related
     bill). related_bill_id has the same form as bill_id ("118-hjres-125"), so it joins stg_govinfo_billstatus__bills
     when the related bill''s Congress is loaded. The kind of relationship (identical, related, procedurally related,
     a bill folded into another) is in stg_govinfo_billstatus__related_bill_relationships: one related bill can carry
-    several. A relation is usually (about 87% in the 118th hjres/sjres) also listed on the other bill; do not assume
-    it.'
+    several. A relation is usually also listed on the other bill; do not assume it. CRS sometimes lists a bill as
+    related to itself (34 of 12,472 rows in the 118th hr and s); those rows are dropped, so position has gaps.'
   data_tests:
   - dbt_utils.unique_combination_of_columns:
       arguments:
@@ -266,7 +301,7 @@ models:
     - not_null
     - dbt_utils.accepted_range:
         arguments:
-          min_value: 100
+          min_value: 93
           max_value: 125
   - name: related_number
     data_tests:

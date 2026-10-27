@@ -19,12 +19,16 @@ repeat
       :govinfo_billstatus_files row (path, URL, size, sha256);
       :parse with lxml (mogov.parsers.govinfo_billstatus):
       bill, sponsors, cosponsors, actions,
-      recorded votes, laws (Public Law number);
+      recorded votes, laws (Public Law number),
+      committees (+ subcommittees and their activities),
+      subjects, related bills (+ relationships);
     repeat while (more members?)
   endif
 repeat while (more zips?)
 :govinfo_billstatus_files, _bills, _sponsors, _cosponsors,
-_actions, _recorded_votes, _laws (all states; no Missouri filter);
+_actions, _recorded_votes, _laws, _committees,
+_committee_activities, _subjects, _related_bills,
+_related_bill_relationships (all states; no Missouri filter);
 note right: dbt keeps sponsors with state MO\n(fct_federal_sponsorship)
 stop
 @enduml

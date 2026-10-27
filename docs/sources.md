@@ -980,14 +980,31 @@ Quirks:
   `sponsorshipWithdrawnDate` set (the mart drops them). `district` is present for House members only.
 - Sponsors carry the member's state at the time of the bill; a member who changed states has rows under both.
 - Eleven reserved 117th House bills (hr2, hr9-17, hr20; "Reserved for the Speaker." / "...Minority Leader.") use `<billType>` and `<billNumber>` where every other file uses `<type>` and `<number>`. The parser reads either, so they keep their real id (`117-hr-2`); they are real bills with no sponsors, cosponsors or votes, and are recognizable by that title.
-- Committees, subjects and related bills (staging only so far): a subcommittee is its own row with `subposition`
-  set and `parent_system_code`; the file gives it no chamber, so staging takes the parent's. Activity labels vary
-  ("Referred to", "Referred To", "Hearings by (subcommittee)", "Unknown"), so match them case-insensitively.
-  A bill's one policy area is `policy_area` on the bills model; the legislative subjects are many per bill and
-  only some bills have any (118th hjres/sjres: 145 of 347 bills). Related bills carry one or more relationship
-  types, and the label is not stable ("Procedurally related" and "Procedurally-related" both occur); the link is
-  listed on both bills about 87% of the time, not always. `related_bill_id` joins the bills model only when that
-  Congress and type are loaded (a 117th bill relates to a 118th one and the reverse).
+- Committees, subjects and related bills (staging only so far; checked on the 118th hr and s, 16,213 bills, and the
+  117th hr and s, 15,066 bills): a subcommittee is its own row with `subposition` set and `parent_system_code`; the
+  file gives it no chamber, so staging takes the parent's.
+  - Activity labels vary in case and wording, so filter on `activity_normalized` (lower case, hyphens as spaces,
+    trimmed). Seen: "Referred to" / "Referred To", "Markup by" / "Markup By", "Reported by" / "Reported By",
+    "Discharged from" / "Discharged From", "Hearings by" (117th), "Hearings By (full committee)" and "Hearings By
+    (subcommittee)" (118th), "Reported Original Measure" / "Reported original measure", "Unknown" and "Bills of
+    Interest - Exchange of Letters". The last has no `<date>` in the file, so `activity_date` is null for exactly
+    those rows (44 in the 118th hr and s, e.g. 118-hr-3935 on hssy00); the not-null rule is relaxed for that label
+    only. Activity counts, 118th hr and s: "Referred to" 25,770, "Markup by" 2,202, "Reported by" 1,692,
+    "Discharged from" 790, "Hearings by" 777 (206 full committee, 571 subcommittee), "Unknown" 265, "Reported
+    Original Measure" 56, "Bills of Interest" 44.
+  - A bill's one policy area is `policy_area` on the bills model; the legislative subjects are many per bill and
+    only some bills have any (118th hr and s: 6,021 of 16,213 bills; 117th: 9,275 of 15,066).
+  - Related bills carry one or more relationship types, and the label is not stable: use
+    `relationship_type_normalized`. Seen: "Identical bill", "Related bill", "Procedurally related" and
+    "Procedurally-related" (one value once normalized), "Text similarities" (59 in the 118th hr and s), "Related
+    document" (6, 117th). The link is listed on both bills 98% of the time in the 118th hr and s (11,946 of the
+    12,171 relations whose other bill is loaded), not always.
+  - CRS sometimes lists a bill as related to itself (34 of 12,472 related-bill rows in the 118th hr and s, e.g.
+    118-hr-9541, hr-292, hr-8205). Staging drops those rows (and their relationship rows), so `position` and
+    `related_position` have gaps; the raw table keeps them.
+  - `related_bill_id` joins the bills model only when that Congress and type are loaded (a 117th bill relates to a
+    118th one and the reverse). The 118th relates back only to the 116th through the 119th; the allowed range is
+    93 to 125 so a deeper backfill does not trip the test.
 - The older export of the eleven reserved 117th bills wraps these lists one level deeper
   (`<committees><billCommittees/>`, `<subjects><billSubjects><legislativeSubjects/>`); all eleven are empty, and
   the parser looks through the wrapper if one ever has entries.

@@ -69,3 +69,59 @@ unit_tests:
       rows:
         - {bill_id: 118-hjres-126, position: 0, subject: Climate change and greenhouse gases, update_date: '2024-10-31'}
         - {bill_id: 117-hr-1319, position: 0, subject: Aging, update_date: null}
+
+  - name: billstatus_activity_normalized_unifies_case_and_hyphens
+    model: stg_govinfo_billstatus__committee_activities
+    description: >
+      activity_normalized is lower case, hyphens as spaces and trimmed, so the case variants (Markup By / Markup by)
+      and the undated "Bills of Interest - Exchange of Letters" (no date in the file) map to one value each.
+    given:
+      - input: source('govinfo_billstatus', 'committee_activities')
+        format: sql
+        rows: |
+            select cast('{"bill_id": "118-hr-1", "position": 0, "subposition": null, "activity_position": 0, "system_code": "hsba00", "activity": "Markup By", "activity_date": "2023-05-01T10:00:00Z"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-hr-1", "position": 0, "subposition": null, "activity_position": 1, "system_code": "hsba00", "activity": "Markup by ", "activity_date": "2023-05-02T10:00:00Z"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-hr-3935", "position": 0, "subposition": null, "activity_position": 0, "system_code": "hssy00", "activity": "Bills of Interest - Exchange of Letters", "activity_date": null}' as varchar) as payload, 'u' as source_url
+    expect:
+      rows:
+        - {bill_id: 118-hr-1, position: 0, subposition: null, activity_position: 0, system_code: hsba00, activity: Markup By, activity_normalized: markup by, activity_date: '2023-05-01'}
+        - {bill_id: 118-hr-1, position: 0, subposition: null, activity_position: 1, system_code: hsba00, activity: 'Markup by ', activity_normalized: markup by, activity_date: '2023-05-02'}
+        - {bill_id: 118-hr-3935, position: 0, subposition: null, activity_position: 0, system_code: hssy00, activity: Bills of Interest - Exchange of Letters, activity_normalized: bills of interest   exchange of letters, activity_date: null}
+
+  - name: billstatus_relationship_type_normalized_unifies_hyphens_and_self_relations_are_dropped
+    model: stg_govinfo_billstatus__related_bill_relationships
+    description: >
+      "Procedurally-related" and "Procedurally related" share a normalized value. A relationship whose related bill
+      is the bill itself (CRS lists 118-hr-9541 as related to itself) is dropped; the same bill's other relation stays.
+    given:
+      - input: source('govinfo_billstatus', 'related_bill_relationships')
+        format: sql
+        rows: |
+            select cast('{"bill_id": "118-hr-9541", "related_position": 0, "position": 0, "relationship_type": "Related bill", "identified_by": "CRS"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-hr-9541", "related_position": 1, "position": 0, "relationship_type": "Procedurally-related", "identified_by": "House"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-s-5", "related_position": 0, "position": 0, "relationship_type": "Procedurally related", "identified_by": "Senate"}' as varchar) as payload, 'u' as source_url
+      - input: source('govinfo_billstatus', 'related_bills')
+        format: sql
+        rows: |
+            select cast('{"bill_id": "118-hr-9541", "position": 0, "related_congress": "118", "related_bill_type": "HR", "related_number": "9541"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-hr-9541", "position": 1, "related_congress": "118", "related_bill_type": "S", "related_number": "5"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-s-5", "position": 0, "related_congress": "118", "related_bill_type": "HR", "related_number": "9541"}' as varchar) as payload, 'u' as source_url
+    expect:
+      rows:
+        - {bill_id: 118-hr-9541, related_position: 1, position: 0, relationship_type: Procedurally-related, relationship_type_normalized: procedurally related, identified_by: House, source_url: u}
+        - {bill_id: 118-s-5, related_position: 0, position: 0, relationship_type: Procedurally related, relationship_type_normalized: procedurally related, identified_by: Senate, source_url: u}
+
+  - name: billstatus_related_bills_drop_a_bill_related_to_itself
+    model: stg_govinfo_billstatus__related_bills
+    description: >
+      CRS sometimes lists a bill as related to itself (118-hr-9541); that row is dropped and the bill's real
+      relation keeps its original position.
+    given:
+      - input: source('govinfo_billstatus', 'related_bills')
+        format: sql
+        rows: |
+            select cast('{"bill_id": "118-hr-9541", "position": 0, "related_congress": "118", "related_bill_type": "HR", "related_number": "9541", "title": null, "latest_action_date": null, "latest_action_text": null}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-hr-9541", "position": 1, "related_congress": "118", "related_bill_type": "S", "related_number": "5", "title": null, "latest_action_date": null, "latest_action_text": null}' as varchar) as payload, 'u' as source_url
+    expect:
+      rows:
+        - {bill_id: 118-hr-9541, position: 1, related_congress: 118, related_bill_type: s, related_number: 5, related_bill_id: 118-s-5, title: null, latest_action_date: null, latest_action_text: null, source_url: u}
