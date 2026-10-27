@@ -5,7 +5,9 @@ only on its bytes and the extraction options, so the text is cached under that k
 import hashlib
 import io
 import json
+import time
 from importlib.metadata import version
+from pathlib import Path
 
 import pdfplumber
 from pdfplumber.utils import cluster_objects
@@ -17,20 +19,66 @@ from mogov.http import write_atomic
 _EXTRACTOR = f"pdfplumber-{version('pdfplumber')}"
 
 
-def page_texts(data: bytes, *, max_pages: int | None = None, **extract_opts) -> list[str]:
-    """page.extract_text(**extract_opts) for every page, or only the first `max_pages` ("" where a page has
-    no text layer)."""
-    key = hashlib.sha256(data)
+# One document may take this long to extract (checked between pages); a malformed or enormous PDF then becomes an
+# error for that document instead of hanging a shard. A single page that never returns cannot be interrupted here.
+MAX_SECONDS = 600.0
+
+
+class ExtractTimeout(TimeoutError):
+    """Extraction of one PDF ran past its time budget."""
+
+
+def _key(data_digest, extract_opts: dict, max_pages: int | None) -> str:
     # max_pages joins the key only when set, so existing cache entries stay valid
+    key = data_digest.copy()
     key.update(
         json.dumps([_EXTRACTOR, extract_opts] + ([max_pages] if max_pages is not None else []), sort_keys=True).encode()
     )
-    path = CACHE_DIR / "pdftext" / f"{key.hexdigest()}.json"
+    return key.hexdigest()
+
+
+def _alias(sha256_hex: str, extract_opts: dict, max_pages: int | None) -> Path:
+    """Tiny pointer file: (PDF sha256, options) -> the cache key. It lets a caller that already knows a PDF's hash
+    reuse the cached text without reading the PDF (slow over a network mount) to derive the key."""
+    blob = json.dumps([sha256_hex, _EXTRACTOR, extract_opts, max_pages], sort_keys=True).encode()
+    return CACHE_DIR / "pdftext" / "by-hash" / f"{hashlib.sha256(blob).hexdigest()}.key"
+
+
+def cached_page_texts(sha256_hex: str, *, max_pages: int | None = None, **extract_opts) -> list[str] | None:
+    """The cached page_texts() of the PDF with this sha256, or None when it is not cached (or not known by
+    hash yet: an earlier page_texts() call on the bytes records that)."""
+    try:
+        key = _alias(sha256_hex, extract_opts, max_pages).read_text().strip()
+        return json.loads((CACHE_DIR / "pdftext" / f"{key}.json").read_bytes())
+    except (OSError, ValueError):
+        return None
+
+
+def page_texts(
+    data: bytes, *, max_pages: int | None = None, max_seconds: float | None = MAX_SECONDS, **extract_opts
+) -> list[str]:
+    """page.extract_text(**extract_opts) for every page, or only the first `max_pages` ("" where a page has
+    no text layer). Raises ExtractTimeout when the pages together take longer than `max_seconds` (None: no
+    limit); each page's parsed objects are released before the next, so memory follows the largest page, not
+    the document."""
+    digest = hashlib.sha256(data)
+    key = _key(digest, extract_opts, max_pages)
+    path = CACHE_DIR / "pdftext" / f"{key}.json"
+    alias = _alias(digest.hexdigest(), extract_opts, max_pages)
     if path.exists():
+        if not alias.exists():
+            write_atomic(alias, key.encode())
         return json.loads(path.read_bytes())
+    deadline = None if max_seconds is None else time.monotonic() + max_seconds
+    texts = []
     with pdfplumber.open(io.BytesIO(data)) as pdf:
-        texts = [page.extract_text(**extract_opts) or "" for page in pdf.pages[:max_pages]]
+        for page in pdf.pages[:max_pages]:
+            if deadline is not None and time.monotonic() > deadline:
+                raise ExtractTimeout(f"text extraction ran past {max_seconds:g} s after {len(texts)} pages")
+            texts.append(page.extract_text(**extract_opts) or "")
+            page.close()  # drops the page's parsed objects and cached layout
     write_atomic(path, json.dumps(texts).encode())
+    write_atomic(alias, key.encode())
     return texts
 
 

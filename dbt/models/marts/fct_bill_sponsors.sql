@@ -10,10 +10,11 @@
 -- The XML lists the latest district too for a representative who later moved to the Senate, as 200 + the senate
 -- district, so his House-era rows look like a senator's (#646). A sponsor, co-sponsor, handler or House conferee of
 -- a House bill is a House member in that session, whatever district is listed: such a senate-listed row matches the
--- House roster on (session, surname, given name) when that person later held the listed senate seat, and then
+-- House roster on (session, surname, given name) when that person held the listed senate seat in some session
+-- (the order is not checked: the XML lists the latest district), and then
 -- counts as state_house with the roster's district. It never matches two people. A row that finds no one on the
--- House roster keeps the listed-district reading (a House member prefiled bills before taking a senate seat in
--- January).
+-- House roster keeps the listed-district reading (a defensive fallback: in current data every senate-listed
+-- House-role row finds its person on the House roster, so it does not trigger).
 -- Re-listed bills (status 'relisted for governor message', int_bills__status) are left out: the House lists the
 -- previous session's appropriation bill again only for the governor's message, repeating its sponsors, so keeping
 -- them would count the budget chair's sponsorship twice. The original's row carries the sponsorship.

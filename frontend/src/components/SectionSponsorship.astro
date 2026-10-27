@@ -3,7 +3,7 @@
 // session, how many bills the member was the primary sponsor of and how many of the decided ones passed the House
 // and became law. Counts with their n; a percent only when 5 or more bills were decided. Not a score.
 import type { OfficialBundle } from "../lib/exports/types";
-import { MIN_DECIDED_FOR_SHARE, countWithShare } from "../lib/sponsorshipOutcomes";
+import { MIN_DECIDED_FOR_SHARE, countWithShare, inProgressNote } from "../lib/sponsorshipOutcomes";
 import { href } from "../lib/site";
 import SourceLink from "./SourceLink.astro";
 
@@ -54,9 +54,7 @@ const show = isHouse || (sessions?.length ?? 0) > 0;
                 <tr>
                   <th scope="row" class="what">
                     {s.label}
-                    {s.in_progress && (
-                      <span class="muted small"> (session in progress: undecided bills not counted)</span>
-                    )}
+                    {s.in_progress && <span class="muted small">{inProgressNote(s)}</span>}
                   </th>
                   <td>{s.bills_sponsored}</td>
                   <td>{s.bills_decided}</td>
@@ -74,9 +72,10 @@ const show = isHouse || (sessions?.length ?? 0) > 0;
           A percent appears only when {MIN_DECIDED_FOR_SHARE} or more bills were decided. Current officials
           only: bills sponsored by members who have since left office are not here, so the earliest sessions
           show only members still serving, mostly long-serving leaders, and their numbers are not comparable
-          with recent sessions. Resolutions (HR, HCR) and Senate bills are left out, appropriation bills are
-          included (the Budget chair sponsors them and nearly all pass), and a bill the House passed that then
-          died in the Senate counts as passed the House but not as law.
+          with recent sessions. Resolutions (HR, HCR) and Senate bills are left out (Senate service is not
+          counted for members who also served there), appropriation bills are included (the Budget chair
+          sponsors them and nearly all pass), and a bill the House passed that then died in the Senate counts
+          as passed the House but not as law.
           <a href={href("/methodology/#sponsorship")}>How this is counted</a>.
         </p>
       </>

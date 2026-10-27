@@ -2,7 +2,9 @@
 
 - BillTracking/Bills/BillList?year=YYYY&session=R is one page per session (3-6 MB). Its CSV button embeds the
   whole list as JSON in a script element (`const bills = [...];`): one object per Senate bill or resolution
-  (SB, SJR, SCR, SR). The objects land as printed, one row per bill. Extraordinary sessions are `E1`, `E2`, ...;
+  (SB, SJR, SCR, SR). The objects land as printed (the served `year` untouched), plus `list_year` (the year
+  asked for) and
+  `session_type`, one row per bill. Extraordinary sessions are `E1`, `E2`, ...;
   a session that doesn't exist comes back as `const bills = [];`.
 - BillTracking/Bills/BillList?billId=N&year=YYYY&billPrefix=SB&billSuffix=1&handler=Actions is an HTML fragment
   with the bill's whole action history (Senate and House side, enrollment, governor), newest first, one table
@@ -23,6 +25,7 @@ Requests to the host are paced by the lock shared by every process on the machin
 """
 
 import json
+import math
 import os
 import re
 from datetime import date
@@ -46,18 +49,27 @@ TEXTS_TABLE = "mo_senate_bill_texts"
 FISCAL_NOTES_TABLE = "mo_senate_bill_fiscal_notes"
 AMENDMENTS_TABLE = "mo_senate_bill_amendments"
 SUMMARIES_TABLE = "mo_senate_bill_summaries"
-# handler -> (table, the fragment's container, which marks a real answer). A bill with none of a kind gets
-# "No <things> available" instead, also a real answer with zero rows.
+# handler -> (table, the fragment's container, the tab's own "none" notice). A bill with none of a kind gets
+# "No <things> available for this bill." instead, also a real answer with zero rows. The notices are matched per
+# tab (not any "No ... available"), so an error page such as "No content available" is not taken for one.
 DOC_HANDLERS = {
-    "BillText": (TEXTS_TABLE, b"bill-text-container"),
-    "FiscalNotes": (FISCAL_NOTES_TABLE, b"fiscal-notes-container"),
-    "Amendments": (AMENDMENTS_TABLE, b"amendments-container"),
-    "Summaries": (SUMMARIES_TABLE, b"summaries-container"),
+    "BillText": (
+        TEXTS_TABLE,
+        b"bill-text-container",
+        re.compile(rb"No (?:bill )?text(?: versions)? available", re.I),
+    ),
+    "FiscalNotes": (FISCAL_NOTES_TABLE, b"fiscal-notes-container", re.compile(rb"No fiscal notes available", re.I)),
+    "Amendments": (AMENDMENTS_TABLE, b"amendments-container", re.compile(rb"No amendments available", re.I)),
+    "Summaries": (SUMMARIES_TABLE, b"summaries-container", re.compile(rb"No summaries available", re.I)),
 }
-DOC_TABLES = [t for t, _ in DOC_HANDLERS.values()]
-NONE_AVAILABLE = re.compile(rb"\bNo [A-Za-z ]{3,40} available\b", re.IGNORECASE)
-# senate.mo.gov accepted at ~1 request/second (#584). On Cloud Run each task has its own filesystem, so the
-# per-machine pacing lock doesn't see the other tasks: each task slows down by the task count to keep the total.
+DOC_TABLES = [t for t, _, _ in DOC_HANDLERS.values()]
+# The Actions tab: its container, or the notice a bill with no actions gets (HTTP 200, 81 bytes, seen live
+# 2026-10: `<p ...>No actions found for this bill.</p>`).
+ACTIONS_MARKER = b"actions-container"
+ACTIONS_NONE = re.compile(rb"No actions (?:found|available) for this bill", re.I)
+# senate.mo.gov accepted at ~1 request/second (#584). Every senate.mo.gov loader paces through host_throttle
+# (http.fetch min_interval), a lock shared by all processes on the machine. On Cloud Run each task has its own
+# filesystem, so the lock doesn't see the other tasks: each task slows down by the task count to keep the total.
 POLITE_DELAY = 1.0
 # Extraordinary sessions are probed as E1, E2, ... until one comes back empty (E4 is beyond any seen).
 MAX_EXTRA_SESSIONS = 4
@@ -71,6 +83,16 @@ BILLS_ASSIGNMENT = re.compile(r"const\s+bills\s*=\s*")  # finds where the JSON s
 
 class NotABillFragment(RuntimeError):
     """A bill-page tab fragment that is neither a document list nor the site's "none available" notice."""
+
+
+class TooManyRejectedFragments(RuntimeError):
+    """Rejected fragments past the bound: the site is likely blocking us, so publish nothing from this shard."""
+
+
+# Isolated rejections are skipped; stop at 3 bills in a row, or at 5% of the shard's bills (never fewer than 3).
+MAX_CONSECUTIVE_REJECTED = 3
+MAX_REJECTED_SHARE = 0.05
+MIN_REJECTED_BILLS = 3
 
 
 class NotABillList(RuntimeError):
@@ -98,14 +120,20 @@ def parse_bill_list(page: str) -> list[dict]:
 
 def _is_doc_fragment(handler: str):
     """check= for a document tab: reject (so never cache) a body that is neither the tab's container nor the
-    "No ... available" notice, e.g. an error or block page served with 200."""
-    marker = DOC_HANDLERS[handler][1]
+    tab's own "No ... available" notice, e.g. an error or block page served with 200."""
+    _, marker, none = DOC_HANDLERS[handler]
 
     def check(resp) -> None:
-        if marker not in resp.content and not NONE_AVAILABLE.search(resp.content):
+        if marker not in resp.content and not none.search(resp.content):
             raise NotABillFragment(f"not a {handler} fragment: {resp.url}")
 
     return check
+
+
+def _is_actions_fragment(resp) -> None:
+    """check= for the Actions tab: its container or its "none" notice, else an error or block page (not cached)."""
+    if ACTIONS_MARKER not in resp.content and not ACTIONS_NONE.search(resp.content):
+        raise NotABillFragment(f"not an Actions fragment: {resp.url}")
 
 
 def _cell(td) -> str:
@@ -230,7 +258,8 @@ def docs_enabled() -> bool:
     return os.environ.get("MOGOV_SENATE_BILL_DOCS", "1").strip().lower() not in {"0", "false", "no", "off"}
 
 
-def _interval() -> float:
+def senate_interval() -> float:
+    """Seconds between requests to senate.mo.gov for min_interval; shared by mo_senate, mo_senate_topics and here."""
     return POLITE_DELAY * int(os.environ.get("CLOUD_RUN_TASK_COUNT") or 1)
 
 
@@ -240,7 +269,9 @@ def _max_age(year: int) -> float:
 
 
 def _get(params: dict, year: int, **kw) -> str:
-    return fetch(LIST_URL, params, max_age=_max_age(year), min_interval=_interval(), **kw).decode("utf-8", "replace")
+    return fetch(LIST_URL, params, max_age=_max_age(year), min_interval=senate_interval(), **kw).decode(
+        "utf-8", "replace"
+    )
 
 
 def session_lists(year: int) -> list[tuple[str, list[dict]]]:
@@ -278,7 +309,9 @@ def _actions_params(year: int, bill: dict) -> dict:
 def _doc_params(year: int, session: str, bill: dict, handler: str) -> dict:
     params = {**_actions_params(year, bill), "handler": handler}
     if handler == "FiscalNotes":
-        params["sessionType"] = session  # the site's tab sends it; the fragment came back without it too
+        # The tab's own script sends it, but the list page's data-modal-url does not; the response is identical
+        # either way (probed 2026-10-26). Sent to match the tab.
+        params["sessionType"] = session
     return params
 
 
@@ -310,20 +343,56 @@ def load(shard: db.Shard) -> dict[str, int]:
     tables = [BILLS_TABLE, ACTIONS_TABLE, *(DOC_TABLES if docs else [])]
     with db.JsonSink(shard, source_url=LIST_URL, tables=tables) as sink:
         progress = obs.Progress("bills", len(units), log)
+        rejected_bills = consecutive = 0
         for year, session, bill in units:
             key = bill_key(year, session, bill["billId"])
+            params = _actions_params(year, bill)
+            url = f"{LIST_URL}?" + "&".join(f"{k}={v}" for k, v in params.items())
+            # The list page passed its own check, so the bill row always lands. A tab whose fragment is rejected
+            # lands no rows this run (nothing cached, retried next run); that means "not fetched", never "none".
+            skipped = []
+            try:
+                actions = parse_actions(_get(params, year, check=_is_actions_fragment))
+            except NotABillFragment as e:
+                actions = None
+                skipped.append(("Actions", e))
+            fetched = []
+            for handler in DOC_HANDLERS if docs else ():
+                dparams = _doc_params(year, session, bill, handler)
+                try:
+                    fragment = _get(dparams, year, check=_is_doc_fragment(handler))
+                except NotABillFragment as e:
+                    skipped.append((handler, e))
+                    continue
+                durl = f"{LIST_URL}?" + "&".join(f"{k}={v}" for k, v in dparams.items())
+                fetched.append((handler, DOC_PARSERS[handler](fragment), durl))
+            for tab, e in skipped:
+                log.warning(
+                    "mo_senate_bills.fragment_rejected", year=year, session=session, bill_key=key, tab=tab, error=str(e)
+                )
+            if skipped:
+                rejected_bills += 1
+                consecutive += 1
+                # A site that starts serving block pages would otherwise skip every remaining bill and end the run
+                # "cleanly", and the sink would then replace the last good landing. Stop before publishing instead.
+                if consecutive >= MAX_CONSECUTIVE_REJECTED or rejected_bills >= max(
+                    MIN_REJECTED_BILLS, math.ceil(MAX_REJECTED_SHARE * len(units))
+                ):
+                    raise TooManyRejectedFragments(
+                        f"{rejected_bills} of {len(units)} bills had rejected fragments "
+                        f"({consecutive} in a row, last {key}); nothing published"
+                    )
+            else:
+                consecutive = 0
             sink.add(
                 BILLS_TABLE,
                 key,
-                {**bill, "year": year, "session_type": session},
+                {**bill, "list_year": year, "session_type": session},
                 source_url=f"{LIST_URL}?year={year}&session={session}",
             )
-            params = _actions_params(year, bill)
-            actions = parse_actions(_get(params, year))
-            if not actions:
+            if actions is not None and not actions:
                 log.warning("mo_senate_bills.no_actions", year=year, session=session, bill_id=bill["billId"])
-            url = f"{LIST_URL}?" + "&".join(f"{k}={v}" for k, v in params.items())
-            for a in actions:
+            for a in actions or ():
                 row = {
                     "year": year,
                     "session_type": session,
@@ -332,12 +401,9 @@ def load(shard: db.Shard) -> dict[str, int]:
                     **a,
                 }
                 sink.add(ACTIONS_TABLE, f"{key}/{a['action_index']}", row, source_url=url)
-            for handler in DOC_HANDLERS if docs else ():
+            for handler, parsed, durl in fetched:
                 table = DOC_HANDLERS[handler][0]
-                dparams = _doc_params(year, session, bill, handler)
-                fragment = _get(dparams, year, check=_is_doc_fragment(handler))
-                durl = f"{LIST_URL}?" + "&".join(f"{k}={v}" for k, v in dparams.items())
-                for d in DOC_PARSERS[handler](fragment):
+                for d in parsed:
                     row = {
                         "year": year,
                         "session_type": session,

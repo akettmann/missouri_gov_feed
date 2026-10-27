@@ -8,16 +8,16 @@
 --                payroll surname is compared without suffixes the payroll prints inside it ("BRATTIN JR.",
 --                "HADEN DVM"), with spaces ignored ("VANSCHOIACK" = Van Schoiack), and, when the first name
 --                fits too, by its last words ("WALSH MOORE" for Moore). Kept when
---                  1. exactly one member of that chamber that year has the surname and exactly one payee does, or
---                  2. several share it and a payee and a member are each other's only best first-name fit
---                     (Ed = EDWIN, Patty = PATRICIA), or
---                  3. a payee's middle initial is the initial of the name a member goes by, and no one else fits
+--                  1. a payee and a member are each other's only best first-name fit (Ed = EDWIN, Patty = PATRICIA;
+--                     a surname only one member and one payee have is paired here when the first names fit), or
+--                  2. a payee's middle initial is the initial of the name a member goes by, and no one else fits
 --                     that way ("SMITH, DAVID C" is Cody Smith), or
---                  4. once 1 to 3 have paired the rest, one payee and one member remain (Mike Jones =
---                     JONES, MICHAEL J after Holly Jones)
+--                  3. once 1 and 2 have paired the rest, one payee and one member remain (Mike Jones =
+--                     JONES, MICHAEL J after Holly Jones; a lone Smith and lone payee SMITH whose first names
+--                     differ are paired here too)
 --                A seat counts from the member's first roster year in that chamber (House and Senate each) when Open
 --                States has no start date (#227). A small payment that fits a member whose seat ended the December
---                before, or that January, is that member's final check and is left out of 1 to 4 (#250).
+--                before, or that January, is that member's final check and is left out of 1 to 3 (#250).
 --                A final check is only ever set aside, never paired by seat: a December one is matched by name as
 --                well, and so is a January one (#269). Both depend on the departed member having a row in
 --                int_officials__name_keys and on the by-name checks passing (exactly one matching official, one row);
@@ -153,30 +153,14 @@ seat_pairs_best as (
 seat_pairs as (
     select
         *,
-        count(distinct person_id) over (partition by calendar_year, seat_chamber, employee_name) as n_members,
-        count(distinct employee_name) over (partition by calendar_year, seat_chamber, person_id) as n_payees,
         max(name_fit) over (partition by calendar_year, seat_chamber, employee_name) as payee_best,
         max(name_fit) over (partition by calendar_year, seat_chamber, person_id) as member_best
     from seat_pairs_best
     where same_surname or name_fit >= 1
 ),
 
--- 1. the only member of the chamber with the surname that year, and the only payee
-seat_unique as (
-    select
-        person_id,
-        calendar_year,
-        seat_chamber,
-        employee_name,
-        agency_name,
-        position_title,
-        gross_pay,
-        name_fit
-    from seat_pairs
-    where n_members = 1 and n_payees = 1
-),
-
--- 2. several share the surname: pair those whose first names fit, when each is the other's only best fit
+-- 1. pair a payee and a member whose first names fit, when each is the other's only best fit. A surname only
+-- one member and one payee have is paired here too, when the first names fit.
 -- (Ed Lewis = LEWIS, EDWIN G; Patty Lewis = LEWIS, PATRICIA)
 seat_fitted as (
     select
@@ -188,8 +172,6 @@ seat_fitted as (
 ),
 
 seat_matched as (
-    select * from seat_unique
-    union
     select
         person_id,
         calendar_year,
@@ -203,7 +185,7 @@ seat_matched as (
     where n_best_members = 1 and n_best_payees = 1
 ),
 
--- what is left of a shared surname after steps 1 and 2
+-- what is left of the seat pairs after step 1
 seat_open as (
     select p.*
     from seat_pairs as p
@@ -220,7 +202,7 @@ seat_open as (
     where m_payee.person_id is null and m_member.person_id is null
 ),
 
--- 3. a payee and a member that fit by the payee's middle initial and no one else does: "SMITH, DAVID C" is
+-- 2. a payee and a member that fit by the payee's middle initial and no one else does: "SMITH, DAVID C" is
 -- Cody Smith, though David Smith fits the first name just as well
 seat_initial as (
     select
@@ -244,8 +226,9 @@ seat_initial_matched as (
     where n_init_members = 1 and n_init_payees = 1
 ),
 
--- 4. what is left once 1 to 3 have paired the rest: one payee and one member with nobody else to pair with,
--- though their first names don't fit (Mike Jones = JONES, MICHAEL J after Holly Jones; David Smith =
+-- 3. what is left once 1 and 2 have paired the rest: one payee and one member with nobody else to pair with,
+-- though their first names don't fit; this is also how a surname only one member and one payee have is paired
+-- when the first names don't fit (Mike Jones = JONES, MICHAEL J after Holly Jones; David Smith =
 -- SMITH, DAVID T after Cody Smith)
 seat_left as (
     select

@@ -9,28 +9,53 @@ note right
 end note
 :one unit per distinct URL, owned by hash(URL) % --shards;
 repeat
-  if (file already under RAW_DIR/mo_house_pdf/SESSION/KIND/\nand (closed session or younger than 7 days)?) then (yes)
-    :read it from disk: no request;
+  if (file already under RAW_DIR/mo_house_pdf/SESSION/KIND/
+and (closed session or younger than 7 days)?) then (yes)
+    if (size and mtime match the previous
+mo_house_pdf_files row?) then (yes)
+      :keep the row (hash known): file not read,
+      text from the pdftext cache by that hash;
+    else (no)
+      :read it from disk, hash it;
+    endif
+    :no request;
+  elseif (no file, and the previous row is a permanent failure
+(HTTP 4xx or HTML page) of a closed session
+checked < 30 days ago?) then (yes)
+    :keep the previous error row: no request;
+  elseif (run limited by KINDS / SESSIONS and outside them?) then (yes)
+    :carry the previous row over (error history kept);
   else (no)
     :GET at the host-wide throttle (1 request/s,
     shared with mo_house and every shard);
-    if (PDF bytes (%PDF-)?) then (yes)
+    note right
+      A stale open-session file is re-checked with
+      If-None-Match / If-Modified-Since from the previous row.
+    end note
+    if (304 Not Modified?) then (yes)
+      :touch the file, keep its row and hash;
+    elseif (PDF bytes (%PDF-)?) then (yes)
       if (bytes differ from the file on disk?) then (yes)
         :write the PDF unchanged;
       else (no)
         :touch the file only;
       endif
+    elseif (file already on disk?) then (yes)
+      :keep that file, row and text;
+      :log mo_house_pdf.recheck_failed, retry next run;
     else (HTTP error, timeout, HTML page)
-      :error row, no file;
+      :error row, no file (4xx / HTML: not asked again for 30 days);
     endif
   endif
-  :pdfplumber text per page (mogov.pdftext, stored as-is);
+  :pdfplumber text per page (mogov.pdftext, stored as-is,
+  time budget per document);
   if (bill text version with text?) then (yes)
     :read the enacting title and Section A for the RSMo sections
     repealed, amended and enacted (mogov.parsers.mo_house_statute_refs);
     :rows in mo_house_pdf_statute_refs (ranges kept as written);
   endif
-  :row in mo_house_pdf_files (path, size, sha256, status, error)
+  :row in mo_house_pdf_files (path, size, sha256, status, error,
+  checked_at, etag, last_modified)
   and row in mo_house_pdf_texts (page_count, text, pages_json, error);
 repeat while (more URLs?) is (yes)
 ->no;

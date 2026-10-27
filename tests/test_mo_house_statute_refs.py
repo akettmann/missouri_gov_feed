@@ -160,3 +160,14 @@ def test_line_numbers_on_their_own_lines():
         + "\n3\nfollows:",
     )
     assert _short(parse_statute_refs(text)) == [("enact", 1, "537.1250", None, None)]
+
+
+def test_as_enacted_by_in_the_middle_of_the_repeal_list_keeps_later_sections():
+    text = _bill(
+        "To repeal sections 1.010, RSMo, and section 2.020 as enacted by house bill no. 1, one hundred first "
+        "general assembly, and sections 3.030 and 4.040, RSMo, and to enact in lieu thereof two new sections "
+        "relating to the same subject.",
+        "Section A. Sections 1.010, 3.030 and 4.040, RSMo, are repealed.",
+    )
+    refs = [r for r in parse_statute_refs(text) if r.action == "repeal"]
+    assert [r.section_start for r in refs][:4] == ["1.010", "2.020", "3.030", "4.040"]

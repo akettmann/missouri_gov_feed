@@ -40,6 +40,35 @@ def test_bill_list_rows_are_the_embedded_json_unchanged():
     assert "handlerLastName" not in bills[2]
 
 
+def test_landed_list_row_is_the_served_object_plus_the_added_keys(monkeypatch, tmp_path):
+    served = {b["billId"]: b for b in m.parse_bill_list(LIST_2025_R)}
+    _run(monkeypatch, tmp_path, db.Shard(), [])
+    landed = _landed(m.BILLS_TABLE)
+    assert sorted(landed) == sorted(f"2025/R/{i}" for i in served)
+    for key, row in landed.items():
+        obj = served[int(key.rsplit("/", 1)[1])]
+        # nothing served is changed or dropped (the served `year` stays); only the two keys below are added
+        assert {k: v for k, v in row.items() if k not in ("list_year", "session_type")} == obj
+        assert row["list_year"] == 2025 and row["session_type"] == "R"
+        assert set(row) - set(obj) == {"list_year", "session_type"}
+
+
+def test_a_served_year_that_differs_from_the_asked_year_is_kept(monkeypatch, tmp_path):
+    odd = LIST_2025_R.replace('"year":2025', '"year":1999', 1)
+    monkeypatch.setattr(db, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(m, "window_years", lambda: [2025])
+
+    def fake_get(params, year, **kw):
+        if params.get("handler"):
+            return SB1_ACTIONS if params["handler"] == "Actions" else _doc_page(params)
+        return odd if params["session"] == "R" else LIST_2025_EMPTY
+
+    monkeypatch.setattr(m, "_get", fake_get)
+    m.load(db.Shard())
+    sb1 = _landed(m.BILLS_TABLE)["2025/R/233"]
+    assert sb1["year"] == 1999 and sb1["list_year"] == 2025
+
+
 def test_page_without_bills_gives_no_rows():
     assert m.parse_bill_list(LIST_2025_EMPTY) == []
     assert m.parse_bill_list("<html><body><script>var bills = 1;</script></body></html>") == []
@@ -375,6 +404,34 @@ def test_fragment_check_accepts_real_answers_including_none_available(handler, g
     m._is_doc_fragment(handler)(_Resp(good))
 
 
+NO_SUMMARIES = "<p style='text-align: center; padding: 40px;'>No summaries available for this bill.</p>"
+
+
+def test_the_summaries_notice_is_accepted_for_its_own_tab_only():
+    m._is_doc_fragment("Summaries")(_Resp(NO_SUMMARIES))
+    # another tab's notice, or a generic "No ... available" error page, is not an answer
+    for handler in ("BillText", "FiscalNotes", "Amendments"):
+        with pytest.raises(m.NotABillFragment):
+            m._is_doc_fragment(handler)(_Resp(NO_SUMMARIES))
+    for generic in ("<p>No content available</p>", "<p>No service available</p>"):
+        for handler in m.DOC_HANDLERS:
+            with pytest.raises(m.NotABillFragment):
+                m._is_doc_fragment(handler)(_Resp(generic))
+
+
+# The real answer for a bill with no actions (HTTP 200, 81 bytes), captured live.
+NO_ACTIONS = "<p style='text-align: center; padding: 40px;'>No actions found for this bill.</p>"
+
+
+def test_actions_check_accepts_the_tab_and_rejects_error_pages():
+    m._is_actions_fragment(_Resp(SB1_ACTIONS))
+    m._is_actions_fragment(_Resp(SB600_ACTIONS))
+    m._is_actions_fragment(_Resp(NO_ACTIONS))
+    for bad in ("", "<html>Service unavailable</html>", "<p>No content available</p>", SB1_TEXT):
+        with pytest.raises(m.NotABillFragment):
+            m._is_actions_fragment(_Resp(bad))
+
+
 @pytest.mark.parametrize("handler", list(m.DOC_HANDLERS))
 @pytest.mark.parametrize(
     "bad",
@@ -519,3 +576,172 @@ def test_many_amendments_keep_order_ids_and_every_status():
     adopted = amendments[3]
     assert adopted["title"] == "2/19/2025 - SA 1 to SS#2 S offered  & adopted (Trent)--(0120S08.09S)"
     assert adopted["label"] == "2/19/2025 - SA 1 to SS#2 S offered & adopted (Trent)--(0120S08.09S)"
+
+
+def test_every_senate_mo_gov_loader_paces_through_the_shared_host_throttle(monkeypatch, tmp_path):
+    """mo_senate and mo_senate_topics request with min_interval (the shared host lock) and no per-process delay."""
+    from mogov.loaders import mo_senate, mo_senate_topics
+
+    calls = []
+
+    def fake_fetch(url, params=None, **kw):
+        calls.append((url, kw))
+        if url.endswith("/journallist/"):
+            return b'<a href="/25info/Journals/DAY01.pdf">1</a>'
+        if url.endswith("/keywords"):
+            return b"<html></html>"
+        return b"%PDF"
+
+    monkeypatch.setattr(db, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setenv("CLOUD_RUN_TASK_COUNT", "3")
+    for mod in (mo_senate, mo_senate_topics):
+        monkeypatch.setattr(mod, "fetch", fake_fetch)
+        monkeypatch.setattr(mod, "window_years", lambda: [2025])
+    monkeypatch.setattr(mo_senate.pdftext, "page_texts", lambda data: [])
+    mo_senate.load(db.Shard())
+    mo_senate_topics.load(db.Shard())
+    assert len(calls) == 3  # journal list, one journal, one topical index
+    for _, kw in calls:
+        assert kw["min_interval"] == m.senate_interval() == 3.0
+        assert "delay" not in kw
+
+
+def test_load_checks_the_actions_fragment_before_caching_it(monkeypatch, tmp_path):
+    checks = {}
+    monkeypatch.setattr(db, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(m, "window_years", lambda: [2025])
+    monkeypatch.setenv("MOGOV_SENATE_BILL_DOCS", "0")
+
+    def fake_get(params, year, **kw):
+        if params.get("handler") == "Actions":
+            checks[params["billId"]] = kw.get("check")
+            return SB1_ACTIONS
+        return LIST_2025_R if params["session"] == "R" else LIST_2025_EMPTY
+
+    monkeypatch.setattr(m, "_get", fake_get)
+    m.load(db.Shard())
+    assert len(checks) == 5 and set(checks.values()) == {m._is_actions_fragment}
+
+
+def test_no_actions_notice_is_the_real_81_byte_answer():
+    assert len(NO_ACTIONS.encode()) == 81
+    m._is_actions_fragment(_Resp(NO_ACTIONS))
+    assert m.parse_actions(NO_ACTIONS) == []
+
+
+def _fake_get(reject):
+    """_get stand-in: reject(params) -> True raises NotABillFragment; otherwise the canned page."""
+
+    def fake_get(params, year, **kw):
+        if "handler" not in params:
+            return LIST_2025_R if params["session"] == "R" else LIST_2025_EMPTY
+        if reject(params):
+            raise m.NotABillFragment("blocked")
+        return SB1_ACTIONS if params["handler"] == "Actions" else _doc_page(params)
+
+    return fake_get
+
+
+def _keys(table):
+    return sorted(_landed(table))
+
+
+def _setup(monkeypatch, tmp_path, docs):
+    monkeypatch.setattr(db, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(m, "window_years", lambda: [2025])
+    monkeypatch.setenv("MOGOV_SENATE_BILL_DOCS", "1" if docs else "0")
+
+
+def test_an_isolated_rejected_actions_tab_keeps_the_bill_row_and_drops_only_those_rows(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=False)
+    bad = 2724185
+    monkeypatch.setattr(m, "_get", _fake_get(lambda p: p["billId"] == bad))
+    counts = m.load(db.Shard())
+    assert counts[m.BILLS_TABLE] == 5  # the rejected bill is still listed
+    assert m.bill_key(2025, "R", bad) in _keys(m.BILLS_TABLE)
+    assert not [k for k in _keys(m.ACTIONS_TABLE) if k.startswith(f"2025/R/{bad}/")]
+    assert any(k.startswith("2025/R/233/") for k in _keys(m.ACTIONS_TABLE))
+
+
+def test_an_isolated_rejected_document_tab_drops_only_that_tab(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=True)
+    monkeypatch.setattr(m, "_get", _fake_get(lambda p: p["billId"] == 233 and p["handler"] == "Amendments"))
+    m.load(db.Shard())
+    assert "2025/R/233" in _keys(m.BILLS_TABLE)
+    assert any(k.startswith("2025/R/233/") for k in _keys(m.ACTIONS_TABLE))
+    assert any(k.startswith("2025/R/233/") for k in _keys(m.TEXTS_TABLE))
+    assert any(k.startswith("2025/R/233/") for k in _keys(m.FISCAL_NOTES_TABLE))
+    assert not [k for k in _keys(m.AMENDMENTS_TABLE) if k.startswith("2025/R/233/")]
+
+
+def test_persistent_rejection_raises_and_keeps_the_previous_landing(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=False)
+    monkeypatch.setattr(m, "_get", _fake_get(lambda p: False))
+    first = m.load(db.Shard())
+    assert first[m.BILLS_TABLE] == 5 and first[m.ACTIONS_TABLE] > 0
+    before = {t: _landed(t) for t in (m.BILLS_TABLE, m.ACTIONS_TABLE)}
+    monkeypatch.setattr(m, "_get", _fake_get(lambda p: p["handler"] == "Actions"))
+    with pytest.raises(m.TooManyRejectedFragments):
+        m.load(db.Shard())
+    assert {t: _landed(t) for t in before} == before
+
+
+def _many_bills(monkeypatch, n):
+    """Make the session list n copies of a real bill row with distinct billIds (1..n), in list order."""
+    template = m.parse_bill_list(LIST_2025_R)[0]
+    bills = [{**template, "billId": i} for i in range(1, n + 1)]
+    monkeypatch.setattr(m, "session_lists", lambda year: [("R", bills)])
+
+
+def _reject_ids(bad, only=None):
+    return lambda p: p["billId"] in bad and (only is None or p["handler"] in only)
+
+
+def _pairs(n_pairs, gap):
+    """Bill ids rejected in adjacent pairs, with `gap` good bills between pairs."""
+    return {i for k in range(n_pairs) for i in (1 + k * (gap + 2), 2 + k * (gap + 2))}
+
+
+def test_rejections_in_pairs_with_good_bills_between_publish(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=False)
+    _many_bills(monkeypatch, 200)
+    bad = _pairs(4, 10)  # 8 rejected bills (over max(3, 5%)? 5% of 200 = 10, so under), never 3 in a row
+    assert len(bad) == 8
+    monkeypatch.setattr(m, "_get", _fake_get(_reject_ids(bad, {"Actions"})))
+    counts = m.load(db.Shard())
+    assert counts[m.BILLS_TABLE] == 200
+
+
+def test_three_rejected_bills_in_a_row_raise_even_in_a_large_list(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=False)
+    _many_bills(monkeypatch, 200)
+    monkeypatch.setattr(m, "_get", _fake_get(_reject_ids(_pairs(2, 10) | {50, 51, 52}, {"Actions"})))
+    with pytest.raises(m.TooManyRejectedFragments):
+        m.load(db.Shard())
+
+
+def test_the_run_of_rejected_bills_restarts_after_a_good_bill(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=False)
+    _many_bills(monkeypatch, 200)
+    # 2, good, 2, good, 2: six rejected in all, but never three adjacent
+    monkeypatch.setattr(m, "_get", _fake_get(_reject_ids({1, 2, 4, 5, 7, 8}, {"Actions"})))
+    assert m.load(db.Shard())[m.BILLS_TABLE] == 200
+
+
+def test_every_tab_rejected_on_two_adjacent_bills_counts_bills_not_tabs(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=True)
+    _many_bills(monkeypatch, 10)
+    # 2 bills x 5 tabs = 10 rejected tabs, but only 2 bills
+    monkeypatch.setattr(m, "_get", _fake_get(_reject_ids({4, 5})))
+    assert m.load(db.Shard())[m.BILLS_TABLE] == 10
+
+
+def test_the_share_limit_scales_with_the_list_49_of_1000_publish_50_raise(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=False)
+    _many_bills(monkeypatch, 1000)
+    scattered = [i * 20 for i in range(1, 51)]  # never adjacent
+    monkeypatch.setattr(m, "_get", _fake_get(_reject_ids(set(scattered[:49]), {"Actions"})))
+    assert m.load(db.Shard())[m.BILLS_TABLE] == 1000
+    monkeypatch.setattr(m, "_get", _fake_get(_reject_ids(set(scattered), {"Actions"})))
+    with pytest.raises(m.TooManyRejectedFragments):
+        m.load(db.Shard())

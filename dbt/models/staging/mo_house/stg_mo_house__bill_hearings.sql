@@ -3,9 +3,10 @@
 -- A hearing that was moved is listed again under a new notice (the comments say "Rescheduled" or "Time change"),
 -- so a bill can show two notices for one day; the House XML carries no cancelled flag.
 -- notice_time is the clock time as HH:MM, null when the House gave only the free-text alt_time ("4:30 PM or upon
--- adjournment"; the XML stores that as midnight).
--- Comments that contain an email address are withheld (null): committee staff and members put contact addresses
--- there, and this project keeps contact data out of the models.
+-- adjournment"; the XML stores that as midnight). Midnight without an alt_time is kept as 00:00 (not seen so far).
+-- Email addresses and phone numbers in comments and locations are replaced by a marker ("[email removed]",
+-- "[phone removed]", mogov.redact_contact): committee staff and members put contact details there, and this
+-- project keeps contact data out of the models. The rest of the text stays.
 with hearings as (
     select
         b.session_code,
@@ -44,10 +45,10 @@ select
     committee_name,
     notice_date as hearing_date,
     case
-        when substr(notice_time, 12, 5) = '00:00' then null
+        when alt_time is not null and substr(notice_time, 12, 5) = '00:00' then null
         else substr(notice_time, 12, 5)
     end as hearing_time,
     alt_time as hearing_time_note,
-    location,
-    case when comments like '%@%' then null else comments end as comments
+    {{ mogov.redact_contact('location') }} as location,
+    {{ mogov.redact_contact('comments') }} as comments
 from hearings

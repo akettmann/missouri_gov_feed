@@ -25,7 +25,7 @@ _REF = re.compile(rf"(?<![\w.-])(?P<start>{_ID})(?![\w-])(?:\s+(?:to|through)\s+
 _RSMO = re.compile(r"RSMo(?:\s+Supp\.\s*(\d{4}))?")
 _TITLE = re.compile(r"\bAN ACT\b(?P<title>.*?)Be it enacted", re.S)
 _REPEAL = re.compile(
-    r"\bTo (?P<verb>repeal|amend) (?P<body>sections?\b.*?)(?=\bto enact\b|\bby\b|\brelating to\b|$)", re.S
+    r"\bTo (?P<verb>repeal|amend) (?P<body>sections?\b.*?)(?=\bto enact\b|\bby adding\b|\brelating to\b|$)", re.S
 )
 # searched in text with the line numbers removed
 _SECTION_A = re.compile(r"Be it enacted.*?\bSection A\.(?P<body>.*?)\bto read as follows", re.S)

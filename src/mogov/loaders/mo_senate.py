@@ -15,6 +15,7 @@ from mogov import db, obs, pdftext
 from mogov.config import window_years
 from mogov.http import fetch
 from mogov.loaders import loader
+from mogov.loaders.mo_senate_bills import senate_interval
 
 log = obs.get_logger(__name__)
 
@@ -117,7 +118,7 @@ def parse_journal(text: str) -> list[dict]:
 def _journal_urls(year: int) -> list[str]:
     # past years monthly, not never: a listing cached mid-session would otherwise miss that session's later journals
     max_age = 86400 if year >= date.today().year else 30 * 86400
-    html = fetch(f"{BASE}/journallist/", {"SelectedYear": year}, max_age=max_age)
+    html = fetch(f"{BASE}/journallist/", {"SelectedYear": year}, max_age=max_age, min_interval=senate_interval())
     links = re.findall(rb'href="(/\d{2}info/Journals/[^"]+\.pdf)"', html, flags=re.I)
     return sorted({BASE + link.decode() for link in links})
 
@@ -131,11 +132,16 @@ def load(shard: db.Shard) -> dict[str, int]:
         for url, year in journals:
             progress.tick()
             try:
-                data = fetch(url, max_age=None, delay=0.5)
+                data = fetch(url, max_age=None, min_interval=senate_interval())
             except Exception as exc:
                 sink.add("mo_senate_journals", url, {"year": year, "url": url, "error": str(exc)})
                 continue
-            text = "\n".join(pdftext.page_texts(data))
+            try:
+                text = "\n".join(pdftext.page_texts(data))
+            except pdftext.ExtractTimeout as exc:  # a pathological PDF must not stop the run; it lands as an error
+                log.warning("mo_senate.extract_timeout", url=url, error=str(exc))
+                sink.add("mo_senate_journals", url, {"year": year, "url": url, "error": str(exc)})
+                continue
             rows = parse_journal(text)
             sink.add("mo_senate_journals", url, {"year": year, "url": url, "n_vote_rows": len(rows)})
             sink.extend(

@@ -495,6 +495,79 @@ models:
         description: "{{ doc('source_url') }}"
         data_tests: [not_null]
 
+  - name: fct_federal_vote_bills
+    description: >
+      Which federal bill each House or Senate roll call decided, read from the roll calls the GovInfo BILLSTATUS
+      bill actions cite and joined to Voteview. BILLSTATUS numbers a roll call by the chamber clerk's number within
+      the session; Voteview's `rollnumber` runs across the Congress, so the join uses Voteview's `clerk_rollnumber`
+      and `session`. Only roll calls both sources know are listed: it covers the loaded BILLSTATUS Congresses and
+      bill types, so a roll call absent here means no bill was found, not that none exists (votes on nominations,
+      quorum calls and some procedural questions cite no bill). Grain: (congress, chamber, rollnumber, bill_id).
+      Join to fct_federal_votes on (congress, chamber, rollnumber) to see each Missouri member's vote on the bill.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [congress, chamber, rollnumber, bill_id]
+    columns:
+      - name: congress
+        data_type: integer
+        description: Congress number (119 = 2025-2027).
+      - name: chamber
+        data_type: varchar
+        description: "`House` or `Senate` (Voteview spelling)."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['House', 'Senate']
+      - name: rollnumber
+        data_type: integer
+        description: Voteview roll-call number within the congress and chamber (as in fct_federal_votes).
+        data_tests: [not_null]
+      - name: session
+        data_type: integer
+        description: Session of the Congress (1 or 2).
+      - name: clerk_rollnumber
+        data_type: integer
+        description: The chamber clerk's roll-call number within the session, which BILLSTATUS cites.
+      - name: vote_date
+        data_type: date
+        description: Date of the vote (Voteview).
+      - name: bill_id
+        data_type: varchar
+        description: "`<congress>-<type>-<number>`, e.g. 118-hr-815."
+        data_tests: [not_null]
+      - name: bill_type
+        data_type: varchar
+        description: hr, s, hjres, sjres, hconres, sconres, hres or sres.
+      - name: bill_no
+        data_type: integer
+        description: Bill number within its type and congress.
+      - name: bill_title
+        data_type: varchar
+        description: The bill's title as published.
+      - name: legislation_url
+        data_type: varchar
+        description: Congress.gov page of the bill.
+      - name: voteview_bill_number
+        data_type: varchar
+        description: Voteview's own bill text for the roll call (e.g. HR815), kept for comparison; null for some roll calls it ties to no bill.
+      - name: vote_question
+        data_type: varchar
+        description: Question put to the chamber (e.g. "On Passage").
+      - name: vote_result
+        data_type: varchar
+        description: Outcome of the roll call (e.g. "Passed").
+      - name: yea_count
+        data_type: integer
+        description: Yea votes cast.
+      - name: nay_count
+        data_type: integer
+        description: Nay votes cast.
+      - name: source_url
+        data_type: varchar
+        description: "{{ doc('source_url') }}"
+        data_tests: [not_null]
+
   - name: fct_federal_sponsorship
     description: >
       Federal bills sponsored or cosponsored by Missouri's members of Congress, from the GovInfo BILLSTATUS bulk
@@ -1887,8 +1960,11 @@ models:
       acted on (2024 sessions on). A bill heard twice, or by two committees, has several rows. A moved hearing is
       noticed again, so one bill can show two notices on one day; the House XML has no cancelled flag, so read the
       comments ("Rescheduled hearing, previously noticed for ..."). Referrals that never got a hearing are bill
-      actions ("Referred: ..."), not rows here. Comments containing an email address are withheld. Join to
-      fct_bills on (session_code, bill). Grain: one row per (session, bill, hearing_index).
+      actions ("Referred: ..."), not rows here. Email addresses and phone numbers in comments and locations are
+      replaced by "[email removed]" / "[phone removed]" (a public official's office phone too); the rest of the
+      text stays, and a build-failing test checks none remain. A notice the House lists twice (same committee,
+      date, time and room) is one hearing: count hearings with is_superseded = false. Join to fct_bills on
+      (session_code, bill). Grain: one row per (session, bill, hearing_index).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -1914,7 +1990,7 @@ models:
           - not_null
       - name: hearing_index
         data_type: bigint
-        description: Position of the notice in the bill's hearing list (1 = first noticed).
+        description: Position of the notice in the House's list for the bill. The XML order is not chronological (a later list entry can carry an earlier date), so do not read it as the order the notices were issued.
         data_tests:
           - not_null
       - name: committee_name
@@ -1935,10 +2011,18 @@ models:
         description: The House's free-text time when it is not a clock time ("4:30 PM or upon adjournment (whichever is later)"); null when hearing_time is set.
       - name: location
         data_type: varchar
-        description: Hearing room (House Hearing Room 5).
+        description: Hearing room (House Hearing Room 5). Contact strings are redacted as in comments.
       - name: comments
         data_type: varchar
-        description: The committee's note on the notice (time or room change, rescheduling, bills added, COVID-19 procedures). Withheld (null) when it holds an email address.
+        description: The committee's note on the notice (time or room change, rescheduling, bills added, COVID-19 procedures). Email addresses and phone numbers are replaced by "[email removed]" / "[phone removed]".
+      - name: superseded_by_index
+        data_type: bigint
+        description: hearing_index of the later notice that repeats this one exactly (same committee, date, time or time note, and room); null when no later notice does.
+      - name: is_superseded
+        data_type: boolean
+        description: True when the House lists the same notice again later (superseded_by_index is set). Filter to false to count hearings once.
+        data_tests:
+          - not_null
 
   - name: fct_bill_subjects
     description: >

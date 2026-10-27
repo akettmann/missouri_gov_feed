@@ -353,7 +353,10 @@ more than one request stream per shard. Slow loaders (`mo_senate`, `mo_house`, `
 it lands a table, so lower that or `--workers` on a small machine.
 
 Each shard replaces only its own part. If you change the shard count, run every shard before the next
-`dbt build`. Parts left by the old count are deleted as the new shards write theirs.
+`dbt build`. Parts left by the old count are deleted only once every shard of the new count has landed (a shard
+that owns no data leaves a hidden `.none` marker instead), so shards that start late still see the old history.
+Until then dbt would read both counts and double-count rows: building mid-transition shows up as
+uniqueness test failures on the staging models (loaders reading their own tables dedupe, dbt does not).
 
 Only one run may write a given table's shard at a time. A sink takes an exclusive OS lock on
 `data/raw/<table>/.part-<i>-of-<N>.parquet.lock` when it opens and holds it until it finishes. A second
@@ -424,7 +427,7 @@ instead run `mogov run` as a job, it is strict by default; set `MOGOV_ALLOW_FAIL
 The HTTP cache is `$MOGOV_DATA_DIR/cache` (`/data/cache`), so it lives on the mounted bucket and survives
 between job runs. Loaders that re-fetch on a schedule (`govinfo_billstatus` re-reads the in-session Congress's zips
 daily and older ones monthly) judge freshness by the cached file's modification time, which Cloud Storage FUSE
-keeps (the object's update time). Keep `/data` mounted on every load job; without it each run starts cold and
+reports from the object's `gcsfuse_mtime` metadata when set, else its update time. Keep `/data` mounted on every load job; without it each run starts cold and
 downloads every zip again.
 
 Metrics: set `OTEL_EXPORTER_OTLP_ENDPOINT` to an OTLP/HTTP collector, for example an OpenTelemetry
