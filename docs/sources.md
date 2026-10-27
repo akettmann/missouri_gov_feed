@@ -470,7 +470,7 @@ Quirks:
   they also filed for a later one. An offered year with no dates is still logged as
   `mec.crosswalk_no_elections` and not cached.
 - The 24-hour notices repeat here too (#156): 74 direct-export rows ($0.51M, report years 2023-26) are notice lines
-  that a full report itemizes again; `int_mec__contributions_direct` drops them (see tap_mec Quirks for the rule).
+  that a full report itemizes again; `int_mec__contributions_direct` drops them (see tap_mec Quirks for the rule). The second tier (#542) drops 4 more ($19.6k) whose donor name was misspelled in the notice or the report.
 - MEC answers in under a second (the lobbyist search takes about 13 s). The fixed `MOGOV_MEC_PAUSE`
   (3 s) between requests is most of the runtime. A cold run is about 4 requests per export year and
   3 per election date.
@@ -543,8 +543,15 @@ Quirks:
   receipts, donor summaries and the campaign-finance fact read) drops the notice line when the same committee's full
   report itemizes the same gift (donor compared by `name_key`: case, punctuation and spaces ignored), matched one-to-one,
   so a notice with no later full-report line and two equal gifts that both appear in full reports stay. Measured
-  October 2026: 127 TAP rows, $1.30M. Gifts whose name differs more than that ("Missouri Growth PAC" against
-  "MO GROWTH PAC") are not matched.
+  October 2026: 127 TAP rows, $1.30M. A second tier (#542) catches the same donor spelled differently: among the lines
+  left over, a committee/date/amount with exactly one notice and one full-report line, both naming the same city and
+  state, is one gift when the names are equal after dropping MO/Missouri, "and"/"of"/"the", legal forms and middle
+  initials ("MO Soybean Association" / "Missouri Soybean Association", "James Nutter" / "James B Nutter"), or are a
+  typo apart (up to 2 letters, names of 10+ characters, same digits: "Lathrop GPM" / "Lanthrop GPM"; "LIUNA Local 110"
+  is not "LIUNA Local 100"). Measured October 2026: 7 TAP rows ($35.4k). Left in place on purpose: two or more
+  candidates on either side (a $5,000 gift to one committee on one day from several donors), names that differ by an
+  abbreviation ("deVries & Associates" / "DeVries and Assoc") or an added word ("Committee to Elect Jamie Burger HD"),
+  and different donors who happened to give the same amount.
 - A few MECIDs are lower-case (`c000525`); the intermediate models upper-case them.
 - A committee-to-committee gift names the donor committee only. `cmte_id` / `mecid` is the receiving
   committee's ID, and there is no donor MECID. The same holds for MEC's direct export (see mec below).

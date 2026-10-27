@@ -160,3 +160,18 @@
         {%- endfor %}
     end
 {%- endmacro %}
+
+
+{# Levenshtein edit distance between two strings (null if either is null). DuckDB and Postgres (fuzzystrmatch) call it
+   levenshtein, Snowflake editdistance. #}
+{% macro edit_distance(a, b) -%}
+    {{ return(adapter.dispatch('edit_distance', 'mogov')(a, b)) }}
+{%- endmacro %}
+
+{% macro default__edit_distance(a, b) -%}
+    levenshtein({{ a }}, {{ b }})
+{%- endmacro %}
+
+{% macro snowflake__edit_distance(a, b) -%}
+    editdistance({{ a }}, {{ b }})
+{%- endmacro %}
