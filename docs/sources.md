@@ -332,12 +332,24 @@ fiscal_notes,amendments}`), so run `mo_house` first; no crawl is needed.
 - Negative cache: a closed session's permanent failures (HTTP 4xx except 408/429, or `200` with an HTML page, i.e.
   `error = 'not a PDF'`) are not asked for again for 30 days (`NEGATIVE_CACHE_S`, judged by the previous row's
   `checked_at`; about 800 resolution-summary links, ~13 min per run). Timeouts, 429, 5xx and any failure in the open
-  session are retried every run. Delete the row's part (or wait 30 days) to force a retry.
+  session are retried every run. To force a retry of one URL, set its row's `checked_at` in the `mo_house_pdf_files` part
+  to NULL or an old date (a part holds many URLs; deleting it forgets all of them). Without editing the data, wait 30 days.
 - Filtered runs (`MOGOV_HOUSE_PDF_KINDS` / `_SESSIONS`) carry the previous error rows of URLs outside the filter, so
   the error history survives a piecewise load.
 - Text extraction is bounded: pages are released as they are read, and one document may take at most
   `pdftext.MAX_SECONDS` (600 s, checked between pages); past that the document lands as an error row
-  (`ExtractTimeout`) instead of hanging the shard. A single page that never returns is not interrupted.
+  (`ExtractTimeout`) instead of hanging the shard. A single page that never returns is not interrupted. A timeout is remembered by the
+  PDF's hash and the pdfplumber version (`<cache>/mo_house_pdf_timeouts/`) for the same 30 days, so later runs
+  report the error row (prefixed `(cached) `) without extracting again; an extractor upgrade retries on its own, or
+  delete the marker file to retry sooner. The marker is written best-effort: if it cannot be written the row still
+  lands and the next run tries again.
+- Changing the shard count: `db` drops the old-count parts when the first new-count shard publishes, so a shard that
+  starts later (Cloud Run waves) no longer sees the earlier rows for its URLs: one round of re-hashing, and error
+  history is lost for them. Run a full unfiltered load after changing `--shards`. `previous_files()` retries its read
+  when a part vanishes mid-listing. Tracked in #712.
+- A URL that is new to an already-started session/kind but outside a filtered run's kinds/sessions gets no row, so
+  `assert_house_documents_have_landed_rows` fails until a full (unfiltered) run; normal syncs are unaffected.
+- Only rows fetched this run log `mo_house_pdf.failed`; carried-over and negative-cached error rows are quiet.
 - Shard units: distinct document URLs, split by the URL's hash (`--shards`/`--shard`). Failures (HTTP errors,
   timeouts, a non-PDF answer) land as rows with `error` set; transient ones are retried on the next run, permanent ones
   after the negative-cache window. A failed weekly re-check of an open-session file already on disk keeps that file,
