@@ -83,3 +83,38 @@ unit_tests:
       rows:
         - {disclosure_item_id: 'house:annual:1:1', is_latest_version: true}
         - {disclosure_item_id: 'house:amended', is_latest_version: false}
+
+  - name: disclosures_scanned_amendment_does_not_supersede_annual_report
+    model: fct_disclosures
+    description: >
+      An annual report with schedule lines and a later amended report that is a scan (a pdf_lines row with
+      has_text false and no load error) must not supersede it: the annual report's lines stay is_latest_version and
+      the scanned placeholder row is not. This exercises the has_text rule for the "not text-extractable" label.
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: h1, office: us_house, district: 1, family_name: Jones}
+      - input: ref('stg_senate_efd__items')
+        rows: []
+      - input: ref('stg_house_fd__filings')
+        rows:
+          - {doc_id: annual, filing_year: 2023, filing_kind: annual report, filing_date: '2024-05-01', state_district: MO01, last_name: Jones, document_url: u_annual}
+          - {doc_id: amended, filing_year: 2023, filing_kind: amended report, filing_date: '2024-08-01', state_district: MO01, last_name: Jones, document_url: u_amended}
+      - input: ref('stg_house_fd__pdf_lines')
+        rows:
+          - {doc_id: amended, has_text: false, load_error: null}
+      - input: ref('int_house_fd__period_covered')
+        rows: []
+      - input: ref('int_house_fd__schedule_lines')
+        rows:
+          - {doc_id: annual, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+      - input: ref('int_judges__federal')
+        rows: []
+      - input: ref('stg_fjc__appointments')
+        rows: []
+      - input: ref('int_courtlistener__judge_disclosure_items')
+        rows: []
+    expect:
+      rows:
+        - {disclosure_item_id: 'house:annual:1:1', is_latest_version: true}
+        - {disclosure_item_id: 'house:amended', is_latest_version: false}

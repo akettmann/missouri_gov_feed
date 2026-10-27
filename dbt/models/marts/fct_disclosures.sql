@@ -105,7 +105,8 @@ house as (
 
 house_pdf_status as (
     -- one row per doc the loader tried to fetch: did any of its rows carry a load error?
-    -- A filing with no row here was never fetched (its filing type is outside the loader's PDF_TYPES).
+    -- A filing with no row here was not fetched: its filing type is outside the loader's PDF_TYPES, or the loader
+    -- has not fetched it yet (4 real H filings).
     select
         doc_id,
         max(case when load_error is not null then 1 else 0 end) as has_error
