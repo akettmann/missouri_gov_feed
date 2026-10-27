@@ -164,8 +164,8 @@ unit_tests:
       - input: ref('int_mo_house__member_identity')
         format: sql
         rows: |
-            select '171' as session_code, 5 as district_number, 'smith' as surname_key, 'p_smith' as person_key union all
-            select '181', 5, 'smith', 'p_smith'
+            select '171' as session_code, 5 as district_number, 'Sam' as first_name, 'Sam Smith' as full_name, 'smith' as surname_key, 'p_smith' as person_key union all
+            select '181', 5, 'Sam', 'Sam Smith', 'smith', 'p_smith'
       - input: ref('int_mo_legislators__seats')
         format: sql
         rows: |
