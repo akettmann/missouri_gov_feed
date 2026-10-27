@@ -243,7 +243,8 @@ roster_match as (
         on
             t.district_number = r.district_number
             and (
-                replace(r.last_name_key, ' ', '') = replace({{ mogov.surname_key('t.family_name') }}, ' ', '')
+                {{ dbt.replace('r.last_name_key', "' '", "''") }}
+                = {{ dbt.replace(mogov.surname_key('t.family_name'), "' '", "''") }}
                 or r.last_name_key like '% ' || {{ mogov.surname_key('t.family_name') }}
             )
     inner join roster_years as y on r.session_year = y.session_year

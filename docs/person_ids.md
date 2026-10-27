@@ -285,7 +285,8 @@ House terms keep Open States' dates.
 A House roster row is kept for a year unless either:
 
 1. the row carries an Open States id and that person's last Open States House term ended on or before January 15
-   of the year (line 91 keeps it only when `last_end_date > handover_date`, #152). In practice this fires only on rows the name-anchor override assigned; or
+   of the year (line 91 keeps it only when `last_end_date > handover_date`, #152). In practice this fires only on
+   rows the name-anchor override assigned; or
 2. the person's last attributed roll-call vote was before January 15, in a year that has House roll calls on or
    after January 15 (line 92, #491). The Speaker is attributed from the seed, so this works for Speakers too.
 
@@ -346,7 +347,8 @@ local load, which may be older than the sources today.
 | bad input | count today | how it is handled | issues |
 |---|---|---|---|
 | Undated Open States starts (`1900-01-01` sentinel in `int_mo_legislators__seat_terms`) | 198 terms (173 House, 25 Senate), all ending 2018-12-31 to 2023-01-04 | Identity: last year only (R2 evidence). Senate: dated from the first journal vote (all 25). House: R0 treats them as covering everything before their end; payroll counts them from the first roster year | #136 #227 #512 #516 #519 |
-| January-1 starts that are placeholders (`2011-01-01`, `2013-01-01`, `2015-01-01` in the source) | 221 terms (194 House, 27 Senate); 11 still run past 2017-01-15. The four `2015-01-01` ones (Cloria Brown, Justin Alferman, Nick King, Lauren Arthur) all end 2016-12-31 | R2b needs a short stub, so equal or nested placeholder terms never join | #332 |
+| January-1 starts that are placeholders (`2011-01-01`, `2013-01-01`, `2015-01-01` in the source) | 221 terms (194 House, 27 Senate); 11 still run past 2017-01-15. The four `2015-01-01` ones (Cloria Brown, Justin Alferman, Nick King, Lauren Arthur) all end 2016-12-31. `start_quality = 'placeholder'` flags any January-1 start, so 222 terms: these plus one `2017-01-01` start, Nick Schroer HD107, near-true (his first term began with the session on 2017-01-04) | R2b needs a short stub, so equal or nested placeholder terms never join | #332 #656 #675 |
+| Seed starts (`legislator_seat_corrections`) | 3 rows: Wayne Wallingford SD27 from 2013-01-09; Mike Kehoe SD6 and Mike Parson SD28 from 2017-01-01 | Always `start_quality = 'dated'` and taken at face value, January 1 included. A seed start is where the correction begins, not a first start: Kehoe's and Parson's 2017-01-01 continue terms Open States starts on 2011-01-01 | #656 #675 |
 | Open States ends that are really mid-term departures, or wrong ends | Senate: the ends of 6 terms re-dated (Keaveny, Schmitt, Schaefer, Pearce end 2017-01-03, the day before the journals begin; Kraus capped at 2017-07-25, Silvey at 2017-09-13). House: Lauren Arthur HD18 ends 2016-12-31 though she voted through 2018 | Senate: re-dating from the journal. House: no re-dating; R2's one-year hand-over joins her roster key to her Senate id | #313 #491 #522 #525 |
 | 2025-01-08 to 2025-02-03 duplicate stub records | 3: Kenneth Jamison (HD15, joined by R2b), David A. Dolan (HD148) and Martin Jacobs (HD38), not joined | Planned, see #661 | #263 #292 #294 |
 | Redistricting 2022-23 | 27 `name_continuity` aliases in all; the redistricted ones are among them | R2 (same name, different seats in different years); bill sponsors match on the held district | #97 #636 |
@@ -377,36 +379,38 @@ test. Each subsection belongs to one child issue, so their PRs edit only their o
 
 ### Person ids and House seat match
 
-Owner: #657.
+Owner: #657. "named" tests are in `_intermediate__person_ids_cases_unit_tests.yml` and use the person's real
+ids, seats and dates; "shape" tests are the older ones with invented people. A case marked *not breakable
+here* has a named `person_ids_cases_*` test that only checks that nothing goes wrong (no wrong merge or split);
+the test after "protected by", where given, is the one that fails if the case breaks.
 
 | person | issues | model | rule | test |
 |---|---|---|---|---|
-| David Smith (HD45 to HD46) | #97 | `int_officials__person_ids` | R2, redistricting | `person_ids_join_a_redistricted_seat_change` |
-| Bennie Cook, Josh Hurlbert, Bill Hardwick, Mark Matthiesen, Peggy McGaugh (redistricting) | #97 | `int_officials__person_ids` | R2, redistricting | TODO (#657); the David Smith shape |
+| David Tyson Smith (HD45 to HD46), Bennie Cook, Josh Hurlbert, Bill Hardwick, Mark Matthiesen (redistricting) | #97 | `int_officials__person_ids` | R2, redistricting (basis `name_continuity`, not `member_id_continuity`) | named: `person_ids_cases_join_redistricted_seat_changes`; shape: `person_ids_join_a_redistricted_seat_change` |
+| Peggy McGaugh (one Open States id across HD39 and HD7) | #97 | `int_officials__person_ids` | stays one person | named: `person_ids_cases_join_redistricted_seat_changes` *(not breakable here: she is a single id, so no person-id rule can split her; a no-regression check only)* |
 | Bennie Cook (member 2235, two Open States records) | #97 | `int_mo_house__member_seat_keys` | R0 name anchors | `house_member_with_two_given_name_anchors_keeps_the_seat_match` |
-| Mike Cierpiot (`mohouse:476` to SD8) | #97 #136 | `int_officials__person_ids` | R2, fallback key | `person_ids_join_a_house_fallback_key_to_the_senate_record` |
-| Sandy Crawford (`mohouse:478` to SD28) | #97 #136 | `int_officials__person_ids` | R2, fallback key | TODO (#657) |
-| Scott Fitzpatrick (`mohouse:648`, later State Treasurer and Auditor) | #97 #491 | `int_officials__person_ids` | R2, fallback key | TODO (#657) |
-| Curtis Trent, Mary Elizabeth Coleman, Rusty Black, Tracy McCreery (House to Senate) | #97 | `int_officials__person_ids` | R2 | TODO (#657) |
-| Jean Evans (HD99, Open States and `mohouse:1912`) | #97 | `int_officials__person_ids` | R2, same-seat split | `person_ids_join_a_same_seat_split` |
-| Adam Schwadron, Deb Lavender, Joe Adams (split within past rosters) | #97 | `int_officials__person_ids` | R2 | TODO (#657) |
-| Lauren Arthur (HD18 2017-18 as `mohouse:1810`, SD17 from 2018) | #97 #491 | `int_officials__person_ids` | R2, one-year hand-over | `person_ids_join_a_one_year_hand_over_between_seats` |
-| Joe Don McGaugh (HD39, vs Peggy McGaugh's undated term) | #97 #136 #475 | `int_mo_house__member_seat_keys` | R0 given-name tie-break | `house_seat_match_breaks_same_surname_ties_on_given_name` |
+| Mike Cierpiot (`mohouse:476` to SD8), Sandy Crawford (`mohouse:478` to SD28) | #97 #136 | `int_officials__person_ids` | R2, fallback key; one shared year is not a seat conflict | named: `person_ids_cases_join_house_fallback_keys_to_the_senate_record`; shape: `person_ids_join_a_house_fallback_key_to_the_senate_record`, `person_ids_join_a_one_year_hand_over_between_seats` |
+| Scott Fitzpatrick (`mohouse:648`, later State Treasurer and Auditor) | #97 #491 | `int_officials__person_ids` | R2, fallback key | no named test yet (#676); shape: `person_ids_join_a_house_fallback_key_to_the_senate_record` |
+| Curtis Trent, Mary Elizabeth Coleman, Rusty Black, Tracy McCreery (House to Senate) | #97 | `int_officials__person_ids` | R2; the Senate id is kept | named: `person_ids_cases_join_house_to_senate_moves`; shape: `person_ids_join_a_house_fallback_key_to_the_senate_record` |
+| Adam Schwadron, Deb Lavender, Jean Evans (HD99, `mohouse:1912`), Joe Adams (`mohouse:1780`), Lauren Arthur (HD18 2017-18 as `mohouse:1810`, SD17 from 2018) | #97 #491 | `int_officials__person_ids` | R2, same-seat split and one-year hand-over; the Open States id wins over the `mohouse:` key | named: `person_ids_cases_join_same_seat_splits`; shape: `person_ids_join_a_same_seat_split`, `person_ids_join_a_one_year_hand_over_between_seats` (Arthur) |
+| Joe Don McGaugh (HD39 2017, vs Peggy McGaugh's undated term) | #97 #136 #475 | `int_mo_house__member_seat_keys` | R0 given-name tie-break: resolves to his own Open States id (044d5678), not `mohouse:658` | named: `house_seat_keys_cases_joe_don_mcgaugh_keeps_his_own_id`; shape: `house_seat_match_breaks_same_surname_ties_on_given_name` |
 | Joe Don McGaugh (to `mojudge:`) | #97 #174 | `int_officials__person_ids` | R1 curated (unsigned) | `person_ids_follow_a_curated_link_to_a_judge`, `person_ids_ignore_unsigned_curated_links` |
-| Mazzie Boyd / Mazzie Christensen (member 2381) | #151 | `int_officials__person_ids` | R2c | `person_ids_join_a_name_change_by_house_member_id` |
-| Rebecca Roeber (HD34, listed 2020) / Rick Roeber | #152 | `int_mo_house__member_seat_keys` | R0 name anchors | `house_departed_member_keeps_own_person_when_roster_outlives_term` |
-| Rick Roeber (holds members 2215 and 1790) | #152 | `int_officials__person_ids` | R2c skip | `person_ids_skip_a_key_that_carries_two_house_member_ids` |
-| Rebecca Roeber (undated Open States term) | #152 #512 | `int_officials__person_ids` | R2 with undated evidence | `person_ids_join_an_undated_open_states_term_to_a_roster_key_in_the_same_seat` |
-| Dean Van Schoiack (`mohouse:2243`) | #228 | `int_officials__person_ids` | R2 spaces ignored | `person_ids_ignore_spacing_inside_a_surname` |
-| Steven / Steve Roberts (House 2017-20, Senate 2021+) | #263 | `int_officials__person_ids` | R2b chamber move | `person_ids_join_a_given_name_variant_across_chambers` |
-| Ken / Kenneth Jamison (HD15, 2025 stub) | #263 | `int_officials__person_ids` | R2b shared-seat stub | `person_ids_join_a_given_name_variant_in_the_same_seat` |
-| Fitzwater / Dinkins, Silvey / Lauren Arthur, Kraus / Cierpiot (successors overlapping on paper) | #313 | `int_officials__person_ids` | shape only: these pairs are not given-name variants, so R2b never compares them; the stub requirement guards the same shape in variant pairs | `person_ids_keep_a_mid_term_departure_successor_apart` (Dan/Danielle Smith shape) |
-| Jason Smith / Shawn Sisco (HD120), Fowler / Hubrecht (HD151) | #332 | `int_officials__person_ids` | R2b stub requirement | `person_ids_keep_placeholder_start_same_span_given_name_variants_apart`, `person_ids_keep_a_long_term_nested_in_a_longer_one_given_name_variants_apart` |
-| Stephen Webber (House to 2016-12-31, Senate from 2025) | #504 | `int_officials__identity_terms` | evidence years before the roster, then R2 | `identity_terms_cover_the_year_before_the_first_roster`; person_ids: TODO (#657) |
-| Tom Dempsey, Paul LeVota (2015 resignations) | #512 | `int_officials__identity_terms` | evidence years before the roster | TODO (#657); data test `assert_recent_seat_term_ids_have_person_ids` |
-| Paul Wieland, Bob Onder, Jeanie Riddle, Dan Brown, Jill Schupp, Dave Schatz and the other undated senators | #512 #519 | `int_officials__identity_terms` | undated term: last year only | `identity_terms_undated_start_counts_for_its_last_year`; data test `assert_undated_open_states_ids_share_no_name` |
-| David Dolan / David A. Dolan (HD148, 2025 stub) | #294 | `int_officials__person_ids` | none today; planned, see #661 | TODO (#657 / #661) |
-| Martin / Marty Jacobs (HD38, 2025 stub) | #292 | `int_officials__person_ids` | none today; planned, see #661 | TODO (#657 / #661) |
+| Dan vs Daniel (word boundary of the given-name anchor) | #475 #498 | `int_mo_house__member_seat_keys` | R0 given-name anchor | shape: `house_seat_match_breaks_same_surname_ties_on_given_name` (Dan Pratt row), `house_given_name_anchor_ends_at_a_word_boundary` |
+| Mazzie Boyd / Mazzie Christensen (member 2381) | #151 | `int_officials__person_ids` | R2c, basis `member_id_continuity` | named: `person_ids_cases_join_a_name_change_by_house_member_id`; shape: `person_ids_join_a_name_change_by_house_member_id` |
+| Rebecca Roeber (HD34, 2020 roster rows) / Rick Roeber | #152 | `int_mo_house__member_seat_keys` | R0 name anchors: the 2020 rows keep her id (ad28c002), not Rick's (cd0a84e5) | named: `house_seat_keys_cases_rebecca_roeber_keeps_her_own_id_in_2020`; shape: `house_departed_member_keeps_own_person_when_roster_outlives_term` |
+| Rick Roeber (holds members 2215 and 1790) / Rebecca Roeber | #152 | `int_officials__person_ids` | R2c skip: Rick stays apart; Rebecca's two ids join | named: `person_ids_cases_keep_rick_and_rebecca_roeber_apart`; shape: `person_ids_skip_a_key_that_carries_two_house_member_ids` |
+| Rebecca Roeber (undated Open States term) | #152 #512 | `int_officials__person_ids` | R2 with undated evidence | named: `person_ids_cases_keep_rick_and_rebecca_roeber_apart`; shape: `person_ids_join_an_undated_open_states_term_to_a_roster_key_in_the_same_seat` |
+| Dean Van Schoiack / VanSchoiack (`mohouse:2243`) | #228 | `int_officials__person_ids` | R2 spaces ignored | named: `person_ids_cases_join_a_surname_spelled_with_and_without_a_space`; shape: `person_ids_ignore_spacing_inside_a_surname` |
+| Steven / Steve Roberts (House 2017-20, Senate 2021+; Lane Roberts is not a variant) | #263 | `int_officials__person_ids` | R2b chamber move; Lane stays apart | named: `person_ids_cases_join_given_name_variants`; shape: `person_ids_join_a_given_name_variant_across_chambers` |
+| Ken / Kenneth Jamison (HD15, 2025 stub) | #263 #332 | `int_officials__person_ids` | R2b shared-seat stub: the stub joins Ken | named: `person_ids_cases_join_given_name_variants`; shape: `person_ids_join_a_given_name_variant_in_the_same_seat` |
+| Fitzwater / Dinkins (HD144), Silvey / Lauren Arthur (SD17), Kraus / Cierpiot (SD8) (successors overlapping on paper) | #313 | `int_officials__person_ids` | R2b containment: kept apart. The real pairs are not given-name variants, so the named test keeps their real ids, seats and dates and gives one of each pair an invented variant name | named: `person_ids_cases_keep_mid_term_departure_successors_apart`; shape: `person_ids_keep_a_mid_term_departure_successor_apart` (Dan/Danielle Smith) |
+| Jason Smith / Shawn Sisco (HD120), Dennis Fowler inside Tila Hubrecht (HD151) | #332 | `int_officials__person_ids` | R2b stub requirement: kept apart. Real ids and dates, invented variant names | named: `person_ids_cases_keep_placeholder_start_terms_apart` (rule level only: Smith's, Sisco's and Fowler's terms end 2014-12-31, before today's `identity_terms` window starts in 2015, so the model never emits them and no pair forms; only Hubrecht's 2015+ rows reach it, alone); shape: `person_ids_keep_placeholder_start_same_span_given_name_variants_apart`, `person_ids_keep_a_long_term_nested_in_a_longer_one_given_name_variants_apart` |
+| Stephen Webber (House HD46 to 2016-12-31, Senate SD19 from 2025) | #504 | `int_officials__identity_terms`, `int_officials__person_ids` | 2015-16 evidence from the two years before the roster, then R2; the Senate id is kept | named: `person_ids_cases_join_stephen_webber_house_and_senate` *(the 2015-16 evidence is a fixed input there, so it can't fail on the window; protected by `identity_terms_cases_cover_the_two_years_before_the_roster`)*; shape: `identity_terms_cover_the_year_before_the_first_roster` |
+| Tom Dempsey (SD23), Paul LeVota (SD11) (2015 resignations) | #512 | `int_officials__identity_terms`, `int_officials__person_ids` | 2015 evidence row; own person | named: `identity_terms_cases_cover_the_two_years_before_the_roster`, `person_ids_cases_give_undated_senators_rows_without_wrong_merges` *(not breakable here: no rule joins them, so it only guards against wrong merges; protected by `identity_terms_cases_cover_the_two_years_before_the_roster`)*; shape: `identity_terms_cover_the_year_before_the_first_roster`; data test `assert_recent_seat_term_ids_have_person_ids` |
+| Paul Wieland, Bob Onder, Jeanie Riddle, Dan Brown, Jill Schupp, Dave Schatz, Rebecca Roeber (undated terms) | #512 | `int_officials__identity_terms`, `int_officials__person_ids` | undated term: last year only; own person, not merged with the successors Justin Brown or Ben Brown | named: `identity_terms_cases_give_undated_senators_their_last_year`, `person_ids_cases_give_undated_senators_rows_without_wrong_merges` *(not breakable here: it only guards against wrong merges; protected by `identity_terms_cases_give_undated_senators_their_last_year`)*; shape: `identity_terms_undated_start_counts_for_its_last_year` |
+| Paul Wieland, Dan Brown, each beside a hypothetical dated neighbour | #519 | `int_officials__person_ids` | documented weakness: a same-name neighbour joins by R2 and a variant by R2b | named: `person_ids_cases_undated_id_beside_a_same_name_dated_id`; shape: `person_ids_join_an_undated_open_states_term_to_a_roster_key_in_the_same_seat`; data test `assert_undated_open_states_ids_share_no_name` guards real data |
+| David Dolan / David A. Dolan (HD148, 2025 stub) | #294 | `int_officials__person_ids` | none today; planned, see #661 | TODO (#661) |
+| Martin / Marty Jacobs (HD38, 2025 stub) | #292 | `int_officials__person_ids` | none today; planned, see #661 | TODO (#661) |
 
 <!-- #657 edits only this subsection -->
 
@@ -438,17 +442,21 @@ Owner: #658.
 
 ### Payroll
 
-Owner: #659.
+Owner: #659. "named" tests are in `_marts__salaries_cases_unit_tests.yml` and
+`_intermediate__final_checks_cases_unit_tests.yml`, with real payroll rows, ids and seat dates; "shape" tests
+are the older ones with invented people.
 
 | person | issues | model | rule | test |
 |---|---|---|---|---|
-| David (Tyson) Smith / Cody Smith | #227 | `fct_salaries` | undated seat counts from first roster year; middle initial | `salaries_pay_from_before_the_first_term_never_matches`, `salaries_pair_a_middle_initial_with_the_name_the_member_goes_by` |
+| David (Tyson) Smith / Cody Smith | #227 | `fct_salaries` | undated seat counts from first roster year; middle initial. David gets only DAVID T 2021, 2024 and 2025 (medium) and no 2017-20 pay; the 2025 `SMITH, DAVID C` $1,636 check is not David's (Cody has no current official, so the test does not show his pairing) | named: `salaries_case_227_cody_and_david_smith_keep_their_own_pay`; shape: `salaries_pay_from_before_the_first_term_never_matches`, `salaries_pair_a_middle_initial_with_the_name_the_member_goes_by` |
 | Ken / Kenneth Jamison (two seat rows in 2025) | #263 | `fct_salaries` | paid once | `salaries_pay_once_for_a_member_with_two_seat_rows_in_a_year` |
-| Steve / Steven Roberts | #263 | `fct_salaries` | by-name pay outside the service years | `salaries_keep_earlier_pay_when_another_seat_holder_has_a_fitting_first_name` |
-| Dean Van Schoiack | #228 | `fct_salaries` | by name, spaces ignored | `salaries_match_a_surname_spelled_with_a_space_by_name` |
-| Linda Black / Rusty Black (final check) | #97 #250 | `int_mo_legislators__final_checks`, `fct_salaries` | final check set aside | `final_checks_a_small_december_departure_payment_is_the_departed_members`, `salaries_a_final_check_is_the_departed_members_not_a_claim_on_the_seat` |
-| Ryan Silvey (2018 payment after the 2017-09-13 cap) | #551 | `fct_salaries`, `int_mo_legislators__final_checks` | not a final check, today's behaviour | TODO (#659) |
-| Will Kraus (no 2018 pay) | #551 | `fct_salaries` | cap agrees with payroll | TODO (#659) |
+| Steve / Steven Roberts (Lane Roberts keeps his own) | #263 | `fct_salaries` | House pay 2017 and 2020 (high), the 2021 House check and Senate pay (medium) all go to the Senate id `20ad6a34` | named: `salaries_case_263_steve_roberts_house_and_senate_pay_is_one_official`; shape: `salaries_keep_earlier_pay_when_another_seat_holder_has_a_fitting_first_name` |
+| Dean Van Schoiack (payroll `VANSCHOIACK`, roster `Van Schoiack`, Open States `VanSchoiack`) | #228 | `fct_salaries` | spaces ignored; the 2025 seat row uses the roster spelling | named: `salaries_case_228_van_schoiack_matches_across_the_two_spellings`; shape: `salaries_match_a_surname_spelled_with_a_space_by_name` |
+| Stephen Webber, Lincoln Hough, Denny Hoskins (2017 checks of House seats that ended 2016-12-31) | #504 #227 | `fct_salaries`, `int_mo_legislators__final_checks` | final check, paired to the same id as the person's Senate pay (Hoskins' is under `STATE REPRESENTATIVE-LEADERSHP`) | named: `salaries_case_504_2017_final_checks_of_seats_ended_2016_stay_with_their_member`, `final_checks_case_2017_checks_of_house_seats_ended_2016` |
+| Linda Black / Rusty Black, John Black (final check) | #97 #250 | `int_mo_legislators__final_checks`, `fct_salaries` | final check set aside: Linda's 2017 `BLACK, LINDA R.` check does not block Rusty (`BLACK, JAMES R`), who gets 2017, 2019, 2023 House and 2023 Senate pay | named: `salaries_case_250_linda_blacks_final_check_does_not_block_rusty_black`; shape: `final_checks_a_small_december_departure_payment_is_the_departed_members`, `salaries_a_final_check_is_the_departed_members_not_a_claim_on_the_seat` |
+| Ryan Silvey (2018 payment after the 2017-09-13 cap) | #551 | `fct_salaries`, `int_mo_legislators__final_checks` | not a final check and paired with no one, today's behaviour (pending the #551 decision); his 2017 pay is his by seat | named: `salaries_case_551_silvey_2018_payment_is_not_paired_while_his_seat_ends_at_his_last_vote`, `final_checks_case_551_silvey_2018_payment_is_not_one_while_his_seat_ends_at_his_last_vote` |
+| Will Kraus (SD8, capped at 2017-07-25) | #551 | `fct_salaries`, `int_mo_legislators__final_checks` | cap agrees with payroll: his partial 2017 pay is his by seat (medium, WILLIAM for Will). The fixtures have no 2018 Kraus row because payroll has none | named: the same two `*_case_551_*` tests |
+| Mike Moon, Rusty Black, Mike Henderson, Maggie Nurrenbern, Cody Smith (legal first name: CHRIS, JAMES, JAMES, MARGARET, DAVID); Mark Matthiesen, John Simmons (returned to the House later) | #660 | `int_mo_legislators__final_checks`, `fct_salaries` | `final_checks` leaves these last House checks out (only Travis Smith's 2025 row is in), and `fct_salaries` pairs the last checks of Moon, Henderson, Nurrenbern and Simmons by seat (the seat ends in January) and Matthiesen's 2019 one by name; Rusty Black's pairing is in the #250 test. Cody Smith's is not shown (no current official) | named: `final_checks_case_last_house_checks_left_out_by_legal_first_name_or_a_return`, `salaries_case_legal_first_name_and_returning_member_last_house_checks_pair_by_seat` |
 
 <!-- #659 edits only this subsection -->
 
