@@ -991,8 +991,9 @@ Quirks:
 - GovInfo data error: 119-hr-766 (the SEWER Act; actions end at referral) lists Public Law 119-120, which is
   really 119 S. 766 (that bill's own actions show it signed). `int_federal_bills__stage` therefore takes
   `became_law` from the actions only and keeps the laws list as the separate `has_law_number` flag; a test checks
-  each law maps to one `became_law` bill. The staging and sponsorship models still credit the law to 119-hr-766
-  (#729).
+  each law maps to one `became_law` bill. `fct_federal_sponsorship` reads `became_law` from that stage and only
+  shows a law number for such bills, so 119-hr-766's sponsors are not credited with the law; a second test checks
+  each law in the fact maps to one bill (#729).
 - Each action is often listed twice: the chamber's own and the Library of Congress's coded copy (`sourceSystem`
   names which). Roll calls cited by both appear twice in `_recorded_votes`. Count distinct roll calls, not rows.
 - `isOriginalCosponsor` is the text `True`/`False`; a cosponsor who later withdrew keeps their row with

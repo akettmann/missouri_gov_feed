@@ -579,7 +579,8 @@ models:
     description: >
       Federal bills sponsored or cosponsored by Missouri's members of Congress, from the GovInfo BILLSTATUS bulk
       XML (loaded congresses, MOGOV_BILLSTATUS_CONGRESSES), with the outcome as a fact: became_law is true when
-      the bill carries a law number, public or private (law_type says which; a private law relieves one named person
+      the bill's actions record it becoming law (int_federal_bills__stage; the BILLSTATUS laws list only supplies
+      the number, since it can credit a law to the wrong bill, #729), public or private (law_type says which; a private law relieves one named person
       or entity and is rare, none among the 118th Congress's bills). Withdrawn cosponsorships are dropped. Whether that counts as a
       "successful" bill is a policy call this model does not make. Grain: (bioguide_id, bill_id, role).
     data_tests:
