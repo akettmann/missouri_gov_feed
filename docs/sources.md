@@ -868,12 +868,18 @@ Quirks:
   "Smith Alexandra", "John Smith" / "John Smithson" and "Committee to Elect John Smith" / "... Smithson" stay unpaired,
   and Roman numerals and 1-2 letter words must be equal ("Holding III" / "Holdings II"). Two different abbreviations of one word also pair (#740), through a map in the macro
   `org_word_abbreviation` ("Ass" / "Assoc" / "Assn" / "Association", "Ed" / "Edu" / "Educ", "Int" / "Intl", "Com" / "Comm",
-  "Telecom" / "Telecomm", "Govt" / "Government"). An organisation abbreviated in a way the list and the map do not cover
+  "Telecom" / "Telecomm", "Dist" / "District", "Govt" / "Government"; "Assoc" can also mean "Associates", a firm, but maps to
+  "association": no wrong match seen in the data; the map applies from word 2 on, so "John Ed Smith" / "John Edu Smith" pair by design). An organisation abbreviated in a way the list and the map do not cover
   (a misspelling, "Mfg") is not paired by this rule. The typo rule (#735) only pairs names whose differing words are 5+ letters in both names, so a change to a short
   word ("Citizens for Ann Smith" / "Citizens for Anne Smith", "Joan" / "John", "Sara" / "Sarah") is two people and both
   lines stay; "Fran Froelich" / "Fran Froehlich" and "Lathrop GPM" / "Lanthrop GPM" still pair. Spacing
-  variants that change the word count or a short word ("Century Link" / "CenturyLink", "Fire Fighters" / "Firefighters",
-  "Kansas City Life" / "KansasCity Life") no longer pair either. A name whose loose key is empty
+  variants that change the word count ("Century Link" / "CenturyLink", "Fire Fighters" / "Firefighters", "Kansas City Life" /
+  "KansasCity Life", "Van Dyke" / "Vandyke") pair again (#753): with the spaces removed the two names are identical (6+ characters, different
+  word counts, so "Marc Anthony" / "Marca Nthony" does not pair). That is no looser than an exact match. October 2026: no notice/full-report
+  pair of the two feeds is a spacing variant, so no row changes. The typo rule cannot tell a person from an organisation, so 5+-letter first
+  name and surname variants (Frances / Francis, Peterson / Petersen) still pair when one lone notice and one lone full-report line share committee,
+  date, amount, city and state; no such pair exists in the data, and skipping word 1 would break real organisation typos ("Lathrop GPM" /
+  "Lanthrop GPM"). A name whose loose key is empty
   (only stop words, legal forms and initials) is never paired. On the October 2026 data the tightening changes no
   row (the same records: still 138 TAP notices and 78 direct-export notices dropped). With several lines in the
   group a notice is dropped only when it has exactly one name-compatible full-report line, that line has exactly one
