@@ -55,7 +55,13 @@
     "Smith Alex" / "Smith Alexandra" never pair. Chosen from the words that really occur abbreviated in MEC donor names
     (October 2026). It is a macro list rather than a seed because dbt unit tests cannot run a model that refs a seed
     they do not mock, and every dedupe test would have to repeat the list. word is the longer word and prefix the
-    shorter, both column names or expressions. A prefix needs 3+ letters, except 2 for Ed / Education. -#}
+    shorter, both column names or expressions. A prefix needs 3+ letters, except 2 for Ed / Education.
+    Hygiene (#740): an entry must be a word that means an organisation, trade, place or plural noun, NEVER a person
+    surname. A surname on the list would pair "John Hill" with "John Hillhouse". The few entries that start with a
+    surname (cooperative: Cooper, maintenance: Main, marketers: Mark, drivers: Driver, masons: Mason) are tolerated
+    only because a pair needs the LONGER name to contain the organisation word itself ("John Cooper" would pair
+    only with a donor really named "John Cooperative"), which no real donor name does. Do not add a general plural rule:
+    richard / richards is a surname pair. Add a word only after checking MEC donor names show it abbreviated or truncated. -#}
 {% macro is_org_word_prefix(word, prefix) -%}
     (
         (
@@ -64,26 +70,48 @@
                 'accountants', 'administration', 'administrative', 'administrators', 'advisors', 'american',
                 'anesthesiologists', 'anesthesiology', 'anesthetists', 'architects', 'architectural',
                 'associate', 'associated', 'associates', 'association', 'associations', 'attorneys',
-                'bankers', 'benevolent', 'builders', 'cattlemens', 'centers', 'chiropractors', 'commission',
+                'bankers', 'benevolent', 'builders', 'casinos', 'cattlemens', 'centers', 'chiropractors', 'commission',
                 'commissioners', 'committee', 'committees', 'communications', 'community', 'construction',
                 'constructors', 'consulting', 'contractors', 'convenience', 'cooperative', 'cooperatives',
                 'corporation', 'corporations', 'corrections', 'council', 'democrat', 'democratic',
                 'democrats', 'dermatological', 'development', 'district', 'districts', 'drivers', 'electric',
                 'electrical', 'elevators', 'employees', 'engineering', 'engineers', 'enterprises', 'farms',
-                'federal', 'federation', 'financial', 'firefighters', 'fitters', 'foods', 'glassworkers',
+                'federal', 'federation', 'fighters', 'financial', 'firefighters', 'fitters', 'foods', 'funds',
+                'glassworkers',
                 'government', 'growers', 'healthcare', 'holdings', 'homes', 'hospital', 'hospitals',
                 'independent', 'industries', 'insurance', 'international', 'investments', 'laborers',
                 'legislative', 'local', 'locals', 'machinists', 'maintenance', 'management', 'marketers',
-                'medical', 'metals', 'motors', 'municipal', 'national', 'officers', 'organization',
+                'masons', 'medical', 'metals', 'missouri', 'motors', 'municipal', 'national', 'nurses', 'offices',
+                'officers', 'organization',
                 'petroleum', 'pipefitters', 'plasterers', 'police', 'political', 'professional', 'realtors',
                 'regional', 'rehabilitation', 'representative', 'republican', 'republicans', 'services',
                 'society', 'solutions', 'state', 'states', 'stores', 'systems', 'teachers', 'technical',
                 'telecommunication', 'telecommunications', 'trades', 'transportation', 'troopers', 'union',
-                'voluntary', 'wholesale', 'wholesalers', 'workers'
+                'voluntary', 'wholesale', 'wholesalers', 'womens', 'workers'
             )
         )
         or (length({{ prefix }}) >= 2 and {{ word }} in ('education', 'educational'))
     )
+{%- endmacro %}
+
+{#- The full word a known abbreviation stands for (#740), so two abbreviations of one word compare equal ("Assoc" and
+    "Assn" are both "association", as is "Ass"; "Educ" and "Edu", "Int" and "Intl", "Telecom" and "Telecomm"). Any other word comes
+    back unchanged, so it only ever equals itself. A prefix pair ("Assoc" / "Associates") is the job of
+    is_org_word_prefix; this covers what a prefix cannot: two shortenings that are not prefixes of each other, and
+    "Assn" / "Association". "Com" and "Comm" are mapped to the shared token 'comm', not to one word, because they stand
+    for committee, commission or communications alike and the longer name decides nothing; they pair with each other
+    only. Only organisation abbreviations belong here, never a surname. word is a column or expression. -#}
+{% macro org_word_abbreviation(word) -%}
+    (case
+        when {{ word }} in ('ass', 'assoc', 'asso', 'assn', 'association') then 'association'
+        when {{ word }} in ('ed', 'edu', 'educ', 'education') then 'education'
+        when {{ word }} in ('int', 'intl', 'international') then 'international'
+        when {{ word }} in ('com', 'comm') then 'comm'
+        when {{ word }} in ('telecom', 'telecomm', 'telecommunications') then 'telecommunications'
+        when {{ word }} in ('dist', 'district') then 'district'
+        when {{ word }} in ('govt', 'government') then 'government'
+        else {{ word }}
+    end)
 {%- endmacro %}
 
 {#- True when two loose_name_keys are the same name abbreviated or with words added (#557): at least two words in the
@@ -94,7 +122,8 @@
     listed, so "John Hill" / "John Hillhouse", "Smith Alex" / "Smith Alexandra" and "Committee to Elect John Smith" /
     "... Smithson" stay unpaired, and words of 1-2 letters (except "Ed" for education) and Roman numerals ("Holding III"
     / "Holdings II") must be equal. Equal words and extra trailing words always count.
-    Compares up to 8 words; digits are compared by the caller.
+    Two different abbreviations of one word ("Assoc" / "Assn", "Educ" / "Edu") also count, through the map in
+    org_word_abbreviation (#740). Compares up to 8 words; digits are compared by the caller.
     n_a, n_b are the word counts of a, b (columns or expressions). -#}
 {% macro name_words_match(a, b, n_a, n_b) -%}
     (
@@ -107,6 +136,7 @@
             least({{ n_a }}, {{ n_b }}) < {{ i }}
             or {{ wa }} = {{ wb }}
             {%- if i > 1 %}
+            or {{ mogov.org_word_abbreviation(wa) }} = {{ mogov.org_word_abbreviation(wb) }}
             or (
                 {{ wa }} like {{ wb }} || '%'
                 and {{ mogov.is_org_word_prefix(wa, wb) }}

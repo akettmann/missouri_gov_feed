@@ -866,8 +866,10 @@ Quirks:
   least 3 letters (2 for "Ed" / "Education"): "Assoc" / "Associates", "Ins" / "Insurance", "Technical Ed" /
   "Technical Education". Person surnames are not on the list, so "John Hill" / "John Hillhouse", "Smith Alex" /
   "Smith Alexandra", "John Smith" / "John Smithson" and "Committee to Elect John Smith" / "... Smithson" stay unpaired,
-  and Roman numerals and 1-2 letter words must be equal ("Holding III" / "Holdings II"). An organisation abbreviated
-  in a way the list does not cover (a misspelling, "Mfg") is not paired by this rule. The typo rule (#735) only pairs names whose differing words are 5+ letters in both names, so a change to a short
+  and Roman numerals and 1-2 letter words must be equal ("Holding III" / "Holdings II"). Two different abbreviations of one word also pair (#740), through a map in the macro
+  `org_word_abbreviation` ("Ass" / "Assoc" / "Assn" / "Association", "Ed" / "Edu" / "Educ", "Int" / "Intl", "Com" / "Comm",
+  "Telecom" / "Telecomm", "Govt" / "Government"). An organisation abbreviated in a way the list and the map do not cover
+  (a misspelling, "Mfg") is not paired by this rule. The typo rule (#735) only pairs names whose differing words are 5+ letters in both names, so a change to a short
   word ("Citizens for Ann Smith" / "Citizens for Anne Smith", "Joan" / "John", "Sara" / "Sarah") is two people and both
   lines stay; "Fran Froelich" / "Fran Froehlich" and "Lathrop GPM" / "Lanthrop GPM" still pair. Spacing
   variants that change the word count or a short word ("Century Link" / "CenturyLink", "Fire Fighters" / "Firefighters",
