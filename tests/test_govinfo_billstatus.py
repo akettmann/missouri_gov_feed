@@ -331,3 +331,104 @@ def test_reserved_bill_with_billtype_and_billnumber_keeps_its_real_id():
     assert (row["congress"], row["bill_type"], row["number"]) == ("117", "HR", "2")
     assert row["title"] == "Reserved for the Speaker."
     assert [k for k, _ in rows["actions"]] == ["117-hr-2#0", "117-hr-2#1"]
+
+
+# ---- committees, subjects, related bills (#625) --------------------------------------------------------------
+# Trimmed-free copies of real 118th files: H.J.Res. 99 (a committee with a subcommittee), H.J.Res. 126 (a committee
+# with three dated activities, two related bills) and S.J.Res. 9 (related bills carrying two relationship types).
+HJRES99 = (FIXTURES / "BILLSTATUS-118hjres99.xml").read_bytes()
+HJRES126 = (FIXTURES / "BILLSTATUS-118hjres126.xml").read_bytes()
+SJRES9 = (FIXTURES / "BILLSTATUS-118sjres9.xml").read_bytes()
+HR2 = (FIXTURES / "BILLSTATUS-117hr2.xml").read_bytes()
+
+
+def test_committee_rows_and_their_activities_are_separate_long_tables():
+    rows = parser.parse_bill(HJRES126, "f.xml")
+    ((key, committee),) = rows["committees"]
+    assert key == "118-hjres-126#0"
+    assert (committee["system_code"], committee["name"], committee["chamber"], committee["committee_type"]) == (
+        "hsba00",
+        "Financial Services Committee",
+        "House",
+        "Standing",
+    )
+    assert committee["parent_system_code"] is None
+    acts = [(p["activity"], p["activity_date"]) for _, p in rows["committee_activities"]]
+    assert acts == [
+        ("Reported By", "2024-07-30T17:44:28Z"),
+        ("Markup By", "2024-04-17T18:44:00Z"),
+        ("Referred To", "2024-04-05T13:00:50Z"),
+    ]
+    assert {p["system_code"] for _, p in rows["committee_activities"]} == {"hsba00"}
+
+
+def test_subcommittee_is_its_own_row_pointing_at_its_parent():
+    rows = parser.parse_bill(HJRES99, "f.xml")
+    parent, sub = (p for _, p in rows["committees"])
+    assert (parent["system_code"], parent["subposition"], parent["parent_system_code"]) == ("hsif00", None, None)
+    assert (sub["system_code"], sub["name"], sub["subposition"]) == ("hsif14", "Health Subcommittee", 0)
+    assert sub["parent_system_code"] == "hsif00"
+    by_code = {p["system_code"]: p["activity_date"] for _, p in rows["committee_activities"]}
+    assert by_code == {"hsif00": "2023-11-09T14:04:20Z", "hsif14": "2023-11-10T15:23:53Z"}
+
+
+def test_legislative_subjects_are_one_row_each_and_the_policy_area_stays_on_the_bill():
+    rows = parser.parse_bill(HJRES126, "f.xml")
+    assert [(p["position"], p["name"]) for _, p in rows["subjects"]] == [
+        (0, "Climate change and greenhouse gases"),
+        (1, "Financial services and investments"),
+        (2, "Legislative rules and procedure"),
+    ]
+    assert rows["subjects"][0][1]["update_date"] == "2024-10-31T19:27:45Z"
+    assert rows["bills"][0][1]["policy_area"] == "Finance and Financial Sector"
+
+
+def test_related_bills_carry_their_own_bill_and_relationship_types_separately():
+    rows = parser.parse_bill(SJRES9, "f.xml")
+    assert rows["related_bills"], "S.J.Res. 9 lists related bills"
+    related = {(p["position"]): p for _, p in rows["related_bills"]}
+    first = related[0]
+    assert (first["related_congress"], first["related_bill_type"]) == ("118", "HRES")
+    assert first["related_number"] == "614" and first["title"] and first["latest_action_date"]
+    rels = [
+        (p["related_position"], p["position"], p["relationship_type"], p["identified_by"])
+        for _, p in rows["related_bill_relationships"]
+    ]
+    assert (0, 0, "Procedurally related", "House") in rels
+    assert (0, 1, "Related bill", "House") in rels
+    assert (1, 0, "Identical bill", "CRS") in rels
+    assert len(rels) > len(rows["related_bills"])  # a bill with two relationship types gets two rows
+    hj = parser.parse_bill(HJRES126, "f.xml")
+    assert [(p["related_bill_type"], p["related_number"]) for _, p in hj["related_bills"]] == [
+        ("HJRES", "125"),
+        ("HJRES", "124"),
+    ]
+    assert [p["relationship_type"] for _, p in hj["related_bill_relationships"]] == ["Related bill"] * 2
+
+
+def test_older_layout_with_empty_wrappers_yields_no_rows_and_no_error():
+    # 117th H.R. 2 nests empty lists as <committees><billCommittees/></committees> and
+    # <subjects><billSubjects><legislativeSubjects/></billSubjects></subjects>; the wrapper is not an item.
+    rows = parser.parse_bill(HR2, "f.xml")
+    for key in ("committees", "committee_activities", "subjects", "related_bills", "related_bill_relationships"):
+        assert rows[key] == []
+
+
+def test_older_layout_wrapper_is_looked_through():
+    # Synthetic (no real older file has entries): the same items one level down inside the older wrappers.
+    xml = (
+        b"<billStatus><bill><billNumber>9</billNumber><billType>HR</billType><congress>117</congress>"
+        b"<committees><billCommittees><item><systemCode>hsju00</systemCode><name>Judiciary</name></item></billCommittees>"
+        b"</committees><subjects><billSubjects><legislativeSubjects><item><name>Taxation</name></item>"
+        b"</legislativeSubjects></billSubjects></subjects></bill></billStatus>"
+    )
+    rows = parser.parse_bill(xml, "f.xml")
+    assert [p["system_code"] for _, p in rows["committees"]] == ["hsju00"]
+    assert [p["name"] for _, p in rows["subjects"]] == ["Taxation"]
+
+
+def test_new_entity_row_keys_are_unique_across_every_fixture():
+    for xml in (HJRES99, HJRES126, SJRES9, HR2):
+        for key in ("committees", "committee_activities", "subjects", "related_bills", "related_bill_relationships"):
+            keys = [k for k, _ in parser.parse_bill(xml, "f.xml")[key]]
+            assert len(keys) == len(set(keys)), key

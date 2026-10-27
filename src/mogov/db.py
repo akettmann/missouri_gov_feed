@@ -516,6 +516,11 @@ OPTIONAL_JSON_TABLES = {
     "govinfo_billstatus_actions": "govinfo_billstatus",
     "govinfo_billstatus_recorded_votes": "govinfo_billstatus",
     "govinfo_billstatus_laws": "govinfo_billstatus",
+    "govinfo_billstatus_committees": "govinfo_billstatus",
+    "govinfo_billstatus_committee_activities": "govinfo_billstatus",
+    "govinfo_billstatus_subjects": "govinfo_billstatus",
+    "govinfo_billstatus_related_bills": "govinfo_billstatus",
+    "govinfo_billstatus_related_bill_relationships": "govinfo_billstatus",
 }
 
 

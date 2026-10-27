@@ -9,10 +9,18 @@ One file is one federal bill (`<billStatus><bill>...`). It is walked with lxml (
 - actions         -> `govinfo_billstatus_actions`
 - recorded votes  -> `govinfo_billstatus_recorded_votes` (the roll calls an action cites: chamber, session, roll number)
 - laws            -> `govinfo_billstatus_laws`        (the Public Law number a bill became)
+- committees      -> `govinfo_billstatus_committees` (referral committees and their subcommittees, one row each) and
+                     `govinfo_billstatus_committee_activities` (one row per dated activity: Referred to, Markup by, ...)
+- subjects        -> `govinfo_billstatus_subjects`    (CRS legislative subject terms; the policy area is a bills column)
+- related bills   -> `govinfo_billstatus_related_bills` (identified-by-CRS/House related bills) and
+                     `govinfo_billstatus_related_bill_relationships` (one row per relationship type of a related bill)
 
 Elements are selected by local name. Empty elements are None, text is only stripped, and nothing is interpreted:
-what became law, and which outcomes count as success, is dbt's call. Committees, subjects, summaries, titles and
-text versions stay in the raw XML (see docs/sources.md).
+what became law, and which outcomes count as success, is dbt's call. Summaries, titles, text versions and
+amendments (including their recorded votes) stay in the raw XML (see docs/sources.md).
+
+The 11 reserved 117th House bills use an older export that wraps the lists one level deeper
+(`committees/billCommittees/item`, `subjects/billSubjects/legislativeSubjects`); both layouts are read.
 """
 
 from lxml import etree
@@ -26,6 +34,11 @@ TABLES = {
     "actions": "govinfo_billstatus_actions",
     "recorded_votes": "govinfo_billstatus_recorded_votes",
     "laws": "govinfo_billstatus_laws",
+    "committees": "govinfo_billstatus_committees",
+    "committee_activities": "govinfo_billstatus_committee_activities",
+    "subjects": "govinfo_billstatus_subjects",
+    "related_bills": "govinfo_billstatus_related_bills",
+    "related_bill_relationships": "govinfo_billstatus_related_bill_relationships",
 }
 ALL_TABLES = list(TABLES.values())
 
@@ -145,7 +158,112 @@ def parse_bill(xml: bytes, file_name: str, errors: list[str] | None = None) -> d
                 {"bill_id": bid, "position": i, "law_type": text(law, "type"), "law_number": text(law, "number")},
             )
         )
+    _committees(out, bid, bill)
+    for i, subj in enumerate(items(_unwrap(child(bill, "subjects"), "billSubjects"), "legislativeSubjects")):
+        out["subjects"].append(
+            (
+                f"{bid}#{i}",
+                {"bill_id": bid, "position": i, "name": text(subj, "name"), "update_date": text(subj, "updateDate")},
+            )
+        )
+    for i, rel in enumerate(items(bill, "relatedBills")):
+        rel_type = text(rel, "type")
+        out["related_bills"].append(
+            (
+                f"{bid}#{i}",
+                {
+                    "bill_id": bid,
+                    "position": i,
+                    "related_congress": text(rel, "congress"),
+                    "related_bill_type": rel_type,
+                    "related_number": text(rel, "number"),
+                    "title": text(rel, "title"),
+                    "latest_action_date": text(child(rel, "latestAction"), "actionDate"),
+                    "latest_action_text": text(child(rel, "latestAction"), "text"),
+                },
+            )
+        )
+        for j, detail in enumerate(items(rel, "relationshipDetails")):
+            out["related_bill_relationships"].append(
+                (
+                    f"{bid}#{i}#{j}",
+                    {
+                        "bill_id": bid,
+                        "related_position": i,
+                        "position": j,
+                        "relationship_type": text(detail, "type"),
+                        "identified_by": text(detail, "identifiedBy"),
+                    },
+                )
+            )
     return out
+
+
+def _unwrap(el: etree._Element | None, old_wrapper: str) -> etree._Element | None:
+    """`el`, or its `<old_wrapper>` child when the older export put the list one level deeper."""
+    inner = child(el, old_wrapper)
+    return inner if inner is not None else el
+
+
+def _committees(out: dict[str, list[Row]], bid: str, bill: etree._Element) -> None:
+    """Committees the bill was referred to, each with its subcommittees (rows with `parent_system_code` set) and
+    their dated activities. `position` counts committees; `subposition` counts a committee's subcommittees."""
+    container = _unwrap(child(bill, "committees"), "billCommittees")
+    for i, c in enumerate(c for c in (container if container is not None else []) if _local(c) == "item"):
+        sys_code = text(c, "systemCode")
+        out["committees"].append(
+            (
+                f"{bid}#{i}",
+                {
+                    "bill_id": bid,
+                    "position": i,
+                    "subposition": None,
+                    "system_code": sys_code,
+                    "parent_system_code": None,
+                    "name": text(c, "name"),
+                    "chamber": text(c, "chamber"),
+                    "committee_type": text(c, "type"),
+                },
+            )
+        )
+        _activities(out, bid, f"{bid}#{i}", i, None, sys_code, c)
+        for j, sub in enumerate(items(c, "subcommittees")):
+            out["committees"].append(
+                (
+                    f"{bid}#{i}#s{j}",
+                    {
+                        "bill_id": bid,
+                        "position": i,
+                        "subposition": j,
+                        "system_code": text(sub, "systemCode"),
+                        "parent_system_code": sys_code,
+                        "name": text(sub, "name"),
+                        "chamber": None,  # the file leaves it out; dbt takes the parent committee's
+                        "committee_type": None,
+                    },
+                )
+            )
+            _activities(out, bid, f"{bid}#{i}#s{j}", i, j, text(sub, "systemCode"), sub)
+
+
+def _activities(
+    out: dict[str, list[Row]], bid: str, key: str, position: int, subposition: int | None, sys_code: str | None, el
+) -> None:
+    for k, a in enumerate(items(el, "activities")):
+        out["committee_activities"].append(
+            (
+                f"{key}#a{k}",
+                {
+                    "bill_id": bid,
+                    "position": position,
+                    "subposition": subposition,
+                    "activity_position": k,
+                    "system_code": sys_code,
+                    "activity": text(a, "name"),
+                    "activity_date": text(a, "date"),
+                },
+            )
+        )
 
 
 def _person(el: etree._Element) -> dict:
