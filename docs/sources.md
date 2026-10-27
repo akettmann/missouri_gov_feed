@@ -185,7 +185,7 @@ Quirks:
   never mentions can be missed in two ways. (1) Days: it stops at the last day the XML links a roll call for plus
   `DAY_SLACK` (3, `src/mogov/loaders/mo_house.py`). A recorded vote more than 3 session days past the last linked day
   is never requested. For session 204 this does not bite (see above: days 4-6 are all the site's 404 page), but it is a
-  structural limit; widening it costs about one request per extra empty day per session (a day the XML links nothing
+  structural limit; widening it costs one request per extra empty day per session (a day the XML links nothing
   for has `last_linked = 0`, so `_probe_day` stops at the first miss, roll call 001; a day that does have votes costs
   one request per roll call plus the final miss). Misses are cached for good once the year is over, so re-runs cost
   nothing. It cannot be tested without the network, so it is left as is. (2) Numbers: within a day it
@@ -199,9 +199,9 @@ Quirks:
   `stg_mo_house__rollcalls` drops error rows, and `fct_vote_bills` now links only roll calls that are in staging, so
   those 55 links are gone (32 bills, 13 of which now have no linked vote; they were dangling `vote_id`s that no
   member vote row carries). A relationships test keeps it that way.
-  Those 13 bills show no vote on a bill page even though the House did record one. Showing "roll call recorded, PDF
-  not published" for them is possible without new loading: the link is in `stg_mo_house__bill_rollcalls` and the miss
-  is in the raw `mo_house_rollcalls` rows with `error = 'not a pdf'`. Not built; it is an open product decision (#555).
+  Those 13 bills have no linked vote in `fct_vote_bills` even though the House recorded one (the XML lists the roll
+  call with totals). A bill page, if one is built, could show "roll call recorded, PDF not published" without new loading: the link is in `stg_mo_house__bill_rollcalls` and the miss
+  is in the raw `mo_house_rollcalls` rows with `error = 'not a pdf'`. Not built; an open product decision (#570).
 - Committee posts (`fct_committee_memberships`, `fct_committee_posts`): the member XML page lists each
   member's committees and subcommittees with a position (Chair, Vice-Chair, Co-Chair, Ranking Minority
   Member, Member), in every session from 2017 except 253, whose pages list none. For 253 the
