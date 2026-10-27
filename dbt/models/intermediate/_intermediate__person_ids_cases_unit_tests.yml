@@ -1,0 +1,802 @@
+# Named-person cases for the person-id layer (#649, #657): one fixed-input row group per real person from the
+# identity issues, grouped into tests by the rule that decides them. The shape-only tests in
+# _intermediate__person_ids_unit_tests.yml cover the same rules with invented people; these tests name the real ones,
+# so a rule change that breaks a known case fails a test that says who it is.
+# Rows are copied from int_officials__identity_terms (or its inputs) as the pipeline built them: real Open States ids,
+# House member ids, seats and Open States dates. A row with a house_member_id and no dates is a House roster row; a row
+# with dates (or only an end: an undated start, #512) is an Open States seat-term row. Where a hazard needs a name
+# variant that does not exist in the data, the row keeps the real id, seat and dates and takes an invented name; the
+# test description says so.
+# The Dolan and Jacobs 2025 duplicate stubs (#292, #294) are #661's cases and live with its rule change.
+version: 2
+
+unit_tests:
+  # --- int_officials__person_ids -------------------------------------------------------------------------------------
+
+  - name: person_ids_cases_join_redistricted_seat_changes
+    model: int_officials__person_ids
+    description: >
+      #97: the 2022 redistricting renumbered these members' House seats and Open States gave each a second record
+      for the new seat. Same exact name, different seats, no shared year (the old record ends 2023-01-03, in 2022;
+      the new one starts 2023-01-04), so rule 2 joins each pair and the id that serves latest is kept: Bennie Cook
+      HD142 -> HD143, Josh Hurlbert HD12 -> HD8, David Tyson Smith HD45 -> HD46 (name_key "david smith"), Bill
+      Hardwick HD122 -> HD121, Mark Matthiesen HD70 (2017-18) -> HD107 (2023+). Each pair also shares a House member
+      id, so rule 2c would join them too, but the name rule decides first and the basis stays name_continuity. Peggy
+      McGaugh (HD39 to 2022, HD7 from 2023) has one Open States id across both seats today: it must stay one person,
+      not split by the seat change.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          # Bennie Cook, member 2235: HD142 (2021-22, undated start) -> HD143 (2023+)
+          - {alias_id: ocd-person/5effdbcd-6045-436c-8f70-a67131c27ac4, year: 2021, office: state_house, district: '142', house_member_id: '2235', name_key: bennie cook}
+          - {alias_id: ocd-person/5effdbcd-6045-436c-8f70-a67131c27ac4, year: 2022, office: state_house, district: '142', name_key: bennie cook, term_end: '2023-01-03'}
+          - {alias_id: ocd-person/5effdbcd-6045-436c-8f70-a67131c27ac4, year: 2022, office: state_house, district: '142', house_member_id: '2235', name_key: bennie cook}
+          - {alias_id: ocd-person/9c485ac1-4ad5-4466-9392-a9014827ef56, year: 2023, office: state_house, district: '143', name_key: bennie cook, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/9c485ac1-4ad5-4466-9392-a9014827ef56, year: 2023, office: state_house, district: '143', house_member_id: '2235', name_key: bennie cook}
+          - {alias_id: ocd-person/9c485ac1-4ad5-4466-9392-a9014827ef56, year: 2024, office: state_house, district: '143', name_key: bennie cook, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/9c485ac1-4ad5-4466-9392-a9014827ef56, year: 2024, office: state_house, district: '143', house_member_id: '2235', name_key: bennie cook}
+          - {alias_id: ocd-person/9c485ac1-4ad5-4466-9392-a9014827ef56, year: 2025, office: state_house, district: '143', name_key: bennie cook, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/9c485ac1-4ad5-4466-9392-a9014827ef56, year: 2025, office: state_house, district: '143', house_member_id: '2235', name_key: bennie cook}
+          - {alias_id: ocd-person/9c485ac1-4ad5-4466-9392-a9014827ef56, year: 2026, office: state_house, district: '143', name_key: bennie cook, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/9c485ac1-4ad5-4466-9392-a9014827ef56, year: 2026, office: state_house, district: '143', house_member_id: '2235', name_key: bennie cook}
+          # Josh Hurlbert, member 2242: HD12 (2021-22) -> HD8 (2023+)
+          - {alias_id: ocd-person/08e6cc95-8f83-4e3f-a9d4-1b22d12d23b6, year: 2021, office: state_house, district: '12', house_member_id: '2242', name_key: josh hurlbert}
+          - {alias_id: ocd-person/08e6cc95-8f83-4e3f-a9d4-1b22d12d23b6, year: 2022, office: state_house, district: '12', name_key: josh hurlbert, term_end: '2023-01-03'}
+          - {alias_id: ocd-person/08e6cc95-8f83-4e3f-a9d4-1b22d12d23b6, year: 2022, office: state_house, district: '12', house_member_id: '2242', name_key: josh hurlbert}
+          - {alias_id: ocd-person/1da3a25b-64fa-48d4-8441-e1dca4526f7f, year: 2023, office: state_house, district: '8', name_key: josh hurlbert, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/1da3a25b-64fa-48d4-8441-e1dca4526f7f, year: 2023, office: state_house, district: '8', house_member_id: '2242', name_key: josh hurlbert}
+          - {alias_id: ocd-person/1da3a25b-64fa-48d4-8441-e1dca4526f7f, year: 2024, office: state_house, district: '8', name_key: josh hurlbert, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/1da3a25b-64fa-48d4-8441-e1dca4526f7f, year: 2024, office: state_house, district: '8', house_member_id: '2242', name_key: josh hurlbert}
+          - {alias_id: ocd-person/1da3a25b-64fa-48d4-8441-e1dca4526f7f, year: 2025, office: state_house, district: '8', name_key: josh hurlbert, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/1da3a25b-64fa-48d4-8441-e1dca4526f7f, year: 2025, office: state_house, district: '8', house_member_id: '2242', name_key: josh hurlbert}
+          - {alias_id: ocd-person/1da3a25b-64fa-48d4-8441-e1dca4526f7f, year: 2026, office: state_house, district: '8', name_key: josh hurlbert, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/1da3a25b-64fa-48d4-8441-e1dca4526f7f, year: 2026, office: state_house, district: '8', house_member_id: '2242', name_key: josh hurlbert}
+          # David Tyson Smith, member 2290: HD45 (2021-22) -> HD46 (2023+)
+          - {alias_id: ocd-person/c509449e-070c-462c-810e-f14315c9df42, year: 2023, office: state_house, district: '46', name_key: david smith, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/c509449e-070c-462c-810e-f14315c9df42, year: 2023, office: state_house, district: '46', house_member_id: '2290', name_key: david smith}
+          - {alias_id: ocd-person/c509449e-070c-462c-810e-f14315c9df42, year: 2024, office: state_house, district: '46', name_key: david smith, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/c509449e-070c-462c-810e-f14315c9df42, year: 2024, office: state_house, district: '46', house_member_id: '2290', name_key: david smith}
+          - {alias_id: ocd-person/c509449e-070c-462c-810e-f14315c9df42, year: 2025, office: state_house, district: '46', name_key: david smith, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/c509449e-070c-462c-810e-f14315c9df42, year: 2025, office: state_house, district: '46', house_member_id: '2290', name_key: david smith}
+          - {alias_id: ocd-person/c509449e-070c-462c-810e-f14315c9df42, year: 2026, office: state_house, district: '46', name_key: david smith, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/c509449e-070c-462c-810e-f14315c9df42, year: 2026, office: state_house, district: '46', house_member_id: '2290', name_key: david smith}
+          - {alias_id: ocd-person/c8f4ccf3-c7c4-4e71-8226-6ee92bdf501e, year: 2021, office: state_house, district: '45', house_member_id: '2290', name_key: david smith}
+          - {alias_id: ocd-person/c8f4ccf3-c7c4-4e71-8226-6ee92bdf501e, year: 2022, office: state_house, district: '45', name_key: david smith, term_end: '2023-01-03'}
+          - {alias_id: ocd-person/c8f4ccf3-c7c4-4e71-8226-6ee92bdf501e, year: 2022, office: state_house, district: '45', house_member_id: '2290', name_key: david smith}
+          # Bill Hardwick, member 2253: HD122 (2021-22) -> HD121 (2023+)
+          - {alias_id: ocd-person/6b7c5c9c-05ba-4a2e-8f23-117edbf2969b, year: 2023, office: state_house, district: '121', name_key: bill hardwick, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/6b7c5c9c-05ba-4a2e-8f23-117edbf2969b, year: 2023, office: state_house, district: '121', house_member_id: '2253', name_key: bill hardwick}
+          - {alias_id: ocd-person/6b7c5c9c-05ba-4a2e-8f23-117edbf2969b, year: 2024, office: state_house, district: '121', name_key: bill hardwick, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/6b7c5c9c-05ba-4a2e-8f23-117edbf2969b, year: 2024, office: state_house, district: '121', house_member_id: '2253', name_key: bill hardwick}
+          - {alias_id: ocd-person/6b7c5c9c-05ba-4a2e-8f23-117edbf2969b, year: 2025, office: state_house, district: '121', name_key: bill hardwick, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/6b7c5c9c-05ba-4a2e-8f23-117edbf2969b, year: 2025, office: state_house, district: '121', house_member_id: '2253', name_key: bill hardwick}
+          - {alias_id: ocd-person/6b7c5c9c-05ba-4a2e-8f23-117edbf2969b, year: 2026, office: state_house, district: '121', name_key: bill hardwick, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/6b7c5c9c-05ba-4a2e-8f23-117edbf2969b, year: 2026, office: state_house, district: '121', house_member_id: '2253', name_key: bill hardwick}
+          - {alias_id: ocd-person/b71be68e-7289-4744-bacf-0e98bf375f0d, year: 2021, office: state_house, district: '122', house_member_id: '2253', name_key: bill hardwick}
+          - {alias_id: ocd-person/b71be68e-7289-4744-bacf-0e98bf375f0d, year: 2022, office: state_house, district: '122', name_key: bill hardwick, term_end: '2023-01-03'}
+          - {alias_id: ocd-person/b71be68e-7289-4744-bacf-0e98bf375f0d, year: 2022, office: state_house, district: '122', house_member_id: '2253', name_key: bill hardwick}
+          # Mark Matthiesen, member 1937: HD70 (2017-18) -> HD107 (2023+)
+          - {alias_id: ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df, year: 2023, office: state_house, district: '107', name_key: mark matthiesen, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df, year: 2023, office: state_house, district: '107', house_member_id: '1937', name_key: mark matthiesen}
+          - {alias_id: ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df, year: 2024, office: state_house, district: '107', name_key: mark matthiesen, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df, year: 2024, office: state_house, district: '107', house_member_id: '1937', name_key: mark matthiesen}
+          - {alias_id: ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df, year: 2025, office: state_house, district: '107', name_key: mark matthiesen, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df, year: 2025, office: state_house, district: '107', house_member_id: '1937', name_key: mark matthiesen}
+          - {alias_id: ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df, year: 2026, office: state_house, district: '107', name_key: mark matthiesen, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df, year: 2026, office: state_house, district: '107', house_member_id: '1937', name_key: mark matthiesen}
+          - {alias_id: ocd-person/f7a7b094-3b7f-470c-aed3-9e9bc60f68b5, year: 2017, office: state_house, district: '70', house_member_id: '1937', name_key: mark matthiesen}
+          - {alias_id: ocd-person/f7a7b094-3b7f-470c-aed3-9e9bc60f68b5, year: 2018, office: state_house, district: '70', name_key: mark matthiesen, term_end: '2018-12-31'}
+          - {alias_id: ocd-person/f7a7b094-3b7f-470c-aed3-9e9bc60f68b5, year: 2018, office: state_house, district: '70', house_member_id: '1937', name_key: mark matthiesen}
+          # Peggy McGaugh, member 2019: one Open States id, HD39 (2018-22) then HD7 (2023+)
+          - {alias_id: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014, year: 2018, office: state_house, district: '39', house_member_id: '2019', name_key: peggy mcgaugh}
+          - {alias_id: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014, year: 2019, office: state_house, district: '39', house_member_id: '2019', name_key: peggy mcgaugh}
+          - {alias_id: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014, year: 2020, office: state_house, district: '39', house_member_id: '2019', name_key: peggy mcgaugh}
+          - {alias_id: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014, year: 2021, office: state_house, district: '39', house_member_id: '2019', name_key: peggy mcgaugh}
+          - {alias_id: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014, year: 2022, office: state_house, district: '39', name_key: peggy mcgaugh, term_end: '2023-01-03'}
+          - {alias_id: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014, year: 2022, office: state_house, district: '39', house_member_id: '2019', name_key: peggy mcgaugh}
+          - {alias_id: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014, year: 2023, office: state_house, district: '7', name_key: peggy mcgaugh, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014, year: 2023, office: state_house, district: '7', house_member_id: '2019', name_key: peggy mcgaugh}
+          - {alias_id: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014, year: 2024, office: state_house, district: '7', name_key: peggy mcgaugh, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014, year: 2024, office: state_house, district: '7', house_member_id: '2019', name_key: peggy mcgaugh}
+          - {alias_id: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014, year: 2025, office: state_house, district: '7', name_key: peggy mcgaugh, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014, year: 2025, office: state_house, district: '7', house_member_id: '2019', name_key: peggy mcgaugh}
+          - {alias_id: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014, year: 2026, office: state_house, district: '7', name_key: peggy mcgaugh, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014, year: 2026, office: state_house, district: '7', house_member_id: '2019', name_key: peggy mcgaugh}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        # Bennie Cook, Josh Hurlbert, David Tyson Smith, Bill Hardwick, Mark Matthiesen, Peggy McGaugh
+        - {alias_id: ocd-person/08e6cc95-8f83-4e3f-a9d4-1b22d12d23b6, person_id: ocd-person/1da3a25b-64fa-48d4-8441-e1dca4526f7f, basis: name_continuity}
+        - {alias_id: ocd-person/1da3a25b-64fa-48d4-8441-e1dca4526f7f, person_id: ocd-person/1da3a25b-64fa-48d4-8441-e1dca4526f7f, basis: self}
+        - {alias_id: ocd-person/5effdbcd-6045-436c-8f70-a67131c27ac4, person_id: ocd-person/9c485ac1-4ad5-4466-9392-a9014827ef56, basis: name_continuity}
+        - {alias_id: ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df, person_id: ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df, basis: self}
+        - {alias_id: ocd-person/6b7c5c9c-05ba-4a2e-8f23-117edbf2969b, person_id: ocd-person/6b7c5c9c-05ba-4a2e-8f23-117edbf2969b, basis: self}
+        - {alias_id: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014, person_id: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014, basis: self}
+        - {alias_id: ocd-person/9c485ac1-4ad5-4466-9392-a9014827ef56, person_id: ocd-person/9c485ac1-4ad5-4466-9392-a9014827ef56, basis: self}
+        - {alias_id: ocd-person/b71be68e-7289-4744-bacf-0e98bf375f0d, person_id: ocd-person/6b7c5c9c-05ba-4a2e-8f23-117edbf2969b, basis: name_continuity}
+        - {alias_id: ocd-person/c509449e-070c-462c-810e-f14315c9df42, person_id: ocd-person/c509449e-070c-462c-810e-f14315c9df42, basis: self}
+        - {alias_id: ocd-person/c8f4ccf3-c7c4-4e71-8226-6ee92bdf501e, person_id: ocd-person/c509449e-070c-462c-810e-f14315c9df42, basis: name_continuity}
+        - {alias_id: ocd-person/f7a7b094-3b7f-470c-aed3-9e9bc60f68b5, person_id: ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df, basis: name_continuity}
+
+  - name: person_ids_cases_join_house_fallback_keys_to_the_senate_record
+    model: int_officials__person_ids
+    description: >
+      #97 / #136: the House roster keyed Mike Cierpiot (HD30, 2017-18) as mohouse:476 and Sandy Crawford (HD129,
+      2017) as mohouse:478; both later have an Open States Senate record. Open States dates both Senate terms early
+      (Cierpiot SD8 from 2018-01-03, Crawford SD28 from 2017-09-13), so each holds a House seat and a Senate seat in
+      one shared year. One shared year is a hand-over, not a seat conflict, so rule 2 joins the fallback key to the
+      Open States id. Requiring no shared year at all (seat_conflicts on one year) splits both.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          # Mike Cierpiot: mohouse:476 HD30 2017-18, Open States SD8 from 2018-01-03
+          - {alias_id: 'mohouse:476', year: 2017, office: state_house, district: '30', house_member_id: '476', name_key: mike cierpiot}
+          - {alias_id: 'mohouse:476', year: 2018, office: state_house, district: '30', house_member_id: '476', name_key: mike cierpiot}
+          - {alias_id: ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8, year: 2018, office: state_senate, district: '8', name_key: mike cierpiot, term_start: '2018-01-03', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8, year: 2019, office: state_senate, district: '8', name_key: mike cierpiot, term_start: '2018-01-03', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8, year: 2020, office: state_senate, district: '8', name_key: mike cierpiot, term_start: '2018-01-03', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8, year: 2021, office: state_senate, district: '8', name_key: mike cierpiot, term_start: '2018-01-03', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8, year: 2022, office: state_senate, district: '8', name_key: mike cierpiot, term_start: '2018-01-03', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8, year: 2023, office: state_senate, district: '8', name_key: mike cierpiot, term_start: '2018-01-03', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8, year: 2024, office: state_senate, district: '8', name_key: mike cierpiot, term_start: '2018-01-03', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8, year: 2025, office: state_senate, district: '8', name_key: mike cierpiot, term_start: '2018-01-03', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8, year: 2026, office: state_senate, district: '8', name_key: mike cierpiot, term_start: '2018-01-03', term_end: '9999-12-31'}
+          # Sandy Crawford: mohouse:478 HD129 2017, Open States SD28 from 2017-09-13
+          - {alias_id: 'mohouse:478', year: 2017, office: state_house, district: '129', house_member_id: '478', name_key: sandy crawford}
+          - {alias_id: ocd-person/4f194218-3d95-4f08-8963-7e3440fdb671, year: 2017, office: state_senate, district: '28', name_key: sandy crawford, term_start: '2017-09-13', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/4f194218-3d95-4f08-8963-7e3440fdb671, year: 2018, office: state_senate, district: '28', name_key: sandy crawford, term_start: '2017-09-13', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/4f194218-3d95-4f08-8963-7e3440fdb671, year: 2019, office: state_senate, district: '28', name_key: sandy crawford, term_start: '2017-09-13', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/4f194218-3d95-4f08-8963-7e3440fdb671, year: 2020, office: state_senate, district: '28', name_key: sandy crawford, term_start: '2017-09-13', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/4f194218-3d95-4f08-8963-7e3440fdb671, year: 2021, office: state_senate, district: '28', name_key: sandy crawford, term_start: '2017-09-13', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/4f194218-3d95-4f08-8963-7e3440fdb671, year: 2022, office: state_senate, district: '28', name_key: sandy crawford, term_start: '2017-09-13', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/4f194218-3d95-4f08-8963-7e3440fdb671, year: 2023, office: state_senate, district: '28', name_key: sandy crawford, term_start: '2017-09-13', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/4f194218-3d95-4f08-8963-7e3440fdb671, year: 2024, office: state_senate, district: '28', name_key: sandy crawford, term_start: '2017-09-13', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/4f194218-3d95-4f08-8963-7e3440fdb671, year: 2025, office: state_senate, district: '28', name_key: sandy crawford, term_start: '2017-09-13', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/4f194218-3d95-4f08-8963-7e3440fdb671, year: 2026, office: state_senate, district: '28', name_key: sandy crawford, term_start: '2017-09-13', term_end: '9999-12-31'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        # Mike Cierpiot, Sandy Crawford
+        - {alias_id: 'mohouse:476', person_id: ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8, basis: name_continuity}
+        - {alias_id: 'mohouse:478', person_id: ocd-person/4f194218-3d95-4f08-8963-7e3440fdb671, basis: name_continuity}
+        - {alias_id: ocd-person/4f194218-3d95-4f08-8963-7e3440fdb671, person_id: ocd-person/4f194218-3d95-4f08-8963-7e3440fdb671, basis: self}
+        - {alias_id: ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8, person_id: ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8, basis: self}
+
+  - name: person_ids_cases_join_house_to_senate_moves
+    model: int_officials__person_ids
+    description: >
+      #97: Open States starts a new person record when a representative moves to the Senate. Curtis Trent (HD133
+      2017-22 -> SD20), Mary Elizabeth Coleman (HD97 2019-22 -> SD22), Rusty Black (HD7 2017-22 -> SD12) and Tracy
+      McCreery (HD88 2017-22 -> SD24) each hold the same exact name in both records, with no shared year, so rule 2
+      joins them and the Senate id (serving latest) is kept. The Senate records carry no House member id, so only
+      the name rule can join them.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          # Curtis Trent, member 1942: HD133 -> SD20 (2023+)
+          - {alias_id: ocd-person/a4977829-21d4-4668-ae6e-16a3d0f444ec, year: 2017, office: state_house, district: '133', house_member_id: '1942', name_key: curtis trent}
+          - {alias_id: ocd-person/a4977829-21d4-4668-ae6e-16a3d0f444ec, year: 2018, office: state_house, district: '133', house_member_id: '1942', name_key: curtis trent}
+          - {alias_id: ocd-person/a4977829-21d4-4668-ae6e-16a3d0f444ec, year: 2019, office: state_house, district: '133', house_member_id: '1942', name_key: curtis trent}
+          - {alias_id: ocd-person/a4977829-21d4-4668-ae6e-16a3d0f444ec, year: 2020, office: state_house, district: '133', house_member_id: '1942', name_key: curtis trent}
+          - {alias_id: ocd-person/a4977829-21d4-4668-ae6e-16a3d0f444ec, year: 2021, office: state_house, district: '133', house_member_id: '1942', name_key: curtis trent}
+          - {alias_id: ocd-person/a4977829-21d4-4668-ae6e-16a3d0f444ec, year: 2022, office: state_house, district: '133', name_key: curtis trent, term_end: '2023-01-03'}
+          - {alias_id: ocd-person/a4977829-21d4-4668-ae6e-16a3d0f444ec, year: 2022, office: state_house, district: '133', house_member_id: '1942', name_key: curtis trent}
+          - {alias_id: ocd-person/c5e38dee-7f82-4795-a134-b984b6878458, year: 2023, office: state_senate, district: '20', name_key: curtis trent, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/c5e38dee-7f82-4795-a134-b984b6878458, year: 2024, office: state_senate, district: '20', name_key: curtis trent, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/c5e38dee-7f82-4795-a134-b984b6878458, year: 2025, office: state_senate, district: '20', name_key: curtis trent, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/c5e38dee-7f82-4795-a134-b984b6878458, year: 2026, office: state_senate, district: '20', name_key: curtis trent, term_start: '2023-01-04', term_end: '9999-12-31'}
+          # Mary Elizabeth Coleman, member 2072: HD97 -> SD22 (2023+)
+          - {alias_id: ocd-person/54d1ac92-5c3c-4f59-91c4-fbfd23d3eb0f, year: 2019, office: state_house, district: '97', house_member_id: '2072', name_key: mary elizabeth coleman}
+          - {alias_id: ocd-person/54d1ac92-5c3c-4f59-91c4-fbfd23d3eb0f, year: 2020, office: state_house, district: '97', house_member_id: '2072', name_key: mary elizabeth coleman}
+          - {alias_id: ocd-person/54d1ac92-5c3c-4f59-91c4-fbfd23d3eb0f, year: 2021, office: state_house, district: '97', house_member_id: '2072', name_key: mary elizabeth coleman}
+          - {alias_id: ocd-person/54d1ac92-5c3c-4f59-91c4-fbfd23d3eb0f, year: 2022, office: state_house, district: '97', name_key: mary elizabeth coleman, term_end: '2023-01-03'}
+          - {alias_id: ocd-person/54d1ac92-5c3c-4f59-91c4-fbfd23d3eb0f, year: 2022, office: state_house, district: '97', house_member_id: '2072', name_key: mary elizabeth coleman}
+          - {alias_id: ocd-person/f1d83642-4aa6-4fea-80f1-4c3f422c63ed, year: 2023, office: state_senate, district: '22', name_key: mary elizabeth coleman, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/f1d83642-4aa6-4fea-80f1-4c3f422c63ed, year: 2024, office: state_senate, district: '22', name_key: mary elizabeth coleman, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/f1d83642-4aa6-4fea-80f1-4c3f422c63ed, year: 2025, office: state_senate, district: '22', name_key: mary elizabeth coleman, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/f1d83642-4aa6-4fea-80f1-4c3f422c63ed, year: 2026, office: state_senate, district: '22', name_key: mary elizabeth coleman, term_start: '2023-01-04', term_end: '9999-12-31'}
+          # Rusty Black, member 1933: HD7 -> SD12 (2023+)
+          - {alias_id: ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0, year: 2023, office: state_senate, district: '12', name_key: rusty black, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0, year: 2024, office: state_senate, district: '12', name_key: rusty black, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0, year: 2025, office: state_senate, district: '12', name_key: rusty black, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0, year: 2026, office: state_senate, district: '12', name_key: rusty black, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/c46e8275-c962-4530-af84-563236b03e37, year: 2017, office: state_house, district: '7', house_member_id: '1933', name_key: rusty black}
+          - {alias_id: ocd-person/c46e8275-c962-4530-af84-563236b03e37, year: 2018, office: state_house, district: '7', house_member_id: '1933', name_key: rusty black}
+          - {alias_id: ocd-person/c46e8275-c962-4530-af84-563236b03e37, year: 2019, office: state_house, district: '7', house_member_id: '1933', name_key: rusty black}
+          - {alias_id: ocd-person/c46e8275-c962-4530-af84-563236b03e37, year: 2020, office: state_house, district: '7', house_member_id: '1933', name_key: rusty black}
+          - {alias_id: ocd-person/c46e8275-c962-4530-af84-563236b03e37, year: 2021, office: state_house, district: '7', house_member_id: '1933', name_key: rusty black}
+          - {alias_id: ocd-person/c46e8275-c962-4530-af84-563236b03e37, year: 2022, office: state_house, district: '7', name_key: rusty black, term_end: '2023-01-03'}
+          - {alias_id: ocd-person/c46e8275-c962-4530-af84-563236b03e37, year: 2022, office: state_house, district: '7', house_member_id: '1933', name_key: rusty black}
+          # Tracy McCreery, member 623: HD88 -> SD24 (2023+)
+          - {alias_id: ocd-person/704c5c98-77bc-47e7-9df5-10b5c5ecb4ec, year: 2017, office: state_house, district: '88', house_member_id: '623', name_key: tracy mccreery}
+          - {alias_id: ocd-person/704c5c98-77bc-47e7-9df5-10b5c5ecb4ec, year: 2018, office: state_house, district: '88', house_member_id: '623', name_key: tracy mccreery}
+          - {alias_id: ocd-person/704c5c98-77bc-47e7-9df5-10b5c5ecb4ec, year: 2019, office: state_house, district: '88', house_member_id: '623', name_key: tracy mccreery}
+          - {alias_id: ocd-person/704c5c98-77bc-47e7-9df5-10b5c5ecb4ec, year: 2020, office: state_house, district: '88', house_member_id: '623', name_key: tracy mccreery}
+          - {alias_id: ocd-person/704c5c98-77bc-47e7-9df5-10b5c5ecb4ec, year: 2021, office: state_house, district: '88', house_member_id: '623', name_key: tracy mccreery}
+          - {alias_id: ocd-person/704c5c98-77bc-47e7-9df5-10b5c5ecb4ec, year: 2022, office: state_house, district: '88', name_key: tracy mccreery, term_end: '2023-01-03'}
+          - {alias_id: ocd-person/704c5c98-77bc-47e7-9df5-10b5c5ecb4ec, year: 2022, office: state_house, district: '88', house_member_id: '623', name_key: tracy mccreery}
+          - {alias_id: ocd-person/802c155f-8979-418f-b13b-b75de93caf31, year: 2023, office: state_senate, district: '24', name_key: tracy mccreery, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/802c155f-8979-418f-b13b-b75de93caf31, year: 2024, office: state_senate, district: '24', name_key: tracy mccreery, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/802c155f-8979-418f-b13b-b75de93caf31, year: 2025, office: state_senate, district: '24', name_key: tracy mccreery, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/802c155f-8979-418f-b13b-b75de93caf31, year: 2026, office: state_senate, district: '24', name_key: tracy mccreery, term_start: '2023-01-04', term_end: '9999-12-31'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        # Curtis Trent, Mary Elizabeth Coleman, Rusty Black, Tracy McCreery
+        - {alias_id: ocd-person/54d1ac92-5c3c-4f59-91c4-fbfd23d3eb0f, person_id: ocd-person/f1d83642-4aa6-4fea-80f1-4c3f422c63ed, basis: name_continuity}
+        - {alias_id: ocd-person/704c5c98-77bc-47e7-9df5-10b5c5ecb4ec, person_id: ocd-person/802c155f-8979-418f-b13b-b75de93caf31, basis: name_continuity}
+        - {alias_id: ocd-person/802c155f-8979-418f-b13b-b75de93caf31, person_id: ocd-person/802c155f-8979-418f-b13b-b75de93caf31, basis: self}
+        - {alias_id: ocd-person/a4977829-21d4-4668-ae6e-16a3d0f444ec, person_id: ocd-person/c5e38dee-7f82-4795-a134-b984b6878458, basis: name_continuity}
+        - {alias_id: ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0, person_id: ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0, basis: self}
+        - {alias_id: ocd-person/c46e8275-c962-4530-af84-563236b03e37, person_id: ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0, basis: name_continuity}
+        - {alias_id: ocd-person/c5e38dee-7f82-4795-a134-b984b6878458, person_id: ocd-person/c5e38dee-7f82-4795-a134-b984b6878458, basis: self}
+        - {alias_id: ocd-person/f1d83642-4aa6-4fea-80f1-4c3f422c63ed, person_id: ocd-person/f1d83642-4aa6-4fea-80f1-4c3f422c63ed, basis: self}
+
+  - name: person_ids_cases_join_same_seat_splits
+    model: int_officials__person_ids
+    description: >
+      #97: these members each had two ids in past rosters. Adam Schwadron (HD106 2021-22, HD105 2023-24) and Deb
+      Lavender (HD90 2017-20, HD98 2023-24) have two Open States records; Jean Evans (HD99: Open States to
+      2019-02-05, roster mohouse:1912 in 2019, the same seat in the same year), Joe Adams (HD86: mohouse:1780 in
+      2017-18, Open States 2021-24) and Lauren Arthur (mohouse:1810 HD18 in 2017-18; her Open States record holds
+      HD18 in 2015-16 and SD17 from 2018-09-12, so 2018 is one hand-over year) each have a roster fallback key. Rule 2
+      joins each pair, and an Open States id wins over a mohouse: key.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          # Adam Schwadron, member 2226: HD106 (2021-22, undated start) and HD105 (2023-24)
+          - {alias_id: ocd-person/0035304c-e314-4d57-8fc8-addf19b16111, year: 2023, office: state_house, district: '105', name_key: adam schwadron, term_start: '2023-01-04', term_end: '2025-01-07'}
+          - {alias_id: ocd-person/0035304c-e314-4d57-8fc8-addf19b16111, year: 2023, office: state_house, district: '105', house_member_id: '2226', name_key: adam schwadron}
+          - {alias_id: ocd-person/0035304c-e314-4d57-8fc8-addf19b16111, year: 2024, office: state_house, district: '105', name_key: adam schwadron, term_start: '2023-01-04', term_end: '2025-01-07'}
+          - {alias_id: ocd-person/0035304c-e314-4d57-8fc8-addf19b16111, year: 2024, office: state_house, district: '105', house_member_id: '2226', name_key: adam schwadron}
+          - {alias_id: ocd-person/c9efc84d-7adb-462d-9e86-b545fe52f6ae, year: 2021, office: state_house, district: '106', house_member_id: '2226', name_key: adam schwadron}
+          - {alias_id: ocd-person/c9efc84d-7adb-462d-9e86-b545fe52f6ae, year: 2022, office: state_house, district: '106', name_key: adam schwadron, term_end: '2023-01-03'}
+          - {alias_id: ocd-person/c9efc84d-7adb-462d-9e86-b545fe52f6ae, year: 2022, office: state_house, district: '106', house_member_id: '2226', name_key: adam schwadron}
+          # Deb Lavender, member 1786: HD90 (2017-20) and HD98 (2023-24)
+          - {alias_id: ocd-person/3135abbd-6e12-4847-9b19-e2a57337724a, year: 2023, office: state_house, district: '98', name_key: deb lavender, term_start: '2023-01-04', term_end: '2025-01-07'}
+          - {alias_id: ocd-person/3135abbd-6e12-4847-9b19-e2a57337724a, year: 2023, office: state_house, district: '98', house_member_id: '1786', name_key: deb lavender}
+          - {alias_id: ocd-person/3135abbd-6e12-4847-9b19-e2a57337724a, year: 2024, office: state_house, district: '98', name_key: deb lavender, term_start: '2023-01-04', term_end: '2025-01-07'}
+          - {alias_id: ocd-person/3135abbd-6e12-4847-9b19-e2a57337724a, year: 2024, office: state_house, district: '98', house_member_id: '1786', name_key: deb lavender}
+          - {alias_id: ocd-person/c92b2810-9dcd-41e9-9d3b-7c65e1e36011, year: 2017, office: state_house, district: '90', house_member_id: '1786', name_key: deb lavender}
+          - {alias_id: ocd-person/c92b2810-9dcd-41e9-9d3b-7c65e1e36011, year: 2018, office: state_house, district: '90', house_member_id: '1786', name_key: deb lavender}
+          - {alias_id: ocd-person/c92b2810-9dcd-41e9-9d3b-7c65e1e36011, year: 2019, office: state_house, district: '90', house_member_id: '1786', name_key: deb lavender}
+          - {alias_id: ocd-person/c92b2810-9dcd-41e9-9d3b-7c65e1e36011, year: 2020, office: state_house, district: '90', name_key: deb lavender, term_end: '2020-12-31'}
+          - {alias_id: ocd-person/c92b2810-9dcd-41e9-9d3b-7c65e1e36011, year: 2020, office: state_house, district: '90', house_member_id: '1786', name_key: deb lavender}
+          # Jean Evans, member 1912: Open States HD99 to 2019-02-05 and roster mohouse:1912 in 2019
+          - {alias_id: 'mohouse:1912', year: 2019, office: state_house, district: '99', house_member_id: '1912', name_key: jean evans}
+          - {alias_id: ocd-person/af12fdba-1167-4346-8b57-8d79e7a73b89, year: 2017, office: state_house, district: '99', house_member_id: '1912', name_key: jean evans}
+          - {alias_id: ocd-person/af12fdba-1167-4346-8b57-8d79e7a73b89, year: 2018, office: state_house, district: '99', house_member_id: '1912', name_key: jean evans}
+          - {alias_id: ocd-person/af12fdba-1167-4346-8b57-8d79e7a73b89, year: 2019, office: state_house, district: '99', name_key: jean evans, term_end: '2019-02-05'}
+          # Joe Adams, member 1780: mohouse:1780 HD86 2017-18 and Open States HD86 2021-24
+          - {alias_id: 'mohouse:1780', year: 2017, office: state_house, district: '86', house_member_id: '1780', name_key: joe adams}
+          - {alias_id: 'mohouse:1780', year: 2018, office: state_house, district: '86', house_member_id: '1780', name_key: joe adams}
+          - {alias_id: ocd-person/16ede933-ba44-4da8-9371-e72ee885758b, year: 2021, office: state_house, district: '86', name_key: joe adams, term_start: '2021-01-06', term_end: '2025-01-07'}
+          - {alias_id: ocd-person/16ede933-ba44-4da8-9371-e72ee885758b, year: 2021, office: state_house, district: '86', house_member_id: '1780', name_key: joe adams}
+          - {alias_id: ocd-person/16ede933-ba44-4da8-9371-e72ee885758b, year: 2022, office: state_house, district: '86', name_key: joe adams, term_start: '2021-01-06', term_end: '2025-01-07'}
+          - {alias_id: ocd-person/16ede933-ba44-4da8-9371-e72ee885758b, year: 2022, office: state_house, district: '86', house_member_id: '1780', name_key: joe adams}
+          - {alias_id: ocd-person/16ede933-ba44-4da8-9371-e72ee885758b, year: 2023, office: state_house, district: '86', name_key: joe adams, term_start: '2021-01-06', term_end: '2025-01-07'}
+          - {alias_id: ocd-person/16ede933-ba44-4da8-9371-e72ee885758b, year: 2023, office: state_house, district: '86', house_member_id: '1780', name_key: joe adams}
+          - {alias_id: ocd-person/16ede933-ba44-4da8-9371-e72ee885758b, year: 2024, office: state_house, district: '86', name_key: joe adams, term_start: '2021-01-06', term_end: '2025-01-07'}
+          - {alias_id: ocd-person/16ede933-ba44-4da8-9371-e72ee885758b, year: 2024, office: state_house, district: '86', house_member_id: '1780', name_key: joe adams}
+          # Lauren Arthur, member 1810: mohouse:1810 HD18 2017-18 and Open States HD18 2015-16, SD17 2018-24
+          - {alias_id: 'mohouse:1810', year: 2017, office: state_house, district: '18', house_member_id: '1810', name_key: lauren arthur}
+          - {alias_id: 'mohouse:1810', year: 2018, office: state_house, district: '18', house_member_id: '1810', name_key: lauren arthur}
+          - {alias_id: ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff, year: 2015, office: state_house, district: '18', name_key: lauren arthur, term_start: '2015-01-01', term_end: '2016-12-31'}
+          - {alias_id: ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff, year: 2016, office: state_house, district: '18', name_key: lauren arthur, term_start: '2015-01-01', term_end: '2016-12-31'}
+          - {alias_id: ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff, year: 2018, office: state_senate, district: '17', name_key: lauren arthur, term_start: '2018-09-12', term_end: '2024-07-21'}
+          - {alias_id: ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff, year: 2019, office: state_senate, district: '17', name_key: lauren arthur, term_start: '2018-09-12', term_end: '2024-07-21'}
+          - {alias_id: ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff, year: 2020, office: state_senate, district: '17', name_key: lauren arthur, term_start: '2018-09-12', term_end: '2024-07-21'}
+          - {alias_id: ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff, year: 2021, office: state_senate, district: '17', name_key: lauren arthur, term_start: '2018-09-12', term_end: '2024-07-21'}
+          - {alias_id: ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff, year: 2022, office: state_senate, district: '17', name_key: lauren arthur, term_start: '2018-09-12', term_end: '2024-07-21'}
+          - {alias_id: ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff, year: 2023, office: state_senate, district: '17', name_key: lauren arthur, term_start: '2018-09-12', term_end: '2024-07-21'}
+          - {alias_id: ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff, year: 2024, office: state_senate, district: '17', name_key: lauren arthur, term_start: '2018-09-12', term_end: '2024-07-21'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        # Adam Schwadron, Deb Lavender, Jean Evans, Joe Adams, Lauren Arthur
+        - {alias_id: 'mohouse:1780', person_id: ocd-person/16ede933-ba44-4da8-9371-e72ee885758b, basis: name_continuity}
+        - {alias_id: 'mohouse:1810', person_id: ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff, basis: name_continuity}
+        - {alias_id: 'mohouse:1912', person_id: ocd-person/af12fdba-1167-4346-8b57-8d79e7a73b89, basis: name_continuity}
+        - {alias_id: ocd-person/0035304c-e314-4d57-8fc8-addf19b16111, person_id: ocd-person/0035304c-e314-4d57-8fc8-addf19b16111, basis: self}
+        - {alias_id: ocd-person/16ede933-ba44-4da8-9371-e72ee885758b, person_id: ocd-person/16ede933-ba44-4da8-9371-e72ee885758b, basis: self}
+        - {alias_id: ocd-person/3135abbd-6e12-4847-9b19-e2a57337724a, person_id: ocd-person/3135abbd-6e12-4847-9b19-e2a57337724a, basis: self}
+        - {alias_id: ocd-person/af12fdba-1167-4346-8b57-8d79e7a73b89, person_id: ocd-person/af12fdba-1167-4346-8b57-8d79e7a73b89, basis: self}
+        - {alias_id: ocd-person/c92b2810-9dcd-41e9-9d3b-7c65e1e36011, person_id: ocd-person/3135abbd-6e12-4847-9b19-e2a57337724a, basis: name_continuity}
+        - {alias_id: ocd-person/c9efc84d-7adb-462d-9e86-b545fe52f6ae, person_id: ocd-person/0035304c-e314-4d57-8fc8-addf19b16111, basis: name_continuity}
+        - {alias_id: ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff, person_id: ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff, basis: self}
+
+  - name: person_ids_cases_join_a_name_change_by_house_member_id
+    model: int_officials__person_ids
+    description: >
+      #151: Mazzie Boyd (mohouse:2381, HD2 in 2023) and Mazzie Christensen (Open States 22e282f9, HD2 from
+      2023-01-04, roster member 2381 in 2024-26) are one person under a name change. No name rule can join them;
+      rule 2c joins the two ids because they share House member id 2381.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          # Mazzie Boyd / Mazzie Christensen, member 2381, HD2
+          - {alias_id: 'mohouse:2381', year: 2023, office: state_house, district: '2', house_member_id: '2381', name_key: mazzie boyd}
+          - {alias_id: ocd-person/22e282f9-afbf-46b8-ac81-0780f5372d0d, year: 2023, office: state_house, district: '2', name_key: mazzie christensen, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/22e282f9-afbf-46b8-ac81-0780f5372d0d, year: 2024, office: state_house, district: '2', name_key: mazzie christensen, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/22e282f9-afbf-46b8-ac81-0780f5372d0d, year: 2024, office: state_house, district: '2', house_member_id: '2381', name_key: mazzie christensen}
+          - {alias_id: ocd-person/22e282f9-afbf-46b8-ac81-0780f5372d0d, year: 2025, office: state_house, district: '2', name_key: mazzie christensen, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/22e282f9-afbf-46b8-ac81-0780f5372d0d, year: 2025, office: state_house, district: '2', house_member_id: '2381', name_key: mazzie christensen}
+          - {alias_id: ocd-person/22e282f9-afbf-46b8-ac81-0780f5372d0d, year: 2026, office: state_house, district: '2', name_key: mazzie christensen, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/22e282f9-afbf-46b8-ac81-0780f5372d0d, year: 2026, office: state_house, district: '2', house_member_id: '2381', name_key: mazzie christensen}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        # Mazzie Boyd / Mazzie Christensen
+        - {alias_id: 'mohouse:2381', person_id: ocd-person/22e282f9-afbf-46b8-ac81-0780f5372d0d, basis: member_id_continuity}
+        - {alias_id: ocd-person/22e282f9-afbf-46b8-ac81-0780f5372d0d, person_id: ocd-person/22e282f9-afbf-46b8-ac81-0780f5372d0d, basis: self}
+
+  - name: person_ids_cases_keep_rick_and_rebecca_roeber_apart
+    model: int_officials__person_ids
+    description: >
+      #152, the shape before the seat-match fix: the House roster kept listing Rebecca Roeber (member 1790, HD34)
+      in 2020 after her death on 2019-07-30, and those 2020 rows seat-matched to Rick Roeber's Open States id
+      (cd0a84e5), so his id carried member 1790 (2020) and his own 2215 (2021). Rebecca's roster rows were
+      mohouse:1790 (2017-19), beside her undated Open States record (ad28c002, ends 2019-07-30). Rule 2c skips an id
+      that carries two member ids, so the shared 1790 does not join Rick to Rebecca; her two ids still join by name.
+      Today the seat match gives the 2020 rows Rebecca's own id (see house_seat_keys_cases_rebecca_roeber_keeps_her_own_id_in_2020).
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          # Rebecca Roeber, member 1790, HD34: roster fallback key 2017-19 and her undated Open States record
+          - {alias_id: 'mohouse:1790', year: 2017, office: state_house, district: '34', house_member_id: '1790', name_key: rebecca roeber}
+          - {alias_id: 'mohouse:1790', year: 2018, office: state_house, district: '34', house_member_id: '1790', name_key: rebecca roeber}
+          - {alias_id: 'mohouse:1790', year: 2019, office: state_house, district: '34', house_member_id: '1790', name_key: rebecca roeber}
+          - {alias_id: ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07, year: 2019, office: state_house, district: '34', name_key: rebecca roeber, term_end: '2019-07-30'}
+          # Rick Roeber, member 2215, HD34: his id also carries Rebecca's 1790 through the 2020 roster rows
+          - {alias_id: ocd-person/cd0a84e5-3f3d-4c02-a8b8-fa1bf8cc8c50, year: 2020, office: state_house, district: '34', house_member_id: '1790', name_key: rick roeber}
+          - {alias_id: ocd-person/cd0a84e5-3f3d-4c02-a8b8-fa1bf8cc8c50, year: 2021, office: state_house, district: '34', name_key: rick roeber, term_end: '2021-04-21'}
+          - {alias_id: ocd-person/cd0a84e5-3f3d-4c02-a8b8-fa1bf8cc8c50, year: 2021, office: state_house, district: '34', house_member_id: '2215', name_key: rick roeber}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        # Rebecca Roeber
+        - {alias_id: 'mohouse:1790', person_id: ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07, basis: name_continuity}
+        - {alias_id: ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07, person_id: ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07, basis: self}
+        # Rick Roeber
+        - {alias_id: ocd-person/cd0a84e5-3f3d-4c02-a8b8-fa1bf8cc8c50, person_id: ocd-person/cd0a84e5-3f3d-4c02-a8b8-fa1bf8cc8c50, basis: self}
+
+  - name: person_ids_cases_join_a_surname_spelled_with_and_without_a_space
+    model: int_officials__person_ids
+    description: >
+      #228: the House roster spells Dean Van Schoiack's name with a space (mohouse:2243, HD9 2021-26) and Open
+      States without one ("Dean VanSchoiack", f3250139, HD9 from 2021-01-06). Rule 2 compares names with spaces
+      removed, so the two ids are one person. The Open States record has no House member id, so rule 2c cannot join
+      them, and the given names are equal, so rule 2b does not apply.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          # Dean Van Schoiack / VanSchoiack, member 2243, HD9
+          - {alias_id: 'mohouse:2243', year: 2021, office: state_house, district: '9', house_member_id: '2243', name_key: dean van schoiack}
+          - {alias_id: 'mohouse:2243', year: 2022, office: state_house, district: '9', house_member_id: '2243', name_key: dean van schoiack}
+          - {alias_id: 'mohouse:2243', year: 2023, office: state_house, district: '9', house_member_id: '2243', name_key: dean van schoiack}
+          - {alias_id: 'mohouse:2243', year: 2024, office: state_house, district: '9', house_member_id: '2243', name_key: dean van schoiack}
+          - {alias_id: 'mohouse:2243', year: 2025, office: state_house, district: '9', house_member_id: '2243', name_key: dean van schoiack}
+          - {alias_id: 'mohouse:2243', year: 2026, office: state_house, district: '9', house_member_id: '2243', name_key: dean van schoiack}
+          - {alias_id: ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e, year: 2021, office: state_house, district: '9', name_key: dean vanschoiack, term_start: '2021-01-06', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e, year: 2022, office: state_house, district: '9', name_key: dean vanschoiack, term_start: '2021-01-06', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e, year: 2023, office: state_house, district: '9', name_key: dean vanschoiack, term_start: '2021-01-06', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e, year: 2024, office: state_house, district: '9', name_key: dean vanschoiack, term_start: '2021-01-06', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e, year: 2025, office: state_house, district: '9', name_key: dean vanschoiack, term_start: '2021-01-06', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e, year: 2026, office: state_house, district: '9', name_key: dean vanschoiack, term_start: '2021-01-06', term_end: '9999-12-31'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        # Dean Van Schoiack
+        - {alias_id: 'mohouse:2243', person_id: ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e, basis: name_continuity}
+        - {alias_id: ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e, person_id: ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e, basis: self}
+
+  - name: person_ids_cases_join_given_name_variants
+    model: int_officials__person_ids
+    description: >
+      Rule 2b. #263: Open States keeps Steve Roberts' House years as "Steven Roberts" (528445cb, HD77 2017-20,
+      member 1940) and his Senate years as "Steve Roberts" (20ad6a34, SD5 from 2021-01-06): a move between chambers
+      in consecutive years, so the two names are one person. Lane Roberts (HD161, 2019+) shares the surname but his
+      given name is no prefix of the others, so he stays apart and Steve / Steven has exactly one partner. Ken /
+      Kenneth Jamison (HD15): Open States holds a 26-day "Kenneth" stub (2025-01-08 to 2025-02-03) inside Ken's term
+      from 2025-01-08, so the stub joins Ken.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          # Steven Roberts (House) / Steve Roberts (Senate)
+          - {alias_id: ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831, year: 2021, office: state_senate, district: '5', name_key: steve roberts, term_start: '2021-01-06', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831, year: 2022, office: state_senate, district: '5', name_key: steve roberts, term_start: '2021-01-06', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831, year: 2023, office: state_senate, district: '5', name_key: steve roberts, term_start: '2021-01-06', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831, year: 2024, office: state_senate, district: '5', name_key: steve roberts, term_start: '2021-01-06', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831, year: 2025, office: state_senate, district: '5', name_key: steve roberts, term_start: '2021-01-06', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831, year: 2026, office: state_senate, district: '5', name_key: steve roberts, term_start: '2021-01-06', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/528445cb-21cc-46ef-86fc-a1d1d9922dc0, year: 2017, office: state_house, district: '77', house_member_id: '1940', name_key: steven roberts}
+          - {alias_id: ocd-person/528445cb-21cc-46ef-86fc-a1d1d9922dc0, year: 2018, office: state_house, district: '77', house_member_id: '1940', name_key: steven roberts}
+          - {alias_id: ocd-person/528445cb-21cc-46ef-86fc-a1d1d9922dc0, year: 2019, office: state_house, district: '77', house_member_id: '1940', name_key: steven roberts}
+          - {alias_id: ocd-person/528445cb-21cc-46ef-86fc-a1d1d9922dc0, year: 2020, office: state_house, district: '77', name_key: steven roberts, term_end: '2020-12-31'}
+          - {alias_id: ocd-person/528445cb-21cc-46ef-86fc-a1d1d9922dc0, year: 2020, office: state_house, district: '77', house_member_id: '1940', name_key: steven roberts}
+          # Lane Roberts, member 2092, HD161: same surname, not a variant
+          - {alias_id: ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff, year: 2019, office: state_house, district: '161', name_key: lane roberts, term_start: '2019-01-09', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff, year: 2019, office: state_house, district: '161', house_member_id: '2092', name_key: lane roberts}
+          - {alias_id: ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff, year: 2020, office: state_house, district: '161', name_key: lane roberts, term_start: '2019-01-09', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff, year: 2020, office: state_house, district: '161', house_member_id: '2092', name_key: lane roberts}
+          - {alias_id: ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff, year: 2021, office: state_house, district: '161', name_key: lane roberts, term_start: '2019-01-09', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff, year: 2021, office: state_house, district: '161', house_member_id: '2092', name_key: lane roberts}
+          - {alias_id: ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff, year: 2022, office: state_house, district: '161', name_key: lane roberts, term_start: '2019-01-09', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff, year: 2022, office: state_house, district: '161', house_member_id: '2092', name_key: lane roberts}
+          - {alias_id: ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff, year: 2023, office: state_house, district: '161', name_key: lane roberts, term_start: '2019-01-09', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff, year: 2023, office: state_house, district: '161', house_member_id: '2092', name_key: lane roberts}
+          - {alias_id: ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff, year: 2024, office: state_house, district: '161', name_key: lane roberts, term_start: '2019-01-09', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff, year: 2024, office: state_house, district: '161', house_member_id: '2092', name_key: lane roberts}
+          - {alias_id: ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff, year: 2025, office: state_house, district: '161', name_key: lane roberts, term_start: '2019-01-09', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff, year: 2025, office: state_house, district: '161', house_member_id: '2092', name_key: lane roberts}
+          - {alias_id: ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff, year: 2026, office: state_house, district: '161', name_key: lane roberts, term_start: '2019-01-09', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff, year: 2026, office: state_house, district: '161', house_member_id: '2092', name_key: lane roberts}
+          # Ken Jamison, member 2479, and the Kenneth Jamison stub, HD15
+          - {alias_id: ocd-person/34a05fb9-bb36-416e-ada9-6be70b48b6b2, year: 2025, office: state_house, district: '15', name_key: ken jamison, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/34a05fb9-bb36-416e-ada9-6be70b48b6b2, year: 2025, office: state_house, district: '15', house_member_id: '2479', name_key: ken jamison}
+          - {alias_id: ocd-person/34a05fb9-bb36-416e-ada9-6be70b48b6b2, year: 2026, office: state_house, district: '15', name_key: ken jamison, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/34a05fb9-bb36-416e-ada9-6be70b48b6b2, year: 2026, office: state_house, district: '15', house_member_id: '2479', name_key: ken jamison}
+          - {alias_id: ocd-person/3e791464-2d1a-4b6e-a60e-e0829d68967f, year: 2025, office: state_house, district: '15', name_key: kenneth jamison, term_start: '2025-01-08', term_end: '2025-02-03'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        # Steve Roberts, Lane Roberts, Ken Jamison
+        - {alias_id: ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831, person_id: ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831, basis: self}
+        - {alias_id: ocd-person/34a05fb9-bb36-416e-ada9-6be70b48b6b2, person_id: ocd-person/34a05fb9-bb36-416e-ada9-6be70b48b6b2, basis: self}
+        - {alias_id: ocd-person/3e791464-2d1a-4b6e-a60e-e0829d68967f, person_id: ocd-person/34a05fb9-bb36-416e-ada9-6be70b48b6b2, basis: name_continuity}
+        - {alias_id: ocd-person/528445cb-21cc-46ef-86fc-a1d1d9922dc0, person_id: ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831, basis: name_continuity}
+        - {alias_id: ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff, person_id: ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff, basis: self}
+
+  - name: person_ids_cases_keep_mid_term_departure_successors_apart
+    model: int_officials__person_ids
+    description: >
+      #313: Open States often leaves a member who left mid-term with the normal term end, so the special-election
+      successor overlaps the predecessor on paper. Real ids, seats and Open States dates: Paul Fitzwater (HD144, to
+      2018-12-31) and Chris Dinkins (from 2018-02-26); Ryan Silvey (SD17, to 2018-12-31) and Lauren Arthur (from
+      2018-09-12); Will Kraus (SD8, to 2018-12-31) and Mike Cierpiot (from 2018-01-03). None is a given-name
+      variant in the data, so each successor here takes an INVENTED variant of the predecessor's name ("Paula
+      Fitzwater", "Ryann Silvey", "Willa Kraus") to exercise the hazard: the terms overlap in one seat but neither
+      sits inside the other, so rule 2b keeps them apart. Years are trimmed to the ones around the hand-over.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          # Paul Fitzwater, member 512, HD144 (real)
+          - {alias_id: ocd-person/1399ab29-12f5-4588-b907-ab9c0b2642ca, year: 2017, office: state_house, district: '144', name_key: paul fitzwater, term_start: '2013-01-01', term_end: '2018-12-31'}
+          - {alias_id: ocd-person/1399ab29-12f5-4588-b907-ab9c0b2642ca, year: 2017, office: state_house, district: '144', house_member_id: '512', name_key: paul fitzwater}
+          - {alias_id: ocd-person/1399ab29-12f5-4588-b907-ab9c0b2642ca, year: 2018, office: state_house, district: '144', name_key: paul fitzwater, term_start: '2013-01-01', term_end: '2018-12-31'}
+          # Chris Dinkins, member 2022, HD144 from 2018-02-26 (real id and dates, invented name "paula fitzwater")
+          - {alias_id: ocd-person/34829e4c-4db2-48e5-bf60-c8011ba802ba, year: 2018, office: state_house, district: '144', name_key: paula fitzwater, term_start: '2018-02-26', term_end: '2025-01-07'}
+          - {alias_id: ocd-person/34829e4c-4db2-48e5-bf60-c8011ba802ba, year: 2018, office: state_house, district: '144', house_member_id: '2022', name_key: paula fitzwater}
+          - {alias_id: ocd-person/34829e4c-4db2-48e5-bf60-c8011ba802ba, year: 2019, office: state_house, district: '144', name_key: paula fitzwater, term_start: '2018-02-26', term_end: '2025-01-07'}
+          - {alias_id: ocd-person/34829e4c-4db2-48e5-bf60-c8011ba802ba, year: 2019, office: state_house, district: '144', house_member_id: '2022', name_key: paula fitzwater}
+          # Ryan Silvey, SD17 (real)
+          - {alias_id: ocd-person/fd8438aa-3dfd-48ef-b2a5-076c42799b9b, year: 2017, office: state_senate, district: '17', name_key: ryan silvey, term_start: '2013-01-01', term_end: '2018-12-31'}
+          - {alias_id: ocd-person/fd8438aa-3dfd-48ef-b2a5-076c42799b9b, year: 2018, office: state_senate, district: '17', name_key: ryan silvey, term_start: '2013-01-01', term_end: '2018-12-31'}
+          # Lauren Arthur, SD17 from 2018-09-12 (real id and dates, invented name "ryann silvey")
+          - {alias_id: ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff, year: 2018, office: state_senate, district: '17', name_key: ryann silvey, term_start: '2018-09-12', term_end: '2024-07-21'}
+          - {alias_id: ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff, year: 2019, office: state_senate, district: '17', name_key: ryann silvey, term_start: '2018-09-12', term_end: '2024-07-21'}
+          # Will Kraus, SD8 (real)
+          - {alias_id: ocd-person/e2a4325d-a856-4581-80d5-d323f65391fc, year: 2017, office: state_senate, district: '8', name_key: will kraus, term_start: '2011-01-01', term_end: '2018-12-31'}
+          - {alias_id: ocd-person/e2a4325d-a856-4581-80d5-d323f65391fc, year: 2018, office: state_senate, district: '8', name_key: will kraus, term_start: '2011-01-01', term_end: '2018-12-31'}
+          # Mike Cierpiot, SD8 from 2018-01-03 (real id and dates, invented name "willa kraus")
+          - {alias_id: ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8, year: 2018, office: state_senate, district: '8', name_key: willa kraus, term_start: '2018-01-03', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8, year: 2019, office: state_senate, district: '8', name_key: willa kraus, term_start: '2018-01-03', term_end: '9999-12-31'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        # Fitzwater / Dinkins
+        - {alias_id: ocd-person/1399ab29-12f5-4588-b907-ab9c0b2642ca, person_id: ocd-person/1399ab29-12f5-4588-b907-ab9c0b2642ca, basis: self}
+        - {alias_id: ocd-person/34829e4c-4db2-48e5-bf60-c8011ba802ba, person_id: ocd-person/34829e4c-4db2-48e5-bf60-c8011ba802ba, basis: self}
+        # Silvey / Arthur
+        - {alias_id: ocd-person/fd8438aa-3dfd-48ef-b2a5-076c42799b9b, person_id: ocd-person/fd8438aa-3dfd-48ef-b2a5-076c42799b9b, basis: self}
+        - {alias_id: ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff, person_id: ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff, basis: self}
+        # Kraus / Cierpiot
+        - {alias_id: ocd-person/e2a4325d-a856-4581-80d5-d323f65391fc, person_id: ocd-person/e2a4325d-a856-4581-80d5-d323f65391fc, basis: self}
+        - {alias_id: ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8, person_id: ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8, basis: self}
+
+  - name: person_ids_cases_keep_placeholder_start_terms_apart
+    model: int_officials__person_ids
+    description: >
+      #332: Open States gives some pre-2015 terms a placeholder 2013-01-01 start. Real ids, seats and dates: Jason
+      Smith (53e03a4a) and Shawn Sisco (c1ad3ea4) both hold HD120 2013-01-01 to 2014-12-31; Dennis Fowler (5316959d,
+      HD151 2013-01-01 to 2014-12-31) sits inside Tila Hubrecht (da68b349, HD151 2013-01-01 to 2018-12-31). Equal
+      or nested multi-year terms are not a short stub, so rule 2b does not join them. Sisco and Fowler take INVENTED
+      variant names ("Jas Smith", "Tilan Hubrecht") to exercise the hazard. The rows use the years these terms span
+      (2013-15); today's identity_terms window starts in 2015, so these exact rows do not reach the model yet.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          # Jason Smith, HD120 (real)
+          - {alias_id: ocd-person/53e03a4a-7187-4412-9b6e-99a21eeef6dc, year: 2013, office: state_house, district: '120', name_key: jason smith, term_start: '2013-01-01', term_end: '2014-12-31'}
+          - {alias_id: ocd-person/53e03a4a-7187-4412-9b6e-99a21eeef6dc, year: 2014, office: state_house, district: '120', name_key: jason smith, term_start: '2013-01-01', term_end: '2014-12-31'}
+          # Shawn Sisco, HD120 (real id and dates, invented name "jas smith")
+          - {alias_id: ocd-person/c1ad3ea4-97c6-43a9-b7e2-87dce2e74785, year: 2013, office: state_house, district: '120', name_key: jas smith, term_start: '2013-01-01', term_end: '2014-12-31'}
+          - {alias_id: ocd-person/c1ad3ea4-97c6-43a9-b7e2-87dce2e74785, year: 2014, office: state_house, district: '120', name_key: jas smith, term_start: '2013-01-01', term_end: '2014-12-31'}
+          # Tila Hubrecht, HD151 (real)
+          - {alias_id: ocd-person/da68b349-983a-457b-829c-ce8bad8783d8, year: 2013, office: state_house, district: '151', name_key: tila hubrecht, term_start: '2013-01-01', term_end: '2018-12-31'}
+          - {alias_id: ocd-person/da68b349-983a-457b-829c-ce8bad8783d8, year: 2014, office: state_house, district: '151', name_key: tila hubrecht, term_start: '2013-01-01', term_end: '2018-12-31'}
+          - {alias_id: ocd-person/da68b349-983a-457b-829c-ce8bad8783d8, year: 2015, office: state_house, district: '151', name_key: tila hubrecht, term_start: '2013-01-01', term_end: '2018-12-31'}
+          # Dennis Fowler, HD151 (real id and dates, invented name "tilan hubrecht")
+          - {alias_id: ocd-person/5316959d-ee83-4d84-8fd9-3025737a9f99, year: 2013, office: state_house, district: '151', name_key: tilan hubrecht, term_start: '2013-01-01', term_end: '2014-12-31'}
+          - {alias_id: ocd-person/5316959d-ee83-4d84-8fd9-3025737a9f99, year: 2014, office: state_house, district: '151', name_key: tilan hubrecht, term_start: '2013-01-01', term_end: '2014-12-31'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        # Jason Smith / Shawn Sisco
+        - {alias_id: ocd-person/53e03a4a-7187-4412-9b6e-99a21eeef6dc, person_id: ocd-person/53e03a4a-7187-4412-9b6e-99a21eeef6dc, basis: self}
+        - {alias_id: ocd-person/c1ad3ea4-97c6-43a9-b7e2-87dce2e74785, person_id: ocd-person/c1ad3ea4-97c6-43a9-b7e2-87dce2e74785, basis: self}
+        # Hubrecht / Fowler
+        - {alias_id: ocd-person/da68b349-983a-457b-829c-ce8bad8783d8, person_id: ocd-person/da68b349-983a-457b-829c-ce8bad8783d8, basis: self}
+        - {alias_id: ocd-person/5316959d-ee83-4d84-8fd9-3025737a9f99, person_id: ocd-person/5316959d-ee83-4d84-8fd9-3025737a9f99, basis: self}
+
+  - name: person_ids_cases_join_stephen_webber_house_and_senate
+    model: int_officials__person_ids
+    description: >
+      #504: Stephen Webber has two Open States ids, House (385fd852, HD46 2013-01-01 to 2016-12-31) and Senate
+      (63dea1c8, SD19 from 2025-01-08). The House term ended before the first House roster (2017), so his House id
+      has evidence only through the two years before the roster that int_officials__identity_terms covers (2015-16;
+      identity_terms_cases_cover_the_two_years_before_the_roster). With it, rule 2 joins the two ids and the Senate
+      id is kept.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          # Stephen Webber: House HD46 to 2016-12-31, Senate SD19 from 2025-01-08
+          - {alias_id: ocd-person/385fd852-bd78-4f3c-8a3d-9fb2233297e0, year: 2015, office: state_house, district: '46', name_key: stephen webber, term_start: '2013-01-01', term_end: '2016-12-31'}
+          - {alias_id: ocd-person/385fd852-bd78-4f3c-8a3d-9fb2233297e0, year: 2016, office: state_house, district: '46', name_key: stephen webber, term_start: '2013-01-01', term_end: '2016-12-31'}
+          - {alias_id: ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9, year: 2025, office: state_senate, district: '19', name_key: stephen webber, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9, year: 2026, office: state_senate, district: '19', name_key: stephen webber, term_start: '2025-01-08', term_end: '9999-12-31'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        # Stephen Webber
+        - {alias_id: ocd-person/385fd852-bd78-4f3c-8a3d-9fb2233297e0, person_id: ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9, basis: name_continuity}
+        - {alias_id: ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9, person_id: ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9, basis: self}
+
+  - name: person_ids_cases_give_undated_senators_rows_without_wrong_merges
+    model: int_officials__person_ids
+    description: >
+      #512: Open States gives these senators no start date; each undated id has one evidence year, the last its term
+      ran past the January 15 handover (2022 for terms ending 2023-01-04, 2018 for Dan Brown's ending 2018-12-31).
+      Each gets its own person_ids row, and none is merged with the dated successor in its seat (Justin Brown SD16
+      from 2019-01-09, Ben Brown SD26 from 2023-01-04; neither given name is a variant). Tom Dempsey (SD23, to
+      2015-08-07) and Paul LeVota (SD11, to 2015-08-23) resigned in 2015 and get rows from the 2015 window year.
+      Rebecca Roeber's undated id is in person_ids_cases_keep_rick_and_rebecca_roeber_apart.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          # Paul Wieland, SD22, undated
+          - {alias_id: ocd-person/b742d6cb-a63d-40c9-afd0-033f26190063, year: 2022, office: state_senate, district: '22', name_key: paul wieland, term_end: '2023-01-04'}
+          # Bob Onder, SD2, undated
+          - {alias_id: ocd-person/e29b57a2-c2e7-4b5a-b299-bb734104f0d7, year: 2022, office: state_senate, district: '2', name_key: bob onder, term_end: '2023-01-04'}
+          # Jeanie Riddle, SD10, undated
+          - {alias_id: ocd-person/3382ca1d-1920-48a9-9d49-6406b5d157c8, year: 2022, office: state_senate, district: '10', name_key: jeanie riddle, term_end: '2023-01-04'}
+          # Dan Brown, SD16, undated, and his successor Justin Brown
+          - {alias_id: ocd-person/2713f041-077d-4253-97a3-e5b168005202, year: 2018, office: state_senate, district: '16', name_key: dan brown, term_end: '2018-12-31'}
+          - {alias_id: ocd-person/867469f6-f988-49ec-be8c-4a065db3f223, year: 2019, office: state_senate, district: '16', name_key: justin brown, term_start: '2019-01-09', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/867469f6-f988-49ec-be8c-4a065db3f223, year: 2020, office: state_senate, district: '16', name_key: justin brown, term_start: '2019-01-09', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/867469f6-f988-49ec-be8c-4a065db3f223, year: 2021, office: state_senate, district: '16', name_key: justin brown, term_start: '2019-01-09', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/867469f6-f988-49ec-be8c-4a065db3f223, year: 2022, office: state_senate, district: '16', name_key: justin brown, term_start: '2019-01-09', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/867469f6-f988-49ec-be8c-4a065db3f223, year: 2023, office: state_senate, district: '16', name_key: justin brown, term_start: '2019-01-09', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/867469f6-f988-49ec-be8c-4a065db3f223, year: 2024, office: state_senate, district: '16', name_key: justin brown, term_start: '2019-01-09', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/867469f6-f988-49ec-be8c-4a065db3f223, year: 2025, office: state_senate, district: '16', name_key: justin brown, term_start: '2019-01-09', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/867469f6-f988-49ec-be8c-4a065db3f223, year: 2026, office: state_senate, district: '16', name_key: justin brown, term_start: '2019-01-09', term_end: '9999-12-31'}
+          # Jill Schupp, SD24, undated
+          - {alias_id: ocd-person/fb7fcb56-e180-4e63-a9be-1f68f0ac44f6, year: 2022, office: state_senate, district: '24', name_key: jill schupp, term_end: '2023-01-04'}
+          # Dave Schatz, SD26, undated, and his successor Ben Brown
+          - {alias_id: ocd-person/1b6006c9-382f-4f2c-a403-48ca97b3e62a, year: 2022, office: state_senate, district: '26', name_key: dave schatz, term_end: '2023-01-04'}
+          - {alias_id: ocd-person/c44ce433-7957-40b8-98dd-221b2f7d1436, year: 2023, office: state_senate, district: '26', name_key: ben brown, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/c44ce433-7957-40b8-98dd-221b2f7d1436, year: 2024, office: state_senate, district: '26', name_key: ben brown, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/c44ce433-7957-40b8-98dd-221b2f7d1436, year: 2025, office: state_senate, district: '26', name_key: ben brown, term_start: '2023-01-04', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/c44ce433-7957-40b8-98dd-221b2f7d1436, year: 2026, office: state_senate, district: '26', name_key: ben brown, term_start: '2023-01-04', term_end: '9999-12-31'}
+          # Tom Dempsey, SD23, resigned 2015-08-07
+          - {alias_id: ocd-person/daea2f5e-5853-45d0-ba92-f0231796d857, year: 2015, office: state_senate, district: '23', name_key: tom dempsey, term_start: '2007-09-18', term_end: '2015-08-07'}
+          # Paul LeVota, SD11, resigned 2015-08-23
+          - {alias_id: ocd-person/e4ba2f03-f2eb-4ec2-b950-16f682b77cae, year: 2015, office: state_senate, district: '11', name_key: paul levota, term_start: '2013-01-01', term_end: '2015-08-23'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        # all self
+        - {alias_id: ocd-person/1b6006c9-382f-4f2c-a403-48ca97b3e62a, person_id: ocd-person/1b6006c9-382f-4f2c-a403-48ca97b3e62a, basis: self}
+        - {alias_id: ocd-person/2713f041-077d-4253-97a3-e5b168005202, person_id: ocd-person/2713f041-077d-4253-97a3-e5b168005202, basis: self}
+        - {alias_id: ocd-person/3382ca1d-1920-48a9-9d49-6406b5d157c8, person_id: ocd-person/3382ca1d-1920-48a9-9d49-6406b5d157c8, basis: self}
+        - {alias_id: ocd-person/867469f6-f988-49ec-be8c-4a065db3f223, person_id: ocd-person/867469f6-f988-49ec-be8c-4a065db3f223, basis: self}
+        - {alias_id: ocd-person/b742d6cb-a63d-40c9-afd0-033f26190063, person_id: ocd-person/b742d6cb-a63d-40c9-afd0-033f26190063, basis: self}
+        - {alias_id: ocd-person/c44ce433-7957-40b8-98dd-221b2f7d1436, person_id: ocd-person/c44ce433-7957-40b8-98dd-221b2f7d1436, basis: self}
+        - {alias_id: ocd-person/daea2f5e-5853-45d0-ba92-f0231796d857, person_id: ocd-person/daea2f5e-5853-45d0-ba92-f0231796d857, basis: self}
+        - {alias_id: ocd-person/e29b57a2-c2e7-4b5a-b299-bb734104f0d7, person_id: ocd-person/e29b57a2-c2e7-4b5a-b299-bb734104f0d7, basis: self}
+        - {alias_id: ocd-person/e4ba2f03-f2eb-4ec2-b950-16f682b77cae, person_id: ocd-person/e4ba2f03-f2eb-4ec2-b950-16f682b77cae, basis: self}
+        - {alias_id: ocd-person/fb7fcb56-e180-4e63-a9be-1f68f0ac44f6, person_id: ocd-person/fb7fcb56-e180-4e63-a9be-1f68f0ac44f6, basis: self}
+
+  - name: person_ids_cases_undated_id_beside_a_same_name_dated_id
+    model: int_officials__person_ids
+    description: >
+      #519, documented behaviour (int_officials__identity_terms header): an undated id has one evidence year, so rule
+      2 cannot see a seat conflict with a same-name id (that needs two shared years), and rule 2b reads a chamber
+      move from its single year. Real undated ids with HYPOTHETICAL dated neighbours (no such records exist today):
+      Paul Wieland (b742d6cb, SD22, last year 2022) beside a dated "Paul Wieland" House id in HD99 2021-22 joins by
+      name although both seats are held in 2022; Dan Brown (2713f041, SD16, last year 2018) beside a dated "Daniel
+      Brown" House id in HD50 2016-17 joins as a chamber move. Both joins are the known weakness: the data test
+      assert_undated_open_states_ids_share_no_name fails on either shape in real data, to be settled by hand. If a
+      rule change gives undated ids more evidence, this test should change with it.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          # Paul Wieland, undated SD22 (real), and a hypothetical dated same-name House id
+          - {alias_id: ocd-person/b742d6cb-a63d-40c9-afd0-033f26190063, year: 2022, office: state_senate, district: '22', name_key: paul wieland, term_end: '2023-01-04'}
+          - {alias_id: ocd-person/wieland-house, year: 2021, office: state_house, district: '99', name_key: paul wieland, term_start: '2021-01-06', term_end: '2023-01-04'}
+          - {alias_id: ocd-person/wieland-house, year: 2022, office: state_house, district: '99', name_key: paul wieland, term_start: '2021-01-06', term_end: '2023-01-04'}
+          # Dan Brown, undated SD16 (real), and a hypothetical dated "Daniel Brown" House id
+          - {alias_id: ocd-person/2713f041-077d-4253-97a3-e5b168005202, year: 2018, office: state_senate, district: '16', name_key: dan brown, term_end: '2018-12-31'}
+          - {alias_id: ocd-person/daniel-brown-house, year: 2016, office: state_house, district: '50', name_key: daniel brown, term_start: '2015-01-07', term_end: '2017-12-31'}
+          - {alias_id: ocd-person/daniel-brown-house, year: 2017, office: state_house, district: '50', name_key: daniel brown, term_start: '2015-01-07', term_end: '2017-12-31'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        # Paul Wieland: joined by name (rule 2); both last serve in 2022, the smaller id is kept
+        - {alias_id: ocd-person/b742d6cb-a63d-40c9-afd0-033f26190063, person_id: ocd-person/b742d6cb-a63d-40c9-afd0-033f26190063, basis: self}
+        - {alias_id: ocd-person/wieland-house, person_id: ocd-person/b742d6cb-a63d-40c9-afd0-033f26190063, basis: name_continuity}
+        # Dan / Daniel Brown: joined as a chamber move (rule 2b); Dan's id serves latest
+        - {alias_id: ocd-person/2713f041-077d-4253-97a3-e5b168005202, person_id: ocd-person/2713f041-077d-4253-97a3-e5b168005202, basis: self}
+        - {alias_id: ocd-person/daniel-brown-house, person_id: ocd-person/2713f041-077d-4253-97a3-e5b168005202, basis: name_continuity}
+
+  # --- int_officials__identity_terms ---------------------------------------------------------------------------------
+
+  - name: identity_terms_cases_cover_the_two_years_before_the_roster
+    model: int_officials__identity_terms
+    description: >
+      #504 / #512: the House roster starts in 2017, and identity_terms also covers the two years before it from Open
+      States seat-terms. Stephen Webber's House id (HD46, 2013-01-01 to 2016-12-31) gets 2015 and 2016, so it has
+      evidence to join his Senate id (SD19 from 2025-01-08); his earlier HD23 term (2011-12) gives nothing. Tom
+      Dempsey (SD23, to 2015-08-07) and Paul LeVota (SD11, to 2015-08-23) resigned in 2015 and get 2015. The roster
+      member here only sets the roster years (2017, 2025, 2026).
+    given:
+      - input: ref('int_mo_house__member_seat_keys')
+        rows:
+          - {raw_person_key: 'mohouse:9', session_year: 2017, district_number: 99, full_name: Zed Zed, openstates_id: null}
+          - {raw_person_key: 'mohouse:9', session_year: 2025, district_number: 99, full_name: Zed Zed, openstates_id: null}
+          - {raw_person_key: 'mohouse:9', session_year: 2026, district_number: 99, full_name: Zed Zed, openstates_id: null}
+      - input: ref('stg_openstates__people')
+        rows: []
+      - input: ref('int_mo_legislators__seat_terms')
+        rows:
+          # Stephen Webber: two House terms and the Senate term
+          - {openstates_id: ocd-person/385fd852-bd78-4f3c-8a3d-9fb2233297e0, chamber: lower, district_number: 23, full_name: Stephen Webber, start_date: '2011-01-01', end_date: '2012-12-31', source_start_date: '2011-01-01', source_end_date: '2012-12-31'}
+          - {openstates_id: ocd-person/385fd852-bd78-4f3c-8a3d-9fb2233297e0, chamber: lower, district_number: 46, full_name: Stephen Webber, start_date: '2013-01-01', end_date: '2016-12-31', source_start_date: '2013-01-01', source_end_date: '2016-12-31'}
+          - {openstates_id: ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9, chamber: upper, district_number: 19, full_name: Stephen Webber, start_date: '2025-01-01', end_date: '9999-12-31', source_start_date: '2025-01-08', source_end_date: '9999-12-31'}
+          # Tom Dempsey
+          - {openstates_id: ocd-person/daea2f5e-5853-45d0-ba92-f0231796d857, chamber: upper, district_number: 23, full_name: Tom Dempsey, start_date: '2007-09-18', end_date: '2015-08-07', source_start_date: '2007-09-18', source_end_date: '2015-08-07'}
+          # Paul LeVota
+          - {openstates_id: ocd-person/e4ba2f03-f2eb-4ec2-b950-16f682b77cae, chamber: upper, district_number: 11, full_name: Paul LeVota, start_date: '2013-01-01', end_date: '2015-08-23', source_start_date: '2013-01-01', source_end_date: '2015-08-23'}
+    expect:
+      rows:
+        - {alias_id: 'mohouse:9', year: 2017, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: 'mohouse:9', year: 2025, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: 'mohouse:9', year: 2026, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        # Stephen Webber
+        - {alias_id: ocd-person/385fd852-bd78-4f3c-8a3d-9fb2233297e0, year: 2015, office: state_house, district: '46', name_key: stephen webber, term_start: '2013-01-01', term_end: '2016-12-31'}
+        - {alias_id: ocd-person/385fd852-bd78-4f3c-8a3d-9fb2233297e0, year: 2016, office: state_house, district: '46', name_key: stephen webber, term_start: '2013-01-01', term_end: '2016-12-31'}
+        - {alias_id: ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9, year: 2025, office: state_senate, district: '19', name_key: stephen webber, term_start: '2025-01-08', term_end: '9999-12-31'}
+        - {alias_id: ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9, year: 2026, office: state_senate, district: '19', name_key: stephen webber, term_start: '2025-01-08', term_end: '9999-12-31'}
+        # Tom Dempsey
+        - {alias_id: ocd-person/daea2f5e-5853-45d0-ba92-f0231796d857, year: 2015, office: state_senate, district: '23', name_key: tom dempsey, term_start: '2007-09-18', term_end: '2015-08-07'}
+        # Paul LeVota
+        - {alias_id: ocd-person/e4ba2f03-f2eb-4ec2-b950-16f682b77cae, year: 2015, office: state_senate, district: '11', name_key: paul levota, term_start: '2013-01-01', term_end: '2015-08-23'}
+
+  - name: identity_terms_cases_give_undated_senators_their_last_year
+    model: int_officials__identity_terms
+    description: >
+      #512: Open States gives these members no start date (int_mo_legislators__seat_terms puts it at 1900-01-01).
+      Each undated term counts for one year, the last its term ran past the January 15 handover: 2022 for the
+      senators whose terms end 2023-01-04 (Paul Wieland, Bob Onder, Jeanie Riddle, Jill Schupp, Dave Schatz), 2018
+      for Dan Brown (to 2018-12-31) and 2019 for Rebecca Roeber (HD34, to 2019-07-30). Justin Brown's dated SD16
+      term (from 2019-01-09) is unchanged. The roster member here only sets the roster years (2017-2022).
+    given:
+      - input: ref('int_mo_house__member_seat_keys')
+        rows:
+          - {raw_person_key: 'mohouse:9', session_year: 2017, district_number: 99, full_name: Zed Zed, openstates_id: null}
+          - {raw_person_key: 'mohouse:9', session_year: 2018, district_number: 99, full_name: Zed Zed, openstates_id: null}
+          - {raw_person_key: 'mohouse:9', session_year: 2019, district_number: 99, full_name: Zed Zed, openstates_id: null}
+          - {raw_person_key: 'mohouse:9', session_year: 2020, district_number: 99, full_name: Zed Zed, openstates_id: null}
+          - {raw_person_key: 'mohouse:9', session_year: 2021, district_number: 99, full_name: Zed Zed, openstates_id: null}
+          - {raw_person_key: 'mohouse:9', session_year: 2022, district_number: 99, full_name: Zed Zed, openstates_id: null}
+      - input: ref('stg_openstates__people')
+        rows: []
+      - input: ref('int_mo_legislators__seat_terms')
+        rows:
+          - {openstates_id: ocd-person/b742d6cb-a63d-40c9-afd0-033f26190063, chamber: upper, district_number: 22, full_name: Paul Wieland, start_date: '1900-01-01', end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
+          - {openstates_id: ocd-person/e29b57a2-c2e7-4b5a-b299-bb734104f0d7, chamber: upper, district_number: 2, full_name: Bob Onder, start_date: '1900-01-01', end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
+          - {openstates_id: ocd-person/3382ca1d-1920-48a9-9d49-6406b5d157c8, chamber: upper, district_number: 10, full_name: Jeanie Riddle, start_date: '1900-01-01', end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
+          - {openstates_id: ocd-person/2713f041-077d-4253-97a3-e5b168005202, chamber: upper, district_number: 16, full_name: Dan Brown, start_date: '1900-01-01', end_date: '2018-12-31', source_start_date: null, source_end_date: '2018-12-31'}
+          - {openstates_id: ocd-person/867469f6-f988-49ec-be8c-4a065db3f223, chamber: upper, district_number: 16, full_name: Justin Brown, start_date: '2019-01-01', end_date: '9999-12-31', source_start_date: '2019-01-09', source_end_date: '9999-12-31'}
+          - {openstates_id: ocd-person/fb7fcb56-e180-4e63-a9be-1f68f0ac44f6, chamber: upper, district_number: 24, full_name: Jill Schupp, start_date: '1900-01-01', end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
+          - {openstates_id: ocd-person/1b6006c9-382f-4f2c-a403-48ca97b3e62a, chamber: upper, district_number: 26, full_name: Dave Schatz, start_date: '1900-01-01', end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
+          - {openstates_id: ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07, chamber: lower, district_number: 34, full_name: Rebecca Roeber, start_date: '1900-01-01', end_date: '2019-07-30', source_start_date: null, source_end_date: '2019-07-30'}
+    expect:
+      rows:
+        - {alias_id: 'mohouse:9', year: 2017, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: 'mohouse:9', year: 2018, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: 'mohouse:9', year: 2019, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: 'mohouse:9', year: 2020, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: 'mohouse:9', year: 2021, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: 'mohouse:9', year: 2022, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
+        - {alias_id: ocd-person/b742d6cb-a63d-40c9-afd0-033f26190063, year: 2022, office: state_senate, district: '22', name_key: paul wieland, term_start: null, term_end: '2023-01-04'}
+        - {alias_id: ocd-person/e29b57a2-c2e7-4b5a-b299-bb734104f0d7, year: 2022, office: state_senate, district: '2', name_key: bob onder, term_start: null, term_end: '2023-01-04'}
+        - {alias_id: ocd-person/3382ca1d-1920-48a9-9d49-6406b5d157c8, year: 2022, office: state_senate, district: '10', name_key: jeanie riddle, term_start: null, term_end: '2023-01-04'}
+        - {alias_id: ocd-person/2713f041-077d-4253-97a3-e5b168005202, year: 2018, office: state_senate, district: '16', name_key: dan brown, term_start: null, term_end: '2018-12-31'}
+        - {alias_id: ocd-person/867469f6-f988-49ec-be8c-4a065db3f223, year: 2019, office: state_senate, district: '16', name_key: justin brown, term_start: '2019-01-09', term_end: '9999-12-31'}
+        - {alias_id: ocd-person/867469f6-f988-49ec-be8c-4a065db3f223, year: 2020, office: state_senate, district: '16', name_key: justin brown, term_start: '2019-01-09', term_end: '9999-12-31'}
+        - {alias_id: ocd-person/867469f6-f988-49ec-be8c-4a065db3f223, year: 2021, office: state_senate, district: '16', name_key: justin brown, term_start: '2019-01-09', term_end: '9999-12-31'}
+        - {alias_id: ocd-person/867469f6-f988-49ec-be8c-4a065db3f223, year: 2022, office: state_senate, district: '16', name_key: justin brown, term_start: '2019-01-09', term_end: '9999-12-31'}
+        - {alias_id: ocd-person/fb7fcb56-e180-4e63-a9be-1f68f0ac44f6, year: 2022, office: state_senate, district: '24', name_key: jill schupp, term_start: null, term_end: '2023-01-04'}
+        - {alias_id: ocd-person/1b6006c9-382f-4f2c-a403-48ca97b3e62a, year: 2022, office: state_senate, district: '26', name_key: dave schatz, term_start: null, term_end: '2023-01-04'}
+        - {alias_id: ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07, year: 2019, office: state_house, district: '34', name_key: rebecca roeber, term_start: null, term_end: '2019-07-30'}
+
+  # --- int_mo_house__member_seat_keys --------------------------------------------------------------------------------
+
+  - name: house_seat_keys_cases_joe_don_mcgaugh_keeps_his_own_id
+    model: int_mo_house__member_seat_keys
+    description: >
+      #136: in 2017 two Open States terms cover HD39 with the surname McGaugh: Joe Don McGaugh's (044d5678,
+      2013-01-01 to 2018-12-31) and Peggy McGaugh's, which has no start date (920c5b79, 1900-01-01 placeholder to
+      2023-01-03). The seat alone is ambiguous, so the House member's given name breaks the tie: Joe Don (member 658)
+      resolves to his own Open States id, not mohouse:658, and Peggy (member 2019, 2018 session) to hers. Her later
+      HD7 term does not cover HD39.
+    given:
+      - input: ref('stg_mo_house__members')
+        rows:
+          - {session_code: '171', session_year: 2017, district_number: 39, house_member_id: '658', first_name: Joe Don, last_name: McGaugh}
+          - {session_code: '181', session_year: 2018, district_number: 39, house_member_id: '2019', first_name: Peggy, last_name: McGaugh}
+      - input: ref('int_mo_legislators__seat_terms')
+        rows:
+          - {openstates_id: ocd-person/044d5678-1ad5-429f-b7b5-a7e41d091aec, chamber: lower, district_number: 39, surname_key: mcgaugh, full_name_key: joe don mcgaugh, start_date: '2013-01-01', end_date: '2018-12-31'}
+          - {openstates_id: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014, chamber: lower, district_number: 39, surname_key: mcgaugh, full_name_key: peggy mcgaugh, start_date: '1900-01-01', end_date: '2023-01-03'}
+          - {openstates_id: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014, chamber: lower, district_number: 7, surname_key: mcgaugh, full_name_key: peggy mcgaugh, start_date: '2023-01-01', end_date: '9999-12-31'}
+    expect:
+      rows:
+        # Joe Don McGaugh
+        - {session_code: '171', district_number: 39, house_member_id: '658', raw_person_key: ocd-person/044d5678-1ad5-429f-b7b5-a7e41d091aec}
+        # Peggy McGaugh
+        - {session_code: '181', district_number: 39, house_member_id: '2019', raw_person_key: ocd-person/920c5b79-73a0-477b-a90d-1a290e48e014}
+
+  - name: house_seat_keys_cases_rebecca_roeber_keeps_her_own_id_in_2020
+    model: int_mo_house__member_seat_keys
+    description: >
+      #152: the House roster lists Rebecca Roeber (member 1790, HD34) through 2020, after her death on 2019-07-30.
+      Both Roeber terms in Open States are undated (Rebecca's ends 2019-07-30, Rick's 2021-04-21), so in 2017 and
+      2019 both cover HD34 and the given name picks Rebecca; in 2020 only Rick's covers it, so the seat match lands
+      on him. Member 1790's other sessions anchor it to Rebecca by given name, so her 2020 rows keep her id
+      (ad28c002) and do not take Rick's (cd0a84e5). Rick (member 2215, 2021) resolves to his own id.
+    given:
+      - input: ref('stg_mo_house__members')
+        rows:
+          # Rebecca Roeber
+          - {session_code: '171', session_year: 2017, district_number: 34, house_member_id: '1790', first_name: Rebecca, last_name: Roeber}
+          - {session_code: '191', session_year: 2019, district_number: 34, house_member_id: '1790', first_name: Rebecca, last_name: Roeber}
+          - {session_code: '201', session_year: 2020, district_number: 34, house_member_id: '1790', first_name: Rebecca, last_name: Roeber}
+          # Rick Roeber
+          - {session_code: '211', session_year: 2021, district_number: 34, house_member_id: '2215', first_name: Rick, last_name: Roeber}
+      - input: ref('int_mo_legislators__seat_terms')
+        rows:
+          - {openstates_id: ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07, chamber: lower, district_number: 34, surname_key: roeber, full_name_key: rebecca roeber, start_date: '1900-01-01', end_date: '2019-07-30'}
+          - {openstates_id: ocd-person/cd0a84e5-3f3d-4c02-a8b8-fa1bf8cc8c50, chamber: lower, district_number: 34, surname_key: roeber, full_name_key: rick roeber, start_date: '1900-01-01', end_date: '2021-04-21'}
+    expect:
+      rows:
+        # Rebecca Roeber
+        - {session_code: '171', district_number: 34, house_member_id: '1790', raw_person_key: ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07}
+        - {session_code: '191', district_number: 34, house_member_id: '1790', raw_person_key: ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07}
+        - {session_code: '201', district_number: 34, house_member_id: '1790', raw_person_key: ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07}
+        # Rick Roeber
+        - {session_code: '211', district_number: 34, house_member_id: '2215', raw_person_key: ocd-person/cd0a84e5-3f3d-4c02-a8b8-fa1bf8cc8c50}
