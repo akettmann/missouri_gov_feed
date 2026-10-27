@@ -3,6 +3,9 @@
 -- failure as a row. A link with no row means the loader skipped it or the document URL changed shape (whitespace,
 -- host) between the two. Sessions and kinds the loader has not started are skipped: it runs in pieces and is
 -- optional (the 2017-2026 set is about 19 hours of requests). Witness forms and change maps are never fetched.
+-- Warns rather than fails: a filtered loader run drops earlier error rows (#631 item 4) while the session still
+-- counts as started, so a piecewise load reports links that did get a row once.
+{{ config(severity='warn') }}
 with started as (
     select distinct
         session_code,
