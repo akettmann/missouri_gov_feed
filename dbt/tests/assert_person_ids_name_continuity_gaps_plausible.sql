@@ -11,10 +11,10 @@
 -- signed off by a maintainer (checked_by and checked_on filled).
 -- Measured on a full build (2026-10): 27 name_continuity ids, in 27 persons of 2 ids each. 23 persons touch in
 -- time; Joe Adams returns to HD86 after 2 years; Lavender and Matthiesen are exempt by member id; Stephen Webber
--- (HD46 to 2016, SD19 from 2025: 9 years, another chamber) fails. He is one person (#504, PR #511), but only a
--- maintainer can sign that off: his row in official_id_links is unsigned, so this test warns until it is signed
--- (#663); then make it error.
-{{ config(severity='warn') }}
+-- (HD46 to 2016, SD19 from 2025: 9 years, another chamber) would fail on the name alone. A maintainer signed off
+-- that he is one person (#504, PR #511, #663), so his row in official_id_links is signed: his ids are now basis
+-- curated, not name_continuity, and this test no longer sees them. It lists nothing, so it is an error (#663).
+{{ config(severity='error') }}
 
 with person_ids as (
     select * from {{ ref('int_officials__person_ids') }}
