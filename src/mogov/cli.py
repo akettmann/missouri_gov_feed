@@ -221,7 +221,7 @@ def _dump_vars(dbt_vars: dict) -> str:
 
 def run_dbt(args: list[str]) -> int:
     for table in db.ensure_optional_tables():
-        loader_name = db.OPTIONAL_JSON_TABLES[table]
+        loader_name = {**db.OPTIONAL_JSON_TABLES, **db.OPTIONAL_TYPED_TABLES}[table]
         log.warning(
             "dbt.placeholder",
             table=f"raw.{table}",

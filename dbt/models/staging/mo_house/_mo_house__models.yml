@@ -119,6 +119,72 @@ models:
     committee, member). Held only for sessions 231, 241, 251, 253 and 254 (2023 onward). The member is identified
     by the House district number, which is unique within a session. source_url is the House file the COMMITTEELIST
     export was fetched from (the session zip for a closed session).'
+- name: stg_mo_house__document_texts
+  description: 'The text of the House''s bill documents (bill text versions, summaries, fiscal notes, amendments)
+    that the mo_house_pdf loader fetched: one row per document URL, with the NUL and other control characters removed
+    from the text (see clean_pdf_text). A document that failed to download or extract has a row with fetch_error
+    set and no text; the loader retries it on its next run. A summary shared by several bill versions is one row
+    (n_links counts the links). bill is the House bill whose XML first names the URL; it is null when the first
+    link is on a Senate bill listed in the SenateActList (that list''s file holds many bills), so join to fct_bill_documents
+    on document_url for the bill. The state row in mo_house_pdf_files adds the HTTP status and the file''s size.'
+  data_tests:
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: text_length = 0 or page_count > 0
+  columns:
+  - name: document_url
+    description: Link to the PDF, trimmed.
+    data_tests:
+    - unique
+    - not_null
+  - name: document_kind
+    description: bill_text, summary, fiscal_note or amendment.
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - bill_text
+          - summary
+          - fiscal_note
+          - amendment
+  - name: session_code
+    description: House session code of the first link row that names the URL.
+    data_tests:
+    - not_null
+  - name: bill
+    description: The House bill whose XML first names the URL; null when that is a Senate bill listed in the SenateActList.
+  - name: lr_number
+    description: Legislative Research number from the first link row (null for fiscal notes).
+  - name: version_code
+    description: Bill text version code (I, H, P, T, ...) from the first link row (null for fiscal notes and amendments).
+  - name: n_links
+    description: How many link rows in the House XML name this URL.
+    data_tests:
+    - not_null
+  - name: page_count
+    description: Pages in the PDF; null when the fetch failed.
+    data_tests:
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 1
+          max_value: 1500
+  - name: document_text
+    description: Text of the PDF as pdfplumber extracted it, control characters removed; null when the fetch failed.
+  - name: text_length
+    description: Characters in document_text (0 when there is none).
+    data_tests:
+    - not_null
+  - name: has_text
+    description: True when document_text has any non-blank character. A PDF of scanned images has none.
+    data_tests:
+    - not_null
+  - name: fetch_error
+    description: Why the document has no text (HTTP error, "not a PDF", timeout); null when it was fetched.
+  - name: http_status
+    description: HTTP status of the fetch, from mo_house_pdf_files.
+  - name: size_bytes
+    description: Size of the stored PDF, from mo_house_pdf_files.
 - name: stg_mo_house__member_committees
   description: 'Committee and subcommittee posts of each MO House member per session, as the member''s own XML page
     lists them (end-of-session snapshot): committee name and position (Chair, Vice-Chair, Co-Chair, Ranking Minority

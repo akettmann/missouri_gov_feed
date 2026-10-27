@@ -1735,6 +1735,72 @@ models:
       - name: label
         data_type: varchar
         description: The House's name for the document (summary or text version name, amendment description, witness-form description); null for fiscal notes.
+      - name: page_count
+        data_type: bigint
+        description: Pages in the fetched PDF; null when the mo_house_pdf loader has not fetched the link (not run yet, witness forms, change maps) or the fetch failed.
+      - name: text_length
+        data_type: bigint
+        description: Characters of extracted text (see fct_bill_document_texts); null when not fetched, 0 when fetched with no text.
+      - name: has_text
+        data_type: boolean
+        description: True when the PDF has a text layer; null when not fetched.
+      - name: fetch_error
+        data_type: varchar
+        description: Why the loader could not get the text ("not a PDF", HTTP error); null when fetched or not tried.
+
+  - name: fct_bill_document_texts
+    description: >
+      The text of the House's bill documents, one row per document URL: bill text versions, summaries, fiscal notes
+      and amendments the mo_house_pdf loader fetched (empty until it has run). A sibling of fct_bill_documents rather
+      than columns on it, because the text is wide (a few GB for 2017-2026) and the link mart is small and is read
+      for every bill page; join on document_url for the bill, label and index. A summary shared by several
+      versions is one row here and one row per bill in fct_bill_documents. Control characters (NUL from small-caps
+      glyphs) are removed. A scanned page adds to page_count but has no text. Grain: one row per document_url.
+    columns:
+      - name: document_url
+        data_type: varchar
+        description: Link to the PDF; joins to fct_bill_documents.document_url.
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_bill_documents')
+                field: document_url
+      - name: document_kind
+        data_type: varchar
+        description: bill_text, summary, fiscal_note or amendment.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['bill_text', 'summary', 'fiscal_note', 'amendment']
+      - name: session_code
+        data_type: varchar
+        description: House session code of the first link that names the URL.
+      - name: lr_number
+        data_type: varchar
+        description: Legislative Research number (null for fiscal notes).
+      - name: version_code
+        data_type: varchar
+        description: Bill text version code (I introduced, H committee substitute, P perfected, T truly agreed, ...); null for fiscal notes and amendments.
+      - name: n_links
+        data_type: bigint
+        description: How many links in the House XML name this URL.
+      - name: page_count
+        data_type: bigint
+        description: Pages in the PDF; null when the fetch failed. Between 1 and 1,500.
+      - name: text_length
+        data_type: bigint
+        description: Characters in document_text; 0 when there is none.
+      - name: has_text
+        data_type: boolean
+        description: True when document_text has a non-blank character.
+      - name: fetch_error
+        data_type: varchar
+        description: Why there is no text (HTTP error, "not a PDF"); null when fetched.
+      - name: document_text
+        data_type: varchar
+        description: The PDF's text as extracted, control characters removed; null when the fetch failed.
 
   - name: fct_bill_hearings
     description: >

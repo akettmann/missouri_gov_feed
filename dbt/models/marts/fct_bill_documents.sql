@@ -4,6 +4,9 @@
 -- Covers House bills and the Senate bills the House acted on (2024 sessions on). Witness forms name citizens, so
 -- only the link is kept. The XML sometimes lists one link twice (a summary shared by two versions): a link is
 -- one row, with its lowest index and the label at that index.
+-- The fetched PDFs' size and extraction result are joined by URL (page_count, text_length, has_text, fetch_error;
+-- null when the mo_house_pdf loader has not fetched the link, which it never does for witness forms and change maps).
+-- The text itself is in fct_bill_document_texts.
 -- document_kind: summary, fiscal_note, witness_form, bill_text, text_map, amendment, amendment_map
 with documents as (
     select
@@ -97,11 +100,17 @@ ranked as (
 )
 
 select
-    session_code,
-    bill,
-    document_kind,
-    document_url,
-    document_index,
-    label
-from ranked
-where link_rank = 1
+    r.session_code,
+    r.bill,
+    r.document_kind,
+    r.document_url,
+    r.document_index,
+    r.label,
+    t.page_count,
+    t.text_length,
+    t.has_text,
+    t.fetch_error
+from ranked as r
+left join {{ ref('stg_mo_house__document_texts') }} as t
+    on trim(r.document_url) = t.document_url and r.document_kind = t.document_kind
+where r.link_rank = 1
