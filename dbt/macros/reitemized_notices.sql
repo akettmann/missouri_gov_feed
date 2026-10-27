@@ -20,6 +20,8 @@
        other ("deVries and Assoc" / "DeVries and Associates", "Alliance ... Technical Ed" / "... Education") and the
        longer name has up to two more words at the end ("Committee to Elect Jamie Burger" / "... Burger HD"). The
        first word must be equal ("Ed Smith" is not "Edward Smith"), both names need two words, and the digits must match.
+       A word that is only the start of another counts only when the longer one is an organisation word from the macro
+       is_org_word_prefix (see name_words_match): person surnames never pair this way.
        Because that is a statement about two names, not about the count of lines, tiers 2 and 3 also run when the
        committee/date/amount has several leftover lines: a notice is dropped when it has exactly ONE name-compatible
        full-report line and that line has exactly ONE name-compatible notice, and no leftover line of the group lacks
@@ -46,13 +48,50 @@
     ) }})
 {%- endmacro %}
 
+{#- Organisation words that may be abbreviated or truncated in donor names (#634), for name_words_match: the longer word of
+    a prefix pair must be one of these. Person surnames are deliberately absent, so "John Hill" / "John Hillhouse" and
+    "Smith Alex" / "Smith Alexandra" never pair. Chosen from the words that really occur abbreviated in MEC donor names
+    (October 2026). It is a macro list rather than a seed because dbt unit tests cannot run a model that refs a seed
+    they do not mock, and every dedupe test would have to repeat the list. word is the longer word and prefix the
+    shorter, both column names or expressions. A prefix needs 3+ letters, except 2 for Ed / Education. -#}
+{% macro is_org_word_prefix(word, prefix) -%}
+    (
+        (
+            length({{ prefix }}) >= 3
+            and {{ word }} in (
+                'accountants', 'administration', 'administrative', 'administrators', 'advisors', 'american',
+                'anesthesiologists', 'anesthesiology', 'anesthetists', 'architects', 'architectural',
+                'associate', 'associated', 'associates', 'association', 'associations', 'attorneys',
+                'bankers', 'benevolent', 'builders', 'cattlemens', 'centers', 'chiropractors', 'commission',
+                'commissioners', 'committee', 'committees', 'communications', 'community', 'construction',
+                'constructors', 'consulting', 'contractors', 'convenience', 'cooperative', 'cooperatives',
+                'corporation', 'corporations', 'corrections', 'council', 'democrat', 'democratic',
+                'democrats', 'dermatological', 'development', 'district', 'districts', 'drivers', 'electric',
+                'electrical', 'elevators', 'employees', 'engineering', 'engineers', 'enterprises', 'farms',
+                'federal', 'federation', 'financial', 'firefighters', 'fitters', 'foods', 'glassworkers',
+                'government', 'growers', 'healthcare', 'holdings', 'homes', 'hospital', 'hospitals',
+                'independent', 'industries', 'insurance', 'international', 'investments', 'laborers',
+                'legislative', 'local', 'locals', 'machinists', 'maintenance', 'management', 'marketers',
+                'medical', 'metals', 'motors', 'municipal', 'national', 'officers', 'organization',
+                'petroleum', 'pipefitters', 'plasterers', 'police', 'political', 'professional', 'realtors',
+                'regional', 'rehabilitation', 'representative', 'republican', 'republicans', 'services',
+                'society', 'solutions', 'state', 'states', 'stores', 'systems', 'teachers', 'technical',
+                'telecommunication', 'telecommunications', 'trades', 'transportation', 'troopers', 'union',
+                'voluntary', 'wholesale', 'wholesalers', 'workers'
+            )
+        )
+        or (length({{ prefix }}) >= 2 and {{ word }} in ('education', 'educational'))
+    )
+{%- endmacro %}
+
 {#- True when two loose_name_keys are the same name abbreviated or with words added (#557): at least two words in the
     shorter name, the first word equal, each later word of the shorter equal to or a prefix of the same-position word
-    of the other, and at most two extra words on the longer. A prefix that is not the whole word must look like an
-    abbreviation or a truncation (#634): in a name of up to three words it is at least 4 letters and the full word is
-    at least 5 letters longer ("Assoc" / "Associates", "Tech" / "Technical"), so a surname that is the start of another
-    surname ("John Smith" / "John Smithson", "Mary Ann" / "Mary Anderson", "Jon Van" / "Jon Vance") stays unpaired;
-    names of four or more words take any prefix ("... Technical Ed" / "... Technical Education").
+    of the other, and at most two extra words on the longer. A word that is only a prefix of the other word counts
+    only when the LONGER word is an organisation word listed in the macro is_org_word_prefix ("Assoc" / "Associates",
+    "Ins" / "Insurance") and the prefix has 3+ letters, 2 for Ed / Education (#634). Surnames are not
+    listed, so "John Hill" / "John Hillhouse", "Smith Alex" / "Smith Alexandra" and "Committee to Elect John Smith" /
+    "... Smithson" stay unpaired, and words of 1-2 letters (except "Ed" for education) and Roman numerals ("Holding III"
+    / "Holdings II") must be equal. Equal words and extra trailing words always count.
     Compares up to 8 words; digits are compared by the caller.
     n_a, n_b are the word counts of a, b (columns or expressions). -#}
 {% macro name_words_match(a, b, n_a, n_b) -%}
@@ -68,11 +107,11 @@
             {%- if i > 1 %}
             or (
                 {{ wa }} like {{ wb }} || '%'
-                and (least({{ n_a }}, {{ n_b }}) >= 4 or (length({{ wb }}) >= 4 and length({{ wa }}) - length({{ wb }}) >= 5))
+                and {{ mogov.is_org_word_prefix(wa, wb) }}
             )
             or (
                 {{ wb }} like {{ wa }} || '%'
-                and (least({{ n_a }}, {{ n_b }}) >= 4 or (length({{ wa }}) >= 4 and length({{ wb }}) - length({{ wa }}) >= 5))
+                and {{ mogov.is_org_word_prefix(wb, wa) }}
             )
             {%- endif %}
         )

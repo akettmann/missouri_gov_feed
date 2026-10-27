@@ -6,10 +6,11 @@ unit_tests:
     model: int_tap_mec__contributions
     description: >
       Surname prefixes and empty loose keys (#634). A word that is only the start of another word pairs two names only
-      when it looks like an abbreviation: in a name of up to three words at least 4 letters, with the full word 5 or more
-      letters longer. Kept: John Smith / John Smithson (a), Mary Ann Smith / Mary Ann Smithson (b), Mary Ann / Mary
+      when the longer word is an organisation word in the macro is_org_word_prefix and the prefix has 3+ letters (2 for
+      Ed / Education); surnames never pair (m, n, o, t) and Roman numerals must be equal (p). Kept: John Smith / John Smithson (a), Mary Ann Smith / Mary Ann Smithson (b), Mary Ann / Mary
       Anderson (c), Jon Van / Jon Vance (d), a hyphenated surname that is a prefix (e), Jim Mc / Jim McDonald (f), Bob Kellogg Smith / Bob Kellogg
-      Smithson (l). Dropped: Assoc / Associates (g, h), Tech / Technical (i), a name of four or more words with a truncated
+      Smithson (l), John Hill / Hillhouse (m), smith alex / alexandra (n), Committee to Elect John Smith / Smithson (o),
+      holding iii / holdings ii (p), Robert Good / Goodspeed (t). Dropped: deVries & Associates / DeVries and Assoc (q), Nationwide Mutual Ins / Insurance (r), Assoc / Associates (g, h), Tech / Technical (i), a name of four or more words with a truncated
       last word (j), an added legal-form word after a hyphenated surname (k). A name with an empty loose key ("A B", "The
       Co") is never paired, with one or several leftover lines (the ne/fe cases).
     given:
@@ -39,6 +40,20 @@ unit_tests:
           - {record_id: fk, mec_committee_id: P11, contributor_name: Anne Smith-Jones Inc, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
           - {record_id: nl, mec_committee_id: P12, contributor_name: Bob Kellogg Smith, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
           - {record_id: fl, mec_committee_id: P12, contributor_name: Bob Kellogg Smithson, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nm, mec_committee_id: P13, contributor_name: John Hill, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fm, mec_committee_id: P13, contributor_name: John Hillhouse, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nn, mec_committee_id: P14, contributor_name: smith alex, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fn, mec_committee_id: P14, contributor_name: smith alexandra, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nco, mec_committee_id: P15, contributor_name: Committee to Elect John Smith, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fco, mec_committee_id: P15, contributor_name: Committee to Elect John Smithson, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: np, mec_committee_id: P16, contributor_name: holding iii, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fp, mec_committee_id: P16, contributor_name: holdings ii, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nq, mec_committee_id: P17, contributor_name: deVries & Associates, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fq, mec_committee_id: P17, contributor_name: DeVries and Assoc, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nr, mec_committee_id: P18, contributor_name: Nationwide Mutual Ins, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fr, mec_committee_id: P18, contributor_name: Nationwide Mutual Insurance, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nt, mec_committee_id: P20, contributor_name: Robert Good, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: ft, mec_committee_id: P20, contributor_name: Robert Goodspeed, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
           - {record_id: ne1, mec_committee_id: P90, contributor_name: A B, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
           - {record_id: fe1, mec_committee_id: P90, contributor_name: C D, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
           - {record_id: ne2, mec_committee_id: P91, contributor_name: A B, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
@@ -65,6 +80,18 @@ unit_tests:
         - {record_id: fk}
         - {record_id: nl}
         - {record_id: fl}
+        - {record_id: nm}
+        - {record_id: fm}
+        - {record_id: nn}
+        - {record_id: fn}
+        - {record_id: nco}
+        - {record_id: fco}
+        - {record_id: np}
+        - {record_id: fp}
+        - {record_id: fq}
+        - {record_id: fr}
+        - {record_id: nt}
+        - {record_id: ft}
         - {record_id: ne1}
         - {record_id: fe1}
         - {record_id: ne2}
