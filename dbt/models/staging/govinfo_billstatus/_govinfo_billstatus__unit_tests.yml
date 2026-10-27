@@ -47,3 +47,19 @@ unit_tests:
     expect:
       rows:
         - {bill_id: 118-sjres-32, action_position: 0, chamber: Senate, congress: 118, session_number: 2, roll_number: 5, vote_date: '2024-01-10', vote_url: 'https://s/5'}
+
+  - name: billstatus_laws_split_the_number_into_integers
+    model: stg_govinfo_billstatus__laws
+    description: >
+      The law number "<congress>-<n>" is split into integer parts so laws sort numerically (118-100 after 118-21);
+      the type (Public or Private Law) is kept as published.
+    given:
+      - input: source('govinfo_billstatus', 'laws')
+        format: sql
+        rows: |
+            select cast('{"bill_id": "118-hr-1", "position": 0, "law_type": "Public Law", "law_number": "118-100"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-s-2", "position": 0, "law_type": "Private Law", "law_number": "118-21"}' as varchar) as payload, 'u' as source_url
+    expect:
+      rows:
+        - {bill_id: 118-hr-1, law_type: Public Law, law_number: 118-100, law_congress: 118, law_sequence: 100}
+        - {bill_id: 118-s-2, law_type: Private Law, law_number: 118-21, law_congress: 118, law_sequence: 21}

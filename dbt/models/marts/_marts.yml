@@ -499,7 +499,8 @@ models:
     description: >
       Federal bills sponsored or cosponsored by Missouri's members of Congress, from the GovInfo BILLSTATUS bulk
       XML (loaded congresses, MOGOV_BILLSTATUS_CONGRESSES), with the outcome as a fact: became_law is true when
-      the bill carries a Public Law number. Withdrawn cosponsorships are dropped. Whether that counts as a
+      the bill carries a law number, public or private (law_type says which; a private law relieves one named person
+      or entity and is rare, none among the 118th Congress's bills). Withdrawn cosponsorships are dropped. Whether that counts as a
       "successful" bill is a policy call this model does not make. Grain: (bioguide_id, bill_id, role).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
@@ -557,12 +558,20 @@ models:
       - name: latest_action_text
         data_type: varchar
         description: Text of the most recent action, as published.
-      - name: public_law_number
+      - name: law_type
         data_type: varchar
-        description: Public Law number, e.g. 119-21, when the bill became law.
+        description: Public Law or Private Law, when the bill became law; null otherwise.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [Public Law, Private Law]
+      - name: law_number
+        data_type: varchar
+        description: Law number, e.g. 119-21, when the bill became law. Public and private laws are numbered
+          separately, so read it with law_type. When a bill carries two laws, the earliest by number.
       - name: became_law
         data_type: boolean
-        description: True when the bill carries a Public Law number.
+        description: True when the bill carries a law number, public or private.
         data_tests: [not_null]
       - name: source_url
         data_type: varchar
