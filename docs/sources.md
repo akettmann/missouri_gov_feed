@@ -849,10 +849,10 @@ Quirks:
   "Technical Education". Person surnames are not on the list, so "John Hill" / "John Hillhouse", "Smith Alex" /
   "Smith Alexandra", "John Smith" / "John Smithson" and "Committee to Elect John Smith" / "... Smithson" stay unpaired,
   and Roman numerals and 1-2 letter words must be equal ("Holding III" / "Holdings II"). An organisation abbreviated
-  in a way the list does not cover (a misspelling, "Mfg") is not paired by this rule. A donor name that differs from
-  another by one or two letters (10+ characters, same digits) still pairs through the typo rule above, so
-  "Citizens for Ann Smith" / "Citizens for Anne Smith" is not stopped here. The #557 fixtures "Jim Nutter" / "James Nutter Jr" were
-  changed to "James Nutter" / "James Nutter Jr" to keep their "kept" expectations. A name whose loose key is empty
+  in a way the list does not cover (a misspelling, "Mfg") is not paired by this rule. The typo rule (#735) only pairs names whose differing words are 5+ letters in both names, so a change to a short
+  word ("Citizens for Ann Smith" / "Citizens for Anne Smith", "Joan" / "John", "Sara" / "Sarah") is two people and both
+  lines stay; "Fran Froelich" / "Fran Froehlich" and "Lathrop GPM" / "Lanthrop GPM" still pair. Plurals and spacing
+  variants of a short word ("Hobbs Farm" / "Hobbs Farms", "Century Link" / "CenturyLink") no longer pair either. A name whose loose key is empty
   (only stop words, legal forms and initials) is never paired. On the October 2026 data the tightening changes no
   row (the same records: still 138 TAP notices and 78 direct-export notices dropped). With several lines in the
   group a notice is dropped only when it has exactly one name-compatible full-report line, that line has exactly one
