@@ -100,7 +100,10 @@ def test_sweep_stale_parts_removes_only_old_parts_of_that_file(tmp_path):
     import os
 
     target = tmp_path / "big.zip"
-    old, new, other = (tmp_path / n for n in (".big.zip.1.aa.part", ".big.zip.1.bb.part", ".other.zip.1.aa.part"))
+    old, new, other = (
+        tmp_path / n
+        for n in (f".big.zip.1.{'a' * 32}.part", f".big.zip.1.{'b' * 32}.part", f".other.zip.1.{'a' * 32}.part")
+    )
     for p in (old, new, other):
         p.write_bytes(b"x")
     os.utime(old, (0, 0))
@@ -109,3 +112,41 @@ def test_sweep_stale_parts_removes_only_old_parts_of_that_file(tmp_path):
     assert not old.exists()
     assert new.exists()
     assert other.exists()
+
+
+def _part(directory, name, pid=1, hexid="a" * 32):
+    return directory / f".{name}.{pid}.{hexid}.part"
+
+
+def test_sweep_stale_parts_is_anchored_on_the_exact_file_name(tmp_path):
+    import os
+
+    mine = _part(tmp_path, "big.zip")
+    neighbour = _part(tmp_path, "big.zip.foo")  # another file's temp name that merely starts with ours
+    for p in (mine, neighbour):
+        p.write_bytes(b"x")
+        os.utime(p, (0, 0))
+    http.sweep_stale_parts(tmp_path / "big.zip")
+    assert not mine.exists()
+    assert neighbour.exists()
+
+
+def test_write_atomic_first_call_sweeps_crashed_small_file_leftovers(tmp_path, monkeypatch):
+    import os
+
+    monkeypatch.setattr(http, "_swept_dirs", set())
+    old, fresh, odd = _part(tmp_path, "a.bin"), _part(tmp_path, "b.bin", hexid="b" * 32), tmp_path / ".x.part"
+    for p in (old, fresh, odd):
+        p.write_bytes(b"x")
+    os.utime(old, (0, 0))
+    os.utime(odd, (0, 0))  # old but not a tmp_sibling name: not ours to delete
+    http.write_atomic(tmp_path / "c.bin", b"c")
+    assert not old.exists()
+    assert fresh.exists()  # a live writer's file is younger than PART_STALE_S
+    assert odd.exists()
+    # swept once per process per directory, not on every write
+    again = _part(tmp_path, "z.bin", hexid="c" * 32)
+    again.write_bytes(b"x")
+    os.utime(again, (0, 0))
+    http.write_atomic(tmp_path / "d.bin", b"d")
+    assert again.exists()
