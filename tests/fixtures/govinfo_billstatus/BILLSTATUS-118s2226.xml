@@ -1,0 +1,547 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<billStatus>
+  <version>3.0.0</version>
+  <bill>
+    <number>2226</number>
+    <updateDate>2026-01-14T20:57:25Z</updateDate>
+    <originChamber>Senate</originChamber>
+    <type>S</type>
+    <introducedDate>2023-07-11</introducedDate>
+    <congress>118</congress>
+    <title>National Defense Authorization Act for Fiscal Year 2024</title>
+    <amendments>
+      <amendment>
+        <number>999</number>
+        <congress>118</congress>
+        <type>SAMDT</type>
+        <purpose>To require the Secretary of Energy to establish a Nuclear Fuel Security Program, expand the American Assured Fuel Supply Program, establish an HALEU for Advanced Nuclear Reactor Demonstration Projects Program, and submit a report on a civil nuclear credit program, and to enhance programs to build workforce capacity to meet critical mission needs of the Department of Energy.</purpose>
+        <updateDate>2024-04-06T00:24:39Z</updateDate>
+        <latestAction>
+          <actionDate>2023-07-27</actionDate>
+          <text>Amendment SA 999 under the order of 7/26/2023, having achieved 60 votes in the affirmative, was agreed to in Senate by Yea-Nay Vote. 96 - 3. Record Vote Number: 202.</text>
+          <links>
+            <link>
+              <name>Record Vote Number: 202</name>
+              <url>https://www.senate.gov/legislative/LIS/roll_call_votes/vote1181/vote_118_1_00202.xml</url>
+            </link>
+            <link>
+              <name>SA 999</name>
+              <url>https://www.congress.gov/amendment/118th-congress/senate-amendment/999</url>
+            </link>
+          </links>
+        </latestAction>
+        <sponsors>
+          <item>
+            <bioguideId>B001261</bioguideId>
+            <fullName>Sen. Barrasso, John [R-WY]</fullName>
+            <firstName>John</firstName>
+            <lastName>Barrasso</lastName>
+            <party>R</party>
+            <state>WY</state>
+          </item>
+        </sponsors>
+        <onBehalfOfSponsor>
+          <item>
+            <bioguideId>R000584</bioguideId>
+            <fullName>Sen. Risch, James E. [R-ID]</fullName>
+            <firstName>James</firstName>
+            <lastName>Risch</lastName>
+            <party>R</party>
+            <state>ID</state>
+            <type>Submitted on behalf of</type>
+          </item>
+        </onBehalfOfSponsor>
+        <proposedDate>2023-07-27T04:00:00Z</proposedDate>
+        <submittedDate>2023-07-20T04:00:00Z</submittedDate>
+        <chamber>Senate</chamber>
+        <amendedBill>
+          <congress>118</congress>
+          <type>S</type>
+          <originChamber>Senate</originChamber>
+          <originChamberCode>S</originChamberCode>
+          <number>2226</number>
+          <title>National Defense Authorization Act for Fiscal Year 2024</title>
+          <updateDateIncludingText>2026-01-14</updateDateIncludingText>
+        </amendedBill>
+        <amendedAmendment>
+          <number>935</number>
+          <congress>118</congress>
+          <type>SAMDT</type>
+          <purpose>In the nature of a substitute.</purpose>
+          <updateDate>2024-04-06T00:24:36Z</updateDate>
+        </amendedAmendment>
+        <actions>
+          <count>8</count>
+          <actions>
+            <item>
+              <actionDate>2023-07-27</actionDate>
+              <sourceSystem>
+                <code>0</code>
+                <name>Senate</name>
+              </sourceSystem>
+              <text>Amendment SA 999 under the order of 7/26/2023, having achieved 60 votes in the affirmative, was agreed to in Senate by Yea-Nay Vote. 96 - 3. Record Vote Number: 202.</text>
+              <type>Floor</type>
+              <recordedVotes>
+                <recordedVote>
+                  <rollNumber>202</rollNumber>
+                  <chamber>Senate</chamber>
+                  <congress>118</congress>
+                  <date>2023-07-27T17:01:27Z</date>
+                  <sessionNumber>1</sessionNumber>
+                  <url>https://www.senate.gov/legislative/LIS/roll_call_votes/vote1181/vote_118_1_00202.xml</url>
+                </recordedVote>
+              </recordedVotes>
+            </item>
+            <item>
+              <actionDate>2023-07-27</actionDate>
+              <sourceSystem>
+                <code>0</code>
+                <name>Senate</name>
+              </sourceSystem>
+              <text>Amendment SA 999 proposed by Senator Barrasso to Amendment SA 935. (consideration: CR S3717-3718) To require the Secretary of Energy to establish a Nuclear Fuel Security Program, expand the American Assured Fuel Supply Program, establish an HALEU for Advanced Nuclear Reactor Demonstration Projects Program, and submit a report on a civil nuclear credit program, and to enhance programs to build workforce capacity to meet critical mission needs of the Department of Energy.</text>
+              <type>Floor</type>
+            </item>
+            <item>
+              <actionDate>2023-07-20</actionDate>
+              <type>IntroReferral</type>
+              <actionCode>Intro-S</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+            </item>
+            <item>
+              <actionDate>2023-07-20</actionDate>
+              <text>Senate amendment submitted</text>
+              <type>Floor</type>
+              <actionCode>91000</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+            </item>
+            <item>
+              <actionDate>2023-07-20</actionDate>
+              <text>Senate amendment submitted</text>
+              <type>Floor</type>
+              <actionCode>91000</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+            </item>
+            <item>
+              <actionDate>2023-07-27</actionDate>
+              <text>Senate amendment proposed (on the floor): Amendment SA 999 proposed by Senator Barrasso to Amendment SA 935.(consideration: CR S3717-3718)</text>
+              <type>Floor</type>
+              <actionCode>93000</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+            </item>
+            <item>
+              <actionDate>2023-07-27</actionDate>
+              <text>Senate amendment agreed to: Amendment SA 999 under the order of 7/26/2023, having achieved 60 votes in the affirmative, was agreed to in Senate by Yea-Nay Vote. 96 - 3. Record Vote Number: 202.</text>
+              <type>Floor</type>
+              <actionCode>94000</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+              <recordedVotes>
+                <recordedVote>
+                  <rollNumber>202</rollNumber>
+                  <chamber>Senate</chamber>
+                  <congress>118</congress>
+                  <date>2023-07-27T17:01:27Z</date>
+                  <sessionNumber>1</sessionNumber>
+                  <url>https://www.senate.gov/legislative/LIS/roll_call_votes/vote1181/vote_118_1_00202.xml</url>
+                </recordedVote>
+              </recordedVotes>
+            </item>
+            <item>
+              <actionDate>2023-07-27</actionDate>
+              <text>Roll call votes on amendments in Senate: Amendment SA 999 under the order of 7/26/2023, having achieved 60 votes in the affirmative, was agreed to in Senate by Yea-Nay Vote. 96 - 3. Record Vote Number: 202.</text>
+              <type>Floor</type>
+              <actionCode>97000</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+              <recordedVotes>
+                <recordedVote>
+                  <rollNumber>202</rollNumber>
+                  <chamber>Senate</chamber>
+                  <congress>118</congress>
+                  <date>2023-07-27T17:01:27Z</date>
+                  <sessionNumber>1</sessionNumber>
+                  <url>https://www.senate.gov/legislative/LIS/roll_call_votes/vote1181/vote_118_1_00202.xml</url>
+                </recordedVote>
+              </recordedVotes>
+            </item>
+          </actions>
+        </actions>
+        </amendment>
+      <amendment>
+        <number>935</number>
+        <congress>118</congress>
+        <type>SAMDT</type>
+        <purpose>In the nature of a substitute.</purpose>
+        <updateDate>2024-04-06T00:24:36Z</updateDate>
+        <latestAction>
+          <actionDate>2023-07-27</actionDate>
+          <text>Amendment SA 935, as amended, agreed to in Senate by Unanimous Consent.</text>
+          <links>
+            <link>
+              <name>SA 935</name>
+              <url>https://www.congress.gov/amendment/118th-congress/senate-amendment/935</url>
+            </link>
+          </links>
+        </latestAction>
+        <sponsors>
+          <item>
+            <bioguideId>R000122</bioguideId>
+            <fullName>Sen. Reed, Jack [D-RI]</fullName>
+            <firstName>John</firstName>
+            <lastName>Reed</lastName>
+            <party>D</party>
+            <state>RI</state>
+            <middleName>F.</middleName>
+          </item>
+        </sponsors>
+        <onBehalfOfSponsor>
+          <item>
+            <bioguideId>S000148</bioguideId>
+            <fullName>Sen. Schumer, Charles E. [D-NY]</fullName>
+            <firstName>Charles</firstName>
+            <lastName>Schumer</lastName>
+            <party>D</party>
+            <state>NY</state>
+            <type>Submitted on behalf of</type>
+          </item>
+          <item>
+            <bioguideId>S000148</bioguideId>
+            <fullName>Sen. Schumer, Charles E. [D-NY]</fullName>
+            <firstName>Charles</firstName>
+            <lastName>Schumer</lastName>
+            <party>D</party>
+            <state>NY</state>
+            <type>Proposed on behalf of</type>
+          </item>
+        </onBehalfOfSponsor>
+        <proposedDate>2023-07-19T04:00:00Z</proposedDate>
+        <submittedDate>2023-07-19T04:00:00Z</submittedDate>
+        <chamber>Senate</chamber>
+        <amendedBill>
+          <congress>118</congress>
+          <type>S</type>
+          <originChamber>Senate</originChamber>
+          <originChamberCode>S</originChamberCode>
+          <number>2226</number>
+          <title>National Defense Authorization Act for Fiscal Year 2024</title>
+          <updateDateIncludingText>2026-01-14</updateDateIncludingText>
+        </amendedBill>
+        <amendmentsToAmendment>
+          <count>37</count>
+        </amendmentsToAmendment>
+        <actions>
+          <count>13</count>
+          <actions>
+            <item>
+              <actionDate>2023-07-27</actionDate>
+              <sourceSystem>
+                <code>0</code>
+                <name>Senate</name>
+              </sourceSystem>
+              <text>Amendment SA 935, as amended, agreed to in Senate by Unanimous Consent.</text>
+              <type>Floor</type>
+            </item>
+            <item>
+              <actionDate>2023-07-27</actionDate>
+              <sourceSystem>
+                <code>0</code>
+                <name>Senate</name>
+              </sourceSystem>
+              <text>Cloture motion on amendment SA 935 withdrawn by unanimous consent in Senate.</text>
+              <type>Floor</type>
+            </item>
+            <item>
+              <actionDate>2023-07-27</actionDate>
+              <sourceSystem>
+                <code>0</code>
+                <name>Senate</name>
+              </sourceSystem>
+              <text>Considered by Senate. (consideration: CR S3713-3726)</text>
+              <type>Floor</type>
+            </item>
+            <item>
+              <actionDate>2023-07-26</actionDate>
+              <sourceSystem>
+                <code>0</code>
+                <name>Senate</name>
+              </sourceSystem>
+              <text>Cloture motion on amendment SA 935 presented in Senate.</text>
+              <type>Floor</type>
+            </item>
+            <item>
+              <actionDate>2023-07-26</actionDate>
+              <sourceSystem>
+                <code>0</code>
+                <name>Senate</name>
+              </sourceSystem>
+              <text>Considered by Senate. (consideration: CR S3585)</text>
+              <type>Floor</type>
+            </item>
+            <item>
+              <actionDate>2023-07-25</actionDate>
+              <sourceSystem>
+                <code>0</code>
+                <name>Senate</name>
+              </sourceSystem>
+              <text>Considered by Senate. (consideration: CR S3510-3513)</text>
+              <type>Floor</type>
+            </item>
+            <item>
+              <actionDate>2023-07-20</actionDate>
+              <sourceSystem>
+                <code>0</code>
+                <name>Senate</name>
+              </sourceSystem>
+              <text>Considered by Senate. (consideration: CR S3444)</text>
+              <type>Floor</type>
+            </item>
+            <item>
+              <actionDate>2023-07-19</actionDate>
+              <sourceSystem>
+                <code>0</code>
+                <name>Senate</name>
+              </sourceSystem>
+              <text>Amendment SA 935 proposed by Senator Schumer for Senator Reed. (consideration: CR S3129) In the nature of a substitute.</text>
+              <type>Floor</type>
+            </item>
+            <item>
+              <actionDate>2023-07-19</actionDate>
+              <type>IntroReferral</type>
+              <actionCode>Intro-S</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+            </item>
+            <item>
+              <actionDate>2023-07-19</actionDate>
+              <text>Senate amendment submitted</text>
+              <type>Floor</type>
+              <actionCode>91000</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+            </item>
+            <item>
+              <actionDate>2023-07-19</actionDate>
+              <text>Senate amendment submitted</text>
+              <type>Floor</type>
+              <actionCode>91000</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+            </item>
+            <item>
+              <actionDate>2023-07-19</actionDate>
+              <text>Senate amendment proposed (on the floor): Amendment SA 935 proposed by Senator Schumer for Senator Reed.(consideration: CR S3129)</text>
+              <type>Floor</type>
+              <actionCode>93000</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+            </item>
+            <item>
+              <actionDate>2023-07-27</actionDate>
+              <text>Senate amendment agreed to: Amendment SA 935, as amended, agreed to in Senate by Unanimous Consent.</text>
+              <type>Floor</type>
+              <actionCode>94000</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+            </item>
+          </actions>
+        </actions>
+        </amendment>
+      <amendment>
+        <number>1087</number>
+        <congress>118</congress>
+        <type>SAMDT</type>
+        <purpose>To provide for a manager's amendment.</purpose>
+        <updateDate>2024-04-06T00:25:20Z</updateDate>
+        <latestAction>
+          <actionDate>2023-07-27</actionDate>
+          <text>Amendment SA 1087 agreed to in Senate by Yea-Nay Vote. 94 - 3. Record Vote Number: 211.</text>
+          <links>
+            <link>
+              <name>Record Vote Number: 211</name>
+              <url>https://www.senate.gov/legislative/LIS/roll_call_votes/vote1181/vote_118_1_00211.xml</url>
+            </link>
+            <link>
+              <name>SA 1087</name>
+              <url>https://www.congress.gov/amendment/118th-congress/senate-amendment/1087</url>
+            </link>
+          </links>
+        </latestAction>
+        <sponsors>
+          <item>
+            <bioguideId>R000122</bioguideId>
+            <fullName>Sen. Reed, Jack [D-RI]</fullName>
+            <firstName>John</firstName>
+            <lastName>Reed</lastName>
+            <party>D</party>
+            <state>RI</state>
+            <middleName>F.</middleName>
+          </item>
+        </sponsors>
+        <proposedDate>2023-07-27T04:00:00Z</proposedDate>
+        <submittedDate>2023-07-27T04:00:00Z</submittedDate>
+        <chamber>Senate</chamber>
+        <amendedBill>
+          <congress>118</congress>
+          <type>S</type>
+          <originChamber>Senate</originChamber>
+          <originChamberCode>S</originChamberCode>
+          <number>2226</number>
+          <title>National Defense Authorization Act for Fiscal Year 2024</title>
+          <updateDateIncludingText>2026-01-14</updateDateIncludingText>
+        </amendedBill>
+        <amendedAmendment>
+          <number>935</number>
+          <congress>118</congress>
+          <type>SAMDT</type>
+          <purpose>In the nature of a substitute.</purpose>
+          <updateDate>2024-04-06T00:24:36Z</updateDate>
+        </amendedAmendment>
+        <actions>
+          <count>8</count>
+          <actions>
+            <item>
+              <actionDate>2023-07-27</actionDate>
+              <sourceSystem>
+                <code>0</code>
+                <name>Senate</name>
+              </sourceSystem>
+              <text>Amendment SA 1087 agreed to in Senate by Yea-Nay Vote. 94 - 3. Record Vote Number: 211.</text>
+              <type>Floor</type>
+              <recordedVotes>
+                <recordedVote>
+                  <rollNumber>211</rollNumber>
+                  <chamber>Senate</chamber>
+                  <congress>118</congress>
+                  <date>2023-07-27T23:44:40Z</date>
+                  <sessionNumber>1</sessionNumber>
+                  <url>https://www.senate.gov/legislative/LIS/roll_call_votes/vote1181/vote_118_1_00211.xml</url>
+                </recordedVote>
+              </recordedVotes>
+            </item>
+            <item>
+              <actionDate>2023-07-27</actionDate>
+              <sourceSystem>
+                <code>0</code>
+                <name>Senate</name>
+              </sourceSystem>
+              <text>Amendment SA 1087 proposed by Senator Reed to Amendment SA 935. (consideration: CR S3727-3728) To provide for a manager's amendment.</text>
+              <type>Floor</type>
+            </item>
+            <item>
+              <actionDate>2023-07-27</actionDate>
+              <type>IntroReferral</type>
+              <actionCode>Intro-S</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+            </item>
+            <item>
+              <actionDate>2023-07-27</actionDate>
+              <text>Senate amendment submitted</text>
+              <type>Floor</type>
+              <actionCode>91000</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+            </item>
+            <item>
+              <actionDate>2023-07-27</actionDate>
+              <text>Senate amendment submitted</text>
+              <type>Floor</type>
+              <actionCode>91000</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+            </item>
+            <item>
+              <actionDate>2023-07-27</actionDate>
+              <text>Senate amendment proposed (on the floor): Amendment SA 1087 proposed by Senator Reed to Amendment SA 935.(consideration: CR S3727-3728)</text>
+              <type>Floor</type>
+              <actionCode>93000</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+            </item>
+            <item>
+              <actionDate>2023-07-27</actionDate>
+              <text>Senate amendment agreed to: Amendment SA 1087 agreed to in Senate by Yea-Nay Vote. 94 - 3. Record Vote Number: 211.</text>
+              <type>Floor</type>
+              <actionCode>94000</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+              <recordedVotes>
+                <recordedVote>
+                  <rollNumber>211</rollNumber>
+                  <chamber>Senate</chamber>
+                  <congress>118</congress>
+                  <date>2023-07-27T23:44:40Z</date>
+                  <sessionNumber>1</sessionNumber>
+                  <url>https://www.senate.gov/legislative/LIS/roll_call_votes/vote1181/vote_118_1_00211.xml</url>
+                </recordedVote>
+              </recordedVotes>
+            </item>
+            <item>
+              <actionDate>2023-07-27</actionDate>
+              <text>Roll call votes on amendments in Senate: Amendment SA 1087 agreed to in Senate by Yea-Nay Vote. 94 - 3. Record Vote Number: 211.</text>
+              <type>Floor</type>
+              <actionCode>97000</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+              <recordedVotes>
+                <recordedVote>
+                  <rollNumber>211</rollNumber>
+                  <chamber>Senate</chamber>
+                  <congress>118</congress>
+                  <date>2023-07-27T23:44:40Z</date>
+                  <sessionNumber>1</sessionNumber>
+                  <url>https://www.senate.gov/legislative/LIS/roll_call_votes/vote1181/vote_118_1_00211.xml</url>
+                </recordedVote>
+              </recordedVotes>
+            </item>
+          </actions>
+        </actions>
+        </amendment>
+      </amendments>
+    </bill>
+  <dublinCore xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:format>text/xml</dc:format>
+    <dc:language>EN</dc:language>
+    <dc:rights>Pursuant to Title 17 Section 105 of the United States Code, this file is not subject to copyright protection and is in the public domain.</dc:rights>
+    <dc:contributor>Congressional Research Service, Library of Congress</dc:contributor>
+    <dc:description>This file contains bill summaries and statuses for federal legislation. A bill summary describes the most significant provisions of a piece of legislation and details the effects the legislative text may have on current law and federal programs. Bill summaries are authored by the Congressional Research Service (CRS) of the Library of Congress. As stated in Public Law 91-510 (2 USC 166 (d)(6)), one of the duties of CRS is "to prepare summaries and digests of bills and resolutions of a public general nature introduced in the Senate or House of Representatives". For more information, refer to the User Guide that accompanies this file.</dc:description>
+  </dublinCore>
+</billStatus>
