@@ -794,7 +794,14 @@ Quirks:
   is not "LIUNA Local 100"). Measured October 2026: 7 TAP rows ($35.4k). A third rule (#557) in the same tier
   also pairs an abbreviation or an added word: word by word one name is a prefix of the other ("deVries & Associates" /
   "DeVries and Assoc", "...Technical Ed" / "...Technical Education") and the longer name has at most two more words
-  ("Committee to Elect Jamie Burger HD"); the first word must be equal and the digits match. With several lines in the
+  ("Committee to Elect Jamie Burger HD"); the first word must be equal and the digits match. A word that is only the
+  start of another word counts (#634) when it looks like an abbreviation or truncation: in a name of up to three words
+  it is at least 4 letters and the full word is at least 5 letters longer ("Assoc" / "Associates"), so "John Smith" /
+  "John Smithson", "Mary Ann" / "Mary Anderson" and "Jon Van" / "Jon Vance" stay unpaired; names of four or more words
+  take any prefix ("... Technical Ed" / "... Education"). The #557 fixtures "Jim Nutter" / "James Nutter Jr" were
+  changed to "James Nutter" / "James Nutter Jr" to keep their "kept" expectations. A name whose loose key is empty
+  (only stop words, legal forms and initials) is never paired. On the October 2026 data the tightening changes no
+  row (still 138 TAP notices and 78 direct-export notices dropped). With several lines in the
   group a notice is dropped only when it has exactly one name-compatible full-report line, that line has exactly one
   name-compatible notice, and no line in the group lacks a donor name. Measured October 2026: 4 more TAP notices
   ($10.9k). Left in place on purpose: two compatible candidates on either side, names that need outside knowledge

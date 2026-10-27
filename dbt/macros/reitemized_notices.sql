@@ -16,7 +16,7 @@
        with the same digits ("LIUNA Local 110 PAC Fund" is not "LIUNA Local 100 PAC Fund"). With two or more leftover
        lines on either side it is unknowable who gave what, so every notice is kept.
 
-    3. Abbreviations and added words (#557). The same tier also pairs names where, word by word, one is a prefix of the
+    3. Abbreviations and added words (#557, #634). The same tier also pairs names where, word by word, one is a prefix of the
        other ("deVries and Assoc" / "DeVries and Associates", "Alliance ... Technical Ed" / "... Education") and the
        longer name has up to two more words at the end ("Committee to Elect Jamie Burger" / "... Burger HD"). The
        first word must be equal ("Ed Smith" is not "Edward Smith"), both names need two words, and the digits must match.
@@ -24,6 +24,9 @@
        committee/date/amount has several leftover lines: a notice is dropped when it has exactly ONE name-compatible
        full-report line and that line has exactly ONE name-compatible notice, and no leftover line of the group lacks
        a donor name. Two compatible lines on either side keep every notice.
+
+    A name whose loose key is empty (only stop words, legal forms and single letters: "A B", "The Co") is never matched
+    in tiers 2 and 3 (#634): two such names would otherwise compare equal.
 
     Rows missing a committee, date, amount or donor are never matched in tier 1, and a row without a city and state
     never in tier 2. rel is a relation with record_id, mec_committee_id, contributor_name, contributor_city,
@@ -45,7 +48,12 @@
 
 {#- True when two loose_name_keys are the same name abbreviated or with words added (#557): at least two words in the
     shorter name, the first word equal, each later word of the shorter equal to or a prefix of the same-position word
-    of the other, and at most two extra words on the longer. Compares up to 8 words; digits are compared by the caller.
+    of the other, and at most two extra words on the longer. A prefix that is not the whole word must look like an
+    abbreviation or a truncation (#634): in a name of up to three words it is at least 4 letters and the full word is
+    at least 5 letters longer ("Assoc" / "Associates", "Tech" / "Technical"), so a surname that is the start of another
+    surname ("John Smith" / "John Smithson", "Mary Ann" / "Mary Anderson", "Jon Van" / "Jon Vance") stays unpaired;
+    names of four or more words take any prefix ("... Technical Ed" / "... Technical Education").
+    Compares up to 8 words; digits are compared by the caller.
     n_a, n_b are the word counts of a, b (columns or expressions). -#}
 {% macro name_words_match(a, b, n_a, n_b) -%}
     (
@@ -58,8 +66,14 @@
             least({{ n_a }}, {{ n_b }}) < {{ i }}
             or {{ wa }} = {{ wb }}
             {%- if i > 1 %}
-            or {{ wa }} like {{ wb }} || '%'
-            or {{ wb }} like {{ wa }} || '%'
+            or (
+                {{ wa }} like {{ wb }} || '%'
+                and (least({{ n_a }}, {{ n_b }}) >= 4 or (length({{ wb }}) >= 4 and length({{ wa }}) - length({{ wb }}) >= 5))
+            )
+            or (
+                {{ wb }} like {{ wa }} || '%'
+                and (least({{ n_a }}, {{ n_b }}) >= 4 or (length({{ wa }}) >= 4 and length({{ wb }}) - length({{ wa }}) >= 5))
+            )
             {%- endif %}
         )
         {%- endfor %}
@@ -158,20 +172,24 @@ compatible as (
         count(*) over (partition by full_report_id) as notices_for_full_report
     from word_counts
     where
-        notice_loose = full_report_loose
-        or (
-            {{ mogov.regex_replace_all('notice_loose', '[^0-9]', '') }}
-            = {{ mogov.regex_replace_all('full_report_loose', '[^0-9]', '') }}
-            and (
-                (
-                    length(notice_loose) >= 10
-                    and length(full_report_loose) >= 10
-                    and {{ mogov.edit_distance('notice_loose', 'full_report_loose') }} <= 2
-                    and 10 * {{ mogov.edit_distance('notice_loose', 'full_report_loose') }}
-                    <= greatest(length(notice_loose), length(full_report_loose))
+        notice_loose <> ''
+        and full_report_loose <> ''
+        and (
+            notice_loose = full_report_loose
+            or (
+                {{ mogov.regex_replace_all('notice_loose', '[^0-9]', '') }}
+                = {{ mogov.regex_replace_all('full_report_loose', '[^0-9]', '') }}
+                and (
+                    (
+                        length(notice_loose) >= 10
+                        and length(full_report_loose) >= 10
+                        and {{ mogov.edit_distance('notice_loose', 'full_report_loose') }} <= 2
+                        and 10 * {{ mogov.edit_distance('notice_loose', 'full_report_loose') }}
+                        <= greatest(length(notice_loose), length(full_report_loose))
+                    )
+                    or {{ mogov.name_words_match('notice_loose', 'full_report_loose', 'notice_words', 'full_report_words') }}
                 )
-                or {{ mogov.name_words_match('notice_loose', 'full_report_loose', 'notice_words', 'full_report_words') }}
-            )
+        )
         )
 ),
 
