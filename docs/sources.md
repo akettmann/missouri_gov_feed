@@ -12,6 +12,7 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `mo_house` | Missouri House (documents.house.mo.gov) | members, bills, per-member roll-call votes | `MOGOV_LOOKBACK_YEARS` (default 10; PDFs from 2014) | |
 | `mo_senate` | Missouri Senate journals (senate.mo.gov) | per-senator roll-call votes | `MOGOV_LOOKBACK_YEARS` | |
 | `mo_senate_topics` | Missouri Senate topical index (senate.mo.gov) | Senate bills, subject terms for Senate bills and House bills that reached the Senate | `MOGOV_LOOKBACK_YEARS` (regular sessions) | |
+| `mo_senate_bills` | Missouri Senate bill tracking (senate.mo.gov) | every Senate bill and resolution of each session (regular and extraordinary) and its full action history, with journal references | `MOGOV_LOOKBACK_YEARS` | slow: ~1 request/s, one request per bill |
 | `mo_revisor` | Missouri Revisor of Statutes (revisor.mo.gov) | statute text (RSMo) by section version, repeals and transfers, which bills enacted, amended or repealed each section | current statutes; repeals since 1945 | slow: ~1 request/s |
 | `mec` | Missouri Ethics Commission | state campaign contributions and spending, candidate↔committee links, lobbyist gifts | 2023+ | opt-in |
 | `tap_mec` | MEC via The Accountability Project | state campaign finance and lobbyist gifts | 2011–2022 (gifts from 2004) | |
@@ -327,6 +328,44 @@ Quirks:
   (Kraus's last vote was 2017-07-25), and first voted in the Senate on 2018-01-08; Open States starts his Senate
   term 2018-01-03. Nothing loaded dates his seating within 2017-09-14 to 2018-01-03 more closely. Only the
   2025-2026 Official Manual is loaded, so it gives no evidence for earlier years.
+
+## mo_senate_bills: Missouri Senate bill list and action history
+
+Flow: [diagrams/sources/mo_senate_bills.svg](diagrams/sources/mo_senate_bills.svg)
+
+senate.mo.gov's bill tracking (`/BillTracking/Bills/BillList`) has one page per session listing every Senate
+bill and resolution (SB, SJR, SCR, SR), and one small HTML fragment per bill with its whole action history:
+the Senate's referral, hearing, perfection and third reading, the House side, enrollment and the governor,
+each with the journal page that records it. This is the only source of Senate-side actions; the House XML
+lists actions for House bills and for Senate bills only once they reach the House.
+
+- Lands: `mo_senate_bill_list`, one row per bill, the page's embedded JSON object as printed (ids, prefix and
+  number, sponsor and handler, description, links) plus `year` and `session_type`. `mo_senate_bill_actions`,
+  one row per action: `year`, `session_type`, `bill_id`, `bill` (e.g. `SB1`), `action_index` (0 = top row as
+  served, newest first), `action_date` (as printed, MM/DD/YYYY), `action`, `journal_ref`, `journal_url`.
+- Window: `MOGOV_LOOKBACK_YEARS`: the regular session (`R`) of each year plus every extraordinary session
+  (`E1`, `E2`, ... until one comes back empty). Shard units: bills, split by a stable hash of
+  `year/session/billId`. Every shard reads every session list once (cached) and takes its bills, so the split
+  does not depend on listing order or on who else is running.
+- Pace: one request per bill, ~1 request/second to the host (accepted by the maintainer in #584), a lock
+  shared by every process on the machine, so shards add no speed. A regular session is ~1,000 bills, about
+  17 minutes cold; a year or more of lookback takes hours. Past sessions are cached 30 days, the current
+  year 1 day. Cloud Run tasks do not share a filesystem, so each task slows to `1 s x CLOUD_RUN_TASK_COUNT`.
+- Bill lists come from the `const bills = [...]` array in a script element, read with a JSON parser; the
+  bill cards in the page are not parsed.
+
+Quirks:
+- `billId` is the site's own key, not the bill number: 2025 SB 1 is 233, 2017 SB 1 is 57095344. The number is
+  `billPrefix` + `billSuffix`.
+- Session codes are `R` and `E1`, `E2`, ...; `session=E` and `S1` return an empty list. They are not the House
+  codes: the 2025 special session `E1` (29 bills, SB 1 is id 18267452) is House session `253` (SB1-SB4 there),
+  not `252`, and 2025 also has an `E2` (2 bills). Map session to House code by evidence, not arithmetic.
+- Action wording differs from the House's (for example "S First Read", "Second Read and Referred S
+  Government Efficiency Committee"); normalize in dbt.
+- The history is newest first and covers both chambers. The journal reference can name both (`H2291 / S1216`)
+  and links to the journal PDF page (`.../25info/pdf-jrnl/DAY68.pdf#page=32`).
+- A bill whose fragment has no action table logs `mo_senate_bills.no_actions` and lands no action rows.
+- Resolutions have no handler: those keys are absent from the bill's JSON.
 
 ## mo_senate_topics: Missouri Senate topical index
 
