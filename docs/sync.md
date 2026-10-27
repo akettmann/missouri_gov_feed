@@ -69,6 +69,11 @@ uv run mogov load mo_house mo_senate --shards 4
 uv run mogov build
 ```
 
+`mo_house_pdf` also fills `mo_house_pdf_statute_refs` (the RSMo sections each bill text repeals, amends or enacts,
+#594). Texts landed before that table existed have no rows until the loader runs over them again: a run over PDFs
+already landed reads them from disk and fetches nothing for closed sessions, so after upgrading run
+`uv run mogov load mo_house_pdf` once, then `mogov build` (#736).
+
 ## When a loader fails
 
 - `mogov load` always runs every selected loader, even if one fails. It logs a `loader.summary` naming

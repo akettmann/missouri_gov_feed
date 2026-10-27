@@ -407,8 +407,14 @@ Quirks:
   rows. Sections within a chapter run in the order of the number after the point as an integer (140.995 is followed
   by 140.1000), not as a decimal: 1,698 of 1,699 consecutive pairs in the slice's lists follow it. For the 82 truly
   agreed texts whose bill the Revisor also links, 891 of 918 repealed or amended sections are in
-  `fct_bill_statute_links` (`assert_bill_text_repeals_agree_with_revisor_links`, warn); the one bill below half is
-  2026 HB 3279, which renumbers 620.580-620.592 to 173.4000-173.4012.
+  `fct_bill_statute_links` (`assert_bill_text_repeals_agree_with_revisor_links`, warn). 2026 HB 3279 renumbers
+  620.580-620.592 to 173.4000-173.4012 and the Revisor credits it only with the new numbers (a moved section's
+  repeal note reads `(Transferred 2026; now 173.4000)`, no bill), so `int_mo_house__bill_text_revisor_agreement` counts a
+  repealed section the Revisor lists as transferred to a section credited to the same bill (7 of 7; it was 0 of 7).
+  A mid-list `relating to` (`To repeal section 1.010, relating to x, and section 2.020, ...`) does not end the
+  repeal list when another `section N` follows before `to enact`; none of 714 real titles has one, so this is
+  tested on made-up titles. Limit: a pure repeal whose trailing topic itself says `section 3.030` reads it as a
+  continuation.
 - A summary PDF is linked by every version of a bill that shares it (23,648 link rows, 23,291 distinct URLs), so
   `mo_house_pdf_texts` has one row per URL, not per link.
 - Small-caps and some display glyphs can extract as NUL characters (seen in `house_fd` text); that is stored as-is.

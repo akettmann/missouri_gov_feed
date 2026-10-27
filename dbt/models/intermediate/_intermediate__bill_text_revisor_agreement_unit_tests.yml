@@ -1,0 +1,51 @@
+# Unit tests for int_mo_house__bill_text_revisor_agreement: fixed links -> exact agreement counts.
+version: 2
+
+unit_tests:
+  - name: bill_text_revisor_agreement_counts_renumbered_sections
+    model: int_mo_house__bill_text_revisor_agreement
+    description: >
+      HB1 repeals three sections the Revisor credits to it under the same number plus one it does not credit
+      (genuine disagreement, 3 of 4 agree). HB2 moves 5.010 and 5.020 to 9.010 and 9.020, which the Revisor credits
+      to HB2 only under the new numbers: the transfers count, 2 of 2 (HB3279, 2026: 620.580 to 173.4000). HB3 repeals
+      three sections the Revisor credits to other bills, and 5.010 which moved to a section credited to HB2, not HB3:
+      0 of 4. HB4 has no Revisor links and no row. Only T texts count; an introduced text is ignored. Dropping the
+      transfer join leaves HB2 at 0 of 2 and fails this test.
+    given:
+      - input: ref('fct_bill_text_statute_links')
+        format: sql
+        rows: |
+            select cast('261' as varchar) as session_code, cast('HB1' as varchar) as bill, cast('T' as varchar) as version_code, cast('1.010' as varchar) as section_id, cast('amended' as varchar) as change union all
+            select '261', 'HB1', 'T', '1.020', 'amended' union all
+            select '261', 'HB1', 'T', '1.030', 'repealed' union all
+            select '261', 'HB1', 'T', '1.040', 'amended' union all
+            select '261', 'HB1', 'T', '1.050', 'enacted' union all
+            select '261', 'HB1', 'IN', '1.060', 'amended' union all
+            select '261', 'HB2', 'T', '5.010', 'repealed' union all
+            select '261', 'HB2', 'T', '5.020', 'repealed' union all
+            select '261', 'HB3', 'T', '5.010', 'repealed' union all
+            select '261', 'HB3', 'T', '6.010', 'repealed' union all
+            select '261', 'HB3', 'T', '6.020', 'repealed' union all
+            select '261', 'HB3', 'T', '6.030', 'repealed' union all
+            select '261', 'HB4', 'T', '7.010', 'repealed'
+      - input: ref('fct_bill_statute_links')
+        format: sql
+        rows: |
+            select cast('261' as varchar) as session_code, cast('HB1' as varchar) as bill, cast('1.010' as varchar) as section_id union all
+            select '261', 'HB1', '1.020' union all
+            select '261', 'HB1', '1.030' union all
+            select '261', 'HB2', '9.010' union all
+            select '261', 'HB2', '9.020' union all
+            select '261', 'HB3', '8.010'
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select cast('5.010' as varchar) as section_id, cast('transferred' as varchar) as change_kind, cast('9.010' as varchar) as transferred_to union all
+            select '5.020', 'transferred', '9.020' union all
+            select '6.010', 'repealed', null
+    expect:
+      format: sql
+      rows: |
+          select cast('261' as varchar) as session_code, cast('HB1' as varchar) as bill, cast(4 as bigint) as text_sections, cast(3 as bigint) as linked_directly, cast(0 as bigint) as linked_via_transfer, cast(3 as bigint) as also_in_revisor_links union all
+          select '261', 'HB2', 2, 0, 2, 2 union all
+          select '261', 'HB3', 4, 0, 0, 0

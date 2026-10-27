@@ -38,6 +38,7 @@ GRAIN = {
     "int_mec__donor_committees": "one row per (donor committee name as reported, contribution year)",
     "int_mec__official_committees": "one row per (official, MEC committee) with a confidence label",
     "int_tap_mec__contributions": "one itemized contribution in the TAP mirror, minus re-itemized 24-hour notices",
+    "int_mo_house__bill_text_revisor_agreement": "one row per bill with Revisor links and a T text naming sections",
     "int_mo_house__bill_text_statute_refs": "one row per (bill text version, bill, action, ordinal, section)",
     "int_mo_house__committee_memberships": "one row per (House session, member, committee)",
     "int_mo_house__member_identity": "one row per (House session, member) with a person_key",
