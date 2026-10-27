@@ -57,6 +57,47 @@ def test_new_shard_count_drops_old_parts(raw_dir):
     assert names == [".part-000-of-001.parquet.lock", "part-000-of-001.parquet"]
 
 
+def _parquets(raw_dir, table="t"):
+    return sorted(p.name for p in (raw_dir / table).glob("*.parquet"))
+
+
+def test_old_count_parts_stay_until_every_new_count_shard_has_published(raw_dir):
+    for i in range(3):
+        db.replace_json("t", [(f"old{i}", {})], shard=db.Shard(i, 3))
+    db.replace_json("t", [("n0", {})], shard=db.Shard(0, 2))  # first of a wave: others haven't started
+    assert len(_parquets(raw_dir)) == 4  # old history still readable by shards that start later
+    db.replace_json("t", [("n1", {})], shard=db.Shard(1, 2))
+    assert _parquets(raw_dir) == ["part-000-of-002.parquet", "part-001-of-002.parquet"]
+    assert sorted(k for k, _ in _rows("t")) == ["n0", "n1"]  # no double counting once complete
+
+
+def test_rerunning_a_new_count_shard_is_idempotent(raw_dir):
+    db.replace_json("t", [("old", {})])
+    db.replace_json("t", [("n0", {})], shard=db.Shard(0, 2))
+    db.replace_json("t", [("n0b", {})], shard=db.Shard(0, 2))
+    assert _parquets(raw_dir) == ["part-000-of-001.parquet", "part-000-of-002.parquet"]
+    db.replace_json("t", [("n1", {})], shard=db.Shard(1, 2))
+    db.replace_json("t", [("n1", {})], shard=db.Shard(1, 2))
+    assert sorted(k for k, _ in _rows("t")) == ["n0b", "n1"]
+
+
+def test_empty_shard_marker_lets_the_new_count_complete(raw_dir):
+    db.replace_json("t", [("old", {})])
+    db.remove_part("t", db.Shard(1, 2))
+    assert _parquets(raw_dir) == ["part-000-of-001.parquet"]
+    db.replace_json("t", [("n0", {})], shard=db.Shard(0, 2))
+    assert _parquets(raw_dir) == ["part-000-of-002.parquet"]
+    assert [p.name for p in (raw_dir / "t").glob(".*.none")] == [".part-001-of-002.parquet.none"]
+
+
+def test_abandoned_transition_is_swept_when_the_old_count_runs_again(raw_dir):
+    db.replace_json("t", [("old0", {})], shard=db.Shard(0, 2))
+    db.replace_json("t", [("old1", {})], shard=db.Shard(1, 2))
+    db.replace_json("t", [("n0", {})], shard=db.Shard(0, 3))  # never finished
+    db.replace_json("t", [("old0b", {})], shard=db.Shard(0, 2))
+    assert _parquets(raw_dir) == ["part-000-of-002.parquet", "part-001-of-002.parquet"]
+
+
 def test_new_shard_count_drops_orphan_lock_files_but_not_held_ones(raw_dir):
     folder = db.table_dir("t")
     orphan = folder / f".{db.Shard(0, 3).part_name}.lock"  # a run that failed before publishing: lock, no part
