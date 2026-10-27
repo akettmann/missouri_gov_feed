@@ -1,0 +1,417 @@
+# Unit tests for fct_salaries on the named people of the person-id issues (#649, #659): real payroll rows, real
+# Open States person ids and seat dates (prod DB copy, 2026-10), each pinned to the one official it belongs to.
+# Inputs a case does not need are empty; the federal inputs are not under test. The invented-name tests of the
+# same rules are in _marts__salaries_unit_tests.yml.
+version: 2
+
+unit_tests:
+  - name: salaries_case_227_cody_and_david_smith_keep_their_own_pay
+    model: fct_salaries
+    description: >
+      #227. "SMITH, DAVID C" is Cody Smith (HD163, 2017-01-01 to 2025-01-07, no current official so his pay is
+      not shown) and "SMITH, DAVID T" is David Tyson Smith (HD45 then HD46). David's HD45 seat starts on the
+      1900-01-01 placeholder and his first roster year is 2021, so Cody's 2017 and 2020 pay never goes to David,
+      by seat or by name. From 2021 both payees fit David's first name equally; the middle initial C pairs Cody,
+      and David is the one member left for T (medium). In 2025 Cody's seat ends in January and "SMITH, DAVID C"
+      ($1,636) is his final check by the middle initial too (it is not in int_mo_legislators__final_checks: DAVID
+      does not fit Cody); Travis Smith's 2025 final check is set aside; Kem and Marla Smith pair by first name.
+      Clem Smith (1900 start, roster 2017-18) pairs with "SMITH, CLEMENT J." in 2017. Fails if the seat start
+      falls back to 1900 (David gets DAVID C in 2017 and 2020) or without the middle-initial rule (David loses
+      2021, 2024 and 2025).
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, DAVID C', last_name: SMITH, first_names: DAVID C, gross_pay: 34418.35}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, CLEMENT J.', last_name: SMITH, first_names: CLEMENT J., gross_pay: 35914.80}
+          - {calendar_year: 2020, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, DAVID C', last_name: SMITH, first_names: DAVID C, gross_pay: 35914.80}
+          - {calendar_year: 2021, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, DAVID C', last_name: SMITH, first_names: DAVID C, gross_pay: 35914.80}
+          - {calendar_year: 2021, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, DAVID T', last_name: SMITH, first_names: DAVID T, gross_pay: 22646.28}
+          - {calendar_year: 2021, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, NEIL I', last_name: SMITH, first_names: NEIL I, gross_pay: 34418.35}
+          - {calendar_year: 2021, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, TRAVIS M', last_name: SMITH, first_names: TRAVIS M, gross_pay: 34418.35}
+          - {calendar_year: 2024, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, DAVID C', last_name: SMITH, first_names: DAVID C, gross_pay: 39264.00}
+          - {calendar_year: 2024, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, DAVID T', last_name: SMITH, first_names: DAVID T, gross_pay: 39264.00}
+          - {calendar_year: 2024, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, TRAVIS M', last_name: SMITH, first_names: TRAVIS M, gross_pay: 39264.00}
+          - {calendar_year: 2025, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, DAVID C', last_name: SMITH, first_names: DAVID C, gross_pay: 1636.00}
+          - {calendar_year: 2025, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, DAVID T', last_name: SMITH, first_names: DAVID T, gross_pay: 41315.63}
+          - {calendar_year: 2025, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, TRAVIS M', last_name: SMITH, first_names: TRAVIS M, gross_pay: 1636.00}
+          - {calendar_year: 2025, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, KEM M', last_name: SMITH, first_names: KEM M, gross_pay: 39679.63}
+          - {calendar_year: 2025, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, MARLA C.', last_name: SMITH, first_names: MARLA C., gross_pay: 39679.63}
+      - input: ref('mo_payroll_office_titles')
+        rows: &house_titles
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: 'ocd-person/7529d2d2-0cc1-4d30-9e8f-12d3773dff8d', full_name: Cody Smith, surname_key: smith, chamber: lower, start_date: '2017-01-01', end_date: '2025-01-07'}
+          - {person_id: 'ocd-person/c509449e-070c-462c-810e-f14315c9df42', full_name: David Smith, surname_key: smith, chamber: lower, start_date: '1900-01-01', end_date: '2023-01-03'}
+          - {person_id: 'ocd-person/c509449e-070c-462c-810e-f14315c9df42', full_name: David Smith, surname_key: smith, chamber: lower, start_date: '2023-01-01', end_date: '9999-12-31'}
+          - {person_id: 'ocd-person/59ac7bab-e54b-496a-8f1d-61c275f3c2eb', full_name: Clem Smith, surname_key: smith, chamber: lower, start_date: '1900-01-01', end_date: '2018-12-31'}
+          - {person_id: 'ocd-person/0c9efb98-e995-4927-a2c1-ee627a5faf0a', full_name: Neil Smith, surname_key: smith, chamber: lower, start_date: '1900-01-01', end_date: '2023-01-03'}
+          - {person_id: 'ocd-person/74efb08b-f153-4d63-b6d6-c685d6a04790', full_name: Travis Smith, surname_key: smith, chamber: lower, start_date: '2021-01-01', end_date: '2025-01-07'}
+          - {person_id: 'ocd-person/e4b24233-89d2-41eb-b360-ae297e3385ba', full_name: Kem Smith, surname_key: smith, chamber: lower, start_date: '2025-01-01', end_date: '9999-12-31'}
+          - {person_id: 'ocd-person/56a68a64-7a44-4052-b5f2-e9f7c626e311', full_name: Marla Smith, surname_key: smith, chamber: lower, start_date: '2025-01-01', end_date: '9999-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows:
+          - {calendar_year: 2025, seat_chamber: lower, employee_name: 'SMITH, TRAVIS M', person_id: 'ocd-person/74efb08b-f153-4d63-b6d6-c685d6a04790'}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: 'ocd-person/c509449e-070c-462c-810e-f14315c9df42', office: state_house}
+          - {official_id: 'ocd-person/e4b24233-89d2-41eb-b360-ae297e3385ba', office: state_house}
+          - {official_id: 'ocd-person/56a68a64-7a44-4052-b5f2-e9f7c626e311', office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: 'ocd-person/c509449e-070c-462c-810e-f14315c9df42', level: state, office: state_house, family_key: smith, given_key: david}
+          - {official_id: 'ocd-person/e4b24233-89d2-41eb-b360-ae297e3385ba', level: state, office: state_house, family_key: smith, given_key: kem}
+          - {official_id: 'ocd-person/56a68a64-7a44-4052-b5f2-e9f7c626e311', level: state, office: state_house, family_key: smith, given_key: marla}
+      - input: ref('int_officials__current')
+        rows: &no_current []
+      - input: ref('stg_congress__terms')
+        rows: &no_terms []
+      - input: ref('int_officeholders__years')
+        rows:
+          # first roster years: the 1900-01-01 seats count from these
+          - {year: 2021, official_id: 'ocd-person/c509449e-070c-462c-810e-f14315c9df42', office: state_house}
+          - {year: 2017, official_id: 'ocd-person/59ac7bab-e54b-496a-8f1d-61c275f3c2eb', office: state_house}
+          - {year: 2021, official_id: 'ocd-person/0c9efb98-e995-4927-a2c1-ee627a5faf0a', office: state_house}
+          - {year: 2017, official_id: 'ocd-person/7529d2d2-0cc1-4d30-9e8f-12d3773dff8d', office: state_house}
+      - input: ref('federal_salaries')
+        rows: &no_federal []
+    expect:
+      rows:
+        - {official_id: 'ocd-person/c509449e-070c-462c-810e-f14315c9df42', calendar_year: 2021, employee_name: 'SMITH, DAVID T', pay: 22646.28, match_confidence: medium}
+        - {official_id: 'ocd-person/c509449e-070c-462c-810e-f14315c9df42', calendar_year: 2024, employee_name: 'SMITH, DAVID T', pay: 39264.00, match_confidence: medium}
+        - {official_id: 'ocd-person/c509449e-070c-462c-810e-f14315c9df42', calendar_year: 2025, employee_name: 'SMITH, DAVID T', pay: 41315.63, match_confidence: medium}
+        - {official_id: 'ocd-person/e4b24233-89d2-41eb-b360-ae297e3385ba', calendar_year: 2025, employee_name: 'SMITH, KEM M', pay: 39679.63, match_confidence: high}
+        - {official_id: 'ocd-person/56a68a64-7a44-4052-b5f2-e9f7c626e311', calendar_year: 2025, employee_name: 'SMITH, MARLA C.', pay: 39679.63, match_confidence: high}
+
+  - name: salaries_case_263_steve_roberts_house_and_senate_pay_is_one_official
+    model: fct_salaries
+    description: >
+      #263. Open States keeps Steve Roberts' HD77 years (2017-20, placeholder 1900-01-01 start) under "Steven
+      Roberts" (ocd-person/528445cb...); the person-id merge gives that seat his Senate id 20ad6a34, so his House
+      pay (high: STEVEN = Steven), his 2021 House final check ($1,496.45, set aside and matched by name) and his
+      Senate pay (medium: STEVEN for Steve) all go to one official. Lane Roberts (HD161 from 2019) keeps his own.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'ROBERTS, STEVEN', last_name: ROBERTS, first_names: STEVEN, gross_pay: 34418.35}
+          - {calendar_year: 2020, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'ROBERTS, STEVEN', last_name: ROBERTS, first_names: STEVEN, gross_pay: 35914.80}
+          - {calendar_year: 2020, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'ROBERTS, LANE J.', last_name: ROBERTS, first_names: LANE J., gross_pay: 35914.80}
+          - {calendar_year: 2021, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'ROBERTS, STEVEN', last_name: ROBERTS, first_names: STEVEN, gross_pay: 1496.45}
+          - {calendar_year: 2021, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'ROBERTS, LANE J.', last_name: ROBERTS, first_names: LANE J., gross_pay: 35914.80}
+          - {calendar_year: 2021, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'ROBERTS, STEVEN', last_name: ROBERTS, first_names: STEVEN, gross_pay: 34830.08}
+          - {calendar_year: 2025, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'ROBERTS, STEVEN', last_name: ROBERTS, first_names: STEVEN, gross_pay: 41390.89}
+      - input: ref('mo_payroll_office_titles')
+        rows: &legislature_titles
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE-LEADERSHP, office_group: legislature}
+          - {agency_name: LEGISLATURE, position_title: SENATOR, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', full_name: Steven Roberts, surname_key: roberts, chamber: lower, start_date: '1900-01-01', end_date: '2020-12-31'}
+          - {person_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', full_name: Steve Roberts, surname_key: roberts, chamber: upper, start_date: '2021-01-01', end_date: '9999-12-31'}
+          - {person_id: 'ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff', full_name: Lane Roberts, surname_key: roberts, chamber: lower, start_date: '2019-01-01', end_date: '9999-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows:
+          - {calendar_year: 2021, seat_chamber: lower, employee_name: 'ROBERTS, STEVEN', person_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831'}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', office: state_senate}
+          - {official_id: 'ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff', office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', level: state, office: state_senate, family_key: roberts, given_key: steve}
+          - {official_id: 'ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff', level: state, office: state_house, family_key: roberts, given_key: lane}
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows:
+          - {year: 2017, official_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', office: state_house}
+          - {year: 2021, official_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', office: state_senate}
+          - {year: 2019, official_id: 'ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff', office: state_house}
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', calendar_year: 2017, position_title: STATE REPRESENTATIVE, pay: 34418.35, match_confidence: high}
+        - {official_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', calendar_year: 2020, position_title: STATE REPRESENTATIVE, pay: 35914.80, match_confidence: high}
+        - {official_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', calendar_year: 2021, position_title: STATE REPRESENTATIVE, pay: 1496.45, match_confidence: medium}
+        - {official_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', calendar_year: 2021, position_title: SENATOR, pay: 34830.08, match_confidence: medium}
+        - {official_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', calendar_year: 2025, position_title: SENATOR, pay: 41390.89, match_confidence: medium}
+        - {official_id: 'ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff', calendar_year: 2020, position_title: STATE REPRESENTATIVE, pay: 35914.80, match_confidence: high}
+        - {official_id: 'ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff', calendar_year: 2021, position_title: STATE REPRESENTATIVE, pay: 35914.80, match_confidence: high}
+
+  - name: salaries_case_504_2017_final_checks_of_seats_ended_2016_stay_with_their_member
+    model: fct_salaries
+    description: >
+      #504, #227. Stephen Webber's HD46 seat, Lincoln Hough's HD135 seat and Denny Hoskins' HD54 seat all ended
+      2016-12-31, and each was paid a 2017 House final check. Webber's ("WEBBER, STEPHEN D", $1,496.45) goes to the
+      same id as his 2025 Senate pay (63dea1c8, one person since #504), Hough's to his Senate id, and Hoskins'
+      ("STATE REPRESENTATIVE-LEADERSHP", $1,558.95) to him next to his 2017 Senate pay. The checks are set aside
+      and matched by name; 2017 is outside Webber's and Hough's seat years, and each is kept because no other
+      member of the House holds the surname that year.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'WEBBER, STEPHEN D', last_name: WEBBER, first_names: STEPHEN D, gross_pay: 1496.45}
+          - {calendar_year: 2025, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'WEBBER, STEPHEN D', last_name: WEBBER, first_names: STEPHEN D, gross_pay: 39679.63}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'HOUGH, LINCOLN P', last_name: HOUGH, first_names: LINCOLN P, gross_pay: 1496.45}
+          - {calendar_year: 2019, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'HOUGH, LINCOLN P', last_name: HOUGH, first_names: LINCOLN P, gross_pay: 34418.35}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE-LEADERSHP, employee_name: 'HOSKINS, DENNY', last_name: HOSKINS, first_names: DENNY, gross_pay: 1558.95}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'HOSKINS, DENNY', last_name: HOSKINS, first_names: DENNY, gross_pay: 34418.35}
+      - input: ref('mo_payroll_office_titles')
+        rows: *legislature_titles
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: 'ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9', full_name: Stephen Webber, surname_key: webber, chamber: lower, start_date: '2013-01-01', end_date: '2016-12-31'}
+          - {person_id: 'ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9', full_name: Stephen Webber, surname_key: webber, chamber: upper, start_date: '2025-01-01', end_date: '9999-12-31'}
+          - {person_id: 'ocd-person/934fdfca-5cdf-4c67-a3b0-b23e433f87f6', full_name: Lincoln Hough, surname_key: hough, chamber: lower, start_date: '2013-01-01', end_date: '2016-12-31'}
+          - {person_id: 'ocd-person/934fdfca-5cdf-4c67-a3b0-b23e433f87f6', full_name: Lincoln Hough, surname_key: hough, chamber: upper, start_date: '2019-01-01', end_date: '9999-12-31'}
+          - {person_id: 'ocd-person/9f04b7ea-bd98-4f8e-ad76-8a5bf7b5917a', full_name: Denny Hoskins, surname_key: hoskins, chamber: lower, start_date: '2013-01-01', end_date: '2016-12-31'}
+          - {person_id: 'ocd-person/9f04b7ea-bd98-4f8e-ad76-8a5bf7b5917a', full_name: Denny Hoskins, surname_key: hoskins, chamber: upper, start_date: '2017-01-01', end_date: '2025-01-07'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows:
+          - {calendar_year: 2017, seat_chamber: lower, employee_name: 'WEBBER, STEPHEN D', person_id: 'ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9'}
+          - {calendar_year: 2017, seat_chamber: lower, employee_name: 'HOUGH, LINCOLN P', person_id: 'ocd-person/934fdfca-5cdf-4c67-a3b0-b23e433f87f6'}
+          - {calendar_year: 2017, seat_chamber: lower, employee_name: 'HOSKINS, DENNY', person_id: 'ocd-person/9f04b7ea-bd98-4f8e-ad76-8a5bf7b5917a'}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: 'ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9', office: state_senate}
+          - {official_id: 'ocd-person/934fdfca-5cdf-4c67-a3b0-b23e433f87f6', office: state_senate}
+          - {official_id: 'ocd-person/9f04b7ea-bd98-4f8e-ad76-8a5bf7b5917a', office: secretary_of_state}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: 'ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9', level: state, office: state_senate, family_key: webber, given_key: stephen}
+          - {official_id: 'ocd-person/934fdfca-5cdf-4c67-a3b0-b23e433f87f6', level: state, office: state_senate, family_key: hough, given_key: lincoln}
+          - {official_id: 'ocd-person/9f04b7ea-bd98-4f8e-ad76-8a5bf7b5917a', level: state, office: secretary_of_state, family_key: hoskins, given_key: denny}
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows:
+          - {year: 2025, official_id: 'ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9', office: state_senate}
+          - {year: 2019, official_id: 'ocd-person/934fdfca-5cdf-4c67-a3b0-b23e433f87f6', office: state_senate}
+          - {year: 2017, official_id: 'ocd-person/9f04b7ea-bd98-4f8e-ad76-8a5bf7b5917a', office: state_senate}
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: 'ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9', calendar_year: 2017, position_title: STATE REPRESENTATIVE, pay: 1496.45, match_confidence: high}
+        - {official_id: 'ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9', calendar_year: 2025, position_title: SENATOR, pay: 39679.63, match_confidence: high}
+        - {official_id: 'ocd-person/934fdfca-5cdf-4c67-a3b0-b23e433f87f6', calendar_year: 2017, position_title: STATE REPRESENTATIVE, pay: 1496.45, match_confidence: high}
+        - {official_id: 'ocd-person/934fdfca-5cdf-4c67-a3b0-b23e433f87f6', calendar_year: 2019, position_title: SENATOR, pay: 34418.35, match_confidence: high}
+        - {official_id: 'ocd-person/9f04b7ea-bd98-4f8e-ad76-8a5bf7b5917a', calendar_year: 2017, position_title: STATE REPRESENTATIVE-LEADERSHP, pay: 1558.95, match_confidence: high}
+        - {official_id: 'ocd-person/9f04b7ea-bd98-4f8e-ad76-8a5bf7b5917a', calendar_year: 2017, position_title: SENATOR, pay: 34418.35, match_confidence: high}
+
+  - name: salaries_case_250_linda_blacks_final_check_does_not_block_rusty_black
+    model: fct_salaries
+    description: >
+      #250. Linda Black's HD117 seat ended 2016-12-31 and "BLACK, LINDA R." ($1,496.45) in 2017 is her final check
+      (she is no current official, so it is not shown). It shares the middle initial R with "BLACK, JAMES R", who
+      is Rusty Black; set aside, it leaves Rusty the only House payee of the surname in 2017. John Black (HD137,
+      1900-01-01 start, first roster year 2019) pairs by first name from 2019, leaving JAMES R to Rusty. Rusty's
+      2023 House payment ($1,533.86, his HD7 seat ended 2023-01-03) is paid by seat to him as well, next to his
+      Senate pay: it is not in int_mo_legislators__final_checks because JAMES does not fit Rusty. Fails without
+      the final-check set-aside (Rusty's 2017 pay is unmatched).
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, JAMES R', last_name: BLACK, first_names: JAMES R, gross_pay: 34418.35}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, LINDA R.', last_name: BLACK, first_names: LINDA R., gross_pay: 1496.45}
+          - {calendar_year: 2019, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, JAMES R', last_name: BLACK, first_names: JAMES R, gross_pay: 35914.80}
+          - {calendar_year: 2019, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, JOHN', last_name: BLACK, first_names: JOHN, gross_pay: 34418.35}
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, JAMES R', last_name: BLACK, first_names: JAMES R, gross_pay: 1533.86}
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'BLACK, JAMES R', last_name: BLACK, first_names: JAMES R, gross_pay: 36851.60}
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, JOHN', last_name: BLACK, first_names: JOHN, gross_pay: 38385.46}
+      - input: ref('mo_payroll_office_titles')
+        rows: *legislature_titles
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: 'ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0', full_name: Rusty Black, surname_key: black, chamber: lower, start_date: '1900-01-01', end_date: '2023-01-03'}
+          - {person_id: 'ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0', full_name: Rusty Black, surname_key: black, chamber: upper, start_date: '2023-01-01', end_date: '9999-12-31'}
+          - {person_id: 'ocd-person/a421125b-3625-4309-b4a7-73ec15541bf5', full_name: Linda Black, surname_key: black, chamber: lower, start_date: '2013-01-01', end_date: '2016-12-31'}
+          - {person_id: 'ocd-person/1250ea3d-fe5c-46ea-bead-f7249d234e68', full_name: John Black, surname_key: black, chamber: lower, start_date: '1900-01-01', end_date: '2022-12-29'}
+          - {person_id: 'ocd-person/1250ea3d-fe5c-46ea-bead-f7249d234e68', full_name: John Black, surname_key: black, chamber: lower, start_date: '2023-01-01', end_date: '9999-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows:
+          - {calendar_year: 2017, seat_chamber: lower, employee_name: 'BLACK, LINDA R.', person_id: 'ocd-person/a421125b-3625-4309-b4a7-73ec15541bf5'}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: 'ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0', office: state_senate}
+          - {official_id: 'ocd-person/1250ea3d-fe5c-46ea-bead-f7249d234e68', office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: 'ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0', level: state, office: state_senate, family_key: black, given_key: rusty}
+          - {official_id: 'ocd-person/1250ea3d-fe5c-46ea-bead-f7249d234e68', level: state, office: state_house, family_key: black, given_key: john}
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows:
+          - {year: 2017, official_id: 'ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0', office: state_house}
+          - {year: 2023, official_id: 'ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0', office: state_senate}
+          - {year: 2019, official_id: 'ocd-person/1250ea3d-fe5c-46ea-bead-f7249d234e68', office: state_house}
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: 'ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0', calendar_year: 2017, position_title: STATE REPRESENTATIVE, pay: 34418.35, match_confidence: medium}
+        - {official_id: 'ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0', calendar_year: 2019, position_title: STATE REPRESENTATIVE, pay: 35914.80, match_confidence: medium}
+        - {official_id: 'ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0', calendar_year: 2023, position_title: STATE REPRESENTATIVE, pay: 1533.86, match_confidence: medium}
+        - {official_id: 'ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0', calendar_year: 2023, position_title: SENATOR, pay: 36851.60, match_confidence: medium}
+        - {official_id: 'ocd-person/1250ea3d-fe5c-46ea-bead-f7249d234e68', calendar_year: 2019, position_title: STATE REPRESENTATIVE, pay: 34418.35, match_confidence: high}
+        - {official_id: 'ocd-person/1250ea3d-fe5c-46ea-bead-f7249d234e68', calendar_year: 2023, position_title: STATE REPRESENTATIVE, pay: 38385.46, match_confidence: high}
+
+  - name: salaries_case_legal_first_name_and_returning_member_last_house_checks_pair_by_seat
+    model: fct_salaries
+    description: >
+      The last House payments that int_mo_legislators__final_checks leaves out (#660): Mike Moon ("MOON, CHRIS M",
+      2021, $1,496.45), Mike Henderson ("HENDERSON, JAMES M", 2025 leadership, $1,704.32) and Maggie Nurrenbern
+      ("NURRENBERN, MARGARET", 2025, $1,636.00) because the legal first name does not fit; John Simmons (2023,
+      $1,533.86) because he returned to HD109 in 2025. Each House seat ends in January of the pay year, so each is
+      the only member of the surname that year and pairs by seat. Mark Matthiesen's 2019 payment ($1,496.45, HD70
+      ended 2018-12-31, back from 2023) has no seat that year and is kept by name inside his service years.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2021, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'MOON, CHRIS M', last_name: MOON, first_names: CHRIS M, gross_pay: 1496.45}
+          - {calendar_year: 2025, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE-LEADERSHP, employee_name: 'HENDERSON, JAMES M', last_name: HENDERSON, first_names: JAMES M, gross_pay: 1704.32}
+          - {calendar_year: 2025, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'NURRENBERN, MARGARET', last_name: NURRENBERN, first_names: MARGARET, gross_pay: 1636.00}
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SIMMONS, JOHN', last_name: SIMMONS, first_names: JOHN, gross_pay: 1533.86}
+          - {calendar_year: 2019, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'MATTHIESEN, MARK', last_name: MATTHIESEN, first_names: MARK, gross_pay: 1496.45}
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'MATTHIESEN, MARK', last_name: MATTHIESEN, first_names: MARK, gross_pay: 36851.60}
+      - input: ref('mo_payroll_office_titles')
+        rows: *legislature_titles
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: 'ocd-person/43563b48-1d26-4a85-bad2-615971201d41', full_name: Mike Moon, surname_key: moon, chamber: lower, start_date: '2013-01-01', end_date: '2021-01-06'}
+          - {person_id: 'ocd-person/43563b48-1d26-4a85-bad2-615971201d41', full_name: Mike Moon, surname_key: moon, chamber: upper, start_date: '2021-01-01', end_date: '9999-12-31'}
+          - {person_id: 'ocd-person/bfad4ef7-fad2-46e6-8f12-f8ea9feaa0cb', full_name: Mike Henderson, surname_key: henderson, chamber: lower, start_date: '2017-01-01', end_date: '2025-01-08'}
+          - {person_id: 'ocd-person/d8594030-4826-48c5-af43-674470f1dd44', full_name: Maggie Nurrenbern, surname_key: nurrenbern, chamber: lower, start_date: '2021-01-01', end_date: '2025-01-08'}
+          - {person_id: 'ocd-person/3de9f0e2-7062-4363-91d0-c3f17084ced4', full_name: John Simmons, surname_key: simmons, chamber: lower, start_date: '1900-01-01', end_date: '2023-01-03'}
+          - {person_id: 'ocd-person/3de9f0e2-7062-4363-91d0-c3f17084ced4', full_name: John Simmons, surname_key: simmons, chamber: lower, start_date: '2025-01-01', end_date: '9999-12-31'}
+          - {person_id: 'ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df', full_name: Mark Matthiesen, surname_key: matthiesen, chamber: lower, start_date: '1900-01-01', end_date: '2018-12-31'}
+          - {person_id: 'ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df', full_name: Mark Matthiesen, surname_key: matthiesen, chamber: lower, start_date: '2023-01-01', end_date: '9999-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows: []
+      - input: ref('dim_official')
+        rows:
+          - {official_id: 'ocd-person/43563b48-1d26-4a85-bad2-615971201d41', office: state_senate}
+          - {official_id: 'ocd-person/bfad4ef7-fad2-46e6-8f12-f8ea9feaa0cb', office: state_senate}
+          - {official_id: 'ocd-person/d8594030-4826-48c5-af43-674470f1dd44', office: state_senate}
+          - {official_id: 'ocd-person/3de9f0e2-7062-4363-91d0-c3f17084ced4', office: state_house}
+          - {official_id: 'ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df', office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: 'ocd-person/43563b48-1d26-4a85-bad2-615971201d41', level: state, office: state_senate, family_key: moon, given_key: mike}
+          - {official_id: 'ocd-person/bfad4ef7-fad2-46e6-8f12-f8ea9feaa0cb', level: state, office: state_senate, family_key: henderson, given_key: mike}
+          - {official_id: 'ocd-person/d8594030-4826-48c5-af43-674470f1dd44', level: state, office: state_senate, family_key: nurrenbern, given_key: maggie}
+          - {official_id: 'ocd-person/3de9f0e2-7062-4363-91d0-c3f17084ced4', level: state, office: state_house, family_key: simmons, given_key: john}
+          - {official_id: 'ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df', level: state, office: state_house, family_key: matthiesen, given_key: mark}
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows:
+          - {year: 2017, official_id: 'ocd-person/3de9f0e2-7062-4363-91d0-c3f17084ced4', office: state_house}
+          - {year: 2017, official_id: 'ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df', office: state_house}
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: 'ocd-person/43563b48-1d26-4a85-bad2-615971201d41', calendar_year: 2021, employee_name: 'MOON, CHRIS M', pay: 1496.45, match_confidence: medium}
+        - {official_id: 'ocd-person/bfad4ef7-fad2-46e6-8f12-f8ea9feaa0cb', calendar_year: 2025, employee_name: 'HENDERSON, JAMES M', pay: 1704.32, match_confidence: medium}
+        - {official_id: 'ocd-person/d8594030-4826-48c5-af43-674470f1dd44', calendar_year: 2025, employee_name: 'NURRENBERN, MARGARET', pay: 1636.00, match_confidence: medium}
+        - {official_id: 'ocd-person/3de9f0e2-7062-4363-91d0-c3f17084ced4', calendar_year: 2023, employee_name: 'SIMMONS, JOHN', pay: 1533.86, match_confidence: high}
+        - {official_id: 'ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df', calendar_year: 2019, employee_name: 'MATTHIESEN, MARK', pay: 1496.45, match_confidence: high}
+        - {official_id: 'ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df', calendar_year: 2023, employee_name: 'MATTHIESEN, MARK', pay: 36851.60, match_confidence: high}
+
+  - name: salaries_case_228_van_schoiack_matches_across_the_two_spellings
+    model: fct_salaries
+    description: >
+      #228. The payroll prints "VANSCHOIACK, DEAN A"; the House roster spells him "Van Schoiack" (his official name
+      key, family_key 'van schoiack') and Open States "VanSchoiack". Since the merge his official id is the Open
+      States id f3250139. Today his HD9 seat carries the Open States spelling (2021-2024 pay, by seat). The 2025
+      seat row here carries the roster spelling instead, as a seat keyed on the House roster would: the surname
+      still matches with spaces ignored. All high (DEAN = Dean). Fails if the surname comparison keeps spaces
+      (2025 is unmatched).
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2021, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'VANSCHOIACK, DEAN A', last_name: VANSCHOIACK, first_names: DEAN A, gross_pay: 34418.35}
+          - {calendar_year: 2024, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'VANSCHOIACK, DEAN A', last_name: VANSCHOIACK, first_names: DEAN A, gross_pay: 39264.00}
+          - {calendar_year: 2025, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'VANSCHOIACK, DEAN A', last_name: VANSCHOIACK, first_names: DEAN A, gross_pay: 41315.63}
+      - input: ref('mo_payroll_office_titles')
+        rows: *house_titles
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: 'ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e', full_name: Dean VanSchoiack, surname_key: vanschoiack, chamber: lower, start_date: '2021-01-01', end_date: '2024-12-31'}
+          - {person_id: 'ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e', full_name: Dean Van Schoiack, surname_key: van schoiack, chamber: lower, start_date: '2025-01-01', end_date: '9999-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows: []
+      - input: ref('dim_official')
+        rows:
+          - {official_id: 'ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e', office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: 'ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e', level: state, office: state_house, family_key: van schoiack, given_key: dean}
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows: []
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: 'ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e', calendar_year: 2021, pay: 34418.35, match_confidence: high}
+        - {official_id: 'ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e', calendar_year: 2024, pay: 39264.00, match_confidence: high}
+        - {official_id: 'ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e', calendar_year: 2025, pay: 41315.63, match_confidence: high}
+
+  - name: salaries_case_551_silvey_2018_payment_is_not_paired_while_his_seat_ends_at_his_last_vote
+    model: fct_salaries
+    description: >
+      #551, pinning today's behaviour (option 1, last-vote cap) pending the maintainer's decision. Ryan Silvey's
+      SD17 seat ends at his last vote, 2017-09-13, and Will Kraus's SD8 seat at his, 2017-07-25. Kraus's partial
+      2017 pay ($22,395.50) is his by seat (medium: WILLIAM for Will) and Silvey's full 2017 pay is his (high).
+      Silvey's 2018 SENATOR payment ($1,836.67) is no final check (int_mo_legislators__final_checks has no row) and
+      has no seat that year, so it pairs with nobody; neither is a current official, so they have no name keys.
+      Both are given dim_official rows here only so the seat pairing shows (in the real build their pay is not
+      shown at all). If #551 moves Silvey's end into January 2018, this test is expected to change.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'SILVEY, RYAN A', last_name: SILVEY, first_names: RYAN A, gross_pay: 35914.80}
+          - {calendar_year: 2018, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'SILVEY, RYAN A', last_name: SILVEY, first_names: RYAN A, gross_pay: 1836.67}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'KRAUS, WILLIAM G', last_name: KRAUS, first_names: WILLIAM G, gross_pay: 22395.50}
+      - input: ref('mo_payroll_office_titles')
+        rows: *legislature_titles
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: 'ocd-person/fd8438aa-3dfd-48ef-b2a5-076c42799b9b', full_name: Ryan Silvey, surname_key: silvey, chamber: upper, start_date: '2013-01-01', end_date: '2017-09-13'}
+          - {person_id: 'ocd-person/e2a4325d-a856-4581-80d5-d323f65391fc', full_name: Will Kraus, surname_key: kraus, chamber: upper, start_date: '2011-01-01', end_date: '2017-07-25'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows: []
+      - input: ref('dim_official')
+        rows:
+          - {official_id: 'ocd-person/fd8438aa-3dfd-48ef-b2a5-076c42799b9b', office: state_senate}
+          - {official_id: 'ocd-person/e2a4325d-a856-4581-80d5-d323f65391fc', office: state_senate}
+      - input: ref('int_officials__name_keys')
+        rows: []
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows: []
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: 'ocd-person/fd8438aa-3dfd-48ef-b2a5-076c42799b9b', calendar_year: 2017, pay: 35914.80, match_confidence: high}
+        - {official_id: 'ocd-person/e2a4325d-a856-4581-80d5-d323f65391fc', calendar_year: 2017, pay: 22395.50, match_confidence: medium}
