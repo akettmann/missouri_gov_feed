@@ -355,7 +355,8 @@ it lands a table, so lower that or `--workers` on a small machine.
 Each shard replaces only its own part. If you change the shard count, run every shard before the next
 `dbt build`. Parts left by the old count are deleted only once every shard of the new count has landed (a shard
 that owns no data leaves a hidden `.none` marker instead), so shards that start late still see the old history.
-Until then dbt would read both counts and double-count rows.
+Until then dbt would read both counts and double-count rows: building mid-transition shows up as
+uniqueness test failures on the staging models (loaders reading their own tables dedupe, dbt does not).
 
 Only one run may write a given table's shard at a time. A sink takes an exclusive OS lock on
 `data/raw/<table>/.part-<i>-of-<N>.parquet.lock` when it opens and holds it until it finishes. A second

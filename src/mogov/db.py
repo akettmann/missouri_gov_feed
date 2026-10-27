@@ -92,6 +92,19 @@ def raw_glob(table: str) -> str:
     return (table_dir(table) / "*.parquet").as_posix()
 
 
+def own_rows_sql(table: str, keys: Iterable[str], recency: str = "landed_at") -> str:
+    """A `select` over a raw table that a loader reads back to learn its own state, tolerating two shard counts
+    coexisting (a shard-count change leaves the old parts until the new count has fully landed, see
+    `_drop_other_shard_counts`). Keeps one row per `keys`: the latest by `recency`, ties broken by the part file
+    name, which is unique, so the choice is deterministic."""
+    cols = ", ".join(keys)
+    return (
+        f"select * exclude (_rn, filename) from (select *, row_number() over ("
+        f"partition by {cols} order by {recency} desc, filename desc) as _rn "
+        f"from read_parquet('{raw_glob(table)}', filename = true)) where _rn = 1"
+    )
+
+
 def raw_exists(table: str) -> bool:
     return any(table_dir(table).glob("*.parquet"))
 
@@ -188,6 +201,8 @@ def _clear_stale_scratch(table: str, shard: Shard) -> None:
     (they are named .<part>.<pid>.jsonl / .<part>.<pid>.part, so each is one dead run's). A shard is a single
     writer, and a killed run's rows are never wanted, so starting a sink for the shard makes them stale."""
     folder = table_dir(table)
+    # a run that starts and then crashes must count as "not landed", not as the empty shard an old marker says
+    _none_marker(folder, shard).unlink(missing_ok=True)
     for suffix in ("jsonl", "part"):
         for stale in folder.glob(f".{shard.part_name}.*.{suffix}"):
             stale.unlink(missing_ok=True)
@@ -257,8 +272,13 @@ def remove_part(table: str, shard: Shard = UNSHARDED) -> None:
     Parts from a previous shard count stay until every shard of the new count has landed (this one is recorded
     with a `.none` marker, so owning nothing doesn't stall that), so the table is never left empty mid-run."""
     folder = table_dir(table)
-    (folder / shard.part_name).unlink(missing_ok=True)
-    _none_marker(folder, shard).write_bytes(b"")
+    lock = _ShardLock(table, shard)
+    lock.acquire()  # fail fast if a sink is writing this shard
+    try:
+        (folder / shard.part_name).unlink(missing_ok=True)
+        _none_marker(folder, shard).write_bytes(b"")
+    finally:
+        lock.release()
     _drop_other_shard_counts(folder, shard)
 
 

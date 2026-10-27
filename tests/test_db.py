@@ -352,3 +352,19 @@ def test_second_process_holding_the_shard_makes_this_one_fail_fast(raw_dir):
     assert child.returncode == 0
     with db.JsonSink(db.Shard(0, 2), tables=["t"]):  # the child released it on exit
         pass
+
+
+def test_sink_start_clears_own_none_marker(raw_dir):
+    db.remove_part("t", db.Shard(1, 2))
+    marker = raw_dir / "t" / ".part-001-of-002.parquet.none"
+    assert marker.exists()
+    with db.JsonSink(db.Shard(1, 2), tables=["t"]) as sink:
+        sink.add("t", "k", {})
+        assert not marker.exists()
+
+
+def test_remove_part_refuses_while_a_sink_holds_the_shard(raw_dir):
+    with db.JsonSink(db.Shard(1, 2), tables=["t"]) as sink:
+        sink.add("t", "k", {})
+        with pytest.raises(db.ShardBusyError):
+            db.remove_part("t", db.Shard(1, 2))
