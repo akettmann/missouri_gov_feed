@@ -1,0 +1,63 @@
+# Unit tests for int_house_fd__schedule_lines: entries the PDF wraps over several lines on schedules A, B, D and H come
+# out as one row each (#641).
+version: 2
+
+unit_tests:
+  - name: house_fd_wrapped_entries_joined_a_b_d_h
+    model: int_house_fd__schedule_lines
+    description: >
+      Schedule A: a line of only income-type words ("Dividends"), only amounts (the high end of a range), only
+      form-checkbox glyphs ("gfedc"), or a ticker and asset-type code ("(OANEX) [MF]") belongs to the entry above; the
+      head line keeps the amount and owner code. A line with an asset name and an amount is its own entry, and
+      Location / Description lines stay lines of their own. Schedule B: a line with neither a date nor a transaction
+      type before an amount is the asset name wrapped under the account line; the column-header spill "$200?" is
+      dropped. Schedule D: a line with no amount belongs to the entry above, a line ending on "Over" starts one.
+      Schedule H: a line with no date is the wrapped sponsor / itinerary of the entry above. The head line's page and
+      line number stay the row's identity.
+    given:
+      - input: ref('stg_house_fd__pdf_lines')
+        format: sql
+        rows: |
+          select 'w' as doc_id, 'u_w' as document_url, true as has_text, 1 as page, 1 as line_no, 'Schedule A: Assets and "Unearned" Income' as line_text union all
+          select 'w', 'u_w', true, 1, 2, 'Widget Fund [MF] SP $15,001 - $50,000 Capital Gains, $1 - $200' union all
+          select 'w', 'u_w', true, 1, 3, 'Dividends' union all
+          select 'w', 'u_w', true, 1, 4, 'Oakmark International Small Cap Fund Institutional Class' union all
+          select 'w', 'u_w', true, 1, 5, '(OANEX) [MF]' union all
+          select 'w', 'u_w', true, 1, 6, 'Mass Mutual Life $50,001 -' union all
+          select 'w', 'u_w', true, 1, 7, '$100,000' union all
+          select 'w', 'u_w', true, 1, 8, 'Gadget Fund [MF] $1,001 - $15,000' union all
+          select 'w', 'u_w', true, 1, 9, 'Location: Salem, MO, US' union all
+          select 'w', 'u_w', true, 2, 1, 'Schedule B: Transactions' union all
+          select 'w', 'u_w', true, 2, 2, '$200?' union all
+          select 'w', 'u_w', true, 2, 3, 'Fidelity Trust ⇒ JT 09/5/2019 S $100,001 -' union all
+          select 'w', 'u_w', true, 2, 4, 'Vanguard Windsor II [MF] (partial) $250,000' union all
+          select 'w', 'u_w', true, 2, 5, 'Enterprise 401k - SP Monthly P $1,001 - $15,000' union all
+          select 'w', 'u_w', true, 2, 6, 'Dodge & Cox Stock Fund [MF]' union all
+          select 'w', 'u_w', true, 2, 7, 'Description: Inherited Asset' union all
+          select 'w', 'u_w', true, 3, 1, 'Schedule D: Liabilities' union all
+          select 'w', 'u_w', true, 3, 2, 'FNMa Co-Signatore of Wyloris april 1998 Student Loan $10,000 - $15,000' union all
+          select 'w', 'u_w', true, 3, 3, 'McNeel (Niece)' union all
+          select 'w', 'u_w', true, 3, 4, 'U.S. Department of Education 1988-2014 Student Loans Over' union all
+          select 'w', 'u_w', true, 3, 5, '$1,000,000' union all
+          select 'w', 'u_w', true, 3, 6, 'COMMENTS: Mortgage paid in 2019' union all
+          select 'w', 'u_w', true, 3, 7, 'Town Bank July 2009 Mortgage $15,001 - $50,000' union all
+          select 'w', 'u_w', true, 4, 1, 'Schedule H: Travel Payments' union all
+          select 'w', 'u_w', true, 4, 2, 'Congressional Black 08/6/2015 08/9/2015 Chicago, IL - 0' union all
+          select 'w', 'u_w', true, 4, 3, 'Caucus Institute Tunica, MS - Kansas City, MO' union all
+          select 'w', 'u_w', true, 4, 4, 'National Bar 07/20/2015 07/21/2015 Kansas City, MO - Los 0' union all
+          select 'w', 'u_w', true, 4, 5, 'angeles, Ca - Washington, DC'
+    expect:
+      rows:
+        - {doc_id: w, page: 1, line_no: 2, schedule: 'A: assets & unearned income', owner_code: SP, amount_range: '$15,001 - $50,000', line_text: 'Widget Fund [MF] SP $15,001 - $50,000 Capital Gains, $1 - $200 Dividends'}
+        - {doc_id: w, page: 1, line_no: 4, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Oakmark International Small Cap Fund Institutional Class (OANEX) [MF]'}
+        - {doc_id: w, page: 1, line_no: 6, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$50,001', line_text: 'Mass Mutual Life $50,001 - $100,000'}
+        - {doc_id: w, page: 1, line_no: 8, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Gadget Fund [MF] $1,001 - $15,000'}
+        - {doc_id: w, page: 1, line_no: 9, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Location: Salem, MO, US'}
+        - {doc_id: w, page: 2, line_no: 3, schedule: 'B: transactions', owner_code: JT, amount_range: '$100,001', line_text: 'Fidelity Trust ⇒ JT 09/5/2019 S $100,001 - Vanguard Windsor II [MF] (partial) $250,000'}
+        - {doc_id: w, page: 2, line_no: 5, schedule: 'B: transactions', owner_code: SP, amount_range: '$1,001 - $15,000', line_text: 'Enterprise 401k - SP Monthly P $1,001 - $15,000 Dodge & Cox Stock Fund [MF]'}
+        - {doc_id: w, page: 2, line_no: 7, schedule: 'B: transactions', owner_code: null, amount_range: null, line_text: 'Description: Inherited Asset'}
+        - {doc_id: w, page: 3, line_no: 2, schedule: 'D: liabilities', owner_code: null, amount_range: '$10,000 - $15,000', line_text: 'FNMa Co-Signatore of Wyloris april 1998 Student Loan $10,000 - $15,000 McNeel (Niece)'}
+        - {doc_id: w, page: 3, line_no: 4, schedule: 'D: liabilities', owner_code: null, amount_range: null, line_text: 'U.S. Department of Education 1988-2014 Student Loans Over $1,000,000 COMMENTS: Mortgage paid in 2019'}
+        - {doc_id: w, page: 3, line_no: 7, schedule: 'D: liabilities', owner_code: null, amount_range: '$15,001 - $50,000', line_text: 'Town Bank July 2009 Mortgage $15,001 - $50,000'}
+        - {doc_id: w, page: 4, line_no: 2, schedule: 'H: travel', owner_code: null, amount_range: null, line_text: 'Congressional Black 08/6/2015 08/9/2015 Chicago, IL - 0 Caucus Institute Tunica, MS - Kansas City, MO'}
+        - {doc_id: w, page: 4, line_no: 4, schedule: 'H: travel', owner_code: null, amount_range: null, line_text: 'National Bar 07/20/2015 07/21/2015 Kansas City, MO - Los 0 angeles, Ca - Washington, DC'}

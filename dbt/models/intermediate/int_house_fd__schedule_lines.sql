@@ -1,7 +1,8 @@
 -- House disclosure PDF text, each line tagged with the schedule it falls under (the nearest preceding
 -- "Schedule X:" header in the same document). Column-header rows, "None disclosed." and boilerplate drop out.
--- Entries the PDF wraps over several lines are joined back into one row on the schedules that feed commercial ties
--- (C, E, F, J: see "continuation" below), so a wrapped tail never becomes a tie of its own (#599).
+-- Entries the PDF wraps over several lines are joined back into one row (see "continuation" below): on the schedules
+-- that feed commercial ties (C, E, F, J) so a wrapped tail never becomes a tie of its own (#599), and on A, B, D and H
+-- so a wrapped entry is not counted as several disclosure items (#641).
 -- PDFs from 2021 on extract their small-caps text with NUL characters; the words are restored first (#576).
 with lines as (
     select
@@ -87,6 +88,7 @@ kept as (
             'i v d',
             'liability',
             'exp.',
+            '$200?',
             'date exp.',
             'date own exp.',
             'trip details inclusions',
@@ -116,7 +118,17 @@ kept as (
 --   * F: it does not start with the agreement's date (a year, optionally after a month): Date, Parties, Terms;
 --   * C, E, F, J: it closes a parenthesis the entry above left open, or starts with one ("Name (Owensboro," then
 --     "KY, US)"; "... Consulting services" then "(Jefferson City, MO, US)").
--- Other lines stay entries: pure wrapped tails with no such signal ("Government") cannot be told from an entry.
+--   * A: it is nothing but income-type words ("Dividends", "Capital Gains,"), nothing but amounts (the high end of a
+--     range wrapped under the low end) or form-checkbox glyphs ("gfedc"), or a ticker and asset-type code
+--     ("(OANEX) [MF]", "[MF]");
+--   * B: it carries neither a transaction type before an amount ("P $1,001 - ...", "S (partial) $...") nor a date: the
+--     2021+ layout puts the asset name on the line(s) after the account/date/amount line;
+--   * D: it carries no amount ("$..." or "N/A") and does not end on "Over" (an amount wrapped to the next line), or it
+--     is nothing but amounts;
+--   * H: it carries no date (mm/dd/yyyy): the sponsor, itinerary and city names wrap around the line with the dates.
+-- "Location:" / "Description:" / "Comments:" lines of A and B stay lines of their own (labelled attributes).
+-- Other lines stay entries: pure wrapped tails with no such signal ("Government") cannot be told from an entry, and
+-- neither can an asset name wrapped over two lines on A ("Fidelity Managed Income II III [HE]" / "Unit Cl I [HE]").
 flagged as (
     select
         k.*,
@@ -128,8 +140,17 @@ flagged as (
 continued as (
     select
         f.*,
-        coalesce(f.prev_schedule = f.schedule, false) and substr(f.schedule, 1, 1) in ('C', 'E', 'F', 'J') and (
+        coalesce(f.prev_schedule = f.schedule, false) and (
             (
+                substr(f.schedule, 1, 1) in ('C', 'E', 'F', 'J', 'A', 'B', 'D', 'H') and (
+                    length(f.prev_text) - length(replace(f.prev_text, '(', ''))
+                    > length(f.prev_text) - length(replace(f.prev_text, ')', ''))
+                    or length(f.line_text) - length(replace(f.line_text, ')', ''))
+                    > length(f.line_text) - length(replace(f.line_text, '(', ''))
+                    or f.line_text like '(%'
+                )
+            )
+            or (
                 substr(f.schedule, 1, 1) = 'C'
                 and not {{ mogov.regex_matches('f.line_text', '\\$[0-9]|(^| )[Nn]/[Aa]( |$)') }}
             )
@@ -140,11 +161,31 @@ continued as (
                     '^((january|february|march|april|may|june|july|august|september|october|november|december) )?[0-9]{4}( |$)'
                 ) }}
             )
-            or length(f.prev_text) - length(replace(f.prev_text, '(', ''))
-            > length(f.prev_text) - length(replace(f.prev_text, ')', ''))
-            or length(f.line_text) - length(replace(f.line_text, ')', ''))
-            > length(f.line_text) - length(replace(f.line_text, '(', ''))
-            or f.line_text like '(%'
+            or (
+                substr(f.schedule, 1, 1) = 'A'
+                and {{ mogov.regex_matches(
+                    'lower(f.line_text)',
+                    '^((dividends|interest|capital gains|rent|royalties|tax-deferred|none)[, ]*)+$'
+                    ~ '|^(\\$[0-9,.]+ ?)+$|^(gfedcb? ?)+$|^(\\([a-z0-9.]+\\) )?\\[[a-z]{2}\\]$'
+                ) }}
+            )
+            or (
+                substr(f.schedule, 1, 1) = 'B'
+                and not {{ mogov.regex_matches('f.line_text', '(^| )[0-9]{1,2}/[0-9]{1,2}/[0-9]{2,4}( |$)') }}
+                and not {{ mogov.regex_matches('f.line_text', '(^| )(P|S|E)( \\([Pp]artial\\))? (\\$[0-9]|None)') }}
+                and not {{ mogov.regex_matches('lower(f.line_text)', '^(location|description|comments):') }}
+            )
+            or (
+                substr(f.schedule, 1, 1) = 'D'
+                and (
+                    not {{ mogov.regex_matches('f.line_text', '\\$[0-9]|(^| )[Nn]/[Aa]( |$)|(^| )Over$') }}
+                    or {{ mogov.regex_matches('f.line_text', '^(\\$[0-9,.]+ ?)+$') }}
+                )
+            )
+            or (
+                substr(f.schedule, 1, 1) = 'H'
+                and not {{ mogov.regex_matches('f.line_text', '[0-9]{1,2}/[0-9]{1,2}/[0-9]{2,4}') }}
+            )
         ) as is_continuation
     from flagged as f
 ),
