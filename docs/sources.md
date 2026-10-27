@@ -149,6 +149,14 @@ Quirks:
 - Vote tokens are printed surnames, sometimes with a district ("SMITH 46"), plus "MR SPEAKER".
   Some names are truncated ("FOUNTAIN HENDERS"). dbt matches them to members
   (`int_mo_house__member_identity`, seed `house_speakers`).
+- Tokens do not always spell the roster surname: a compound surname is printed by its last word ("REHDER" is Holly
+  Thompson Rehder, "REISCH" is Cheri Toalson Reisch, "COURTWAY" is Cyndi Buchheit-Courtway), a generational suffix is
+  dropped ("PRICE" is Wiley Price IV in 2019-2022, Tiffany Price from 2025), and a district is added only while two
+  members share a surname ("EVANS 99" / "EVANS 154" until Jean Evans left on 2019-02-05, then a bare "EVANS" is
+  David Evans). The roster is an end-of-session list, so a member who left mid-session is missing from their last
+  session (Rory Rowland in 2022). `int_mo_house__votes` handles all of these (#539): a whole-surname match beats a
+  last-word one, and the Open States seat dates break a tie between same-surname members only when exactly one
+  seat covers the vote date.
 - A member's seat is matched to an Open States person (district, date and surname; when several same-surname terms overlap, the one whose name starts with the member's given name); when that fails the key is `mohouse:<member id>`.
   Open States also holds some people twice (after a redistricting or a move to the Senate). Both are
   reconciled to one stable `official_id` per person by `int_officials__person_ids` (the same MO House member id, which follows a name change such as Mazzie Boyd/Christensen, member 2381, #151; otherwise the same exact name, or names that differ only in the given
