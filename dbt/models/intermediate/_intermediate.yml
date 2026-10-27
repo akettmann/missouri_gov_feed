@@ -371,6 +371,19 @@ models:
     2008" both: the earliest start and the latest end Most titles say nothing ("Office of Governor"); both are then
     null. A date is "Month d, yyyy"; the month name''s first three letters give the month (mogov.month_name_date).
     Grain: one row per State Auditor report, with its rating and audited entity type.'
+- name: int_mo_house__bill_text_statute_refs
+  description: 'The RSMo sections each House bill text version names in its enacting title and Section A (stg_mo_house__statute_refs),
+    one row per (text version, bill, action, ordinal, section) with ranges expanded: "sections 2.020 to 2.040" becomes
+    every section of that span that fct_statute_sections has, plus both endpoints (a repealed range may end at a
+    section the Revisor no longer lists; an enacted range names sections that do not exist yet). A range that crosses
+    a chapter is not expanded: only its two endpoints are kept. Within a chapter sections run in the order of the
+    number after the point, read as an integer (140.995 is followed by 140.1000, 67.646 by 67.1157), then its letter
+    or uniform-code suffix as text. The section lists in House bill titles follow that order in 1,698 of 1,699 consecutive
+    pairs (the other is a section named twice), not a decimal one. bill comes from fct_bill_documents (a text version
+    shared by combined bills gives a row per bill); a text PDF no bill links has no row. in_statutes says whether
+    fct_statute_sections has the section today: false for a section the bill would enact, or one the Revisor has
+    since moved or dropped. from_range marks a section that came from a range. Grain: one row per (bill text version,
+    bill, action, ordinal, section).'
 - name: int_mo_house__committee_memberships
   description: 'House committee and subcommittee memberships per member and session, keyed to the person (person_key
     from int_mo_house__member_identity). The member pages (stg_mo_house__member_committees) cover every session

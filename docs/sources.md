@@ -317,7 +317,18 @@ fiscal_notes,amendments}`), so run `mo_house` first; no crawl is needed.
   hash), stored as-is; clean-up is in dbt: `stg_mo_house__document_texts` strips control characters (#593) and
   `fct_bill_document_texts` is the mart (one row per URL; `fct_bill_documents` carries `page_count`, `text_length`,
   `has_text`, `fetch_error`). The tables are optional for dbt: a build without the loader gets empty placeholders
-  (`db.OPTIONAL_TYPED_TABLES`). Statute links (#594) are not parsed here.
+  (`db.OPTIONAL_TYPED_TABLES`).
+- Statute references (#594): for each `bill_text` document with text, `mogov.parsers.mo_house_statute_refs` reads the
+  enacting title (`AN ACT To repeal sections 1.010 and 2.020, RSMo, and to enact ...`; `To amend section ...` gives
+  action `amend`) and Section A (`... to be known as sections ..., to read as follows`) into
+  `mo_house_pdf_statute_refs`: one row per section or range as written (`section_start`, `section_end`), with
+  `action` (`repeal`, `amend`, `enact`), `ordinal` within the action, `supp_year` (from `RSMo Supp. 2023`), the
+  matched `clause`, and the document's URL, session, file name, LR number and version code. Ranges are not
+  expanded here. dbt: `stg_mo_house__statute_refs`, `int_mo_house__bill_text_statute_refs` (joins
+  `fct_bill_documents` for the bill and expands ranges against `fct_statute_sections`) and
+  `fct_bill_text_statute_links`. Appropriation bills, land conveyances and joint resolutions that amend the
+  Constitution name no RSMo section and give no rows. The parser runs on the stored text, so a change to it means
+  re-running the loader (a re-read of the landed PDFs, no downloads).
 - Not fetched: witness forms (`mo_house_xml_bill_witnesses`; they print citizens' contact details, #244) and
   change-map PDFs (`map_link`). `fetch_document` and the `KINDS` table are the reusable seam for adding a kind.
 - Rate: every request waits at the host-wide throttle (`REQUEST_INTERVAL` = 1 s, shared by every shard and by
@@ -370,6 +381,22 @@ Quirks:
 - Two fiscal-note links point to `www.moga.mo.gov/OverSight/...htm` (HTML, 2018, a host that did not answer when
   probed); they land as error rows. Two bill-text links use `house.mo.gov` rather than `documents.house.mo.gov`; such
   a file is stored as `<host>__<file name>` so it cannot collide with the same name on the main host.
+- Statute references (#594), measured on a 378-document slice (sessions 241, 251 and 261: every truly agreed text,
+  120 random introduced texts, HB 1-13; first 8 pages of each): 192 documents give 2,768 rows (1,134 repeal, 1,634
+  enact; no range, no `Supp.` citation and no `To amend section` title among them, so those three forms are
+  tested on made-up text only). The other 186 are 168 appropriation bills, 9 joint resolutions, 3 land
+  conveyances or transfers, 3 not-a-PDF links and 3 with no text layer. Section A prints its line numbers either at the start of the line
+  (`2 sections enacted in lieu`) or alone on the line before it (`2` then `one new section`, seen in
+  5627H.09T); both are stripped before reading. `To amend chapter 160, RSMo, by adding thereto one new section`
+  has no repealed section, only the enacted one. New sections that Section A adds without a number (`..., and 1, to read as follows`, a bare
+  `1` standing for a section the Revisor numbers later) are not captured: 19 of 714 bill texts from 2024-26.
+  `as enacted by house bill no. N` inside a repeal list does not end it (the list ends at `to enact`, `relating to`
+  or `by adding`). A pure repeal (`Sections 559.301 ... are repealed`) has no enact
+  rows. Sections within a chapter run in the order of the number after the point as an integer (140.995 is followed
+  by 140.1000), not as a decimal: 1,698 of 1,699 consecutive pairs in the slice's lists follow it. For the 82 truly
+  agreed texts whose bill the Revisor also links, 891 of 918 repealed or amended sections are in
+  `fct_bill_statute_links` (`assert_bill_text_repeals_agree_with_revisor_links`, warn); the one bill below half is
+  2026 HB 3279, which renumbers 620.580-620.592 to 173.4000-173.4012.
 - A summary PDF is linked by every version of a bill that shares it (23,648 link rows, 23,291 distinct URLs), so
   `mo_house_pdf_texts` has one row per URL, not per link.
 - Small-caps and some display glyphs can extract as NUL characters (seen in `house_fd` text); that is stored as-is.
@@ -698,8 +725,9 @@ Quirks:
   "sections a bill repealed" should expect rows for sections it also amended, and filter on `change`. In a repeal
   note "Repealed" covers every "and L." act after it, however long the chain, and any bill-only pieces that follow.
 - Some chapters list no sections at all: every section in them was repealed or transferred.
-- History notes only cover bills that became law. A pending bill's statute targets are in its text, which
-  isn't loaded yet (#175).
+- History notes only cover bills that became law. A pending bill's statute targets are read from its text
+  (`mo_house_pdf`, #594) into `fct_bill_text_statute_links`; `link_source` is `revisor_history` in
+  `fct_bill_statute_links` and `bill_text` there.
 
 ## mec: Missouri Ethics Commission (opt-in)
 

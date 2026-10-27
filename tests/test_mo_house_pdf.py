@@ -181,7 +181,7 @@ def test_pdfs_land_unchanged_and_errors_become_rows(links_landed, monkeypatch, e
     site = _site()
     monkeypatch.setattr(m, "fetch_document", site)
     counts = m.load(db.UNSHARDED)
-    assert counts == {"mo_house_pdf_files": 7, "mo_house_pdf_texts": 7}
+    assert counts == {"mo_house_pdf_files": 7, "mo_house_pdf_texts": 7, "mo_house_pdf_statute_refs": 0}
     raw = env / "raw"
     assert (raw / "mo_house_pdf/171/bill_text/0001H.01I.pdf").read_bytes() == PDF_A
     assert (raw / "mo_house_pdf/171/fiscal_note/0563-01N.ORG.pdf").read_bytes() == PDF_B
@@ -197,6 +197,55 @@ def test_pdfs_land_unchanged_and_errors_become_rows(links_landed, monkeypatch, e
     assert texts[TEXT_1]["lr_number"] == "0001H.01" and texts[TEXT_1]["version_code"] == "IN"
     assert texts[SUMMARY]["text"] is None and texts[SUMMARY]["error"] == "not a PDF" and texts[SUMMARY]["n_links"] == 2
     assert WITNESS not in site.requests
+
+
+def test_bill_text_versions_get_statute_ref_rows_and_other_kinds_do_not(links_landed, monkeypatch):
+    bill = _pdf(
+        [
+            "AN ACT To repeal sections 1.010 to 1.012, RSMo, and to enact in lieu thereof",
+            "two new sections relating to x. Be it enacted by the General Assembly",
+            "Section A. Sections 1.010 to 1.012, RSMo, are repealed and two new sections",
+            "2 enacted in lieu thereof, to be known as sections 1.010 and 1.011, to read as",
+            "3 follows:",
+        ]
+    )
+    site = _site()
+    site.pages[TEXT_1] = _pdf_ok(bill)
+    site.pages[AMEND] = _pdf_ok(bill)  # same words in an amendment: not a bill text, no rows
+    monkeypatch.setattr(m, "fetch_document", site)
+    counts = m.load(db.UNSHARDED)
+    assert counts["mo_house_pdf_statute_refs"] == 3
+    rows = _rows("mo_house_pdf_statute_refs")
+    assert [(r["action"], r["ordinal"], r["section_start"], r["section_end"]) for r in rows] == [
+        ("repeal", 1, "1.010", "1.012"),
+        ("enact", 1, "1.010", None),
+        ("enact", 2, "1.011", None),
+    ]
+    assert {(r["url"], r["session_code"], r["file_name"], r["version_code"]) for r in rows} == {
+        (TEXT_1, "171", "171-HB1.XML", "IN")
+    }
+    assert rows[0]["clause"] == "To repeal sections 1.010 to 1.012, RSMo, and"
+
+
+def test_rerun_without_downloads_still_fills_the_statute_ref_rows(links_landed, monkeypatch):
+    bill = _pdf(
+        [
+            "AN ACT To repeal section 1.010, RSMo, and to enact in lieu thereof one new section",
+            "relating to x. Be it enacted by the General Assembly",
+            "Section A. Section 1.010, RSMo, is repealed and one new section",
+            "2 enacted in lieu thereof, to be known as section 1.010, to read as follows:",
+        ]
+    )
+    site = _site()
+    site.pages[TEXT_1] = _pdf_ok(bill)
+    _run(monkeypatch, site)
+    first = _rows("mo_house_pdf_statute_refs")
+    assert len(first) == 2
+    again = _site()
+    again.pages[TEXT_1] = _pdf_ok(bill)
+    _run(monkeypatch, again)
+    assert TEXT_1 not in again.requests or again.requests.count(TEXT_1) == 0
+    assert _rows("mo_house_pdf_statute_refs") == first
 
 
 def test_second_run_of_closed_sessions_makes_no_requests_and_rewrites_nothing(links_landed, monkeypatch, env):
