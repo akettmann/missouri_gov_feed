@@ -2,12 +2,15 @@
 -- "Schedule X:" header in the same document). Column-header rows, "None disclosed." and boilerplate drop out.
 -- Entries the PDF wraps over several lines are joined back into one row (see "continuation" below): on the schedules
 -- that feed commercial ties (C, E, F, J) so a wrapped tail never becomes a tie of its own (#599), and on A, B, D and H
--- so a wrapped entry is not counted as several disclosure items (#641).
+-- so a wrapped entry is not counted as several disclosure items (#641); a PTR range wrapped after its low end takes
+-- its high end from the next line (#749).
 -- PDFs from 2021 on extract their small-caps text with NUL characters; the words are restored first (#576).
 {# a line whose first "$" is a low end with no high end ("... $250,001 -"), and one whose last "$" is
    ("... Interest $201 -") #}
 {% set first_low_only = '^[^$]*\\$[0-9,]+ -( [^$0-9]|$)' %}
 {% set last_low_only = '\\$[0-9,]+ -( [^$0-9]*)?$' %}
+{# a PTR transaction line: the transaction's date and its notification date side by side ("P 12/05/2025 12/08/2025") #}
+{% set ptr_dates = '[0-9]{1,2}/[0-9]{1,2}/[0-9]{4} [0-9]{1,2}/[0-9]{1,2}/[0-9]{4}' %}
 with lines as (
     select
         doc_id,
@@ -134,6 +137,11 @@ kept as (
 --   * A, B, D: the line above holds only the low end of its value range ("... $250,001 -", or "$500,001 - Dividends
 --     $2,501 -" in the 2021+ layout) and this one has an amount but no range of its own: the high end, with the part of
 --     the description that wrapped ("Road $500,000", "Merck & Company, Inc. (MRK) [ST] $1,000,000 $5,000");
+--   * PTR: the line above is a transaction line (its two dates) holding only the low end of the range ("... P
+--     12/05/2025 12/08/2025 $100,001 -") and this one has an amount but no transaction dates of its own and is no
+--     "Description:" / "Location:" / "Comments:" / "Filing Status:" / "Subholding Of:" line: the high end, with the
+--     part of the asset name that wrapped ("[GS] $250,000"). The dates of the head are the head marker: a line with
+--     its own dates starts the next transaction.
 --   * H: it carries no date (mm/dd/yyyy): the sponsor, itinerary and city names wrap around the line with the dates.
 -- "Location:" / "Description:" / "Comments:" lines of B stay lines of their own (labelled attributes), and so do
 -- those of A unless the rules above apply: a parenthesis the entry above left open ("(50% Inter") pulls the next
@@ -228,6 +236,18 @@ continued as (
                 and not {{ mogov.regex_matches('lower(f.prev_text)', '^(location|description|comments):') }}
                 and {{ mogov.regex_matches('f.line_text', '\\$[0-9]') }}
                 and not {{ mogov.regex_matches('f.line_text', '\\$[0-9,]+ -( |$)') }}
+            )
+            -- PTR: the range wrapped after its low end; the tail is the high end (see above)
+            or (
+                substr(f.schedule, 1, 1) = 'P'
+                and {{ mogov.regex_matches('f.prev_text', first_low_only) }}
+                and {{ mogov.regex_matches('f.prev_text', ptr_dates ~ ' \\$[0-9,]+ -( |$)') }}
+                and {{ mogov.regex_matches('f.line_text', '\\$[0-9]') }}
+                and not {{ mogov.regex_matches('f.line_text', '\\$[0-9,]+ -( |$)') }}
+                and not {{ mogov.regex_matches('f.line_text', ptr_dates) }}
+                and not {{ mogov.regex_matches(
+                    'lower(f.line_text)', '^(location|description|comments|filing status|subholding of):'
+                ) }}
             )
             or (
                 substr(f.schedule, 1, 1) = 'H'

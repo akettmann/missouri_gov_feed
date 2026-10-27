@@ -327,9 +327,10 @@ models:
     "Schedule X:" header in the same document). Column-header rows, "None disclosed." and boilerplate drop out.
     Entries the PDF wraps over several lines are joined back into one row (see "continuation" below): on the schedules
     that feed commercial ties (C, E, F, J) so a wrapped tail never becomes a tie of its own (#599), and on A, B,
-    D and H so a wrapped entry is not counted as several disclosure items (#641). PDFs from 2021 on extract their
-    small-caps text with NUL characters; the words are restored first (#576). Grain: one text line per House disclosure
-    PDF, tagged with its schedule.'
+    D and H so a wrapped entry is not counted as several disclosure items (#641); a PTR range wrapped after its
+    low end takes its high end from the next line (#749). PDFs from 2021 on extract their small-caps text with NUL
+    characters; the words are restored first (#576). Grain: one text line per House disclosure PDF, tagged with
+    its schedule.'
 - name: int_interests__industry_money
   description: 'Money each official received from an industry or interest, per year: campaign contributions from
     organizations, PACs and committees (individuals are left out: their employer is not their money) and lobbyist
@@ -758,7 +759,7 @@ models:
     text per official per source.'
 - name: int_officials__current
   description: 'Everyone currently holding a Missouri public office that we track, one row per (person, office).
-    official_id: Open States ocd-person id when one exists, else bioguide:<id>, statewide:<office>, or judge:<key>
+    official_id: Open States ocd-person id when one exists, else bioguide:<id>, statewide:<office>:<name>, or judge:<key>
     (see int_judges__current). A legislator Open States or the House roster knows under several ids gets one stable
     id (int_officials__person_ids); a current official keeps the id they had. Grain: one row per (person, current
     office).'
@@ -859,11 +860,21 @@ models:
     row. An open term (term_end_year null) ends 9999-12-31. official_id is the person''s dim_official id when they
     also hold a tracked office today (matched on first and last name, or on a known variant such as "Josh Hawley"
     for Open States'' "Joshua"; null for people who left public life). A name that fits two current officials matches
-    neither. A former governor who is now a senator links to the senator''s profile.'
+    neither. A former governor who is now a senator links to the senator''s profile. A name alone is not enough:
+    Governor Benjamin Gratz Brown (1871) and the current legislator Ben Brown share one (#760). The match is kept
+    only when the person''s known service corroborates it (official_id_basis): same_office     the term is for the
+    office the official holds today (Malek, Treasurer 2023 and 2025); service_overlap the term overlaps, or lies
+    within a year of, a dated stretch of service we know for the official (Open States roles, congress-legislators
+    terms, Wikidata positions, the current term): Hawley''s 2017-2019 Attorney General term ends the day his Senate
+    term starts. Otherwise official_id is null, so every consumer gets the guard instead of only fct_office_history.'
   data_tests:
   - dbt_utils.expression_is_true:
       arguments:
         expression: term_start <= term_end
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: (official_id is null and official_id_basis is null) or (official_id is not null and official_id_basis
+          is not null)
   - dbt_utils.unique_combination_of_columns:
       arguments:
         combination_of_columns:
@@ -880,6 +891,15 @@ models:
   - name: term_end
     data_tests:
     - not_null
+  - name: official_id_basis
+    description: 'Why the name match was kept: same_office or service_overlap. Null exactly when official_id is
+      null.'
+    data_tests:
+    - accepted_values:
+        arguments:
+          values:
+          - same_office
+          - service_overlap
 - name: int_tap_mec__contributions
   description: 'TAP MEC contributions without the 24-hour notices that a full report itemizes again (#156): stg_tap_mec__contributions
     keeps every row of the source; everything that totals gifts (committee receipts, donor summaries, the campaign-finance

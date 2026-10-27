@@ -16,6 +16,13 @@
 -- name, or on a known variant such as "Josh Hawley" for Open States' "Joshua"; null for people who left public
 -- life). A name that fits two current officials matches neither. A former governor who is now a senator links to the
 -- senator's profile.
+-- A name alone is not enough: Governor Benjamin Gratz Brown (1871) and the current legislator Ben Brown share one
+-- (#760). The match is kept only when the person's known service corroborates it (official_id_basis):
+--   same_office     the term is for the office the official holds today (Malek, Treasurer 2023 and 2025);
+--   service_overlap the term overlaps, or lies within a year of, a dated stretch of service we know for the official
+--                   (Open States roles, congress-legislators terms, Wikidata positions, the current term): Hawley's
+--                   2017-2019 Attorney General term ends the day his Senate term starts.
+-- Otherwise official_id is null, so every consumer gets the guard instead of only fct_office_history.
 {% set end_year_text = dbt.safe_cast('b.term_end_year', dbt.type_string()) %}
 {% set family_of_holder = mogov.name_key(mogov.regex_extract('b.full_name', '([^ ]+)$')) %}
 with holders as (
@@ -70,18 +77,105 @@ current_by_name as (
     from name_matches
     group by match_key
     having count(distinct official_id) = 1
+),
+
+-- dated stretches of service we know for each current official; a null end is still serving
+known_service as (
+    select
+        official_id,
+        office,
+        current_term_start as start_date,
+        coalesce(current_term_end, {{ dbt.safe_cast("'9999-12-31'", 'date') }}) as end_date
+    from {{ ref('int_officials__current') }}
+    where current_term_start is not null
+    union all
+    select
+        o.official_id,
+        cast(null as {{ dbt.type_string() }}) as office,
+        r.start_date,
+        coalesce(r.end_date, {{ dbt.safe_cast("'9999-12-31'", 'date') }}) as end_date
+    from {{ ref('int_officials__current') }} as o
+    inner join (
+        select
+            coalesce(x.person_id, ro.openstates_id) as person_id,
+            ro.start_date,
+            ro.end_date
+        from {{ ref('stg_openstates__roles') }} as ro
+        left join {{ ref('int_officials__person_ids') }} as x on ro.openstates_id = x.alias_id
+    ) as r on o.official_id = r.person_id
+    where r.start_date is not null
+    union all
+    select
+        o.official_id,
+        cast(null as {{ dbt.type_string() }}) as office,
+        t.start_date,
+        coalesce(t.end_date, {{ dbt.safe_cast("'9999-12-31'", 'date') }}) as end_date
+    from {{ ref('int_officials__current') }} as o
+    inner join {{ ref('stg_congress__terms') }} as t on o.bioguide_id = t.bioguide_id
+    where t.start_date is not null
+    union all
+    select
+        q.official_id,
+        cast(null as {{ dbt.type_string() }}) as office,
+        f.start_date,
+        coalesce(f.end_date, {{ dbt.safe_cast("'9999-12-31'", 'date') }}) as end_date
+    from {{ ref('int_officials__wikidata') }} as q
+    inner join {{ ref('stg_wikidata__facts') }} as f on q.qid = f.qid
+    where f.fact_kind = 'position held' and f.start_date is not null
+),
+
+candidates as (
+    select
+        h.*,
+        c.official_id as candidate_id
+    from holders as h
+    left join current_by_name as c on h.given_key || ' ' || h.family_key = c.match_key
+),
+
+-- the strongest corroboration per candidate (a term can have several)
+basis as (
+    select
+        c.office,
+        c.full_name,
+        c.term_start_year,
+        c.candidate_id,
+        min(
+            case
+                when k.office = c.office then 'same_office'
+                else 'service_overlap'
+            end
+        ) as official_id_basis
+    from candidates as c
+    inner join known_service as k
+        on
+            c.candidate_id = k.official_id
+            and (
+                k.office = c.office
+                -- within a year either side: the Manual lists whole years, the sources exact days
+                or (
+                    {{ dbt.dateadd('day', -366, 'c.term_start') }} <= k.end_date
+                    and {{ dbt.dateadd('day', -366, 'k.start_date') }} <= c.term_end
+                )
+            )
+    group by c.office, c.full_name, c.term_start_year, c.candidate_id
 )
 
 select
-    h.office,
-    h.full_name,
-    h.party,
-    h.term_start_year,
-    h.term_end_year,
-    h.term_start,
-    h.term_end,
-    h.given_key,
-    h.family_key,
-    c.official_id
-from holders as h
-left join current_by_name as c on h.given_key || ' ' || h.family_key = c.match_key
+    c.office,
+    c.full_name,
+    c.party,
+    c.term_start_year,
+    c.term_end_year,
+    c.term_start,
+    c.term_end,
+    c.given_key,
+    c.family_key,
+    b.candidate_id as official_id,
+    b.official_id_basis
+from candidates as c
+left join basis as b
+    on
+        c.office = b.office
+        and c.full_name = b.full_name
+        and c.term_start_year = b.term_start_year
+        and c.candidate_id = b.candidate_id

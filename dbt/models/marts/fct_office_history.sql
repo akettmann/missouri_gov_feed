@@ -107,9 +107,9 @@ courtlistener as (
 -- Earlier stretches of the statewide offices a current official has held (#741): Malek's 2023 appointment as Treasurer
 -- before the term he was elected to in 2025, Fitzpatrick's 2019-2023 Treasurer term, Schmitt as Attorney General.
 -- Derived from the Official Manual listings with exact dates from statewide_office_handovers (int_statewide__terms),
--- not from a second hand-kept list. The open term ends where the seed's current term starts; when it starts on the
--- same day the seed row already says it. Skipped when Wikidata or Open States already records a term starting the
--- same day under its own title (Wikidata calls the office "Missouri State Treasurer"), so one term is not listed twice.
+-- not from a second hand-kept list. The open term ends where the seed's current term starts. int_statewide__terms
+-- only gives an official_id when the person's known service corroborates the name match (#760), so a namesake of a
+-- nineteenth-century governor gets no row. A term another source also records is collapsed by deduped below.
 statewide_past as (
     select
         t.official_id,
@@ -124,25 +124,7 @@ statewide_past as (
     inner join {{ ref('statewide_officials') }} as s on t.office = s.office
     where
         t.official_id is not null
-        -- only terms from 2000 on, the years the handover seed covers: a name match with a nineteenth-century governor
-        -- (a current legislator named Ben Brown against Benjamin Gratz Brown) is a different person
-        and t.term_start_year >= 2000
         and t.term_start < case when t.term_end_year is null then s.term_start else t.term_end end
-        and not exists (
-            select 1
-            from (
-                select
-                    official_id,
-                    start_date
-                from wikidata
-                union all
-                select
-                    official_id,
-                    start_date
-                from os
-            ) as known
-            where known.official_id = t.official_id and known.start_date = t.term_start
-        )
 ),
 
 -- State judges: appointment / election sentences from their Official Manual biography
@@ -191,6 +173,7 @@ all_terms as (
 ranked as (
     select
         *,
+        {{ mogov.statewide_office_key('office_title') }} as office_key,
         row_number() over (
             partition by official_id, office_title, start_date
             order by
@@ -202,6 +185,47 @@ ranked as (
                 jurisdiction asc
         ) as rn
     from all_terms
+),
+
+best as (
+    select *
+    from ranked
+    where rn = 1
+),
+
+-- One statewide term arrives from several sources under different titles ("Governor" in the seed, "Governor of
+-- Missouri" in Wikidata) and dates a day or two apart. A row is dropped when the same official has a better-ranked row
+-- for the same statewide office (statewide_office_key) starting within a month of it. The best-ranked row is kept;
+-- the key ends in the title and the start date so the choice is the same on every run.
+deduped as (
+    select b.*
+    from best as b
+    where not exists (
+        select 1
+        from best as o
+        where
+            o.official_id = b.official_id
+            and o.office_key = b.office_key
+            and {{ mogov.is_statewide_office_key('o.office_key') }}
+            and not (o.office_title = b.office_title and o.start_date = b.start_date)
+            and abs({{ dbt.datediff('o.start_date', 'b.start_date', 'day') }}) <= 31
+            and (
+                o.source_rank < b.source_rank
+                or (
+                    o.source_rank = b.source_rank
+                    and (
+                        o.source < b.source
+                        or (
+                            o.source = b.source
+                            and (
+                                o.start_date < b.start_date
+                                or (o.start_date = b.start_date and o.office_title < b.office_title)
+                            )
+                        )
+                    )
+                )
+            )
+    )
 )
 
 select
@@ -212,5 +236,4 @@ select
     start_date,
     end_date,
     source
-from ranked
-where rn = 1
+from deduped

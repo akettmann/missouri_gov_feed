@@ -1,4 +1,6 @@
--- Which federal bill each Voteview roll call decided, from the roll calls the GovInfo BILLSTATUS actions cite.
+-- Which federal bill each Voteview roll call was taken on (not always its passage: recommit, previous question,
+-- cloture, tabling and similar procedural votes are included; amendment votes are not, #738),
+-- from the roll calls the GovInfo BILLSTATUS actions cite.
 -- BILLSTATUS names a roll call by (congress, chamber, session, roll number), where the roll number is the chamber
 -- clerk's, restarting each session; Voteview's own `rollnumber` runs across the Congress, so the join is on its
 -- `clerk_rollnumber` (with its `session`). Voteview's `bill_number` text (e.g. "HR3746") is kept beside it for
