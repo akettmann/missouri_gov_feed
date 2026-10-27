@@ -88,8 +88,12 @@ unit_tests:
     description: >
       #263. Open States keeps Steve Roberts' HD77 years (2017-20, placeholder 1900-01-01 start) under "Steven
       Roberts" (ocd-person/528445cb...); the person-id merge gives that seat his Senate id 20ad6a34, so his House
-      pay (high: STEVEN = Steven), his 2021 House final check ($1,496.45, set aside and matched by name) and his
-      Senate pay (medium: STEVEN for Steve) all go to one official. Lane Roberts (HD161 from 2019) keeps his own.
+      pay (high: STEVEN = Steven) and his Senate pay (medium: STEVEN for Steve, by seat) go to one official. The
+      fixture also keeps an unmerged "Steven Roberts" official under 528445cb (not in the real data: it stands for
+      the alias as its own person). He holds no seat and is paid nothing; with two officials fitting "ROBERTS,
+      STEVEN", the 2021 House final check ($1,496.45, set aside, so by name only) is ambiguous and goes nowhere.
+      Lane Roberts (HD161 from 2019) keeps his own. Fails on the pre-#263 shape (the HD77 seat and its roster
+      years under 528445cb): the 2017 and 2020 House pay goes to 528445cb by seat.
     given:
       - input: ref('stg_mo_employee_pay__pay')
         rows:
@@ -117,10 +121,12 @@ unit_tests:
         rows:
           - {official_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', office: state_senate}
           - {official_id: 'ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff', office: state_house}
+          - {official_id: 'ocd-person/528445cb-21cc-46ef-86fc-a1d1d9922dc0', office: state_house}
       - input: ref('int_officials__name_keys')
         rows:
           - {official_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', level: state, office: state_senate, family_key: roberts, given_key: steve}
           - {official_id: 'ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff', level: state, office: state_house, family_key: roberts, given_key: lane}
+          - {official_id: 'ocd-person/528445cb-21cc-46ef-86fc-a1d1d9922dc0', level: state, office: state_house, family_key: roberts, given_key: steven}
       - input: ref('int_officials__current')
         rows: *no_current
       - input: ref('stg_congress__terms')
@@ -136,7 +142,6 @@ unit_tests:
       rows:
         - {official_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', calendar_year: 2017, position_title: STATE REPRESENTATIVE, pay: 34418.35, match_confidence: high}
         - {official_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', calendar_year: 2020, position_title: STATE REPRESENTATIVE, pay: 35914.80, match_confidence: high}
-        - {official_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', calendar_year: 2021, position_title: STATE REPRESENTATIVE, pay: 1496.45, match_confidence: medium}
         - {official_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', calendar_year: 2021, position_title: SENATOR, pay: 34830.08, match_confidence: medium}
         - {official_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', calendar_year: 2025, position_title: SENATOR, pay: 41390.89, match_confidence: medium}
         - {official_id: 'ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff', calendar_year: 2020, position_title: STATE REPRESENTATIVE, pay: 35914.80, match_confidence: high}
@@ -150,7 +155,10 @@ unit_tests:
       same id as his 2025 Senate pay (63dea1c8, one person since #504), Hough's to his Senate id, and Hoskins'
       ("STATE REPRESENTATIVE-LEADERSHP", $1,558.95) to him next to his 2017 Senate pay. The checks are set aside
       and matched by name; 2017 is outside Webber's and Hough's seat years, and each is kept because no other
-      member of the House holds the surname that year.
+      member of the House holds the surname that year. The case pins only that by-name "no one else holds the
+      surname" exception (it fails without it); no member has a 2017 House seat, so int_mo_legislators__final_checks
+      would change nothing here and is left empty. The House and Senate ids being one person is tested in
+      person_ids_cases_join_stephen_webber_house_and_senate.
     given:
       - input: ref('stg_mo_employee_pay__pay')
         rows:
@@ -171,10 +179,7 @@ unit_tests:
           - {person_id: 'ocd-person/9f04b7ea-bd98-4f8e-ad76-8a5bf7b5917a', full_name: Denny Hoskins, surname_key: hoskins, chamber: lower, start_date: '2013-01-01', end_date: '2016-12-31'}
           - {person_id: 'ocd-person/9f04b7ea-bd98-4f8e-ad76-8a5bf7b5917a', full_name: Denny Hoskins, surname_key: hoskins, chamber: upper, start_date: '2017-01-01', end_date: '2025-01-07'}
       - input: ref('int_mo_legislators__final_checks')
-        rows:
-          - {calendar_year: 2017, seat_chamber: lower, employee_name: 'WEBBER, STEPHEN D', person_id: 'ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9'}
-          - {calendar_year: 2017, seat_chamber: lower, employee_name: 'HOUGH, LINCOLN P', person_id: 'ocd-person/934fdfca-5cdf-4c67-a3b0-b23e433f87f6'}
-          - {calendar_year: 2017, seat_chamber: lower, employee_name: 'HOSKINS, DENNY', person_id: 'ocd-person/9f04b7ea-bd98-4f8e-ad76-8a5bf7b5917a'}
+        rows: []
       - input: ref('dim_official')
         rows:
           - {official_id: 'ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9', office: state_senate}
@@ -335,21 +340,24 @@ unit_tests:
     description: >
       #228. The payroll prints "VANSCHOIACK, DEAN A"; the House roster spells him "Van Schoiack" (his official name
       key, family_key 'van schoiack') and Open States "VanSchoiack". Since the merge his official id is the Open
-      States id f3250139. Today his HD9 seat carries the Open States spelling (2021-2024 pay, by seat). The 2025
-      seat row here carries the roster spelling instead, as a seat keyed on the House roster would: the surname
-      still matches with spaces ignored. All high (DEAN = Dean). Fails if the surname comparison keeps spaces
-      (2025 is unmatched).
+      States id f3250139. Today his HD9 seat is one Open States row from 2021 on and every year pairs by seat. The
+      seats here are reshaped to reach all three comparisons: 2021-2022 carries the Open States spelling (2021 by
+      seat), 2023-2024 has no seat, as for a member Open States has no term for, so that pay takes the by-name
+      path against family_key 'van schoiack', and the 2025 seat carries the roster spelling, as a seat keyed on
+      the House roster would. All high (DEAN = Dean). Fails if the seat surname keeps spaces (2025 is unmatched)
+      or if the by-name surname does (family_flat back to family_key: 2023 and 2024 are unmatched).
     given:
       - input: ref('stg_mo_employee_pay__pay')
         rows:
           - {calendar_year: 2021, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'VANSCHOIACK, DEAN A', last_name: VANSCHOIACK, first_names: DEAN A, gross_pay: 34418.35}
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'VANSCHOIACK, DEAN A', last_name: VANSCHOIACK, first_names: DEAN A, gross_pay: 38385.46}
           - {calendar_year: 2024, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'VANSCHOIACK, DEAN A', last_name: VANSCHOIACK, first_names: DEAN A, gross_pay: 39264.00}
           - {calendar_year: 2025, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'VANSCHOIACK, DEAN A', last_name: VANSCHOIACK, first_names: DEAN A, gross_pay: 41315.63}
       - input: ref('mo_payroll_office_titles')
         rows: *house_titles
       - input: ref('int_mo_legislators__seats')
         rows:
-          - {person_id: 'ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e', full_name: Dean VanSchoiack, surname_key: vanschoiack, chamber: lower, start_date: '2021-01-01', end_date: '2024-12-31'}
+          - {person_id: 'ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e', full_name: Dean VanSchoiack, surname_key: vanschoiack, chamber: lower, start_date: '2021-01-01', end_date: '2022-12-31'}
           - {person_id: 'ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e', full_name: Dean Van Schoiack, surname_key: van schoiack, chamber: lower, start_date: '2025-01-01', end_date: '9999-12-31'}
       - input: ref('int_mo_legislators__final_checks')
         rows: []
@@ -370,6 +378,7 @@ unit_tests:
     expect:
       rows:
         - {official_id: 'ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e', calendar_year: 2021, pay: 34418.35, match_confidence: high}
+        - {official_id: 'ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e', calendar_year: 2023, pay: 38385.46, match_confidence: high}
         - {official_id: 'ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e', calendar_year: 2024, pay: 39264.00, match_confidence: high}
         - {official_id: 'ocd-person/f3250139-5c42-40d9-b535-2e7137f83f1e', calendar_year: 2025, pay: 41315.63, match_confidence: high}
 
