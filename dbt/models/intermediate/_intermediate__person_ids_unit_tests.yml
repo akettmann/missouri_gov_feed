@@ -1120,3 +1120,25 @@ unit_tests:
         - {alias_id: ocd-person/mcgaugh, person_id: 'mojudge:joe don mcgaugh', basis: curated}
         - {alias_id: 'mohouse:658', person_id: 'mojudge:joe don mcgaugh', basis: curated}
         - {alias_id: ocd-person/someone-else, person_id: ocd-person/someone-else, basis: self}
+
+  - name: person_ids_join_the_whole_target_person_of_a_curated_link_to_a_non_chosen_alias
+    model: int_officials__person_ids
+    description: >
+      A signed same_person row whose person_id (its target) is an id the name rule merged but did not choose (the
+      fallback key mohouse:7, merged into the Open States id ocd-person/lee) sends the row's person to the target's
+      chosen id, so the alias and both ids of the target person end up as one person, not two (#682, the target side
+      of #174 item 3). Only the moved person is basis curated; the target's ids keep the basis the rules gave them.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/lee, year: 2019, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: 'mohouse:7', year: 2019, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: ocd-person/wu, year: 2025, office: state_senate, district: '3', name_key: ann wu}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: ocd-person/wu, person_id: 'mohouse:7', relation: same_person, checked_by: maintainer, checked_on: '2026-01-01'}
+    expect:
+      rows:
+        - {alias_id: ocd-person/lee, person_id: ocd-person/lee, basis: self}
+        - {alias_id: 'mohouse:7', person_id: ocd-person/lee, basis: name_continuity}
+        - {alias_id: ocd-person/wu, person_id: ocd-person/lee, basis: curated}
