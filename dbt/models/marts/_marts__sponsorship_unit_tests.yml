@@ -140,8 +140,10 @@ unit_tests:
       Senate bill (SB14; a Senate sponsor is read by the listed district: no seat held in 2019) and Pat Roe listed
       231 (HB16; two Pat Roes on the roster both held senate district 31). Those stay state_senate with the senate
       district. A Senate conferee listed 205 (HB15) stays a senator and matches the seat held in 2019. Sandy
-      Crawford (HB17), a House member who took a senate seat in January and prefiled in December, is not on the
-      191 House roster: her row keeps the listed-district reading and matches the senate seat.
+      Terry Vale (HB17), a hypothetical name absent from the 191 House roster (real data has no such row today: every
+      House-bill sponsor is on the roster), keeps the listed-district reading and matches the senate seat. A Handler
+      row (HB18, Mike Moon listed 229; the real Handler rows are all on House bills) is a House row like the Sponsor
+      one: state_house with his roster district 157.
     given:
       - input: ref('int_bills__status')
         format: sql
@@ -157,7 +159,8 @@ unit_tests:
             select '191', 2019, 'SB14', 'Sponsor', 'Mike Moon', 229 union all
             select '191', 2019, 'HB15', 'SenateConferee', 'Jane Doe', 205 union all
             select '191', 2019, 'HB16', 'Sponsor', 'Pat Roe', 231 union all
-            select '191', 2019, 'HB17', 'Sponsor', 'Sandy Crawford', 228
+            select '191', 2019, 'HB17', 'Sponsor', 'Terry Vale', 228 union all
+            select '191', 2019, 'HB18', 'Handler', 'Mike Moon', 229
       - input: ref('int_mo_house__member_identity')
         format: sql
         rows: |
@@ -171,7 +174,7 @@ unit_tests:
             select 'upper', 5, cast('2019-01-01' as date), cast('2022-12-31' as date), 'doe', 'p_doe' union all
             select 'upper', 31, cast('2021-01-01' as date), cast('9999-12-31' as date), 'roe', 'p_roe_a' union all
             select 'upper', 31, cast('2023-01-01' as date), cast('9999-12-31' as date), 'roe', 'p_roe_b' union all
-            select 'upper', 28, cast('2017-01-01' as date), cast('2024-12-31' as date), 'crawford', 'p_crawford'
+            select 'upper', 28, cast('2017-01-01' as date), cast('2024-12-31' as date), 'vale', 'p_vale'
       - input: ref('dim_official')
         format: sql
         rows: |
@@ -179,7 +182,7 @@ unit_tests:
             select 'p_doe' union all
             select 'p_roe_a' union all
             select 'p_roe_b' union all
-            select 'p_crawford'
+            select 'p_vale'
     expect:
       format: sql
       rows: |
@@ -190,4 +193,5 @@ unit_tests:
           select '191', 'SB14', 'Sponsor', 'Mike Moon', 'state_senate', 29, cast(null as varchar) union all
           select '191', 'HB15', 'SenateConferee', 'Jane Doe', 'state_senate', 5, 'p_doe' union all
           select '191', 'HB16', 'Sponsor', 'Pat Roe', 'state_senate', 31, cast(null as varchar) union all
-          select '191', 'HB17', 'Sponsor', 'Sandy Crawford', 'state_senate', 28, 'p_crawford'
+          select '191', 'HB17', 'Sponsor', 'Terry Vale', 'state_senate', 28, 'p_vale' union all
+          select '191', 'HB18', 'Handler', 'Mike Moon', 'state_house', 157, 'p_moon'
