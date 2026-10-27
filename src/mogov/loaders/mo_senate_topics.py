@@ -16,6 +16,7 @@ from mogov import db, obs
 from mogov.config import window_years
 from mogov.http import fetch
 from mogov.loaders import loader
+from mogov.loaders.mo_senate_bills import senate_interval
 
 log = obs.get_logger(__name__)
 
@@ -76,7 +77,9 @@ def load(shard: db.Shard) -> dict[str, int]:
             url = f"{BASE}/BillTracking/bills/keywords"
             # the open session's index changes daily; a past one only with late corrections
             max_age = 86400 if year >= date.today().year else 30 * 86400
-            page = fetch(url, {"year": year, "session": "R"}, max_age=max_age, delay=0.5).decode("utf-8", "replace")
+            page = fetch(url, {"year": year, "session": "R"}, max_age=max_age, min_interval=senate_interval()).decode(
+                "utf-8", "replace"
+            )
             rows = parse_index(page)
             if not rows:
                 log.warning("mo_senate_topics.empty_index", year=year)
