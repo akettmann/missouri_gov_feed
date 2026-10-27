@@ -1,7 +1,8 @@
 {#- Contributions with the 24-hour notices that a later full report itemizes again removed (#156, #542).
     A gift of $5,000+ is first reported on a "24 Hour ..." notice and then listed again, as a line of its own, in the
     committee's next full report (8 Day Before, 30 Day After, Quarterly, ...). Both lines carry the same committee, date
-    and amount, and the full report's line covers the gift's date, so the notice line is dropped. Two matching tiers:
+    and amount, so the notice line is dropped. Only an equal date counts: a full report that dates the gift differently
+    from the notice is not recognised, and both lines stay. Two matching tiers:
 
     1. Same donor. Rows sharing a key (committee, date, amount, donor) are numbered separately among the notices and
        among the full-report lines (by record_id), and the nth notice is dropped only if the nth full-report line

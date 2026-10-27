@@ -149,6 +149,14 @@ Quirks:
 - Vote tokens are printed surnames, sometimes with a district ("SMITH 46"), plus "MR SPEAKER".
   Some names are truncated ("FOUNTAIN HENDERS"). dbt matches them to members
   (`int_mo_house__member_identity`, seed `house_speakers`).
+- Tokens do not always spell the roster surname: a compound surname is printed by its last word ("REHDER" is Holly
+  Thompson Rehder, "REISCH" is Cheri Toalson Reisch, "COURTWAY" is Cyndi Buchheit-Courtway), a generational suffix is
+  dropped ("PRICE" is Wiley Price IV in 2019-2022, Tiffany Price from 2025), and a district is added only while two
+  members share a surname ("EVANS 99" / "EVANS 154" until Jean Evans left on 2019-02-05, then a bare "EVANS" is
+  David Evans). The roster is an end-of-session list, so a member who left mid-session is missing from their last
+  session (Rory Rowland in 2022). `int_mo_house__votes` handles all of these (#539): a whole-surname match beats a
+  last-word one, and the Open States seat dates break a tie between same-surname members only when exactly one
+  seat covers the vote date.
 - A member's seat is matched to an Open States person (district, date and surname; when several same-surname terms overlap, the one whose name starts with the member's given name); when that fails the key is `mohouse:<member id>`.
   Open States also holds some people twice (after a redistricting or a move to the Senate). Both are
   reconciled to one stable `official_id` per person by `int_officials__person_ids` (the same MO House member id, which follows a name change such as Mazzie Boyd/Christensen, member 2381, #151; otherwise the same exact name, or names that differ only in the given
@@ -185,17 +193,23 @@ Quirks:
   never mentions can be missed in two ways. (1) Days: it stops at the last day the XML links a roll call for plus
   `DAY_SLACK` (3, `src/mogov/loaders/mo_house.py`). A recorded vote more than 3 session days past the last linked day
   is never requested. For session 204 this does not bite (see above: days 4-6 are all the site's 404 page), but it is a
-  structural limit; widening it costs 3 or more requests per extra day per session (misses are cached for good once
-  the year is over) and cannot be tested without the network, so it is left as is. (2) Numbers: within a day it
+  structural limit; widening it costs one request per extra empty day per session (a day the XML links nothing
+  for has `last_linked = 0`, so `_probe_day` stops at the first miss, roll call 001; a day that does have votes costs
+  one request per roll call plus the final miss). Misses are cached for good once the year is over, so re-runs cost
+  nothing. It cannot be tested without the network, so it is left as is. (2) Numbers: within a day it
   stops at the first missing number past the highest the XML links for that day, so a gap in the numbering past
-  that point hides later roll calls. A session whose XML links no roll call is probed for 10 days
-  (`DAYS_IF_UNKNOWN`).
+  that point hides later roll calls. A session that has XML files but whose XML links no roll call is probed for 10
+  days (`DAYS_IF_UNKNOWN`). A session code with no XML files at all gets no `linked` entry and is never probed (unless
+  another session's XML links a roll call under its code).
 - The XML also links roll-call PDFs the House never published: the fetch returns the HTML error page, and the loader
   keeps the miss in `mo_house_rollcalls` as a row with `error = 'not a pdf'` (60 in October 2026: 201 one, 211 eight,
   221 one, 241 fifty). 55 of them are named under a bill (e.g. `bills241/rollcalls/062.013.pdf`, listed on HB 2634).
   `stg_mo_house__rollcalls` drops error rows, and `fct_vote_bills` now links only roll calls that are in staging, so
   those 55 links are gone (32 bills, 13 of which now have no linked vote; they were dangling `vote_id`s that no
   member vote row carries). A relationships test keeps it that way.
+  Those 13 bills have no linked vote in `fct_vote_bills` even though the House recorded one (the XML lists the roll
+  call with totals). A bill page, if one is built, could show "roll call recorded, PDF not published" without new loading: the link is in `stg_mo_house__bill_rollcalls` and the miss
+  is in the raw `mo_house_rollcalls` rows with `error = 'not a pdf'`. Not built; an open product decision (#570).
 - Committee posts (`fct_committee_memberships`, `fct_committee_posts`): the member XML page lists each
   member's committees and subcommittees with a position (Chair, Vice-Chair, Co-Chair, Ranking Minority
   Member, Member), in every session from 2017 except 253, whose pages list none. For 253 the
@@ -366,6 +380,13 @@ of their own.
   row per bill), then `fct_statute_sections` and `fct_bill_statute_links`.
 
 Quirks:
+- **Cross-chamber combined acts.** Five acts join a Senate and a House bill with "&" or "and" ("A.L. 1977 S.B. 111
+  & H.B. 130"; 1998 and 2005 use "and"), all before 2017: 1977 SB 111 and HB 130 (6 sections), 1981 HB 519 and SB 16 (1), 1982 SB 649 and HB 1096 (1),
+  1998 SB 820 and HB 1587 (1), 2005 HB 353 and SB 254 (2). The section text never names the bill, so the
+  combined-act reading (the first bill passed, the other's subject went into it) can't be confirmed from the
+  Revisor; it needs the journals. The data argues against it for some: HB 130 (1977) and SB 16 (1981) are the lead
+  bill of 53 and 259 other sections, and HB 1096 (1982) leads 5 others. The model still reads these
+  as combined (issue #571); `assert_cross_chamber_combined_acts_are_known` pins the five so a new one gets looked at (it warns; add the act to the `known` CTE in that test after a spot-check).
 - **Rate limit.** The site blocks an IP address that sends requests less than a second apart several times in
   30 seconds. First it serves a warning page with status 200 in place of the page asked for (the same page it
   serves for a page that doesn't exist). If requests keep coming, every request from that IP, browsers
@@ -617,6 +638,9 @@ Quirks:
 - Scanned paper filings (DocID 8xxxxxxx/9xxxxxxx) have no text layer. They land as one
   `has_text = false` row, so the gap is visible.
 - Periodic transaction reports live under `ptr-pdfs/`; everything else is under `financial-pdfs/`.
+- Index type `H` is the New Filer Report (PDF header `Filing Type: New Filer Report`), filed by new members; a
+  separate report from that year's Annual Report (O). The loader reads it like O/A/P/C/T. Other index types
+  (D, X, G, E, B, W) are not downloaded.
 
 ## senate_efd: U.S. Senate eFD (opt-in)
 
@@ -689,12 +713,15 @@ Quirks:
   among the amendments of its report (ties: numeric doc id).
   The Clerk index does not say which report a House amendment amends, so it is taken to amend the latest annual,
   candidate or termination report the filer filed that year on or before it (an amendment of a candidate or
-  termination report supersedes that report only) (#142, #463). Index type H is a base of the same tier as an
-  annual report: on the Clerk index it is very likely a new member's first annual report, not a "new-filer notice"
-  (of 346 H filings only 3 have an O for the same filer and year, 233 have an extension request X that year, the H
-  counts follow the freshman classes of election years, and they are filed May to September of the next year;
-  Missouri freshmen Alford and Burlison (2022), Onder and Bell (2024) each have an X then an H in August and no
-  O). Periodic transaction reports and the remaining "other" kinds (W withdrawal, B, E, G) are never a base.
+  termination report supersedes that report only) (#142, #463). Index type H is a New Filer Report (the PDF header says
+  "Filing Type: New Filer Report"; e.g. Carey OH15 #10050139, Alford MO04 #10051960), a separate report from the
+  Annual Report (O) of the same year, so it is a base like a candidate report: an amendment filed after an H amends
+  it and supersedes it, while an H and an O of one year are both kept latest (Carey OH15 2022, Wied WI08 2025; for
+  O, A, H, A as in Miller WV03 2018 the first A supersedes the O and the second the H). Whether both should be
+  latest, and which report a later amendment amends, is open (#572). Of 346 H filings only 3 have an O for the same
+  filer and year, 233 have an extension request X that year, and the H counts follow the freshman classes of
+  election years (Missouri freshmen Alford and Burlison (2022), Onder and Bell (2024) each have an X then an H in
+  August and no O). Periodic transaction reports and the remaining "other" kinds (W withdrawal, B, E, G) are never a base.
   The "Period Covered: mm/dd/yyyy-mm/dd/yyyy" line in the amendment's PDF text (`int_house_fd__period_covered`;
   candidate reports and their amendments carry it, annual and termination reports do not) refines this: the base
   covering through the same last day wins, and an amendment with such a line is taken for an amendment of an
