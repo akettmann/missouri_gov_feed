@@ -16,6 +16,15 @@
        with the same digits ("LIUNA Local 110 PAC Fund" is not "LIUNA Local 100 PAC Fund"). With two or more leftover
        lines on either side it is unknowable who gave what, so every notice is kept.
 
+    3. Abbreviations and added words (#557). The same tier also pairs names where, word by word, one is a prefix of the
+       other ("deVries and Assoc" / "DeVries and Associates", "Alliance ... Technical Ed" / "... Education") and the
+       longer name has up to two more words at the end ("Committee to Elect Jamie Burger" / "... Burger HD"). The
+       first word must be equal ("Ed Smith" is not "Edward Smith"), both names need two words, and the digits must match.
+       Because that is a statement about two names, not about the count of lines, tiers 2 and 3 also run when the
+       committee/date/amount has several leftover lines: a notice is dropped when it has exactly ONE name-compatible
+       full-report line and that line has exactly ONE name-compatible notice, and no leftover line of the group lacks
+       a donor name. Two compatible lines on either side keep every notice.
+
     Rows missing a committee, date, amount or donor are never matched in tier 1, and a row without a city and state
     never in tier 2. rel is a relation with record_id, mec_committee_id, contributor_name, contributor_city,
     contributor_state, amount, contribution_date and report.
@@ -32,6 +41,29 @@
         mogov.regex_replace_all(mogov.regex_replace_all(padded, words, ' '), words, ' '),
         ' +', ' '
     ) }})
+{%- endmacro %}
+
+{#- True when two loose_name_keys are the same name abbreviated or with words added (#557): at least two words in the
+    shorter name, the first word equal, each later word of the shorter equal to or a prefix of the same-position word
+    of the other, and at most two extra words on the longer. Compares up to 8 words; digits are compared by the caller.
+    n_a, n_b are the word counts of a, b (columns or expressions). -#}
+{% macro name_words_match(a, b, n_a, n_b) -%}
+    (
+        least({{ n_a }}, {{ n_b }}) between 2 and 8
+        and abs({{ n_a }} - {{ n_b }}) <= 2
+        {%- for i in range(1, 9) %}
+        {%- set wa = dbt.split_part(a, "' '", i) %}
+        {%- set wb = dbt.split_part(b, "' '", i) %}
+        and (
+            least({{ n_a }}, {{ n_b }}) < {{ i }}
+            or {{ wa }} = {{ wb }}
+            {%- if i > 1 %}
+            or {{ wa }} like {{ wb }} || '%'
+            or {{ wb }} like {{ wa }} || '%'
+            {%- endif %}
+        )
+        {%- endfor %}
+    )
 {%- endmacro %}
 
 {% macro drop_reitemized_notices(rel) -%}
@@ -80,25 +112,22 @@ exact_pairs as (
 leftover as (
     select
         *,
-        sum(case when is_notice then 1 else 0 end) over (
+        sum(case when match_donor is null then 1 else 0 end) over (
             partition by match_committee_id, match_date, match_amount
-        ) as notices_left,
-        sum(case when is_notice then 0 else 1 end) over (
-            partition by match_committee_id, match_date, match_amount
-        ) as full_reports_left
+        ) as nameless_left
     from keyed
     where
         record_id not in (select notice_id from exact_pairs)
         and record_id not in (select full_report_id from exact_pairs)
 ),
 
-similar_pairs as (
+similar_candidates as (
     select
         notice.record_id as notice_id,
-        notice.match_donor as notice_donor,
+        full_report.record_id as full_report_id,
+        notice.nameless_left,
         {{ mogov.loose_name_key('notice.match_donor') }} as notice_loose,
-        {{ mogov.loose_name_key('full_report.match_donor') }} as full_report_loose,
-        full_report.match_donor as full_report_donor
+        {{ mogov.loose_name_key('full_report.match_donor') }} as full_report_loose
     from leftover as notice
     inner join leftover as full_report
         on
@@ -110,28 +139,48 @@ similar_pairs as (
     where
         notice.is_notice
         and not full_report.is_notice
-        and notice.notices_left = 1
-        and notice.full_reports_left = 1
         and notice.match_donor is not null
         and full_report.match_donor is not null
+),
+
+word_counts as (
+    select
+        *,
+        length(notice_loose) - length(replace(notice_loose, ' ', '')) + 1 as notice_words,
+        length(full_report_loose) - length(replace(full_report_loose, ' ', '')) + 1 as full_report_words
+    from similar_candidates
+),
+
+compatible as (
+    select
+        *,
+        count(*) over (partition by notice_id) as full_reports_for_notice,
+        count(*) over (partition by full_report_id) as notices_for_full_report
+    from word_counts
+    where
+        notice_loose = full_report_loose
+        or (
+            {{ mogov.regex_replace_all('notice_loose', '[^0-9]', '') }}
+            = {{ mogov.regex_replace_all('full_report_loose', '[^0-9]', '') }}
+            and (
+                (
+                    length(notice_loose) >= 10
+                    and length(full_report_loose) >= 10
+                    and {{ mogov.edit_distance('notice_loose', 'full_report_loose') }} <= 2
+                    and 10 * {{ mogov.edit_distance('notice_loose', 'full_report_loose') }}
+                    <= greatest(length(notice_loose), length(full_report_loose))
+                )
+                or {{ mogov.name_words_match('notice_loose', 'full_report_loose', 'notice_words', 'full_report_words') }}
+            )
+        )
 ),
 
 reitemized as (
     select notice_id as record_id from exact_pairs
     union
     select notice_id
-    from similar_pairs
-    where
-        notice_loose = full_report_loose
-        or (
-            length(notice_loose) >= 10
-            and length(full_report_loose) >= 10
-            and {{ mogov.regex_replace_all('notice_loose', '[^0-9]', '') }}
-            = {{ mogov.regex_replace_all('full_report_loose', '[^0-9]', '') }}
-            and {{ mogov.edit_distance('notice_loose', 'full_report_loose') }} <= 2
-            and 10 * {{ mogov.edit_distance('notice_loose', 'full_report_loose') }}
-            <= greatest(length(notice_loose), length(full_report_loose))
-        )
+    from compatible
+    where full_reports_for_notice = 1 and notices_for_full_report = 1 and nameless_left = 0
 )
 
 select c.*
