@@ -62,6 +62,48 @@ models:
     are "<NAME IN CAPS>" followed by "Office address: ..."; appellate entries open with "<NAME IN CAPS> was born
     / received / served ...". The bio runs until the next entry; words hyphenated across lines are rejoined. Grain:
     one biography per judge in the judicial chapter.'
+- name: int_bluebook__statewide_officeholders
+  description: Every holder of each statewide elected office since 1820, from the Official Manual's "Historical
+    Listing" tables in the executive chapter (Governors, Lieutenant Governors, Secretaries of State, State Auditors,
+    State Treasurers, Attorneys General). A row looks like "57. Michael L. Parson (R)12 2018–25 Polk 09/17/1955";
+    the digits after the party are footnote marks. The Manual gives years only, so a term is (start year, end year);
+    end year is null while the person still holds the office. A person who held an office more than once is listed
+    once (the Manual says so), with the whole span. Appointed successors (Wilson 2000, Parson 2018) are rows like
+    any other; the Manual does not date mid-year hand-overs here. Only the latest edition loaded is used. office
+    keys match the statewide_officials seed.
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - office
+        - full_name
+        - term_start_year
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: term_end_year is null or term_end_year >= term_start_year
+  columns:
+  - name: office
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - governor
+          - lt_governor
+          - secretary_of_state
+          - state_auditor
+          - state_treasurer
+          - attorney_general
+  - name: full_name
+    data_tests:
+    - not_null
+  - name: term_start_year
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 1816
+          max_value: extract(year from current_date)
 - name: int_courtlistener__bulk_case_matches
   description: 'Officials matched to Missouri cases in the CourtListener bulk export. Mirrors the API loader''s
     searches (src/mogov/loaders/courtlistener_cases.py) over the same people (fct_legal_careers): judge     on the
@@ -304,8 +346,13 @@ models:
     before the 2012 summaries). rating_level orders the Auditor''s four levels (Excellent 4 ... Poor 1). entity_type:
     ''statewide_office'' when the title starts with an audited statewide office (seed mo_auditor_statewide_entities),
     ''county'' for a title ending in " County", else ''other'' (state agencies, cities, courts, schools, districts,
-    statewide reports). Only a statewide office is ever linked to an officeholder. Grain: one row per State Auditor
-    report, with its rating and audited entity type.'
+    statewide reports). Only a statewide office is ever linked to an officeholder. audit_period_start / audit_period_end:
+    the period the title says the audit covers, when it says one: "Period July 1, 2022 through January 9, 2023"            a
+    final audit of a departing officeholder "Year Ended June 30, 2012", "Three Years Ended June 30, 2003"   whole
+    fiscal years, ending on that date "Period July 1, 2008 to January 12, 2009, and the Two Years Ended June 30,
+    2008" both: the earliest start and the latest end Most titles say nothing ("Office of Governor"); both are then
+    null. A date is "Month d, yyyy"; the month name''s first three letters give the month (mogov.month_name_date).
+    Grain: one row per State Auditor report, with its rating and audited entity type.'
 - name: int_mo_house__committee_memberships
   description: 'House committee and subcommittee memberships per member and session, keyed to the person (person_key
     from int_mo_house__member_identity). The member pages (stg_mo_house__member_committees) cover every session

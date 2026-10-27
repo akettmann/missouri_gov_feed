@@ -21,3 +21,21 @@
 {% macro years_between(start_date, end_date) -%}
     {{ dbt.datediff(start_date, end_date, 'year') }}
 {%- endmacro %}
+
+
+{# DATE from lower-case text "month d, yyyy" ("july 1, 2022"); the month's first three letters give the month. NULL if the text is NULL. #}
+{% macro month_name_date(text_expr) -%}
+    {{ dbt.safe_cast(dbt.concat([
+        mogov.regex_extract(text_expr, '([0-9]{4})$'),
+        "'-'",
+        mogov.zero_pad(
+            dbt.safe_cast(
+                '(' ~ dbt.position(mogov.regex_extract(text_expr, '^([a-z]{3})'), "'janfebmaraprmayjunjulaugsepoctnovdec'") ~ ' + 2) / 3',
+                dbt.type_int()
+            ),
+            2
+        ),
+        "'-'",
+        mogov.zero_pad(mogov.regex_extract(text_expr, '([0-9]{1,2}),'), 2),
+    ]), 'date') }}
+{%- endmacro %}
