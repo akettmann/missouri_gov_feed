@@ -45,27 +45,52 @@ seeds:
     description: >
       Missouri's six statewide elected executive officers. Curated by hand because the Open States
       executive folder is incomplete. Matched to Open States people by name to pick up prior
-      legislative careers. Review after each election / appointment.
+      legislative careers. Review after each election / appointment. term_start / term_end are the CURRENT term, as
+      dim_official.current_term_start / current_term_end show it and fct_office_history lists it: the day the term
+      the person holds now began (a second Monday of January, 2025-01-13 for the 2024 election; Malek's appointment
+      on 2023-01-17 is not this column but statewide_office_handovers) or, for someone appointed to the vacancy who
+      has not yet faced an election, the day they took office (Hanaway, 2025-09-08). term_end is the next second
+      Monday of January after the term's election (RSMo 27.010), so it is 2029-01-08 for the 2024 cohort and
+      2027-01-11 for the auditor.
     config:
       column_types: {term_start: date, term_end: date}
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: term_start <= term_end
     columns:
       - name: office
         data_tests: [unique, not_null]
   - name: statewide_office_handovers
     description: >
       Exact hand-over dates for statewide officeholders whose Official Manual term is in whole years but who left or
-      arrived mid-term, or on a day other than the regular January hand-over (#606): Hawley left the Attorney
-      General's office on 2019-01-03 for Schmitt, Greitens resigned on 2018-06-01 and Parson succeeded him, and so on.
-      fct_audit_report_officeholders uses term_start / term_end when a row matches (office, term start year, family
-      name) and otherwise the year-based convention. A blank date keeps the convention for that side. Dates are from
-      each row's source_url (checked_on); Watson's interim auditor term (2015) is left out because no source dated
-      his swearing-in. Add a row when a new mid-term change appears in int_bluebook__statewide_officeholders.
+      arrived mid-term, or on a day other than the regular hand-over, the second Monday of January (#606): Hawley
+      left the Attorney General's office on 2019-01-03 for Schmitt, Greitens resigned on 2018-06-01 and Parson
+      succeeded him, and so on. fct_audit_report_officeholders uses term_start / term_end when a row matches (office,
+      term start year, family name) and otherwise the convention (a term begins and ends on the second Monday of
+      January of its first and last year when that year is an inauguration year). A blank date keeps the convention
+      for that side. Unlike statewide_officials, whose dates are the CURRENT term only, a row here is the whole
+      continuous stretch the Manual lists as one term: Malek took office 2023-01-17 by appointment and is still
+      Treasurer. This cannot be derived from statewide_officials or wikidata: those hold only today's six officers,
+      and most rows here are people who no longer hold office (Greitens, Hawley as Attorney General, Bailey). Dates
+      are from each row's source_url (checked_on): the Secretary of State's historical listings, the Treasurer's
+      Past Treasurers page, the Lieutenant Governor's Past Lieutenant Governors page and the Attorney General's
+      swearing-in release. Watson's interim auditor term (2015) is left out because no source dated his
+      swearing-in. Add a row when a new mid-term change appears in int_bluebook__statewide_officeholders (the test
+      assert_statewide_handovers_cover_mid_term_changes lists the ones missing).
     config:
       column_types: {office: varchar, family_name: varchar, term_start_year: integer, term_start: date, term_end: date, source_url: varchar, checked_on: date}
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [office, family_name, term_start_year]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: term_start is null or term_end is null or term_start <= term_end
+      # the dates stay inside the Manual's years: a typo would silently move a holder out of the term
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: term_start is null or extract(year from term_start) = term_start_year
     columns:
       - name: office
         data_tests:
