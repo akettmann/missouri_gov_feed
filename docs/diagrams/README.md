@@ -106,6 +106,12 @@ Federal Judicial Center directory of federal judges. Source: [sources/fjc_judges
 
 ![fjc_judges](sources/fjc_judges.svg)
 
+### mo_house_docs
+
+Missouri House bill document PDFs and their text. Source: [sources/mo_house_docs.puml](sources/mo_house_docs.puml)
+
+![mo_house_docs](sources/mo_house_docs.svg)
+
 ### house_fd
 
 U.S. House Clerk financial disclosures. Source: [sources/house_fd.puml](sources/house_fd.puml)

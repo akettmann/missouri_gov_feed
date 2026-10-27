@@ -192,16 +192,20 @@ def _is_open(session_code: str) -> bool:
     return 2000 + int(session_code[:2]) >= date.today().year
 
 
-def land(link: Link, fetcher=None) -> tuple[DocFile, bytes | None]:
+def land(link: Link, fetcher=None, *, fetch: bool = True) -> tuple[DocFile | None, bytes | None]:
     """Make sure the document's bytes are on disk and describe them. A closed session's file already landed is
-    read, not fetched; the open session's is re-checked weekly. Bytes that did not change are not rewritten."""
+    read, not fetched; the open session's is re-checked weekly. Bytes that did not change are not rewritten.
+    With fetch=False (the document is outside the selected kinds/sessions) only a file already on disk is used, and
+    nothing is returned for one that is not."""
     rel = rel_path(link)
     dest = db.RAW_DIR / rel
     if dest.exists():
         age = time.time() - dest.stat().st_mtime
-        if not _is_open(link.session_code) or age < OPEN_SESSION_RECHECK_S:
+        if not fetch or not _is_open(link.session_code) or age < OPEN_SESSION_RECHECK_S:
             data = dest.read_bytes()
             return _described(link, rel, dest, data), data
+    if not fetch:
+        return None, None
     got = (fetcher or fetch_document)(link.url)
     error = got.error
     if got.content is not None and got.content[:5] != b"%PDF-":
@@ -249,31 +253,33 @@ def _csv_env(name: str) -> list[str]:
     return [v.strip() for v in os.environ.get(name, "").split(",") if v.strip()]
 
 
-def units(kinds: list[str], sessions: set[str] | None, shard: db.Shard) -> list[Link]:
-    """This shard's share of the document URLs: assigned by the URL, so the split holds across runs."""
-    return shard.take(links(kinds, sessions), key=lambda x: x.url)
+def units(shard: db.Shard) -> list[Link]:
+    """This shard's share of all the document URLs: assigned by the URL, so the split holds across runs."""
+    return shard.take(links(list(KINDS)), key=lambda x: x.url)
 
 
-def _iter_rows(mine: list[Link]) -> Iterator[tuple[DocFile, DocText]]:
+def _iter_rows(mine: list[Link], kinds: set[str], sessions: set[str] | None) -> Iterator[tuple[DocFile, DocText]]:
     progress = obs.Progress("house documents", len(mine), log)
     for link in mine:
         progress.tick()
-        file_row, data = land(link)
-        yield file_row, extract(link, data, file_row.error)
+        wanted = link.kind in kinds and (sessions is None or link.session_code in sessions)
+        file_row, data = land(link, fetch=wanted)
+        if file_row is not None:
+            yield file_row, extract(link, data, file_row.error)
     progress.finish()
 
 
 @loader("mo_house_docs", stage=2, service="documents.house.mo.gov", slow=True)
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: distinct document URLs. Each shard lands and reads its own; every shard lists the same URLs from the
-    `mo_house` link tables, so the split needs no coordination."""
+    `mo_house` link tables, so the split needs no coordination. The kind/session options only limit what is
+    fetched: documents already on disk outside them still get their rows, so pieces of a first run add up."""
     kinds = _csv_env("MOGOV_HOUSE_DOCS_KINDS") or list(KINDS)
     if unknown := set(kinds) - set(KINDS):
         raise SystemExit(f"unknown MOGOV_HOUSE_DOCS_KINDS {sorted(unknown)}; choose from {sorted(KINDS)}")
     sessions = set(_csv_env("MOGOV_HOUSE_DOCS_SESSIONS")) or None
-    mine = units(kinds, sessions, shard)
     with db.TableSink(shard, tables=[DocFile, DocText]) as sink:
-        for file_row, text_row in _iter_rows(mine):
+        for file_row, text_row in _iter_rows(units(shard), set(kinds), sessions):
             if file_row.error:
                 log.warning("mo_house_docs.failed", url=file_row.url, error=file_row.error)
             sink.add(file_row)

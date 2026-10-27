@@ -164,10 +164,10 @@ def test_links_union_dedupes_urls_and_skips_blank_links(links_landed):
 
 def test_shards_split_the_urls_stably_and_completely(links_landed):
     every = {x.url for x in m.links(list(m.KINDS))}
-    parts = [{x.url for x in m.units(list(m.KINDS), None, db.Shard(i, 3))} for i in range(3)]
+    parts = [{x.url for x in m.units(db.Shard(i, 3))} for i in range(3)]
     assert set().union(*parts) == every
     assert sum(len(p) for p in parts) == len(every)  # disjoint
-    assert parts == [{x.url for x in m.units(list(m.KINDS), None, db.Shard(i, 3))} for i in range(3)]
+    assert parts == [{x.url for x in m.units(db.Shard(i, 3))} for i in range(3)]
     assert parts[1] == {u for u in every if db.Shard(1, 3).owns(u)}  # decided by the URL alone
 
 
@@ -236,13 +236,18 @@ def test_open_session_is_rechecked_weekly_and_rewritten_only_on_change(links_lan
     assert dest.read_bytes() == PDF_B == data and row.sha256 == hashlib.sha256(PDF_B).hexdigest()
 
 
-def test_kinds_and_sessions_options_narrow_the_run(links_landed, monkeypatch):
+def test_kinds_and_sessions_options_only_limit_fetching_and_pieces_add_up(links_landed, monkeypatch):
     site = _site()
     monkeypatch.setattr(m, "fetch_document", site)
     monkeypatch.setenv("MOGOV_HOUSE_DOCS_KINDS", "bill_text")
     monkeypatch.setenv("MOGOV_HOUSE_DOCS_SESSIONS", "171")
     m.load(db.UNSHARDED)
     assert sorted(site.requests) == sorted([TEXT_1, TEXT_2])
+    assert {r["url"] for r in _rows("mo_house_doc_files")} == {TEXT_1, TEXT_2}  # nothing else is on disk yet
+    monkeypatch.setenv("MOGOV_HOUSE_DOCS_KINDS", "amendment")  # the next piece keeps the bill texts' rows
+    m.load(db.UNSHARDED)
+    assert site.requests[2:] == [AMEND]
+    assert {r["url"] for r in _rows("mo_house_doc_texts")} == {TEXT_1, TEXT_2, AMEND}
     monkeypatch.setenv("MOGOV_HOUSE_DOCS_KINDS", "witness")
     with pytest.raises(SystemExit):
         m.load(db.UNSHARDED)
