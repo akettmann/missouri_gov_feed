@@ -864,7 +864,7 @@ rule against `/bulkdata`, US government work (the page states no licence). Congr
   became_law; a simple resolution agreed to in its own chamber is `agreed_to`. `president_outcome` separates signed
   from became_law_without_signature (law with no "Signed by President" action; the House's own copy says "Sent to
   Archivist of the United States unsigned") and `veto_result` says whether an override failed in the House or the
-  Senate. 118th and 119th (loaded 2026-10-27): 412 laws (274 + 138), 15 vetoes (118th: 13; 119th: 2), every veto
+  Senate. 118th and 119th (loaded 2026-10-27): 413 laws (274 + 139, one of them, 119-hr-766, from the laws list only), 15 vetoes (118th: 13; 119th: 2), every veto
   sustained or never put to an override vote, no override and no pocket veto in these two Congresses (the pocket
   veto is read from action text, since no code is known for it, so it is unverified on real data). Whether a bill
   "succeeded" is left to the reader (#622).
