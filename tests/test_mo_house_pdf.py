@@ -108,8 +108,15 @@ def links_landed(env):
     )
     _table(
         "mo_house_xml_senate_act_amendments",
-        {"session_code": s, "file_name": s, "amendment_index": "integer", "lr_number": s, "amendment_text": s},
-        [("171", "171-SENATEACTLIST.XML", 1, "3329S24", AMEND)],
+        {
+            "session_code": s,
+            "file_name": s,
+            "bill": s,
+            "amendment_index": "integer",
+            "lr_number": s,
+            "amendment_text": s,
+        },
+        [("171", "171-SENATEACTLIST.XML", "SB1", 1, "3329S24", AMEND)],
     )
     _table(
         "mo_house_xml_bill_witnesses",
@@ -165,6 +172,28 @@ def test_links_union_dedupes_urls_and_skips_blank_links(links_landed):
     assert found[FISCAL].lr_number is None
     assert [x.url for x in m.links(["fiscal_note"])] == sorted([FISCAL, DEAD])
     assert {x.url for x in m.links(list(m.KINDS), {"171"})} == set(found) - {OPEN_TEXT}
+
+
+def test_senate_act_bills_sharing_an_index_in_one_file_keep_each_link(env):
+    """A SenateActList file holds many bills, each numbering its amendments from 1 (#727)."""
+    s = "varchar"
+    first, second = "http://x/amend-sb1.pdf", "http://x/amend-sb2.pdf"
+    _table(
+        "mo_house_xml_senate_act_amendments",
+        {
+            "session_code": s,
+            "file_name": s,
+            "bill": s,
+            "amendment_index": "integer",
+            "lr_number": s,
+            "amendment_text": s,
+        },
+        [
+            ("171", "171-SENATEACTLIST.XML", "SB1", 1, None, first),
+            ("171", "171-SENATEACTLIST.XML", "SB2", 1, None, second),
+        ],
+    )
+    assert {x.url: x.n_links for x in m.links(["amendment"])} == {first: 1, second: 1}
 
 
 def test_shards_split_the_urls_stably_and_completely(links_landed):

@@ -57,23 +57,34 @@ RETRIES = 4
 # It is part of the pdftext cache key: changing it re-extracts every document from the PDF already on disk.
 X_TOLERANCE = 2
 
-# kind -> link tables as (table, link column, index column, LR number expression, version code expression).
-# The Senate-act tables have the same columns as the bill tables.
-KINDS: dict[str, list[tuple[str, str, str, str, str]]] = {
+_BILL = {"bill": "''", "senate_act": "bill"}
+
+# kind -> link tables as (table, link column, index column, LR number expression, version code expression,
+# bill expression). The Senate-act tables have the same columns as the bill tables plus `bill`: one SenateActList
+# file holds many bills, each restarting its indexes at 1, so a row there is (session, file, bill, index). A bill
+# table is one bill per file, with no `bill` column (the expression is a constant).
+KINDS: dict[str, list[tuple[str, str, str, str, str, str]]] = {
     "bill_text": [
-        (f"mo_house_xml_{p}_texts", "text_link", "text_index", "lr_number", "version_type_code")
+        (f"mo_house_xml_{p}_texts", "text_link", "text_index", "lr_number", "version_type_code", _BILL[p])
         for p in ("bill", "senate_act")
     ],
     "summary": [
-        (f"mo_house_xml_{p}_summaries", "summary_text_link", "summary_index", "lr_number", "version_type_code")
+        (
+            f"mo_house_xml_{p}_summaries",
+            "summary_text_link",
+            "summary_index",
+            "lr_number",
+            "version_type_code",
+            _BILL[p],
+        )
         for p in ("bill", "senate_act")
     ],
     "fiscal_note": [
-        (f"mo_house_xml_{p}_fiscal_notes", "fiscal_note_link", "fiscal_note_index", "null", "null")
+        (f"mo_house_xml_{p}_fiscal_notes", "fiscal_note_link", "fiscal_note_index", "null", "null", _BILL[p])
         for p in ("bill", "senate_act")
     ],
     "amendment": [
-        (f"mo_house_xml_{p}_amendments", "amendment_text", "amendment_index", "lr_number", "null")
+        (f"mo_house_xml_{p}_amendments", "amendment_text", "amendment_index", "lr_number", "null", _BILL[p])
         for p in ("bill", "senate_act")
     ],
 }
@@ -200,14 +211,16 @@ def links(kinds: list[str], sessions: set[str] | None = None) -> list[Link]:
     order. Missing tables (a session set with no Senate acts) are skipped."""
     parts = []
     for kind in kinds:
-        for table, col, idx, lr, ver in KINDS[kind]:
+        for table, col, idx, lr, ver, bill in KINDS[kind]:
             if db.raw_exists(table):
                 # one row per link row even while two shard counts of the table coexist (else n_links doubles)
-                own = db.own_rows_sql(table, ["session_code", "file_name", idx], "session_code", union_by_name=True)
+                keys = ["session_code", "file_name", idx] + (["bill"] if bill == "bill" else [])
+                # the recency is a constant: the link tables carry no timestamp, so ties go to the highest part name
+                own = db.own_rows_sql(table, keys, "0", union_by_name=True)
                 parts.append(
                     f"select trim({col}) as url, '{kind}' as kind, session_code, file_name, "
                     f"{lr}::varchar as lr_number, {ver}::varchar as version_code, "
-                    f"{idx}::integer as idx "
+                    f"{idx}::integer as idx, {bill}::varchar as bill "
                     f"from ({own}) "
                     f"where trim({col}) <> ''"
                 )
@@ -217,7 +230,7 @@ def links(kinds: list[str], sessions: set[str] | None = None) -> list[Link]:
         rows = con.execute(
             f"""
             select url, kind, session_code, file_name, lr_number, version_code, count(*) over (partition by url) as n,
-                   row_number() over (partition by url order by session_code, file_name, idx, kind) as rn
+                   row_number() over (partition by url order by session_code, file_name, bill, idx, kind) as rn
             from ({" union all ".join(parts)})
             qualify rn = 1
             order by url

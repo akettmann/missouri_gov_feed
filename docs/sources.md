@@ -366,7 +366,7 @@ fiscal_notes,amendments}`), so run `mo_house` first; no crawl is needed.
 - Changing the shard count: `db` keeps the old-count parts until every shard of the new count has landed, so a shard
   that starts late (Cloud Run waves) still sees the earlier rows for its URLs. `previous_files()` and `links()` read
   through `db.own_rows_sql`, so while both counts exist a URL has one state row (the newest `checked_at`/`landed_at`,
-  ties to the highest part name) and `n_links` counts each link row once; `previous_files()` also retries its read when
+  ties to the highest part name) and `n_links` counts each link row once (a row is session, file, index; for the Senate-act tables, which hold many bills per file, also the bill); `previous_files()` also retries its read when
   a part vanishes mid-listing. Finish every shard of `mo_house` before `mo_house_pdf` runs (see docs/environment.md).
 - A URL that is new to an already-started session/kind but outside a filtered run's kinds/sessions gets no row, so
   `assert_house_documents_have_landed_rows` fails until a full (unfiltered) run; normal syncs are unaffected.
