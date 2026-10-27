@@ -1,10 +1,13 @@
 -- Voteview roll calls (both chambers, loaded congresses): date, bill, question, result and vote totals.
+-- rollnumber runs across the whole Congress; clerk_rollnumber is the chamber clerk's number, which restarts each
+-- session and is the number BILLSTATUS cites (with the session).
 select
     {{ dbt.safe_cast('congress', dbt.type_int()) }} as congress,
     chamber,
     {{ dbt.safe_cast('rollnumber', dbt.type_int()) }} as rollnumber,
     {{ dbt.safe_cast('date', 'date') }} as vote_date,
     {{ dbt.safe_cast('session', dbt.type_int()) }} as session,
+    {{ dbt.safe_cast('clerk_rollnumber', dbt.type_int()) }} as clerk_rollnumber,
     {{ dbt.safe_cast('yea_count', dbt.type_int()) }} as yea_count,
     {{ dbt.safe_cast('nay_count', dbt.type_int()) }} as nay_count,
     bill_number,

@@ -827,6 +827,13 @@ rule against `/bulkdata`, US government work (the page states no licence). Congr
 - Everything is landed (all states): cosponsor lists need the whole file anyway, and the Missouri filter
   (sponsor `state` = MO) is applied in dbt, in `fct_federal_sponsorship` (one row per Missouri member, bill and
   role, with `became_law`, `law_type` and `law_number`).
+- Votes to bills: `fct_federal_vote_bills` links each cited roll call to its Voteview roll call (one row per roll
+  call and bill). BILLSTATUS cites the chamber clerk's roll number within the session; Voteview's `rollnumber`
+  runs across the whole Congress (House session 2 starts at 720 in the 118th), so the join uses Voteview's
+  `clerk_rollnumber` and `session`, not `rollnumber`. On the 118th and 119th, all 1,646 cited roll calls were
+  found in Voteview and every one names the same bill as Voteview's own `bill_number` text. Only roll calls a bill
+  action cites are linked (118th: 794 of 1,926 roll calls; 119th so far: 852 of 1,589), so votes on nominations,
+  quorum calls and amendments to a bill the file does not cite for them have no bill here.
 - Laws: `law_type` is Public Law or Private Law; the two are numbered separately (118-5 can be either). A private
   law relieves a named person or entity; the 118th Congress's hr/s/sjres/hconres bills have 269 public and no
   private laws. `became_law` is true for either type, so read `law_type` before calling a law broad policy. A
