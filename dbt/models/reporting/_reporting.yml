@@ -924,7 +924,8 @@ exposures:
     type: application
     maturity: low
     description: >
-      Static site that shows each official's measurable lean and potential conflicts of interest, as
+      Static site that cuts through obfuscation and misdirection so any citizen can see whether an official
+      is likely working for the citizenry or for themselves, a benefactor or a corporate interest, shown as
       evidence rather than verdicts (docs/frontend_principles.md). Its build reads the exported marts and reporting
       tables (`mogov export`).
     owner:

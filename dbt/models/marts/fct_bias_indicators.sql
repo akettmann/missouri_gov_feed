@@ -1,4 +1,5 @@
--- "Bias" indicators: measurable lean, not judgments. Each row is one indicator for one official:
+-- "Bias" indicators: measured evidence of whom an official works for (the citizenry, themselves, a
+-- benefactor, a corporate interest), not judgments. Each row is one indicator for one official:
 --   dw_nominate_dim1   Voteview, Congress. -1 liberal .. +1 conservative (economic dimension).
 --   shor_mccarty_np    State legislators, 1993-2022. Negative liberal, positive conservative.
 --   party_unity_pct    Share of party-line votes (majority of R vs majority of D) where the official
