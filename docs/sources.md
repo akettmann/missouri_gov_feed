@@ -907,6 +907,10 @@ Yearly national index plus each Missouri filing's PDF, split into text lines.
 Quirks:
 - Scanned paper filings (DocID 8xxxxxxx/9xxxxxxx) have no text layer. They land as one
   `has_text = false` row, so the gap is visible.
+- `fct_disclosures` gives a filing with no schedule lines one placeholder row, labelled by why: "not text-extractable"
+  (a scan), "download or text extraction failed" (the loader stored a `load_error` row; the PDF link may itself be
+  dead), or "not fetched" (no `house_fd_pdf_lines` row at all: a filing type the loader skips, such as an extension
+  request). "Not fetched" is derived from the absence of rows, so it also covers a filing the loader has not reached yet.
 - Periodic transaction reports live under `ptr-pdfs/`; everything else is under `financial-pdfs/`.
 - From 2021 on, the PDFs set their small-caps text (schedule headers, the Location/Description/Comments labels,
   the page section titles) in a font that text extraction turns into NUL characters: the capital stays and each

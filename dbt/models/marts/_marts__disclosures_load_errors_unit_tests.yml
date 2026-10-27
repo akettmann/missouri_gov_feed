@@ -9,7 +9,8 @@ unit_tests:
       A filing with a loader error row (download failed or text extraction timed out) gets the section
       "document (download or text extraction failed; see PDF)"; a scanned filing (has_text false, no error) keeps
       "document (not text-extractable; see PDF)"; a filing with schedule lines gets its lines and no placeholder.
-      A filing with both an error row and schedule lines is parsed, so it gets no placeholder.
+      A filing with both an error row and schedule lines is parsed, so it gets no placeholder. A filing with no
+      pdf_lines row at all (a type the loader never fetches, e.g. an extension request) is "not fetched".
     given:
       - input: ref('dim_official')
         rows:
@@ -22,6 +23,7 @@ unit_tests:
           - {doc_id: scan, filing_year: 2022, filing_kind: annual report, filing_date: '2023-05-01', state_district: MO01, last_name: Jones, document_url: u_scan}
           - {doc_id: err, filing_year: 2021, filing_kind: annual report, filing_date: '2022-05-01', state_district: MO01, last_name: Jones, document_url: u_err}
           - {doc_id: both, filing_year: 2020, filing_kind: annual report, filing_date: '2021-05-01', state_district: MO01, last_name: Jones, document_url: u_both}
+          - {doc_id: nofetch, filing_year: 2019, filing_kind: extension request, filing_date: '2020-05-01', state_district: MO01, last_name: Jones, document_url: u_nofetch}
       - input: ref('stg_house_fd__pdf_lines')
         rows:
           - {doc_id: scan, has_text: false, load_error: null}
@@ -45,3 +47,39 @@ unit_tests:
         - {disclosure_item_id: 'house:scan', section: 'document (not text-extractable; see PDF)'}
         - {disclosure_item_id: 'house:err', section: 'document (download or text extraction failed; see PDF)'}
         - {disclosure_item_id: 'house:both:1:1', section: 'A: assets'}
+        - {disclosure_item_id: 'house:nofetch', section: 'document (not fetched; see PDF)'}
+
+  - name: disclosures_error_placeholder_amendment_does_not_supersede_annual_report
+    model: fct_disclosures
+    description: >
+      An annual report with schedule lines and a later amended report of the same year that has only a placeholder
+      row (here a loader error row) must not supersede it: the annual report's lines stay is_latest_version and the
+      placeholder row is not. This exercises the has_text rule for the "download or text extraction failed" label.
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: h1, office: us_house, district: 1, family_name: Jones}
+      - input: ref('stg_senate_efd__items')
+        rows: []
+      - input: ref('stg_house_fd__filings')
+        rows:
+          - {doc_id: annual, filing_year: 2023, filing_kind: annual report, filing_date: '2024-05-01', state_district: MO01, last_name: Jones, document_url: u_annual}
+          - {doc_id: amended, filing_year: 2023, filing_kind: amended report, filing_date: '2024-08-01', state_district: MO01, last_name: Jones, document_url: u_amended}
+      - input: ref('stg_house_fd__pdf_lines')
+        rows:
+          - {doc_id: amended, has_text: null, load_error: 'extract timed out after 120s'}
+      - input: ref('int_house_fd__period_covered')
+        rows: []
+      - input: ref('int_house_fd__schedule_lines')
+        rows:
+          - {doc_id: annual, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+      - input: ref('int_judges__federal')
+        rows: []
+      - input: ref('stg_fjc__appointments')
+        rows: []
+      - input: ref('int_courtlistener__judge_disclosure_items')
+        rows: []
+    expect:
+      rows:
+        - {disclosure_item_id: 'house:annual:1:1', is_latest_version: true}
+        - {disclosure_item_id: 'house:amended', is_latest_version: false}
