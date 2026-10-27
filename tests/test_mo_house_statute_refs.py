@@ -148,3 +148,15 @@ def test_nul_glyphs_do_not_hide_the_title():
         "2 section 1.010, to read as follows:",
     ).replace("AN ACT", "A\x00N ACT")
     assert [r.action for r in parse_statute_refs(text)] == ["repeal", "enact"]
+
+
+def test_line_numbers_on_their_own_lines():
+    """Some House PDFs extract each line number on a line of its own (5627H.09T)."""
+    text = _bill(
+        "To amend chapter 537, RSMo, by adding thereto one new section relating to litigation.",
+        "1\nSection A. Chapter 537, RSMo, is amended by adding thereto"
+        + "\n2\n"
+        + "one new section, to be known as section 537.1250, to read as"
+        + "\n3\nfollows:",
+    )
+    assert _short(parse_statute_refs(text)) == [("enact", 1, "537.1250", None, None)]

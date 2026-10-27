@@ -340,3 +340,6 @@ sources:
   - name: pdf_texts
     identifier: mo_house_pdf_texts
     description: "One row per House document URL: kind, session, the link row's file name, LR number and version code, link count, page count, pdfplumber text as extracted (joined and per page, small-caps NULs included) and the error if the fetch or extraction failed. Optional: empty until `mogov load mo_house_pdf` has run."
+  - name: pdf_statute_refs
+    identifier: mo_house_pdf_statute_refs
+    description: "One row per RSMo section (or range, as written) a bill text version repeals, amends or enacts, read by the mo_house_pdf loader from the enacting title and Section A (#594): document URL, session, link row's file name, LR number and version code, ordinal within the action, action (repeal, amend, enact), section_start, section_end, RSMo Supp. year and the matched clause. Optional: empty until `mogov load mo_house_pdf` has run."

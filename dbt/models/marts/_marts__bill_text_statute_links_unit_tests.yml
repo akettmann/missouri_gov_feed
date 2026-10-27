@@ -1,0 +1,30 @@
+# Unit tests for fct_bill_text_statute_links: fixed parsed references -> exact expected rows.
+version: 2
+
+unit_tests:
+  - name: bill_text_statute_links_name_the_change_like_the_revisor_mart
+    model: fct_bill_text_statute_links
+    description: >
+      A section a text version both repeals and enacts (repeal and enact in lieu thereof) is 'amended', one it only
+      repeals is 'repealed', one it only enacts is 'enacted', and one the title amends is 'amended'. A section that
+      is both repealed and enacted is one row, not two, and a section in two text versions of the same bill is a row
+      per version. Collapsing to one row per bill, or labelling the repeal-and-enact pair as repealed, fails this
+      test.
+    given:
+      - input: ref('int_mo_house__bill_text_statute_refs')
+        format: sql
+        rows: |
+            select cast('261' as varchar) as session_code, cast('HB1' as varchar) as bill, cast('u1' as varchar) as document_url, cast('0001H.01' as varchar) as lr_number, cast('IN' as varchar) as version_code, cast('repeal' as varchar) as action, cast('1.010' as varchar) as section_id, cast(null as bigint) as supp_year, false as from_range, true as in_statutes union all
+            select '261', 'HB1', 'u1', '0001H.01', 'IN', 'enact', '1.010', null, false, true union all
+            select '261', 'HB1', 'u1', '0001H.01', 'IN', 'repeal', '2.020', 2023, true, true union all
+            select '261', 'HB1', 'u1', '0001H.01', 'IN', 'enact', '1.011', null, false, false union all
+            select '261', 'HB1', 'u1', '0001H.01', 'IN', 'amend', '3.030', null, false, true union all
+            select '261', 'HB1', 'u2', '0001H.02', 'P', 'enact', '1.011', null, false, false
+    expect:
+      format: sql
+      rows: |
+          select cast('261' as varchar) as session_code, cast('HB1' as varchar) as bill, cast('u1' as varchar) as document_url, cast('0001H.01' as varchar) as lr_number, cast('IN' as varchar) as version_code, cast('1.010' as varchar) as section_id, cast('amended' as varchar) as change, cast('bill_text' as varchar) as link_source, cast(null as integer) as supp_year, false as from_range, true as in_statutes union all
+          select '261', 'HB1', 'u1', '0001H.01', 'IN', '2.020', 'repealed', 'bill_text', 2023, true, true union all
+          select '261', 'HB1', 'u1', '0001H.01', 'IN', '1.011', 'enacted', 'bill_text', null, false, false union all
+          select '261', 'HB1', 'u1', '0001H.01', 'IN', '3.030', 'amended', 'bill_text', null, false, true union all
+          select '261', 'HB1', 'u2', '0001H.02', 'P', '1.011', 'enacted', 'bill_text', null, false, false

@@ -30,7 +30,7 @@ _REPEAL = re.compile(
 # searched in text with the line numbers removed
 _SECTION_A = re.compile(r"Be it enacted.*?\bSection A\.(?P<body>.*?)\bto read as follows", re.S)
 _KNOWN_AS = re.compile(r"\bto be known as\s+sections?\b(?P<ids>.*)$", re.S)
-_LINE_NUMBER = re.compile(r"(?m)^\d{1,3} ")
+_LINE_NUMBER = re.compile(r"(?m)^\d{1,3}(?: |$)")
 
 
 SECTION_A_WINDOW = 80_000  # characters after the enacting clause searched for Section A (long omnibus lists)

@@ -1,0 +1,71 @@
+# Unit tests for the bill text statute references: fixed parsed rows -> exact expected rows.
+version: 2
+
+unit_tests:
+  - name: bill_text_statute_ranges_expand_against_the_statutes_within_one_chapter
+    model: int_mo_house__bill_text_statute_refs
+    description: >
+      "Sections 1.010 to 1.050" repeals every section of the span that fct_statute_sections has (the section with
+      two versions counts once; 1.051 is outside), plus both endpoints even where the statutes lack one (1.050 here
+      exists, 135.1150 does not). Sections run in the order of the number after the point read as an integer (as the
+      House's own lists do: 140.995 is followed by 140.1000), so 135.1155 lies in 135.1150 to 135.1160 while 135.750
+      and 135.1200 do not, and 135.100 to 135.200 holds 135.150 but not 135.1155, 135.1200 or 135.1500: comparing the
+      tails as text fails this test. A range that crosses
+      a chapter (3.010 to 4.020) keeps only its endpoints. A single section stays one row, in_statutes false when
+      it is new (1.011). A text version shared by two combined bills gives a row for each bill, a link that is
+      not a bill text (a summary) or no link at all gives none.
+    given:
+      - input: ref('stg_mo_house__statute_refs')
+        format: sql
+        rows: |
+            select cast('u1' as varchar) as document_url, cast('261' as varchar) as session_code, cast('261-HB1.XML' as varchar) as file_name, cast('0001H.01' as varchar) as lr_number, cast('IN' as varchar) as version_code, cast(1 as bigint) as ordinal, cast('repeal' as varchar) as action, cast('1.010' as varchar) as section_start, cast('1.050' as varchar) as section_end, cast(null as bigint) as supp_year union all
+            select 'u1', '261', '261-HB1.XML', '0001H.01', 'IN', 2, 'repeal', '2.020', null, 2023 union all
+            select 'u1', '261', '261-HB1.XML', '0001H.01', 'IN', 3, 'repeal', '135.1150', '135.1160', null union all
+            select 'u1', '261', '261-HB1.XML', '0001H.01', 'IN', 4, 'repeal', '3.010', '4.020', null union all
+            select 'u1', '261', '261-HB1.XML', '0001H.01', 'IN', 5, 'repeal', '135.100', '135.200', null union all
+            select 'u1', '261', '261-HB1.XML', '0001H.01', 'IN', 1, 'enact', '1.011', null, null union all
+            select 'u2', '261', '261-HB2.XML', '0002H.01', 'IN', 1, 'enact', '9.001', null, null union all
+            select 'u3', '261', '261-HB9.XML', '0009H.01', 'IN', 1, 'enact', '9.002', null, null union all
+            select 'u4', '261', '261-HB1.XML', '0001H.01', 'IN', 1, 'enact', '9.003', null, null
+      - input: ref('fct_bill_documents')
+        format: sql
+        rows: |
+            select cast('261' as varchar) as session_code, cast('HB1' as varchar) as bill, cast('bill_text' as varchar) as document_kind, cast('u1' as varchar) as document_url union all
+            select '261', 'HB2', 'bill_text', 'u2' union all
+            select '261', 'HB3', 'bill_text', 'u2' union all
+            select '261', 'HB1', 'summary', 'u4'
+      - input: ref('fct_statute_sections')
+        format: sql
+        rows: |
+            select cast('1.010' as varchar) as section_id union all
+            select '1.010' union all
+            select '1.015' union all
+            select '1.020' union all
+            select '1.050' union all
+            select '1.051' union all
+            select '2.020' union all
+            select '3.015' union all
+            select '4.010' union all
+            select '135.750' union all
+            select '135.1155' union all
+            select '135.1200' union all
+            select '135.150' union all
+            select '135.1500'
+    expect:
+      rows:
+        - {bill: HB1, action: repeal, ordinal: 1, section_id: '1.010', from_range: true, in_statutes: true, supp_year: null}
+        - {bill: HB1, action: repeal, ordinal: 1, section_id: '1.015', from_range: true, in_statutes: true, supp_year: null}
+        - {bill: HB1, action: repeal, ordinal: 1, section_id: '1.020', from_range: true, in_statutes: true, supp_year: null}
+        - {bill: HB1, action: repeal, ordinal: 1, section_id: '1.050', from_range: true, in_statutes: true, supp_year: null}
+        - {bill: HB1, action: repeal, ordinal: 2, section_id: '2.020', from_range: false, in_statutes: true, supp_year: 2023}
+        - {bill: HB1, action: repeal, ordinal: 3, section_id: '135.1150', from_range: true, in_statutes: false, supp_year: null}
+        - {bill: HB1, action: repeal, ordinal: 3, section_id: '135.1155', from_range: true, in_statutes: true, supp_year: null}
+        - {bill: HB1, action: repeal, ordinal: 3, section_id: '135.1160', from_range: true, in_statutes: false, supp_year: null}
+        - {bill: HB1, action: repeal, ordinal: 4, section_id: '3.010', from_range: true, in_statutes: false, supp_year: null}
+        - {bill: HB1, action: repeal, ordinal: 4, section_id: '4.020', from_range: true, in_statutes: false, supp_year: null}
+        - {bill: HB1, action: repeal, ordinal: 5, section_id: '135.100', from_range: true, in_statutes: false, supp_year: null}
+        - {bill: HB1, action: repeal, ordinal: 5, section_id: '135.150', from_range: true, in_statutes: true, supp_year: null}
+        - {bill: HB1, action: repeal, ordinal: 5, section_id: '135.200', from_range: true, in_statutes: false, supp_year: null}
+        - {bill: HB1, action: enact, ordinal: 1, section_id: '1.011', from_range: false, in_statutes: false, supp_year: null}
+        - {bill: HB2, action: enact, ordinal: 1, section_id: '9.001', from_range: false, in_statutes: false, supp_year: null}
+        - {bill: HB3, action: enact, ordinal: 1, section_id: '9.001', from_range: false, in_statutes: false, supp_year: null}
