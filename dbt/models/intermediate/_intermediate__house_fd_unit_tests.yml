@@ -1,0 +1,69 @@
+# Unit tests for int_house_fd__schedule_lines: PDFs from 2021 on extract small-caps text as NUL characters
+# ("S" + 7 NULs = "Schedule"), which must still be recognized as schedule headers (#576).
+version: 2
+
+unit_tests:
+  - name: house_fd_schedule_headers_survive_nul_small_caps
+    model: int_house_fd__schedule_lines
+    description: >
+      A schedule header whose small-caps letters extracted as NULs ("S" + 7 NULs + " A:") opens its schedule just
+      like the plain-text header of older PDFs; "A and B" headers (3 NULs for "and") open schedule A; the NUL labels
+      (Location, Description, Comments, running page headers) come out readable or as the known words and never
+      carry a NUL; a label that only starts with S (the "Subholding of" label, S + 9 NULs + " O" + 1 NUL) or has the
+      wrong NUL count (S + 6) is not a header, so a document with no real header yields no lines. The closing pages
+      of the form ("Exclusions of spouse..." question, trust/exemption questions, "Yes No", "Certification and
+      Signature", the certify line, "Digitally Signed") belong to no schedule, so no line after them is emitted (not
+      under the schedule that came last, e.g. J); a "Schedule A Investment Vehicle Details" block that follows
+      Schedule J lands under A (not J); the "Subholding Of:" and "Filing Status:" labels are restored.
+    given:
+      - input: ref('stg_house_fd__pdf_lines')
+        format: sql
+        rows: |
+          select 'nul' as doc_id, 'u_nul' as document_url, true as has_text, 1 as page, 1 as line_no, 'Filing ID #1' as line_text union all
+          select 'nul', 'u_nul', true, 1, 2, 'F' || repeat(chr(0), 8) || ' D' || repeat(chr(0), 9) || ' R' || repeat(chr(0), 5) union all
+          select 'nul', 'u_nul', true, 1, 3, 'S' || repeat(chr(0), 7) || ' A: A' || repeat(chr(0), 5) || ' ' || repeat(chr(0), 3) || ' "U' || repeat(chr(0), 7) || '" I' || repeat(chr(0), 5) union all
+          select 'nul', 'u_nul', true, 1, 4, 'Asset Owner Value of Asset Income Type(s) Income Tx. >' union all
+          select 'nul', 'u_nul', true, 1, 5, 'Acme Bank [BA] SP $1,001 - $15,000 Interest $201 - $1,000' union all
+          select 'nul', 'u_nul', true, 1, 6, 'L' || repeat(chr(0), 7) || ': Kansas City, MO, US' union all
+          select 'nul', 'u_nul', true, 1, 7, 'D' || repeat(chr(0), 10) || ': Family farm' union all
+          select 'nul', 'u_nul', true, 1, 8, 'C' || repeat(chr(0), 7) || ': managed by a trust' union all
+          select 'nul', 'u_nul', true, 1, 9, 'S' || repeat(chr(0), 9) || ' O' || repeat(chr(0), 1) || ': Fidelity Trust' union all
+          select 'nul', 'u_nul', true, 1, 10, 'S' || repeat(chr(0), 7) || ' C: E' || repeat(chr(0), 5) || ' I' || repeat(chr(0), 5) union all
+          select 'nul', 'u_nul', true, 1, 11, 'Source Type Amount' union all
+          select 'nul', 'u_nul', true, 1, 12, 'Example Co Salary $50,000' union all
+          select 'nul', 'u_nul', true, 1, 13, 'C' || repeat(chr(0), 12) || ' ' || repeat(chr(0), 3) || ' S' || repeat(chr(0), 8) union all
+          select 'nul', 'u_nul', true, 1, 14, 'Yes No' union all
+          select 'nul', 'u_nul', true, 1, 15, 'Digitally Signed: A Member , 01/01/2022' union all
+          select 'form', 'u_form', true, 1, 1, 'S' || repeat(chr(0), 7) || ' J: C' || repeat(chr(0), 10) || ' O' || repeat(chr(0), 3) || ' $5,000' union all
+          select 'form', 'u_form', true, 1, 2, 'Acme Corp, Springfield, MO $60,000 Salary' union all
+          select 'form', 'u_form', true, 1, 3, 'S' || repeat(chr(0), 7) || ' A I' || repeat(chr(0), 9) || ' V' || repeat(chr(0), 6) || ' D' || repeat(chr(0), 6) union all
+          select 'form', 'u_form', true, 1, 4, 'Schwab IRA' union all
+          select 'form', 'u_form', true, 1, 5, 'F' || repeat(chr(0), 5) || ' S' || repeat(chr(0), 5) || ': New' union all
+          select 'form', 'u_form', true, 1, 6, 'E' || repeat(chr(0), 9) || ' ' || repeat(chr(0), 2) || ' S' || repeat(chr(0), 5) || ', D' || repeat(chr(0), 8) || ', ' || repeat(chr(0), 2) || ' T' || repeat(chr(0), 4) || ' I' || repeat(chr(0), 10) union all
+          select 'form', 'u_form', true, 1, 7, 'Trusts: Details regarding "Qualified Blind Trusts" need not be disclosed.' union all
+          select 'form', 'u_form', true, 1, 8, 'Yes No' union all
+          select 'form', 'u_form', true, 1, 9, 'I CERTIFY that the statements I have made are true.' union all
+          select 'cert', 'u_cert', true, 1, 1, 'S' || repeat(chr(0), 7) || ' J: C' || repeat(chr(0), 10) || ' O' || repeat(chr(0), 3) || ' $5,000' union all
+          select 'cert', 'u_cert', true, 1, 2, 'Beta LLC, Kansas City, MO $9,000 Consulting' union all
+          select 'cert', 'u_cert', true, 1, 3, 'CerTiFiCATion AnD SignATure' union all
+          select 'cert', 'u_cert', true, 1, 4, 'Digitally Signed: A Member , 01/01/2022' union all
+          select 'plain', 'u_plain', true, 1, 1, 'ScheDule A: aSSetS anD "unearneD" income' union all
+          select 'plain', 'u_plain', true, 1, 2, 'Widget Fund [MF] $15,001 - $50,000' union all
+          select 'ab', 'u_ab', true, 1, 1, 'S' || repeat(chr(0), 7) || ' A ' || repeat(chr(0), 3) || ' B A' || repeat(chr(0), 4) || ' C' || repeat(chr(0), 4) || ' D' || repeat(chr(0), 6) union all
+          select 'ab', 'u_ab', true, 1, 2, 'Some Fund [MF] $1,001 - $15,000' union all
+          select 'short', 'u_short', true, 1, 1, 'S' || repeat(chr(0), 6) || ' A: not a schedule header' union all
+          select 'short', 'u_short', true, 1, 2, 'Ghost Asset [BA] $1,001 - $15,000'
+    expect:
+      rows:
+        - {doc_id: nul, line_no: 5, schedule: 'A: assets & unearned income', owner_code: SP, amount_range: '$1,001 - $15,000', line_text: 'Acme Bank [BA] SP $1,001 - $15,000 Interest $201 - $1,000'}
+        - {doc_id: nul, line_no: 6, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Location: Kansas City, MO, US'}
+        - {doc_id: nul, line_no: 7, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Description: Family farm'}
+        - {doc_id: nul, line_no: 8, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Comments: managed by a trust'}
+        - {doc_id: nul, line_no: 9, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Subholding Of: Fidelity Trust'}
+        - {doc_id: nul, line_no: 12, schedule: 'C: earned income', owner_code: null, amount_range: '$50,000', line_text: 'Example Co Salary $50,000'}
+        - {doc_id: form, line_no: 2, schedule: 'J: compensation over $5,000 from one source', owner_code: null, amount_range: '$60,000', line_text: 'Acme Corp, Springfield, MO $60,000 Salary'}
+        - {doc_id: form, line_no: 4, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Schwab IRA'}
+        - {doc_id: form, line_no: 5, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Filing Status: New'}
+        - {doc_id: cert, line_no: 2, schedule: 'J: compensation over $5,000 from one source', owner_code: null, amount_range: '$9,000', line_text: 'Beta LLC, Kansas City, MO $9,000 Consulting'}
+        - {doc_id: plain, line_no: 2, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$15,001 - $50,000', line_text: 'Widget Fund [MF] $15,001 - $50,000'}
+        - {doc_id: ab, line_no: 2, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Some Fund [MF] $1,001 - $15,000'}
