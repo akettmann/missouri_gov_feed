@@ -1,0 +1,97 @@
+version: 2
+
+models:
+  - name: fct_federal_vote_amendments
+    description: >
+      Which federal amendment each House or Senate roll call decided, read from the roll calls the GovInfo
+      BILLSTATUS amendment actions cite, joined to Voteview and to the bill the amendment was filed to. A sibling of
+      fct_federal_vote_bills, kept separate: that model lists votes on the bill itself, this one votes on floor
+      amendments to it (so it holds no bill passage votes). BILLSTATUS numbers a roll call by the chamber clerk's
+      number within the session; the join uses Voteview's `clerk_rollnumber` and `session`. Only roll calls both
+      sources know are listed (loaded BILLSTATUS Congresses; amendments the files do not list under a loaded bill are
+      absent), so a roll call missing here means no amendment was found, not that none exists. Grain: (congress,
+      chamber, rollnumber, amendment_id). Join to fct_federal_votes on (congress, chamber, rollnumber) to see each
+      Missouri member's vote on the amendment.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [congress, chamber, rollnumber, amendment_id]
+    columns:
+      - name: congress
+        data_type: integer
+        description: Congress number (119 = 2025-2027).
+        data_tests: [not_null]
+      - name: chamber
+        data_type: varchar
+        description: "`House` or `Senate` (Voteview spelling)."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['House', 'Senate']
+      - name: rollnumber
+        data_type: integer
+        description: Voteview roll-call number within the congress and chamber (as in fct_federal_votes).
+        data_tests: [not_null]
+      - name: session
+        data_type: integer
+        description: Session of the Congress (1 or 2).
+      - name: clerk_rollnumber
+        data_type: integer
+        description: The chamber clerk's roll-call number within the session, which BILLSTATUS cites.
+      - name: vote_date
+        data_type: date
+        description: Date of the vote (Voteview).
+      - name: amendment_id
+        data_type: varchar
+        description: "`<congress>-<type>-<number>`, e.g. 118-hamdt-180 or 118-samdt-999."
+        data_tests: [not_null]
+      - name: amendment_type
+        data_type: varchar
+        description: hamdt (House amendment) or samdt (Senate amendment).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['hamdt', 'samdt']
+      - name: amendment_number
+        data_type: integer
+        description: Amendment number within its type and congress.
+      - name: amendment_purpose
+        data_type: varchar
+        description: The amendment's stated purpose as published (Senate amendments and some House ones); often null.
+      - name: amendment_description
+        data_type: varchar
+        description: The House's description of the amendment as published ("An amendment numbered 2 printed in Part A of House Report 118-59 ..."); null for Senate amendments.
+      - name: bill_id
+        data_type: varchar
+        description: "The bill the amendment was filed to: `<congress>-<type>-<number>`, e.g. 118-hr-2494."
+        data_tests: [not_null]
+      - name: bill_type
+        data_type: varchar
+        description: hr, s, hjres, sjres, hconres, sconres, hres or sres.
+      - name: bill_no
+        data_type: integer
+        description: Bill number within its type and congress.
+      - name: bill_title
+        data_type: varchar
+        description: The bill's title as published.
+      - name: legislation_url
+        data_type: varchar
+        description: Congress.gov page of the bill.
+      - name: voteview_bill_number
+        data_type: varchar
+        description: Voteview's own bill text for the roll call (e.g. HR2494), kept for comparison; null for some roll calls it ties to no bill.
+      - name: vote_question
+        data_type: varchar
+        description: Question put to the chamber (e.g. "On Agreeing to the Amendment").
+      - name: vote_result
+        data_type: varchar
+        description: Result as Voteview records it.
+      - name: yea_count
+        data_type: integer
+        description: Yea votes (Voteview).
+      - name: nay_count
+        data_type: integer
+        description: Nay votes (Voteview).
+      - name: source_url
+        data_type: varchar
+        description: Voteview page of the roll call.
