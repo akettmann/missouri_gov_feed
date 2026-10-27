@@ -3,7 +3,9 @@
 -- names the PDF truncates) and, when the token carries one, same district. The PDF prints a compound surname by
 -- its last word ("REHDER" for Holly Thompson Rehder) and drops a generational suffix ("PRICE" for Wiley Price IV),
 -- so those spellings match too. The Speaker comes from the house_speakers seed. Members who left mid-session are
--- missing from that session's (end-of-session) list, so a second pass matches against every session's members.
+-- missing from that session's (end-of-session) list, so a second pass matches against every session's members; there
+-- a person whose dated seat missed the vote date is ruled out even if alone, and one whose seat covered it outranks
+-- one with no dated seat. In a session the exact surname beats the suffix-stripped one ("PRICE" is Price not Price IV).
 -- Keys ignore spaces ("VANSCHOIACK" = "Van Schoiack"). When several people still fit a token, the Open States seat
 -- dates break the tie: a person whose seat did not cover the vote date is dropped if another candidate's did ("EVANS"
 -- after Jean Evans left on 2019-02-05 is David Evans). Tokens still matching zero or several people stay
@@ -60,16 +62,26 @@ term_people as (
     from house_terms
 ),
 
-candidates as (
+matches as (
     select
         v.rollcall_url,
         v.member_token,
         m.person_key,
         m.party,
-        -- same-session members first; within that, a whole-surname match beats the last word of a compound surname
-        -- ("HENDERSON" is Henderson, not Fountain Henderson, whom the PDF prints as "FOUNTAIN HENDERS")
-        (case when v.session_code = m.session_code then 1 else 2 end) * 10
-        + case when v.token_key = m.surname_last_word and v.token_key <> m.surname_squashed then 2 else 1 end as tier,
+        case when v.session_code = m.session_code then 1 else 0 end as same_session,
+        -- how the token fits the name: 1 the whole surname (or the truncated start of a long one), 2 the surname
+        -- without its generational suffix ("PRICE" for Price IV), 3 the last word of a compound surname
+        -- ("HENDERSON" is Henderson, not Fountain Henderson, whom the PDF prints as "FOUNTAIN HENDERS"). The Speaker
+        -- is matched by seat, not name.
+        case
+            when sp.district_number is not null then 1
+            when
+                v.token_key = m.surname_squashed
+                or (length(v.token_key) >= 13 and m.surname_squashed like v.token_key || '%')
+                then 1
+            when v.token_key = m.surname_unsuffixed then 2
+            else 3
+        end as name_rank,
         -- 1 unless Open States dates this person's seat and it did not cover the vote date
         max(case when tp.person_id is null or t.person_id is not null then 1 else 0 end) as seat_dated_ok,
         -- 1 when Open States gives this person a seat that covers the vote date
@@ -96,7 +108,26 @@ candidates as (
             m.person_key = t.person_id
             and m.district_number = t.district_number
             and v.vote_date between t.start_date and t.end_date
-    group by 1, 2, 3, 4, 5
+    group by 1, 2, 3, 4, 5, 6
+),
+
+-- Same-session members rank ahead of other sessions' members (members who left mid-session are only in the latter).
+-- Within the same session, a better name fit wins. Outside it a person is a stray namesake unless the dates say
+-- otherwise, so a dated seat that missed the vote date rules the person out (even a lone candidate), and a seat that
+-- covered the date outranks a person with no dated seat, whatever the name fit.
+candidates as (
+    select
+        rollcall_url,
+        member_token,
+        person_key,
+        party,
+        seat_dated_ok,
+        seat_covered,
+        (case when same_session = 1 then 1 else 2 end) * 100
+        + case when same_session = 1 or seat_covered = 1 then 0 else 10 end
+        + name_rank as tier
+    from matches
+    where same_session = 1 or seat_dated_ok = 1
 ),
 
 best_tier as (

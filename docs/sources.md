@@ -13,6 +13,7 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `mo_house_docs` | Missouri House bill documents (documents.house.mo.gov) | the PDFs behind the `mo_house` document links (bill text versions, summaries, fiscal notes, amendments), unchanged, with their extracted text | every link `mo_house` landed (about 68.7k PDFs, sessions 171-261) | stage 2; slow: ~1 request/s |
 | `mo_senate` | Missouri Senate journals (senate.mo.gov) | per-senator roll-call votes | `MOGOV_LOOKBACK_YEARS` | |
 | `mo_senate_topics` | Missouri Senate topical index (senate.mo.gov) | Senate bills, subject terms for Senate bills and House bills that reached the Senate | `MOGOV_LOOKBACK_YEARS` (regular sessions) | |
+| `mo_senate_bills` | Missouri Senate bill tracking (senate.mo.gov) | every Senate bill and resolution of each session (regular and extraordinary) and its full action history, with journal references | `MOGOV_LOOKBACK_YEARS` | slow: ~1 request/s, one request per bill |
 | `mo_revisor` | Missouri Revisor of Statutes (revisor.mo.gov) | statute text (RSMo) by section version, repeals and transfers, which bills enacted, amended or repealed each section | current statutes; repeals since 1945 | slow: ~1 request/s |
 | `mec` | Missouri Ethics Commission | state campaign contributions and spending, candidate↔committee links, lobbyist gifts | 2023+ | opt-in |
 | `tap_mec` | MEC via The Accountability Project | state campaign finance and lobbyist gifts | 2011–2022 (gifts from 2004) | |
@@ -58,7 +59,7 @@ the only per-member House vote record.
   `rollcalls`, `hearings`, `summaries`, `fiscal_notes`, `witnesses` (each child row carries a `bill`
   column naming its Senate bill; the list has no sponsor or subject children, the sponsor is on the bill row as
   `sponsor_name`/`sponsor_district`/`sponsor_link`). Bill, text, amendment, summary, fiscal-note and witness-form
-  links reach `marts.fct_bill_documents`. The roll-call PDFs land as `mo_house_rollcalls` and
+  links reach `marts.fct_bill_documents`. Hearing notices (`_bill_hearings`, and the SenateActList's) reach `marts.fct_bill_hearings` (18,739 + 593 rows, 2017-2026; one row per notice, a moved hearing is noticed again and the XML has no cancelled flag; comments holding an email address are withheld). The roll-call PDFs land as `mo_house_rollcalls` and
   `mo_house_rollcall_votes`.
 - Window: `MOGOV_LOOKBACK_YEARS` (default 10). Roll-call PDFs go back to 2014.
 - Shard units: session codes (XML) and session days (roll-call PDFs).
@@ -223,9 +224,16 @@ Quirks:
   file inside a zip has no address of its own. Committee names change between sessions. The metric counts
   full-committee chairs separately from subcommittee chairs.
   The `COMMITTEELIST` lists carry no Co-Chair seats at all (2025 regular session: member pages show 3 co-chair posts the list lacks), and 253's list names fewer committees than 251 or 254 (no Conference Committee on Budget, 22 seats; neither of the two property tax special committees, 40 seats), so 253 shows 617 committee seats against 697 in 251 and 685 in 254. The joint committees are in the list. The profile says so under the 253 row. Re-checked against the typed XML raw (2026-10): no other landed file carries 253 co-chair seats. The 253 member pages have no `Committees` element at all, `UPCOMINGHEARINGLIST` names only a committee's chair, and bill files carry no committee roles. The House does not publish them in the exports, so the gap is accepted and not inferred from 251 or 254 (co-chairs of a joint committee are not guaranteed to carry over); 251 and 254 co-chair posts come from the member pages (3 in 251, 2 in 254).
-- Bill sponsorship success (share of a member's sponsored bills that passed) is not built yet: it needs the
-  bill status (`fct_bills.status` and `outcome`, from #34), but Senate bills before 2024 have no status (see
-  Bill status below), so it can only cover House bills and 2024 and later until #317 lands.
+- Bill sponsorship outcomes (`marts.fct_sponsorship_outcomes`, one row per official and House session) count the
+  House bills (HB) and House joint resolutions (HJR) a member was the primary sponsor of (`sponsor_type =
+  'Sponsor'`, one per bill) and what became of them: `bills_decided` (the denominator: every outcome but
+  `pending` and `awaiting governor`), `bills_passed_house` (the House's third-reading passage, including bills
+  that then died in the Senate), `bills_became_law` (`enacted` for an HB, `sent to voters` for an HJR; a bill
+  with `no governor action recorded` is decided but not counted as law) and the two shares over `bills_decided`
+  (null when it is 0). Resolutions (HR, HCR) and Senate sponsors are left out. Appropriation bills are kept
+  (the Budget chair sponsors them and almost all pass). Only current officials (`dim_official`) have an
+  `official_id`, so former members are absent: for 2017 only 27 of 1,224 House primary-sponsor rows match, for
+  2026 2,044 of 2,086. A member with House and Senate careers has rows for House sessions only.
 - PDF text extraction is cached by PDF content (`data/cache/pdftext/`). Before that, a re-run spent
   3–10 minutes per shard re-parsing PDFs that were already downloaded.
 - Bill status (`fct_bills.status`, `outcome`; `int_bills__status`) comes from each bill's `Action` list. The
@@ -377,6 +385,44 @@ Quirks:
   (Kraus's last vote was 2017-07-25), and first voted in the Senate on 2018-01-08; Open States starts his Senate
   term 2018-01-03. Nothing loaded dates his seating within 2017-09-14 to 2018-01-03 more closely. Only the
   2025-2026 Official Manual is loaded, so it gives no evidence for earlier years.
+
+## mo_senate_bills: Missouri Senate bill list and action history
+
+Flow: [diagrams/sources/mo_senate_bills.svg](diagrams/sources/mo_senate_bills.svg)
+
+senate.mo.gov's bill tracking (`/BillTracking/Bills/BillList`) has one page per session listing every Senate
+bill and resolution (SB, SJR, SCR, SR), and one small HTML fragment per bill with its whole action history:
+the Senate's referral, hearing, perfection and third reading, the House side, enrollment and the governor,
+each with the journal page that records it. This is the only source of Senate-side actions; the House XML
+lists actions for House bills and for Senate bills only once they reach the House.
+
+- Lands: `mo_senate_bill_list`, one row per bill, the page's embedded JSON object as printed (ids, prefix and
+  number, sponsor and handler, description, links) plus `year` and `session_type`. `mo_senate_bill_actions`,
+  one row per action: `year`, `session_type`, `bill_id`, `bill` (e.g. `SB1`), `action_index` (0 = top row as
+  served, newest first), `action_date` (as printed, MM/DD/YYYY), `action`, `journal_ref`, `journal_url`.
+- Window: `MOGOV_LOOKBACK_YEARS`: the regular session (`R`) of each year plus every extraordinary session
+  (`E1`, `E2`, ... until one comes back empty). Shard units: bills, split by a stable hash of
+  `year/session/billId`. Every shard reads every session list once (cached) and takes its bills, so the split
+  does not depend on listing order or on who else is running.
+- Pace: one request per bill, ~1 request/second to the host (accepted by the maintainer in #584), a lock
+  shared by every process on the machine, so shards add no speed. A regular session is ~1,000 bills, about
+  17 minutes cold; a year or more of lookback takes hours. Past sessions are cached 30 days, the current
+  year 1 day. Cloud Run tasks do not share a filesystem, so each task slows to `1 s x CLOUD_RUN_TASK_COUNT`.
+- Bill lists come from the `const bills = [...]` array in a script element, read with a JSON parser; the
+  bill cards in the page are not parsed.
+
+Quirks:
+- `billId` is the site's own key, not the bill number: 2025 SB 1 is 233, 2017 SB 1 is 57095344. The number is
+  `billPrefix` + `billSuffix`.
+- Session codes are `R` and `E1`, `E2`, ...; `session=E` and `S1` return an empty list. They are not the House
+  codes: the 2025 special session `E1` (29 bills, SB 1 is id 18267452) is House session `253` (SB1-SB4 there),
+  not `252`, and 2025 also has an `E2` (2 bills). Map session to House code by evidence, not arithmetic.
+- Action wording differs from the House's (for example "S First Read", "Second Read and Referred S
+  Government Efficiency Committee"); normalize in dbt.
+- The history is newest first and covers both chambers. The journal reference can name both (`H2291 / S1216`)
+  and links to the journal PDF page (`.../25info/pdf-jrnl/DAY68.pdf#page=32`).
+- A bill whose fragment has no action table logs `mo_senate_bills.no_actions` and lands no action rows.
+- Resolutions have no handler: those keys are absent from the bill's JSON.
 
 ## mo_senate_topics: Missouri Senate topical index
 
@@ -854,6 +900,9 @@ Chapter PDFs (executive, legislative, judicial), one row per text line.
 
 - Lands: `bluebook_lines`.
 - Window: `MOGOV_BLUEBOOK_EDITIONS`.
+- Besides biographies and the judges, dbt reads the executive chapter's "Historical Listing" tables (every governor,
+  lieutenant governor, secretary of state, auditor, treasurer and attorney general since 1820, terms in whole years)
+  into `int_bluebook__statewide_officeholders`.
 
 Quirks:
 - PDF file names differ between editions. Links are scraped from the edition page, with a fallback to
@@ -1282,5 +1331,13 @@ Flow: [diagrams/sources/mo_auditor.svg](diagrams/sources/mo_auditor.svg)
     The "Report on Internal Control..." companions of the annual financial report have a Citizens Summary, which is still read
     (status `no_rating_sentence`).
   - The ratings cover only the areas audited. A county's rating is the county's, never one official's: only audits of a
-    statewide office (seed `mo_auditor_statewide_entities`) are linked to an officeholder, and then only to whoever held
-    the office on the release date ("in office when published", not "audited"), and only for current officials.
+    statewide office (seed `mo_auditor_statewide_entities`) are linked to officeholders, in `fct_audit_report_officeholders`
+    (#323, policy #333: everyone in office during the years the audit covers). Former holders come from the Official
+    Manual's "Historical Listing" tables (`int_bluebook__statewide_officeholders`; whole years only). The period is read
+    from the title when it names one ("Year Ended June 30, 2015", "Period July 1, 2022 through January 9, 2023"; 26 of 78
+    statewide-office audits); the Auditor's other titles ("Office of Governor") name no period, and the PDFs are not
+    parsed for it, so those audits are linked to everyone in office from January 1 of the year before the release to the
+    release date (`link_basis` = `release_window`). That is a bounded guess at the period, not the period: say "in
+    office around the time of the audit", never "audited". A mid-term change (Parson, June 2018) has no date in the
+    Manual, so both people are credited for the year. Sub-unit audits ("Office of Attorney General - Missouri Office of
+    Prosecution Services", "...Medicaid Fraud Control Unit") match the office prefix and count as the office's (#333).

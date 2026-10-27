@@ -2,6 +2,11 @@
 -- handful of roll calls in a year is a systematic gap (a compound surname, a dropped suffix, a shared surname the
 -- seat dates cannot split), not a stray typo. REHDER, REISCH, EVANS and ROWLAND each failed on hundreds of roll
 -- calls before. The Speaker is attributed from a seed and is not named in the PDFs.
+-- A warning, not an error (#581): a new session's roll calls can load before that session's roster does, and then
+-- every freshman's token is unmatched for a while. That is a load-order gap that fixes itself on the next sync, not
+-- a broken build, so it must not block the models that read this one; the warning still names the tokens.
+{{ config(severity='warn') }}
+
 select
     member_token,
     extract(year from vote_date) as vote_year,

@@ -160,6 +160,12 @@ Missouri Senate topical index of bills. Source: [sources/mo_senate_topics.puml](
 
 ![mo_senate_topics](sources/mo_senate_topics.svg)
 
+### mo_senate_bills
+
+Missouri Senate bill list and action history. Source: [sources/mo_senate_bills.puml](sources/mo_senate_bills.puml)
+
+![mo_senate_bills](sources/mo_senate_bills.svg)
+
 ### openstates_people
 
 The Open States people repo. Source: [sources/openstates_people.puml](sources/openstates_people.puml)

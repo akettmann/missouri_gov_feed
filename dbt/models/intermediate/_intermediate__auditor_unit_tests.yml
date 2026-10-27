@@ -40,3 +40,34 @@ unit_tests:
         - {report_number: '5', entity_type: other, office: null, rating: null, rating_level: null, rating_status: no_rating_sentence}
         - {report_number: '6', entity_type: county, office: null, rating: Fair, rating_level: 2, rating_status: ok}
         - {report_number: '7', entity_type: county, office: null, rating: Good, rating_level: 3, rating_status: ok}
+
+  - name: auditor_reports_read_the_audit_period_from_the_title
+    model: int_mo_auditor__reports
+    description: >
+      The period a title names becomes audit_period_start/end. "Year Ended June 30, 2012" is the fiscal year
+      2011-07-01 to 2012-06-30; "Three Years Ended June 30, 2003" runs three years back; "Period July 1, 2022
+      through January 9, 2023" is that span (the final audit of a departing officeholder); a title with a
+      period and the years before it takes the earliest start and the latest end; case and a slash do not matter.
+      A title that names no period ("Office of Governor") has none.
+    given:
+      - input: ref('stg_mo_auditor__reports')
+        rows:
+          - {report_number: '1', title: 'Office of State Treasurer/ Year Ended June 30, 2012', release_date: '2013-03-08'}
+          - {report_number: '2', title: 'Office of Lieutenant Governor Three Years Ended June 30, 2003', release_date: '2004-01-26'}
+          - {report_number: '3', title: 'Office of State Treasurer Period July 1, 2022 through January 9, 2023', release_date: '2023-08-09'}
+          - {report_number: '4', title: 'Office of Governor / Period July 1, 2008 to January 12, 2009, and the Year Ended June 30, 2008', release_date: '2009-06-01'}
+          - {report_number: '5', title: Office of Governor, release_date: '2019-09-11'}
+          - {report_number: '6', title: 'OFFICE OF ATTORNEY GENERAL / PERIOD JULY 1, 2008 TO JANUARY 12, 2009, AND THE TWO YEARS ENDED JUNE 30, 2008', release_date: '2009-06-01'}
+      - input: ref('stg_mo_auditor__ratings')
+        rows: []
+      - input: ref('mo_auditor_statewide_entities')
+        rows:
+          - {title_prefix: office of, office: x}
+    expect:
+      rows:
+        - {report_number: '1', audit_period_start: '2011-07-01', audit_period_end: '2012-06-30'}
+        - {report_number: '2', audit_period_start: '2000-07-01', audit_period_end: '2003-06-30'}
+        - {report_number: '3', audit_period_start: '2022-07-01', audit_period_end: '2023-01-09'}
+        - {report_number: '4', audit_period_start: '2007-07-01', audit_period_end: '2009-01-12'}
+        - {report_number: '5', audit_period_start: null, audit_period_end: null}
+        - {report_number: '6', audit_period_start: '2006-07-01', audit_period_end: '2009-01-12'}

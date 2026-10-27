@@ -1,0 +1,55 @@
+# Unit tests for fct_sponsorship_outcomes: fixed sponsor and status rows -> exact counts per official and session.
+version: 2
+
+unit_tests:
+  - name: sponsorship_outcomes_count_decided_bills_only
+    model: fct_sponsorship_outcomes
+    description: >
+      Official A in session 261 is primary sponsor of seven counted bills: HB1 (enacted), HB2 (passed the House,
+      failed in the Senate), HB3 (failed in committee), HB4 (pending: not decided), HB5 (awaiting governor: not
+      decided), HJR6 (sent to voters: became law), HJR7 (passed the House, failed). A also co-sponsors HB8
+      (enacted), is primary sponsor of HR9 (an adopted resolution) and SB10 (a Senate bill), and a state_senate
+      sponsor row of HB11: none of those four count. HB12, sponsored with no matching official, is left out. So A
+      has 7 sponsored, 5 decided (HB4 and HB5 out), 4 passed the House among the decided (HB1, HB2, HJR6, HJR7) and
+      2 became law (HB1, HJR6): shares 0.8 and 0.4. Official B has only a pending bill, so no decided bills and
+      null shares. Official C sponsors HB13, which passed the House and was then withdrawn: passed, not law.
+    given:
+      - input: ref('fct_bill_sponsors')
+        format: sql
+        rows: |
+            select 'A' as official_id, '261' as session_code, 'HB1' as bill, 'Sponsor' as sponsor_type, 'state_house' as sponsor_chamber union all
+            select 'A', '261', 'HB2', 'Sponsor', 'state_house' union all
+            select 'A', '261', 'HB3', 'Sponsor', 'state_house' union all
+            select 'A', '261', 'HB4', 'Sponsor', 'state_house' union all
+            select 'A', '261', 'HB5', 'Sponsor', 'state_house' union all
+            select 'A', '261', 'HJR6', 'Sponsor', 'state_house' union all
+            select 'A', '261', 'HJR7', 'Sponsor', 'state_house' union all
+            select 'A', '261', 'HB8', 'Co-Sponsor', 'state_house' union all
+            select 'A', '261', 'HR9', 'Sponsor', 'state_house' union all
+            select 'A', '261', 'SB10', 'Sponsor', 'state_house' union all
+            select 'A', '261', 'HB11', 'Sponsor', 'state_senate' union all
+            select cast(null as varchar), '261', 'HB12', 'Sponsor', 'state_house' union all
+            select 'B', '261', 'HB14', 'Sponsor', 'state_house' union all
+            select 'C', '261', 'HB13', 'Sponsor', 'state_house'
+      - input: ref('int_bills__status')
+        format: sql
+        rows: |
+            select '261' as session_code, 2026 as session_year, 'HB1' as bill, 'HB' as bill_type, 'enacted' as outcome, true as passed_house, true as is_session_over union all
+            select '261', 2026, 'HB2', 'HB', 'failed', true, true union all
+            select '261', 2026, 'HB3', 'HB', 'failed', false, true union all
+            select '261', 2026, 'HB4', 'HB', 'pending', false, true union all
+            select '261', 2026, 'HB5', 'HB', 'awaiting governor', true, true union all
+            select '261', 2026, 'HJR6', 'HJR', 'sent to voters', true, true union all
+            select '261', 2026, 'HJR7', 'HJR', 'failed', true, true union all
+            select '261', 2026, 'HB8', 'HB', 'enacted', true, true union all
+            select '261', 2026, 'HR9', 'HR', 'adopted', true, true union all
+            select '261', 2026, 'SB10', 'SB', 'enacted', true, true union all
+            select '261', 2026, 'HB11', 'HB', 'enacted', true, true union all
+            select '261', 2026, 'HB12', 'HB', 'enacted', true, true union all
+            select '261', 2026, 'HB14', 'HB', 'pending', false, true union all
+            select '261', 2026, 'HB13', 'HB', 'failed', true, true
+    expect:
+      rows:
+        - {official_id: A, session_code: '261', session_year: 2026, is_session_over: true, bills_sponsored: 7, bills_decided: 5, bills_passed_house: 4, bills_became_law: 2, passed_house_share: 0.8, became_law_share: 0.4, source_url: 'https://documents.house.mo.gov/xml/261.zip'}
+        - {official_id: B, session_code: '261', session_year: 2026, is_session_over: true, bills_sponsored: 1, bills_decided: 0, bills_passed_house: 0, bills_became_law: 0, passed_house_share: null, became_law_share: null, source_url: 'https://documents.house.mo.gov/xml/261.zip'}
+        - {official_id: C, session_code: '261', session_year: 2026, is_session_over: true, bills_sponsored: 1, bills_decided: 1, bills_passed_house: 1, bills_became_law: 0, passed_house_share: 1, became_law_share: 0, source_url: 'https://documents.house.mo.gov/xml/261.zip'}
