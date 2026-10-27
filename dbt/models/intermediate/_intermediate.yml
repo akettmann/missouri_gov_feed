@@ -706,11 +706,13 @@ models:
     and change), as long as only such pieces come between (or the act is just a year, "A.L. 1985, H.B. 366"); after
     a page cite ("p. 509") or an RSMo piece there is no act to continue. A section cite may follow a bill ("H.B.
     1574 § 6 and S.B. 721 § 2", "H.B. 1807, et al. § 301.4044 and S.B. 480"): it is read past, so the bill after
-    "and" is kept; the typo ".S.B. 58" (stray period) is read as "S.B. 58". Parse bounds (macros/session_law_bounds.sql):
-    a note is read up to 60 acts (longest real note: 43, RSMo 301.010), an act up to 10 "merged with" bills (longest:
-    6) and 6 "&"/"and" bills (longest: 4). Parts past a bound would be dropped silently, and notes list acts oldest
-    first, so the newest acts would go; assert_session_law_bounds_not_exceeded fails the build when real data needs
-    more. Grain: one row per (RSMo section version, act, bill) a history or repeal note names.'
+    "and" is kept; the typo ".S.B. 58" (stray period) is read as "S.B. 58". A Senate bill the note marks "Revision"
+    (2018 "S.B. 975 & 1024 Revision") is named SRB975 and SRB1024, as the Senate''s list and fct_bills do, when
+    the session''s list has SRB n and no SB n (#627). Parse bounds (macros/session_law_bounds.sql): a note is read
+    up to 60 acts (longest real note: 43, RSMo 301.010), an act up to 10 "merged with" bills (longest: 6) and 6
+    "&"/"and" bills (longest: 4). Parts past a bound would be dropped silently, and notes list acts oldest first,
+    so the newest acts would go; assert_session_law_bounds_not_exceeded fails the build when real data needs more.
+    Grain: one row per (RSMo section version, act, bill) a history or repeal note names.'
 - name: int_mo_senate__votes
   description: 'MO Senate journal votes attributed to people: the senator serving on the vote date with a matching
     surname (and district, when the journal adds one to disambiguate), by the dates Open States gives the seat (int_mo_legislators__seats_as_given;
