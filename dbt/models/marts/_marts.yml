@@ -1576,7 +1576,9 @@ models:
           The furthest stage the House XML's actions record (int_bills__status): introduced, in committee, reported
           do pass, perfected, passed one chamber, passed both chambers, truly agreed, signed, signed with line-item
           vetoes, vetoed, veto overridden; adopted for resolutions; withdrawn or defeated when the bill stopped
-          there. relisted for governor message: a re-listing, not a new bill. The House relists the previous
+          there. combined into another bill: the Senate's history says "Bill Combined (w/SCS SBs ...)", its content
+          went into a substitute for other bills; it is not enacted (look at the vehicle bill). relisted for
+          governor message: a re-listing, not a new bill. The House relists the previous
           regular session's appropriation bills (same number and bill string, e.g. 2024 HB 1, the FY2024 budget
           bill of the 2023 session) only to record the governor's Art. IV, s. 27 message, which is their only
           action; 15 to 17 per regular session, 2017 to 2026 (143 in all), none in 2021. Their outcome is null: it
@@ -1588,7 +1590,7 @@ models:
               arguments:
                 values: [introduced, in committee, reported do pass, perfected, passed one chamber,
                   passed both chambers, truly agreed, signed, signed with line-item vetoes, vetoed, veto overridden,
-                  adopted, withdrawn, defeated, relisted for governor message]
+                  adopted, withdrawn, defeated, combined into another bill, relisted for governor message]
       - name: outcome
         data_type: varchar
         description: >

@@ -4,7 +4,8 @@
 -- Senate actions did not land, or the wording
 -- mapping (seed mo_senate_action_flags) stopped matching. The few Senate bills whose Actions tab was rejected at
 -- load time (under 5% of a shard, #637) have no status by design (unknown, not a stage). Sessions before this
--- year only, and only those the Senate action history covers.
+-- year only, and only those the Senate action history covers. A chamber with at most 2 rows without a status passes
+-- whatever its size, so a 3-bill special session survives one rejected fragment (mogov.status_gap_exceeds, #750).
 with covered as (
     select distinct session_code
     from {{ ref('stg_mo_senate__bill_actions') }}
@@ -25,4 +26,4 @@ where
 group by
     b.session_code,
     case when {{ mogov.regex_extract('b.bill', '^([A-Z]+)') }} in ('SB', 'SJR') then 'senate' else 'house' end
-having sum(case when b.status is null then 1 else 0 end) > 0.05 * count(*)
+having {{ mogov.status_gap_exceeds('sum(case when b.status is null then 1 else 0 end)', 'count(*)') }}

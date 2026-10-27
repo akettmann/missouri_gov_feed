@@ -270,14 +270,19 @@ Quirks:
   A Senate bill whose Actions tab was not landed (`mo_senate_bills.fragment_rejected`) has no actions in either
   feed and so no status: unknown, not a stage. For a session the `mo_senate_bills` loader has not landed, a Senate
   bill that never reached the House still has a null status (a lookback of ten years lands 2017 on). Until then
-  counts of failed, pending or enacted bills leave out those Senate bills; House bills are complete. Withdrawals read "Bill Withdrawn" (2024 SB 961, 1121, 1122, 1171, 1339: status "withdrawn"). A veto
-  override reads "Legislature voted to override Governor's veto" (the House's "Passed over Veto" is a different phrase),
-  preceded by one "Motion to override Governor's veto S adopted" and one "... H adopted" line that map to nothing on
-  their own (2016 SB 608, 641, 656, 844 and 994 were overridden on 2016-09-14). No other override of a Senate bill
-  was found (checked: the 2018 sample, 2021 SB 53 was signed, a full sweep of 2023's 723 SBs; 2017, 2019, 2020 and 2022
-  were not swept). The failed or skipped ones end "No motion made to override Governor's veto" (2023 SB 189; 2018
-  SCR 50 adds "when called from calendar") and map to nothing. A line-item veto never shows in the Senate feed: it is limited to appropriations, which are House bills
-  (#715).
+  counts of failed, pending or enacted bills leave out those Senate bills; House bills are complete. Withdrawals read
+  "Bill Withdrawn" (2024 SB 961, 1121, 1122, 1171, 1339: status "withdrawn"). A veto override reads "Legislature voted
+  to override Governor's veto" (the House's "Passed over Veto" is a different phrase), preceded by one "Motion to
+  override Governor's veto S adopted" and one "... H adopted" line that map to nothing on their own (2016 SB 608, 641,
+  656, 844 and 994 were overridden on 2016-09-14). No other override of a Senate bill was found (checked: the 2018
+  sample, 2021 SB 53 was signed, a full sweep of 2023's 723 SBs; 2017, 2019, 2020 and 2022 were not swept). The failed
+  or skipped ones end "No motion made to override Governor's veto" (2023 SB 189; 2018 SCR 50 adds "when called from
+  calendar") and map to nothing. A line-item veto never shows in the Senate feed: it is limited to appropriations,
+  which are House bills (#715). "Bill Combined (w/SCS SBs 901 & 820)" (also written "Bill Combined w/(SCS SBS 975 &
+  1024)") means the bill's content went into a substitute for other bills: status "combined into another bill" (2024:
+  21 bills, 2018: 3 in the sample). It is not enacted; whether the content became law is on the vehicle bill. Its
+  outcome is still "failed" once the session is over, which is a policy question (#756). "Removed S Consent Calendar"
+  maps to nothing (the bill is re-reported).
   The same list names the special-session Senate bills (`stg_mo_house__senate_act_bills`, with titles, version, last
   action and effective date), which the Senate topical index never covers: `int_bills__list` adds those the index lacks
   (2025's 253 SB 1, 3 and 4), for `fct_bills` and `fct_vote_bills` alike. Once `mo_senate_bills` has landed a session,
