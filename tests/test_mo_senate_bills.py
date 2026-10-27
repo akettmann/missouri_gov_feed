@@ -180,13 +180,15 @@ def _run(monkeypatch, tmp_path, shard, requests):
         requests.append(tuple(sorted(params.items())))
         if params.get("handler") == "Actions":
             return SB600_ACTIONS if params["billId"] == 2724185 else SB1_ACTIONS
+        if params.get("handler"):
+            return _doc_page(params)
         return LIST_2025_R if params["session"] == "R" else LIST_2025_EMPTY
 
     monkeypatch.setattr(m, "_get", fake_get)
     assert len(bills) == 5
     counts = m.load(shard)
     rows = {}
-    for table in (m.BILLS_TABLE, m.ACTIONS_TABLE):
+    for table in (m.BILLS_TABLE, m.ACTIONS_TABLE, *m.DOC_TABLES):
         with db.connect() as con:
             files = db.raw_glob(table)
             rows[table] = con.execute(f"select record_key, payload from read_parquet('{files}')").fetchall()
@@ -228,12 +230,26 @@ def test_load_fetches_each_owned_bill_actions_once_and_survives_an_empty_history
         requests.append(params)
         if params.get("handler") == "Actions":
             return ""  # the site answered with nothing for this bill
+        if params.get("handler"):
+            return _doc_page(params)
         return LIST_2025_R if params["session"] == "R" else LIST_2025_EMPTY
 
     monkeypatch.setattr(m, "_get", fake_get)
     counts = m.load(db.Shard())
-    assert counts == {m.BILLS_TABLE: 5, m.ACTIONS_TABLE: 0}
+    # SB 1: 3 texts, 3 fiscal notes, 1 amendment, 4 summaries; the other four bills: 1 text + 1 summary each
+    assert counts == {
+        m.BILLS_TABLE: 5,
+        m.ACTIONS_TABLE: 0,
+        m.TEXTS_TABLE: 3 + 4,
+        m.FISCAL_NOTES_TABLE: 3,
+        m.AMENDMENTS_TABLE: 1,
+        m.SUMMARIES_TABLE: 4 + 4,
+    }
     assert sum(1 for p in requests if p.get("handler") == "Actions") == 5
+    # one request per bill and tab: 5 x (Actions + the four tabs)
+    assert Counter(p["handler"] for p in requests if "handler" in p) == {
+        h: 5 for h in ("Actions", "BillText", "FiscalNotes", "Amendments", "Summaries")
+    }
     assert [p["session"] for p in requests if "session" in p] == ["R", "E1"]
 
 
@@ -241,3 +257,265 @@ def test_empty_regular_session_does_not_hide_an_extraordinary_one(monkeypatch):
     pages = {"R": LIST_2025_EMPTY, "E1": LIST_2025_R, "E2": LIST_2025_EMPTY}
     monkeypatch.setattr(m, "_get", lambda params, year, **kw: pages[params["session"]])
     assert [s for s, _ in m.session_lists(2025)] == ["E1"]
+
+
+# --- the bill page's document tabs (#587): trimmed real fragments of 2025 SB 1 (passed) and SB 600 (died)
+SB1_TEXT = _read("senate_bills_text_2025_sb1.html")
+SB600_TEXT = _read("senate_bills_text_2025_sb600.html")
+SB1_FISCAL = _read("senate_bills_fiscal_notes_2025_sb1.html")
+NO_FISCAL = _read("senate_bills_fiscal_notes_2025_sb600_none.html")
+SB1_AMENDMENTS = _read("senate_bills_amendments_2025_sb1.html")
+NO_AMENDMENTS = _read("senate_bills_amendments_2025_sb600_none.html")
+SB1_SUMMARIES = _read("senate_bills_summaries_2025_sb1.html")
+SB600_SUMMARIES = _read("senate_bills_summaries_2025_sb600.html")
+
+
+def test_text_versions_in_served_order_with_lr_number_and_version():
+    texts = m.parse_texts(SB1_TEXT)
+    assert [t["doc_index"] for t in texts] == [0, 1, 2]
+    assert texts[0] == {
+        "doc_index": 0,
+        "url": "https://www.senate.mo.gov/25info/pdf-bill/tat/SB1.pdf",
+        "title": "SB 1 - 0453S.04T",
+        "label": "0453S.04T - Truly Agreed to and Finally Passed",
+        "lr_number": "0453S.04T",
+        "version": "Truly Agreed to and Finally Passed",
+    }
+    assert [t["version"] for t in texts] == ["Truly Agreed to and Finally Passed", "Perfected", "Introduced"]
+    assert [t["url"].split("/")[-2] for t in texts] == ["tat", "perf", "intro"]
+
+
+def test_one_text_version_and_a_label_without_a_dash():
+    assert [t["label"] for t in m.parse_texts(SB600_TEXT)] == ["2302S.01I - Introduced"]
+    fragment = '<div class="link-card-stack"><a href="https://x/y.pdf" title="t">Introduced</a></div>'
+    assert m.parse_texts(fragment) == [
+        {
+            "doc_index": 0,
+            "url": "https://x/y.pdf",
+            "title": "t",
+            "label": "Introduced",
+            "lr_number": None,
+            "version": "Introduced",
+        }
+    ]
+
+
+def test_fiscal_notes_in_served_order():
+    notes = m.parse_fiscal_notes(SB1_FISCAL)
+    assert notes[0] == {
+        "doc_index": 0,
+        "url": "https://www.senate.mo.gov/FiscalNotes/2025-1/0453S.04T.ORG.pdf",
+        "title": "Fiscal Note - 0453S.04T.ORG",
+        "label": "Truly Agreed to and Finally Passed (0453S.04T.ORG)",
+    }
+    assert [n["label"].split("(")[0].strip() for n in notes] == [
+        "Truly Agreed to and Finally Passed",
+        "Perfected",
+        "Introduced",
+    ]
+
+
+def test_amendment_with_its_status_chip_and_pdf_id():
+    assert m.parse_amendments(SB1_AMENDMENTS) == [
+        {
+            "doc_index": 0,
+            "amendment_id": 3,
+            "url": "https://www.senate.mo.gov/BillTracking/Bills/BillInformation?handler=AmendmentPdf&year=2025&amendmentId=3",
+            "title": "2/4/2025 - SS S offered & adopted (Crawford)--(0453S.04F)",
+            "label": "2/4/2025 - SS S offered & adopted (Crawford)--(0453S.04F)",
+            "status": "2/4/2025 - Adopted",
+        }
+    ]
+
+
+def test_summaries_keep_their_text_as_printed():
+    summaries = m.parse_summaries(SB1_SUMMARIES)
+    assert [s["summary_id"] for s in summaries] == [12475046, 566841, 566551, 275676]
+    assert [s["doc_index"] for s in summaries] == [0, 1, 2, 3]
+    assert summaries[0]["label"] == "Truly Agreed to and Finally Passed"
+    # tabs and CR LF line breaks are the site's, kept; entities are decoded
+    assert summaries[0]["text"].startswith("\tSS/SB 1 - This act amends sections of law")
+    only = m.parse_summaries(SB600_SUMMARIES)
+    assert len(only) == 1 and only[0]["label"] == "Introduced"
+    assert only[0]["text"] == (
+        "\tSB 600 - This act repeals the requirement that the Governor's appointments of commissioners to the "
+        "Bi-State Development Agency be selected from panels of three nominees selected by the Mayor of the City "
+        "of St. Louis and the County Executive of St. Louis County.\r\nERIC VANDER WEERD"
+    )
+
+
+def test_fragments_with_no_documents_give_no_rows():
+    assert m.parse_fiscal_notes(NO_FISCAL) == []
+    assert m.parse_amendments(NO_AMENDMENTS) == []
+    for parse in (m.parse_texts, m.parse_fiscal_notes, m.parse_amendments, m.parse_summaries):
+        assert parse("") == []
+        assert parse("  \n") == []
+    assert m.parse_summaries('<div class="summaries-container"><div id="summariesContent"></div></div>') == []
+
+
+class _Resp:
+    url = "https://www.senate.mo.gov/BillTracking/Bills/BillList?handler=x"
+
+    def __init__(self, body: str):
+        self.content = body.encode()
+
+
+@pytest.mark.parametrize(
+    ("handler", "good"),
+    [
+        ("BillText", SB1_TEXT),
+        ("FiscalNotes", SB1_FISCAL),
+        ("FiscalNotes", NO_FISCAL),
+        ("Amendments", SB1_AMENDMENTS),
+        ("Amendments", NO_AMENDMENTS),
+        ("Summaries", SB600_SUMMARIES),
+    ],
+)
+def test_fragment_check_accepts_real_answers_including_none_available(handler, good):
+    m._is_doc_fragment(handler)(_Resp(good))
+
+
+@pytest.mark.parametrize("handler", list(m.DOC_HANDLERS))
+@pytest.mark.parametrize(
+    "bad",
+    ["<html><body>Service unavailable</body></html>", "", "<h1>Access denied</h1>", SB1_ACTIONS],
+)
+def test_fragment_check_rejects_error_and_block_pages(handler, bad):
+    with pytest.raises(m.NotABillFragment):
+        m._is_doc_fragment(handler)(_Resp(bad))
+
+
+def test_a_block_page_is_not_cached_and_a_real_one_is(monkeypatch, tmp_path):
+    """Through the real fetch(): the rejected body leaves no cache file, the accepted one does."""
+    import httpx
+
+    from mogov import http
+
+    monkeypatch.setattr(http, "CACHE_DIR", tmp_path / "cache")
+    served = {"body": "<html>blocked</html>"}
+
+    def handler(request):
+        return httpx.Response(200, content=served["body"].encode())
+
+    monkeypatch.setattr(http, "client", lambda: httpx.Client(transport=httpx.MockTransport(handler)))
+    check = m._is_doc_fragment("Amendments")
+    params = {"handler": "Amendments"}
+    with pytest.raises(m.NotABillFragment):
+        http.fetch(m.LIST_URL, params, check=check)
+    assert not http._cache_path(m.LIST_URL, params).exists()
+    served["body"] = NO_AMENDMENTS
+    assert http.fetch(m.LIST_URL, params, check=check) == NO_AMENDMENTS.encode()
+    assert http._cache_path(m.LIST_URL, params).exists()
+
+
+def _doc_page(params):
+    """The canned answer of a document tab: SB 1 has them, every other bill has none of its own."""
+    sb1 = params["billId"] == 233
+    return {
+        "BillText": SB1_TEXT if sb1 else SB600_TEXT,
+        "FiscalNotes": SB1_FISCAL if sb1 else NO_FISCAL,
+        "Amendments": SB1_AMENDMENTS if sb1 else NO_AMENDMENTS,
+        "Summaries": SB1_SUMMARIES if sb1 else SB600_SUMMARIES,
+    }[params["handler"]]
+
+
+def _landed(table):
+    with db.connect() as con:
+        files = db.raw_glob(table)
+        return {
+            k: json.loads(p)
+            for k, p in con.execute(f"select record_key, payload from read_parquet('{files}')").fetchall()
+        }
+
+
+def test_document_rows_land_with_the_bills_shard_and_keys_and_rerun_identically(monkeypatch, tmp_path):
+    requests: list = []
+    for i in range(3):
+        _run(monkeypatch, tmp_path, db.Shard(i, 3), requests)
+    texts = _landed(m.TEXTS_TABLE)
+    assert sorted(k for k in texts if k.startswith("2025/R/233/")) == ["2025/R/233/0", "2025/R/233/1", "2025/R/233/2"]
+    assert texts["2025/R/233/1"] == {
+        "year": 2025,
+        "session_type": "R",
+        "bill_id": 233,
+        "bill": "SB1",
+        "doc_index": 1,
+        "url": "https://www.senate.mo.gov/25info/pdf-bill/perf/SB1.pdf",
+        "title": "SB 1 - 0453S.04P",
+        "label": "0453S.04P - Perfected",
+        "lr_number": "0453S.04P",
+        "version": "Perfected",
+    }
+    # a bill's rows in every table sit in the part of the shard that owns it
+    for table in (m.BILLS_TABLE, m.ACTIONS_TABLE, *m.DOC_TABLES):
+        for key in _landed(table):
+            bill_key = "/".join(key.split("/")[:3]) if table != m.BILLS_TABLE else key
+            assert db.Shard(0, 3).owns(bill_key) + db.Shard(1, 3).owns(bill_key) + db.Shard(2, 3).owns(bill_key) == 1
+    amendments = _landed(m.AMENDMENTS_TABLE)
+    assert list(amendments) == ["2025/R/233/0"] and amendments["2025/R/233/0"]["amendment_id"] == 3
+    before = {t: _landed(t) for t in m.DOC_TABLES}
+    _run(monkeypatch, tmp_path, db.Shard(1, 3), requests)
+    assert {t: _landed(t) for t in m.DOC_TABLES} == before
+
+
+def test_fiscal_notes_request_carries_the_session_type_and_other_tabs_do_not():
+    bill = {"billId": 233, "billPrefix": "SB", "billSuffix": 1}
+    assert m._doc_params(2025, "R", bill, "FiscalNotes") == {
+        "billId": 233,
+        "year": 2025,
+        "billPrefix": "SB",
+        "billSuffix": 1,
+        "handler": "FiscalNotes",
+        "sessionType": "R",
+    }
+    assert "sessionType" not in m._doc_params(2025, "R", bill, "BillText")
+
+
+def test_documents_can_be_skipped(monkeypatch, tmp_path):
+    monkeypatch.setenv("MOGOV_SENATE_BILL_DOCS", "0")
+    requests: list = []
+    counts = _run_without_doc_tables(monkeypatch, tmp_path, requests)
+    assert set(counts) == {m.BILLS_TABLE, m.ACTIONS_TABLE}  # the document tables keep their earlier landing
+    assert counts[m.BILLS_TABLE] == 5 and counts[m.ACTIONS_TABLE] > 0
+    assert {p["handler"] for p in requests if "handler" in p} == {"Actions"}
+
+
+def _run_without_doc_tables(monkeypatch, tmp_path, requests):
+    monkeypatch.setattr(db, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(m, "window_years", lambda: [2025])
+
+    def fake_get(params, year, **kw):
+        requests.append(params)
+        if params.get("handler") == "Actions":
+            return SB1_ACTIONS
+        return LIST_2025_R if params["session"] == "R" else LIST_2025_EMPTY
+
+    monkeypatch.setattr(m, "_get", fake_get)
+    return m.load(db.Shard())
+
+
+def test_text_label_splits_at_the_first_dash_only():
+    fragment = (
+        '<div class="link-card-stack"><a href="https://x/y.pdf" title="t">1234S.01I - Introduced - as amended</a></div>'
+    )
+    row = m.parse_texts(fragment)[0]
+    assert (row["lr_number"], row["version"]) == ("1234S.01I", "Introduced - as amended")
+
+
+def test_many_amendments_keep_order_ids_and_every_status():
+    amendments = m.parse_amendments(_read("senate_bills_amendments_2025_sb4.html"))
+    assert [a["doc_index"] for a in amendments] == list(range(8))
+    ids = [a["amendment_id"] for a in amendments]
+    assert all(isinstance(i, int) for i in ids) and len(set(ids)) == 8
+    assert [a["status"] for a in amendments][:5] == [
+        "2/19/2025 - Withdrawn",
+        "2/19/2025 - Moot",
+        "2/20/2025 - Adopted, as amended",
+        "2/19/2025 - Adopted",
+        "2/19/2025 - Defeated",
+    ]
+    assert amendments[0]["label"] == "2/4/2025 - SS S offered (Cierpiot)--(0120S.04F)"
+    # the title is as served (two spaces); the label has its whitespace collapsed
+    adopted = amendments[3]
+    assert adopted["title"] == "2/19/2025 - SA 1 to SS#2 S offered  & adopted (Trent)--(0120S08.09S)"
+    assert adopted["label"] == "2/19/2025 - SA 1 to SS#2 S offered & adopted (Trent)--(0120S08.09S)"
