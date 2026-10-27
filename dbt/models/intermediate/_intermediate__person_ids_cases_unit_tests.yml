@@ -164,6 +164,31 @@ unit_tests:
         - {alias_id: ocd-person/4f194218-3d95-4f08-8963-7e3440fdb671, person_id: ocd-person/4f194218-3d95-4f08-8963-7e3440fdb671, basis: self}
         - {alias_id: ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8, person_id: ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8, basis: self}
 
+  - name: person_ids_cases_join_scott_fitzpatricks_fallback_key_to_his_house_record
+    model: int_officials__person_ids
+    description: >
+      #97 / #491: Scott Fitzpatrick (member 648, HD158) has one Open States House record for 2017-18, ending
+      2019-01-14 when he became State Treasurer. The 2019 House roster still lists him, and with no Open States
+      seat-year left to tie it to, that row takes the fallback key mohouse:648. Unlike Cierpiot and Crawford, the
+      fallback key is his latest id and there is no Senate record: the same seat, no shared year. Rule 2 joins the
+      key to the Open States id (it decides before rule 2c, which would also join them through member 648), and the
+      Open States id is kept even though mohouse:648 serves later. Ranking by latest service before the Open States
+      preference makes mohouse:648 the person_id; turning the name join off for it leaves member_id_continuity.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          # Scott Fitzpatrick: Open States HD158 2017-18 (term ends 2019-01-14), roster fallback mohouse:648 in 2019
+          - {alias_id: 'mohouse:648', year: 2019, office: state_house, district: '158', house_member_id: '648', name_key: scott fitzpatrick}
+          - {alias_id: ocd-person/b97b03ba-eee1-4f52-8815-3d7e61dbbc22, year: 2017, office: state_house, district: '158', house_member_id: '648', name_key: scott fitzpatrick}
+          - {alias_id: ocd-person/b97b03ba-eee1-4f52-8815-3d7e61dbbc22, year: 2018, office: state_house, district: '158', name_key: scott fitzpatrick, term_end: '2019-01-14'}
+          - {alias_id: ocd-person/b97b03ba-eee1-4f52-8815-3d7e61dbbc22, year: 2018, office: state_house, district: '158', house_member_id: '648', name_key: scott fitzpatrick}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: 'mohouse:648', person_id: ocd-person/b97b03ba-eee1-4f52-8815-3d7e61dbbc22, basis: name_continuity}
+        - {alias_id: ocd-person/b97b03ba-eee1-4f52-8815-3d7e61dbbc22, person_id: ocd-person/b97b03ba-eee1-4f52-8815-3d7e61dbbc22, basis: self}
+
   - name: person_ids_cases_join_house_to_senate_moves
     model: int_officials__person_ids
     description: >
