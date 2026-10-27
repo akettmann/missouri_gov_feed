@@ -156,7 +156,7 @@ Missouri Senate topical index of bills. Source: [sources/mo_senate_topics.puml](
 
 ### mo_senate_bills
 
-Missouri Senate bill list and action history. Source: [sources/mo_senate_bills.puml](sources/mo_senate_bills.puml)
+Missouri Senate bill list, action history and document lists. Source: [sources/mo_senate_bills.puml](sources/mo_senate_bills.puml)
 
 ![mo_senate_bills](sources/mo_senate_bills.svg)
 
