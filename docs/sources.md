@@ -13,7 +13,7 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `mo_house_pdf` | Missouri House bill documents (documents.house.mo.gov) | the PDFs behind the `mo_house` document links (bill text versions, summaries, fiscal notes, amendments), unchanged, with their extracted text | every link `mo_house` landed (about 68.7k PDFs, sessions 171-261) | stage 2; slow: ~1 request/s |
 | `mo_senate` | Missouri Senate journals (senate.mo.gov) | per-senator roll-call votes | `MOGOV_LOOKBACK_YEARS` | |
 | `mo_senate_topics` | Missouri Senate topical index (senate.mo.gov) | Senate bills, subject terms for Senate bills and House bills that reached the Senate | `MOGOV_LOOKBACK_YEARS` (regular sessions) | |
-| `mo_senate_bills` | Missouri Senate bill tracking (senate.mo.gov) | every Senate bill and resolution of each session (regular and extraordinary) and its full action history, with journal references | `MOGOV_LOOKBACK_YEARS` | slow: ~1 request/s, one request per bill |
+| `mo_senate_bills` | Missouri Senate bill tracking (senate.mo.gov) | every Senate bill and resolution of each session (regular and extraordinary) and its full action history, with journal references, plus its text-version, fiscal-note, amendment and summary lists | `MOGOV_LOOKBACK_YEARS` | slow: ~1 request/s, five requests per bill (`MOGOV_SENATE_BILL_DOCS=0`: one) |
 | `mo_revisor` | Missouri Revisor of Statutes (revisor.mo.gov) | statute text (RSMo) by section version, repeals and transfers, which bills enacted, amended or repealed each section | current statutes; repeals since 1945 | slow: ~1 request/s |
 | `mec` | Missouri Ethics Commission | state campaign contributions and spending, candidate↔committee links, lobbyist gifts | 2023+ | opt-in |
 | `tap_mec` | MEC via The Accountability Project | state campaign finance and lobbyist gifts | 2011–2022 (gifts from 2004) | |
@@ -386,7 +386,7 @@ Quirks:
   term 2018-01-03. Nothing loaded dates his seating within 2017-09-14 to 2018-01-03 more closely. Only the
   2025-2026 Official Manual is loaded, so it gives no evidence for earlier years.
 
-## mo_senate_bills: Missouri Senate bill list and action history
+## mo_senate_bills: Missouri Senate bill list, action history and document lists
 
 Flow: [diagrams/sources/mo_senate_bills.svg](diagrams/sources/mo_senate_bills.svg)
 
@@ -400,13 +400,26 @@ lists actions for House bills and for Senate bills only once they reach the Hous
   number, sponsor and handler, description, links) plus `year` and `session_type`. `mo_senate_bill_actions`,
   one row per action: `year`, `session_type`, `bill_id`, `bill` (e.g. `SB1`), `action_index` (0 = top row as
   served, newest first), `action_date` (as printed, MM/DD/YYYY), `action`, `journal_ref`, `journal_url`.
+- Also lands the bill page's other tabs (`handler=BillText`, `FiscalNotes`, `Amendments`, `Summaries`), each
+  row carrying `year`, `session_type`, `bill_id`, `bill` and `doc_index` (position as served), keyed
+  `year/session/billId/doc_index`, in the same shard as the bill. The PDFs behind the links are not fetched.
+  - `mo_senate_bill_texts`: `url`, `title` (`SB 1 - 0453S.04T`), `label` as printed (`0453S.04T - Truly Agreed
+    to and Finally Passed`) and its two halves `lr_number` and `version`.
+  - `mo_senate_bill_fiscal_notes`: `url`, `title`, `label` as printed (`Perfected (0453S.04P.ORG)`).
+  - `mo_senate_bill_amendments`: `amendment_id` (from the PDF url), `url`, `title`, `label` (date, who offered
+    it, LR number), `status` (the chip, e.g. `2/4/2025 - Adopted`).
+  - `mo_senate_bill_summaries`: `summary_id`, `label` (the version, e.g. `Introduced`) and `text` exactly as
+    printed (tabs and CR LF kept).
 - Window: `MOGOV_LOOKBACK_YEARS`: the regular session (`R`) of each year plus every extraordinary session
   (`E1`, `E2`, ... until one comes back empty). Shard units: bills, split by a stable hash of
   `year/session/billId`. Every shard reads every session list once (cached) and takes its bills, so the split
   does not depend on listing order or on who else is running.
-- Pace: one request per bill, ~1 request/second to the host (accepted by the maintainer in #584), a lock
-  shared by every process on the machine, so shards add no speed. A regular session is ~1,000 bills, about
-  17 minutes cold; a year or more of lookback takes hours. Past sessions are cached 30 days, the current
+- Pace: five requests per bill (Actions, BillText, FiscalNotes, Amendments, Summaries), ~1 request/second to
+  the host (accepted by the maintainer in #584), a lock shared by every process on the machine, so shards add
+  no speed. A regular session is ~1,000 bills: about 85 minutes cold (~17 of them for the action histories
+  alone); the default ten-year lookback is ~50,000 requests, about 14 hours cold. `MOGOV_SENATE_BILL_DOCS=0`
+  fetches only the bill lists and Actions (one request per bill) and leaves the four document tables as they
+  were last landed. Past sessions are cached 30 days, the current
   year 1 day. Cloud Run tasks do not share a filesystem, so each task slows to `1 s x CLOUD_RUN_TASK_COUNT`.
 - Bill lists come from the `const bills = [...]` array in a script element, read with a JSON parser; the
   bill cards in the page are not parsed.
@@ -423,6 +436,15 @@ Quirks:
   and links to the journal PDF page (`.../25info/pdf-jrnl/DAY68.pdf#page=32`).
 - A bill whose fragment has no action table logs `mo_senate_bills.no_actions` and lands no action rows.
 - Resolutions have no handler: those keys are absent from the bill's JSON.
+- A bill with no fiscal notes or amendments is answered with `No Fiscal Notes available for this bill.` /
+  `No amendments available for this bill.` (HTTP 200, zero rows). Most bills have no fiscal note; bills that
+  died in committee have only the introduced text. SRs have text versions and summaries like bills.
+- Fragments are checked before they are cached: a body with neither the tab's container nor a `No ...
+  available` notice (an error or block page served with 200) is rejected and not cached.
+- `FiscalNotes` is sent with `sessionType=<session>` as the site's tab does; in a probe (2026-10-26) the
+  fragment was the same without it. `CommitteeMinutes` answers HTTP 500 and is not requested (see #280).
+- Amendment links go to `BillInformation?handler=AmendmentPdf&year=YYYY&amendmentId=N`; text and fiscal-note
+  links go to static PDFs (`/25info/pdf-bill/tat/SB1.pdf`, `/FiscalNotes/2025-1/0453S.04T.ORG.pdf`).
 
 ## mo_senate_topics: Missouri Senate topical index
 
