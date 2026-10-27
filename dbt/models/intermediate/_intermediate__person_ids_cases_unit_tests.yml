@@ -673,13 +673,13 @@ unit_tests:
       - input: ref('int_mo_legislators__seat_terms')
         rows:
           # Stephen Webber: two House terms and the Senate term
-          - {openstates_id: ocd-person/385fd852-bd78-4f3c-8a3d-9fb2233297e0, chamber: lower, district_number: 23, full_name: Stephen Webber, start_date: '2011-01-01', end_date: '2012-12-31', source_start_date: '2011-01-01', source_end_date: '2012-12-31'}
-          - {openstates_id: ocd-person/385fd852-bd78-4f3c-8a3d-9fb2233297e0, chamber: lower, district_number: 46, full_name: Stephen Webber, start_date: '2013-01-01', end_date: '2016-12-31', source_start_date: '2013-01-01', source_end_date: '2016-12-31'}
-          - {openstates_id: ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9, chamber: upper, district_number: 19, full_name: Stephen Webber, start_date: '2025-01-01', end_date: '9999-12-31', source_start_date: '2025-01-08', source_end_date: '9999-12-31'}
+          - {openstates_id: ocd-person/385fd852-bd78-4f3c-8a3d-9fb2233297e0, chamber: lower, district_number: 23, full_name: Stephen Webber, start_date: '2011-01-01', start_quality: placeholder, end_date: '2012-12-31', source_start_date: '2011-01-01', source_end_date: '2012-12-31'}
+          - {openstates_id: ocd-person/385fd852-bd78-4f3c-8a3d-9fb2233297e0, chamber: lower, district_number: 46, full_name: Stephen Webber, start_date: '2013-01-01', start_quality: placeholder, end_date: '2016-12-31', source_start_date: '2013-01-01', source_end_date: '2016-12-31'}
+          - {openstates_id: ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9, chamber: upper, district_number: 19, full_name: Stephen Webber, start_date: '2025-01-01', start_quality: dated, end_date: '9999-12-31', source_start_date: '2025-01-08', source_end_date: '9999-12-31'}
           # Tom Dempsey
-          - {openstates_id: ocd-person/daea2f5e-5853-45d0-ba92-f0231796d857, chamber: upper, district_number: 23, full_name: Tom Dempsey, start_date: '2007-09-18', end_date: '2015-08-07', source_start_date: '2007-09-18', source_end_date: '2015-08-07'}
+          - {openstates_id: ocd-person/daea2f5e-5853-45d0-ba92-f0231796d857, chamber: upper, district_number: 23, full_name: Tom Dempsey, start_date: '2007-09-18', start_quality: dated, end_date: '2015-08-07', source_start_date: '2007-09-18', source_end_date: '2015-08-07'}
           # Paul LeVota
-          - {openstates_id: ocd-person/e4ba2f03-f2eb-4ec2-b950-16f682b77cae, chamber: upper, district_number: 11, full_name: Paul LeVota, start_date: '2013-01-01', end_date: '2015-08-23', source_start_date: '2013-01-01', source_end_date: '2015-08-23'}
+          - {openstates_id: ocd-person/e4ba2f03-f2eb-4ec2-b950-16f682b77cae, chamber: upper, district_number: 11, full_name: Paul LeVota, start_date: '2013-01-01', start_quality: placeholder, end_date: '2015-08-23', source_start_date: '2013-01-01', source_end_date: '2015-08-23'}
     expect:
       rows:
         - {alias_id: 'mohouse:9', year: 2017, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
@@ -716,14 +716,14 @@ unit_tests:
         rows: []
       - input: ref('int_mo_legislators__seat_terms')
         rows:
-          - {openstates_id: ocd-person/b742d6cb-a63d-40c9-afd0-033f26190063, chamber: upper, district_number: 22, full_name: Paul Wieland, start_date: '1900-01-01', end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
-          - {openstates_id: ocd-person/e29b57a2-c2e7-4b5a-b299-bb734104f0d7, chamber: upper, district_number: 2, full_name: Bob Onder, start_date: '1900-01-01', end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
-          - {openstates_id: ocd-person/3382ca1d-1920-48a9-9d49-6406b5d157c8, chamber: upper, district_number: 10, full_name: Jeanie Riddle, start_date: '1900-01-01', end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
-          - {openstates_id: ocd-person/2713f041-077d-4253-97a3-e5b168005202, chamber: upper, district_number: 16, full_name: Dan Brown, start_date: '1900-01-01', end_date: '2018-12-31', source_start_date: null, source_end_date: '2018-12-31'}
-          - {openstates_id: ocd-person/867469f6-f988-49ec-be8c-4a065db3f223, chamber: upper, district_number: 16, full_name: Justin Brown, start_date: '2019-01-01', end_date: '9999-12-31', source_start_date: '2019-01-09', source_end_date: '9999-12-31'}
-          - {openstates_id: ocd-person/fb7fcb56-e180-4e63-a9be-1f68f0ac44f6, chamber: upper, district_number: 24, full_name: Jill Schupp, start_date: '1900-01-01', end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
-          - {openstates_id: ocd-person/1b6006c9-382f-4f2c-a403-48ca97b3e62a, chamber: upper, district_number: 26, full_name: Dave Schatz, start_date: '1900-01-01', end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
-          - {openstates_id: ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07, chamber: lower, district_number: 34, full_name: Rebecca Roeber, start_date: '1900-01-01', end_date: '2019-07-30', source_start_date: null, source_end_date: '2019-07-30'}
+          - {openstates_id: ocd-person/b742d6cb-a63d-40c9-afd0-033f26190063, chamber: upper, district_number: 22, full_name: Paul Wieland, start_date: '1900-01-01', start_quality: undated, end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
+          - {openstates_id: ocd-person/e29b57a2-c2e7-4b5a-b299-bb734104f0d7, chamber: upper, district_number: 2, full_name: Bob Onder, start_date: '1900-01-01', start_quality: undated, end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
+          - {openstates_id: ocd-person/3382ca1d-1920-48a9-9d49-6406b5d157c8, chamber: upper, district_number: 10, full_name: Jeanie Riddle, start_date: '1900-01-01', start_quality: undated, end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
+          - {openstates_id: ocd-person/2713f041-077d-4253-97a3-e5b168005202, chamber: upper, district_number: 16, full_name: Dan Brown, start_date: '1900-01-01', start_quality: undated, end_date: '2018-12-31', source_start_date: null, source_end_date: '2018-12-31'}
+          - {openstates_id: ocd-person/867469f6-f988-49ec-be8c-4a065db3f223, chamber: upper, district_number: 16, full_name: Justin Brown, start_date: '2019-01-01', start_quality: dated, end_date: '9999-12-31', source_start_date: '2019-01-09', source_end_date: '9999-12-31'}
+          - {openstates_id: ocd-person/fb7fcb56-e180-4e63-a9be-1f68f0ac44f6, chamber: upper, district_number: 24, full_name: Jill Schupp, start_date: '1900-01-01', start_quality: undated, end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
+          - {openstates_id: ocd-person/1b6006c9-382f-4f2c-a403-48ca97b3e62a, chamber: upper, district_number: 26, full_name: Dave Schatz, start_date: '1900-01-01', start_quality: undated, end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
+          - {openstates_id: ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07, chamber: lower, district_number: 34, full_name: Rebecca Roeber, start_date: '1900-01-01', start_quality: undated, end_date: '2019-07-30', source_start_date: null, source_end_date: '2019-07-30'}
     expect:
       rows:
         - {alias_id: 'mohouse:9', year: 2017, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}

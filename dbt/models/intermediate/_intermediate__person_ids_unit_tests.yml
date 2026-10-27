@@ -511,8 +511,8 @@ unit_tests:
         rows: []
       - input: ref('int_mo_legislators__seat_terms')
         rows:
-          - {openstates_id: ocd-person/dan, chamber: lower, district_number: 10, full_name: Dan Smith, start_date: '2017-01-01', end_date: '2019-01-09', source_start_date: '2017-01-04', source_end_date: '2019-01-09'}
-          - {openstates_id: ocd-person/danielle, chamber: lower, district_number: 10, full_name: Danielle Smith, start_date: '2019-01-01', end_date: '2021-01-06', source_start_date: '2019-01-09', source_end_date: '2021-01-06'}
+          - {openstates_id: ocd-person/dan, chamber: lower, district_number: 10, full_name: Dan Smith, start_date: '2017-01-01', start_quality: dated, end_date: '2019-01-09', source_start_date: '2017-01-04', source_end_date: '2019-01-09'}
+          - {openstates_id: ocd-person/danielle, chamber: lower, district_number: 10, full_name: Danielle Smith, start_date: '2019-01-01', start_quality: dated, end_date: '2021-01-06', source_start_date: '2019-01-09', source_end_date: '2021-01-06'}
     expect:
       rows:
         - {alias_id: 'mohouse:9', year: 2018, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
@@ -557,8 +557,8 @@ unit_tests:
         rows: []
       - input: ref('int_mo_legislators__seat_terms')
         rows:
-          - {openstates_id: ocd-person/gap, chamber: lower, district_number: 10, full_name: Gap Person, start_date: '2019-01-01', end_date: '2019-03-01', source_start_date: '2019-01-09', source_end_date: '2019-03-01'}
-          - {openstates_id: ocd-person/gap, chamber: lower, district_number: 10, full_name: Gap Person, start_date: '2019-09-01', end_date: '2019-12-31', source_start_date: '2019-09-01', source_end_date: '2019-12-31'}
+          - {openstates_id: ocd-person/gap, chamber: lower, district_number: 10, full_name: Gap Person, start_date: '2019-01-01', start_quality: dated, end_date: '2019-03-01', source_start_date: '2019-01-09', source_end_date: '2019-03-01'}
+          - {openstates_id: ocd-person/gap, chamber: lower, district_number: 10, full_name: Gap Person, start_date: '2019-09-01', start_quality: dated, end_date: '2019-12-31', source_start_date: '2019-09-01', source_end_date: '2019-12-31'}
     expect:
       rows:
         - {alias_id: 'mohouse:9', year: 2019, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
@@ -785,9 +785,9 @@ unit_tests:
         rows: []
       - input: ref('int_mo_legislators__seat_terms')
         rows:
-          - {openstates_id: ocd-person/webber-house, chamber: lower, district_number: 46, full_name: Stephen Webber, start_date: '2013-01-01', end_date: '2016-12-31', source_start_date: '2013-01-01', source_end_date: '2016-12-31'}
-          - {openstates_id: ocd-person/old-house, chamber: lower, district_number: 12, full_name: Olive Old, start_date: '2011-01-01', end_date: '2014-12-31', source_start_date: '2011-01-01', source_end_date: '2014-12-31'}
-          - {openstates_id: ocd-person/dempsey, chamber: upper, district_number: 23, full_name: Tom Dempsey, start_date: '2007-09-18', end_date: '2015-08-07', source_start_date: '2007-09-18', source_end_date: '2015-08-07'}
+          - {openstates_id: ocd-person/webber-house, chamber: lower, district_number: 46, full_name: Stephen Webber, start_date: '2013-01-01', start_quality: placeholder, end_date: '2016-12-31', source_start_date: '2013-01-01', source_end_date: '2016-12-31'}
+          - {openstates_id: ocd-person/old-house, chamber: lower, district_number: 12, full_name: Olive Old, start_date: '2011-01-01', start_quality: placeholder, end_date: '2014-12-31', source_start_date: '2011-01-01', source_end_date: '2014-12-31'}
+          - {openstates_id: ocd-person/dempsey, chamber: upper, district_number: 23, full_name: Tom Dempsey, start_date: '2007-09-18', start_quality: dated, end_date: '2015-08-07', source_start_date: '2007-09-18', source_end_date: '2015-08-07'}
     expect:
       rows:
         - {alias_id: 'mohouse:9', year: 2017, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
@@ -816,9 +816,9 @@ unit_tests:
         rows: []
       - input: ref('int_mo_legislators__seat_terms')
         rows:
-          - {openstates_id: ocd-person/undated-a, chamber: upper, district_number: 22, full_name: Paul Wieland, start_date: '1900-01-01', end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
-          - {openstates_id: ocd-person/undated-b, chamber: upper, district_number: 9, full_name: Kiki Curls, start_date: '1900-01-01', end_date: '2020-01-16', source_start_date: null, source_end_date: '2020-01-16'}
-          - {openstates_id: ocd-person/dated, chamber: upper, district_number: 5, full_name: Dee Dated, start_date: '2019-01-01', end_date: '2020-12-31', source_start_date: '2019-01-01', source_end_date: '2020-12-31'}
+          - {openstates_id: ocd-person/undated-a, chamber: upper, district_number: 22, full_name: Paul Wieland, start_date: '1900-01-01', start_quality: undated, end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
+          - {openstates_id: ocd-person/undated-b, chamber: upper, district_number: 9, full_name: Kiki Curls, start_date: '1900-01-01', start_quality: undated, end_date: '2020-01-16', source_start_date: null, source_end_date: '2020-01-16'}
+          - {openstates_id: ocd-person/dated, chamber: upper, district_number: 5, full_name: Dee Dated, start_date: '2019-01-01', start_quality: placeholder, end_date: '2020-12-31', source_start_date: '2019-01-01', source_end_date: '2020-12-31'}
     expect:
       rows:
         - {alias_id: 'mohouse:9', year: 2017, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}

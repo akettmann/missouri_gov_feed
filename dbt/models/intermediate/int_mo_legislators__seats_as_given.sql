@@ -5,7 +5,8 @@
 -- Rows and corrections are those of int_mo_legislators__seat_terms. The dates are still Open States' own: the
 -- Senate terms are re-dated from the journal roll calls in int_mo_legislators__seats, which is what to use. This
 -- model exists so int_mo_senate__votes can attribute votes to senators without depending on the dates those votes
--- later correct.
+-- later correct. start_quality is int_mo_legislators__seat_terms' flag (dated, undated or placeholder), carried so the
+-- re-dating in int_mo_legislators__seats reads it instead of the 1900-01-01 start.
 select
     t.openstates_id,
     t.full_name,
@@ -17,6 +18,7 @@ select
     t.district_number,
     t.start_date,
     t.end_date,
+    t.start_quality,
     coalesce(x.person_id, t.openstates_id) as person_id
 from {{ ref('int_mo_legislators__seat_terms') }} as t
 left join {{ ref('int_officials__person_ids') }} as x on t.openstates_id = x.alias_id

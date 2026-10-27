@@ -109,9 +109,9 @@ senate_terms as (
     inner join years as y on s.start_date <= y.year_end and s.end_date > y.handover_date
     where
         s.chamber = 'upper'
-        -- int_mo_legislators__seats puts undated starts at 1900-01-01 (those in the journal years are dated from
-        -- the senator's first vote there, #522): the first year of any left is unknown
-        and s.start_date > {{ dbt.safe_cast("'1900-01-01'", 'date') }}
+        -- an undated start in the journal years is dated from the senator's first vote there (start_quality
+        -- first_vote, #522); the first year of any left undated is unknown
+        and s.start_quality <> 'undated'
 ),
 
 senate_complete_years as (
