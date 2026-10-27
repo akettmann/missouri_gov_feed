@@ -397,7 +397,8 @@ each with the journal page that records it. This is the only source of Senate-si
 lists actions for House bills and for Senate bills only once they reach the House.
 
 - Lands: `mo_senate_bill_list`, one row per bill, the page's embedded JSON object as printed (ids, prefix and
-  number, sponsor and handler, description, links) plus `year` and `session_type`. `mo_senate_bill_actions`,
+  number, sponsor and handler, description, links; the served `year` is left as is) plus `list_year` (the year
+  asked for) and `session_type`. `mo_senate_bill_actions`,
   one row per action: `year`, `session_type`, `bill_id`, `bill` (e.g. `SB1`), `action_index` (0 = top row as
   served, newest first), `action_date` (as printed, MM/DD/YYYY), `action`, `journal_ref`, `journal_url`.
 - Also lands the bill page's other tabs (`handler=BillText`, `FiscalNotes`, `Amendments`, `Summaries`), each
@@ -420,7 +421,10 @@ lists actions for House bills and for Senate bills only once they reach the Hous
   alone); the default ten-year lookback is ~50,000 requests, about 14 hours cold. `MOGOV_SENATE_BILL_DOCS=0`
   fetches only the bill lists and Actions (one request per bill) and leaves the four document tables as they
   were last landed. Past sessions are cached 30 days, the current
-  year 1 day. Cloud Run tasks do not share a filesystem, so each task slows to `1 s x CLOUD_RUN_TASK_COUNT`.
+  year 1 day, so a daily run re-fetches the current year's five requests per bill (~5,300 for 2026's ~1,060
+  bills, about 90 minutes a day with documents against ~17 without; see docs/sync.md). Cloud Run tasks do not share a filesystem, so each task slows to `1 s x CLOUD_RUN_TASK_COUNT`.
+  `mo_senate` (journal PDFs) and `mo_senate_topics` use the same shared lock, so all senate.mo.gov traffic from
+  one machine stays at ~1 request/second, whichever loaders run together.
 - Bill lists come from the `const bills = [...]` array in a script element, read with a JSON parser; the
   bill cards in the page are not parsed.
 
@@ -438,11 +442,15 @@ Quirks:
 - Resolutions have no handler: those keys are absent from the bill's JSON.
 - A bill with no fiscal notes or amendments is answered with `No Fiscal Notes available for this bill.` /
   `No amendments available for this bill.` (HTTP 200, zero rows). Most bills have no fiscal note; bills that
-  died in committee have only the introduced text. SRs have text versions and summaries like bills.
-- Fragments are checked before they are cached: a body with neither the tab's container nor a `No ...
-  available` notice (an error or block page served with 200) is rejected and not cached.
-- `FiscalNotes` is sent with `sessionType=<session>` as the site's tab does; in a probe (2026-10-26) the
-  fragment was the same without it. `CommitteeMinutes` answers HTTP 500 and is not requested (see #280).
+  died in committee have only the introduced text. A bill with no summaries is answered `No summaries
+  available for this bill.` (seen on 2026 SRM1), so resolutions don't always have text versions and summaries
+  like bills.
+- Fragments are checked before they are cached: a body with neither the tab's container nor that tab's own
+  notice (`No Fiscal Notes available`, `No amendments available`, `No summaries available`, a text-versions
+  one; Actions: its container or `No actions available`) is rejected and not cached. A generic "No ...
+  available" error page does not pass.
+- `FiscalNotes` is sent with `sessionType=<session>` as the tab's own script does (the list page's
+  `data-modal-url` omits it); in a probe (2026-10-26) the fragment was the same without it. `CommitteeMinutes` answers HTTP 500 and is not requested (see #280).
 - Amendment links go to `BillInformation?handler=AmendmentPdf&year=YYYY&amendmentId=N`; text and fiscal-note
   links go to static PDFs (`/25info/pdf-bill/tat/SB1.pdf`, `/FiscalNotes/2025-1/0453S.04T.ORG.pdf`).
 
