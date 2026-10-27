@@ -125,9 +125,17 @@ The seed `official_id_links.csv` holds reviewed pairs, each with a `relation`:
     rules gave them; only the moved person's ids become `curated`.
 
   Two signed rows that send one merged person to different ids are a seed error; the smaller resolved
-  `person_id` wins, so the output stays deterministic. The resolution is one step: a row whose target person is
-  itself moved by another signed row (a chain) is not followed further (#691). Used for ids no seat rule can reach (a
-  legislator who became a state judge).
+  `person_id` wins, so the output stays deterministic (unit test
+  `person_ids_take_the_smallest_resolved_target_of_two_curated_links`). The resolution is one step: a row whose
+  target person is itself moved by another signed row (a chain, A -> B and B' -> C with B' in B's person) is not
+  followed further, so A's person would land on B's chosen id while B's person moves to C. The model stays single
+  pass; instead the data test `assert_signed_same_person_links_end_in_one_person` (error, #691) fails the build
+  when any signed `same_person` row ends with its `alias_id` and its `person_id` in different persons. That catches
+  a chain and two rows sending one person to different persons alike; fix the seed by pointing every row at the
+  final person. Rows that only restate a person the rules already made (Stephen Webber's, or rows in both
+  directions) leave the rules' chosen `person_id` in place and make every id of it `curated` (unit test
+  `person_ids_keep_the_chosen_id_when_curated_links_join_ids_already_one_person`). Used for ids no seat rule can
+  reach (a legislator who became a state judge).
 - `different_people`: the name of either id is kept out of R2 and R2b (`keep_apart`), and the ids are kept out
   of R2c.
 
