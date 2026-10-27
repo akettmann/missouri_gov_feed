@@ -1819,7 +1819,7 @@ models:
   - name: fct_bill_sponsors
     description: >
       Sponsors, co-sponsors, handlers and House/Senate conferees of each House bill, as the House lists them,
-      matched to officials where the district and surname agree. Re-listed appropriation bills (fct_bills status
+      matched to officials where the district and surname agree. The House lists a member's latest district for every session, so for a member whose district number changed (2022 redistricting) the match goes through the session's roster by surname and the listed district being one the member held; two candidates leave the row unmatched. Re-listed appropriation bills (fct_bills status
       "relisted for governor message") are excluded: they repeat the original's sponsors only to record the
       governor's message. Grain: one row per (session, bill, sponsor type, sponsor name).
     data_tests:
@@ -1861,7 +1861,7 @@ models:
       bills are not counted twice (fct_bill_sponsors drops them). Appropriation bills are kept: they are real
       sponsorships, and the Budget chair sponsors them and almost all pass, so the chair's shares are high for
       that reason (a member who has left office, such as a former Budget chair, has no row). Only current officials (dim_official) have an official_id, so former members are not here
-      (2026: 2,044 of 2,086 House sponsor rows match; 2017: 27 of 1,224). Survivorship: the earliest sessions (2017-2018) hold only
+      (2026: 2,044 of 2,086 House sponsor rows match; 2017: 32 of 1,205). Survivorship: the earliest sessions (2017-2018) hold only
       members still in office today, mostly long-serving leaders, so their shares are not comparable with recent sessions. A bill is "decided" unless its outcome
       is pending (session still open) or awaiting governor (truly agreed this year); decided bills are the
       denominator of both shares, and the passed and became-law counts only include decided bills, so a share

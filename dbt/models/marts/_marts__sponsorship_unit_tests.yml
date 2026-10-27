@@ -53,3 +53,56 @@ unit_tests:
         - {official_id: A, session_code: '261', session_year: 2026, is_session_over: true, bills_sponsored: 7, bills_decided: 5, bills_passed_house: 4, bills_became_law: 2, passed_house_share: 0.8, became_law_share: 0.4, source_url: 'https://documents.house.mo.gov/xml/261.zip'}
         - {official_id: B, session_code: '261', session_year: 2026, is_session_over: true, bills_sponsored: 1, bills_decided: 0, bills_passed_house: 0, bills_became_law: 0, passed_house_share: null, became_law_share: null, source_url: 'https://documents.house.mo.gov/xml/261.zip'}
         - {official_id: C, session_code: '261', session_year: 2026, is_session_over: true, bills_sponsored: 1, bills_decided: 1, bills_passed_house: 1, bills_became_law: 0, passed_house_share: 1, became_law_share: 0, source_url: 'https://documents.house.mo.gov/xml/261.zip'}
+
+  - name: bill_sponsors_match_redistricted_members_by_surname_and_held_district
+    model: fct_bill_sponsors
+    description: >
+      The House XML lists a member's latest district for every session. Adam Schnelting sat in district 104 in
+      session 211 and 69 from session 231; the 211 rows list district 69, so the session's own district never
+      matches, and they match through his roster row in 211 plus the fact that he held district 69. Sponsor and
+      Co-Sponsor rows both match. A 231 row (listed district equals the roster's) still matches directly. Jones
+      is listed in district 9 in 211, but the only Jones on the 211 roster never held district 9: not matched
+      (never attributed to the wrong person). Smith is listed in district 7; two Smiths on the 211 roster each
+      held district 7 in some session: ambiguous, so not matched. A senator row is unaffected.
+    given:
+      - input: ref('int_bills__status')
+        format: sql
+        rows: |
+            select '211' as session_code, 'HB1' as bill, 'signed' as status
+      - input: ref('stg_mo_house__bill_sponsors')
+        format: sql
+        rows: |
+            select '211' as session_code, 2021 as session_year, 'HB1' as bill, 'Sponsor' as sponsor_type, 'Adam Schnelting' as sponsor_name, 69 as sponsor_district union all
+            select '211', 2021, 'HB1', 'Co-Sponsor', 'Jones', 9 union all
+            select '211', 2021, 'HB2', 'Co-Sponsor', 'Adam Schnelting', 69 union all
+            select '211', 2021, 'HB3', 'Sponsor', 'Smith', 7 union all
+            select '231', 2023, 'HB4', 'Sponsor', 'Adam Schnelting', 69
+      - input: ref('int_mo_house__member_identity')
+        format: sql
+        rows: |
+            select '211' as session_code, 104 as district_number, 'schnelting' as surname_key, 'p_sch' as person_key union all
+            select '231', 69, 'schnelting', 'p_sch' union all
+            select '211', 4, 'jones', 'p_jones' union all
+            select '211', 20, 'smith', 'p_smith_a' union all
+            select '231', 7, 'smith', 'p_smith_a' union all
+            select '211', 21, 'smith', 'p_smith_b' union all
+            select '231', 7, 'smith', 'p_smith_b'
+      - input: ref('int_mo_legislators__seats')
+        format: sql
+        rows: |
+            select 'upper' as chamber, 1 as district_number, cast('2017-01-01' as date) as start_date, cast('2018-12-31' as date) as end_date, 'x' as surname_key, 'p_x' as person_id
+      - input: ref('dim_official')
+        format: sql
+        rows: |
+            select 'p_sch' as official_id union all
+            select 'p_jones' union all
+            select 'p_smith_a' union all
+            select 'p_smith_b'
+    expect:
+      format: sql
+      rows: |
+          select '211' as session_code, 'HB1' as bill, 'Sponsor' as sponsor_type, 'Adam Schnelting' as sponsor_name, 'state_house' as sponsor_chamber, 69 as sponsor_district, 'p_sch' as official_id union all
+          select '211', 'HB1', 'Co-Sponsor', 'Jones', 'state_house', 9, cast(null as varchar) union all
+          select '211', 'HB2', 'Co-Sponsor', 'Adam Schnelting', 'state_house', 69, 'p_sch' union all
+          select '211', 'HB3', 'Sponsor', 'Smith', 'state_house', 7, cast(null as varchar) union all
+          select '231', 'HB4', 'Sponsor', 'Adam Schnelting', 'state_house', 69, 'p_sch'

@@ -233,7 +233,7 @@ Quirks:
   with `no governor action recorded` is decided but not counted as law) and the two shares over `bills_decided`
   (null when it is 0). Resolutions (HR, HCR) and Senate sponsors are left out. Appropriation bills are kept
   (the Budget chair sponsors them and almost all pass). Only current officials (`dim_official`) have an
-  `official_id`, so former members are absent: for 2017 only 27 of 1,224 House primary-sponsor rows match, for
+  `official_id`, so former members are absent: for 2017 only 32 of 1,205 House primary-sponsor rows match, for
   2026 2,044 of 2,086. A member with House and Senate careers has rows for House sessions only.
   Survivorship: the earliest sessions (2017-2018) hold only members still in office today, mostly long-serving
   leaders, so their shares are not comparable with recent sessions. The profile page ("Bills sponsored in the

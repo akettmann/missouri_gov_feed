@@ -1,7 +1,11 @@
 -- Sponsors, co-sponsors, handlers and conferees of each House bill, matched to officials where possible.
 -- The House numbers senators 200 + senate district. A representative is matched on (session, district)
 -- through the House roster; a senator on the senate seat held that year. Either way the listed name must
--- contain the member's surname. Unmatched rows (former members, typos) keep official_id null.
+-- contain the member's surname. The House XML lists a representative's latest district for every session, so
+-- a member whose district number changed (the 2022 redistricting) never matches on the session's own district;
+-- those rows match on (session, surname) among members on that session's roster who held the listed district in
+-- some session. Two candidate people leave the row unmatched. Unmatched rows (former members, typos) keep
+-- official_id null.
 -- Re-listed bills (status 'relisted for governor message', int_bills__status) are left out: the House lists the
 -- previous session's appropriation bill again only for the governor's message, repeating its sponsors, so keeping
 -- them would count the budget chair's sponsorship twice. The original's row carries the sponsorship.
@@ -41,6 +45,36 @@ house_match as (
     having count(distinct m.person_key) = 1
 ),
 
+redistricted_match as (
+    select
+        s.session_code,
+        s.bill,
+        s.sponsor_type,
+        s.sponsor_name,
+        max(m.person_key) as person_key
+    from sponsors as s
+    inner join {{ ref('int_mo_house__member_identity') }} as m
+        on
+            s.session_code = m.session_code
+            and ' ' || s.sponsor_key || ' ' like '% ' || m.surname_key || ' %'
+    inner join {{ ref('int_mo_house__member_identity') }} as held
+        on
+            m.person_key = held.person_key
+            and s.sponsor_district = held.district_number
+    where
+        s.sponsor_chamber = 'state_house'
+        and not exists (
+            select 1
+            from {{ ref('int_mo_house__member_identity') }} as own
+            where
+                own.session_code = s.session_code
+                and own.district_number = s.sponsor_district
+                and ' ' || s.sponsor_key || ' ' like '% ' || own.surname_key || ' %'
+        )
+    group by s.session_code, s.bill, s.sponsor_type, s.sponsor_name
+    having count(distinct m.person_key) = 1
+),
+
 senate_match as (
     select
         s.session_code,
@@ -62,6 +96,8 @@ senate_match as (
 
 matches as (
     select * from house_match
+    union all
+    select * from redistricted_match
     union all
     select * from senate_match
 )
