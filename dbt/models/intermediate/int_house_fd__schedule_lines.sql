@@ -2,7 +2,8 @@
 -- "Schedule X:" header in the same document). Column-header rows, "None disclosed." and boilerplate drop out.
 -- Entries the PDF wraps over several lines are joined back into one row (see "continuation" below): on the schedules
 -- that feed commercial ties (C, E, F, J) so a wrapped tail never becomes a tie of its own (#599), and on A, B, D and H
--- so a wrapped entry is not counted as several disclosure items (#641).
+-- so a wrapped entry is not counted as several disclosure items (#641); a PTR range wrapped after its low end takes
+-- its high end from the next line (#749).
 -- PDFs from 2021 on extract their small-caps text with NUL characters; the words are restored first (#576).
 {# a line whose first "$" is a low end with no high end ("... $250,001 -"), and one whose last "$" is
    ("... Interest $201 -") #}

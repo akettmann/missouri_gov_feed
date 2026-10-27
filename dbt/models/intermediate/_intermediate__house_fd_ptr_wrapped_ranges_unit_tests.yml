@@ -10,7 +10,7 @@ unit_tests:
       next line as its tail when that line has an amount and neither transaction dates nor a label: the high end, with
       the part of the asset name that wrapped. The owner code and the low end stay those of the head. Lines that do
       not join: a transaction line with a complete range, a transaction line of its own after a low-only head (it
-      carries its own dates), the "Filing Status:" / "Subholding Of:" / "Description:" lines (a description may hold
+      carries its own dates, e.g. "Over $1,000,000"), the "Filing Status:" / "Subholding Of:" / "Description:" lines (a description may hold
       "$" amounts), and a low-only line without transaction dates (a bond name is no head).
     given:
       - input: ref('stg_house_fd__pdf_lines')
@@ -30,7 +30,9 @@ unit_tests:
           select 'p', 'u_p', true, 1, 12, 'JT Head Three P 06/12/2026 06/13/2026 $15,001 -' union all
           select 'p', 'u_p', true, 1, 13, 'Description: sold @ $27.645/share' union all
           select 'p', 'u_p', true, 1, 14, 'Bond Name 5% 07/01/2031 $1,001 -' union all
-          select 'p', 'u_p', true, 1, 15, 'Tail Without Head $5,000'
+          select 'p', 'u_p', true, 1, 15, 'Tail Without Head $5,000' union all
+          select 'p', 'u_p', true, 1, 16, 'JT Head Four P 06/14/2026 06/15/2026 $15,001 -' union all
+          select 'p', 'u_p', true, 1, 17, 'Whale Corp S 06/16/2026 06/17/2026 Over $1,000,000'
     expect:
       rows:
         - {doc_id: p, page: 1, line_no: 2, schedule: 'PTR: transactions', owner_code: JT, amount_range: '$100,001 - $250,000', line_text: 'JT Floyd County IN 4.00% 12/30/2031 P 12/05/2025 12/08/2025 $100,001 - [GS] $250,000'}
@@ -45,6 +47,8 @@ unit_tests:
         - {doc_id: p, page: 1, line_no: 13, schedule: 'PTR: transactions', owner_code: null, amount_range: '$27', line_text: 'Description: sold @ $27.645/share'}
         - {doc_id: p, page: 1, line_no: 14, schedule: 'PTR: transactions', owner_code: null, amount_range: '$1,001', line_text: 'Bond Name 5% 07/01/2031 $1,001 -'}
         - {doc_id: p, page: 1, line_no: 15, schedule: 'PTR: transactions', owner_code: null, amount_range: '$5,000', line_text: 'Tail Without Head $5,000'}
+        - {doc_id: p, page: 1, line_no: 16, schedule: 'PTR: transactions', owner_code: JT, amount_range: '$15,001', line_text: 'JT Head Four P 06/14/2026 06/15/2026 $15,001 -'}
+        - {doc_id: p, page: 1, line_no: 17, schedule: 'PTR: transactions', owner_code: null, amount_range: 'Over $1,000,000', line_text: 'Whale Corp S 06/16/2026 06/17/2026 Over $1,000,000'}
 
   - name: house_fd_wrapped_range_tail_rules_pinned
     model: int_house_fd__schedule_lines
