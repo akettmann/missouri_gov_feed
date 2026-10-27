@@ -705,12 +705,15 @@ Quirks:
   among the amendments of its report (ties: numeric doc id).
   The Clerk index does not say which report a House amendment amends, so it is taken to amend the latest annual,
   candidate or termination report the filer filed that year on or before it (an amendment of a candidate or
-  termination report supersedes that report only) (#142, #463). Index type H is a base of the same tier as an
-  annual report: on the Clerk index it is very likely a new member's first annual report, not a "new-filer notice"
-  (of 346 H filings only 3 have an O for the same filer and year, 233 have an extension request X that year, the H
-  counts follow the freshman classes of election years, and they are filed May to September of the next year;
-  Missouri freshmen Alford and Burlison (2022), Onder and Bell (2024) each have an X then an H in August and no
-  O). Periodic transaction reports and the remaining "other" kinds (W withdrawal, B, E, G) are never a base.
+  termination report supersedes that report only) (#142, #463). Index type H is a New Filer Report (the PDF header says
+  "Filing Type: New Filer Report"; e.g. Carey OH15 #10050139, Alford MO04 #10051960), a separate report from the
+  Annual Report (O) of the same year, so it is a base like a candidate report: an amendment filed after an H amends
+  it and supersedes it, while an H and an O of one year are both kept latest (Carey OH15 2022, Wied WI08 2025; for
+  O, A, H, A as in Miller WV03 2018 the first A supersedes the O and the second the H). Whether both should be
+  latest, and which report a later amendment amends, is open (#572). Of 346 H filings only 3 have an O for the same
+  filer and year, 233 have an extension request X that year, and the H counts follow the freshman classes of
+  election years (Missouri freshmen Alford and Burlison (2022), Onder and Bell (2024) each have an X then an H in
+  August and no O). Periodic transaction reports and the remaining "other" kinds (W withdrawal, B, E, G) are never a base.
   The "Period Covered: mm/dd/yyyy-mm/dd/yyyy" line in the amendment's PDF text (`int_house_fd__period_covered`;
   candidate reports and their amendments carry it, annual and termination reports do not) refines this: the base
   covering through the same last day wins, and an amendment with such a line is taken for an amendment of an
