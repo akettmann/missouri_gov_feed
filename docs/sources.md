@@ -19,7 +19,7 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `tap_mec` | MEC via The Accountability Project | state campaign finance and lobbyist gifts | 2011–2022 (gifts from 2004) | |
 | `fec` | Federal Election Commission | federal candidates, committees, PAC contributions, donor aggregates | `MOGOV_FEC_CYCLES` | API key for aggregates |
 | `voteview` | Voteview | Congress roll calls, votes, DW-NOMINATE ideology | `MOGOV_VOTEVIEW_CONGRESSES` | |
-| `govinfo_billstatus` | GovInfo BILLSTATUS bulk XML (govinfo.gov) | federal bills: sponsor, cosponsors, actions, roll calls cited, Public Law number | `MOGOV_BILLSTATUS_CONGRESSES` (default 117-119) | |
+| `govinfo_billstatus` | GovInfo BILLSTATUS bulk XML (govinfo.gov) | federal bills: sponsor, cosponsors, actions, roll calls cited, Public Law number | `MOGOV_BILLSTATUS_CONGRESSES` (default 117 to today's Congress) | |
 | `house_fd` | U.S. House Clerk | House members' financial disclosures and trades | 2015+ | |
 | `senate_efd` | U.S. Senate eFD | senators' financial disclosures | as filed | opt-in |
 | `courtlistener_bulk` | CourtListener bulk files | judges, positions, education, federal judges' disclosures | quarterly snapshot | |
@@ -850,7 +850,8 @@ Flow: [diagrams/sources/govinfo_billstatus.svg](diagrams/sources/govinfo_billsta
 GovInfo's Bill Status bulk data (https://www.govinfo.gov/bulkdata/BILLSTATUS): one zip per Congress and bill type
 (`/119/hr/BILLSTATUS-119-hr.zip`, 33 MB; `/118/s/...`, 14 MB), each member one bill's XML. No key, no robots.txt
 rule against `/bulkdata`, US government work (the page states no licence). Congresses 108 (2003) to 119 exist;
-`MOGOV_BILLSTATUS_CONGRESSES` picks the loaded ones (default 117,118,119, as for Voteview) and
+`MOGOV_BILLSTATUS_CONGRESSES` picks the loaded ones (default: the 117th through the Congress in session today, so the
+120th joins on 2027-01-03 with no change) and
 `MOGOV_BILLSTATUS_TYPES` the bill types (default all eight).
 
 - Lands: every XML file unchanged as gzip under `data/raw/govinfo_billstatus_xml/<congress>/<type>/` plus
