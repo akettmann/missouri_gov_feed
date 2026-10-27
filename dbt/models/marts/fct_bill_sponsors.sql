@@ -13,8 +13,8 @@
 -- House roster on (session, surname, given name) when that person held the listed senate seat in some session
 -- (the order is not checked: the XML lists the latest district), and then
 -- counts as state_house with the roster's district. It never matches two people. A row that finds no one on the
--- House roster keeps the listed-district reading (a defensive fallback: in current data every House-bill sponsor
--- is on the roster, so it does not trigger).
+-- House roster keeps the listed-district reading (a defensive fallback: in current data every senate-listed
+-- House-role row finds its person on the House roster, so it does not trigger).
 -- Re-listed bills (status 'relisted for governor message', int_bills__status) are left out: the House lists the
 -- previous session's appropriation bill again only for the governor's message, repeating its sponsors, so keeping
 -- them would count the budget chair's sponsorship twice. The original's row carries the sponsorship.

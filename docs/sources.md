@@ -193,8 +193,8 @@ Quirks:
   has his House-era sponsor, co-sponsor, handler and House-conferee rows listed as 200 + a senate district
   (Mike Moon on 191-HB161: 229). `fct_bill_sponsors` reads those rows as House rows when the bill is a House bill
   (or the row is a handler or House conferee) and matches them to the session's House roster on surname and given
-  name, provided that person held the listed senate seat in some session (#646, 1,559 rows; 1,266 of them now reach an
-  official, 776 as primary sponsor, the other 293 are former members). The district shown is then the roster's.
+  name, provided that person held the listed senate seat in some session (#646; as of 2026-10-27, 1,575 rows, 1,282 of them
+  reaching an official). The district shown is then the roster's.
   Senate conferees, and sponsors of Senate bills, keep the listed-district reading. The redistricting match
   (members whose House district number changed) also requires the given name (#647).
 - The bill XML only links roll calls nested under a House bill. It misses House votes on Senate bills

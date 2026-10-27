@@ -141,7 +141,7 @@ unit_tests:
       231 (HB16; two Pat Roes on the roster both held senate district 31). Those stay state_senate with the senate
       district. A Senate conferee listed 205 (HB15) stays a senator and matches the seat held in 2019. Sandy
       Terry Vale (HB17), a hypothetical name absent from the 191 House roster (real data has no such row today: every
-      House-bill sponsor is on the roster), keeps the listed-district reading and matches the senate seat. A Handler
+      senate-listed House-role row finds its person on the House roster), keeps the listed-district reading and matches the senate seat. A Handler
       row (HB18, Mike Moon listed 229; the real Handler rows are all on House bills) is a House row like the Sponsor
       one: state_house with his roster district 157.
     given:
