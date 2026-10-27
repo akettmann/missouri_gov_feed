@@ -15,8 +15,9 @@
 -- int_mo_legislators__final_checks lists only 20 of the 26: Moon, Rusty Black, Henderson and Nurrenbern (legal
 -- first name does not fit), Matthiesen and Simmons (back in the House later).
 
--- the chamber, not the title: a title can have one payee in a year (2017 STATE REPRESENTATIVE-LEADERSHP: only
--- Denny Hoskins' final check), and then its top pay is that final check
+-- the chamber, not the title: a title can have only a few payees in a year, all paid for part of it, and then its
+-- top pay is well under a full salary (2025 STATE REPRESENTATIVE-SPEAKER: Jonathan Patterson's $20,476.94, the rest
+-- of his year paid as LEADERSHP, and Dean Plocher's $1,749.88 final check; the House top was $42,972.52)
 with top_pay as (
     select
         p.calendar_year,
