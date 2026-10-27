@@ -1,7 +1,8 @@
 -- No two official_ids may be one person (#97). Two ids sharing an exact full name whose office history overlaps -- they
 -- hold the same office and district, or any office in the same year -- are the same person under two ids (the House
 -- roster and Open States keyed them differently, or Open States holds the person twice), unless a maintainer has
--- reviewed the pair as different people in official_id_links (relation different_people, checked_by filled in).
+-- reviewed the pair as different people in official_id_links (relation different_people, signed off: checked_by and
+-- checked_on filled, as int_officials__person_ids requires).
 -- Covers everyone int_officeholders__years lists for a past year, plus every current official as of the latest year.
 with latest as (
     select max(year) as year from {{ ref('int_officeholders__years') }}
@@ -31,7 +32,7 @@ reviewed as (
         alias_id,
         person_id
     from {{ ref('official_id_links') }}
-    where relation = 'different_people' and checked_by is not null
+    where relation = 'different_people' and checked_by is not null and checked_on is not null
 )
 
 select

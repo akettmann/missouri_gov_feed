@@ -5,8 +5,9 @@
 -- A warning, not an error (#581): a new session's roll calls can load before that session's roster does, and then
 -- every freshman's token is unmatched for a while. That is a load-order gap that fixes itself on the next sync, not
 -- a broken build, so it must not block the models that read this one; the warning still names the tokens.
--- The error-level guard is assert_vote_attribution_share_per_session (#660, #629 item 3): per session, it skips a
--- session with no roster rows yet (the load-order case) and fails when the attributed share drops under its floor.
+-- The error-level guard is assert_vote_attribution_share_per_session (#660, #629 item 3): per session, it skips only
+-- the newest session, and only when it has no roster rows yet (the load-order case), and fails when the attributed
+-- share drops under its floor.
 {{ config(severity='warn') }}
 
 select

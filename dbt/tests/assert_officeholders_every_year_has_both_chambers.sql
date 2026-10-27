@@ -10,6 +10,8 @@
 -- Years come from a series, not from the rows themselves, so a year with no rows for a chamber counts as 0. The
 -- series ends at the later of the newest House roster year and the newest officeholder year (#668): ending it at the
 -- newest officeholder year alone would stop it a year early, and pass, if every office lost its newest year.
+-- In practice the bound is the newest House roster year (2026 for both on a full build, 2026-10); the officeholder
+-- branch only guards against a gap, a year with officeholders but no roster yet.
 with last_years as (
     select max(session_year) as last_year from {{ ref('int_mo_house__member_identity') }}
     union all

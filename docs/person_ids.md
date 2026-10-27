@@ -119,8 +119,9 @@ its name group redirects only that alias, which splits the group (#174 item 3, p
   `person_ids_keep_a_different_people_pair_apart`,
   `person_ids_keep_a_signed_different_people_pair_apart_across_given_name_variants`,
   `person_ids_keep_a_signed_different_people_id_out_of_the_house_member_id_rule`.
-- Today: two rows, both unsigned, so they change nothing: Joe Don McGaugh (Open States id to his `mojudge:`
-  id) and Stephen Webber (his two Open States ids, already joined by R2; waiting for a sign-off, #663).
+- Today: two rows. Joe Don McGaugh (Open States id to his `mojudge:` id) is unsigned, so it changes nothing.
+  Stephen Webber (his two Open States ids, already joined by R2) is signed (#663), so both his ids are
+  `basis = curated`; his `person_id` is unchanged, the id R2 chose (`ocd-person/63dea1c8-…`, his Senate id).
 
 ### R2. Exact name, spaces ignored (lines 46-101, 250-285)
 
@@ -136,9 +137,9 @@ roster row's name is the Open States name when it matched one (its alias is then
   `different_people` row excludes them. One shared year is allowed: a hand-over (Lauren Arthur in HD18 and
   SD17 in 2018).
 - No check on the gap between the ids' years or on how far apart the seats are (#174 item 2). The data test
-  `assert_person_ids_name_continuity_gaps_plausible` (warn, #660) lists a merged id whose years neither touch
-  another id of its person nor return to the same seat within 8 years; today it lists Stephen Webber, whose
-  link waits for a sign-off (#663).
+  `assert_person_ids_name_continuity_gaps_plausible` (error, #660, #663) lists a merged id whose years neither
+  touch another id of its person nor return to the same seat within 8 years; it lists nothing today. Stephen
+  Webber would be listed on his name alone; his signed `same_person` row makes him `curated` (#663).
 - An undated id has one evidence year, so it can never show a seat conflict (#519). The data test
   `assert_undated_open_states_ids_share_no_name` fails if such an id shares a name with another id.
 - Tests: `person_ids_join_a_redistricted_seat_change`, `person_ids_join_a_house_fallback_key_to_the_senate_record`,
@@ -359,17 +360,17 @@ local load, which may be older than the sources today.
 | House seat dates vs roll-call attendance | 13,133 attributed House votes fall outside every Open States House seat of that person (`int_mo_legislators__seats_as_given`): 11,773 by people with an Open States House seat (plus 1,360 by Cierpiot, 681, and Crawford, 679, who have none). Most are from the 2017 class: PHILLIPS and ADAMS 1,545 each, ALFERMAN, ARTHUR, CORNEJO, MCCANN BEATTY, RHOADS 1,532 each | House seat dates are only a tie-break | #565 |
 | Senate last-vote cap vs payroll | Silvey and Kraus (above) | Today: the cap (option 1) | #551 |
 | Federal judges without an `fjc_id` | Sarah Pitlyk and 6 newer judges (from the issue, not re-measured) | Out of scope for legislator ids: a known gap | #322 |
-| Unsigned curated rows | `official_id_links.csv` has 2 rows (Joe Don McGaugh, Open States id to `mojudge:`; Stephen Webber, his two Open States ids), `checked_by` empty | No effect until signed | #174 #663 |
+| Unsigned curated rows | `official_id_links.csv` has 1 unsigned row (Joe Don McGaugh, Open States id to `mojudge:`), `checked_by` empty; Stephen Webber's row is signed (#663) | No effect until signed | #174 #663 |
 
-In all, `int_officials__person_ids` has 501 aliases and 473 persons: 473 `self`, 27 `name_continuity`, 1
-`member_id_continuity`, 0 `curated`. Data tests `assert_official_ids_one_per_person`,
+In all, `int_officials__person_ids` has 501 aliases and 471 persons: 470 `self`, 26 `name_continuity`, 2
+`duplicate_stub`, 1 `member_id_continuity`, 2 `curated` (Stephen Webber, #663). Data tests `assert_official_ids_one_per_person`,
 `assert_house_member_id_one_person`, `assert_undated_open_states_ids_share_no_name`,
 `assert_recent_seat_term_ids_have_person_ids`, `assert_senate_terms_have_votes`,
 `assert_senate_vote_tokens_attributed`, `assert_house_vote_tokens_attributed`,
 `assert_vote_attribution_share_per_session`, `assert_officeholders_every_year_has_both_chambers`,
 `assert_salaries_final_checks_not_paid_again_later`, `assert_salaries_legislature_pay_within_held_terms` and
-`assert_bill_sponsors_roster_members_matched` pass on that copy; `assert_person_ids_name_continuity_gaps_plausible`
-warns on Stephen Webber's two ids (#663).
+`assert_bill_sponsors_roster_members_matched` pass on that copy, and so does
+`assert_person_ids_name_continuity_gaps_plausible` (error since #663).
 
 ## Case registry
 
