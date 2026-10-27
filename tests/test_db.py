@@ -2,6 +2,7 @@ import os
 import queue
 import threading
 import time
+from pathlib import Path
 
 import duckdb
 import pytest
@@ -464,3 +465,31 @@ def test_old_count_scratch_stays_until_new_count_is_complete(raw_dir):
     assert old.exists()
     db.replace_json("t", [("n1", {})], shard=db.Shard(1, 2))
     assert not old.exists()
+
+
+def test_old_count_scratch_unlink_failure_does_not_fail_the_publish(raw_dir, monkeypatch):
+    folder = db.table_dir("t")
+    stuck = _old_scratch(folder, 3, 0, age_s=http.PART_STALE_S + 60, tag="1")
+    old_lock = folder / ".part-001-of-003.parquet.lock"
+    old_lock.write_bytes(b"")
+    real_unlink = Path.unlink
+
+    def flaky_unlink(self, *args, **kwargs):
+        if self == stuck:
+            raise PermissionError(13, "file held open by another handle")
+        return real_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", flaky_unlink)
+    db.replace_json("t", [("new", {})])  # must not raise
+    assert (folder / "part-000-of-001.parquet").exists()
+    assert stuck.exists()  # left for the next run
+    assert not old_lock.exists()  # the lock sweep after it still ran
+
+
+def test_old_count_scratch_sweep_never_touches_current_count_scratch(raw_dir):
+    folder = db.table_dir("t")
+    stale = http.PART_STALE_S + 60
+    current = _old_scratch(folder, 1, 0, age_s=stale, tag="1")  # same count as the publish below, stale by age
+    other = _old_scratch(folder, 3, 0, age_s=stale, tag="2")
+    db._sweep_old_count_scratch(folder, "-of-001.parquet")
+    assert current.exists() and not other.exists()

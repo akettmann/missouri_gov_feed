@@ -285,7 +285,10 @@ def _sweep_old_count_scratch(folder: Path, suffix: str) -> None:
                 continue
             if _lock_held_by_live_run(folder / f".{fields[1]}.parquet.lock"):
                 continue
-            scratch.unlink(missing_ok=True)
+            try:
+                scratch.unlink(missing_ok=True)
+            except OSError:  # e.g. Windows: held open elsewhere; the next run retries
+                log.debug("old_count_scratch_kept", path=str(scratch))
 
 
 def _none_marker(folder: Path, shard: Shard) -> Path:
