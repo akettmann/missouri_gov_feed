@@ -121,12 +121,15 @@ kept as (
 --   * A: it is nothing but income-type words ("Dividends", "Capital Gains,"), nothing but amounts (the high end of a
 --     range wrapped under the low end) or form-checkbox glyphs ("gfedc"), or a ticker and asset-type code
 --     ("(OANEX) [MF]", "[MF]");
---   * B: it carries neither a transaction type before an amount ("P $1,001 - ...", "S (partial) $...") nor a date: the
---     2021+ layout puts the asset name on the line(s) after the account/date/amount line;
+--   * B: it carries no transaction type before an amount ("P $1,001 - ...", "S (partial) $..."): the 2021+ layout
+--     puts the asset name on the line(s) after the account/date/amount line. A date alone does not make a line an
+--     entry: bond names wrap with their maturity ("Rev 5% 07/01/2031 [GS] $100,000", "05/24/2028 [GS]");
 --   * D: it carries no amount ("$..." or "N/A") and does not end on "Over" (an amount wrapped to the next line), or it
 --     is nothing but amounts;
 --   * H: it carries no date (mm/dd/yyyy): the sponsor, itinerary and city names wrap around the line with the dates.
--- "Location:" / "Description:" / "Comments:" lines of A and B stay lines of their own (labelled attributes).
+-- "Location:" / "Description:" / "Comments:" lines of B stay lines of their own (labelled attributes), and so do
+-- those of A unless the rules above apply: a parenthesis the entry above left open ("(50% Inter") pulls the next
+-- line in, "DESCRIPTION:" included (3 lines).
 -- Other lines stay entries: pure wrapped tails with no such signal ("Government") cannot be told from an entry, and
 -- neither can an asset name wrapped over two lines on A ("Fidelity Managed Income II III [HE]" / "Unit Cl I [HE]").
 flagged as (
@@ -171,7 +174,6 @@ continued as (
             )
             or (
                 substr(f.schedule, 1, 1) = 'B'
-                and not {{ mogov.regex_matches('f.line_text', '(^| )[0-9]{1,2}/[0-9]{1,2}/[0-9]{2,4}( |$)') }}
                 and not {{ mogov.regex_matches('f.line_text', '(^| )(P|S|E)( \\([Pp]artial\\))? (\\$[0-9]|None)') }}
                 and not {{ mogov.regex_matches('lower(f.line_text)', '^(location|description|comments):') }}
             )
