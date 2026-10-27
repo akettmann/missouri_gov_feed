@@ -21,7 +21,7 @@ log = obs.get_logger(__name__)
 BASE = "https://disclosures-clerk.house.gov/public_disc"
 FIRST_YEAR = int(os.environ.get("MOGOV_HOUSE_FD_FIRST_YEAR", "2015"))
 # Filing types worth reading: O original annual, A amendment, P periodic transaction report, C candidate, T termination,
-# H new filer report (a new member's first annual-style report; the PDF says "Filing Type: New Filer Report").
+# H new filer report (the PDF says "Filing Type: New Filer Report").
 PDF_TYPES = {"O", "A", "P", "C", "T", "H"}
 
 

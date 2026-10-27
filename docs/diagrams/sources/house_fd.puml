@@ -4,7 +4,7 @@ start
 :yearly index zips <year>FD.zip (national, tab-delimited)
 from MOGOV_HOUSE_FD_FIRST_YEAR;
 :house_fd_index (owned years);
-:Missouri filings of types O, A, P, C, T;
+:Missouri filings of types O, A, P, C, T, H;
 :PDF -> text lines (pdfplumber);
 if (text layer?) then (yes)
   :one row per line;

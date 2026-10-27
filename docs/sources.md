@@ -617,9 +617,9 @@ Quirks:
 - Scanned paper filings (DocID 8xxxxxxx/9xxxxxxx) have no text layer. They land as one
   `has_text = false` row, so the gap is visible.
 - Periodic transaction reports live under `ptr-pdfs/`; everything else is under `financial-pdfs/`.
-- Index type `H` is the "New Filer Report" (PDF header: `Filing Type: New Filer Report`): a new member's first
-  annual-style report, filed the August after the election year. The loader reads it like O/A/P/C/T. Other index
-  types (D, X, G, E, B, W) are notices or requests with no report body and are not downloaded.
+- Index type `H` is the New Filer Report (PDF header `Filing Type: New Filer Report`), filed by new members; a
+  separate report from that year's Annual Report (O). The loader reads it like O/A/P/C/T. Other index types
+  (D, X, G, E, B, W) are not downloaded.
 
 ## senate_efd: U.S. Senate eFD (opt-in)
 
