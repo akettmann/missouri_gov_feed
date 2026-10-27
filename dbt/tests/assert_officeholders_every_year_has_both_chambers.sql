@@ -15,7 +15,7 @@ with bounds as (
 ),
 
 years as (
-    select b.first_year + s.generated_number - 1 as year
+    select {{ dbt.safe_cast("b.first_year + s.generated_number - 1", dbt.type_int()) }} as year
     from bounds as b
     cross join ({{ dbt_utils.generate_series(100) }}) as s
     where b.first_year + s.generated_number - 1 <= b.last_year
