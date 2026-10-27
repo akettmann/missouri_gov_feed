@@ -89,6 +89,7 @@ house as (
         l.owner_code as owner,
         l.amount_range as amount,
         l.line_text as description,
+        h.filing_type,
         h.document_url,
         am.amends_url,
         false as is_garbled,
@@ -111,6 +112,7 @@ house_unparsed as (
         cast(null as {{ dbt.type_string() }}) as owner,
         cast(null as {{ dbt.type_string() }}) as amount,
         cast(null as {{ dbt.type_string() }}) as description,
+        h.filing_type,
         h.document_url,
         am.amends_url,
         false as is_garbled,
@@ -134,6 +136,7 @@ senate as (
         s.owner,
         coalesce(s.amount, s.income_amount) as amount,
         s.description,
+        cast(null as {{ dbt.type_string() }}) as filing_type,
         s.document_url,
         cast(null as {{ dbt.type_string() }}) as amends_url,
         false as is_garbled,
@@ -156,6 +159,7 @@ judges as (
         cast(null as {{ dbt.type_string() }}) as owner,
         i.amount_code as amount,
         i.description,
+        cast(null as {{ dbt.type_string() }}) as filing_type,
         i.document_url,
         cast(null as {{ dbt.type_string() }}) as amends_url,
         i.is_garbled,
@@ -179,6 +183,8 @@ unioned as (
 --   report_group    annual reports and their amendments share 'annual report'; every other kind (periodic
 --                   transaction report, candidate report, extension request...) is its own group (the
 --                   document url), because those are separate filings, not revisions of each other.
+--                   A House index type H (filing_kind 'other') joins them too: it is a base of an amendment
+--                   like an annual report (house_amendment_base), so it must share the amendment's group.
 --                   A report with no report_year can't be matched to its siblings either (Senate candidate
 --                   reports), so it stays its own group.
 --                   A House amendment of a candidate or termination report joins that report's group instead
@@ -196,6 +202,8 @@ keyed as (
         case
             when amends_url is not null then amends_url
             when report_year is not null and filing_kind in ('annual report', 'amended report') then 'annual report'
+            when report_year is not null and filing_type = 'H' and disclosure_type like 'U.S. House%'
+                then 'annual report'
             when report_year is not null and filing_kind like 'annual report for cy%' then 'annual report'
             else document_url
         end as report_group,
