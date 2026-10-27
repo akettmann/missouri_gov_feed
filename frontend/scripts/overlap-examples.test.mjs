@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DuckDBInstance } from "@duckdb/node-api";
-import { overlapExamplesSql } from "../src/lib/exports/overlapQuery.ts";
+import { overlapExamplesSql, recusedSql, senateRollCallsSql } from "../src/lib/exports/overlapQuery.ts";
 
 // Fixed rows shaped like SB724 on 2022-05-10: an amendment first (lowest id), passage in the middle, a later
 // emergency-clause vote, and Senate ids where plain string order puts vote10 before vote2.
@@ -10,13 +10,14 @@ async function run(rows, examples = 5) {
   await conn.run(`create table ov (official_id varchar, industry varchar, chamber varchar, vote_id varchar,
     session_code varchar, vote_date date, bill varchar, short_title varchar, vote_cast varchar, vote_description varchar,
     vote_source_url varchar, bill_source_url varchar)`);
-  for (const [vote_id, date, bill, desc, chamber = "state_senate", session = "S1"] of rows) {
-    await conn.run(`insert into ov values ('A','Gas',?,?,?,?,?,'t','yea',?,?,'b')`, [
+  for (const [vote_id, date, bill, desc, chamber = "state_senate", session = "S1", cast = "yea"] of rows) {
+    await conn.run(`insert into ov values ('A','Gas',?,?,?,?,?,'t',?,?,?,'b')`, [
       chamber,
       vote_id,
       session,
       date,
       bill,
+      cast,
       desc,
       vote_id,
     ]);
@@ -131,4 +132,75 @@ test("the same bill number in two sessions is two examples", async () => {
     rows.map((r) => r.vote_date),
     ["2020-05-10", "2018-05-10"],
   );
+});
+
+test("recusals are listed past the cap and flagged as not recent (#154)", async () => {
+  const rows = await run(
+    [
+      [`${J}0`, "2022-05-10", "SB3", PASS],
+      [`${J}0`, "2022-05-09", "SB2", PASS],
+      [`${J}0`, "2021-05-09", "SB1", PASS, "state_senate", "S1", "recused"],
+    ],
+    2,
+  );
+  assert.deepEqual(
+    rows.map((r) => [r.bill, r.vote_cast, r.recent]),
+    [
+      ["SB3", "yea", true],
+      ["SB2", "yea", true],
+      ["SB1", "recused", false],
+    ],
+  );
+});
+
+test("a recusal already among the recent bills is not repeated (#154)", async () => {
+  const rows = await run([[`${J}0`, "2022-05-10", "SB3", PASS, "state_senate", "S1", "recused"]]);
+  assert.deepEqual(
+    rows.map((r) => [r.bill, r.recent]),
+    [["SB3", true]],
+  );
+});
+
+test("a recusal on an earlier day of a bill is listed next to that bill's later yea (#154)", async () => {
+  const rows = await run(
+    [
+      [`${J}0`, "2022-05-09", "SB3", AMEND, "state_senate", "S1", "recused"],
+      [`${J}1`, "2022-05-10", "SB3", PASS],
+    ],
+    5,
+  );
+  assert.deepEqual(
+    rows.map((r) => [r.vote_cast, r.recent]),
+    [
+      ["yea", true],
+      ["recused", false],
+    ],
+  );
+});
+
+test("recused rollup is null for House-only groups, a count when any vote is a Senate vote (#154)", async () => {
+  const conn = await (await DuckDBInstance.create(":memory:")).connect();
+  await conn.run(
+    `create table ov (official_id varchar, industry varchar, chamber varchar, vote_id varchar, vote_cast varchar)`,
+  );
+  for (const [o, ch, id, cast] of [
+    ["house_only", "state_house", "h1", "yea"],
+    ["house_only", "state_house", "h2", "nay"],
+    ["mixed", "state_house", "h3", "yea"],
+    ["mixed", "state_senate", "s1", "recused"],
+    ["mixed", "state_senate", "s2", "recused"],
+    ["senate_only", "state_senate", "s3", "yea"],
+  ]) {
+    await conn.run(`insert into ov values (?, 'Gas', ?, ?, ?)`, [o, ch, id, cast]);
+  }
+  const rows = (
+    await conn.runAndReadAll(
+      `select official_id, ${recusedSql()} as recused, ${senateRollCallsSql()} as senate from ov group by official_id order by official_id`,
+    )
+  ).getRowObjectsJson();
+  assert.deepEqual(rows, [
+    { official_id: "house_only", recused: null, senate: 0 },
+    { official_id: "mixed", recused: 2, senate: 2 },
+    { official_id: "senate_only", recused: 0, senate: 1 },
+  ]);
 });
