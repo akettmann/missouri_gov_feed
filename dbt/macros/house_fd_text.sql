@@ -22,6 +22,10 @@
             '^E' ~ nul ~ '{9} ' ~ nul ~ '{2} S' ~ nul ~ '{5}, D' ~ nul ~ '{8}, ' ~ nul ~ '{2} T' ~ nul ~ '{4} I' ~ nul ~ '{10}$',
             'Exclusions of spouse, dependent, or trust information',
         ],
+        ['^(Schedule A( and B)?) A' ~ nul ~ '{4} C' ~ nul ~ '{4} D' ~ nul ~ '{6}$', bs ~ '1 Asset Class Details'],
+        ['^(Schedule A( and B)?) I' ~ nul ~ '{9} V' ~ nul ~ '{6} D' ~ nul ~ '{6}$', bs ~ '1 Investment Vehicle Details'],
+        ['^S' ~ nul ~ '{9} O' ~ nul ~ ':', 'Subholding Of:'],
+        ['^F' ~ nul ~ '{5} S' ~ nul ~ '{5}:', 'Filing Status:'],
         [nul ~ '+', ''],
     ] -%}
     {%- set ns = namespace(sql=expr) -%}

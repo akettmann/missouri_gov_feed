@@ -645,6 +645,10 @@ Quirks:
   the exact NUL counts (macro `mogov.house_fd_restore_text`) and strips any NUL left, so no NUL reaches the
   marts. Before this fix no 2022+ report (and 8 of 25 in 2021) produced a schedule line (#576); a sanity test now
   fails if under 90% of a year's text PDFs do.
+  The form's closing pages (the "Exclusions of spouse, dependent, or trust information" questions, certification
+  and signature) follow Schedule J but belong to no schedule, and "Schedule A ... Investment Vehicle Details"
+  blocks follow it too, so the parser stops emitting lines at the exclusions page and opens schedule A at those
+  detail headers; otherwise that boilerplate and the vehicle names surfaced as J compensation sources.
 - Index type `H` is the New Filer Report (PDF header `Filing Type: New Filer Report`), filed by new members; a
   separate report from that year's Annual Report (O). The loader reads it like O/A/P/C/T. Other index types
   (D, X, G, E, B, W) are not downloaded.

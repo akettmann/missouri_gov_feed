@@ -2,6 +2,8 @@
 -- extractable text yield schedule lines. When the parser stops recognizing a year's schedule headers, its reports
 -- silently fall back to a single "not text-extractable" row: it happened for every report from 2022 on (and 8 of
 -- the 25 from 2021) when the PDFs began extracting their small-caps headers as NUL characters (#576).
+-- A report with no entries at all (every schedule "None disclosed.", only form boilerplate left) yields no lines
+-- but still counts as parsed: its schedule headers were recognized.
 -- Returns one row per year where fewer than 90% of the text PDFs produce a schedule line.
 with docs as (
     select
@@ -14,6 +16,17 @@ with docs as (
 
 parsed as (
     select distinct doc_id from {{ ref('int_house_fd__schedule_lines') }}
+    union
+    select doc_id
+    from (
+        select
+            doc_id,
+            lower({{ mogov.house_fd_restore_text('line_text') }}) as line_text
+        from {{ ref('stg_house_fd__pdf_lines') }}
+        where has_text
+    ) as restored
+    where line_text like 'schedule _:%' or line_text like 'schedule a and b%' or line_text like 'schedule a %details'
+    group by doc_id
 )
 
 select
