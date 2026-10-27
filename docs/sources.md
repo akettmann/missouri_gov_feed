@@ -451,8 +451,12 @@ Quirks:
   like bills.
 - Fragments are checked before they are cached: a body with neither the tab's container nor that tab's own
   notice (`No Fiscal Notes available`, `No amendments available`, `No summaries available`, a text-versions
-  one; Actions: its container or `No actions available`) is rejected and not cached. A generic "No ...
-  available" error page does not pass.
+  one; Actions: its container or the 81-byte `No actions found for this bill.` a bill with no actions gets) is
+  rejected and not cached. A generic "No ... available" error page does not pass. A rejected fragment does not
+  stop the run: `mo_senate_bills.fragment_rejected` is logged with the bill key, none of that bill's rows land,
+  and the next run retries it.
+- In the 2017 R list 561 of 604 bill objects have `session` = `"R "` with a trailing space (the loader's own
+  `session_type` is clean).
 - `FiscalNotes` is sent with `sessionType=<session>` as the tab's own script does (the list page's
   `data-modal-url` omits it); in a probe (2026-10-26) the fragment was the same without it. `CommitteeMinutes` answers HTTP 500 and is not requested (see #280).
 - Amendment links go to `BillInformation?handler=AmendmentPdf&year=YYYY&amendmentId=N`; text and fiscal-note

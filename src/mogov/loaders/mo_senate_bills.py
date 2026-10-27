@@ -62,9 +62,10 @@ DOC_HANDLERS = {
     "Summaries": (SUMMARIES_TABLE, b"summaries-container", re.compile(rb"No summaries available", re.I)),
 }
 DOC_TABLES = [t for t, _, _ in DOC_HANDLERS.values()]
-# The Actions tab: its container, or (not seen yet) a "No actions available" notice.
+# The Actions tab: its container, or the notice a bill with no actions gets (HTTP 200, 81 bytes, seen live
+# 2026-10: `<p ...>No actions found for this bill.</p>`).
 ACTIONS_MARKER = b"actions-container"
-ACTIONS_NONE = re.compile(rb"No actions? (?:are |is )?available", re.I)
+ACTIONS_NONE = re.compile(rb"No actions (?:found|available) for this bill", re.I)
 # senate.mo.gov accepted at ~1 request/second (#584). Every senate.mo.gov loader paces through host_throttle
 # (http.fetch min_interval), a lock shared by all processes on the machine. On Cloud Run each task has its own
 # filesystem, so the lock doesn't see the other tasks: each task slows down by the task count to keep the total.
@@ -333,17 +334,30 @@ def load(shard: db.Shard) -> dict[str, int]:
         progress = obs.Progress("bills", len(units), log)
         for year, session, bill in units:
             key = bill_key(year, session, bill["billId"])
+            params = _actions_params(year, bill)
+            url = f"{LIST_URL}?" + "&".join(f"{k}={v}" for k, v in params.items())
+            # Fetch every fragment before landing any row, so a rejected one skips the whole bill for this run
+            # (nothing cached, retried next run) instead of crashing the shard or landing a partial bill.
+            try:
+                actions = parse_actions(_get(params, year, check=_is_actions_fragment))
+                fetched = []
+                for handler in DOC_HANDLERS if docs else ():
+                    dparams = _doc_params(year, session, bill, handler)
+                    fragment = _get(dparams, year, check=_is_doc_fragment(handler))
+                    durl = f"{LIST_URL}?" + "&".join(f"{k}={v}" for k, v in dparams.items())
+                    fetched.append((handler, DOC_PARSERS[handler](fragment), durl))
+            except NotABillFragment as e:
+                log.warning("mo_senate_bills.fragment_rejected", year=year, session=session, bill_key=key, error=str(e))
+                progress.tick()
+                continue
             sink.add(
                 BILLS_TABLE,
                 key,
                 {**bill, "list_year": year, "session_type": session},
                 source_url=f"{LIST_URL}?year={year}&session={session}",
             )
-            params = _actions_params(year, bill)
-            actions = parse_actions(_get(params, year, check=_is_actions_fragment))
             if not actions:
                 log.warning("mo_senate_bills.no_actions", year=year, session=session, bill_id=bill["billId"])
-            url = f"{LIST_URL}?" + "&".join(f"{k}={v}" for k, v in params.items())
             for a in actions:
                 row = {
                     "year": year,
@@ -353,12 +367,9 @@ def load(shard: db.Shard) -> dict[str, int]:
                     **a,
                 }
                 sink.add(ACTIONS_TABLE, f"{key}/{a['action_index']}", row, source_url=url)
-            for handler in DOC_HANDLERS if docs else ():
+            for handler, parsed, durl in fetched:
                 table = DOC_HANDLERS[handler][0]
-                dparams = _doc_params(year, session, bill, handler)
-                fragment = _get(dparams, year, check=_is_doc_fragment(handler))
-                durl = f"{LIST_URL}?" + "&".join(f"{k}={v}" for k, v in dparams.items())
-                for d in DOC_PARSERS[handler](fragment):
+                for d in parsed:
                     row = {
                         "year": year,
                         "session_type": session,

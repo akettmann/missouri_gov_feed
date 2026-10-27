@@ -419,10 +419,14 @@ def test_the_summaries_notice_is_accepted_for_its_own_tab_only():
                 m._is_doc_fragment(handler)(_Resp(generic))
 
 
+# The real answer for a bill with no actions (HTTP 200, 81 bytes), captured live.
+NO_ACTIONS = "<p style='text-align: center; padding: 40px;'>No actions found for this bill.</p>"
+
+
 def test_actions_check_accepts_the_tab_and_rejects_error_pages():
     m._is_actions_fragment(_Resp(SB1_ACTIONS))
     m._is_actions_fragment(_Resp(SB600_ACTIONS))
-    m._is_actions_fragment(_Resp("<p>No actions available for this bill.</p>"))
+    m._is_actions_fragment(_Resp(NO_ACTIONS))
     for bad in ("", "<html>Service unavailable</html>", "<p>No content available</p>", SB1_TEXT):
         with pytest.raises(m.NotABillFragment):
             m._is_actions_fragment(_Resp(bad))
@@ -617,3 +621,31 @@ def test_load_checks_the_actions_fragment_before_caching_it(monkeypatch, tmp_pat
     monkeypatch.setattr(m, "_get", fake_get)
     m.load(db.Shard())
     assert len(checks) == 5 and set(checks.values()) == {m._is_actions_fragment}
+
+
+def test_no_actions_notice_is_the_real_81_byte_answer():
+    assert len(NO_ACTIONS.encode()) == 81
+    m._is_actions_fragment(_Resp(NO_ACTIONS))
+    assert m.parse_actions(NO_ACTIONS) == []
+
+
+def test_a_rejected_fragment_skips_that_bill_but_not_the_others(monkeypatch, tmp_path):
+    monkeypatch.setattr(db, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(m, "window_years", lambda: [2025])
+    monkeypatch.setenv("MOGOV_SENATE_BILL_DOCS", "0")
+
+    def fake_get(params, year, **kw):
+        if params.get("handler") == "Actions":
+            if params["billId"] == 2724185:
+                raise m.NotABillFragment("blocked")
+            return SB1_ACTIONS
+        return LIST_2025_R if params["session"] == "R" else LIST_2025_EMPTY
+
+    monkeypatch.setattr(m, "_get", fake_get)
+    counts = m.load(db.Shard())
+    assert counts[m.BILLS_TABLE] == 4  # 5 listed, the rejected one skipped
+    with db.connect() as con:
+        keys = [
+            r[0] for r in con.execute(f"select record_key from read_parquet('{db.raw_glob(m.BILLS_TABLE)}')").fetchall()
+        ]
+    assert m.bill_key(2025, "R", 2724185) not in keys
