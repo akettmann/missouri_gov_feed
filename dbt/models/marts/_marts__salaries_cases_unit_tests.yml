@@ -344,8 +344,9 @@ unit_tests:
       seats here are reshaped to reach all three comparisons: 2021-2022 carries the Open States spelling (2021 by
       seat), 2023-2024 has no seat, as for a member Open States has no term for, so that pay takes the by-name
       path against family_key 'van schoiack', and the 2025 seat carries the roster spelling, as a seat keyed on
-      the House roster would. All high (DEAN = Dean). Fails if the seat surname keeps spaces (2025 is unmatched)
-      or if the by-name surname does (family_flat back to family_key: 2023 and 2024 are unmatched).
+      the House roster would. All high (DEAN = Dean). Fails if the by-name surname keeps spaces (family_flat back
+      to family_key: 2023 and 2024 are unmatched). If only the seat surname keeps spaces, 2025 falls through to
+      the by-name match and still pairs, so this case does not catch that alone.
     given:
       - input: ref('stg_mo_employee_pay__pay')
         rows:
