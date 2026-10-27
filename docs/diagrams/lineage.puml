@@ -78,6 +78,7 @@ package "intermediate (identity resolution)" {
   [int_officeholders__years] as I_years
   [int_epa_frs__facilities] as I_frs
   [int_mo_auditor__reports] as I_aud
+  [int_bluebook__statewide_officeholders] as I_swho
 }
 
 package "marts" {
@@ -103,6 +104,7 @@ package "marts" {
   [fct_jurisdiction_businesses] as F_biz
   [fct_jurisdiction_business_donors] as F_bizd
   [fct_audit_reports] as F_aud
+  [fct_audit_report_officeholders] as F_audho
 }
 
 package "reporting (frontend views)" {
@@ -264,7 +266,10 @@ F_fac --> F_biz
 L_aud --> I_aud
 S_aud --> I_aud
 I_aud --> F_aud
-F_office --> F_aud
+I_aud --> F_audho
+L_bb --> I_swho
+I_swho --> F_audho
+F_audho --> F_aud
 D_dist --> I_bizm
 D_dist --> F_biz
 F_money --> I_bizm

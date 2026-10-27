@@ -1,0 +1,45 @@
+# Unit tests for int_bluebook__statewide_officeholders: fixed Official Manual lines -> exact expected rows.
+version: 2
+
+unit_tests:
+  - name: statewide_officeholders_are_read_from_the_historical_listings
+    model: int_bluebook__statewide_officeholders
+    description: >
+      Each "Historical Listing" heading opens an office; numbered lines after it are its holders until the next
+      heading. Covers: footnote digits after the party ("(D)12", "(R)5, 10", a stray character from a garbled
+      superscript), a two-digit end year ("2018-25"), a four-digit end year ("1897-1901"), a two-digit end year across a century ("1899-02" is 1902), an
+      open term ("2025-"), a name with a nickname in parentheses, and a ", CPA" suffix. Footnotes after the list
+      and a numbered line before any heading are not holders; neither is a numbered line in another chapter.
+      An older edition is ignored.
+    given:
+      - input: ref('stg_bluebook__lines')
+        rows:
+          - {edition: 2025-2026, chapter: executive, page: 6, page_column: 1, line_no: 1, line_text: '1. Not A Holder (D) 1999-2001 Cole', source_url: u}
+          - {edition: 2025-2026, chapter: executive, page: 7, page_column: 1, line_no: 2, line_text: 'Historical Listing, Governors', source_url: u}
+          - {edition: 2025-2026, chapter: executive, page: 7, page_column: 1, line_no: 3, line_text: 'Name and (Party) Term County Born Died', source_url: u}
+          - {edition: 2025-2026, chapter: executive, page: 7, page_column: 1, line_no: 4, line_text: '29. Lon Vest Stephens (D)9 1897–1901 Cooper 12/21/1858 01/10/1923', source_url: u}
+          - {edition: 2025-2026, chapter: executive, page: 7, page_column: 1, line_no: 4, line_text: '30. Century Wrap (D) 1899–02 Cole', source_url: u}
+          - {edition: 2025-2026, chapter: executive, page: 7, page_column: 1, line_no: 5, line_text: '55. Jeremiah W. (Jay) Nixon (D)10 2009–17 Jefferson 02/13/1956', source_url: u}
+          - {edition: 2025-2026, chapter: executive, page: 7, page_column: 1, line_no: 6, line_text: '57. Michael L. Parson (R)12 2018–25 Polk 09/17/1955', source_url: u}
+          - {edition: 2025-2026, chapter: executive, page: 7, page_column: 1, line_no: 7, line_text: '58. Mike Kehoe (R) 2025– Cole 01/17/1962', source_url: u}
+          - {edition: 2025-2026, chapter: executive, page: 8, page_column: 1, line_no: 2, line_text: '11Wilson became the 52nd governor on October 17, 2000.', source_url: u}
+          - {edition: 2025-2026, chapter: executive, page: 13, page_column: 1, line_no: 2, line_text: 'Historical Listing, Lieutenant Governors', source_url: u}
+          - {edition: 2025-2026, chapter: executive, page: 13, page_column: 1, line_no: 4, line_text: '8.Thomas Lawson Price (U)? 1848?52 Cole 01/19/1809 07/15/1870', source_url: u}
+          - {edition: 2025-2026, chapter: executive, page: 13, page_column: 1, line_no: 5, line_text: '47.Michael L. Parson (R) 2017–18 Polk 09/17/1955', source_url: u}
+          - {edition: 2025-2026, chapter: executive, page: 24, page_column: 1, line_no: 2, line_text: 'Historical Listing, Secretaries of State', source_url: u}
+          - {edition: 2025-2026, chapter: executive, page: 24, page_column: 1, line_no: 3, line_text: '41.Denny Hoskins, CPA (R) 2025– Johnson 10/10/1974', source_url: u}
+          - {edition: 2025-2026, chapter: executive, page: 24, page_column: 1, line_no: 4, line_text: '36.Rebecca McDowell Cook (D)5, 10 1994–2001 Cape Girardeau 07/18/1950', source_url: u}
+          - {edition: 2025-2026, chapter: judicial, page: 5, page_column: 1, line_no: 1, line_text: '9. Some Judge (R) 2001–05 Cole', source_url: u}
+          - {edition: 2023-2024, chapter: executive, page: 7, page_column: 1, line_no: 2, line_text: 'Historical Listing, Governors', source_url: u}
+          - {edition: 2023-2024, chapter: executive, page: 7, page_column: 1, line_no: 4, line_text: '57. Michael L. Parson (R) 2018–25 Polk', source_url: u}
+    expect:
+      rows:
+        - {edition: 2025-2026, office: governor, full_name: Lon Vest Stephens, party: D, term_start_year: 1897, term_end_year: 1901}
+        - {edition: 2025-2026, office: governor, full_name: Century Wrap, party: D, term_start_year: 1899, term_end_year: 1902}
+        - {edition: 2025-2026, office: governor, full_name: Jeremiah W. (Jay) Nixon, party: D, term_start_year: 2009, term_end_year: 2017}
+        - {edition: 2025-2026, office: governor, full_name: Michael L. Parson, party: R, term_start_year: 2018, term_end_year: 2025}
+        - {edition: 2025-2026, office: governor, full_name: Mike Kehoe, party: R, term_start_year: 2025, term_end_year: null}
+        - {edition: 2025-2026, office: lt_governor, full_name: Thomas Lawson Price, party: U, term_start_year: 1848, term_end_year: 1852}
+        - {edition: 2025-2026, office: lt_governor, full_name: Michael L. Parson, party: R, term_start_year: 2017, term_end_year: 2018}
+        - {edition: 2025-2026, office: secretary_of_state, full_name: Denny Hoskins, party: R, term_start_year: 2025, term_end_year: null}
+        - {edition: 2025-2026, office: secretary_of_state, full_name: Rebecca McDowell Cook, party: D, term_start_year: 1994, term_end_year: 2001}

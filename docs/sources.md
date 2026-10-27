@@ -804,6 +804,9 @@ Chapter PDFs (executive, legislative, judicial), one row per text line.
 
 - Lands: `bluebook_lines`.
 - Window: `MOGOV_BLUEBOOK_EDITIONS`.
+- Besides biographies and the judges, dbt reads the executive chapter's "Historical Listing" tables (every governor,
+  lieutenant governor, secretary of state, auditor, treasurer and attorney general since 1820, terms in whole years)
+  into `int_bluebook__statewide_officeholders`.
 
 Quirks:
 - PDF file names differ between editions. Links are scraped from the edition page, with a fallback to
@@ -1232,5 +1235,13 @@ Flow: [diagrams/sources/mo_auditor.svg](diagrams/sources/mo_auditor.svg)
     The "Report on Internal Control..." companions of the annual financial report have a Citizens Summary, which is still read
     (status `no_rating_sentence`).
   - The ratings cover only the areas audited. A county's rating is the county's, never one official's: only audits of a
-    statewide office (seed `mo_auditor_statewide_entities`) are linked to an officeholder, and then only to whoever held
-    the office on the release date ("in office when published", not "audited"), and only for current officials.
+    statewide office (seed `mo_auditor_statewide_entities`) are linked to officeholders, in `fct_audit_report_officeholders`
+    (#323, policy #333: everyone in office during the years the audit covers). Former holders come from the Official
+    Manual's "Historical Listing" tables (`int_bluebook__statewide_officeholders`; whole years only). The period is read
+    from the title when it names one ("Year Ended June 30, 2015", "Period July 1, 2022 through January 9, 2023"; 26 of 78
+    statewide-office audits); the Auditor's other titles ("Office of Governor") name no period, and the PDFs are not
+    parsed for it, so those audits are linked to everyone in office from January 1 of the year before the release to the
+    release date (`link_basis` = `release_window`). That is a bounded guess at the period, not the period: say "in
+    office around the time of the audit", never "audited". A mid-term change (Parson, June 2018) has no date in the
+    Manual, so both people are credited for the year. Sub-unit audits ("Office of Attorney General - Missouri Office of
+    Prosecution Services", "...Medicaid Fraud Control Unit") match the office prefix and count as the office's (#333).

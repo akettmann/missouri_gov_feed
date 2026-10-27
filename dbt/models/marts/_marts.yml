@@ -231,9 +231,10 @@ models:
       Citizens Summary: "In the areas audited, the overall performance of this entity was Good." The rating
       covers only the areas audited, not the whole operation of the entity. Ratings exist from 2012 and only
       for audits the Auditor rates (not performance audits, financial statements or follow-ups); rating_status says why a
-      row has none. Grain: one row per report. The officeholder is filled only for audits of a statewide office,
-      and is whoever held it on the release date (the audit may cover a predecessor's term). A county audit is never linked
-      to a person: the Auditor says a county's rating does not indicate the performance of any one elected official.
+      row has none. Grain: one row per report. The people an audit of a statewide office is credited to (everyone who held
+      the office during the years the audit covers) are in fct_audit_report_officeholders; here only their count and
+      basis. A county audit is never linked to a person: the Auditor says a county's rating does not indicate the
+      performance of any one elected official.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -303,17 +304,86 @@ models:
       - name: citizens_summary_url
         data_type: varchar
         description: The one-page Citizens Summary PDF, where the Auditor published one.
-      - name: officeholder_at_release_id
+      - name: audit_period_start
+        data_type: date
+        description: First day of the period the report title names ("Year Ended June 30, 2015" starts 2014-07-01); null when the title names none.
+      - name: audit_period_end
+        data_type: date
+        description: Last day of the period the report title names; null when the title names none.
+      - name: officeholder_link_basis
         data_type: varchar
-        description: "{{ doc('official_id') }} Holder of the audited statewide office on the release date, when a current official; null for any other audit."
+        description: "How fct_audit_report_officeholders chose the people for this audit: `audit_period` (the title names a period) or `release_window` (it does not). Null for audits that are not of a statewide office."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [audit_period, release_window]
+      - name: officeholder_count
+        data_type: integer
+        description: Number of people in fct_audit_report_officeholders for this report; 0 for any audit that is not of a statewide office.
+
+  - name: fct_audit_report_officeholders
+    description: >
+      The people an audit of a statewide office is credited to: everyone who held that office during the period the audit
+      covers. Grain: one row per (report, person). Only audits of a statewide office have rows; a county audit never
+      does. link_basis says what "during the audit" means for the row: `audit_period` when the report title names
+      the period it covers ("Period July 1, 2022 through January 9, 2023", "Year Ended June 30, 2015"), else
+      `release_window`, the calendar year before the release through the release date. Most titles name no period,
+      so most rows are `release_window`: the link says "in office when the audit was probably being done", not
+      "audited". Terms come from the Official Manual in whole years (a term starts January 15 of its first year), so
+      a term ending in an inauguration year (2017, 2021, 2025) ends January 15, and a mid-term change has no date in
+      the Manual, so both holders are credited for that whole year.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [report_number, office, full_name, term_start_year]
+    columns:
+      - name: report_number
+        data_type: varchar
+        description: Compact report number, as in fct_audit_reports.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_audit_reports')
+                field: report_number
+      - name: office
+        data_type: varchar
+        description: Key of the statewide office (as in statewide_officials).
+        data_tests: [not_null]
+      - name: full_name
+        data_type: varchar
+        description: The officeholder's name as the Official Manual prints it.
+        data_tests: [not_null]
+      - name: party
+        data_type: varchar
+        description: Party letter from the Official Manual (D, R, U...).
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }} Set only when the person also holds a tracked office today (matched on first and last name); null for people who left public life."
         data_tests:
           - relationships:
               arguments:
                 to: ref('dim_official')
                 field: official_id
-      - name: officeholder_at_release_name
+      - name: term_start_year
+        data_type: integer
+        description: First year of the person's term in this office, per the Official Manual.
+      - name: term_end_year
+        data_type: integer
+        description: Last year of the term; null while the person still holds the office.
+      - name: link_basis
         data_type: varchar
-        description: full_name of that official.
+        description: "`audit_period` or `release_window`; see the model description."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [audit_period, release_window]
+      - name: window_start
+        data_type: date
+        description: Start of the window the person's term was matched against.
+      - name: window_end
+        data_type: date
+        description: End of that window (the audit period's end, or the release date).
 
   - name: fct_votes
     description: >
