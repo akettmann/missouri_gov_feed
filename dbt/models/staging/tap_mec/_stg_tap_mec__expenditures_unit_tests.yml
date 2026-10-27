@@ -9,8 +9,10 @@ unit_tests:
       name ends in a linking word and the company repeats the last name. A real person whose first name has several
       words stays "First Last" (d2: 'Barbara Anne' / 'Washington'). Words other than the linking words do not
       trigger it: a couple ('Ken and' style first names, d3), a first name ending in 'of' (d4, half of 'State of'
-      / 'Missouri'), and a first name that only contains 'for' mid-name (d5). Without the company repeating the
-      last name the rule is off (d6 keeps the company).
+      / 'Missouri'), a first name that only contains 'for' mid-name (d5), and a first name that merely ends in the
+      letters 'to' with no preceding word (d7 'Toto' / 'Roe' / company 'Roe', pins the word-boundary prefix). When
+      the company does not repeat the last name the rule is off: with no company the full name is kept (d6); with
+      a different company the company wins as usual (d8).
     given:
       - input: source('tap_mec', 'expenditures')
         format: sql
@@ -35,7 +37,9 @@ unit_tests:
           union all select 'd3', 'C1', 'Committee', 'Brown', 'Ken and', 'Brown', null, null, '1', null, null, null, null, null, 'FALSE'
           union all select 'd4', 'C1', 'Committee', 'Missouri', 'State of', 'Missouri', null, null, '1', null, null, null, null, null, 'FALSE'
           union all select 'd5', 'C1', 'Committee', 'Forbes', 'Mary for Jo', 'Forbes', null, null, '1', null, null, null, null, null, 'FALSE'
-          union all select 'd6', 'C1', 'Committee', 'Acme', 'NDC Mailing for', 'USPS', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'd6', 'C1', 'Committee', null, 'NDC Mailing for', 'USPS', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'd7', 'C1', 'Committee', 'Roe', 'Toto', 'Roe', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'd8', 'C1', 'Committee', 'Acme', 'NDC Mailing for', 'USPS', null, null, '1', null, null, null, null, null, 'FALSE'
     expect:
       rows:
         - {record_id: d1, payee_name: USPS}
@@ -43,4 +47,6 @@ unit_tests:
         - {record_id: d3, payee_name: Ken and Brown}
         - {record_id: d4, payee_name: State of Missouri}
         - {record_id: d5, payee_name: Mary for Jo Forbes}
-        - {record_id: d6, payee_name: Acme}
+        - {record_id: d6, payee_name: NDC Mailing for USPS}
+        - {record_id: d7, payee_name: Toto Roe}
+        - {record_id: d8, payee_name: Acme}
