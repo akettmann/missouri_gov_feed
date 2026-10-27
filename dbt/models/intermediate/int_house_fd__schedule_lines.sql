@@ -76,3 +76,6 @@ where
     and lower(t.line_text) not like 'source (name and address)%'
     and lower(t.line_text) not like '%for the complete list of asset type%'
     and lower(t.line_text) not like 'filing id #%'
+    -- column-header spill of the 2021+ layouts (schedule F and others): would otherwise become ties
+    and lower(t.line_text) not like 'date parties to terms%'
+    and lower(t.line_text) not in ('filing', 'current year to preceding year')
