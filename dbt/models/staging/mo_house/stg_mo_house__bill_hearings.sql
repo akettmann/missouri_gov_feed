@@ -48,7 +48,7 @@ select
         when alt_time is not null and substr(notice_time, 12, 5) = '00:00' then null
         else substr(notice_time, 12, 5)
     end as hearing_time,
-    alt_time as hearing_time_note,
+    {{ mogov.redact_contact('alt_time') }} as hearing_time_note,
     {{ mogov.redact_contact('location') }} as location,
     {{ mogov.redact_contact('comments') }} as comments
 from hearings

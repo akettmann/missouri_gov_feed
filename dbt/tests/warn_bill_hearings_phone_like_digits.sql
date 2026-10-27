@@ -7,4 +7,6 @@ select
     bill,
     hearing_index
 from {{ ref('fct_bill_hearings') }}
-where {{ mogov.has_phone_like_digits('comments') }} or {{ mogov.has_phone_like_digits('location') }}
+where
+    {{ mogov.has_phone_like_digits('comments') }} or {{ mogov.has_phone_like_digits('location') }}
+    or {{ mogov.has_phone_like_digits('hearing_time_note') }}

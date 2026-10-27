@@ -1,3 +1,11 @@
+{# Separator classes (#711 round 2). Real comments use Unicode dashes (en dash U+2013 in "751–6662") and no-break
+   spaces, so the patterns accept them as separators INSTEAD OF rewriting the text: only the redacted span changes,
+   the rest of the comment keeps its characters. Dashes: U+2010-U+2015 (hyphen, non-breaking hyphen, figure, en and
+   em dash, horizontal bar), U+2212 minus, and the ASCII hyphen last. Spaces: space, U+00A0, U+202F. #}
+{% macro sep_dash() -%}[‐‑‒–—―−-]{%- endmacro %}
+{% macro sep_any() -%}[   .‐‑‒–—―−-]{%- endmacro %}
+{% macro sep_nodot() -%}[   ‐‑‒–—―−-]{%- endmacro %}
+
 {# Redact contact strings from free text, keeping the rest of the sentence. This project keeps citizens' email
    addresses and phone numbers in raw and join keys only (never in models or exports), so staging replaces just
    the address or number with a marker instead of dropping the whole text. Patterns are POSIX ERE (see
@@ -13,7 +21,7 @@
    "-1167 751-1168" as a 1-prefixed number. #}
 {# Groups: 1 = the character before, 6 = the character after (both kept on replacement). #}
 {% macro contact_phone_pattern() -%}
-    (^|[^0-9])(([+]1[ .-]?|1[ .-])?[(]?[0-9]{3}[)]?[ .-]?[0-9]{3}[ .-]?[0-9]{4}|1[0-9]{10}|1[(][0-9]{3}[)][ .-]?[0-9]{3}[ .-]?[0-9]{4}|[0-9]{3}-[0-9]{4})([ ]?(ext[.]?|EXT[.]?|Ext[.]?|x|X)[ ]?[0-9]{1,5})?([^0-9]|$)
+    (^|[^0-9])(([+]1{{ mogov.sep_any() }}?|1{{ mogov.sep_any() }})?[(]?[0-9]{3}[)]?{{ mogov.sep_any() }}?[0-9]{3}{{ mogov.sep_any() }}?[0-9]{4}|1[0-9]{10}|1[(][0-9]{3}[)]{{ mogov.sep_any() }}?[0-9]{3}{{ mogov.sep_any() }}?[0-9]{4}|[0-9]{3}{{ mogov.sep_dash() }}[0-9]{4})([ ]?(ext[.]?|EXT[.]?|Ext[.]?|x|X)[ ]?[0-9]{1,5})?([^0-9]|$)
 {%- endmacro %}
 
 {% macro redact_contact(expr) -%}
@@ -33,7 +41,7 @@
    lists, but anything that still looks like a phone after redaction must fail the build. Bill numbers are masked
    first (guard_bill_mask_pattern), so "SB 123 4567" or "HCR 12 3456" pass; "100 1000 dollars" fails loudly. #}
 {% macro guard_phone_pattern() -%}
-    (^|[^0-9])(([+]?1[ .-]?)?[(]?[0-9]{3}[)]?[ .-]?[0-9]{3}[ .-]?[0-9]{4}|[0-9]{3}[ -][0-9]{4})([^0-9]|$)
+    (^|[^0-9])(([+]?1{{ mogov.sep_any() }}?)?[(]?[0-9]{3}[)]?{{ mogov.sep_any() }}?[0-9]{3}{{ mogov.sep_any() }}?[0-9]{4}|[0-9]{3}{{ mogov.sep_nodot() }}[0-9]{4}|[0-9]{3}/[0-9]{4})([^0-9]|$)
 {%- endmacro %}
 
 {% macro guard_bill_mask_pattern() -%}

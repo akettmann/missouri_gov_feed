@@ -1,3 +1,4 @@
+# ruff: noqa: RUF001  (Unicode dashes and no-break spaces are the point of the tests)
 """Run dbt/macros/contact_redaction.sql against real DuckDB on fixed strings (#711).
 
 Covers the build-failing guard (has_contact_string), the warn-level check (has_phone_like_digits) and redaction
@@ -71,6 +72,14 @@ def _redact(text):
         "a@b.com",
         "x @ y",
         "100 1000 dollars",  # acceptable loud failure
+        "751/6662",
+        "Call 751–6662",
+        "573–751–1167",
+        "751—6662",
+        "751−6662",
+        "751‑6662",
+        "573 751 1167",
+        "573 751 1167",
     ],
 )
 def test_guard_fails_on_phone_shapes_left_in_redacted_text(text):
@@ -83,6 +92,8 @@ def test_guard_fails_on_phone_shapes_left_in_redacted_text(text):
         "SB 123 4567",
         "See HB 100 1234 and SB 123 4567",
         "HCR 12 3456",
+        "HCR 123 4567",
+        "Dates 12/2020 and 3/4/2021",
         "HJR 5 1234",
         "Call [phone removed],[phone removed] today",
         "[phone removed] [phone removed] [phone removed]",
@@ -114,6 +125,15 @@ def test_warn_ignores_ordinary_numbers(text):
         ("751-6662,751-1167", "[phone removed],[phone removed]"),
         ("751-6662 751-1167 751-1168", "[phone removed] [phone removed] [phone removed]"),
         ("SB 123 4567", "SB 123 4567"),
+        ("751–6662", "[phone removed]"),
+        ("573–751–1167", "[phone removed]"),
+        ("751—6662", "[phone removed]"),
+        ("751−6662", "[phone removed]"),
+        ("751‑6662", "[phone removed]"),
+        ("573 751 1167", "[phone removed]"),
+        ("573 751 1167", "[phone removed]"),
+        ("Call 751–6662 or 2001–2013", "Call [phone removed] or 2001–2013"),
+        ("HCR 123 4567", "HCR 123 4567"),
         ("751 6662", "751 6662"),  # left for the guard / warn check
         ("mail a.b@c.gov.", "mail [email removed]."),
     ],
