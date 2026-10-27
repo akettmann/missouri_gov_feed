@@ -1,10 +1,10 @@
 """HTTP client with an on-disk cache so re-runs don't re-hit public servers."""
 
 import contextlib
-import glob
 import hashlib
 import json
 import os
+import re
 import time
 import uuid
 from collections.abc import Callable, Iterator
@@ -63,20 +63,52 @@ def tmp_sibling(path: Path) -> Path:
     return path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.part")
 
 
-def sweep_stale_parts(path: Path, *, now: float | None = None) -> None:
-    """Delete crashed writers' temp files for `path` that nothing has touched for PART_STALE_S."""
+_PART_TAIL = r"\.\d+\.[0-9a-f]{32}\.part"  # what tmp_sibling appends to ".<name>"
+
+
+def _sweep(directory: Path, name_pattern: str, now: float | None) -> None:
+    pattern = re.compile(rf"\.{name_pattern}{_PART_TAIL}")
     now = time.time() if now is None else now
-    for old in path.parent.glob(f".{glob.escape(path.name)}.*.part"):
-        with contextlib.suppress(OSError):
-            if now - old.stat().st_mtime > PART_STALE_S:
-                old.unlink()
+    try:
+        entries = list(directory.iterdir())
+    except OSError:
+        return
+    for old in entries:
+        if pattern.fullmatch(old.name):
+            with contextlib.suppress(OSError):
+                if now - old.stat().st_mtime > PART_STALE_S:
+                    old.unlink()
+
+
+def sweep_stale_parts(path: Path, *, now: float | None = None) -> None:
+    """Delete crashed writers' temp files for exactly `path` (not for `path.foo`) that nothing has touched for
+    PART_STALE_S."""
+    _sweep(path.parent, re.escape(path.name), now)
+
+
+_swept_dirs: set[Path] = set()
+
+
+def sweep_dir_once(directory: Path, *, now: float | None = None) -> None:
+    """Delete every crashed writer's temp file in `directory` older than PART_STALE_S, once per process per
+    directory (write_atomic calls it before its first write, so each loader process sweeps CACHE_DIR at start
+    and never scans it per write).
+
+    Never removes a live writer's file: the age gate is a full day on the file's mtime, a small file is written
+    in milliseconds and a streamed download rewrites its temp file continuously, so a live writer's temp file is
+    always fresh. On Cloud Run with a gcsfuse mount a file still open for writing is not yet an object, so
+    another container's listing cannot see it, and this container sees its own local mtime."""
+    if directory in _swept_dirs:
+        return
+    _swept_dirs.add(directory)
+    _sweep(directory, ".+", now)
 
 
 def write_atomic(path: Path, content: bytes) -> None:
     """Shards share the cache; never let another process read a half-written entry. Failure removes only this
-    call's own temp file. Small files only: stale temp files from crashes are not swept here (a directory scan
-    per write); the large-download path (_stream) sweeps."""
+    call's own temp file. The first call in a process sweeps the directory for old crashed-writer temp files."""
     path.parent.mkdir(parents=True, exist_ok=True)
+    sweep_dir_once(path.parent)
     tmp = tmp_sibling(path)
     try:
         tmp.write_bytes(content)
