@@ -842,7 +842,19 @@ Quirks:
   is not "LIUNA Local 100"). Measured October 2026: 7 TAP rows ($35.4k). A third rule (#557) in the same tier
   also pairs an abbreviation or an added word: word by word one name is a prefix of the other ("deVries & Associates" /
   "DeVries and Assoc", "...Technical Ed" / "...Technical Education") and the longer name has at most two more words
-  ("Committee to Elect Jamie Burger HD"); the first word must be equal and the digits match. With several lines in the
+  ("Committee to Elect Jamie Burger HD"); the first word must be equal and the digits match. A word that is only the
+  start of another word counts (#634) only when the longer word is an organisation word from a curated list (macro
+  `is_org_word_prefix`: association, committee, construction, insurance, telecommunications, ...) and the prefix has at
+  least 3 letters (2 for "Ed" / "Education"): "Assoc" / "Associates", "Ins" / "Insurance", "Technical Ed" /
+  "Technical Education". Person surnames are not on the list, so "John Hill" / "John Hillhouse", "Smith Alex" /
+  "Smith Alexandra", "John Smith" / "John Smithson" and "Committee to Elect John Smith" / "... Smithson" stay unpaired,
+  and Roman numerals and 1-2 letter words must be equal ("Holding III" / "Holdings II"). An organisation abbreviated
+  in a way the list does not cover (a misspelling, "Mfg") is not paired by this rule. A donor name that differs from
+  another by one or two letters (10+ characters, same digits) still pairs through the typo rule above, so
+  "Citizens for Ann Smith" / "Citizens for Anne Smith" is not stopped here. The #557 fixtures "Jim Nutter" / "James Nutter Jr" were
+  changed to "James Nutter" / "James Nutter Jr" to keep their "kept" expectations. A name whose loose key is empty
+  (only stop words, legal forms and initials) is never paired. On the October 2026 data the tightening changes no
+  row (the same records: still 138 TAP notices and 78 direct-export notices dropped). With several lines in the
   group a notice is dropped only when it has exactly one name-compatible full-report line, that line has exactly one
   name-compatible notice, and no line in the group lacks a donor name. Measured October 2026: 4 more TAP notices
   ($10.9k). Left in place on purpose: two compatible candidates on either side, names that need outside knowledge
