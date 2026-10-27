@@ -126,6 +126,9 @@ kept as (
 --     entry: bond names wrap with their maturity ("Rev 5% 07/01/2031 [GS] $100,000", "05/24/2028 [GS]");
 --   * D: it carries no amount ("$..." or "N/A") and does not end on "Over" (an amount wrapped to the next line), or it
 --     is nothing but amounts;
+--   * A, B, D: the line above holds only the low end of its value range ("... $250,001 -", or "$500,001 - Dividends
+--     $2,501 -" in the 2021+ layout) and this one has an amount but no range of its own: the high end, with the part of
+--     the description that wrapped ("Road $500,000", "Merck & Company, Inc. (MRK) [ST] $1,000,000 $5,000");
 --   * H: it carries no date (mm/dd/yyyy): the sponsor, itinerary and city names wrap around the line with the dates.
 -- "Location:" / "Description:" / "Comments:" lines of B stay lines of their own (labelled attributes), and so do
 -- those of A unless the rules above apply: a parenthesis the entry above left open ("(50% Inter") pulls the next
@@ -136,7 +139,8 @@ flagged as (
     select
         k.*,
         lag(k.schedule) over (partition by k.doc_id order by k.seq) as prev_schedule,
-        lag(k.line_text) over (partition by k.doc_id order by k.seq) as prev_text
+        lag(k.line_text) over (partition by k.doc_id order by k.seq) as prev_text,
+        lag(k.line_text, 2) over (partition by k.doc_id order by k.seq) as prev2_text
     from kept as k
 ),
 
@@ -185,6 +189,19 @@ continued as (
                 )
             )
             or (
+                substr(f.schedule, 1, 1) in ('A', 'B', 'D')
+                and (
+                    {{ mogov.regex_matches('f.prev_text', '^[^$]*\\$[0-9,]+ -( [^$0-9]|$)') }}
+                    -- the checkbox glyphs of the first line wrap onto a line of their own before the asset name
+                    or (
+                        {{ mogov.regex_matches('f.prev_text', '^(gfedcb? ?)+$') }}
+                        and {{ mogov.regex_matches('f.prev2_text', '^[^$]*\\$[0-9,]+ -( [^$0-9]|$)') }}
+                    )
+                )
+                and {{ mogov.regex_matches('f.line_text', '\\$[0-9]') }}
+                and not {{ mogov.regex_matches('f.line_text', '\\$[0-9,]+ -( |$)') }}
+            )
+            or (
                 substr(f.schedule, 1, 1) = 'H'
                 and not {{ mogov.regex_matches('f.line_text', '[0-9]{1,2}/[0-9]{1,2}/[0-9]{2,4}') }}
             )
@@ -209,7 +226,10 @@ joined as (
     group by e.doc_id, e.entry_seq
 )
 
--- owner code and amount come from the entry's first line only: a joined tail must not add or change them
+-- owner code and the amount's low end come from the entry's first line: a joined tail must not add or change them.
+-- A range the PDF wrapped ("$250,001 -" / "Road $500,000", or "Over" / "$1,000,000") takes its high end from the tail.
+-- Owner codes exist only on schedules with an owner column (A, B, D and the PTR): a "DC" in a travel itinerary
+-- ("Washington, DC") is a city, not a dependent child (#702). On D the code opens the line.
 select
     e.doc_id,
     e.document_url,
@@ -219,7 +239,25 @@ select
     e.schedule,
     j.line_text,
     -- owner codes: SP spouse, DC dependent child, JT joint
-    {{ mogov.regex_extract('e.line_text', '(^| )(SP|DC|JT)( |$)', 2) }} as owner_code,
-    {{ mogov.regex_extract('e.line_text', '(\\$[0-9,]+( - \\$[0-9,]+)?|Over \\$[0-9,]+|None)') }} as amount_range
+    case
+        when substr(e.schedule, 1, 1) in ('A', 'B', 'P')
+            then {{ mogov.regex_extract('e.line_text', '(^| )(SP|DC|JT)( |$)', 2) }}
+        when substr(e.schedule, 1, 1) = 'D'
+            then {{ mogov.regex_extract('e.line_text', '^(SP|DC|JT)( |$)') }}
+    end as owner_code,
+    case
+        when
+            {{ mogov.regex_matches('e.line_text', '^[^$]*\\$[0-9,]+ -( [^$0-9]|$)') }}
+            and e.line_text != j.line_text
+            then
+                {{ mogov.regex_extract('e.line_text', '(\\$[0-9,]+)') }}
+                || coalesce(
+                    ' - ' || {{ mogov.regex_extract('substr(j.line_text, length(e.line_text) + 2)', '(\\$[0-9,]+)') }},
+                    ''
+                )
+        when {{ mogov.regex_matches('e.line_text', '(^| )Over$') }}
+            then {{ mogov.regex_extract('j.line_text', '(Over \\$[0-9,]+)') }}
+        else {{ mogov.regex_extract('e.line_text', '(\\$[0-9,]+( - \\$[0-9,]+)?|Over \\$[0-9,]+|None)') }}
+    end as amount_range
 from entries as e
 inner join joined as j on e.doc_id = j.doc_id and e.seq = j.entry_seq
