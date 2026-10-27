@@ -1,0 +1,66 @@
+# Unit tests for #753: names that differ only by spacing or compounding pair in the 24-hour-notice dedupe.
+version: 2
+
+unit_tests:
+  - name: tap_contributions_notice_dedupe_spacing_variants
+    model: int_tap_mec__contributions
+    description: >
+      Names that are identical once the spaces are removed, with different word counts, are the same donor: the notice (n) of each d pair is dropped (Century Link / CenturyLink, Fire Fighters / Firefighters, Kansas City Life / KansasCity Life, Ken Van Kirk / Ken Vankirk, Van Dyke / Vandyke, Local 541 PAC / 541PAC, John Ed Smith / John Edu Smith by the abbreviation map). Kept: same word count with the cuts at other places, and spaceless names under 6 characters.
+    given:
+      - input: ref('stg_tap_mec__contributions')
+        rows:
+          - {record_id: nd0, mec_committee_id: Rd0, contributor_name: Century Link, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fd0, mec_committee_id: Rd0, contributor_name: CenturyLink, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nd1, mec_committee_id: Rd1, contributor_name: Fire Fighters, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fd1, mec_committee_id: Rd1, contributor_name: Firefighters, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nd2, mec_committee_id: Rd2, contributor_name: Kansas City Life, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fd2, mec_committee_id: Rd2, contributor_name: KansasCity Life, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nd3, mec_committee_id: Rd3, contributor_name: Ken Van Kirk, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fd3, mec_committee_id: Rd3, contributor_name: Ken Vankirk, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nd4, mec_committee_id: Rd4, contributor_name: Van Dyke, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fd4, mec_committee_id: Rd4, contributor_name: Vandyke, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nd5, mec_committee_id: Rd5, contributor_name: Teamsters Local 541 PAC, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fd5, mec_committee_id: Rd5, contributor_name: Teamsters Local 541PAC, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nd6, mec_committee_id: Rd6, contributor_name: John Ed Smith, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fd6, mec_committee_id: Rd6, contributor_name: John Edu Smith, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nk0, mec_committee_id: Rk0, contributor_name: Marc Anthony Jones, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fk0, mec_committee_id: Rk0, contributor_name: Marca Nthony Jones, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nk1, mec_committee_id: Rk1, contributor_name: Jo Ann, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fk1, mec_committee_id: Rk1, contributor_name: Joann, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nk2, mec_committee_id: Rk2, contributor_name: Local 54 1 PAC, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fk2, mec_committee_id: Rk2, contributor_name: Local 5 41 PAC, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+    expect:
+      rows:
+        - {record_id: fd0}
+        - {record_id: fd1}
+        - {record_id: fd2}
+        - {record_id: fd3}
+        - {record_id: fd4}
+        - {record_id: fd5}
+        - {record_id: fd6}
+        - {record_id: nk0}
+        - {record_id: fk0}
+        - {record_id: nk1}
+        - {record_id: fk1}
+        - {record_id: nk2}
+        - {record_id: fk2}
+
+  - name: direct_contributions_notice_dedupe_spacing_variants
+    model: int_mec__contributions_direct
+    description: >
+      The same spacing rule for the MEC direct export: Century Link / CenturyLink is dropped, Marc Anthony Jones / Marca Nthony Jones is kept.
+    overrides:
+      vars:
+        mec_direct: true
+    given:
+      - input: ref('stg_mec__contributions')
+        rows:
+          - {record_id: nd0, mec_committee_id: Sd0, contributor_name: Century Link, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fd0, mec_committee_id: Sd0, contributor_name: CenturyLink, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nk0, mec_committee_id: Sk0, contributor_name: Marc Anthony Jones, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fk0, mec_committee_id: Sk0, contributor_name: Marca Nthony Jones, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+    expect:
+      rows:
+        - {record_id: fd0}
+        - {record_id: nk0}
+        - {record_id: fk0}

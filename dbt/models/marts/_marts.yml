@@ -504,8 +504,11 @@ models:
 
   - name: fct_federal_vote_bills
     description: >
-      Which federal bill each House or Senate roll call decided, read from the roll calls the GovInfo BILLSTATUS
-      bill actions cite and joined to Voteview. BILLSTATUS numbers a roll call by the chamber clerk's number within
+      Which federal bill each House or Senate roll call was taken on, read from the roll calls the GovInfo BILLSTATUS
+      bill actions cite and joined to Voteview. The vote is not always on the bill itself: many are procedural
+      (motion to recommit, ordering the previous question on the rule's H.Res., motion to proceed, cloture, tabling),
+      so read `vote_question` before calling a row a vote for or against the bill. Amendment roll calls are not
+      linked (BILLSTATUS keeps them under `<amendments>`, which is not parsed yet, #738). BILLSTATUS numbers a roll call by the chamber clerk's number within
       the session; Voteview's `rollnumber` runs across the Congress, so the join uses Voteview's `clerk_rollnumber`
       and `session`. Only roll calls both sources know are listed: it covers the loaded BILLSTATUS Congresses and
       bill types, so a roll call absent here means no bill was found, not that none exists (votes on nominations,
@@ -579,7 +582,8 @@ models:
     description: >
       Federal bills sponsored or cosponsored by Missouri's members of Congress, from the GovInfo BILLSTATUS bulk
       XML (loaded congresses, MOGOV_BILLSTATUS_CONGRESSES), with the outcome as a fact: became_law is true when
-      the bill carries a law number, public or private (law_type says which; a private law relieves one named person
+      the bill's actions record it becoming law (int_federal_bills__stage; the BILLSTATUS laws list only supplies
+      the number, since it can credit a law to the wrong bill, #729), public or private (law_type says which; a private law relieves one named person
       or entity and is rare, none among the 118th Congress's bills). Withdrawn cosponsorships are dropped. Whether that counts as a
       "successful" bill is a policy call this model does not make. Grain: (bioguide_id, bill_id, role).
     data_tests:
@@ -640,18 +644,20 @@ models:
         description: Text of the most recent action, as published.
       - name: law_type
         data_type: varchar
-        description: Public Law or Private Law, when the bill became law; null otherwise.
+        description: Public Law or Private Law, filled only for bills whose actions record them becoming law (became_law);
+          null otherwise.
         data_tests:
           - accepted_values:
               arguments:
                 values: [Public Law, Private Law]
       - name: law_number
         data_type: varchar
-        description: Law number, e.g. 119-21, when the bill became law. Public and private laws are numbered
+        description: Law number, e.g. 119-21, filled only for bills whose actions record them becoming law (became_law). Public and private laws are numbered
           separately, so read it with law_type. When a bill carries two laws, the earliest by number.
       - name: became_law
         data_type: boolean
-        description: True when the bill carries a law number, public or private.
+        description: True when the bill's actions record it becoming Public or Private Law (int_federal_bills__stage);
+          the laws list alone never sets it.
         data_tests: [not_null]
       - name: source_url
         data_type: varchar

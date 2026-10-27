@@ -29,6 +29,16 @@
        full-report line and that line has exactly ONE name-compatible notice, and no leftover line of the group lacks
        a donor name. Two compatible lines on either side keep every notice.
 
+    4. Spacing and compounding (#753). Names that are the same letters split into words differently, with different
+       word counts ("Century Link" / "CenturyLink", "Fire Fighters" / "Firefighters", "Van Dyke" / "Vandyke"), pair
+       too (see name_compact_match).
+
+    Known gap, left as is (#753): the typo tier pairs 5+-letter first-name and surname variants (Frances / Francis,
+    Louis / Louise, Peterson / Petersen) because the tier cannot tell a person from an organisation, and typos in the
+    first word of an organisation are real ("Lathrop GPM" / "Lanthrop GPM"). Pairing still needs the same committee,
+    date, amount, city and state and exactly one compatible line on each side, so only a lone notice and a lone
+    full-report line for two different people qualify; no such pair exists in the October 2026 data.
+
     A name whose loose key is empty (only stop words, legal forms and single letters: "A B", "The Co") is never matched
     in tiers 2 and 3 (#634): two such names would otherwise compare equal.
 
@@ -98,7 +108,9 @@
     "Assn" are both "association", as is "Ass"; "Educ" and "Edu", "Int" and "Intl", "Telecom" and "Telecomm"). Any other word comes
     back unchanged, so it only ever equals itself. A prefix pair ("Assoc" / "Associates") is the job of
     is_org_word_prefix; this covers what a prefix cannot: two shortenings that are not prefixes of each other, and
-    "Assn" / "Association". "Com" and "Comm" are mapped to the shared token 'comm', not to one word, because they stand
+    "Assn" / "Association". The map holds ass/assoc/asso/assn, ed/edu/educ, int/intl, com/comm, telecom/telecomm, dist/district
+    and govt/government. "Assoc" can also mean "Associates" (a firm) while it maps to "association"; no wrong match was seen in
+    the data. "Com" and "Comm" are mapped to the shared token 'comm', not to one word, because they stand
     for committee, commission or communications alike and the longer name decides nothing; they pair with each other
     only. Only organisation abbreviations belong here, never a surname. word is a column or expression. -#}
 {% macro org_word_abbreviation(word) -%}
@@ -123,7 +135,7 @@
     "... Smithson" stay unpaired, and words of 1-2 letters (except "Ed" for education) and Roman numerals ("Holding III"
     / "Holdings II") must be equal. Equal words and extra trailing words always count.
     Two different abbreviations of one word ("Assoc" / "Assn", "Educ" / "Edu") also count, through the map in
-    org_word_abbreviation (#740). Compares up to 8 words; digits are compared by the caller.
+    org_word_abbreviation (#740), from word 2 on: "John Ed Smith" / "John Edu Smith" pair by design (pinned in a unit test). Compares up to 8 words; digits are compared by the caller.
     n_a, n_b are the word counts of a, b (columns or expressions). -#}
 {% macro name_words_match(a, b, n_a, n_b) -%}
     (
@@ -173,6 +185,21 @@
             or (length({{ wa }}) >= 5 and length({{ wb }}) >= 5)
         )
         {%- endfor %}
+    )
+{%- endmacro %}
+
+{#- True when two loose_name_keys are the same letters and digits split into words differently (#753): "Century Link" /
+    "CenturyLink", "Fire Fighters" / "Firefighters", "Ken Van Kirk" / "Ken Vankirk", "Teamsters Local 541 PAC" /
+    "Teamsters Local 541PAC". The names must have different word counts, so two names that merely cut the same letters at
+    other places ("Marc Anthony" / "Marca Nthony") never pair, and the spaceless name needs 6+ characters. Equal
+    spaceless names carry the same digits, so the caller's digit check is not needed. This is no looser than an
+    exact match: every letter is equal, only the spaces differ. A person name that is one word in one spelling and
+    two in another ("Van Dyke" / "Vandyke") is the same name. n_a, n_b are the word counts of a, b. -#}
+{% macro name_compact_match(a, b, n_a, n_b) -%}
+    (
+        {{ n_a }} <> {{ n_b }}
+        and length(replace({{ a }}, ' ', '')) >= 6
+        and replace({{ a }}, ' ', '') = replace({{ b }}, ' ', '')
     )
 {%- endmacro %}
 
@@ -272,6 +299,7 @@ compatible as (
         and full_report_loose <> ''
         and (
             notice_loose = full_report_loose
+            or {{ mogov.name_compact_match('notice_loose', 'full_report_loose', 'notice_words', 'full_report_words') }}
             or (
                 {{ mogov.regex_replace_all('notice_loose', '[^0-9]', '') }}
                 = {{ mogov.regex_replace_all('full_report_loose', '[^0-9]', '') }}
