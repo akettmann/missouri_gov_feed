@@ -57,9 +57,9 @@ unit_tests:
         format: dict
       - input: ref('int_mo_legislators__seats')
         rows:
-          - {person_id: 'ocd-person/rebecca', chamber: lower, district_number: 34, start_date: '2015-01-01', end_date: '2019-07-30'}
-          - {person_id: 'ocd-person/lee', chamber: lower, district_number: 42, start_date: '2015-01-01', end_date: '2020-12-31'}
-          - {person_id: 'ocd-person/arthur', chamber: lower, district_number: 18, start_date: '2015-01-01', end_date: '2016-12-31'}
+          - {person_id: 'ocd-person/rebecca', chamber: lower, district_number: 34, start_date: '2015-01-01', start_quality: placeholder, end_date: '2019-07-30'}
+          - {person_id: 'ocd-person/lee', chamber: lower, district_number: 42, start_date: '2015-01-01', start_quality: placeholder, end_date: '2020-12-31'}
+          - {person_id: 'ocd-person/arthur', chamber: lower, district_number: 18, start_date: '2015-01-01', start_quality: placeholder, end_date: '2016-12-31'}
       - input: ref('stg_congress__terms')
         rows: []
         format: dict
@@ -109,7 +109,7 @@ unit_tests:
         format: dict
       - input: ref('int_mo_legislators__seats')
         rows:
-          - {person_id: 'p_arthur', chamber: lower, district_number: 18, start_date: '2015-01-01', end_date: '2016-12-31'}
+          - {person_id: 'p_arthur', chamber: lower, district_number: 18, start_date: '2015-01-01', start_quality: placeholder, end_date: '2016-12-31'}
       - input: ref('stg_congress__terms')
         rows: []
         format: dict
@@ -186,43 +186,43 @@ unit_tests:
         format: dict
       - input: ref('int_mo_legislators__seats')
         rows:
-          - {person_id: 'p01', full_name: Ann Undated, chamber: upper, district_number: 1, start_date: '1900-01-01', end_date: '2020-12-31', openstates_id: 'p01'}
-          - {person_id: 'p02', full_name: Eve Holder, chamber: upper, district_number: 1, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'p02'}
-          - {person_id: 'p03', full_name: Bob Left, chamber: upper, district_number: 2, start_date: '2011-01-01', end_date: '2018-01-03', openstates_id: 'p03'}
-          - {person_id: 'p04', full_name: Cat Successor, chamber: upper, district_number: 2, start_date: '2018-01-04', end_date: '9999-12-31', openstates_id: 'p04'}
-          - {person_id: 'p05', full_name: Fay Resigned, chamber: upper, district_number: 3, start_date: '2017-01-04', end_date: '2018-01-16', openstates_id: 'p05'}
-          - {person_id: 'p06', full_name: Dan HouseSeat, chamber: lower, district_number: 4, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'p06'}
-          - {person_id: 'p07', full_name: Gus Holder, chamber: upper, district_number: 4, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'p07'}
-          - {person_id: 'q05', full_name: Filler 5, chamber: upper, district_number: 5, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q05'}
-          - {person_id: 'q06', full_name: Filler 6, chamber: upper, district_number: 6, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q06'}
-          - {person_id: 'q07', full_name: Filler 7, chamber: upper, district_number: 7, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q07'}
-          - {person_id: 'q08', full_name: Filler 8, chamber: upper, district_number: 8, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q08'}
-          - {person_id: 'q09', full_name: Filler 9, chamber: upper, district_number: 9, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q09'}
-          - {person_id: 'q10', full_name: Filler 10, chamber: upper, district_number: 10, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q10'}
-          - {person_id: 'q11', full_name: Filler 11, chamber: upper, district_number: 11, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q11'}
-          - {person_id: 'q12', full_name: Filler 12, chamber: upper, district_number: 12, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q12'}
-          - {person_id: 'q13', full_name: Filler 13, chamber: upper, district_number: 13, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q13'}
-          - {person_id: 'q14', full_name: Filler 14, chamber: upper, district_number: 14, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q14'}
-          - {person_id: 'q15', full_name: Filler 15, chamber: upper, district_number: 15, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q15'}
-          - {person_id: 'q16', full_name: Filler 16, chamber: upper, district_number: 16, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q16'}
-          - {person_id: 'q17', full_name: Filler 17, chamber: upper, district_number: 17, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q17'}
-          - {person_id: 'q18', full_name: Filler 18, chamber: upper, district_number: 18, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q18'}
-          - {person_id: 'q19', full_name: Filler 19, chamber: upper, district_number: 19, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q19'}
-          - {person_id: 'q20', full_name: Filler 20, chamber: upper, district_number: 20, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q20'}
-          - {person_id: 'q21', full_name: Filler 21, chamber: upper, district_number: 21, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q21'}
-          - {person_id: 'q22', full_name: Filler 22, chamber: upper, district_number: 22, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q22'}
-          - {person_id: 'q23', full_name: Filler 23, chamber: upper, district_number: 23, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q23'}
-          - {person_id: 'q24', full_name: Filler 24, chamber: upper, district_number: 24, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q24'}
-          - {person_id: 'q25', full_name: Filler 25, chamber: upper, district_number: 25, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q25'}
-          - {person_id: 'q26', full_name: Filler 26, chamber: upper, district_number: 26, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q26'}
-          - {person_id: 'q27', full_name: Filler 27, chamber: upper, district_number: 27, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q27'}
-          - {person_id: 'q28', full_name: Filler 28, chamber: upper, district_number: 28, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q28'}
-          - {person_id: 'q29', full_name: Filler 29, chamber: upper, district_number: 29, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q29'}
-          - {person_id: 'q30', full_name: Filler 30, chamber: upper, district_number: 30, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q30'}
-          - {person_id: 'q31', full_name: Filler 31, chamber: upper, district_number: 31, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q31'}
-          - {person_id: 'q32', full_name: Filler 32, chamber: upper, district_number: 32, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q32'}
-          - {person_id: 'q33', full_name: Filler 33, chamber: upper, district_number: 33, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q33'}
-          - {person_id: 'q34', full_name: Filler 34, chamber: upper, district_number: 34, start_date: '2017-01-04', end_date: '9999-12-31', openstates_id: 'q34'}
+          - {person_id: 'p01', full_name: Ann Undated, chamber: upper, district_number: 1, start_date: '1900-01-01', start_quality: undated, end_date: '2020-12-31', openstates_id: 'p01'}
+          - {person_id: 'p02', full_name: Eve Holder, chamber: upper, district_number: 1, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'p02'}
+          - {person_id: 'p03', full_name: Bob Left, chamber: upper, district_number: 2, start_date: '2011-01-01', start_quality: placeholder, end_date: '2018-01-03', openstates_id: 'p03'}
+          - {person_id: 'p04', full_name: Cat Successor, chamber: upper, district_number: 2, start_date: '2018-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'p04'}
+          - {person_id: 'p05', full_name: Fay Resigned, chamber: upper, district_number: 3, start_date: '2017-01-04', start_quality: dated, end_date: '2018-01-16', openstates_id: 'p05'}
+          - {person_id: 'p06', full_name: Dan HouseSeat, chamber: lower, district_number: 4, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'p06'}
+          - {person_id: 'p07', full_name: Gus Holder, chamber: upper, district_number: 4, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'p07'}
+          - {person_id: 'q05', full_name: Filler 5, chamber: upper, district_number: 5, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q05'}
+          - {person_id: 'q06', full_name: Filler 6, chamber: upper, district_number: 6, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q06'}
+          - {person_id: 'q07', full_name: Filler 7, chamber: upper, district_number: 7, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q07'}
+          - {person_id: 'q08', full_name: Filler 8, chamber: upper, district_number: 8, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q08'}
+          - {person_id: 'q09', full_name: Filler 9, chamber: upper, district_number: 9, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q09'}
+          - {person_id: 'q10', full_name: Filler 10, chamber: upper, district_number: 10, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q10'}
+          - {person_id: 'q11', full_name: Filler 11, chamber: upper, district_number: 11, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q11'}
+          - {person_id: 'q12', full_name: Filler 12, chamber: upper, district_number: 12, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q12'}
+          - {person_id: 'q13', full_name: Filler 13, chamber: upper, district_number: 13, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q13'}
+          - {person_id: 'q14', full_name: Filler 14, chamber: upper, district_number: 14, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q14'}
+          - {person_id: 'q15', full_name: Filler 15, chamber: upper, district_number: 15, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q15'}
+          - {person_id: 'q16', full_name: Filler 16, chamber: upper, district_number: 16, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q16'}
+          - {person_id: 'q17', full_name: Filler 17, chamber: upper, district_number: 17, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q17'}
+          - {person_id: 'q18', full_name: Filler 18, chamber: upper, district_number: 18, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q18'}
+          - {person_id: 'q19', full_name: Filler 19, chamber: upper, district_number: 19, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q19'}
+          - {person_id: 'q20', full_name: Filler 20, chamber: upper, district_number: 20, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q20'}
+          - {person_id: 'q21', full_name: Filler 21, chamber: upper, district_number: 21, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q21'}
+          - {person_id: 'q22', full_name: Filler 22, chamber: upper, district_number: 22, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q22'}
+          - {person_id: 'q23', full_name: Filler 23, chamber: upper, district_number: 23, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q23'}
+          - {person_id: 'q24', full_name: Filler 24, chamber: upper, district_number: 24, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q24'}
+          - {person_id: 'q25', full_name: Filler 25, chamber: upper, district_number: 25, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q25'}
+          - {person_id: 'q26', full_name: Filler 26, chamber: upper, district_number: 26, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q26'}
+          - {person_id: 'q27', full_name: Filler 27, chamber: upper, district_number: 27, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q27'}
+          - {person_id: 'q28', full_name: Filler 28, chamber: upper, district_number: 28, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q28'}
+          - {person_id: 'q29', full_name: Filler 29, chamber: upper, district_number: 29, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q29'}
+          - {person_id: 'q30', full_name: Filler 30, chamber: upper, district_number: 30, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q30'}
+          - {person_id: 'q31', full_name: Filler 31, chamber: upper, district_number: 31, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q31'}
+          - {person_id: 'q32', full_name: Filler 32, chamber: upper, district_number: 32, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q32'}
+          - {person_id: 'q33', full_name: Filler 33, chamber: upper, district_number: 33, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q33'}
+          - {person_id: 'q34', full_name: Filler 34, chamber: upper, district_number: 34, start_date: '2017-01-04', start_quality: dated, end_date: '9999-12-31', openstates_id: 'q34'}
       - input: ref('stg_congress__terms')
         rows: []
         format: dict

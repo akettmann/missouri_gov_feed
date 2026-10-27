@@ -42,10 +42,10 @@ unit_tests:
       - input: ref('int_mo_legislators__seats')
         rows:
           - {person_id: 'ocd-person/7529d2d2-0cc1-4d30-9e8f-12d3773dff8d', full_name: Cody Smith, surname_key: smith, chamber: lower, start_date: '2017-01-01', end_date: '2025-01-07'}
-          - {person_id: 'ocd-person/c509449e-070c-462c-810e-f14315c9df42', full_name: David Smith, surname_key: smith, chamber: lower, start_date: '1900-01-01', end_date: '2023-01-03'}
+          - {person_id: 'ocd-person/c509449e-070c-462c-810e-f14315c9df42', full_name: David Smith, surname_key: smith, chamber: lower, start_date: '1900-01-01', start_quality: undated, end_date: '2023-01-03'}
           - {person_id: 'ocd-person/c509449e-070c-462c-810e-f14315c9df42', full_name: David Smith, surname_key: smith, chamber: lower, start_date: '2023-01-01', end_date: '9999-12-31'}
-          - {person_id: 'ocd-person/59ac7bab-e54b-496a-8f1d-61c275f3c2eb', full_name: Clem Smith, surname_key: smith, chamber: lower, start_date: '1900-01-01', end_date: '2018-12-31'}
-          - {person_id: 'ocd-person/0c9efb98-e995-4927-a2c1-ee627a5faf0a', full_name: Neil Smith, surname_key: smith, chamber: lower, start_date: '1900-01-01', end_date: '2023-01-03'}
+          - {person_id: 'ocd-person/59ac7bab-e54b-496a-8f1d-61c275f3c2eb', full_name: Clem Smith, surname_key: smith, chamber: lower, start_date: '1900-01-01', start_quality: undated, end_date: '2018-12-31'}
+          - {person_id: 'ocd-person/0c9efb98-e995-4927-a2c1-ee627a5faf0a', full_name: Neil Smith, surname_key: smith, chamber: lower, start_date: '1900-01-01', start_quality: undated, end_date: '2023-01-03'}
           - {person_id: 'ocd-person/74efb08b-f153-4d63-b6d6-c685d6a04790', full_name: Travis Smith, surname_key: smith, chamber: lower, start_date: '2021-01-01', end_date: '2025-01-07'}
           - {person_id: 'ocd-person/e4b24233-89d2-41eb-b360-ae297e3385ba', full_name: Kem Smith, surname_key: smith, chamber: lower, start_date: '2025-01-01', end_date: '9999-12-31'}
           - {person_id: 'ocd-person/56a68a64-7a44-4052-b5f2-e9f7c626e311', full_name: Marla Smith, surname_key: smith, chamber: lower, start_date: '2025-01-01', end_date: '9999-12-31'}
@@ -111,7 +111,7 @@ unit_tests:
           - {agency_name: LEGISLATURE, position_title: SENATOR, office_group: legislature}
       - input: ref('int_mo_legislators__seats')
         rows:
-          - {person_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', full_name: Steven Roberts, surname_key: roberts, chamber: lower, start_date: '1900-01-01', end_date: '2020-12-31'}
+          - {person_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', full_name: Steven Roberts, surname_key: roberts, chamber: lower, start_date: '1900-01-01', start_quality: undated, end_date: '2020-12-31'}
           - {person_id: 'ocd-person/20ad6a34-2965-4068-b819-49c5e0d27831', full_name: Steve Roberts, surname_key: roberts, chamber: upper, start_date: '2021-01-01', end_date: '9999-12-31'}
           - {person_id: 'ocd-person/56f5920f-46d9-4991-b029-5984b80cd7ff', full_name: Lane Roberts, surname_key: roberts, chamber: lower, start_date: '2019-01-01', end_date: '9999-12-31'}
       - input: ref('int_mo_legislators__final_checks')
@@ -234,10 +234,10 @@ unit_tests:
         rows: *legislature_titles
       - input: ref('int_mo_legislators__seats')
         rows:
-          - {person_id: 'ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0', full_name: Rusty Black, surname_key: black, chamber: lower, start_date: '1900-01-01', end_date: '2023-01-03'}
+          - {person_id: 'ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0', full_name: Rusty Black, surname_key: black, chamber: lower, start_date: '1900-01-01', start_quality: undated, end_date: '2023-01-03'}
           - {person_id: 'ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0', full_name: Rusty Black, surname_key: black, chamber: upper, start_date: '2023-01-01', end_date: '9999-12-31'}
           - {person_id: 'ocd-person/a421125b-3625-4309-b4a7-73ec15541bf5', full_name: Linda Black, surname_key: black, chamber: lower, start_date: '2013-01-01', end_date: '2016-12-31'}
-          - {person_id: 'ocd-person/1250ea3d-fe5c-46ea-bead-f7249d234e68', full_name: John Black, surname_key: black, chamber: lower, start_date: '1900-01-01', end_date: '2022-12-29'}
+          - {person_id: 'ocd-person/1250ea3d-fe5c-46ea-bead-f7249d234e68', full_name: John Black, surname_key: black, chamber: lower, start_date: '1900-01-01', start_quality: undated, end_date: '2022-12-29'}
           - {person_id: 'ocd-person/1250ea3d-fe5c-46ea-bead-f7249d234e68', full_name: John Black, surname_key: black, chamber: lower, start_date: '2023-01-01', end_date: '9999-12-31'}
       - input: ref('int_mo_legislators__final_checks')
         rows:
@@ -296,9 +296,9 @@ unit_tests:
           - {person_id: 'ocd-person/43563b48-1d26-4a85-bad2-615971201d41', full_name: Mike Moon, surname_key: moon, chamber: upper, start_date: '2021-01-01', end_date: '9999-12-31'}
           - {person_id: 'ocd-person/bfad4ef7-fad2-46e6-8f12-f8ea9feaa0cb', full_name: Mike Henderson, surname_key: henderson, chamber: lower, start_date: '2017-01-01', end_date: '2025-01-08'}
           - {person_id: 'ocd-person/d8594030-4826-48c5-af43-674470f1dd44', full_name: Maggie Nurrenbern, surname_key: nurrenbern, chamber: lower, start_date: '2021-01-01', end_date: '2025-01-08'}
-          - {person_id: 'ocd-person/3de9f0e2-7062-4363-91d0-c3f17084ced4', full_name: John Simmons, surname_key: simmons, chamber: lower, start_date: '1900-01-01', end_date: '2023-01-03'}
+          - {person_id: 'ocd-person/3de9f0e2-7062-4363-91d0-c3f17084ced4', full_name: John Simmons, surname_key: simmons, chamber: lower, start_date: '1900-01-01', start_quality: undated, end_date: '2023-01-03'}
           - {person_id: 'ocd-person/3de9f0e2-7062-4363-91d0-c3f17084ced4', full_name: John Simmons, surname_key: simmons, chamber: lower, start_date: '2025-01-01', end_date: '9999-12-31'}
-          - {person_id: 'ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df', full_name: Mark Matthiesen, surname_key: matthiesen, chamber: lower, start_date: '1900-01-01', end_date: '2018-12-31'}
+          - {person_id: 'ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df', full_name: Mark Matthiesen, surname_key: matthiesen, chamber: lower, start_date: '1900-01-01', start_quality: undated, end_date: '2018-12-31'}
           - {person_id: 'ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df', full_name: Mark Matthiesen, surname_key: matthiesen, chamber: lower, start_date: '2023-01-01', end_date: '9999-12-31'}
       - input: ref('int_mo_legislators__final_checks')
         rows: []

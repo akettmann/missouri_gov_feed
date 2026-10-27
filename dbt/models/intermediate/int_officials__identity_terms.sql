@@ -3,7 +3,8 @@
 -- House member id) for the
 -- years with a House roster, from the House's own roster (its raw seat-matched key: an Open States id or
 -- mohouse:<House member id>) and from Open States seat-terms (both chambers). A term counts for a year when it
--- runs past January 15 of it, and terms with an undated start are left out, as in int_officeholders__years.
+-- runs past January 15 of it. A term with an undated start (start_quality undated in int_mo_legislators__seat_terms)
+-- counts only for its last year (below); a placeholder start (January 1, #656) counts like a dated one.
 -- house_member_id is the MO House member id the roster gave the row (null for Open States seat-terms): the House keeps
 -- one member id per person across sessions and name changes, so the person-id rule can follow it. name_key is the
 -- id's own full name. term_start/term_end are the Open States term's dates exactly as Open States
@@ -78,9 +79,11 @@ seat_terms as (
         {{ dbt.safe_cast('s.source_end_date', 'date') }} as term_end
     from {{ ref('int_mo_legislators__seat_terms') }} as s
     inner join years as y on s.start_date <= y.year_end and s.end_date > y.handover_date
-    -- int_mo_legislators__seat_terms puts undated starts at 1900-01-01: their first year is unknown, so they are no
-    -- evidence of the years they would span (undated_terms below gives them their last year)
-    where s.start_date > {{ dbt.safe_cast("'1900-01-01'", 'date') }}
+    -- an undated start's first year is unknown, so it is no evidence of the years it would span (undated_terms below
+    -- gives it its last year). A placeholder start (January 1, as given) is kept as dated: its term still ran in the
+    -- 2015+ years it spans (69 placeholder terms, 163 term-years today; counting them as undated would drop 94 of
+    -- those years and change no person_id, #662).
+    where s.start_quality <> 'undated'
 ),
 
 -- an undated-start term: the last year it ran past the handover, the one year Open States' end date proves
@@ -94,7 +97,7 @@ undated_terms as (
         {{ dbt.safe_cast('s.source_end_date', 'date') }} as term_end
     from {{ ref('int_mo_legislators__seat_terms') }} as s
     inner join years as y on s.end_date > y.handover_date
-    where s.start_date = {{ dbt.safe_cast("'1900-01-01'", 'date') }}
+    where s.start_quality = 'undated'
     group by s.openstates_id, s.chamber, s.district_number, s.full_name, s.source_end_date
 ),
 

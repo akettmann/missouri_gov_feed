@@ -60,9 +60,15 @@ What this means in practice:
 - Senate votes are attributed against Open States' own seat dates, and only then do those votes re-date the
   Senate seats. House votes are not used to re-date House seats in the shared seat model yet (#547 item 3).
 - Evidence for cleaning Open States term dates before matching must come from staging (the House roster,
-  the journal tokens in `stg_mo_senate__votes`), not from the attributed vote models. Planned, see #656:
-  start/end quality flags and `known_start_date` on `int_mo_legislators__seat_terms`, computed that way.
-  Planned, see #662: consumers switch to those flags and drop the ad-hoc `1900-01-01` checks.
+  the journal tokens in `stg_mo_senate__votes`), not from the attributed vote models. `int_mo_legislators__seat_terms`
+  computes its start/end quality flags that way (#656).
+- Every rule below that needs to know whether a start is known reads `start_quality` (#662), never the
+  `1900-01-01` date that `int_mo_legislators__seat_terms` still puts in `start_date` for an undated start.
+  `int_mo_legislators__seats_as_given` carries the flag, and `int_mo_legislators__seats` passes it on, with
+  `first_vote` for an undated Senate start it re-dates from the first journal vote. A known start is
+  `start_quality <> 'undated'`, so a `placeholder` start (January 1, as given) counts as known, as it did when the
+  rules compared dates. The end flags (`end_quality`, `evidence_*_date`) are not read by any rule yet: the Senate
+  re-dating still uses the votes `int_mo_senate__votes` attributes, which give the same dates today (#656).
 
 ## Rules in precedence order
 
@@ -79,7 +85,8 @@ Gives each House roster row (session, member) a `raw_person_key`. This is not a 
 House roster's key that `person_ids` then reconciles.
 
 1. **Candidates** (lines 15-33): Open States House terms in the member's district whose dates
-   (January-1 adjusted, undated starts at `1900-01-01`) cover March 1 of the session year, with a surname that
+   (January-1 adjusted `start_date`, so an undated start is `1900-01-01` and the term covers every session
+   before its end; `start_quality` is not read) cover March 1 of the session year, with a surname that
    fits: equal, the roster surname ends with the Open States surname, or the Open States full name ends with
    the roster surname.
 2. **Seat match** (lines 40-53), grouped by (session, district): one candidate wins. With several, the one
@@ -160,7 +167,10 @@ Two names that differ only in the given name, one given name the start of the ot
      start_b < end_a`), and one term is a stub under 90 days nested in the other and starting within 31 days of
      it. Overlap alone is not enough: Open States leaves a mid-term departure at the normal term end, so a
      special-election successor overlaps on paper (#313); and two different people can hold the same
-     placeholder `2013-01-01` term (#332). Roster rows have no dates and prove no overlap.
+     placeholder `2013-01-01` term (#332). Roster rows have no dates and prove no overlap. The test reads
+     `term_start`, Open States' start as given: a `placeholder` term takes part with its January 1 date (the
+     stub guard keeps two same-span placeholder terms apart), and an `undated` term has no `term_start`, so it is
+     never part of an overlap.
    - **chamber move** (lines 186-215): one name's last year is the year before the other's first, those two
      years are in different offices, and not in the same office. The same chamber a year apart is a successor
      (Dan, then Danielle Smith).
@@ -219,9 +229,12 @@ in the latest roster year, so an official's id does not change when they leave o
 
 One row per (alias, year, office, district, House member id) for each House roster year plus the two years
 before the first one (lines 37-53, so Stephen Webber's House term ending 2016-12-31 still counts, #504, and the
-2015 resignations, #512). A term counts for a year when it runs past January 15 (line 80). An undated start
-(`1900-01-01`) counts only for its last year (lines 83, 87-112). `term_start`/`term_end` are Open States' own
-dates, not the January-1 adjusted ones (lines 77-78). Known edge: one id holding a seat in two terms in one year
+2015 resignations, #512). A term counts for a year when it runs past January 15 (line 81). A term with
+`start_quality = 'undated'` counts only for its last year (lines 85, 89-114). A `placeholder` start counts like a
+dated one (#662): 69 placeholder terms (2011, 2013, 2015 and one 2017 start) run into the 2015+ evidence years for
+163 term-years. Counting them as undated would drop 94 of those years and change no `person_id` (measured on a full
+build, 2026-10-27), so they are kept. `term_start`/`term_end` are Open States' own dates, not
+the January-1 adjusted ones (lines 78-79). Known edge: one id holding a seat in two terms in one year
 is collapsed to one span (`identity_terms_collapse_two_terms_of_one_id_in_a_seat_to_one_span`).
 
 ## Downstream attribution rules
@@ -265,15 +278,17 @@ token stays unattributed.
   disagree with attendance for many members (#565), so they are only a tie-break, never a hard filter in the own
   session.
 
-### Senate seat re-dating (`int_mo_legislators__seats.sql` lines 94-168)
+### Senate seat re-dating (`int_mo_legislators__seats.sql` lines 97-170)
 
 Senate terms are re-dated from the journal votes attributed to them, term by term (#516, #522):
 
-- an undated start becomes the term's first vote (lines 116-123);
-- a closed term that Open States ends more than a year after its last vote ends at that vote (lines 124-132);
+- an undated start (`start_quality = 'undated'`) becomes the term's first vote, and its `start_quality` becomes
+  `first_vote` (lines 120-122, 158, 164);
+- a closed term that Open States ends more than a year after its last vote ends at that vote (lines 123-132);
 - a closed term in the journal years with no vote ends the day before the journals begin if it started before
-  them, else it is dropped (lines 108-115, 159-168);
-- dropping or capping needs journal votes in every year of the term (lines 44-77, #534).
+  them (a known start: `start_quality <> 'undated'`, placeholders included), else it is dropped (lines 111-119,
+  160, 167-170);
+- dropping or capping needs journal votes in every year of the term (lines 47-80, #534).
 
 House terms keep Open States' dates.
 
@@ -291,7 +306,8 @@ A House roster row is kept for a year unless either:
 2. the person's last attributed roll-call vote was before January 15, in a year that has House roll calls on or
    after January 15 (line 92, #491). The Speaker is attributed from the seed, so this works for Speakers too.
 
-A Senate year is kept only when all 34 districts have a dated holder (lines 117-128).
+A Senate year is kept only when all 34 districts have a holder with a known start (`start_quality <> 'undated'`
+in `int_mo_legislators__seats`, which counts a start re-dated from the first vote, line 114; lines 95-128).
 
 - Tests: `officeholders_house_row_dropped_when_the_roster_outlives_the_members_last_term`,
   `officeholders_house_row_dropped_when_the_members_last_roll_call_is_before_the_handover`,
@@ -303,9 +319,9 @@ A Senate year is kept only when all 34 districts have a dated holder (lines 117-
 ### Payroll pairing (`fct_salaries.sql` lines 59-310, `int_mo_legislators__final_checks.sql`)
 
 Legislator pay is paired by seat: payroll surname + chamber + year against every person's seats in
-`int_mo_legislators__seats` (lines 73-92), then by first-name fit, middle initial and the last pair left (the
+`int_mo_legislators__seats` (lines 74-93), then by first-name fit, middle initial and the last pair left (the
 model header, lines 7-30, lists the four steps). A seat with an undated start counts from the person's first
-roster year in that chamber (lines 63-71, 86-90, #227). A small payment to a member whose seat ended the December
+roster year in that chamber (`start_quality = 'undated'`, lines 64-72, 87-91, #227). A small payment to a member whose seat ended the December
 before, or that January, is that member's final check (`int_mo_legislators__final_checks` lines 26-57) and is set
 aside before pairing.
 

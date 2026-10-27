@@ -11,22 +11,24 @@ unit_tests:
       undated start is dropped. a07: the same with a start inside the journal years is dropped. a08: a term that
       ended before the journals begin keeps its dates. a09: a term with no vote but an open end is kept as it is.
       a10 has two terms: the first is capped by its own last vote, not by the person's later votes in the second
-      term, and the second keeps its dated start. House terms keep Open States' dates, undated or not.
+      term, and the second keeps its dated start. House terms keep Open States' dates, undated or not. start_quality
+      passes through, except first_vote for a start re-dated from the first vote (a01); a placeholder start (a05)
+      is a known start, so it is capped, not dropped.
     given:
       - input: ref('int_mo_legislators__seats_as_given')
         rows:
-          - {openstates_id: a01, person_id: a01, chamber: upper, district_number: 1, start_date: '1900-01-01', end_date: '2020-12-31'}
-          - {openstates_id: a02, person_id: a02, chamber: upper, district_number: 2, start_date: '2011-01-01', end_date: '2018-12-31'}
-          - {openstates_id: a03, person_id: a03, chamber: upper, district_number: 3, start_date: '2017-01-01', end_date: '2018-01-16'}
-          - {openstates_id: a04, person_id: a04, chamber: upper, district_number: 4, start_date: '2017-01-01', end_date: '9999-12-31'}
-          - {openstates_id: a05, person_id: a05, chamber: upper, district_number: 5, start_date: '2011-01-01', end_date: '2018-12-31'}
-          - {openstates_id: a06, person_id: a06, chamber: upper, district_number: 6, start_date: '1900-01-01', end_date: '2018-12-31'}
-          - {openstates_id: a07, person_id: a07, chamber: upper, district_number: 7, start_date: '2017-02-01', end_date: '2018-12-31'}
-          - {openstates_id: a08, person_id: a08, chamber: upper, district_number: 8, start_date: '2009-01-01', end_date: '2016-12-31'}
-          - {openstates_id: a09, person_id: a09, chamber: upper, district_number: 9, start_date: '2017-02-01', end_date: '9999-12-31'}
-          - {openstates_id: a10, person_id: a10, chamber: upper, district_number: 10, start_date: '2011-01-01', end_date: '2018-12-31'}
-          - {openstates_id: a10b, person_id: a10, chamber: upper, district_number: 10, start_date: '2019-01-01', end_date: '9999-12-31'}
-          - {openstates_id: h01, person_id: h01, chamber: lower, district_number: 1, start_date: '1900-01-01', end_date: '2018-12-31'}
+          - {openstates_id: a01, person_id: a01, chamber: upper, district_number: 1, start_date: '1900-01-01', start_quality: undated, end_date: '2020-12-31'}
+          - {openstates_id: a02, person_id: a02, chamber: upper, district_number: 2, start_date: '2011-01-01', start_quality: placeholder, end_date: '2018-12-31'}
+          - {openstates_id: a03, person_id: a03, chamber: upper, district_number: 3, start_date: '2017-01-01', start_quality: dated, end_date: '2018-01-16'}
+          - {openstates_id: a04, person_id: a04, chamber: upper, district_number: 4, start_date: '2017-01-01', start_quality: dated, end_date: '9999-12-31'}
+          - {openstates_id: a05, person_id: a05, chamber: upper, district_number: 5, start_date: '2011-01-01', start_quality: placeholder, end_date: '2018-12-31'}
+          - {openstates_id: a06, person_id: a06, chamber: upper, district_number: 6, start_date: '1900-01-01', start_quality: undated, end_date: '2018-12-31'}
+          - {openstates_id: a07, person_id: a07, chamber: upper, district_number: 7, start_date: '2017-02-01', start_quality: dated, end_date: '2018-12-31'}
+          - {openstates_id: a08, person_id: a08, chamber: upper, district_number: 8, start_date: '2009-01-01', start_quality: dated, end_date: '2016-12-31'}
+          - {openstates_id: a09, person_id: a09, chamber: upper, district_number: 9, start_date: '2017-02-01', start_quality: dated, end_date: '9999-12-31'}
+          - {openstates_id: a10, person_id: a10, chamber: upper, district_number: 10, start_date: '2011-01-01', start_quality: placeholder, end_date: '2018-12-31'}
+          - {openstates_id: a10b, person_id: a10, chamber: upper, district_number: 10, start_date: '2019-01-01', start_quality: dated, end_date: '9999-12-31'}
+          - {openstates_id: h01, person_id: h01, chamber: lower, district_number: 1, start_date: '1900-01-01', start_quality: undated, end_date: '2018-12-31'}
       - input: ref('int_mo_senate__votes')
         rows:
           - {person_key: a01, vote_date: '2017-01-04'}
@@ -42,16 +44,16 @@ unit_tests:
           - {person_key: a10, vote_date: '2026-05-15'}
     expect:
       rows:
-        - {openstates_id: a01, district_number: 1, start_date: '2017-01-04', end_date: '2020-12-31'}
-        - {openstates_id: a02, district_number: 2, start_date: '2011-01-01', end_date: '2017-09-13'}
-        - {openstates_id: a03, district_number: 3, start_date: '2017-01-01', end_date: '2018-01-16'}
-        - {openstates_id: a04, district_number: 4, start_date: '2017-01-01', end_date: '9999-12-31'}
-        - {openstates_id: a05, district_number: 5, start_date: '2011-01-01', end_date: '2017-01-03'}
-        - {openstates_id: a08, district_number: 8, start_date: '2009-01-01', end_date: '2016-12-31'}
-        - {openstates_id: a09, district_number: 9, start_date: '2017-02-01', end_date: '9999-12-31'}
-        - {openstates_id: a10, district_number: 10, start_date: '2011-01-01', end_date: '2017-09-13'}
-        - {openstates_id: a10b, district_number: 10, start_date: '2019-01-01', end_date: '9999-12-31'}
-        - {openstates_id: h01, district_number: 1, start_date: '1900-01-01', end_date: '2018-12-31'}
+        - {openstates_id: a01, district_number: 1, start_date: '2017-01-04', end_date: '2020-12-31', start_quality: first_vote}
+        - {openstates_id: a02, district_number: 2, start_date: '2011-01-01', end_date: '2017-09-13', start_quality: placeholder}
+        - {openstates_id: a03, district_number: 3, start_date: '2017-01-01', end_date: '2018-01-16', start_quality: dated}
+        - {openstates_id: a04, district_number: 4, start_date: '2017-01-01', end_date: '9999-12-31', start_quality: dated}
+        - {openstates_id: a05, district_number: 5, start_date: '2011-01-01', end_date: '2017-01-03', start_quality: placeholder}
+        - {openstates_id: a08, district_number: 8, start_date: '2009-01-01', end_date: '2016-12-31', start_quality: dated}
+        - {openstates_id: a09, district_number: 9, start_date: '2017-02-01', end_date: '9999-12-31', start_quality: dated}
+        - {openstates_id: a10, district_number: 10, start_date: '2011-01-01', end_date: '2017-09-13', start_quality: placeholder}
+        - {openstates_id: a10b, district_number: 10, start_date: '2019-01-01', end_date: '9999-12-31', start_quality: dated}
+        - {openstates_id: h01, district_number: 1, start_date: '1900-01-01', end_date: '2018-12-31', start_quality: undated}
 
   - name: senate_seat_terms_untouched_when_the_journal_is_empty
     model: int_mo_legislators__seats
@@ -63,10 +65,10 @@ unit_tests:
     given:
       - input: ref('int_mo_legislators__seats_as_given')
         rows:
-          - {openstates_id: b01, person_id: b01, chamber: upper, district_number: 1, start_date: '2011-01-01', end_date: '2018-12-31'}
-          - {openstates_id: b02, person_id: b02, chamber: upper, district_number: 2, start_date: '1900-01-01', end_date: '2018-12-31'}
-          - {openstates_id: b03, person_id: b03, chamber: upper, district_number: 3, start_date: '2009-01-01', end_date: '2016-12-31'}
-          - {openstates_id: h01, person_id: h01, chamber: lower, district_number: 1, start_date: '2011-01-01', end_date: '2018-12-31'}
+          - {openstates_id: b01, person_id: b01, chamber: upper, district_number: 1, start_date: '2011-01-01', start_quality: placeholder, end_date: '2018-12-31'}
+          - {openstates_id: b02, person_id: b02, chamber: upper, district_number: 2, start_date: '1900-01-01', start_quality: undated, end_date: '2018-12-31'}
+          - {openstates_id: b03, person_id: b03, chamber: upper, district_number: 3, start_date: '2009-01-01', start_quality: dated, end_date: '2016-12-31'}
+          - {openstates_id: h01, person_id: h01, chamber: lower, district_number: 1, start_date: '2011-01-01', start_quality: placeholder, end_date: '2018-12-31'}
       - input: ref('int_mo_senate__votes')
         rows: []
     expect:
@@ -88,10 +90,10 @@ unit_tests:
     given:
       - input: ref('int_mo_legislators__seats_as_given')
         rows:
-          - {openstates_id: c01, person_id: c01, chamber: upper, district_number: 1, start_date: '2011-01-01', end_date: '2018-12-31'}
-          - {openstates_id: c02, person_id: c02, chamber: upper, district_number: 2, start_date: '2011-01-01', end_date: '2018-12-31'}
-          - {openstates_id: c03, person_id: c03, chamber: upper, district_number: 3, start_date: '2011-01-01', end_date: '2017-12-31'}
-          - {openstates_id: c04, person_id: c04, chamber: upper, district_number: 4, start_date: '2019-01-01', end_date: '2020-12-31'}
+          - {openstates_id: c01, person_id: c01, chamber: upper, district_number: 1, start_date: '2011-01-01', start_quality: placeholder, end_date: '2018-12-31'}
+          - {openstates_id: c02, person_id: c02, chamber: upper, district_number: 2, start_date: '2011-01-01', start_quality: placeholder, end_date: '2018-12-31'}
+          - {openstates_id: c03, person_id: c03, chamber: upper, district_number: 3, start_date: '2011-01-01', start_quality: placeholder, end_date: '2017-12-31'}
+          - {openstates_id: c04, person_id: c04, chamber: upper, district_number: 4, start_date: '2019-01-01', start_quality: dated, end_date: '2020-12-31'}
       - input: ref('int_mo_senate__votes')
         rows:
           - {person_key: c01, vote_date: '2017-02-01'}
@@ -113,9 +115,9 @@ unit_tests:
     given:
       - input: ref('int_mo_legislators__seats_as_given')
         rows:
-          - {openstates_id: d01, person_id: d01, chamber: upper, district_number: 1, start_date: '2017-01-01', end_date: '2021-12-31'}
-          - {openstates_id: d02, person_id: d02, chamber: upper, district_number: 2, start_date: '2018-01-01', end_date: '2021-12-31'}
-          - {openstates_id: d03, person_id: d03, chamber: upper, district_number: 3, start_date: '2017-01-01', end_date: '2019-12-31'}
+          - {openstates_id: d01, person_id: d01, chamber: upper, district_number: 1, start_date: '2017-01-01', start_quality: dated, end_date: '2021-12-31'}
+          - {openstates_id: d02, person_id: d02, chamber: upper, district_number: 2, start_date: '2018-01-01', start_quality: dated, end_date: '2021-12-31'}
+          - {openstates_id: d03, person_id: d03, chamber: upper, district_number: 3, start_date: '2017-01-01', start_quality: dated, end_date: '2019-12-31'}
       - input: ref('int_mo_senate__votes')
         rows:
           - {person_key: d01, vote_date: '2017-02-01'}

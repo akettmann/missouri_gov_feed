@@ -8,9 +8,9 @@
 -- within the term's Open States dates. Open States has no start date for 25 senators in office from 2017, and a
 -- few terms end long after the person left (Joseph Keaveny, 2011-2018, never voted in the journals, which begin
 -- 2017-01-04; Ryan Silvey's last vote was 2017-09-13, not 2018-12-31):
---   * an undated start (1900-01-01) becomes the term's first roll-call vote. That is the latest the start can be (a
---     senator seated on the journal's first day, 2017-01-04, started on or before it), so it decides which years
---     the senator held the seat in without inventing a start. It agrees with every dated start (the first vote
+--   * an undated start (start_quality undated) becomes the term's first roll-call vote. That is the latest the start
+--     can be (a senator seated on the journal's first day, 2017-01-04, started on or before it), so it decides which
+--     years the senator held the seat in without inventing a start. It agrees with every dated start (the first vote
 --     falls on or just after it). A term that ended before the journals begin keeps Open States' dates.
 --   * a closed term that Open States ends more than a year after the term's last roll-call vote ends at that vote.
 --     A smaller gap stays: a senator who resigned on January 16 voted last on January 13 (Jason Holsman, 2020), and
@@ -23,6 +23,9 @@
 -- (from the journals' first date to the term's end; to the journals' last date for an open term) with no journal vote
 -- at all, which includes years after the journals stop, a term is left as Open States gives it, never dropped or
 -- capped for lacking votes (#534). Only the first rule (an undated start) needs a vote of the term itself.
+-- start_quality is int_mo_legislators__seat_terms' flag (dated, undated or placeholder), except that a start re-dated
+-- from the first roll-call vote is first_vote: a known start, though the latest it can be. Consumers that need a known
+-- start test start_quality <> 'undated', never the date (a placeholder start counts as known, as it always has).
 with as_given as (
     select * from {{ ref('int_mo_legislators__seats_as_given') }}
 ),
@@ -104,6 +107,7 @@ dated as (
         s.person_id,
         s.start_date as given_start,
         s.end_date as given_end,
+        s.start_quality as given_start_quality,
         j.first_date,
         -- a closed Senate term in the journal years with no vote at all
         (
@@ -113,14 +117,10 @@ dated as (
             and s.end_date < {{ dbt.safe_cast("'9999-12-31'", 'date') }}
             and s.end_date >= j.first_date
         ) as is_unvoted,
-        case
-            when
-                s.chamber = 'upper'
-                and s.start_date <= {{ dbt.safe_cast("'1900-01-01'", 'date') }}
-                and v.first_vote is not null
-                then v.first_vote
-            else s.start_date
-        end as start_date,
+        -- an undated Senate start the journal can date: the term's first vote
+        coalesce(s.chamber = 'upper' and s.start_quality = 'undated' and v.first_vote is not null, false)
+            as is_first_vote_start,
+        v.first_vote,
         case
             when
                 s.chamber = 'upper'
@@ -155,14 +155,16 @@ select
     full_name_key,
     chamber,
     district_number,
-    start_date,
+    case when is_first_vote_start then first_vote else given_start end as start_date,
     case
         when is_unvoted then {{ dbt.dateadd('day', -1, 'first_date') }}
         else end_date
     end as end_date,
-    person_id
+    person_id,
+    case when is_first_vote_start then 'first_vote' else given_start_quality end as start_quality
 from dated
 where
-    -- an unvoted term with a dated start before the journals ends the day before them; any other is dropped
+    -- an unvoted term with a known start (dated or placeholder) before the journals ends the day before them; any
+    -- other is dropped
     not is_unvoted
-    or (given_start > {{ dbt.safe_cast("'1900-01-01'", 'date') }} and given_start < first_date)
+    or (given_start_quality <> 'undated' and given_start < first_date)

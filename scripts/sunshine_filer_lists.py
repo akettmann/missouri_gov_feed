@@ -29,7 +29,7 @@ with legislators as (
         case chamber when 'upper' then 'State Senator' else 'State Representative' end as office_title,
         cast(district_number as varchar) as district,
         party,
-        nullif(cast(start_date as date), date '1900-01-01') as term_start,  -- Open States' "unknown"
+        case when start_quality <> 'undated' then cast(start_date as date) end as term_start,  -- Open States' "unknown"
         nullif(cast(end_date as date), date '9999-12-31') as term_end
     from intermediate.int_mo_legislators__seats
 ),

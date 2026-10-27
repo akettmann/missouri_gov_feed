@@ -317,7 +317,7 @@ unit_tests:
           - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
       - input: ref('int_mo_legislators__seats')
         rows:
-          - {person_id: p_david, full_name: David Smith, surname_key: smith, chamber: lower, start_date: '1900-01-01', end_date: '2023-01-03'}
+          - {person_id: p_david, full_name: David Smith, surname_key: smith, chamber: lower, start_date: '1900-01-01', start_quality: undated, end_date: '2023-01-03'}
           - {person_id: p_david, full_name: David Smith, surname_key: smith, chamber: lower, start_date: '2023-01-01', end_date: '9999-12-31'}
           - {person_id: p_cody, full_name: Cody Smith, surname_key: smith, chamber: lower, start_date: '2017-01-01', end_date: '2025-01-07'}
           - {person_id: p_hough, full_name: Lincoln Hough, surname_key: hough, chamber: lower, start_date: '2019-01-01', end_date: '9999-12-31'}
