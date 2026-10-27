@@ -490,3 +490,54 @@ unit_tests:
         - {section_id: d.4, bill: SB35, act_year: 2007, change: repealed, is_lead_bill: true, combined_into: }
         - {section_id: d.4, bill: SB36, act_year: 2007, change: repealed, is_lead_bill: false, combined_into: SB35}
         - {section_id: d.5, bill: HB32, act_year: 2002, change: amended, is_lead_bill: true, combined_into: }
+
+  - name: and_bill_after_a_section_cite_is_not_dropped
+    model: int_mo_revisor__session_law_bills
+    description: >
+      An act may cite a section of each bill: "H.B. 1574 § 6 and S.B. 721 § 2". The section cite (with its "et al."
+      and "subsec.") sits between the bills, so the bill after "and" was dropped (RSMo 301.3166 lost SB 480, 192.667
+      lost SB 721, 281.102 SB 26, 214.500 SB 58). The Revisor's typo ".S.B. 58" (stray period) must not hide the bill
+      either. A bill after "and" is combined into the bill before it, unless its year and session cite it as the first
+      bill of an act elsewhere (SB 480 in 2012: it is a lead).
+    given:
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 'e.1' as section_id, 'e.1/1' as section_version_id, '(L. 2012 H.B. 1807, et al. § 301.4044 and S.B. 480 § 301.4036, A.L. 2014 H.B. 1245)' as history_note
+            union all select 'e.2', 'e.2/1', '(L. 2012 S.B. 480)'
+            union all select 'e.3', 'e.3/1', '(L. 1992 H.B. 1574 § 6 and S.B. 721 § 2 merged with S.B. 796 § 15, A.L. 1993 S.B. 52)'
+            union all select 'e.4', 'e.4/1', '(L. 1997 H.B. 592 § 1 and .S.B. 58 § 1, A.L. 2010 H.B. 1692, et al. merged with S.B. 754)'
+            union all select 'e.5', 'e.5/1', '(L. 2021 H.B. 476 § B and S.B. 26 § B, A.L. 2023 S.B. 138)'
+            union all select 'e.6', 'e.6/1', '(L. 1993 H.B. 551 & 552 § 2 subsec. 1 and S.B. 67 § 10 subsec. 1 merged with S.B. 88 § 1 subsec. l)'
+            union all select 'e.7', 'e.7/1', '(L. 2000 H.B. 5 § 3 and the like, A.L. 2001 H.B. 6)'
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select 'e.1' as section_id, 'e.1/1' as section_version_id, 'transferred' as change_kind, '(Transferred 1959)' as note
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: e.1, bill: HB1807, act_year: 2012, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.1, bill: SB480, act_year: 2012, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.1, bill: HB1245, act_year: 2014, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: e.2, bill: SB480, act_year: 2012, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.3, bill: HB1574, act_year: 1992, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.3, bill: SB721, act_year: 1992, change: enacted, is_lead_bill: false, combined_into: HB1574}
+        - {section_id: e.3, bill: SB796, act_year: 1992, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.3, bill: SB52, act_year: 1993, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: e.4, bill: HB592, act_year: 1997, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.4, bill: SB58, act_year: 1997, change: enacted, is_lead_bill: false, combined_into: HB592}
+        - {section_id: e.4, bill: HB1692, act_year: 2010, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: e.4, bill: SB754, act_year: 2010, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: e.5, bill: HB476, act_year: 2021, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.5, bill: SB26, act_year: 2021, change: enacted, is_lead_bill: false, combined_into: HB476}
+        - {section_id: e.5, bill: SB138, act_year: 2023, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: e.6, bill: HB551, act_year: 1993, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.6, bill: HB552, act_year: 1993, change: enacted, is_lead_bill: false, combined_into: HB551}
+        - {section_id: e.6, bill: SB67, act_year: 1993, change: enacted, is_lead_bill: false, combined_into: HB551}
+        - {section_id: e.6, bill: SB88, act_year: 1993, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.7, bill: HB5, act_year: 2000, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.7, bill: HB6, act_year: 2001, change: amended, is_lead_bill: true, combined_into: }
