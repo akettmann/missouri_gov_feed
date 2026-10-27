@@ -211,7 +211,12 @@ def load(shard: db.Shard) -> dict[str, int]:
                 if isinstance(data, Exception):
                     sink.add("mo_house_rollcalls", url, {"session_code": code, "url": url, "error": str(data)})
                     continue
-                header, cast = _parse_rollcall_pdf(data)
+                try:
+                    header, cast = _parse_rollcall_pdf(data)
+                except pdftext.ExtractTimeout as exc:  # a pathological PDF must not stop the run; it lands as an error
+                    log.warning("mo_house.extract_timeout", url=url, error=str(exc))
+                    sink.add("mo_house_rollcalls", url, {"session_code": code, "url": url, "error": str(exc)})
+                    continue
                 sink.add("mo_house_rollcalls", url, {"session_code": code, "url": url, **header, "n_tokens": len(cast)})
                 for i, (c, n) in enumerate(cast):
                     sink.add(

@@ -135,3 +135,39 @@ def test_every_xml_in_the_zip_is_landed_including_unparsed_kinds(tmp_path, monke
     assert (tmp_path / "mo_house_xml/191/191-GRP1.XML.gz").exists()
     bills = duckdb.sql(f"select bill from read_parquet('{db.raw_glob(parser.Bill.TABLE)}')").fetchall()
     assert bills == [("HB1",)]  # GRP1 stays out of the parser
+
+
+def test_rollcall_extract_timeout_lands_as_an_error_row_and_the_run_goes_on(tmp_path, monkeypatch):
+    import json
+
+    import duckdb
+
+    from mogov import db
+    from mogov.loaders import mo_house
+
+    def slow(data, **_):
+        raise mo_house.pdftext.ExtractTimeout("text extraction ran past 1 s after 3 pages")
+
+    def probe(code, day, linked, get):
+        if code == "191" and day == 1:
+            yield "https://x/r1.pdf", b"%PDF-a"
+            yield "https://x/r2.pdf", b"%PDF-b"
+
+    monkeypatch.setattr(db, "RAW_DIR", tmp_path)
+    monkeypatch.setattr(mo_house, "window_years", lambda: [2019])
+    monkeypatch.setattr(mo_house, "DAYS_IF_UNKNOWN", 1)
+    import io
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("191-HB1.xml", "<R><BillInformation><BillNumber>HB1</BillNumber></BillInformation></R>")
+    zip_bytes = buf.getvalue()
+    monkeypatch.setattr(mo_house, "fetch", lambda url, **_: zip_bytes if url.endswith("/191.zip") else b"<html/>")
+    monkeypatch.setattr(mo_house, "_probe_day", probe)
+    monkeypatch.setattr(mo_house.pdftext, "page_texts", slow)
+    mo_house.load(db.UNSHARDED)
+    rows = duckdb.sql(f"select payload from read_parquet('{db.raw_glob('mo_house_rollcalls')}')").fetchall()
+    payloads = sorted((json.loads(p) for (p,) in rows), key=lambda p: p["url"])
+    assert [p["url"] for p in payloads] == ["https://x/r1.pdf", "https://x/r2.pdf"]
+    assert all("ran past" in p["error"] for p in payloads)
