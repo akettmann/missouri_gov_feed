@@ -344,10 +344,10 @@ Quirks:
   probed); they land as error rows. Two bill-text links use `house.mo.gov` rather than `documents.house.mo.gov`; such
   a file is stored as `<host>__<file name>` so it cannot collide with the same name on the main host.
 - Statute references (#594), measured on a 378-document slice (sessions 241, 251 and 261: every truly agreed text,
-  120 random introduced texts, HB 1-13; first 8 pages of each): 191 documents give 2,768 rows (1,134 repeal, 1,634
+  120 random introduced texts, HB 1-13; first 8 pages of each): 192 documents give 2,768 rows (1,134 repeal, 1,634
   enact; no range, no `Supp.` citation and no `To amend section` title among them, so those three forms are
-  tested on made-up text only). The other 187 are 168 appropriation bills, 9 joint resolutions, 3 land
-  conveyances or transfers and 3 not-a-PDF links. Section A prints its line numbers either at the start of the line
+  tested on made-up text only). The other 186 are 168 appropriation bills, 9 joint resolutions, 3 land
+  conveyances or transfers, 3 not-a-PDF links and 3 with no text layer. Section A prints its line numbers either at the start of the line
   (`2 sections enacted in lieu`) or alone on the line before it (`2` then `one new section`, seen in
   5627H.09T); both are stripped before reading. `To amend chapter 160, RSMo, by adding thereto one new section`
   has no repealed section, only the enacted one. A pure repeal (`Sections 559.301 ... are repealed`) has no enact
