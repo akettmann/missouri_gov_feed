@@ -1,0 +1,45 @@
+action,bill_type,expected_flag
+Second Read and Referred S Education Committee,SB,referred
+Referred S Fiscal Oversight Committee,SB,referred
+Referred H Rules - Legislative Oversight,SB,referred
+Voted Do Pass S Fiscal Oversight Committee,SB,reported
+SCS Voted Do Pass S Education Committee (4858S.04C),SB,reported
+Reported from S Insurance and Banking Committee w/SCS,SB,reported
+Reported Do Pass H Fiscal Review,SB,reported
+Perfected,SB,perfected
+"Perfected, as amended",SB,perfected
+"Reported Truly Perfected S Rules, Joint Rules, Resolutions and Ethics Committee",SB,perfected
+S Third Read and Passed,SB,passed_senate
+CCS S Third Read and Passed,SB,passed_senate
+S Third Read and Passed - EC defeated,SB,passed_senate
+H Third Read and Passed,SB,passed_house
+CCS H Third Read and Passed,SB,passed_house
+S adopted,SR,adopted
+S adopted,SCR,passed_senate
+H adopted,SCR,passed_house
+H adopted,SCR,adopted
+Defeated on S Third Reading,SB,defeated
+Truly Agreed To and Finally Passed,SB,truly_agreed
+Signed by Governor,SB,approved
+Letter of approval from the Governor,SB,approved
+Vetoed by Governor,SCR,vetoed
+Delivered to Secretary of State,SB,delivered_to_sos
+"Governor took no action, sent to Secretary of State/Article III, Sec. 31",SB,delivered_to_sos
+S First Read,SB,none
+Prefiled,SB,none
+Hearing Conducted S Education Committee,SB,none
+SS S adopted,SB,none
+"HCS, as amended, H adopted",SB,none
+SS for SCS S withdrawn,SB,none
+HCS H defeated,SB,none
+SA 1 S offered & defeated (Nasheed)--(6738S01.01S),SB,none
+Bill Placed on Informal Calendar,SB,none
+Informal Calendar S Bills for Perfection,SB,none
+"Reported Duly Enrolled Rules, Joint Rules, Resolutions & Ethics Committee",SB,none
+Signed by House Speaker,SB,none
+Signed by Senate President Pro Tem,SB,none
+Delivered to Governor,SB,none
+"Message received from Governor pursuant to Article IV, Section 27",SB,none
+"Motion to vote bill do pass failed S Transportation, Infrastructure and Public Safety Committee",SB,none
+SCS S adopted,SCR,none
+No motion made to override Governor's veto when called from calendar,SCR,none

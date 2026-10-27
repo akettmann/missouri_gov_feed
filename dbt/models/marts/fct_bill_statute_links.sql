@@ -1,7 +1,8 @@
 -- Which RSMo sections each bill enacted, amended or repealed, from the Revisor's session-law history notes. These
--- cover bills that became law (the Revisor records an act once it takes effect); a pending bill's targets are in its
--- text, which isn't loaded yet. Bills from before the House XML export (2017) or from a session it lacks are linked
--- all the same: in_fct_bills says whether fct_bills has the bill.
+-- cover bills that became law (the Revisor records an act once it takes effect); a pending bill's targets are read
+-- from its text in fct_bill_text_statute_links (link_source tells the two apart: 'revisor_history' here). Bills from
+-- before the House XML export (2017) or from a session it lacks are linked all the same:
+-- in_fct_bills says whether fct_bills has the bill.
 -- A combined act ("A.L. 2023 H.B. 115 & 99") is one substitute carrying several bills: the first is the lead bill and
 -- the only one that passed; the others are linked too (their subjects went into the act) with is_lead_bill false and
 -- combined_into naming the lead. They never reach the governor themselves, so fct_bills shows them as failed. Use
@@ -31,6 +32,7 @@ select
     l.section_versions,
     l.lead_acts = 1 as is_lead_bill,
     case when l.lead_acts = 0 then l.combined_into end as combined_into,
-    b.bill is not null as in_fct_bills
+    b.bill is not null as in_fct_bills,
+    'revisor_history' as link_source
 from links as l
 left join {{ ref('fct_bills') }} as b on l.session_code = b.session_code and l.bill = b.bill

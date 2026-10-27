@@ -1,0 +1,26 @@
+action_pattern,bill_type,flag,evidence
+Second Read and Referred S %,any,referred,"Second Read and Referred S Judiciary and Civil and Criminal Jurisprudence Committee (every Senate bill)"
+Referred S %,any,referred,"Referred S Rules, Joint Rules, Resolutions and Ethics Committee (resolutions); Referred S Fiscal Oversight Committee"
+Re-referred S %,any,referred,Re-referred S Education Committee
+Referred H %,any,referred,Referred H Insurance Policy (the House committee a Senate bill is sent to)
+Re-Referred H %,any,referred,Re-Referred H Rules - Administrative Oversight
+HCS Referred H %,any,referred,HCS Referred H Rules - Administrative
+%Voted Do Pass%,any,reported,"Voted Do Pass S Fiscal Oversight Committee; SCS Voted Do Pass S Education Committee (4858S.04C); Voted Do Pass H Fiscal Review"
+%Reported Do Pass%,any,reported,Reported Do Pass H Rules - Legislative Oversight; HCS Reported Do Pass H Fiscal Review
+Reported from S %,any,reported,"Reported from S Insurance and Banking Committee; ... w/SCS; ... - Consent (the committee's do-pass report to the floor)"
+Perfected%,any,perfected,"Perfected; Perfected, as amended"
+Reported Truly Perfected %,any,perfected,Reported Truly Perfected S Rules Joint Rules Resolutions and Ethics Committee (follows Perfected)
+%S Third Read and Passed%,any,passed_senate,"S Third Read and Passed; CCS S Third Read and Passed; S Third Read and Passed - Consent; ... - EC adopted / EC defeated (the emergency clause vote, the bill passed)"
+%H Third Read and Passed%,any,passed_house,"H Third Read and Passed; CCS H Third Read and Passed; H Third Read and Passed, as amended"
+S adopted,SCR,passed_senate,"SCR 21 (2026): S adopted, then H adopted; a concurrent resolution needs both chambers"
+S adopted,SR,adopted,"SR 980 (2024): S Offered, Rules Suspended, S adopted (a simple resolution is the Senate's alone)"
+H adopted,SCR,passed_house,SCR 21 (2026) H adopted
+H adopted,SCR,adopted,SCR 21 (2026) H adopted (the second chamber's adoption completes a concurrent resolution)
+Defeated on S Third Reading%,any,defeated,Defeated on S Third Reading
+Truly Agreed To and Finally Passed,any,truly_agreed,Truly Agreed To and Finally Passed (51 of the sampled bills)
+Signed by Governor%,any,approved,"Signed by Governor (SB 594 (2018), SB 982 (2026))"
+Letter of approval from the Governor,any,approved,"SB 982 (2026): follows Signed by Governor; not seen alone"
+Vetoed by Governor%,any,vetoed,SCR 50 (2018) Vetoed by Governor
+Vetoed in Part by Governor%,any,vetoed_in_part,"The House XML's wording; not yet seen in the Senate feed (#715)"
+Delivered to Secretary of State%,any,delivered_to_sos,Delivered to Secretary of State (6 sampled bills)
+Governor took no action%,any,delivered_to_sos,"SB 751 (2024): Governor took no action, sent to Secretary of State/Article III, Sec. 31 (law without signature)"

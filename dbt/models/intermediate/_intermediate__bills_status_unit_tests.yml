@@ -61,6 +61,14 @@ unit_tests:
             select '171', 'HB2001', 'house_bill_list', cast('2016-12-28' as date), 'Message Received from the Governor, pursuant to Article IV, Section 27' union all
             select '211', 'HB16', 'house_bill_list', cast('2021-02-11' as date), 'Approved by Governor (G)' union all
             select '211', 'HB16', 'house_bill_list', cast('2021-04-21' as date), 'Message Received from the Governor, pursuant to Article IV, Section 27'
+      - input: ref('stg_mo_senate__bill_actions')
+        format: sql
+        rows: |
+            select cast(null as varchar) as session_code, cast(null as varchar) as bill, cast(null as date) as action_date, cast(null as varchar) as action where false
+      - input: ref('mo_senate_action_flags')
+        format: sql
+        rows: |
+            select cast(null as varchar) as action_pattern, cast(null as varchar) as bill_type, cast(null as varchar) as flag where false
     expect:
       rows:
         - {session_code: '261', bill: HB1, status: in committee, outcome: failed, relisted_from_session_code: null}
@@ -106,6 +114,14 @@ unit_tests:
             select '261', 'HB3', 'house_bill_list', cast('2026-01-10' as date), 'Referred: General Laws(H)' union all
             select '261', 'HB4', 'house_bill_list', cast('2026-02-01' as date), 'Withdrawn (H)' union all
             select '261', 'SB5', 'senate_act_list', cast('2026-04-01' as date), 'Reported to the House and First Read (H)'
+      - input: ref('stg_mo_senate__bill_actions')
+        format: sql
+        rows: |
+            select cast(null as varchar) as session_code, cast(null as varchar) as bill, cast(null as date) as action_date, cast(null as varchar) as action where false
+      - input: ref('mo_senate_action_flags')
+        format: sql
+        rows: |
+            select cast(null as varchar) as action_pattern, cast(null as varchar) as bill_type, cast(null as varchar) as flag where false
     expect:
       rows:
         - {session_code: '261', bill: HB1, passed_house: true}

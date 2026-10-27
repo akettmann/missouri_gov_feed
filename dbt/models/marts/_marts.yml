@@ -232,8 +232,9 @@ models:
       covers only the areas audited, not the whole operation of the entity. Ratings exist from 2012 and only
       for audits the Auditor rates (not performance audits, financial statements or follow-ups); rating_status says why a
       row has none. Grain: one row per report. The people an audit of a statewide office is credited to (everyone who held
-      the office during the years the audit covers) are in fct_audit_report_officeholders; here only their count and
-      basis. A county audit is never linked to a person: the Auditor says a county's rating does not indicate the
+      the office during the period the audit covers, or for most reports, which name no period, in the year before
+      release) are in fct_audit_report_officeholders; here only their count and basis (`release_window` is an
+      approximation). A county audit is never linked to a person: the Auditor says a county's rating does not indicate the
       performance of any one elected official.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
@@ -323,15 +324,19 @@ models:
 
   - name: fct_audit_report_officeholders
     description: >
-      The people an audit of a statewide office is credited to: everyone who held that office during the period the audit
-      covers. Grain: one row per (report, person). Only audits of a statewide office have rows; a county audit never
+      The people an audit of a statewide office is credited to. Most rows are an
+      approximation: `link_basis` = `release_window` means the report title names no period, so the people are
+      those in office from January 1 of the year before the release through the release date, not a period the audit
+      states. Only `audit_period` rows follow a period the title names. Grain: one row per (report, person). Only audits of a statewide office have rows; a county audit never
       does. link_basis says what "during the audit" means for the row: `audit_period` when the report title names
       the period it covers ("Period July 1, 2022 through January 9, 2023", "Year Ended June 30, 2015"), else
       `release_window`, the calendar year before the release through the release date. Most titles name no period,
       so most rows are `release_window`: the link says "in office when the audit was probably being done", not
-      "audited". Terms come from the Official Manual in whole years (a term starts January 15 of its first year), so
-      a term ending in an inauguration year (2017, 2021, 2025) ends January 15, and a mid-term change has no date in
-      the Manual, so both holders are credited for that whole year.
+      "audited". Terms come from the Official Manual in whole years (a term starts on the second Monday of January of its
+      first year, when regular terms begin: 2017-01-09, 2021-01-11, 2025-01-13), so a term ending in an inauguration
+      year (2017, 2021, 2025) ends that day; a window that ends on the hand-over day is credited to the outgoing holder only. Mid-term changes the Manual does not
+      date use the exact dates in the statewide_office_handovers seed; one missing from the seed credits both holders
+      for that whole year.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -838,7 +843,7 @@ models:
       reports (PDF text, tagged by schedule), Senate eFD reports (structured tables), and federal judges'
       AO-10 reports via CourtListener (mostly 2020 and earlier). Missouri state officials' and judges'
       personal financial disclosures are not online (see official_profile.disclosures_status). Grain:
-      (official_id, disclosure_item_id), one disclosed item; scanned filings appear once with section "document (not text-extractable...)".
+      (official_id, disclosure_item_id), one disclosed item; scanned filings appear once with section "document (not text-extractable; see PDF)", filings whose PDF the loader failed to download or extract once with "document (download or text extraction failed; see PDF)" (the PDF link may itself be dead), and filings of a type the loader never fetches (e.g. extension requests) once with "document (not fetched; see PDF)".
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -1715,7 +1720,7 @@ models:
     description: >
       Which RSMo sections each bill enacted, amended or repealed, from the Revisor's session-law history notes
       (int_mo_revisor__session_law_bills). Covers bills that became law, back to the 1950s; a pending bill's
-      targets are in its text, which isn't loaded yet (#175). Grain: one row per (session, bill, section, change).
+      targets are read from its text in fct_bill_text_statute_links (#594). Grain: one row per (session, bill, section, change).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -1766,6 +1771,83 @@ models:
       - name: in_fct_bills
         data_type: boolean
         description: Whether fct_bills has the bill (it covers the House XML export's sessions, 2017 on).
+      - name: link_source
+        data_type: varchar
+        description: Where the link comes from, always 'revisor_history' here ('bill_text' in fct_bill_text_statute_links).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [revisor_history]
+
+  - name: fct_bill_text_statute_links
+    description: >
+      Which RSMo sections each House bill text version would repeal, amend or enact, read from the enacting title and
+      Section A of the bill text PDF (mo_house_pdf loader, int_mo_house__bill_text_statute_refs; empty until that
+      loader has run). Covers pending and failed bills as well as those that became law, which
+      fct_bill_statute_links (the Revisor's history notes) cannot. Grain: one row per (text version, bill, section);
+      a range such as "sections 1.010 to 1.050" is expanded against fct_statute_sections. A text with no RSMo
+      section (appropriations, joint resolutions amending the Constitution, land conveyances) has no row. Bills are
+      rewritten as they move, so read version_code T (truly agreed) or the latest lr_number for what a bill ended
+      up doing; the introduced text is what the sponsor first asked for.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [document_url, bill, section_id]
+    columns:
+      - name: session_code
+        data_type: varchar
+        description: House-style session code.
+        data_tests:
+          - not_null
+      - name: bill
+        data_type: varchar
+        description: Bill number without spaces (HB945, HJR12).
+        data_tests:
+          - not_null
+      - name: document_url
+        data_type: varchar
+        description: The bill text PDF the link was read from (fct_bill_documents.document_url).
+        data_tests:
+          - not_null
+      - name: lr_number
+        data_type: varchar
+        description: Legislative Research number of the text version (0474H.01I introduced; 5057S.04T truly agreed).
+      - name: version_code
+        data_type: varchar
+        description: House version code of the text (I introduced, P perfected, T truly agreed, ...).
+      - name: section_id
+        data_type: varchar
+        description: The RSMo section, in the form fct_statute_sections.section_id uses.
+        data_tests:
+          - not_null
+      - name: change
+        data_type: varchar
+        description: >
+          In the words of fct_bill_statute_links.change. amended: the text repeals and enacts the section in lieu
+          thereof, or amends it; repealed: only repeals it; enacted: only adds it (a new section).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [enacted, amended, repealed]
+      - name: link_source
+        data_type: varchar
+        description: Always 'bill_text' here ('revisor_history' in fct_bill_statute_links).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [bill_text]
+      - name: supp_year
+        data_type: integer
+        description: Year of the "RSMo Supp." the text cites the section from, when it does; else null.
+      - name: from_range
+        data_type: boolean
+        description: Whether the section came from a range ("1.010 to 1.050"), whose members come from the statutes.
+      - name: in_statutes
+        data_type: boolean
+        description: >
+          Whether fct_statute_sections has the section today. False for a section the bill would enact, or one the
+          Revisor has since moved or dropped.
 
   - name: fct_bill_documents
     description: >

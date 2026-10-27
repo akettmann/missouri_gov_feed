@@ -1,0 +1,106 @@
+# Unit tests for status and outcome from the Senate's own action history (#588): fixed senate.mo.gov action rows ->
+# exact status/outcome per bill. The mapping seed mo_senate_action_flags is mocked with the rows these cases use;
+# assert_senate_action_flags_map_known_wordings checks the real seed.
+version: 2
+
+unit_tests:
+  - name: bill_status_from_senate_actions
+    model: int_bills__status
+    description: >
+      A Senate bill gets its status from the Senate's own wording, with "today" pinned to 2026-10-25. SB1 died in
+      committee (referred, hearing): "in committee" / failed. SB2 passed the Senate only: "passed one chamber".
+      SB3's House XML list ends at "Signed by House Speaker" (like 2024 SB 727) while the Senate history has
+      "Signed by Governor": "signed" / enacted. SB4 was truly agreed and the Governor "took no action" (law without
+      signature, like 2024 SB 751): enacted. SJR5 truly agreed: "sent to voters". SR6 "S adopted": adopted; SCR7
+      "S adopted" alone is only passed by the Senate, and "H adopted" completes it (SCR8). SB9's substitute actions
+      ("SS for SCS S withdrawn", "HCS H defeated", "SCS S adopted") move nothing: it stays "in committee" though the
+      words "withdrawn", "defeated" and "adopted" appear. SB10 has only "Prefiled" and "S First Read": "introduced".
+      SB11 "Defeated on S Third Reading": defeated. SB12 is vetoed. SB13 passed both chambers (S and H Third Read
+      and Passed) but was not truly agreed: "passed both chambers". SR16's "SCS S adopted" (a committee substitute, not the resolution) leaves it introduced. SB14 is in the House XML only and keeps its
+      House status. A Senate bill with no action rows at all (a listed bill whose Actions tab was rejected, #637)
+      has no row: its status is unknown, not a stage. A Senate-only bill's House-XML action_count is 0, so it is
+      never mistaken for a governor-message relisting. A Senate action in a session with no code (null
+      session_code, SB15) is ignored.
+    overrides:
+      vars:
+        as_of_date: '2026-10-25'
+    given:
+      - input: ref('stg_mo_house__bills')
+        format: sql
+        rows: |
+            select '261' as session_code, 'SB3' as bill, 'SB 3' as current_bill_string
+      - input: ref('stg_mo_house__bill_actions')
+        format: sql
+        rows: |
+            select '261' as session_code, 'SB3' as bill, 'senate_act_list' as listed_in, cast('2026-05-14' as date) as action_date, 'Signed by House Speaker (H)' as description union all
+            select '261', 'SB14', 'senate_act_list', cast('2026-05-14' as date), 'Truly Agreed To and Finally Passed'
+      - input: ref('stg_mo_senate__bill_actions')
+        format: sql
+        rows: |
+            select '261' as session_code, 'SB1' as bill, cast('2026-01-10' as date) as action_date, 'Second Read and Referred S Education Committee' as action union all
+            select '261', 'SB1', cast('2026-02-10' as date), 'Hearing Conducted S Education Committee' union all
+            select '261', 'SB2', cast('2026-01-10' as date), 'Second Read and Referred S Education Committee' union all
+            select '261', 'SB2', cast('2026-02-10' as date), 'Voted Do Pass S Education Committee' union all
+            select '261', 'SB2', cast('2026-02-11' as date), 'Reported from S Education Committee' union all
+            select '261', 'SB2', cast('2026-02-20' as date), 'S Third Read and Passed' union all
+            select '261', 'SB2', cast('2026-02-20' as date), 'H First Read' union all
+            select '261', 'SB3', cast('2026-05-14' as date), 'Truly Agreed To and Finally Passed' union all
+            select '261', 'SB3', cast('2026-05-20' as date), 'Delivered to Governor' union all
+            select '261', 'SB3', cast('2026-06-10' as date), 'Signed by Governor' union all
+            select '261', 'SB4', cast('2026-05-14' as date), 'Truly Agreed To and Finally Passed' union all
+            select '261', 'SB4', cast('2026-07-11' as date), 'Governor took no action, sent to Secretary of State/Article III, Sec. 31' union all
+            select '261', 'SJR5', cast('2026-05-14' as date), 'Truly Agreed To and Finally Passed' union all
+            select '261', 'SR6', cast('2026-03-01' as date), 'S Offered' union all
+            select '261', 'SR6', cast('2026-03-01' as date), 'S adopted' union all
+            select '261', 'SCR7', cast('2026-03-01' as date), 'S adopted' union all
+            select '261', 'SCR8', cast('2026-03-01' as date), 'S adopted' union all
+            select '261', 'SCR8', cast('2026-04-01' as date), 'H adopted' union all
+            select '261', 'SB9', cast('2026-01-10' as date), 'Second Read and Referred S Education Committee' union all
+            select '261', 'SB9', cast('2026-02-10' as date), 'SS for SCS S withdrawn' union all
+            select '261', 'SB9', cast('2026-02-11' as date), 'HCS H defeated' union all
+            select '261', 'SB9', cast('2026-02-12' as date), 'SCS S adopted' union all
+            select '261', 'SB10', cast('2025-12-01' as date), 'Prefiled' union all
+            select '261', 'SB10', cast('2026-01-07' as date), 'S First Read' union all
+            select '261', 'SB11', cast('2026-03-01' as date), 'Second Read and Referred S Education Committee' union all
+            select '261', 'SB11', cast('2026-03-20' as date), 'Defeated on S Third Reading' union all
+            select '261', 'SB12', cast('2026-05-14' as date), 'Truly Agreed To and Finally Passed' union all
+            select '261', 'SB12', cast('2026-07-01' as date), 'Vetoed by Governor' union all
+            select '261', 'SB13', cast('2026-02-20' as date), 'S Third Read and Passed' union all
+            select '261', 'SB13', cast('2026-04-20' as date), 'H Third Read and Passed - EC defeated' union all
+            select '261', 'SR16', cast('2026-03-01' as date), 'S Offered' union all
+            select '261', 'SR16', cast('2026-03-02' as date), 'SCS S adopted' union all
+            select cast(null as varchar), 'SB15', cast('2026-04-20' as date), 'Signed by Governor'
+      - input: ref('mo_senate_action_flags')
+        format: sql
+        rows: |
+            select 'Second Read and Referred S %' as action_pattern, 'any' as bill_type, 'referred' as flag union all
+            select 'Voted Do Pass%', 'any', 'reported' union all
+            select 'Reported from S %', 'any', 'reported' union all
+            select '%S Third Read and Passed%', 'any', 'passed_senate' union all
+            select '%H Third Read and Passed%', 'any', 'passed_house' union all
+            select 'S adopted', 'SCR', 'passed_senate' union all
+            select 'S adopted', 'SR', 'adopted' union all
+            select 'H adopted', 'SCR', 'passed_house' union all
+            select 'H adopted', 'SCR', 'adopted' union all
+            select 'Defeated on S Third Reading%', 'any', 'defeated' union all
+            select 'Truly Agreed To and Finally Passed', 'any', 'truly_agreed' union all
+            select 'Signed by Governor%', 'any', 'approved' union all
+            select 'Vetoed by Governor%', 'any', 'vetoed' union all
+            select 'Governor took no action%', 'any', 'delivered_to_sos'
+    expect:
+      rows:
+        - {session_code: '261', bill: SB1, status: in committee, outcome: failed, passed_house: false}
+        - {session_code: '261', bill: SB2, status: passed one chamber, outcome: failed, passed_house: false}
+        - {session_code: '261', bill: SB3, status: signed, outcome: enacted, passed_house: false}
+        - {session_code: '261', bill: SB4, status: truly agreed, outcome: enacted, passed_house: false}
+        - {session_code: '261', bill: SJR5, status: truly agreed, outcome: sent to voters, passed_house: false}
+        - {session_code: '261', bill: SR6, status: adopted, outcome: adopted, passed_house: false}
+        - {session_code: '261', bill: SCR7, status: passed one chamber, outcome: failed, passed_house: false}
+        - {session_code: '261', bill: SCR8, status: adopted, outcome: adopted, passed_house: true}
+        - {session_code: '261', bill: SB9, status: in committee, outcome: failed, passed_house: false}
+        - {session_code: '261', bill: SB10, status: introduced, outcome: failed, passed_house: false}
+        - {session_code: '261', bill: SB11, status: defeated, outcome: failed, passed_house: false}
+        - {session_code: '261', bill: SB12, status: vetoed, outcome: vetoed, passed_house: false}
+        - {session_code: '261', bill: SB13, status: passed both chambers, outcome: failed, passed_house: true}
+        - {session_code: '261', bill: SR16, status: introduced, outcome: failed, passed_house: false}
+        - {session_code: '261', bill: SB14, status: truly agreed, outcome: awaiting governor, passed_house: false}

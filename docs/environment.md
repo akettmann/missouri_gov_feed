@@ -373,6 +373,13 @@ every session zip, for example), the first takes a lock file next to the cache e
 is treated as left by a crashed process. Cloud Run tasks run on separate machines, so there the lock
 only helps as far as Cloud Storage FUSE honours exclusive creates; expect some duplicate downloads.
 
+Temp files: every writer in the cache (`write_atomic`, large downloads, the CourtListener case filter) writes
+`.<name>.<pid>.<32 hex>.part` and renames it into place; a failed writer deletes its own. A crash leaves the file
+behind, so the first `write_atomic` in each process sweeps the cache directory (once per process, not per write),
+and each large download sweeps its own name, deleting only such files untouched for 24 hours. A live writer's
+file is always fresh (a small file takes milliseconds; a download rewrites its file continuously), and on a
+Cloud Storage FUSE mount a file still open for writing is not yet an object, so another task cannot list it.
+
 Be polite with small state sites. Each shard keeps its own request pace, so N shards make N times the
 request rate. That matters most for `mec` (ask MEC before running it in parallel) and less for the
 cached PDF sources.
