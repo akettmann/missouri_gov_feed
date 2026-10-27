@@ -16,7 +16,7 @@ from mogov.config import CACHE_DIR
 from mogov.http import write_atomic
 
 # part of the key, so upgrading pdfplumber (whose output can shift) re-extracts everything
-_EXTRACTOR = f"pdfplumber-{version('pdfplumber')}"
+EXTRACTOR = f"pdfplumber-{version('pdfplumber')}"
 
 
 # One document may take this long to extract (checked between pages); a malformed or enormous PDF then becomes an
@@ -32,7 +32,7 @@ def _key(data_digest, extract_opts: dict, max_pages: int | None) -> str:
     # max_pages joins the key only when set, so existing cache entries stay valid
     key = data_digest.copy()
     key.update(
-        json.dumps([_EXTRACTOR, extract_opts] + ([max_pages] if max_pages is not None else []), sort_keys=True).encode()
+        json.dumps([EXTRACTOR, extract_opts] + ([max_pages] if max_pages is not None else []), sort_keys=True).encode()
     )
     return key.hexdigest()
 
@@ -40,7 +40,7 @@ def _key(data_digest, extract_opts: dict, max_pages: int | None) -> str:
 def _alias(sha256_hex: str, extract_opts: dict, max_pages: int | None) -> Path:
     """Tiny pointer file: (PDF sha256, options) -> the cache key. It lets a caller that already knows a PDF's hash
     reuse the cached text without reading the PDF (slow over a network mount) to derive the key."""
-    blob = json.dumps([sha256_hex, _EXTRACTOR, extract_opts, max_pages], sort_keys=True).encode()
+    blob = json.dumps([sha256_hex, EXTRACTOR, extract_opts, max_pages], sort_keys=True).encode()
     return CACHE_DIR / "pdftext" / "by-hash" / f"{hashlib.sha256(blob).hexdigest()}.key"
 
 
@@ -87,7 +87,7 @@ def page_lines(data: bytes, y_tolerance: float = 3) -> list[list[list[tuple[str,
     words clustered by their top edge (the same grouping page.extract_text() uses, so a line's words joined by
     spaces equal its extract_text line). Cached like page_texts()."""
     key = hashlib.sha256(data)
-    key.update(json.dumps([_EXTRACTOR, "lines", y_tolerance]).encode())
+    key.update(json.dumps([EXTRACTOR, "lines", y_tolerance]).encode())
     path = CACHE_DIR / "pdftext" / f"{key.hexdigest()}.json"
     if path.exists():
         return json.loads(path.read_bytes())
