@@ -386,11 +386,13 @@ models:
     truncates) and, when the token carries one, same district. The PDF prints a compound surname by its last word
     ("REHDER" for Holly Thompson Rehder) and drops a generational suffix ("PRICE" for Wiley Price IV), so those
     spellings match too. The Speaker comes from the house_speakers seed. Members who left mid-session are missing
-    from that session''s (end-of-session) list, so a second pass matches against every session''s members. Keys
-    ignore spaces ("VANSCHOIACK" = "Van Schoiack"). When several people still fit a token, the Open States seat
-    dates break the tie: a person whose seat did not cover the vote date is dropped if another candidate''s did
-    ("EVANS" after Jean Evans left on 2019-02-05 is David Evans). Tokens still matching zero or several people stay
-    unattributed rather than guessed. Grain: one row per (House roll call, attributed person).'
+    from that session''s (end-of-session) list, so a second pass matches against every session''s members; there
+    a person whose dated seat missed the vote date is ruled out even if alone, and one whose seat covered it outranks
+    one with no dated seat. In a session the exact surname beats the suffix-stripped one ("PRICE" is Price not Price
+    IV). Keys ignore spaces ("VANSCHOIACK" = "Van Schoiack"). When several people still fit a token, the Open States
+    seat dates break the tie: a person whose seat did not cover the vote date is dropped if another candidate''s
+    did ("EVANS" after Jean Evans left on 2019-02-05 is David Evans). Tokens still matching zero or several people
+    stay unattributed rather than guessed. Grain: one row per (House roll call, attributed person).'
 - name: int_mo_legislators__final_checks
   description: 'Legislator payroll rows that are a departed member''s final check: a small payment to a payee whose
     surname and first name fit a member of the same chamber whose seat ended the December before the pay year, or
