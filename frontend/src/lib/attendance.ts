@@ -30,6 +30,19 @@ export const MISSED_PARTS = [
   { key: "recused", label: "Recused" },
 ] as const;
 
+/**
+ * Only the MO Senate journal records leaves of absence and recusals. The House and Congress sources do not, so their
+ * zeros mean "not recorded", not "never excused". Attendance cells for those chambers show an em dash (#604).
+ */
+export function recordsExcusals(chamber: string): boolean {
+  return chamber === "state_senate";
+}
+
+/** A "leave"/"recused" cell: the formatted value where the chamber records it, an em dash where it does not. */
+export function excusalCell(chamber: string, formatted: string): string {
+  return recordsExcusals(chamber) ? formatted : "—";
+}
+
 /** Public wording for a vote_cast value. Recusals are not absences, so say what they are. */
 export function voteCastLabel(voteCast: string): string {
   return voteCast === "recused" ? "recused (Senate Rule 91)" : voteCast;
