@@ -1,0 +1,49 @@
+# Unit test for "Bill Combined (w/SCS SBs ...)" (#750): fixed senate.mo.gov action rows -> exact status and outcome.
+version: 2
+
+unit_tests:
+  - name: bill_status_senate_bill_combined
+    model: int_bills__status
+    description: >
+      Fixed wordings, "today" pinned to 2026-10-25. SB30 "Bill Combined (w/SCS SBs 901 & 820)" after a committee
+      report: combined into another bill (outcome stays failed: a policy question, #750), not enacted. SB31 the
+      variant "Bill Combined w/(SCS SBS 975 & 1024)" after passing the Senate: still combined. SB32 reported only
+      and no combine line: reported do pass. SB33 combined but later "Truly Agreed To and Finally Passed" and signed:
+      signed wins (the bill itself became law).
+    overrides:
+      vars:
+        as_of_date: '2026-10-25'
+    given:
+      - input: ref('stg_mo_house__bills')
+        format: sql
+        rows: |
+            select '261' as session_code, 'SB30' as bill, 'SB 30' as current_bill_string where 1 = 0
+      - input: ref('stg_mo_house__bill_actions')
+        format: sql
+        rows: |
+            select '261' as session_code, 'SB30' as bill, 'senate_act_list' as listed_in, cast('2026-05-14' as date) as action_date, 'Signed by House Speaker (H)' as description where 1 = 0
+      - input: ref('stg_mo_senate__bill_actions')
+        format: sql
+        rows: |
+            select '261' as session_code, 'SB30' as bill, cast('2026-04-01' as date) as action_date, 'SCS Reported from S Education Committee' as action union all
+            select '261', 'SB30', cast('2026-04-20' as date), 'Bill Combined (w/SCS SBs 901 & 820)' union all
+            select '261', 'SB31', cast('2026-04-02' as date), 'S Third Read and Passed' union all
+            select '261', 'SB31', cast('2026-04-21' as date), 'Bill Combined w/(SCS SBS 975 & 1024)' union all
+            select '261', 'SB32', cast('2026-04-02' as date), 'SCS Reported from S Education Committee' union all
+            select '261', 'SB33', cast('2026-04-20' as date), 'Bill Combined (w/SCS SBs 1 & 2)' union all
+            select '261', 'SB33', cast('2026-05-10' as date), 'Truly Agreed To and Finally Passed' union all
+            select '261', 'SB33', cast('2026-06-20' as date), 'Signed by Governor'
+      - input: ref('mo_senate_action_flags')
+        format: sql
+        rows: |
+            select '%Reported from S %' as action_pattern, 'any' as bill_type, 'reported' as flag union all
+            select '%S Third Read and Passed%', 'any', 'passed_senate' union all
+            select 'Bill Combined%', 'any', 'combined' union all
+            select 'Truly Agreed To and Finally Passed', 'any', 'truly_agreed' union all
+            select 'Signed by Governor%', 'any', 'approved'
+    expect:
+      rows:
+        - {session_code: '261', bill: SB30, status: combined into another bill, outcome: failed}
+        - {session_code: '261', bill: SB31, status: combined into another bill, outcome: failed}
+        - {session_code: '261', bill: SB32, status: reported do pass, outcome: failed}
+        - {session_code: '261', bill: SB33, status: signed, outcome: enacted}

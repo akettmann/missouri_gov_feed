@@ -471,7 +471,7 @@ seeds:
           - accepted_values:
               arguments:
                 values: [referred, reported, perfected, passed_senate, passed_house, defeated, adopted, truly_agreed,
-                         approved, vetoed, vetoed_in_part, veto_overridden, delivered_to_sos, withdrawn]
+                         approved, vetoed, vetoed_in_part, veto_overridden, delivered_to_sos, withdrawn, combined]
   - name: mo_senate_action_flag_examples
     description: >
       Golden examples for mo_senate_action_flags (#588): real Senate action wordings with the stage flag each must

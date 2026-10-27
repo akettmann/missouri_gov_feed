@@ -30,3 +30,4 @@ Legislature voted to override Governor%,any,veto_overridden,"2016 SB 656 (09/14/
 Vetoed in Part by Governor%,any,vetoed_in_part,"The House XML's wording; the Senate feed lists no appropriation bill (HBs), so it never shows there (checked 2016-2025, #715)"
 Delivered to Secretary of State%,any,delivered_to_sos,Delivered to Secretary of State (6 sampled bills)
 Governor took no action%,any,delivered_to_sos,"SB 751 (2024): Governor took no action, sent to Secretary of State/Article III, Sec. 31 (law without signature)"
+"Bill Combined%",any,combined,"Bill Combined (w/SCS SBs 901 & 820); Bill Combined w/(SCS SBS 975 & 1024) (no paren after Combined); Bill Combined w/(SCS/SCRs 24 & 25) (a resolution): the bill went into a substitute for other bills (#750); seen in the 2018 and 2024 samples"

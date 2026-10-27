@@ -10,6 +10,11 @@
 --   status   the furthest stage the actions record: introduced, in committee, reported do pass, perfected, passed
 --            one chamber, passed both chambers, truly agreed, then signed / signed with line-item vetoes / vetoed /
 --            veto overridden; resolutions: adopted. withdrawn and defeated when the bill stopped there.
+--            combined into another bill when the Senate's history says "Bill Combined (w/SCS SBs ...)": its content
+--            went into a substitute for other bills (#750). It never passed on its own number, and whether that
+--            content became law is on the vehicle bill, so this is not enacted; its outcome follows the usual rules
+--            (failed once the session is over), which is a policy question (#750). It ranks below truly agreed /
+--            adopted and above passed both chambers.
 --            relisted for governor message when every recorded action is the governor's Art. IV, s. 27 message
 --            (the budget/withholding message). These are not new bills: the House relists the previous regular
 --            session's appropriation bills (same bill number, bill string and effective date; LR numbers from 241
@@ -125,6 +130,7 @@ flags as (
         end) as passed_senate,
         max(case when description like 'Third Read and Defeated%' or senate_flag = 'defeated' then 1 else 0 end)
             as defeated,
+        max(case when senate_flag = 'combined' then 1 else 0 end) as combined,
         max(case when description in ('Withdrawn (H)', 'Withdrawn (S)') or senate_flag = 'withdrawn' then 1 else 0 end)
             as withdrawn,
         max(case when description in ('Adopted (H)', 'Adopted (S)') or senate_flag = 'adopted' then 1 else 0 end)
@@ -183,6 +189,7 @@ staged_status as (
             when vetoed = 1 then 'vetoed'
             when truly_agreed = 1 then 'truly agreed'
             when adopted = 1 then 'adopted'
+            when combined = 1 then 'combined into another bill'
             when passed_house = 1 and passed_senate_any = 1 then 'passed both chambers'
             when withdrawn = 1 then 'withdrawn'
             when defeated = 1 and passed_house + passed_senate_any = 0 then 'defeated'
