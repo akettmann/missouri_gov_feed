@@ -1,0 +1,41 @@
+# Unit tests for the inauguration-day convention of fct_audit_report_officeholders (#733): a Manual term in whole years
+# starts and ends on the second Monday of January, and a window that ends on the hand-over day is the outgoing holder's.
+version: 2
+
+unit_tests:
+  - name: audit_officeholders_terms_turn_over_on_the_second_monday_of_january
+    model: fct_audit_report_officeholders
+    description: >
+      Governors turn over on 2025-01-13 (second Monday), the auditor on 2023-01-09, not on January 15. r1 ends on
+      2025-01-13 itself: Parson only (a window ending on the hand-over day belongs to the outgoing holder). r2 is
+      2025-01-14 alone: Kehoe only (a January 15 start would miss him). r3 ends 2023-01-09 and r4 is 2023-01-10 to
+      2023-01-12, so the auditor Galloway is credited for r3 and Fitzpatrick for r4. r5 ends on 2021-01-11, a
+      governor inauguration day inside Parson's 2018-2025 Manual span: he is credited and no turn-over is invented
+      (a term ends on a second Monday only in its own last year, 2025).
+    given:
+      - input: ref('int_mo_auditor__reports')
+        rows:
+          - {report_number: r1, entity_type: statewide_office, office: governor, release_date: '2025-06-01', audit_period_start: '2024-07-01', audit_period_end: '2025-01-13'}
+          - {report_number: r2, entity_type: statewide_office, office: governor, release_date: '2025-06-01', audit_period_start: '2025-01-14', audit_period_end: '2025-01-14'}
+          - {report_number: r3, entity_type: statewide_office, office: state_auditor, release_date: '2023-06-01', audit_period_start: '2022-07-01', audit_period_end: '2023-01-09'}
+          - {report_number: r4, entity_type: statewide_office, office: state_auditor, release_date: '2023-06-01', audit_period_start: '2023-01-10', audit_period_end: '2023-01-12'}
+          - {report_number: r5, entity_type: statewide_office, office: governor, release_date: '2021-06-01', audit_period_start: '2020-07-01', audit_period_end: '2021-01-11'}
+      - input: ref('int_bluebook__statewide_officeholders')
+        rows:
+          - {office: governor, full_name: Michael L. Parson, party: R, term_start_year: 2018, term_end_year: 2025}
+          - {office: governor, full_name: Mike Kehoe, party: R, term_start_year: 2025, term_end_year: null}
+          - {office: state_auditor, full_name: Nicole Galloway, party: D, term_start_year: 2015, term_end_year: 2023}
+          - {office: state_auditor, full_name: Scott Fitzpatrick, party: R, term_start_year: 2023, term_end_year: null}
+      - input: ref('statewide_office_handovers')
+        rows:
+          - {office: governor, family_name: nobody, term_start_year: 1900, term_start: null, term_end: null}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: x, variant_key: nobody, given_key: nobody, family_key: nobody}
+    expect:
+      rows:
+        - {report_number: r1, full_name: Michael L. Parson, link_basis: audit_period}
+        - {report_number: r2, full_name: Mike Kehoe, link_basis: audit_period}
+        - {report_number: r3, full_name: Nicole Galloway, link_basis: audit_period}
+        - {report_number: r4, full_name: Scott Fitzpatrick, link_basis: audit_period}
+        - {report_number: r5, full_name: Michael L. Parson, link_basis: audit_period}

@@ -317,7 +317,18 @@ fiscal_notes,amendments}`), so run `mo_house` first; no crawl is needed.
   hash), stored as-is; clean-up is in dbt: `stg_mo_house__document_texts` strips control characters (#593) and
   `fct_bill_document_texts` is the mart (one row per URL; `fct_bill_documents` carries `page_count`, `text_length`,
   `has_text`, `fetch_error`). The tables are optional for dbt: a build without the loader gets empty placeholders
-  (`db.OPTIONAL_TYPED_TABLES`). Statute links (#594) are not parsed here.
+  (`db.OPTIONAL_TYPED_TABLES`).
+- Statute references (#594): for each `bill_text` document with text, `mogov.parsers.mo_house_statute_refs` reads the
+  enacting title (`AN ACT To repeal sections 1.010 and 2.020, RSMo, and to enact ...`; `To amend section ...` gives
+  action `amend`) and Section A (`... to be known as sections ..., to read as follows`) into
+  `mo_house_pdf_statute_refs`: one row per section or range as written (`section_start`, `section_end`), with
+  `action` (`repeal`, `amend`, `enact`), `ordinal` within the action, `supp_year` (from `RSMo Supp. 2023`), the
+  matched `clause`, and the document's URL, session, file name, LR number and version code. Ranges are not
+  expanded here. dbt: `stg_mo_house__statute_refs`, `int_mo_house__bill_text_statute_refs` (joins
+  `fct_bill_documents` for the bill and expands ranges against `fct_statute_sections`) and
+  `fct_bill_text_statute_links`. Appropriation bills, land conveyances and joint resolutions that amend the
+  Constitution name no RSMo section and give no rows. The parser runs on the stored text, so a change to it means
+  re-running the loader (a re-read of the landed PDFs, no downloads).
 - Not fetched: witness forms (`mo_house_xml_bill_witnesses`; they print citizens' contact details, #244) and
   change-map PDFs (`map_link`). `fetch_document` and the `KINDS` table are the reusable seam for adding a kind.
 - Rate: every request waits at the host-wide throttle (`REQUEST_INTERVAL` = 1 s, shared by every shard and by
@@ -370,6 +381,22 @@ Quirks:
 - Two fiscal-note links point to `www.moga.mo.gov/OverSight/...htm` (HTML, 2018, a host that did not answer when
   probed); they land as error rows. Two bill-text links use `house.mo.gov` rather than `documents.house.mo.gov`; such
   a file is stored as `<host>__<file name>` so it cannot collide with the same name on the main host.
+- Statute references (#594), measured on a 378-document slice (sessions 241, 251 and 261: every truly agreed text,
+  120 random introduced texts, HB 1-13; first 8 pages of each): 192 documents give 2,768 rows (1,134 repeal, 1,634
+  enact; no range, no `Supp.` citation and no `To amend section` title among them, so those three forms are
+  tested on made-up text only). The other 186 are 168 appropriation bills, 9 joint resolutions, 3 land
+  conveyances or transfers, 3 not-a-PDF links and 3 with no text layer. Section A prints its line numbers either at the start of the line
+  (`2 sections enacted in lieu`) or alone on the line before it (`2` then `one new section`, seen in
+  5627H.09T); both are stripped before reading. `To amend chapter 160, RSMo, by adding thereto one new section`
+  has no repealed section, only the enacted one. New sections that Section A adds without a number (`..., and 1, to read as follows`, a bare
+  `1` standing for a section the Revisor numbers later) are not captured: 19 of 714 bill texts from 2024-26.
+  `as enacted by house bill no. N` inside a repeal list does not end it (the list ends at `to enact`, `relating to`
+  or `by adding`). A pure repeal (`Sections 559.301 ... are repealed`) has no enact
+  rows. Sections within a chapter run in the order of the number after the point as an integer (140.995 is followed
+  by 140.1000), not as a decimal: 1,698 of 1,699 consecutive pairs in the slice's lists follow it. For the 82 truly
+  agreed texts whose bill the Revisor also links, 891 of 918 repealed or amended sections are in
+  `fct_bill_statute_links` (`assert_bill_text_repeals_agree_with_revisor_links`, warn); the one bill below half is
+  2026 HB 3279, which renumbers 620.580-620.592 to 173.4000-173.4012.
 - A summary PDF is linked by every version of a bill that shares it (23,648 link rows, 23,291 distinct URLs), so
   `mo_house_pdf_texts` has one row per URL, not per link.
 - Small-caps and some display glyphs can extract as NUL characters (seen in `house_fd` text); that is stored as-is.
@@ -698,8 +725,9 @@ Quirks:
   "sections a bill repealed" should expect rows for sections it also amended, and filter on `change`. In a repeal
   note "Repealed" covers every "and L." act after it, however long the chain, and any bill-only pieces that follow.
 - Some chapters list no sections at all: every section in them was repealed or transferred.
-- History notes only cover bills that became law. A pending bill's statute targets are in its text, which
-  isn't loaded yet (#175).
+- History notes only cover bills that became law. A pending bill's statute targets are read from its text
+  (`mo_house_pdf`, #594) into `fct_bill_text_statute_links`; `link_source` is `revisor_history` in
+  `fct_bill_statute_links` and `bill_text` there.
 
 ## mec: Missouri Ethics Commission (opt-in)
 
@@ -814,7 +842,19 @@ Quirks:
   is not "LIUNA Local 100"). Measured October 2026: 7 TAP rows ($35.4k). A third rule (#557) in the same tier
   also pairs an abbreviation or an added word: word by word one name is a prefix of the other ("deVries & Associates" /
   "DeVries and Assoc", "...Technical Ed" / "...Technical Education") and the longer name has at most two more words
-  ("Committee to Elect Jamie Burger HD"); the first word must be equal and the digits match. With several lines in the
+  ("Committee to Elect Jamie Burger HD"); the first word must be equal and the digits match. A word that is only the
+  start of another word counts (#634) only when the longer word is an organisation word from a curated list (macro
+  `is_org_word_prefix`: association, committee, construction, insurance, telecommunications, ...) and the prefix has at
+  least 3 letters (2 for "Ed" / "Education"): "Assoc" / "Associates", "Ins" / "Insurance", "Technical Ed" /
+  "Technical Education". Person surnames are not on the list, so "John Hill" / "John Hillhouse", "Smith Alex" /
+  "Smith Alexandra", "John Smith" / "John Smithson" and "Committee to Elect John Smith" / "... Smithson" stay unpaired,
+  and Roman numerals and 1-2 letter words must be equal ("Holding III" / "Holdings II"). An organisation abbreviated
+  in a way the list does not cover (a misspelling, "Mfg") is not paired by this rule. A donor name that differs from
+  another by one or two letters (10+ characters, same digits) still pairs through the typo rule above, so
+  "Citizens for Ann Smith" / "Citizens for Anne Smith" is not stopped here. The #557 fixtures "Jim Nutter" / "James Nutter Jr" were
+  changed to "James Nutter" / "James Nutter Jr" to keep their "kept" expectations. A name whose loose key is empty
+  (only stop words, legal forms and initials) is never paired. On the October 2026 data the tightening changes no
+  row (the same records: still 138 TAP notices and 78 direct-export notices dropped). With several lines in the
   group a notice is dropped only when it has exactly one name-compatible full-report line, that line has exactly one
   name-compatible notice, and no line in the group lacks a donor name. Measured October 2026: 4 more TAP notices
   ($10.9k). Left in place on purpose: two compatible candidates on either side, names that need outside knowledge
@@ -891,9 +931,27 @@ rule against `/bulkdata`, US government work (the page states no licence). Congr
   action cites are linked (118th: 794 of 1,926 roll calls; 119th so far: 852 of 1,589), so votes on nominations,
   quorum calls and amendments to a bill the file does not cite for them have no bill here.
 - Laws: `law_type` is Public Law or Private Law; the two are numbered separately (118-5 can be either). A private
-  law relieves a named person or entity; the 118th Congress's hr/s/sjres/hconres bills have 269 public and no
-  private laws. `became_law` is true for either type, so read `law_type` before calling a law broad policy. A
+  law relieves a named person or entity; the 118th Congress's hr/s/sjres/hconres bills have 274 public (including 5 H.J.Res.) and
+  no private laws. `became_law` is true for either type, so read `law_type` before calling a law broad policy. A
   bill with two laws shows the earliest by number (compared as integers).
+- Stage and veto outcomes: `int_federal_bills__stage` (one row per bill) reads how far each bill got from the
+  Library of Congress's coded copy of each action (`source_system` 'Library of Congress'; the chamber's own copy is
+  ignored): 8000/17000 passed the House/Senate, 28000 presented, 31000 vetoed, 32000/34000 passed over the veto,
+  33000/35000 failed of passage over the veto, 36000/41000 became Public/Private Law, E30000 "Signed by President".
+  `stage` runs introduced, committee_reported_or_discharged, passed_one_chamber, passed_both_chambers (each chamber
+  passed a version; texts may still differ), presented_to_president, then vetoed, veto_overridden or
+  became_law; a simple resolution agreed to in its own chamber is `agreed_to`. `president_outcome` separates signed
+  from became_law_without_signature (law with no "Signed by President" action; the House's own copy says "Sent to
+  Archivist of the United States unsigned") and `veto_result` says whether an override failed in the House or the
+  Senate. 118th and 119th (loaded 2026-10-27): 412 laws (118th: 274; 119th: 138 = 136 public + 2 private), 15 vetoes
+  (118th: 13; 119th: 2), every veto sustained or never put to an override vote, no override in these two Congresses.
+  `became_law` comes from the actions only; `has_law_number` flags the laws list separately (see the quirk below).
+  A concurrent resolution (hconres, sconres) adopted by both chambers is `agreed_to`, like a simple resolution; it
+  is never presented. `goes_to_president` is true for every hr, s, hjres and sjres, including a joint resolution
+  proposing a constitutional amendment (that goes to the states; none in the 118th or 119th). BILLSTATUS has no
+  code or wording for a pocket veto: a claimed one is a plain 31000 "Vetoed by President." (110 H.R. 1585, 111
+  H.J.Res. 64, 111 H.R. 3808), so it shows as `vetoed`. Whether a bill
+  "succeeded" is left to the reader (#622).
 - Cache: the zips of the Congress in session today (derived from the date, not from the configured list) are
   re-read daily (bills move all the time), and so are the previous Congress's until March 1 of the new Congress's
   first year (signings and Public Law numbers land after Jan 3); others monthly. The date is read once per run.
@@ -903,12 +961,17 @@ rule against `/bulkdata`, US government work (the page states no licence). Congr
 
 Quirks:
 - Outcome is only the `<laws>` list. The latest-action text is a free-text field and a bill can fail, be vetoed,
-  or be folded into another bill with the same words; `became_law` therefore means "carries a Public Law number".
-  Vetoes, veto overrides and pocket vetoes appear only as actions (type `Veto`, `President`, `BecameLaw`) and are
-  not modelled yet.
+  or be folded into another bill with the same words; `became_law` in the staging model therefore means "carries a law number" (the stage model uses the actions).
+  Vetoes, veto overrides and pocket vetoes appear only as actions (type `Veto`, `President`, `BecameLaw`); they
+  are read in `int_federal_bills__stage` (see "Stage and veto outcomes" above), by action code, not text.
 - `<legislationUrl>` is present on only about a third of the files (S.J.Res. 118th: 47 of 122; H.Res.: 335 of
   1,627), so `stg_govinfo_billstatus__bills` builds the congress.gov link from the type, Congress and number
   when it is missing.
+- GovInfo data error: 119-hr-766 (the SEWER Act; actions end at referral) lists Public Law 119-120, which is
+  really 119 S. 766 (that bill's own actions show it signed). `int_federal_bills__stage` therefore takes
+  `became_law` from the actions only and keeps the laws list as the separate `has_law_number` flag; a test checks
+  each law maps to one `became_law` bill. The staging and sponsorship models still credit the law to 119-hr-766
+  (#729).
 - Each action is often listed twice: the chamber's own and the Library of Congress's coded copy (`sourceSystem`
   names which). Roll calls cited by both appear twice in `_recorded_votes`. Count distinct roll calls, not rows.
 - `isOriginalCosponsor` is the text `True`/`False`; a cosponsor who later withdrew keeps their row with
@@ -929,6 +992,10 @@ Yearly national index plus each Missouri filing's PDF, split into text lines.
 Quirks:
 - Scanned paper filings (DocID 8xxxxxxx/9xxxxxxx) have no text layer. They land as one
   `has_text = false` row, so the gap is visible.
+- `fct_disclosures` gives a filing with no schedule lines one placeholder row, labelled by why: "not text-extractable"
+  (a scan), "download or text extraction failed" (the loader stored a `load_error` row; the PDF link may itself be
+  dead), or "not fetched" (no `house_fd_pdf_lines` row at all: a filing type the loader skips, such as an extension
+  request). "Not fetched" is derived from the absence of rows, so it also covers a filing the loader has not reached yet.
 - Periodic transaction reports live under `ptr-pdfs/`; everything else is under `financial-pdfs/`.
 - From 2021 on, the PDFs set their small-caps text (schedule headers, the Location/Description/Comments labels,
   the page section titles) in a font that text extraction turns into NUL characters: the capital stays and each

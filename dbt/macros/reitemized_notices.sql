@@ -16,14 +16,19 @@
        with the same digits ("LIUNA Local 110 PAC Fund" is not "LIUNA Local 100 PAC Fund"). With two or more leftover
        lines on either side it is unknowable who gave what, so every notice is kept.
 
-    3. Abbreviations and added words (#557). The same tier also pairs names where, word by word, one is a prefix of the
+    3. Abbreviations and added words (#557, #634). The same tier also pairs names where, word by word, one is a prefix of the
        other ("deVries and Assoc" / "DeVries and Associates", "Alliance ... Technical Ed" / "... Education") and the
        longer name has up to two more words at the end ("Committee to Elect Jamie Burger" / "... Burger HD"). The
        first word must be equal ("Ed Smith" is not "Edward Smith"), both names need two words, and the digits must match.
+       A word that is only the start of another counts only when the longer one is an organisation word from the macro
+       is_org_word_prefix (see name_words_match): person surnames never pair this way.
        Because that is a statement about two names, not about the count of lines, tiers 2 and 3 also run when the
        committee/date/amount has several leftover lines: a notice is dropped when it has exactly ONE name-compatible
        full-report line and that line has exactly ONE name-compatible notice, and no leftover line of the group lacks
        a donor name. Two compatible lines on either side keep every notice.
+
+    A name whose loose key is empty (only stop words, legal forms and single letters: "A B", "The Co") is never matched
+    in tiers 2 and 3 (#634): two such names would otherwise compare equal.
 
     Rows missing a committee, date, amount or donor are never matched in tier 1, and a row without a city and state
     never in tier 2. rel is a relation with record_id, mec_committee_id, contributor_name, contributor_city,
@@ -43,9 +48,51 @@
     ) }})
 {%- endmacro %}
 
+{#- Organisation words that may be abbreviated or truncated in donor names (#634), for name_words_match: the longer word of
+    a prefix pair must be one of these. Person surnames are deliberately absent, so "John Hill" / "John Hillhouse" and
+    "Smith Alex" / "Smith Alexandra" never pair. Chosen from the words that really occur abbreviated in MEC donor names
+    (October 2026). It is a macro list rather than a seed because dbt unit tests cannot run a model that refs a seed
+    they do not mock, and every dedupe test would have to repeat the list. word is the longer word and prefix the
+    shorter, both column names or expressions. A prefix needs 3+ letters, except 2 for Ed / Education. -#}
+{% macro is_org_word_prefix(word, prefix) -%}
+    (
+        (
+            length({{ prefix }}) >= 3
+            and {{ word }} in (
+                'accountants', 'administration', 'administrative', 'administrators', 'advisors', 'american',
+                'anesthesiologists', 'anesthesiology', 'anesthetists', 'architects', 'architectural',
+                'associate', 'associated', 'associates', 'association', 'associations', 'attorneys',
+                'bankers', 'benevolent', 'builders', 'cattlemens', 'centers', 'chiropractors', 'commission',
+                'commissioners', 'committee', 'committees', 'communications', 'community', 'construction',
+                'constructors', 'consulting', 'contractors', 'convenience', 'cooperative', 'cooperatives',
+                'corporation', 'corporations', 'corrections', 'council', 'democrat', 'democratic',
+                'democrats', 'dermatological', 'development', 'district', 'districts', 'drivers', 'electric',
+                'electrical', 'elevators', 'employees', 'engineering', 'engineers', 'enterprises', 'farms',
+                'federal', 'federation', 'financial', 'firefighters', 'fitters', 'foods', 'glassworkers',
+                'government', 'growers', 'healthcare', 'holdings', 'homes', 'hospital', 'hospitals',
+                'independent', 'industries', 'insurance', 'international', 'investments', 'laborers',
+                'legislative', 'local', 'locals', 'machinists', 'maintenance', 'management', 'marketers',
+                'medical', 'metals', 'motors', 'municipal', 'national', 'officers', 'organization',
+                'petroleum', 'pipefitters', 'plasterers', 'police', 'political', 'professional', 'realtors',
+                'regional', 'rehabilitation', 'representative', 'republican', 'republicans', 'services',
+                'society', 'solutions', 'state', 'states', 'stores', 'systems', 'teachers', 'technical',
+                'telecommunication', 'telecommunications', 'trades', 'transportation', 'troopers', 'union',
+                'voluntary', 'wholesale', 'wholesalers', 'workers'
+            )
+        )
+        or (length({{ prefix }}) >= 2 and {{ word }} in ('education', 'educational'))
+    )
+{%- endmacro %}
+
 {#- True when two loose_name_keys are the same name abbreviated or with words added (#557): at least two words in the
     shorter name, the first word equal, each later word of the shorter equal to or a prefix of the same-position word
-    of the other, and at most two extra words on the longer. Compares up to 8 words; digits are compared by the caller.
+    of the other, and at most two extra words on the longer. A word that is only a prefix of the other word counts
+    only when the LONGER word is an organisation word listed in the macro is_org_word_prefix ("Assoc" / "Associates",
+    "Ins" / "Insurance") and the prefix has 3+ letters, 2 for Ed / Education (#634). Surnames are not
+    listed, so "John Hill" / "John Hillhouse", "Smith Alex" / "Smith Alexandra" and "Committee to Elect John Smith" /
+    "... Smithson" stay unpaired, and words of 1-2 letters (except "Ed" for education) and Roman numerals ("Holding III"
+    / "Holdings II") must be equal. Equal words and extra trailing words always count.
+    Compares up to 8 words; digits are compared by the caller.
     n_a, n_b are the word counts of a, b (columns or expressions). -#}
 {% macro name_words_match(a, b, n_a, n_b) -%}
     (
@@ -58,8 +105,14 @@
             least({{ n_a }}, {{ n_b }}) < {{ i }}
             or {{ wa }} = {{ wb }}
             {%- if i > 1 %}
-            or {{ wa }} like {{ wb }} || '%'
-            or {{ wb }} like {{ wa }} || '%'
+            or (
+                {{ wa }} like {{ wb }} || '%'
+                and {{ mogov.is_org_word_prefix(wa, wb) }}
+            )
+            or (
+                {{ wb }} like {{ wa }} || '%'
+                and {{ mogov.is_org_word_prefix(wb, wa) }}
+            )
             {%- endif %}
         )
         {%- endfor %}
@@ -158,20 +211,24 @@ compatible as (
         count(*) over (partition by full_report_id) as notices_for_full_report
     from word_counts
     where
-        notice_loose = full_report_loose
-        or (
-            {{ mogov.regex_replace_all('notice_loose', '[^0-9]', '') }}
-            = {{ mogov.regex_replace_all('full_report_loose', '[^0-9]', '') }}
-            and (
-                (
-                    length(notice_loose) >= 10
-                    and length(full_report_loose) >= 10
-                    and {{ mogov.edit_distance('notice_loose', 'full_report_loose') }} <= 2
-                    and 10 * {{ mogov.edit_distance('notice_loose', 'full_report_loose') }}
-                    <= greatest(length(notice_loose), length(full_report_loose))
+        notice_loose <> ''
+        and full_report_loose <> ''
+        and (
+            notice_loose = full_report_loose
+            or (
+                {{ mogov.regex_replace_all('notice_loose', '[^0-9]', '') }}
+                = {{ mogov.regex_replace_all('full_report_loose', '[^0-9]', '') }}
+                and (
+                    (
+                        length(notice_loose) >= 10
+                        and length(full_report_loose) >= 10
+                        and {{ mogov.edit_distance('notice_loose', 'full_report_loose') }} <= 2
+                        and 10 * {{ mogov.edit_distance('notice_loose', 'full_report_loose') }}
+                        <= greatest(length(notice_loose), length(full_report_loose))
+                    )
+                    or {{ mogov.name_words_match('notice_loose', 'full_report_loose', 'notice_words', 'full_report_words') }}
                 )
-                or {{ mogov.name_words_match('notice_loose', 'full_report_loose', 'notice_words', 'full_report_words') }}
-            )
+        )
         )
 ),
 
