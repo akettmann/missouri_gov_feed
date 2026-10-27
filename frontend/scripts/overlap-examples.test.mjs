@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DuckDBInstance } from "@duckdb/node-api";
-import { overlapExamplesSql } from "../src/lib/exports/overlapQuery.ts";
+import { overlapExamplesSql, recusedSql } from "../src/lib/exports/overlapQuery.ts";
 
 // Fixed rows shaped like SB724 on 2022-05-10: an amendment first (lowest id), passage in the middle, a later
 // emergency-clause vote, and Senate ids where plain string order puts vote10 before vote2.
@@ -176,4 +176,31 @@ test("a recusal on an earlier day of a bill is listed next to that bill's later 
       ["recused", false],
     ],
   );
+});
+
+test("recused rollup is null for House-only groups, a count when any vote is a Senate vote (#154)", async () => {
+  const conn = await (await DuckDBInstance.create(":memory:")).connect();
+  await conn.run(
+    `create table ov (official_id varchar, industry varchar, chamber varchar, vote_id varchar, vote_cast varchar)`,
+  );
+  for (const [o, ch, id, cast] of [
+    ["house_only", "state_house", "h1", "yea"],
+    ["house_only", "state_house", "h2", "nay"],
+    ["mixed", "state_house", "h3", "yea"],
+    ["mixed", "state_senate", "s1", "recused"],
+    ["mixed", "state_senate", "s2", "recused"],
+    ["senate_only", "state_senate", "s3", "yea"],
+  ]) {
+    await conn.run(`insert into ov values (?, 'Gas', ?, ?, ?)`, [o, ch, id, cast]);
+  }
+  const rows = (
+    await conn.runAndReadAll(
+      `select official_id, ${recusedSql()} as recused from ov group by official_id order by official_id`,
+    )
+  ).getRowObjectsJson();
+  assert.deepEqual(rows, [
+    { official_id: "house_only", recused: null },
+    { official_id: "mixed", recused: 2 },
+    { official_id: "senate_only", recused: 0 },
+  ]);
 });

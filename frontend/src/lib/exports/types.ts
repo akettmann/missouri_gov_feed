@@ -241,8 +241,11 @@ export interface InterestOverlap {
   roll_calls: number;
   yea: number;
   nay: number;
-  /** roll calls recused from (Senate Rule 91); counted in roll_calls and in other, not in yea or nay */
-  recused: number;
+  /**
+   * roll calls recused from (Senate Rule 91); counted in roll_calls and in other, not in yea or nay. null when
+   * none of the votes are Senate votes: the House source records no recusals, so 0 there would not mean never.
+   */
+  recused: number | null;
   other: number;
   bills: number;
   /** the most recent overlapping votes, then any recusals not among them (recent = false) */

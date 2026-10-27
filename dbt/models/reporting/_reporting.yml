@@ -539,7 +539,7 @@ models:
         data_type: bigint
         description: >
           Of those, roll calls where they did anything other than vote yea or nay: present, absent, absent with
-          leave, not voting or recused (Senate Rule 91).
+          leave or recused (Senate Rule 91).
       - name: bills
         data_type: bigint
         description: Distinct bills with this subject among those roll calls.

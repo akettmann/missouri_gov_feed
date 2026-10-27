@@ -17,3 +17,8 @@ export function mostRecentBillsLabel(n: number, extraRecusals = 0): string {
   const extra = `${extraRecusals} ${extraRecusals === 1 ? "recusal" : "recusals"}`;
   return n === 0 ? extra : `${base} + ${extra}`;
 }
+
+/** The "Recused" cell: a count for Senate votes, an em dash where the source records no recusals (House). */
+export function recusedCell(recused: number | null): string {
+  return recused === null ? "—" : String(recused);
+}

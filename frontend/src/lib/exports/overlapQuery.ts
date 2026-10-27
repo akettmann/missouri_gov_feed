@@ -56,3 +56,12 @@ export function overlapExamplesSql(examples: number, overlap: string): string {
       ) as listed
       order by official_id, industry, vote_date desc, bill, session_code`;
 }
+
+/**
+ * SQL for the per (official, industry) recused count, over rpt_interest_vote_overlap rows. Only the MO Senate
+ * records recusals, so a group with no state_senate vote yields null ("not recorded"), never 0 (#154).
+ */
+export function recusedSql(): string {
+  return `case when bool_or(chamber = 'state_senate')
+          then cast(count(distinct case when vote_cast = 'recused' then vote_id end) as integer) end`;
+}

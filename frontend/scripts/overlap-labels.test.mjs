@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mostRecentBillsLabel, voteLinkLabel } from "../src/lib/overlapLabels.ts";
+import { mostRecentBillsLabel, recusedCell, voteLinkLabel } from "../src/lib/overlapLabels.ts";
 
 test("one example reads singular, several plural", () => {
   assert.equal(mostRecentBillsLabel(1), "1 most recent bill");
@@ -28,4 +28,10 @@ test("Senate journal PDFs are labeled as the day's journal, House votes as roll 
     "roll call",
   );
   assert.equal(voteLinkLabel(null), "roll call");
+});
+
+test("recused cell: a count for Senate rows, a dash where the source records none (#154)", () => {
+  assert.equal(recusedCell(3), "3");
+  assert.equal(recusedCell(0), "0");
+  assert.equal(recusedCell(null), "\u2014");
 });
