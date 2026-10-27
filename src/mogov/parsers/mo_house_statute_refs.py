@@ -24,9 +24,15 @@ _ID = r"\d{1,3}[A-Z]?\.\d{1,5}[A-Z]?(?:-\d{1,4}[A-Z]?)?"
 _REF = re.compile(rf"(?<![\w.-])(?P<start>{_ID})(?![\w-])(?:\s+(?:to|through)\s+(?P<end>{_ID})(?![\w-]))?")
 _RSMO = re.compile(r"RSMo(?:\s+Supp\.\s*(\d{4}))?")
 _TITLE = re.compile(r"\bAN ACT\b(?P<title>.*?)Be it enacted", re.S)
+# "relating to x" ends the list, unless more sections follow it ("To repeal section 1.010, relating to x, and section
+# 2.020, RSMo, and to enact ..."): then it is a topic in the middle of the list and the list goes on.
+_MORE = rf"(?:(?!\bto enact\b|\bby adding\b).)*?\bsections?\s+{_ID}(?![\w-])"
 _REPEAL = re.compile(
-    r"\bTo (?P<verb>repeal|amend) (?P<body>sections?\b.*?)(?=\bto enact\b|\bby adding\b|\brelating to\b|$)", re.S
+    rf"\bTo (?P<verb>repeal|amend) (?P<body>sections?\b.*?)(?=\bto enact\b|\bby adding\b|\brelating to\b(?!{_MORE})|$)",
+    re.S,
 )
+# the mid-list topic, up to the next "and section N": its words are not references
+_TOPIC = re.compile(rf"\brelating to\b.*?(?=,?\s*(?:and\s+)?\bsections?\s+{_ID}(?![\w-]))", re.S)
 # searched in text with the line numbers removed
 _SECTION_A = re.compile(r"Be it enacted.*?\bSection A\.(?P<body>.*?)\bto read as follows", re.S)
 _KNOWN_AS = re.compile(r"\bto be known as\s+sections?\b(?P<ids>.*)$", re.S)
@@ -68,7 +74,7 @@ def parse_statute_refs(text: str | None) -> list[StatuteRef]:
     if title := _TITLE.search(text):
         title_text = _squash(title.group("title"))
         if m := _REPEAL.search(title_text):
-            out += _refs(m.group("verb"), m.group("body"), _squash(m.group(0)))
+            out += _refs(m.group("verb"), _TOPIC.sub("", m.group("body")), _squash(m.group(0)))
     start = text.find("Be it enacted")
     enacting = text[start : start + SECTION_A_WINDOW] if start >= 0 else ""
     if sec := _SECTION_A.search(_squash(_LINE_NUMBER.sub("", enacting))):

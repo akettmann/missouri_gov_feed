@@ -171,3 +171,33 @@ def test_as_enacted_by_in_the_middle_of_the_repeal_list_keeps_later_sections():
     )
     refs = [r for r in parse_statute_refs(text) if r.action == "repeal"]
     assert [r.section_start for r in refs][:4] == ["1.010", "2.020", "3.030", "4.040"]
+
+
+def test_relating_to_in_the_middle_of_the_repeal_list_keeps_later_sections():
+    # #736: "relating to x" ended the list, dropping every section after it; the topic's own numbers are not read
+    text = _bill(
+        "To repeal section 1.010, relating to the 2.5 percent fee, and section 2.020, RSMo, and sections 3.030 to "
+        "3.050, relating to y, and section 4.040, RSMo, and to enact in lieu thereof four new sections relating to "
+        "the same subject.",
+        "Section A. Sections 1.010 and 2.020, RSMo, are repealed and four new sections enacted in lieu thereof, to "
+        "be known as sections 1.010, 2.020, 3.030 and 4.040, to read as follows:",
+    )
+    refs = [r for r in parse_statute_refs(text) if r.action == "repeal"]
+    assert [(r.section_start, r.section_end) for r in refs] == [
+        ("1.010", None),
+        ("2.020", None),
+        ("3.030", "3.050"),
+        ("4.040", None),
+    ]
+    assert "same subject" not in refs[0].clause
+
+
+def test_trailing_relating_to_still_ends_the_repeal_list():
+    # a pure repeal's topic comes after the list; numbers in it are not references (a "section N" in the topic would be
+    # read as the list going on: the limit of the mid-list rule)
+    text = _bill(
+        "To repeal sections 1.010 and 2.020, RSMo, relating to the 2.5 percent fee.",
+        "Section A. Sections 1.010 and 2.020, RSMo, are repealed.",
+    )
+    refs = [r for r in parse_statute_refs(text) if r.action == "repeal"]
+    assert [r.section_start for r in refs] == ["1.010", "2.020"]

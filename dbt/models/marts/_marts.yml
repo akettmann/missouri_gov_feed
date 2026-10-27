@@ -3121,3 +3121,42 @@ models:
               arguments:
                 min_value: 0
                 max_value: 7305
+
+  - name: fct_bill_text_revisor_agreement
+    description: >
+      How many of the sections a bill's truly agreed text (version T) repeals or amends the Revisor's history notes
+      also credit to that bill (fct_bill_statute_links). Grain: one row per bill that has Revisor links and a T text
+      naming a repealed or amended section. A section the Revisor lists as transferred to a section credited to the
+      same bill counts as linked (a bill that renumbers sections is credited only with the new numbers).
+      assert_bill_text_repeals_agree_with_revisor_links warns on the low ones.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [session_code, bill]
+    columns:
+      - name: session_code
+        data_type: varchar
+        description: House-style session code.
+        data_tests:
+          - not_null
+      - name: bill
+        data_type: varchar
+        description: Bill number without spaces (HB945, HJR12).
+        data_tests:
+          - not_null
+      - name: text_sections
+        data_type: bigint
+        description: Distinct sections the T text repeals or amends.
+        data_tests:
+          - not_null
+      - name: linked_directly
+        data_type: hugeint
+        description: Of those, the sections the Revisor credits to the bill under the same number.
+      - name: linked_via_transfer
+        data_type: hugeint
+        description: Of those, sections not credited directly but transferred to a section credited to the bill.
+      - name: also_in_revisor_links
+        data_type: hugeint
+        description: linked_directly plus linked_via_transfer.
+        data_tests:
+          - not_null
