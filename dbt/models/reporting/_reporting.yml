@@ -563,7 +563,13 @@ models:
       their party (party unity from fct_party_unity_yearly, current chamber, per calendar year and lifetime, at
       least awards_min_party_line_votes party-line votes in the period (default 20); the lifetime figure equals
       the profile's party_unity_pct, the yearly figures appear with the award only). Most breaks needs at least
-      one break. Only attendance and party unity are pairs (the two ends rank one number over one field); each end's
+      one break. Most bills passed the House ranks, among state_house, the share of a member's decided HB and
+      HJR primary sponsorships (fct_sponsorship_outcomes: not pending, not awaiting the governor; sessions
+      that have ended only; co-sponsored bills and resolutions not counted; appropriation bills counted) that
+      the House passed, per session year and lifetime (counts summed), with at least awards_min_bills_decided
+      decided bills (default 10). It has no low end: most bills are never passed, so a "fewest" list would be
+      a tie at 0%. Early years are not comparable with recent ones (only current officials are in the data).
+      Only attendance and party unity are pairs (the two ends rank one number over one field); each end's
       cutoff is at most half that field (floor(group_size / 2)), ties at the cutoff can add more, so
       no official is in both lists of a pair for one office and period; an official a tie at the cut would put
       in both is in neither. Only offices with awards_min_field_size
@@ -578,13 +584,14 @@ models:
         data_type: varchar
         description: >
           lowest_attendance, highest_attendance, most_committee_money, least_committee_money_share,
-          most_party_breaks, most_party_loyal.
+          most_party_breaks, most_party_loyal, most_bills_passed_house.
         data_tests:
           - not_null
           - accepted_values:
               arguments:
                 values: ['lowest_attendance', 'highest_attendance', 'most_committee_money',
-                  'least_committee_money_share', 'most_party_breaks', 'most_party_loyal']
+                  'least_committee_money_share', 'most_party_breaks', 'most_party_loyal',
+                  'most_bills_passed_house']
       - name: office
         data_type: varchar
         description: The comparison group (dim_official.office); officials are ranked only against their office.
@@ -614,11 +621,11 @@ models:
       - name: metric
         data_type: decimal(28,6)
         description: >
-          The ranked number: attendance %, dollars from PACs/committees/parties, % of money from them, or party
-          unity %.
+          The ranked number: attendance %, dollars from PACs/committees/parties, % of money from them, party
+          unity %, or % of decided sponsored House bills the House passed.
       - name: sample_size
         data_type: decimal(28,6)
-        description: What the metric is out of (recorded votes, total dollars raised, or party-line votes cast).
+        description: What the metric is out of (recorded votes, total dollars raised, party-line votes cast, or decided sponsored bills).
       - name: group_size
         data_type: bigint
         description: >

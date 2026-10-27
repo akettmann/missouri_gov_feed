@@ -16,6 +16,16 @@
 --                      fct_bias_indicators party_unity_pct sums the same counts, so the lifetime figure matches
 --                      the profile; the yearly figures appear with the award only.
 --                      Maverick (most_party_breaks) needs at least one break
+--   House passage:    most_bills_passed_house, from fct_sponsorship_outcomes: of the House bills (HB) and House
+--                      joint resolutions (HJR) a member was primary sponsor of in sessions that have ended, the
+--                      share the House passed, counting only decided bills (not pending, not awaiting the
+--                      governor). Per calendar year of the session (a year's regular and special sessions summed)
+--                      and lifetime (counts summed over all loaded sessions, not an average of shares). Needs
+--                      awards_min_bills_decided (default 10) decided bills in the period. Ranked among
+--                      state_house, whatever office the member holds now. Not a pair: the low end is mostly a
+--                      tie at 0% (most bills die in committee), so there is no "fewest passed" award; read
+--                      early years with care, only members still in office are in the data (see
+--                      fct_sponsorship_outcomes)
 -- Paired awards (the awards_pairs macro: attendance, party unity;
 -- each pair ranks one number over one field): each end's cutoff is at most half of its ranked field
 -- (floor(field / 2)) so nobody is on both lists; ties at the cutoff can add more. An official the two lists
@@ -232,6 +242,41 @@ unity as (
     where party_line_votes >= {{ var('awards_min_party_line_votes') }}
 ),
 
+house_passage_totals as (
+    -- sessions that are still open are left out: their bills are undecided or the counts are partial
+    select
+        official_id,
+        cast(session_year as {{ dbt.type_string() }}) as period,
+        sum(bills_decided) as bills_decided,
+        sum(bills_passed_house) as bills_passed_house
+    from {{ ref('fct_sponsorship_outcomes') }}
+    where is_session_over
+    group by official_id, cast(session_year as {{ dbt.type_string() }})
+    union all
+    select
+        official_id,
+        'lifetime' as period,
+        sum(bills_decided) as bills_decided,
+        sum(bills_passed_house) as bills_passed_house
+    from {{ ref('fct_sponsorship_outcomes') }}
+    where is_session_over
+    group by official_id
+),
+
+house_passage as (
+    select
+        official_id,
+        -- the chamber the bills were introduced in, not the member's current office (like attendance)
+        'state_house' as office,
+        period,
+        round(100.0 * bills_passed_house / bills_decided, 1) as metric,
+        bills_decided as sample_size,
+        -- the unrounded share ranks (rounding made fake ties)
+        100.0 * bills_passed_house / bills_decided as share_exact
+    from house_passage_totals
+    where bills_decided >= {{ var('awards_min_bills_decided') }}
+),
+
 measures as (
     select
         'lowest_attendance' as award,
@@ -308,6 +353,18 @@ measures as (
         -unity_exact as sort_key,
         field_size
     from unity
+    union all
+    select
+        'most_bills_passed_house' as award,
+        official_id,
+        office,
+        period,
+        case when period = 'lifetime' then 'lifetime' else 'year' end as period_kind,
+        metric,
+        sample_size,
+        -share_exact as sort_key,
+        cast(null as {{ dbt.type_bigint() }}) as field_size
+    from house_passage
 ),
 
 ranked as (
