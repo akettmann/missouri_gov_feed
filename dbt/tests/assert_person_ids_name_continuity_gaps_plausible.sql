@@ -13,19 +13,22 @@
 -- signed). 23 persons touch in time; Joe Adams returns to HD86 after 2 years; Lavender and Matthiesen are exempt
 -- by member id. Stephen Webber (HD46 to 2016, SD19 from 2025: 9 years, another chamber) would fail on the name
 -- alone. A maintainer signed off that he is one person (#504, PR #511, #663), so his row in official_id_links is
--- signed: his ids are now basis curated, not name_continuity, and this test no longer sees them. It lists nothing,
--- so it is an error (#663).
+-- signed: his ids are now basis curated, and the signed pair is exempt. It lists nothing, so it is an error (#663).
+-- A signed same_person row makes every id of the person it moves basis curated, including ids the name rules joined
+-- to the signed id, so curated persons are checked too (#682): the sign-off exempts only the pair it names, and an
+-- id the name rules wrongly joined to that person is still listed.
 {{ config(severity='error') }}
 
 with person_ids as (
     select * from {{ ref('int_officials__person_ids') }}
 ),
 
--- persons the name rules built (the chosen id itself is basis self, so take every id of such a person)
+-- persons the name rules built (the chosen id itself is basis self, so take every id of such a person), and persons
+-- a signed row moved, whose ids are all basis curated whatever joined them
 name_persons as (
     select distinct person_id
     from person_ids
-    where basis = 'name_continuity'
+    where basis in ('name_continuity', 'curated')
 ),
 
 spans as (
