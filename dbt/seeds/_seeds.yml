@@ -52,7 +52,12 @@ seeds:
       - name: office
         data_tests: [unique, not_null]
   - name: house_speakers
-    description: Speaker of the Missouri House per year; roll-call PDFs list the Speaker as "MR SPEAKER".
+    description: >
+      Speaker of the Missouri House per year (the district number is the Speaker's seat); roll-call PDFs list the
+      Speaker as "MR SPEAKER". The Speaker is on every roll call, so these rows also keep int_officeholders__years
+      from reading a Speaker with no named votes as a member who stopped voting (#491). 2017-2022 are Todd
+      Richardson (HD152, Speaker to January 2019), Elijah Haahr (HD134, 2019-2020) and Rob Vescovo (HD112,
+      2021-2022); each matches the member of that district in the session's House roster.
   - name: legislator_seat_corrections
     description: >
       Legislative seat-terms Open States lacks or cuts short, added to int_mo_legislators__seats so journal votes
