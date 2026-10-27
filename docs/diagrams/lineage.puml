@@ -19,6 +19,7 @@ package "Votes" {
   [mo_senate] as L_mos
   [mo_senate_topics] as L_most
   [voteview] as L_vv
+  [govinfo_billstatus] as L_gib
 }
 package "Money" {
   [fec] as L_fec
@@ -90,6 +91,7 @@ package "marts" {
   [dim_district\nfct_official_districts] as D_dist
   [dim_zcta] as D_zcta
   [fct_votes\nfct_federal_votes] as F_votes
+  [fct_federal_sponsorship] as F_spons
   [fct_campaign_finance\nfct_federal_donor_summary\nfct_campaign_spending\nfct_campaign_reports] as F_money
   [fct_lobbyist_gifts] as F_gifts
   [fct_disclosures\nfct_voluntary_disclosures] as F_disc
@@ -142,6 +144,8 @@ L_mos --> I_votes
 I_seats --> I_votes
 I_votes --> F_votes
 L_vv --> F_votes
+L_gib --> F_spons
+L_cl --> F_spons
 L_vv --> F_bias
 I_votes --> I_party
 L_vv --> I_party

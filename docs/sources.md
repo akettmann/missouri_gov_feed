@@ -17,6 +17,7 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `tap_mec` | MEC via The Accountability Project | state campaign finance and lobbyist gifts | 2011–2022 (gifts from 2004) | |
 | `fec` | Federal Election Commission | federal candidates, committees, PAC contributions, donor aggregates | `MOGOV_FEC_CYCLES` | API key for aggregates |
 | `voteview` | Voteview | Congress roll calls, votes, DW-NOMINATE ideology | `MOGOV_VOTEVIEW_CONGRESSES` | |
+| `govinfo_billstatus` | GovInfo BILLSTATUS bulk XML (govinfo.gov) | federal bills: sponsor, cosponsors, actions, roll calls cited, Public Law number | `MOGOV_BILLSTATUS_CONGRESSES` (default 117-119) | |
 | `house_fd` | U.S. House Clerk | House members' financial disclosures and trades | 2015+ | |
 | `senate_efd` | U.S. Senate eFD | senators' financial disclosures | as filed | opt-in |
 | `courtlistener_bulk` | CourtListener bulk files | judges, positions, education, federal judges' disclosures | quarterly snapshot | |
@@ -624,6 +625,43 @@ Quirks:
   the filter goes.
 - The rollcalls file has only House and Senate rows, and the source `accepted_values` tests on all three files
   flag any new chamber value; staging drops unknown chambers either way.
+
+## govinfo_billstatus: federal bills, sponsors and outcomes
+
+Flow: [diagrams/sources/govinfo_billstatus.svg](diagrams/sources/govinfo_billstatus.svg)
+
+GovInfo's Bill Status bulk data (https://www.govinfo.gov/bulkdata/BILLSTATUS): one zip per Congress and bill type
+(`/119/hr/BILLSTATUS-119-hr.zip`, 33 MB; `/118/s/...`, 14 MB), each member one bill's XML. No key, no robots.txt
+rule against `/bulkdata`, US government work (the page states no licence). Congresses 108 (2003) to 119 exist;
+`MOGOV_BILLSTATUS_CONGRESSES` picks the loaded ones (default 117,118,119, as for Voteview) and
+`MOGOV_BILLSTATUS_TYPES` the bill types (default all eight).
+
+- Lands: every XML file unchanged as gzip under `data/raw/govinfo_billstatus_xml/<congress>/<type>/` plus
+  `govinfo_billstatus_files` (path, URL, size, sha256, landing time); parsed with lxml into one JSON row per entity:
+  `govinfo_billstatus_bills`, `_sponsors`, `_cosponsors`, `_actions`, `_recorded_votes`, `_laws`.
+  Committees, subjects, summaries, titles and text versions stay in the raw XML only.
+- Shard units: (congress, bill type) zips, each downloaded by exactly one shard (so no shard repeats another's
+  download). The House `hr` zip is by far the largest, so more shards than zips (8 per Congress) gain nothing.
+- Everything is landed (all states): cosponsor lists need the whole file anyway, and the Missouri filter
+  (sponsor `state` = MO) is applied in dbt, in `fct_federal_sponsorship` (one row per Missouri member, bill and
+  role, with `became_law` and the Public Law number).
+- Cache: the newest Congress's zips daily (bills move all the time), older Congresses monthly. A 404 for a zip
+  (a bill type with no zip for a Congress) is logged and skipped.
+
+Quirks:
+- Outcome is only the `<laws>` list. The latest-action text is a free-text field and a bill can fail, be vetoed,
+  or be folded into another bill with the same words; `became_law` therefore means "carries a Public Law number".
+  Vetoes, veto overrides and pocket vetoes appear only as actions (type `Veto`, `President`, `BecameLaw`) and are
+  not modelled yet.
+- `<legislationUrl>` is present on only about a third of the files (S.J.Res. 118th: 47 of 122; H.Res.: 335 of
+  1,627), so `stg_govinfo_billstatus__bills` builds the congress.gov link from the type, Congress and number
+  when it is missing.
+- Each action is often listed twice: the chamber's own and the Library of Congress's coded copy (`sourceSystem`
+  names which). Roll calls cited by both appear twice in `_recorded_votes`. Count distinct roll calls, not rows.
+- `isOriginalCosponsor` is the text `True`/`False`; a cosponsor who later withdrew keeps their row with
+  `sponsorshipWithdrawnDate` set (the mart drops them). `district` is present for House members only.
+- Sponsors carry the member's state at the time of the bill; a member who changed states has rows under both.
+- Rate: the loader makes one request per zip (24 for the default window), not per bill.
 
 ## house_fd: U.S. House financial disclosures
 

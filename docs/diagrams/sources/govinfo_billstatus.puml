@@ -1,0 +1,30 @@
+@startuml govinfo_billstatus
+title govinfo_billstatus: federal bills (GovInfo BILLSTATUS bulk XML)
+start
+:units = (congress, bill type) for
+MOGOV_BILLSTATUS_CONGRESSES x MOGOV_BILLSTATUS_TYPES
+(hr, s, hjres, sjres, hconres, sconres, hres, sres);
+:this shard keeps the units it owns (stable hash);
+note right: each zip is downloaded by exactly one shard
+repeat
+  :GET govinfo.gov/bulkdata/BILLSTATUS/CONGRESS/TYPE/BILLSTATUS-CONGRESS-TYPE.zip
+  (streamed to the cache; newest Congress daily, older monthly);
+  if (404?) then (yes)
+    :log and skip the unit;
+  else (zip)
+    repeat
+      :read one *.xml member (one bill);
+      :gzip it unchanged under
+      RAW_DIR/govinfo_billstatus_xml/CONGRESS/TYPE/;
+      :govinfo_billstatus_files row (path, URL, size, sha256);
+      :parse with lxml (mogov.parsers.govinfo_billstatus):
+      bill, sponsors, cosponsors, actions,
+      recorded votes, laws (Public Law number);
+    repeat while (more members?)
+  endif
+repeat while (more zips?)
+:govinfo_billstatus_files, _bills, _sponsors, _cosponsors,
+_actions, _recorded_votes, _laws (all states; no Missouri filter);
+note right: dbt keeps sponsors with state MO\n(fct_federal_sponsorship)
+stop
+@enduml
