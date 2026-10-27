@@ -1,0 +1,172 @@
+unit_tests:
+  - name: seat_terms_start_quality
+    model: int_mo_legislators__seat_terms
+    description: >
+      start_quality and known_start_date (#656), on real shapes. Peggy McGaugh's HD39 term has no Open States start
+      (undated); her HD7 term starts 2023-01-04 (dated). Jason Smith and Shawn Sisco both hold HD120 from the
+      as-given 2013-01-01, a stand-in Open States uses for "in office by then" (placeholder): real swearing-in falls
+      on January 4-12. A seed correction (Mike Kehoe, SD6 from 2017-01-01) is always dated, even on January 1. The
+      start_date column keeps its old values (1900-01-01 for undated, January 1 for any January start).
+    given:
+      - input: ref('stg_openstates__roles')
+        rows:
+          - {openstates_id: mcgaugh, role_type: lower, district: '39', start_date: null, end_date: '2023-01-03'}
+          - {openstates_id: mcgaugh, role_type: lower, district: '7', start_date: '2023-01-04', end_date: null}
+          - {openstates_id: smith, role_type: lower, district: '120', start_date: '2013-01-01', end_date: '2014-12-31'}
+          - {openstates_id: sisco, role_type: lower, district: '120', start_date: '2013-01-01', end_date: '2014-12-31'}
+          - {openstates_id: kehoe, role_type: upper, district: '6', start_date: '2011-01-01', end_date: '2016-12-31'}
+      - input: ref('legislator_seat_corrections')
+        rows:
+          - {openstates_id: kehoe, chamber: upper, district: 6, start_date: '2017-01-01', end_date: '2018-06-18'}
+      - input: ref('stg_openstates__people')
+        rows:
+          - {openstates_id: mcgaugh, full_name: Peggy McGaugh, family_name: McGaugh}
+          - {openstates_id: smith, full_name: Jason Smith, family_name: Smith}
+          - {openstates_id: sisco, full_name: Shawn Sisco, family_name: Sisco}
+          - {openstates_id: kehoe, full_name: Mike Kehoe, family_name: Kehoe}
+      - input: ref('stg_mo_senate__votes')
+        rows: []
+      - input: ref('stg_mo_house__members')
+        rows: []
+    expect:
+      rows:
+        - {openstates_id: mcgaugh, district_number: 39, start_date: '1900-01-01', start_quality: undated, known_start_date: null}
+        - {openstates_id: mcgaugh, district_number: 7, start_date: '2023-01-01', start_quality: dated, known_start_date: '2023-01-04'}
+        - {openstates_id: smith, district_number: 120, start_date: '2013-01-01', start_quality: placeholder, known_start_date: null}
+        - {openstates_id: sisco, district_number: 120, start_date: '2013-01-01', start_quality: placeholder, known_start_date: null}
+        - {openstates_id: kehoe, district_number: 6, start_date: '2011-01-01', start_quality: placeholder, known_start_date: null}
+        - {openstates_id: kehoe, district_number: 6, start_date: '2017-01-01', start_quality: dated, known_start_date: '2017-01-01'}
+
+  - name: seat_terms_end_quality_against_the_house_roster
+    model: int_mo_legislators__seat_terms
+    description: >
+      conflicts_with_roster (#656, #565), on real shapes. Lauren Arthur's HD18 term ends 2016-12-31, but the 2017
+      and 2018 rosters list her in HD18 and no Open States term of hers runs into those years. Randy Dunn's HD23 term
+      runs to 2018-12-31, but the 2018 roster lists Barbara Washington (elected in a special election) for the rest
+      of it. Neither of the next two is a conflict, as the roster spells the surname differently: Bruce Franks
+      ("Franks Jr." on the roster, HD78, to 2019-07-31, past the 2019 session) and Dean VanSchoiack ("Van Schoiack",
+      HD9, open). Rochelle Walton Gray's HD75 term ends 2016-12-31 and the 2017 roster lists Alan Gray, a different
+      person whose own term covers 2017: dated, not a match on the last word of her surname. Alan Gray's first term
+      ends 2018-12-31 and the 2019 roster lists him, but his next term covers 2019: dated. Scott Fitzpatrick left
+      HD158 on 2019-01-14 (sworn in as State Treasurer), but the 2019 roster still lists him: a conflict, though here
+      the roster outlived the member. A member who left during the 2018 session (leaver, HD30, to 2018-03-01) is not
+      expected on its end-of-session list, which names the successor: dated. Ashley Manlove (Open States) is "Bland
+      Manlove" on the roster, matched by the last word of the roster surname: open. Wes Rogers, HD18 from 2019, is listed
+      every year: dated.
+    given:
+      - input: ref('stg_openstates__roles')
+        rows:
+          - {openstates_id: arthur, role_type: lower, district: '18', start_date: '2015-01-01', end_date: '2016-12-31'}
+          - {openstates_id: rogers, role_type: lower, district: '18', start_date: '2019-01-09', end_date: '2020-12-31'}
+          - {openstates_id: dunn, role_type: lower, district: '23', start_date: '2013-01-01', end_date: '2018-12-31'}
+          - {openstates_id: franks, role_type: lower, district: '78', start_date: null, end_date: '2019-07-31'}
+          - {openstates_id: vanschoiack, role_type: lower, district: '9', start_date: '2021-01-06', end_date: null}
+          - {openstates_id: walton_gray, role_type: lower, district: '75', start_date: '2013-01-01', end_date: '2016-12-31'}
+          - {openstates_id: alan_gray, role_type: lower, district: '75', start_date: '2017-01-11', end_date: '2018-12-31'}
+          - {openstates_id: alan_gray, role_type: lower, district: '75', start_date: '2019-01-09', end_date: '2025-01-07'}
+          - {openstates_id: fitzpatrick, role_type: lower, district: '158', start_date: null, end_date: '2019-01-14'}
+          - {openstates_id: leaver, role_type: lower, district: '30', start_date: '2017-01-11', end_date: '2018-03-01'}
+          - {openstates_id: manlove, role_type: lower, district: '26', start_date: '2019-01-09', end_date: null}
+      - input: ref('legislator_seat_corrections')
+        rows: []
+      - input: ref('stg_openstates__people')
+        rows:
+          - {openstates_id: arthur, full_name: Lauren Arthur, family_name: Arthur}
+          - {openstates_id: rogers, full_name: Wes Rogers, family_name: Rogers}
+          - {openstates_id: dunn, full_name: Randy Dunn, family_name: Dunn}
+          - {openstates_id: franks, full_name: Bruce Franks Jr., family_name: Franks}
+          - {openstates_id: vanschoiack, full_name: Dean VanSchoiack, family_name: VanSchoiack}
+          - {openstates_id: walton_gray, full_name: Rochelle Walton Gray, family_name: Walton Gray}
+          - {openstates_id: alan_gray, full_name: Alan Gray, family_name: Gray}
+          - {openstates_id: fitzpatrick, full_name: Scott Fitzpatrick, family_name: Fitzpatrick}
+          - {openstates_id: leaver, full_name: Lee Leaver, family_name: Leaver}
+          - {openstates_id: manlove, full_name: Ashley Manlove, family_name: Manlove}
+      - input: ref('stg_mo_senate__votes')
+        rows: []
+      - input: ref('stg_mo_house__members')
+        rows:
+          - {session_year: 2017, district_number: 18, last_name: Arthur}
+          - {session_year: 2018, district_number: 18, last_name: Arthur}
+          - {session_year: 2019, district_number: 18, last_name: Rogers}
+          - {session_year: 2020, district_number: 18, last_name: Rogers}
+          - {session_year: 2017, district_number: 23, last_name: Dunn}
+          - {session_year: 2018, district_number: 23, last_name: Washington}
+          - {session_year: 2017, district_number: 78, last_name: Franks Jr.}
+          - {session_year: 2018, district_number: 78, last_name: Franks Jr.}
+          - {session_year: 2019, district_number: 78, last_name: Franks Jr.}
+          - {session_year: 2021, district_number: 9, last_name: Van Schoiack}
+          - {session_year: 2017, district_number: 75, last_name: Gray}
+          - {session_year: 2019, district_number: 75, last_name: Gray}
+          - {session_year: 2018, district_number: 158, last_name: Fitzpatrick}
+          - {session_year: 2019, district_number: 158, last_name: Fitzpatrick}
+          - {session_year: 2017, district_number: 30, last_name: Leaver}
+          - {session_year: 2018, district_number: 30, last_name: Successor}
+          - {session_year: 2019, district_number: 26, last_name: Bland Manlove}
+          - {session_year: 2020, district_number: 26, last_name: Bland Manlove}
+    expect:
+      rows:
+        - {openstates_id: arthur, start_date: '2015-01-01', end_quality: conflicts_with_roster, evidence_first_date: '2017-01-01', evidence_last_date: '2018-12-31'}
+        - {openstates_id: rogers, start_date: '2019-01-01', end_quality: dated, evidence_first_date: null, evidence_last_date: null}
+        - {openstates_id: dunn, start_date: '2013-01-01', end_quality: conflicts_with_roster, evidence_first_date: '2018-01-01', evidence_last_date: '2018-12-31'}
+        - {openstates_id: franks, start_date: '1900-01-01', end_quality: dated, evidence_first_date: null, evidence_last_date: null}
+        - {openstates_id: vanschoiack, start_date: '2021-01-01', end_quality: open, evidence_first_date: null, evidence_last_date: null}
+        - {openstates_id: walton_gray, start_date: '2013-01-01', end_quality: dated, evidence_first_date: null, evidence_last_date: null}
+        - {openstates_id: alan_gray, start_date: '2017-01-01', end_quality: dated, evidence_first_date: null, evidence_last_date: null}
+        - {openstates_id: alan_gray, start_date: '2019-01-01', end_quality: dated, evidence_first_date: null, evidence_last_date: null}
+        - {openstates_id: fitzpatrick, start_date: '1900-01-01', end_quality: conflicts_with_roster, evidence_first_date: '2019-01-01', evidence_last_date: '2019-12-31'}
+        - {openstates_id: leaver, start_date: '2017-01-01', end_quality: dated, evidence_first_date: null, evidence_last_date: null}
+        - {openstates_id: manlove, start_date: '2019-01-01', end_quality: open, evidence_first_date: null, evidence_last_date: null}
+
+  - name: seat_terms_end_quality_against_the_senate_journal
+    model: int_mo_legislators__seat_terms
+    description: >
+      conflicts_with_journal (#656, #522), on real shapes; the journals here cover 2017-2020. Ryan Silvey's SD17 term
+      ends 2018-12-31, but his last vote was 2017-09-13, over a year earlier. Joseph Keaveny's SD4 term runs to
+      2018-12-31 with no vote at all in the journal years. Jason Holsman resigned SD7 on 2020-01-16 and voted last
+      on 2020-01-13, within a year: dated. Dan Brown (SD16) and Dave Brown (SD26, open term) share a surname, so the
+      journal writes "Brown (16)"; the bare "Brown" token is ambiguous and counts for neither. Kiki Curls is held by
+      Open States under two ids in SD9 (curls_a, curls_b): one candidate, not an ambiguous pair, so both rows have
+      her votes and end dated.
+    given:
+      - input: ref('stg_openstates__roles')
+        rows:
+          - {openstates_id: silvey, role_type: upper, district: '17', start_date: '2013-01-01', end_date: '2018-12-31'}
+          - {openstates_id: keaveny, role_type: upper, district: '4', start_date: '2011-01-01', end_date: '2018-12-31'}
+          - {openstates_id: holsman, role_type: upper, district: '7', start_date: null, end_date: '2020-01-16'}
+          - {openstates_id: dan_brown, role_type: upper, district: '16', start_date: null, end_date: '2018-12-31'}
+          - {openstates_id: dave_brown, role_type: upper, district: '26', start_date: '2017-01-11', end_date: null}
+          - {openstates_id: curls_a, role_type: upper, district: '9', start_date: null, end_date: '2020-01-16'}
+          - {openstates_id: curls_b, role_type: upper, district: '9', start_date: '2017-01-01', end_date: '2020-01-16'}
+      - input: ref('legislator_seat_corrections')
+        rows: []
+      - input: ref('stg_openstates__people')
+        rows:
+          - {openstates_id: silvey, full_name: Ryan Silvey, family_name: Silvey}
+          - {openstates_id: keaveny, full_name: Joseph Keaveny, family_name: Keaveny}
+          - {openstates_id: holsman, full_name: Jason Holsman, family_name: Holsman}
+          - {openstates_id: dan_brown, full_name: Dan Brown, family_name: Brown}
+          - {openstates_id: dave_brown, full_name: Dave Brown, family_name: Brown}
+          - {openstates_id: curls_a, full_name: S. Kiki Curls, family_name: Curls}
+          - {openstates_id: curls_b, full_name: Kiki Curls, family_name: Curls}
+      - input: ref('stg_mo_senate__votes')
+        rows:
+          - {vote_id: v1, senator_token: Silvey, token_name: Silvey, token_district: null, vote_date: '2017-01-04'}
+          - {vote_id: v2, senator_token: Silvey, token_name: Silvey, token_district: null, vote_date: '2017-09-13'}
+          - {vote_id: v1, senator_token: Holsman, token_name: Holsman, token_district: null, vote_date: '2017-01-04'}
+          - {vote_id: v5, senator_token: Holsman, token_name: Holsman, token_district: null, vote_date: '2020-01-13'}
+          - {vote_id: v3, senator_token: Brown (16), token_name: Brown, token_district: 16, vote_date: '2018-03-01'}
+          - {vote_id: v3, senator_token: Brown (26), token_name: Brown, token_district: 26, vote_date: '2018-03-01'}
+          - {vote_id: v6, senator_token: Brown, token_name: Brown, token_district: null, vote_date: '2018-12-01'}
+          - {vote_id: v4, senator_token: Curls, token_name: Curls, token_district: null, vote_date: '2019-02-01'}
+          - {vote_id: v5, senator_token: Curls, token_name: Curls, token_district: null, vote_date: '2020-01-13'}
+      - input: ref('stg_mo_house__members')
+        rows: []
+    expect:
+      rows:
+        - {openstates_id: silvey, end_quality: conflicts_with_journal, evidence_first_date: '2017-01-04', evidence_last_date: '2017-09-13'}
+        - {openstates_id: keaveny, end_quality: conflicts_with_journal, evidence_first_date: null, evidence_last_date: null}
+        - {openstates_id: holsman, end_quality: dated, evidence_first_date: '2017-01-04', evidence_last_date: '2020-01-13'}
+        - {openstates_id: dan_brown, end_quality: dated, evidence_first_date: '2018-03-01', evidence_last_date: '2018-03-01'}
+        - {openstates_id: dave_brown, end_quality: open, evidence_first_date: '2018-03-01', evidence_last_date: '2018-03-01'}
+        - {openstates_id: curls_a, end_quality: dated, evidence_first_date: '2019-02-01', evidence_last_date: '2020-01-13'}
+        - {openstates_id: curls_b, end_quality: dated, evidence_first_date: '2019-02-01', evidence_last_date: '2020-01-13'}
