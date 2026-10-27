@@ -1,8 +1,11 @@
 import hashlib
+import inspect
 import json
 import os
 import time
+from datetime import timedelta
 from pathlib import Path
+from typing import ClassVar
 
 import duckdb
 import pytest
@@ -122,9 +125,11 @@ class Site:
     def __init__(self, pages: dict[str, m.Fetched]):
         self.pages = pages
         self.requests: list[str] = []
+        self.headers: dict[str, dict | None] = {}
 
-    def __call__(self, url: str) -> m.Fetched:
+    def __call__(self, url: str, headers: dict | None = None) -> m.Fetched:
         self.requests.append(url)
+        self.headers[url] = headers
         return self.pages.get(url, m.Fetched(404, None, "text/html", "HTTP 404"))
 
 
@@ -146,7 +151,7 @@ def _site() -> Site:
     )
 
 
-def _rows(table: str, drop=("loaded_at",)) -> list[dict]:
+def _rows(table: str, drop=("loaded_at", "checked_at")) -> list[dict]:
     with duckdb.connect() as con:
         cur = con.execute(f"select * from read_parquet('{db.raw_glob(table)}') order by url")
         names = [d[0] for d in cur.description]
@@ -209,8 +214,9 @@ def test_second_run_of_closed_sessions_makes_no_requests_and_rewrites_nothing(li
     monkeypatch.setattr(m, "fetch_document", again)
     monkeypatch.setattr(m, "_is_open", lambda code: code == "991")
     m.load(db.UNSHARDED)
-    # reachable closed-session PDFs are not fetched again; only the failures (no file to reuse) are retried
-    assert set(again.requests) == {SUMMARY, DEAD}
+    # reachable closed-session PDFs are not fetched again; a transient failure is retried, the permanent one
+    # (HTML where a PDF belongs) is in the negative cache
+    assert set(again.requests) == {DEAD}
     assert stamps() == landed
     assert _rows("mo_house_pdf_files") == first_files
     assert _rows("mo_house_pdf_texts") == first_texts
@@ -338,3 +344,262 @@ def test_amendment_words_not_glued():
     assert "AMENDHouse" in old and "AMEND House" not in old
     row = m.extract(m.Link(AMEND, "amendment", "171", "171-HB1.XML", None, None, 1), pdf, None)
     assert "AMEND House Committee Substitute" in row.text
+
+
+def _run(monkeypatch, site):
+    monkeypatch.setattr(m, "fetch_document", site)
+    m.load(db.UNSHARDED)
+
+
+def test_permanent_failures_of_closed_sessions_are_not_retried_until_the_negative_cache_expires(
+    links_landed, monkeypatch
+):
+    _run(monkeypatch, _site())
+    again = _site()
+    _run(monkeypatch, again)
+    assert SUMMARY not in again.requests  # 200-with-HTML: remembered as "not a PDF"
+    assert DEAD in again.requests  # a timeout is transient
+    row = next(r for r in _rows("mo_house_pdf_files") if r["url"] == SUMMARY)
+    assert row["error"] == "not a PDF" and row["rel_path"] is None
+    assert next(r for r in _rows("mo_house_pdf_texts") if r["url"] == SUMMARY)["error"] == "not a PDF"
+
+    later = _site()
+    real_now = m._now
+    monkeypatch.setattr(m, "_now", lambda: real_now() + timedelta(seconds=m.NEGATIVE_CACHE_S + 60))
+    _run(monkeypatch, later)
+    assert SUMMARY in later.requests  # 30 days on, ask again
+
+
+def test_404_is_permanent_but_429_5xx_and_open_sessions_are_retried(links_landed):
+    link = next(x for x in m.links(["fiscal_note"]) if x.url == FISCAL)
+    open_link = next(x for x in m.links(["bill_text"]) if x.url == OPEN_TEXT)
+    for status, retried in ((404, False), (410, False), (429, True), (500, True), (408, True)):
+        site = Site({FISCAL: m.Fetched(status, None, "text/html", f"HTTP {status}")})
+        first, _ = m.land(
+            link,
+            site,
+        )
+        site.requests.clear()
+        again, _ = m.land(link, site, prev=first)
+        assert bool(site.requests) is retried, status
+        assert again.error == f"HTTP {status}"
+    site = Site({OPEN_TEXT: m.Fetched(404, None, "text/html", "HTTP 404")})
+    first, _ = m.land(open_link, site)
+    m.land(open_link, site, prev=first)
+    assert len(site.requests) == 2  # an open session's missing document may be published later
+
+
+def test_unchanged_files_are_not_read_again_and_their_text_comes_from_the_cache(links_landed, monkeypatch):
+    _run(monkeypatch, _site())
+    first = _rows("mo_house_pdf_texts")
+    files = _rows("mo_house_pdf_files")
+
+    def no_read(*args, **kwargs):
+        raise AssertionError("a PDF was read or hashed again")
+
+    real_read = Path.read_bytes
+    monkeypatch.setattr(Path, "read_bytes", lambda self: no_read() if self.suffix == ".pdf" else real_read(self))
+    monkeypatch.setattr(m, "_described", no_read)
+    monkeypatch.setattr(pdftext, "page_texts", no_read)
+    _run(monkeypatch, _site())
+    assert _rows("mo_house_pdf_texts") == first
+    assert [r for r in _rows("mo_house_pdf_files") if r["rel_path"]] == [r for r in files if r["rel_path"]]
+
+
+def test_a_changed_file_is_read_again(links_landed, monkeypatch, env):
+    _run(monkeypatch, _site())
+    dest = env / "raw/mo_house_pdf/171/bill_text/0001H.01I.pdf"
+    dest.write_bytes(PDF_B)  # same URL, different size and mtime
+    _run(monkeypatch, _site())
+    row = next(r for r in _rows("mo_house_pdf_files") if r["url"] == TEXT_1)
+    assert row["sha256"] == hashlib.sha256(PDF_B).hexdigest()
+    assert next(r for r in _rows("mo_house_pdf_texts") if r["url"] == TEXT_1)["page_count"] == 2
+
+
+def test_open_session_recheck_is_conditional_and_a_304_keeps_file_row_and_text(links_landed, monkeypatch, env):
+    site = _site()
+    site.pages[OPEN_TEXT] = m.Fetched(200, PDF_A, "application/pdf", None, '"v1"', "Mon, 01 Jan 2099 00:00:00 GMT")
+    _run(monkeypatch, site)
+    dest = env / "raw/mo_house_pdf/991/bill_text/9999H.01I.pdf"
+    assert next(r for r in _rows("mo_house_pdf_files") if r["url"] == OPEN_TEXT)["etag"] == '"v1"'
+    old = time.time() - 8 * 86400
+    os.utime(dest, (old, old))
+    inode = dest.stat().st_ino
+    again = _site()
+    again.pages[OPEN_TEXT] = m.Fetched(304, None, None, None)
+    _run(monkeypatch, again)
+    assert again.headers[OPEN_TEXT] == {"If-None-Match": '"v1"', "If-Modified-Since": "Mon, 01 Jan 2099 00:00:00 GMT"}
+    assert dest.read_bytes() == PDF_A and dest.stat().st_ino == inode and dest.stat().st_mtime > old + 86400
+    row = next(r for r in _rows("mo_house_pdf_files") if r["url"] == OPEN_TEXT)
+    assert row["error"] is None and row["sha256"] == hashlib.sha256(PDF_A).hexdigest() and row["etag"] == '"v1"'
+    assert next(r for r in _rows("mo_house_pdf_texts") if r["url"] == OPEN_TEXT)["text"] == "Hello bill one"
+    # a 200 with new bytes replaces the file and the validators
+    os.utime(dest, (old, old))
+    changed = _site()
+    changed.pages[OPEN_TEXT] = m.Fetched(200, PDF_B, "application/pdf", None, '"v2"', None)
+    _run(monkeypatch, changed)
+    assert dest.read_bytes() == PDF_B
+    row = next(r for r in _rows("mo_house_pdf_files") if r["url"] == OPEN_TEXT)
+    assert row["etag"] == '"v2"' and row["sha256"] == hashlib.sha256(PDF_B).hexdigest()
+
+
+def test_a_filtered_run_keeps_the_error_rows_of_earlier_pieces(links_landed, monkeypatch):
+    _run(monkeypatch, _site())
+    assert {SUMMARY, DEAD} <= {r["url"] for r in _rows("mo_house_pdf_files") if r["error"]}
+    monkeypatch.setenv("MOGOV_HOUSE_PDF_KINDS", "amendment")
+    again = _site()
+    _run(monkeypatch, again)
+    assert again.requests == []  # the amendment is on disk; nothing else is fetched
+    files = {r["url"]: r for r in _rows("mo_house_pdf_files")}
+    assert len(files) == 7 and files[SUMMARY]["error"] == "not a PDF" and files[DEAD]["error"].startswith("Connect")
+    texts = {r["url"]: r for r in _rows("mo_house_pdf_texts")}
+    assert len(texts) == 7 and texts[DEAD]["error"].startswith("Connect") and texts[TEXT_1]["text"]
+
+
+def test_fetch_document_sends_validators_and_reports_304(monkeypatch):
+    seen = []
+
+    class Resp:
+        status_code, content = 304, b""
+        headers: ClassVar[dict] = {"etag": '"v1"'}
+
+    class Client:
+        def get(self, url, headers=None):
+            seen.append(headers)
+            return Resp()
+
+    monkeypatch.setattr(m, "client", lambda: Client())
+    got = m.fetch_document(TEXT_1, interval=0, headers={"If-None-Match": '"v1"'})
+    assert seen == [{"If-None-Match": '"v1"'}]
+    assert (got.status, got.content, got.error, got.etag) == (304, None, None, '"v1"')
+
+
+def test_a_file_rewritten_at_the_same_size_with_a_new_mtime_is_read_again(links_landed, monkeypatch, env):
+    _run(monkeypatch, _site())
+    dest = env / "raw/mo_house_pdf/171/bill_text/0001H.01I.pdf"
+    other = PDF_A.replace(b"Hello", b"Jello")
+    assert len(other) == len(PDF_A)
+    old = dest.stat().st_mtime
+    dest.write_bytes(other)
+    os.utime(dest, (old + 3600, old + 3600))
+    _run(monkeypatch, _site())
+    row = next(r for r in _rows("mo_house_pdf_files") if r["url"] == TEXT_1)
+    assert row["sha256"] == hashlib.sha256(other).hexdigest()
+    assert "Jello" in next(r for r in _rows("mo_house_pdf_texts") if r["url"] == TEXT_1)["text"]
+
+
+def test_an_extraction_timeout_is_not_retried_until_the_negative_cache_expires(links_landed, monkeypatch):
+    real = pdftext.page_texts
+    calls: list[int] = []
+
+    def slow(data, **kw):
+        if data == PDF_B:
+            calls.append(1)
+            raise pdftext.ExtractTimeout("ran past 600 s")
+        return real(data, **kw)
+
+    monkeypatch.setattr(pdftext, "page_texts", slow)
+    _run(monkeypatch, _site())
+    first = len(calls)
+    assert first >= 1
+    row = next(r for r in _rows("mo_house_pdf_texts") if r["url"] == TEXT_2)
+    assert "ExtractTimeout" in row["error"] and row["text"] is None  # (cached) if another URL had the same bytes
+    _run(monkeypatch, _site())
+    assert len(calls) == first  # remembered by hash: not extracted again
+    assert next(r for r in _rows("mo_house_pdf_texts") if r["url"] == TEXT_2)["error"] == (
+        row["error"] if row["error"].startswith(m.CACHED) else m.CACHED + row["error"]
+    )
+    assert next(r for r in _rows("mo_house_pdf_files") if r["url"] == TEXT_2)["error"] is None  # file row stays good
+    # past the window the document is tried again
+    monkeypatch.setattr(m, "NEGATIVE_CACHE_S", -1)
+    _run(monkeypatch, _site())
+    assert len(calls) > first
+
+
+def _timing_out(calls):
+    real = pdftext.page_texts
+
+    def slow(data, **kw):
+        if data == PDF_B:
+            calls.append(1)
+            raise pdftext.ExtractTimeout("ran past 600 s")
+        return real(data, **kw)
+
+    return slow
+
+
+def test_an_unwritable_timeout_marker_does_not_fail_the_run(links_landed, monkeypatch):
+    monkeypatch.setattr(pdftext, "page_texts", _timing_out([]))
+
+    real_write = m.write_atomic
+
+    def broken(path, content):
+        if "mo_house_pdf_timeouts" in str(path):
+            raise OSError("disk full")
+        real_write(path, content)
+
+    monkeypatch.setattr(m, "write_atomic", broken)
+    _run(monkeypatch, _site())
+    row = next(r for r in _rows("mo_house_pdf_texts") if r["url"] == TEXT_2)
+    assert row["error"].startswith("ExtractTimeout") and row["text"] is None
+
+
+def test_an_extractor_upgrade_retries_a_remembered_timeout(links_landed, monkeypatch):
+    calls: list[int] = []
+    monkeypatch.setattr(pdftext, "page_texts", _timing_out(calls))
+    _run(monkeypatch, _site())
+    first = len(calls)
+    monkeypatch.setattr(pdftext, "_EXTRACTOR", "pdfplumber-99.0")
+    _run(monkeypatch, _site())
+    assert len(calls) > first
+
+
+def test_a_remembered_timeout_is_reported_as_cached_without_reading_the_file(links_landed, monkeypatch):
+    calls: list[int] = []
+    monkeypatch.setattr(pdftext, "page_texts", _timing_out(calls))
+    _run(monkeypatch, _site())
+    row = next(r for r in m.previous_files().values() if r.url == TEXT_2)
+    link = next(x for x in m.links(list(m.KINDS)) if x.url == TEXT_2)
+
+    def no_read(self):
+        raise AssertionError("file was read")
+
+    monkeypatch.setattr(m.Path, "read_bytes", no_read)
+    got = m.extract_landed(link, row)
+    assert got.error.startswith("(cached) ExtractTimeout")
+    # the in-extract check, with the bytes in hand
+    assert m.extract(link, PDF_B, None).error.startswith("(cached) ExtractTimeout")
+    assert len(calls) == 1
+
+
+def test_previous_files_breaks_error_row_ties_by_part_name(links_landed, monkeypatch):
+    _run(monkeypatch, _site())
+    assert "filename = true" in inspect.getsource(m._read_previous_files)
+    assert "order by url, coalesce(checked_at, landed_at) nulls first, filename" in inspect.getsource(
+        m._read_previous_files
+    )
+
+
+def test_only_rows_fetched_this_run_log_failures(links_landed, monkeypatch):
+    _run(monkeypatch, _site())
+    logged: list[str] = []
+    monkeypatch.setattr(m.log, "warning", lambda event, **kw: logged.append(kw.get("url")))
+    _run(monkeypatch, _site())
+    assert logged == [DEAD]  # SUMMARY is negative-cached (carried over) and stays quiet; DEAD was asked again
+
+
+def test_previous_files_retries_when_a_part_vanishes_mid_read(links_landed, monkeypatch):
+    _run(monkeypatch, _site())
+    real = m._read_previous_files
+    calls = []
+
+    def flaky():
+        calls.append(1)
+        if len(calls) == 1:
+            raise duckdb.IOException("No files found that match the pattern")
+        return real()
+
+    monkeypatch.setattr(m, "_read_previous_files", flaky)
+    monkeypatch.setattr(m.time, "sleep", lambda s: None)
+    assert TEXT_1 in m.previous_files()
+    assert len(calls) == 2

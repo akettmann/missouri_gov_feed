@@ -136,7 +136,12 @@ def load(shard: db.Shard) -> dict[str, int]:
             except Exception as exc:
                 sink.add("mo_senate_journals", url, {"year": year, "url": url, "error": str(exc)})
                 continue
-            text = "\n".join(pdftext.page_texts(data))
+            try:
+                text = "\n".join(pdftext.page_texts(data))
+            except pdftext.ExtractTimeout as exc:  # a pathological PDF must not stop the run; it lands as an error
+                log.warning("mo_senate.extract_timeout", url=url, error=str(exc))
+                sink.add("mo_senate_journals", url, {"year": year, "url": url, "error": str(exc)})
+                continue
             rows = parse_journal(text)
             sink.add("mo_senate_journals", url, {"year": year, "url": url, "n_vote_rows": len(rows)})
             sink.extend(

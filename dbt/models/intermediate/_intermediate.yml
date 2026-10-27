@@ -311,10 +311,11 @@ models:
 - name: int_house_fd__schedule_lines
   description: 'House disclosure PDF text, each line tagged with the schedule it falls under (the nearest preceding
     "Schedule X:" header in the same document). Column-header rows, "None disclosed." and boilerplate drop out.
-    Entries the PDF wraps over several lines are joined back into one row on the schedules that feed commercial
-    ties (C, E, F, J: see "continuation" below), so a wrapped tail never becomes a tie of its own (#599). PDFs from
-    2021 on extract their small-caps text with NUL characters; the words are restored first (#576). Grain: one text
-    line per House disclosure PDF, tagged with its schedule.'
+    Entries the PDF wraps over several lines are joined back into one row (see "continuation" below): on the schedules
+    that feed commercial ties (C, E, F, J) so a wrapped tail never becomes a tie of its own (#599), and on A, B,
+    D and H so a wrapped entry is not counted as several disclosure items (#641). PDFs from 2021 on extract their
+    small-caps text with NUL characters; the words are restored first (#576). Grain: one text line per House disclosure
+    PDF, tagged with its schedule.'
 - name: int_interests__industry_money
   description: 'Money each official received from an industry or interest, per year: campaign contributions from
     organizations, PACs and committees (individuals are left out: their employer is not their money) and lobbyist

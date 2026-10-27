@@ -1,4 +1,7 @@
+import hashlib
 from pathlib import Path
+
+import pytest
 
 from mogov import pdftext
 
@@ -44,3 +47,38 @@ def test_max_pages_reads_only_the_first_pages(tmp_path, monkeypatch):
     assert pdftext.page_texts(pdf, max_pages=2) == ["alpha", "beta"]
     assert pdftext.page_texts(pdf, max_pages=2) == ["alpha", "beta"]  # from cache, under its own key
     assert pdftext.page_texts(pdf, max_pages=0) == []
+
+
+def test_cached_text_is_found_by_the_pdf_hash_without_the_pdf(tmp_path, monkeypatch):
+    monkeypatch.setattr(pdftext, "CACHE_DIR", tmp_path)
+    pdf = _pdf(["alpha", "beta"])
+    digest = hashlib.sha256(pdf).hexdigest()
+    assert pdftext.cached_page_texts(digest, layout=False) is None  # not extracted yet
+    assert pdftext.page_texts(pdf, layout=False) == ["alpha", "beta"]
+    assert pdftext.cached_page_texts(digest, layout=False) == ["alpha", "beta"]
+    assert pdftext.cached_page_texts(digest, layout=True) is None  # options are part of the key
+    assert pdftext.cached_page_texts(digest, layout=False, max_pages=1) is None
+
+
+def test_old_cache_entries_gain_their_hash_pointer_on_first_use(tmp_path, monkeypatch):
+    monkeypatch.setattr(pdftext, "CACHE_DIR", tmp_path)
+    pdf = _pdf(["alpha"])
+    pdftext.page_texts(pdf)
+    for alias in (tmp_path / "pdftext" / "by-hash").glob("*.key"):
+        alias.unlink()  # a cache written before pointers existed
+    digest = hashlib.sha256(pdf).hexdigest()
+    assert pdftext.cached_page_texts(digest) is None
+    assert pdftext.page_texts(pdf) == ["alpha"]  # cache hit, pointer written
+    assert pdftext.cached_page_texts(digest) == ["alpha"]
+
+
+def test_extraction_past_its_time_budget_raises_and_caches_nothing(tmp_path, monkeypatch):
+    monkeypatch.setattr(pdftext, "CACHE_DIR", tmp_path)
+    pdf = _pdf(["alpha", "beta", "gamma"])
+    clock = iter(range(0, 1000, 10))
+    with monkeypatch.context() as mp:
+        mp.setattr(pdftext.time, "monotonic", lambda: next(clock))
+        with pytest.raises(pdftext.ExtractTimeout):
+            pdftext.page_texts(pdf, max_seconds=15)
+    assert not list((tmp_path / "pdftext").glob("*.json"))
+    assert pdftext.page_texts(pdf, max_seconds=None) == ["alpha", "beta", "gamma"]

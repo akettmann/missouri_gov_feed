@@ -6,8 +6,9 @@ and does all the shaping. Landing to files rather than the warehouse keeps loade
 single-writer lock, so several loaders, shards and a dbt build can run at once.
 
 Writes are atomic per part file (written as .part, then renamed), so re-running a shard simply replaces its
-own part. A shard that writes a part also deletes parts left by runs with a different shard count; when
-changing the shard count, run every shard before the next dbt build.
+own part. When the shard count changes, the old count's parts are deleted only once every shard of the new
+count has landed (see _drop_other_shard_counts); until then dbt would read both, so run every shard before the
+next dbt build.
 """
 
 import contextlib
@@ -91,6 +92,19 @@ def raw_glob(table: str) -> str:
     return (table_dir(table) / "*.parquet").as_posix()
 
 
+def own_rows_sql(table: str, keys: Iterable[str], recency: str = "landed_at") -> str:
+    """A `select` over a raw table that a loader reads back to learn its own state, tolerating two shard counts
+    coexisting (a shard-count change leaves the old parts until the new count has fully landed, see
+    `_drop_other_shard_counts`). Keeps one row per `keys`: the latest by `recency`, ties broken by the part file
+    name, which is unique, so the choice is deterministic."""
+    cols = ", ".join(keys)
+    return (
+        f"select * exclude (_rn, filename) from (select *, row_number() over ("
+        f"partition by {cols} order by {recency} desc, filename desc) as _rn "
+        f"from read_parquet('{raw_glob(table)}', filename = true)) where _rn = 1"
+    )
+
+
 def raw_exists(table: str) -> bool:
     return any(table_dir(table).glob("*.parquet"))
 
@@ -109,6 +123,7 @@ def _publish(con: duckdb.DuckDBPyConnection, select_sql: str, table: str, shard:
         tmp.replace(dest)
     finally:
         tmp.unlink(missing_ok=True)
+    _none_marker(folder, shard).unlink(missing_ok=True)
     _drop_other_shard_counts(folder, shard)
     return con.execute(f"select count(*) from read_parquet('{dest.as_posix()}')").fetchone()[0]
 
@@ -186,6 +201,8 @@ def _clear_stale_scratch(table: str, shard: Shard) -> None:
     (they are named .<part>.<pid>.jsonl / .<part>.<pid>.part, so each is one dead run's). A shard is a single
     writer, and a killed run's rows are never wanted, so starting a sink for the shard makes them stale."""
     folder = table_dir(table)
+    # a run that starts and then crashes must count as "not landed", not as the empty shard an old marker says
+    _none_marker(folder, shard).unlink(missing_ok=True)
     for suffix in ("jsonl", "part"):
         for stale in folder.glob(f".{shard.part_name}.*.{suffix}"):
             stale.unlink(missing_ok=True)
@@ -213,13 +230,38 @@ def _unlink_lock_if_free(lock_path: Path) -> None:
         lock_path.unlink(missing_ok=True)
 
 
+def _none_marker(folder: Path, shard: Shard) -> Path:
+    return folder / f".{shard.part_name}.none"
+
+
+def _count_is_complete(folder: Path, count: int) -> bool:
+    """Every shard of a `count`-way split has landed: it has a part, or a `.none` marker saying it owns no data."""
+    return all(
+        (folder / Shard(i, count).part_name).exists() or _none_marker(folder, Shard(i, count)).exists()
+        for i in range(count)
+    )
+
+
 def _drop_other_shard_counts(folder: Path, shard: Shard) -> None:
-    """Remove parts, and lock files, written under a different shard count. A lock file is removed even when
-    its part never got published (a run that failed first leaves only the lock), if no run holds it."""
+    """Remove parts, `.none` markers and lock files written under a different shard count, but only once
+    every shard of this shard's count has landed.
+
+    Cloud Run tasks start in waves, so the first new-count shard to publish must not delete old-count parts:
+    loaders that read their own previous parts (mo_house_pdf.previous_files) would lose history for shards that
+    start later. Until the new count is complete the old parts stay, so a reader of `*.parquet` sees both
+    counts (rows twice); as before, run every shard before the next dbt build. If the transition never
+    completes, the next run of any complete count (including the old one) sweeps the leftovers. Idempotent:
+    shards finishing together may both sweep. A lock file is removed even when its part never got published
+    (a run that failed first leaves only the lock), if no run holds it."""
+    if not _count_is_complete(folder, shard.count):
+        return
     suffix = f"-of-{shard.count:03d}.parquet"
     for old in folder.glob("part-*-of-*.parquet"):
         if not old.name.endswith(suffix):
             old.unlink(missing_ok=True)
+    for marker in folder.glob(".part-*-of-*.parquet.none"):
+        if not marker.name.endswith(f"{suffix}.none"):
+            marker.unlink(missing_ok=True)
     for lock_path in folder.glob(".part-*-of-*.parquet.lock"):
         if not lock_path.name.endswith(f"{suffix}.lock"):
             _unlink_lock_if_free(lock_path)
@@ -227,9 +269,17 @@ def _drop_other_shard_counts(folder: Path, shard: Shard) -> None:
 
 def remove_part(table: str, shard: Shard = UNSHARDED) -> None:
     """This shard has nothing for <table> (e.g. it owns none of its files): drop any part it wrote before.
-    Parts from a previous shard count stay until the shard that now owns the data replaces them, so the
-    table is never left empty mid-run."""
-    (table_dir(table) / shard.part_name).unlink(missing_ok=True)
+    Parts from a previous shard count stay until every shard of the new count has landed (this one is recorded
+    with a `.none` marker, so owning nothing doesn't stall that), so the table is never left empty mid-run."""
+    folder = table_dir(table)
+    lock = _ShardLock(table, shard)
+    lock.acquire()  # fail fast if a sink is writing this shard
+    try:
+        (folder / shard.part_name).unlink(missing_ok=True)
+        _none_marker(folder, shard).write_bytes(b"")
+    finally:
+        lock.release()
+    _drop_other_shard_counts(folder, shard)
 
 
 def _lock_shard(locks: dict[str, _ShardLock], table: str, shard: Shard) -> None:
