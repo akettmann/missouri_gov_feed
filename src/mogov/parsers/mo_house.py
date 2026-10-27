@@ -850,9 +850,9 @@ def landed_files(shard: db.Shard) -> list[tuple[str, str, str]]:
     if not db.raw_exists(XmlFile.TABLE):
         return []
     with db.connect() as con:
+        own = db.own_rows_sql(XmlFile.TABLE, ["session_code", "file_name"])
         rows = con.execute(
-            f"select session_code, file_name, path from read_parquet('{db.raw_glob(XmlFile.TABLE)}') "
-            "order by session_code, file_name"
+            f"select session_code, file_name, path from ({own}) order by session_code, file_name"
         ).fetchall()
     return [r for r in rows if shard.owns(r[0])]
 
