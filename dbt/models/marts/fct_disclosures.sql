@@ -34,20 +34,22 @@ with house_members as (
 
 -- Which report a House "amended report" amends. The Clerk index carries no link, so the amendment is taken to
 -- amend the most recent annual, candidate or termination report the same filer filed that year on or before the
--- amendment's date. Index type H counts as an annual report here: on the Clerk index it is very likely a new
--- member's first annual report (only 3 of 346 H filings have an O the same year, 233 have an extension X, and
--- the counts follow the freshman classes), so it is a base of the same tier as O. Other index kinds are no base:
+-- amendment's date. Index type H is a New Filer Report (the PDF header says so), a separate report from the
+-- Annual Report (O) for the same year, so it is a base like a candidate or termination report: an amendment of
+-- it joins its group and supersedes it, and it never shares the annual group with an O. Other index kinds are
+-- no base:
 -- a periodic transaction report is its own filing; the rest of "other" (withdrawals, B, E, G) holds no report to
 -- restate. When the amendment's PDF has a "Period Covered:" line (candidate reports and their amendments carry
 -- it; annual and termination reports do not), a base covering through the same last day wins over a later one,
--- and an annual report is the last resort. amends_url is the url of a candidate or
--- termination base, or null when the base is an annual report (or none is on file, the long-standing default).
+-- and an annual report or H is the last resort. amends_url is the url of a candidate, termination or H base, or
+-- null when the base is an annual report (or none is on file, the long-standing default).
 house_amendment_base as (
     select
         a.official_id,
         a.doc_id,
         b.document_url as base_url,
         b.filing_kind as base_kind,
+        b.filing_type as base_type,
         row_number() over (
             partition by a.official_id, a.doc_id
             order by
@@ -73,7 +75,9 @@ house_amends as (
     select
         official_id,
         doc_id,
-        case when base_kind in ('candidate report', 'termination report') then base_url end as amends_url
+        case
+            when base_kind in ('candidate report', 'termination report') or base_type = 'H' then base_url
+        end as amends_url
     from house_amendment_base
     where base_rank = 1
 ),
@@ -89,7 +93,6 @@ house as (
         l.owner_code as owner,
         l.amount_range as amount,
         l.line_text as description,
-        h.filing_type,
         h.document_url,
         am.amends_url,
         false as is_garbled,
@@ -112,7 +115,6 @@ house_unparsed as (
         cast(null as {{ dbt.type_string() }}) as owner,
         cast(null as {{ dbt.type_string() }}) as amount,
         cast(null as {{ dbt.type_string() }}) as description,
-        h.filing_type,
         h.document_url,
         am.amends_url,
         false as is_garbled,
@@ -136,7 +138,6 @@ senate as (
         s.owner,
         coalesce(s.amount, s.income_amount) as amount,
         s.description,
-        cast(null as {{ dbt.type_string() }}) as filing_type,
         s.document_url,
         cast(null as {{ dbt.type_string() }}) as amends_url,
         false as is_garbled,
@@ -159,7 +160,6 @@ judges as (
         cast(null as {{ dbt.type_string() }}) as owner,
         i.amount_code as amount,
         i.description,
-        cast(null as {{ dbt.type_string() }}) as filing_type,
         i.document_url,
         cast(null as {{ dbt.type_string() }}) as amends_url,
         i.is_garbled,
@@ -183,11 +183,10 @@ unioned as (
 --   report_group    annual reports and their amendments share 'annual report'; every other kind (periodic
 --                   transaction report, candidate report, extension request...) is its own group (the
 --                   document url), because those are separate filings, not revisions of each other.
---                   A House index type H (filing_kind 'other') joins them too: it is a base of an amendment
---                   like an annual report (house_amendment_base), so it must share the amendment's group.
 --                   A report with no report_year can't be matched to its siblings either (Senate candidate
 --                   reports), so it stays its own group.
---                   A House amendment of a candidate or termination report joins that report's group instead
+--                   A House amendment of a candidate, termination or H (New Filer)
+--                   report joins that report's group instead
 --                   (house_amendment_base); otherwise it would be a second "latest" beside the report it amends
 --                   and could supersede an annual report it does not amend.
 --   report_version  0 = original, N = amendment N (Senate "(amendment N)"; AO-10 pdf name suffix "_1" = 1;
@@ -202,8 +201,6 @@ keyed as (
         case
             when amends_url is not null then amends_url
             when report_year is not null and filing_kind in ('annual report', 'amended report') then 'annual report'
-            when report_year is not null and filing_type = 'H' and disclosure_type like 'U.S. House%'
-                then 'annual report'
             when report_year is not null and filing_kind like 'annual report for cy%' then 'annual report'
             else document_url
         end as report_group,
