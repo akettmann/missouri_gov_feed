@@ -103,15 +103,31 @@ house as (
     left join house_amends as am on h.official_id = am.official_id and h.doc_id = am.doc_id
 ),
 
+house_pdf_status as (
+    -- one row per doc the loader tried to fetch: did any of its rows carry a load error?
+    -- A filing with no row here was not fetched: its filing type is outside the loader's PDF_TYPES, or the loader
+    -- has not fetched it yet (4 real H filings).
+    select
+        doc_id,
+        max(case when load_error is not null then 1 else 0 end) as has_error
+    from {{ ref('stg_house_fd__pdf_lines') }}
+    group by doc_id
+),
+
 house_unparsed as (
-    -- filings with no extractable text (scanned paper) or not downloaded: still list them
+    -- filings with no extractable text (scanned paper) or whose PDF the loader failed to download/extract: still
+    -- list them, with a section that says which (#714)
     select
         h.official_id,
         'U.S. House financial disclosure' as disclosure_type,
         h.filing_kind,
         h.filing_year as report_year,
         h.filing_date,
-        'document (not text-extractable; see PDF)' as section,
+        case
+            when ps.doc_id is null then 'document (not fetched; see PDF)'
+            when ps.has_error = 1 then 'document (download or text extraction failed; see PDF)'
+            else 'document (not text-extractable; see PDF)'
+        end as section,
         cast(null as {{ dbt.type_string() }}) as owner,
         cast(null as {{ dbt.type_string() }}) as amount,
         cast(null as {{ dbt.type_string() }}) as description,
@@ -121,6 +137,7 @@ house_unparsed as (
         'house:' || h.doc_id as disclosure_item_id
     from house_members as h
     left join house_amends as am on h.official_id = am.official_id and h.doc_id = am.doc_id
+    left join house_pdf_status as ps on h.doc_id = ps.doc_id
     where h.doc_id not in (select sl.doc_id from {{ ref('int_house_fd__schedule_lines') }} as sl)
 ),
 
@@ -193,8 +210,8 @@ unioned as (
 --                   House "amended report": the clerk index carries no amendment number, so N is the amendment's
 --                   position by filing date among the amendments of its report, ties broken by the numeric
 --                   doc id in the url, which grows with time)
---   has_text        false for House scans with no extractable text. Such an amendment cannot stand in for a
---                   readable report, so it never supersedes one.
+--   has_text        false for House filings with only a placeholder row (scan, failed download, never fetched).
+--                   Such an amendment cannot stand in for a readable report, so it never supersedes one.
 keyed as (
     select
         *,
@@ -231,7 +248,16 @@ document_reports as (
         report_group,
         max(report_version) as report_version,
         max(filing_date) as filing_date,
-        min(case when section like 'document (not text-extractable%' then 0 else 1 end) as has_text
+        min(
+            case
+                when section in (
+                    'document (not text-extractable; see PDF)',
+                    'document (download or text extraction failed; see PDF)',
+                    'document (not fetched; see PDF)'
+                ) then 0
+                else 1
+            end
+        ) as has_text
     from keyed
     group by official_id, disclosure_type, report_year, document_url, report_group
 ),

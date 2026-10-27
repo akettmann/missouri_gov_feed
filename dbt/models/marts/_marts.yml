@@ -842,7 +842,7 @@ models:
       reports (PDF text, tagged by schedule), Senate eFD reports (structured tables), and federal judges'
       AO-10 reports via CourtListener (mostly 2020 and earlier). Missouri state officials' and judges'
       personal financial disclosures are not online (see official_profile.disclosures_status). Grain:
-      (official_id, disclosure_item_id), one disclosed item; scanned filings appear once with section "document (not text-extractable...)".
+      (official_id, disclosure_item_id), one disclosed item; scanned filings appear once with section "document (not text-extractable; see PDF)", filings whose PDF the loader failed to download or extract once with "document (download or text extraction failed; see PDF)" (the PDF link may itself be dead), and filings of a type the loader never fetches (e.g. extension requests) once with "document (not fetched; see PDF)".
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:

@@ -339,6 +339,8 @@ unit_tests:
           - {doc_id: y4, filing_year: 2023, filing_kind: amended report, filing_type: A, filing_date: '2024-04-01', state_district: MO18, last_name: Miller, document_url: u_y4}
           - {doc_id: z1, filing_year: 2023, filing_kind: other, filing_type: H, filing_date: '2024-03-01', state_district: MO19, last_name: Zed, document_url: u_z1}
           - {doc_id: z2, filing_year: 2023, filing_kind: amended report, filing_type: A, filing_date: '2024-05-01', state_district: MO19, last_name: Zed, document_url: u_z2}
+      - input: ref('stg_house_fd__pdf_lines')
+        rows: []
       - input: ref('int_house_fd__period_covered')
         rows:
           - {doc_id: q1, period_start: '2023-01-01', period_end: '2023-02-28'}
