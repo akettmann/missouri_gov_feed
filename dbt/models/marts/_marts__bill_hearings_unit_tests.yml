@@ -1,0 +1,40 @@
+# Unit test for fct_bill_hearings: fixed staging rows -> superseded flags.
+version: 2
+
+unit_tests:
+  - name: bill_hearings_flag_exact_duplicate_notices_as_superseded
+    model: fct_bill_hearings
+    description: >
+      HB1 lists the Judiciary hearing of 2025-02-04 at 08:15 in room 1 twice (idx 1 and 3): the earlier copy is
+      superseded by idx 3, the later one is not. Idx 2 is the same committee and day at 13:00, a separate hearing,
+      so it is not flagged. A chain of three copies (HB2 idx 1, 2, 3) points each at the next. Notices with no
+      clock time compare on hearing_time_note (HB3: two equal notes -> superseded; HB4: different notes -> not),
+      and a null room matches another null room. The same notice on another bill (HB5) is not matched across
+      bills. Flagging on committee and date alone, or ignoring the time, fails this test.
+    given:
+      - input: ref('stg_mo_house__bill_hearings')
+        rows:
+          - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 1, committee_name: Judiciary, hearing_date: '2025-02-04', hearing_time: '08:15', hearing_time_note: null, location: House Hearing Room 1, comments: null}
+          - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 2, committee_name: Judiciary, hearing_date: '2025-02-04', hearing_time: '13:00', hearing_time_note: null, location: House Hearing Room 1, comments: null}
+          - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 3, committee_name: Judiciary, hearing_date: '2025-02-04', hearing_time: '08:15', hearing_time_note: null, location: House Hearing Room 1, comments: Time change.}
+          - {session_code: '251', session_year: 2025, bill: HB2, hearing_index: 1, committee_name: Fiscal Review, hearing_date: '2025-03-05', hearing_time: '09:00', hearing_time_note: null, location: null, comments: null}
+          - {session_code: '251', session_year: 2025, bill: HB2, hearing_index: 2, committee_name: Fiscal Review, hearing_date: '2025-03-05', hearing_time: '09:00', hearing_time_note: null, location: null, comments: null}
+          - {session_code: '251', session_year: 2025, bill: HB2, hearing_index: 3, committee_name: Fiscal Review, hearing_date: '2025-03-05', hearing_time: '09:00', hearing_time_note: null, location: null, comments: null}
+          - {session_code: '251', session_year: 2025, bill: HB3, hearing_index: 1, committee_name: Rules, hearing_date: '2025-05-14', hearing_time: null, hearing_time_note: 10:15 AM or upon adjournment, location: House Hearing Room 1, comments: null}
+          - {session_code: '251', session_year: 2025, bill: HB3, hearing_index: 2, committee_name: Rules, hearing_date: '2025-05-14', hearing_time: null, hearing_time_note: 10:15 AM or upon adjournment, location: House Hearing Room 1, comments: null}
+          - {session_code: '251', session_year: 2025, bill: HB4, hearing_index: 1, committee_name: Rules, hearing_date: '2025-05-14', hearing_time: null, hearing_time_note: 10:15 AM or upon adjournment, location: House Hearing Room 1, comments: null}
+          - {session_code: '251', session_year: 2025, bill: HB4, hearing_index: 2, committee_name: Rules, hearing_date: '2025-05-14', hearing_time: null, hearing_time_note: 2:00 PM or upon adjournment, location: House Hearing Room 1, comments: null}
+          - {session_code: '251', session_year: 2025, bill: HB5, hearing_index: 1, committee_name: Judiciary, hearing_date: '2025-02-04', hearing_time: '08:15', hearing_time_note: null, location: House Hearing Room 1, comments: null}
+    expect:
+      rows:
+        - {session_code: '251', bill: HB1, hearing_index: 1, superseded_by_index: 3, is_superseded: true}
+        - {session_code: '251', bill: HB1, hearing_index: 2, superseded_by_index: null, is_superseded: false}
+        - {session_code: '251', bill: HB1, hearing_index: 3, superseded_by_index: null, is_superseded: false}
+        - {session_code: '251', bill: HB2, hearing_index: 1, superseded_by_index: 2, is_superseded: true}
+        - {session_code: '251', bill: HB2, hearing_index: 2, superseded_by_index: 3, is_superseded: true}
+        - {session_code: '251', bill: HB2, hearing_index: 3, superseded_by_index: null, is_superseded: false}
+        - {session_code: '251', bill: HB3, hearing_index: 1, superseded_by_index: 2, is_superseded: true}
+        - {session_code: '251', bill: HB3, hearing_index: 2, superseded_by_index: null, is_superseded: false}
+        - {session_code: '251', bill: HB4, hearing_index: 1, superseded_by_index: null, is_superseded: false}
+        - {session_code: '251', bill: HB4, hearing_index: 2, superseded_by_index: null, is_superseded: false}
+        - {session_code: '251', bill: HB5, hearing_index: 1, superseded_by_index: null, is_superseded: false}
