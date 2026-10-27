@@ -41,6 +41,28 @@ models:
   - name: fiscal_note_url
     data_tests:
     - not_null
+- name: stg_mo_house__bill_hearings
+  description: 'Committee hearings noticed for each bill, for House bills and for the Senate bills the House acted
+    on (SenateActList, 2024 sessions on). One row per hearing notice, in the order the House lists them. A hearing
+    that was moved is listed again under a new notice (the comments say "Rescheduled" or "Time change"), so a bill
+    can show two notices for one day; the House XML carries no cancelled flag. notice_time is the clock time as
+    HH:MM, null when the House gave only the free-text alt_time ("4:30 PM or upon adjournment"; the XML stores that
+    as midnight). Comments that contain an email address are withheld (null): committee staff and members put contact
+    addresses there, and this project keeps contact data out of the models.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - session_code
+        - bill
+        - hearing_index
+  columns:
+  - name: committee_name
+    data_tests:
+    - not_null
+  - name: hearing_date
+    data_tests:
+    - not_null
 - name: stg_mo_house__bill_rollcalls
   description: 'The House roll calls taken on each bill: the XML nests them under the bill text version voted on
     (amendment roll calls are left out). rollcall_url is the roll-call PDF, which is the House vote_id.'

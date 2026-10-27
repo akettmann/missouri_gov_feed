@@ -50,8 +50,8 @@ Acceptable labels:
 * Area: `Frontend`, `Ingest` (Python loaders), `Transformation (DBT)`, `documentation`
 * Kind: `bug` (something is wrong; omit for new work)
 * Status: `needs-user` (blocked on an action or decision only the maintainer can take)
-* Source, one per loader in `src/mogov/loaders` (see docs/sources.md): `source: mo_house`, `source: mo_senate`,
-  `source: mo_senate_topics`, `source: mec`, `source: tap_mec`, `source: fec`, `source: voteview`,
+* Source, one per loader in `src/mogov/loaders` (see docs/sources.md): `source: mo_house_xml`, `source: mo_house_pdf`, `source: mo_senate`,
+  `source: mo_senate_topics`, `source: mo_senate_bills`, `source: mec`, `source: tap_mec`, `source: fec`, `source: voteview`,
   `source: house_fd`, `source: senate_efd`, `source: courtlistener_bulk`, `source: courtlistener_case_bulk`,
   `source: courtlistener_cases`, `source: bluebook`, `source: openstates_people`, `source: congress_legislators`,
   `source: fjc_judges`, `source: wikidata`, `source: shor_mccarty`, `source: census_tiger`, `source: census_zcta`,

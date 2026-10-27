@@ -1653,6 +1653,65 @@ models:
         data_type: varchar
         description: The House's name for the document (summary or text version name, amendment description, witness-form description); null for fiscal notes.
 
+  - name: fct_bill_hearings
+    description: >
+      House committee hearings per bill, one row per hearing notice, for House bills and the Senate bills the House
+      acted on (2024 sessions on). A bill heard twice, or by two committees, has several rows. A moved hearing is
+      noticed again, so one bill can show two notices on one day; the House XML has no cancelled flag, so read the
+      comments ("Rescheduled hearing, previously noticed for ..."). Referrals that never got a hearing are bill
+      actions ("Referred: ..."), not rows here. Comments containing an email address are withheld. Join to
+      fct_bills on (session_code, bill). Grain: one row per (session, bill, hearing_index).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [session_code, bill, hearing_index]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "hearing_date >= cast(session_year || '-01-01' as date) and hearing_date <= cast(session_year || '-12-31' as date)"
+    columns:
+      - name: session_code
+        data_type: varchar
+        description: House session code.
+        data_tests:
+          - not_null
+      - name: session_year
+        data_type: integer
+        description: Calendar year of the session (2000 + the first two digits of the code). Every hearing falls in it, special sessions included.
+        data_tests:
+          - not_null
+      - name: bill
+        data_type: varchar
+        description: Bill number without spaces (HB2, SB727).
+        data_tests:
+          - not_null
+      - name: hearing_index
+        data_type: bigint
+        description: Position of the notice in the bill's hearing list (1 = first noticed).
+        data_tests:
+          - not_null
+      - name: committee_name
+        data_type: varchar
+        description: House committee noticed to hear the bill (Rules and Fiscal Review committees included).
+        data_tests:
+          - not_null
+      - name: hearing_date
+        data_type: date
+        description: Date of the hearing as noticed.
+        data_tests:
+          - not_null
+      - name: hearing_time
+        data_type: varchar
+        description: Clock time as HH:MM (24-hour); null when the House gave only hearing_time_note.
+      - name: hearing_time_note
+        data_type: varchar
+        description: The House's free-text time when it is not a clock time ("4:30 PM or upon adjournment (whichever is later)"); null when hearing_time is set.
+      - name: location
+        data_type: varchar
+        description: Hearing room (House Hearing Room 5).
+      - name: comments
+        data_type: varchar
+        description: The committee's note on the notice (time or room change, rescheduling, bills added, COVID-19 procedures). Withheld (null) when it holds an email address.
+
   - name: fct_bill_subjects
     description: >
       Subject index terms per bill, one row per term. House bills keep the House XML's terms (2024 sessions on);
@@ -1716,6 +1775,97 @@ models:
         data_type: varchar
         description: "{{ doc('official_id') }} Null when the sponsor isn't a current official or didn't match."
 
+
+  - name: fct_sponsorship_outcomes
+    description: >
+      What became of the bills each House member sponsored, per member and House session: counts from the House's
+      own bill actions (int_bills__status), each with its n; not a score. Counted: bills where the member is the
+      primary sponsor (sponsor_type Sponsor, exactly one per bill), as a House bill (HB) or House joint resolution
+      (HJR: a proposed law or constitutional amendment). Co-sponsors, handlers and conferees are not counted.
+      Resolutions (HR, HCR) are left out: they are adopted on a voice vote or not at all and would swamp the
+      share. Senate sponsors are left out (the House XML lists them for 2017-2022 only). Re-listed appropriation
+      bills are not counted twice (fct_bill_sponsors drops them). Appropriation bills are kept: they are real
+      sponsorships, and the Budget chair sponsors them and almost all pass, so the chair's shares are high for
+      that reason (the 2026 chair, Dirk Deaton, is not in dim_official, so does not appear). Only current officials (dim_official) have an official_id, so former members are not here
+      (2026: 2,044 of 2,086 House sponsor rows match; 2017: 27 of 1,224). A bill is "decided" unless its outcome
+      is pending (session still open) or awaiting governor (truly agreed this year); decided bills are the
+      denominator of both shares, and the passed and became-law counts only include decided bills, so a share
+      is always between 0 and 1. A member who moved between chambers has rows only for the House sessions in
+      which they sponsored House bills. Grain: one row per (official, House session) with at least one counted
+      bill.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, session_code]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: The sponsoring member (dim_official).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: session_code
+        data_type: varchar
+        description: House session code.
+        data_tests:
+          - not_null
+      - name: session_year
+        data_type: integer
+        description: Calendar year of the session.
+      - name: is_session_over
+        data_type: boolean
+        description: >
+          Whether the session has ended (int_bills__status). While it is false, most bills are still pending
+          and not counted as decided.
+      - name: bills_sponsored
+        data_type: bigint
+        description: >
+          House bills (HB) and House joint resolutions (HJR) the member is the primary sponsor of in the session,
+          whatever their outcome, pending ones included.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 60
+      - name: bills_decided
+        data_type: bigint
+        description: >
+          The denominator: those bills whose outcome is known, i.e. everything except pending (session still open)
+          and awaiting governor. A bill the House passed but that failed in the Senate is decided. A truly agreed bill
+          with "no governor action recorded" is decided but not counted as law.
+      - name: bills_passed_house
+        data_type: bigint
+        description: >
+          Decided bills the House passed on third reading (int_bills__status passed_house), including ones that then
+          died in the Senate, were vetoed or were withdrawn afterwards. Appropriation bills are included.
+      - name: bills_became_law
+        data_type: bigint
+        description: >
+          Decided bills that became law: outcome enacted for an HB (signed, line-item vetoed, veto overridden, or
+          delivered to the Secretary of State without signature), sent to voters for an HJR. A vetoed bill is not
+          counted.
+      - name: passed_house_share
+        data_type: decimal(28,6)
+        description: bills_passed_house over bills_decided; null when bills_decided is 0. Always between 0 and 1.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1
+      - name: became_law_share
+        data_type: decimal(28,6)
+        description: bills_became_law over bills_decided; null when bills_decided is 0. Always between 0 and 1.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1
+      - name: source_url
+        data_type: varchar
+        description: The House XML export for the session (documents.house.mo.gov), where the bill actions come from.
   - name: fct_vote_bills
     description: >
       Which bill a state vote was on. House roll calls are linked exactly where the bill XML names the roll-call
