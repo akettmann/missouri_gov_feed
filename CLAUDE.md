@@ -19,6 +19,9 @@ Optional inputs are gated by vars (`mec_direct`, `cl_case_bulk`): build with `mo
 if useful, add dbt-utils and dbt-expectations to the DBT project
 Follow DBT's best practices https://docs.getdbt.com/best-practices?version=2
 Where possible, build tests that serve as "sanity checks". Example: We have never seen 200 roll calls in a day before, no campaign has received 1 trillion dollars
+Deterministic output: every `row_number()` / `rank()` that picks a row, and every dbt or frontend sort that lists a top N, ends its `order by` with a key unique within the group, never a lone amount, date or name (#226). After changing a ranking or sort, run `uv run python scripts/check_site_determinism.py --shuffle` before opening the PR
+Free text from sources (names, addresses, titles) is cleaned in staging with the shared macros (`dbt/macros/names.sql`: `clean_name`, `name_part`, `person_name`, `clean_registry_text`; `placeholder.sql`; `replacement_char.sql`; `garbled_text.sql`), not with inline rules in the model. If a source needs a new rule, extend or add a shared macro. A new source's text columns get tests for HTML entities, U+FFFD, filler values ('~', 'NONE', one-character names) and doubled punctuation
+Never pack several values into one delimited string column (e.g. `donor_names` joined by `'; '`); model a long table with one row per value (#370)
 ## Loader processes
 Loaders are processes that fetch raw data and write it to our raw storage.
 They will be:
@@ -41,6 +44,7 @@ Maintain step by step documentation of:
 ## Issue Tracking
 Issues live in GitHub issues on `akettmann/missouri_gov_feed`, managed with the `gh` CLI (`gh issue create`, `gh issue list`).
 * If you find a problem while working, if it is not blocking your progress, file it as an issue instead of fixing it in passing.
+* Before filing, search open and closed issues for the same problem (`gh issue list --state all --search "<model or keywords>"`). If one exists, add your findings to it as a comment instead of opening a duplicate; parallel workers often find the same thing from different PRs.
 * Reference issues in commits and PRs (`Fixes #12`) so they close when the work merges.
 * Use only the labels below. If a new one seems needed (e.g. a new source), ask before creating it, and add it to this list.
 * Every issue gets exactly one priority label, at least one area label, and a `source:` label for each source it involves.
@@ -55,9 +59,9 @@ Acceptable labels:
   `source: house_fd`, `source: senate_efd`, `source: courtlistener_bulk`, `source: courtlistener_case_bulk`,
   `source: courtlistener_cases`, `source: bluebook`, `source: openstates_people`, `source: congress_legislators`,
   `source: fjc_judges`, `source: wikidata`, `source: shor_mccarty`, `source: census_tiger`, `source: census_zcta`,
-  `source: mo_employee_pay`, `source: epa_frs`, `source: mo_auditor`, `source: mo_revisor`
+  `source: mo_employee_pay`, `source: epa_frs`, `source: mo_auditor`, `source: mo_revisor`, `source: govinfo_billstatus`
 * Candidate sources (not loaded yet): `source: legiscan`, `source: followthemoney`, `source: osha_ita`,
-  `source: mo_sos_business`, `source: mo_state_expenditures`, `source: govinfo_billstatus`, `source: house_sod`,
+  `source: mo_sos_business`, `source: mo_state_expenditures`, `source: house_sod`,
   `source: house_cpf`, `source: mo_sos_elections`, `source: census_acs`,
   `source: uscourts_caseload`, `source: mo_sos_rules`. When a candidate gets a loader, keep the label and update its description.
 

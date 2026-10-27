@@ -459,7 +459,32 @@ OPTIONAL_JSON_TABLES = {
     "epa_frs_alt_names": "epa_frs",  # added for U+FFFD name repair (#260); older raw dirs lack it
     "mo_senate_bill_list": "mo_senate_bills",  # a slow loader (~1 request/s per bill, #585): builds run without it
     "mo_senate_bill_actions": "mo_senate_bills",
+    "govinfo_billstatus_files": "govinfo_billstatus",  # new source (#283): older raw dirs lack it
+    "govinfo_billstatus_bills": "govinfo_billstatus",
+    "govinfo_billstatus_sponsors": "govinfo_billstatus",
+    "govinfo_billstatus_cosponsors": "govinfo_billstatus",
+    "govinfo_billstatus_actions": "govinfo_billstatus",
+    "govinfo_billstatus_recorded_votes": "govinfo_billstatus",
+    "govinfo_billstatus_laws": "govinfo_billstatus",
 }
+
+
+# Optional typed tables (written by TableSink from row dataclasses): table -> loader. dbt reads these too, so a
+# missing one gets an empty table with the row class's columns. The row classes are found by importing the loader
+# lazily (db is imported by the loaders).
+OPTIONAL_TYPED_TABLES = {
+    "mo_house_pdf_files": "mo_house_pdf",  # stage 2 and ~19 hours for a first full run (#591); builds run without it
+    "mo_house_pdf_texts": "mo_house_pdf",
+}
+
+
+def _typed_placeholder(table: str) -> None:
+    import importlib
+
+    module = importlib.import_module(f"mogov.loaders.{OPTIONAL_TYPED_TABLES[table]}")
+    row_types = [v for v in vars(module).values() if isinstance(v, type) and getattr(v, "TABLE", None) == table]
+    with TableSink(tables=row_types):
+        pass  # a clean exit publishes the empty typed table
 
 
 def ensure_optional_tables() -> list[str]:
@@ -467,5 +492,9 @@ def ensure_optional_tables() -> list[str]:
     for table in OPTIONAL_JSON_TABLES:
         if not raw_exists(table):
             replace_json(table, [])
+            created.append(table)
+    for table in OPTIONAL_TYPED_TABLES:
+        if not raw_exists(table):
+            _typed_placeholder(table)
             created.append(table)
     return created

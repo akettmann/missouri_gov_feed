@@ -56,6 +56,7 @@ Layout under `data/` (override the root with `MOGOV_DATA_DIR`):
 | `data/cache/`                              | HTTP cache (one file per request, keyed by URL + params) and large downloads |
 | `data/raw/<table>/part-<i>-of-<N>.parquet` | Raw landings, one part per loader shard (`MOGOV_RAW_DIR`)                    |
 | `data/raw/mo_house_xml/<session>/*.gz`     | Raw files landed unchanged, gzipped; `mo_house_xml_files` records each path  |
+| `data/raw/govinfo_billstatus_xml/<congress>/<type>/*.gz` | Federal bill XML landed unchanged, gzipped; `govinfo_billstatus_files` records each path |
 | `data/raw/mo_house_pdf/<session>/<kind>/*.pdf` | House bill document PDFs landed unchanged (3-6 GB); `mo_house_pdf_files` records each |
 | `data/mogov.duckdb`                        | dbt warehouse (`MOGOV_DB`)                                                   |
 | `data/exports/`                            | `mogov export` output                                                        |
@@ -419,6 +420,12 @@ instead run `mogov run` as a job, it is strict by default; set `MOGOV_ALLOW_FAIL
    `mogov load courtlistener_cases wikidata` (stage 2; `mogov list` shows each loader's stage), then
    `mogov-build` again. Use Cloud Workflows, or Cloud Scheduler triggers spaced far
    enough apart. See [sync.md](sync.md) for cadences.
+
+The HTTP cache is `$MOGOV_DATA_DIR/cache` (`/data/cache`), so it lives on the mounted bucket and survives
+between job runs. Loaders that re-fetch on a schedule (`govinfo_billstatus` re-reads the in-session Congress's zips
+daily and older ones monthly) judge freshness by the cached file's modification time, which Cloud Storage FUSE
+keeps (the object's update time). Keep `/data` mounted on every load job; without it each run starts cold and
+downloads every zip again.
 
 Metrics: set `OTEL_EXPORTER_OTLP_ENDPOINT` to an OTLP/HTTP collector, for example an OpenTelemetry
 Collector sidecar that exports to Cloud Monitoring.

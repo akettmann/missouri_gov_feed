@@ -334,3 +334,9 @@ sources:
         error_after:
           count: 32
           period: day
+  - name: pdf_files
+    identifier: mo_house_pdf_files
+    description: "One row per House document URL the mo_house_pdf loader tried: session, kind, path of the unchanged PDF under MOGOV_RAW_DIR, size, sha256, HTTP status, error and last write. Optional: empty until `mogov load mo_house_pdf` has run (slow, stage 2)."
+  - name: pdf_texts
+    identifier: mo_house_pdf_texts
+    description: "One row per House document URL: kind, session, the link row's file name, LR number and version code, link count, page count, pdfplumber text as extracted (joined and per page, small-caps NULs included) and the error if the fetch or extraction failed. Optional: empty until `mogov load mo_house_pdf` has run."

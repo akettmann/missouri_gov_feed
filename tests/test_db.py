@@ -121,11 +121,28 @@ def test_ensure_optional_tables_leaves_landed_rows_alone():
     assert [k for k, _ in _rows("epa_frs_sic")] == ["k1"]  # the real row survived; no placeholder overwrote it
 
 
+def test_ensure_optional_tables_creates_typed_mo_house_pdf_placeholders():
+    # Builds must work before the mo_house_pdf loader has run (#593): empty tables with the loader's columns.
+    created = db.ensure_optional_tables()
+    assert {"mo_house_pdf_files", "mo_house_pdf_texts"} <= set(created)
+    with db.connect() as con:
+        cols = [
+            r[0]
+            for r in con.execute(
+                f"describe select * from read_parquet('{db.raw_glob('mo_house_pdf_texts')}')"
+            ).fetchall()
+        ]
+        n = con.execute(f"select count(*) from read_parquet('{db.raw_glob('mo_house_pdf_texts')}')").fetchone()[0]
+    assert {"url", "kind", "page_count", "text", "error"} <= set(cols)
+    assert n == 0
+    assert "mo_house_pdf_texts" not in db.ensure_optional_tables()
+
+
 def test_optional_json_tables_map_to_registered_loaders():
     from mogov.loaders import REGISTRY, load_all_modules
 
     load_all_modules()
-    assert set(db.OPTIONAL_JSON_TABLES.values()) <= set(REGISTRY)
+    assert set(db.OPTIONAL_JSON_TABLES.values()) | set(db.OPTIONAL_TYPED_TABLES.values()) <= set(REGISTRY)
 
 
 @pytest.mark.parametrize("sink_type", ["json", "table"])

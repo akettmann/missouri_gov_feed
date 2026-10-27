@@ -1,7 +1,17 @@
 -- House disclosure PDF text, each line tagged with the schedule it falls under (the nearest preceding
 -- "Schedule X:" header in the same document). Column-header rows, "None disclosed." and boilerplate drop out.
+-- Entries the PDF wraps over several lines are joined back into one row on the schedules that feed commercial ties
+-- (C, E, F, J: see "continuation" below), so a wrapped tail never becomes a tie of its own (#599).
+-- PDFs from 2021 on extract their small-caps text with NUL characters; the words are restored first (#576).
 with lines as (
-    select * from {{ ref('stg_house_fd__pdf_lines') }}
+    select
+        doc_id,
+        document_url,
+        has_text,
+        page,
+        line_no,
+        {{ mogov.house_fd_restore_text('line_text') }} as line_text
+    from {{ ref('stg_house_fd__pdf_lines') }}
 ),
 
 sequenced as (
@@ -11,6 +21,8 @@ sequenced as (
         case
             when
                 lower(line_text) like 'schedule a:%' or lower(line_text) like 'schedule a and b%'
+                -- 2021+ layout: "Schedule A Asset Class Details" / "Schedule A Investment Vehicle Details"
+                or lower(line_text) like 'schedule a %details'
                 then 'A: assets & unearned income'
             when lower(line_text) like 'schedule b:%' then 'B: transactions'
             when lower(line_text) like 'schedule c:%' then 'C: earned income'
@@ -21,6 +33,11 @@ sequenced as (
             when lower(line_text) like 'schedule h:%' then 'H: travel'
             when lower(line_text) like 'schedule i:%' then 'I: charity in lieu of honoraria'
             when lower(line_text) like 'schedule j:%' then 'J: compensation over $5,000 from one source'
+            -- the form's closing pages (exclusion questions, certification, signature) follow the last schedule;
+            -- their lines belong to no schedule (the sentinel is dropped below)
+            when
+                lower(line_text) like 'exclusions of spouse%' or lower(line_text) like 'certification and signature%'
+                then 'end of form'
             when
                 lower(line_text) like '%transaction date%' or lower(line_text) like 'id owner asset%'
                 then 'PTR: transactions'
@@ -35,27 +52,131 @@ tagged as (
         max(case when s.header_schedule is not null then s.seq end)
             over (partition by s.doc_id order by s.seq rows between unbounded preceding and current row) as header_seq
     from sequenced as s
+),
+
+kept as (
+    select
+        t.doc_id,
+        t.document_url,
+        t.page,
+        t.line_no,
+        t.seq,
+        h.header_schedule as schedule,
+        t.line_text
+    from tagged as t
+    inner join tagged as h on t.doc_id = h.doc_id and t.header_seq = h.seq
+    where
+        t.header_schedule is null
+        and h.header_schedule != 'end of form'
+        and lower(t.line_text) not in ('none disclosed.', 'none disclosed')
+        and lower(t.line_text) not like 'asset owner value%'
+        and lower(t.line_text) not like 'type(s) $1,000?%'
+        and lower(t.line_text) not like 'source type amount%'
+        and lower(t.line_text) not like 'position name of organization%'
+        and lower(t.line_text) not like 'source (name and address)%'
+        and lower(t.line_text) not like '%for the complete list of asset type%'
+        and lower(t.line_text) not like 'filing id #%'
+        -- column-header spill of the 2021+ layouts (schedule F and others): would otherwise become ties
+        and lower(t.line_text) not like 'date parties to terms%'
+        -- column-header spill, each an exact line (the header cell wraps onto its own line); a real asset or
+        -- position never reads like one of these (#599)
+        and lower(t.line_text) not in (
+            'filing',
+            'yes no',
+            'i p o',
+            'i v d',
+            'liability',
+            'exp.',
+            'date exp.',
+            'date own exp.',
+            'trip details inclusions',
+            'type gains >',
+            'type date gains >',
+            'asset owner date tx. amount cap.',
+            'owner creditor date incurred type amount of',
+            'source activity date amount charity name',
+            'source start end date itinerary days at lodging? food? family?',
+            'source start end date itinerary days at own lodging? food? family?',
+            'source start date end date itinerary days at own lodging? food? family?'
+        )
+        -- "Type(s) of Income, Current Year to Filing / Preceding Year" wrapped over lines: nothing but those words
+        and not {{ mogov.regex_matches(
+            'lower(t.line_text)',
+            '^(type\\(s\\) )?(current|preceding|filing|year|to)( (current|preceding|filing|year|to))*$'
+        ) }}
+        -- the asset-type-code footnote repeated on every page of schedule A / B
+        and lower(t.line_text) not like 'https://fd.house.gov/reference/asset-type-codes%'
+        and lower(t.line_text) not like '* asset class details available at the bottom of this form%'
+),
+
+-- Continuation: on the schedules that feed commercial ties, a wrapped entry leaves its tail as a line of its own.
+-- A line is the tail of the entry above (same schedule) when
+--   * C: it carries no amount ("$..." or "N/A"): the first line holds the amounts, so a line without one (or a
+--     "Comments:" line) belongs to the entry above;
+--   * F: it does not start with the agreement's date (a year, optionally after a month): Date, Parties, Terms;
+--   * C, E, F, J: it closes a parenthesis the entry above left open, or starts with one ("Name (Owensboro," then
+--     "KY, US)"; "... Consulting services" then "(Jefferson City, MO, US)").
+-- Other lines stay entries: pure wrapped tails with no such signal ("Government") cannot be told from an entry.
+flagged as (
+    select
+        k.*,
+        lag(k.schedule) over (partition by k.doc_id order by k.seq) as prev_schedule,
+        lag(k.line_text) over (partition by k.doc_id order by k.seq) as prev_text
+    from kept as k
+),
+
+continued as (
+    select
+        f.*,
+        coalesce(f.prev_schedule = f.schedule, false) and substr(f.schedule, 1, 1) in ('C', 'E', 'F', 'J') and (
+            (
+                substr(f.schedule, 1, 1) = 'C'
+                and not {{ mogov.regex_matches('f.line_text', '\\$[0-9]|(^| )[Nn]/[Aa]( |$)') }}
+            )
+            or (
+                substr(f.schedule, 1, 1) = 'F'
+                and not {{ mogov.regex_matches(
+                    'lower(f.line_text)',
+                    '^((january|february|march|april|may|june|july|august|september|october|november|december) )?[0-9]{4}( |$)'
+                ) }}
+            )
+            or length(f.prev_text) - length(replace(f.prev_text, '(', ''))
+            > length(f.prev_text) - length(replace(f.prev_text, ')', ''))
+            or length(f.line_text) - length(replace(f.line_text, ')', ''))
+            > length(f.line_text) - length(replace(f.line_text, '(', ''))
+            or f.line_text like '(%'
+        ) as is_continuation
+    from flagged as f
+),
+
+entries as (
+    select
+        c.*,
+        max(case when not c.is_continuation then c.seq end)
+            over (partition by c.doc_id order by c.seq rows between unbounded preceding and current row) as entry_seq
+    from continued as c
+),
+
+joined as (
+    select
+        e.doc_id,
+        e.entry_seq,
+        {{ dbt.listagg('e.line_text', "' '", 'order by e.seq') }} as line_text
+    from entries as e
+    group by e.doc_id, e.entry_seq
 )
 
+-- owner code and amount come from the entry's first line only: a joined tail must not add or change them
 select
-    t.doc_id,
-    t.document_url,
-    t.page,
-    t.line_no,
-    t.seq,
-    h.header_schedule as schedule,
-    t.line_text,
+    e.doc_id,
+    e.document_url,
+    e.page,
+    e.line_no,
+    e.seq,
+    e.schedule,
+    j.line_text,
     -- owner codes: SP spouse, DC dependent child, JT joint
-    {{ mogov.regex_extract('t.line_text', '(^| )(SP|DC|JT)( |$)', 2) }} as owner_code,
-    {{ mogov.regex_extract('t.line_text', '(\\$[0-9,]+( - \\$[0-9,]+)?|Over \\$[0-9,]+|None)') }} as amount_range
-from tagged as t
-inner join tagged as h on t.doc_id = h.doc_id and t.header_seq = h.seq
-where
-    t.header_schedule is null
-    and lower(t.line_text) not in ('none disclosed.', 'none disclosed')
-    and lower(t.line_text) not like 'asset owner value%'
-    and lower(t.line_text) not like 'type(s) $1,000?%'
-    and lower(t.line_text) not like 'source type amount%'
-    and lower(t.line_text) not like 'position name of organization%'
-    and lower(t.line_text) not like '%for the complete list of asset type%'
-    and lower(t.line_text) not like 'filing id #%'
+    {{ mogov.regex_extract('e.line_text', '(^| )(SP|DC|JT)( |$)', 2) }} as owner_code,
+    {{ mogov.regex_extract('e.line_text', '(\\$[0-9,]+( - \\$[0-9,]+)?|Over \\$[0-9,]+|None)') }} as amount_range
+from entries as e
+inner join joined as j on e.doc_id = j.doc_id and e.seq = j.entry_seq
