@@ -7,6 +7,9 @@ text with pdfplumber into `mo_house_pdf_texts` (one row per document: joined tex
 count, and the link row's identifying fields). Extraction is stored as-is: small-caps glyphs can come out as NULs
 and are cleaned in dbt.
 
+A bill text version's enacting title and Section A are also read for the RSMo sections it repeals or enacts
+(`mo_house_pdf_statute_refs`, one row per section or range as written; see `mogov.parsers.mo_house_statute_refs`).
+
 Witness forms print private citizens' contact details and are never fetched (#244); `fetch_document` is the
 reusable fetch-and-land helper, so a new kind is one more entry in `KINDS`.
 
@@ -32,6 +35,7 @@ import httpx
 from mogov import db, obs, pdftext
 from mogov.http import client, host_throttle, write_atomic
 from mogov.loaders import loader
+from mogov.parsers.mo_house_statute_refs import parse_statute_refs
 
 log = obs.get_logger(__name__)
 
@@ -104,6 +108,26 @@ class DocText:
     text: str | None
     pages_json: str | None  # JSON array of per-page text ("" for a page without a text layer)
     error: str | None
+
+
+@dataclass
+class DocStatuteRef:
+    """One RSMo section (or range) a bill text version repeals, amends or enacts, from its enacting title and
+    Section A (#594; parser in `mogov.parsers.mo_house_statute_refs`). Only `bill_text` documents. Ranges stay as
+    written (`section_end` set); dbt expands them."""
+
+    TABLE: ClassVar[str] = "mo_house_pdf_statute_refs"
+    url: str
+    session_code: str
+    file_name: str
+    lr_number: str | None
+    version_code: str | None
+    ordinal: int  # 1-based within the action
+    action: str  # repeal, amend or enact
+    section_start: str
+    section_end: str | None
+    supp_year: int | None
+    clause: str
 
 
 @dataclass(frozen=True)
@@ -258,6 +282,28 @@ def extract(link: Link, data: bytes | None, error: str | None) -> DocText:
     return DocText(*base, len(pages), "\n".join(pages), json.dumps(pages), None)
 
 
+def statute_refs(text_row: DocText) -> list[DocStatuteRef]:
+    """The statute references of a bill text version: none for other kinds or a document without text."""
+    if text_row.kind != "bill_text" or not text_row.text:
+        return []
+    return [
+        DocStatuteRef(
+            text_row.url,
+            text_row.session_code,
+            text_row.file_name,
+            text_row.lr_number,
+            text_row.version_code,
+            r.ordinal,
+            r.action,
+            r.section_start,
+            r.section_end,
+            r.supp_year,
+            r.clause,
+        )
+        for r in parse_statute_refs(text_row.text)
+    ]
+
+
 def _csv_env(name: str) -> list[str]:
     return [v.strip() for v in os.environ.get(name, "").split(",") if v.strip()]
 
@@ -287,10 +333,12 @@ def load(shard: db.Shard) -> dict[str, int]:
     if unknown := set(kinds) - set(KINDS):
         raise SystemExit(f"unknown MOGOV_HOUSE_PDF_KINDS {sorted(unknown)}; choose from {sorted(KINDS)}")
     sessions = set(_csv_env("MOGOV_HOUSE_PDF_SESSIONS")) or None
-    with db.TableSink(shard, tables=[DocFile, DocText]) as sink:
+    with db.TableSink(shard, tables=[DocFile, DocText, DocStatuteRef]) as sink:
         for file_row, text_row in _iter_rows(units(shard), set(kinds), sessions):
             if file_row.error:
                 log.warning("mo_house_pdf.failed", url=file_row.url, error=file_row.error)
             sink.add(file_row)
             sink.add(text_row)
+            for ref in statute_refs(text_row):
+                sink.add(ref)
     return sink.counts

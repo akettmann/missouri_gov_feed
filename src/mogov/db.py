@@ -475,6 +475,7 @@ OPTIONAL_JSON_TABLES = {
 OPTIONAL_TYPED_TABLES = {
     "mo_house_pdf_files": "mo_house_pdf",  # stage 2 and ~19 hours for a first full run (#591); builds run without it
     "mo_house_pdf_texts": "mo_house_pdf",
+    "mo_house_pdf_statute_refs": "mo_house_pdf",  # #594
 }
 
 
