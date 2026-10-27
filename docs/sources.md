@@ -234,6 +234,9 @@ Quirks:
   (the Budget chair sponsors them and almost all pass). Only current officials (`dim_official`) have an
   `official_id`, so former members are absent: for 2017 only 27 of 1,224 House primary-sponsor rows match, for
   2026 2,044 of 2,086. A member with House and Senate careers has rows for House sessions only.
+  Survivorship: the earliest sessions (2017-2018) hold only members still in office today, mostly long-serving
+  leaders, so their shares are not comparable with recent sessions. The profile page ("Bills sponsored in the
+  House") shows the counts with their n, a percent only when `bills_decided >= 5`, and this caveat.
 - PDF text extraction is cached by PDF content (`data/cache/pdftext/`). Before that, a re-run spent
   3–10 minutes per shard re-parsing PDFs that were already downloaded.
 - Bill status (`fct_bills.status`, `outcome`; `int_bills__status`) comes from each bill's `Action` list. The
