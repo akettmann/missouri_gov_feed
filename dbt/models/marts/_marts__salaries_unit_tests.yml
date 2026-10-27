@@ -840,3 +840,51 @@ unit_tests:
     expect:
       rows:
         - {official_id: p_van_fixture, calendar_year: 2023, employee_name: 'VANFIXTURE, ROBERT Q', match_confidence: medium}
+
+  - name: salaries_a_first_vote_senate_start_counts_from_its_own_year
+    model: fct_salaries
+    description: >
+      Invented senators (not real cases), #690. Zoe Firstvote's seat has no Open States start, so
+      int_mo_legislators__seats dates it from her first journal vote, 2017-01-04 (start_quality first_vote), and her
+      2017 pay is hers by seat. Her first int_officeholders__years row is 2018 (as when 2017's Senate is not complete
+      for every district), but a first_vote start is a known date, so the seat counts from 2017, not from that first
+      listed year. Una Undated's seat has no start at all (undated, 1900-01-01): it counts from her first listed year,
+      2018, so her 2017 pay pairs with nobody. Neither is a current official, so they have no name keys and only the
+      seat match can pair them.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'FIRSTVOTE, ZOE', last_name: FIRSTVOTE, first_names: ZOE, gross_pay: 35914.80}
+          - {calendar_year: 2018, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'FIRSTVOTE, ZOE', last_name: FIRSTVOTE, first_names: ZOE, gross_pay: 35914.80}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'UNDATED, UNA', last_name: UNDATED, first_names: UNA, gross_pay: 35914.80}
+          - {calendar_year: 2018, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'UNDATED, UNA', last_name: UNDATED, first_names: UNA, gross_pay: 35914.80}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: SENATOR, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_firstvote, full_name: Zoe Firstvote, surname_key: firstvote, chamber: upper, start_date: '2017-01-04', start_quality: first_vote, end_date: '9999-12-31'}
+          - {person_id: p_undated, full_name: Una Undated, surname_key: undated, chamber: upper, start_date: '1900-01-01', start_quality: undated, end_date: '9999-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows: *no_final_checks
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p_firstvote, office: state_senate}
+          - {official_id: p_undated, office: state_senate}
+      - input: ref('int_officials__name_keys')
+        rows: *no_name_keys
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows:
+          - {year: 2018, official_id: p_firstvote, office: state_senate}
+          - {year: 2018, official_id: p_undated, office: state_senate}
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: p_firstvote, calendar_year: 2017, employee_name: 'FIRSTVOTE, ZOE', match_confidence: high}
+        - {official_id: p_firstvote, calendar_year: 2018, employee_name: 'FIRSTVOTE, ZOE', match_confidence: high}
+        - {official_id: p_undated, calendar_year: 2018, employee_name: 'UNDATED, UNA', match_confidence: high}

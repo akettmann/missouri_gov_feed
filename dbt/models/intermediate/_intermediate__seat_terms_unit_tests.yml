@@ -5,8 +5,8 @@ unit_tests:
       start_quality and known_start_date (#656), on real shapes. Peggy McGaugh's HD39 term has no Open States start
       (undated); her HD7 term starts 2023-01-04 (dated). Jason Smith and Shawn Sisco both hold HD120 from the
       as-given 2013-01-01, a stand-in Open States uses for "in office by then" (placeholder): real swearing-in falls
-      on January 4-12. A seed correction (Mike Kehoe, SD6 from 2017-01-01) is always dated, even on January 1. The
-      start_date column keeps its old values (1900-01-01 for undated, January 1 for any January start).
+      on January 4-12. A seed correction with a start (Mike Kehoe, SD6 from 2017-01-01) is always dated, even on
+      January 1; a seed row with a blank start is undated. The start_date column keeps its old values (1900-01-01 for undated, January 1 for any January start).
     given:
       - input: ref('stg_openstates__roles')
         rows:
@@ -36,6 +36,32 @@ unit_tests:
         - {openstates_id: sisco, district_number: 120, start_date: '2013-01-01', start_quality: placeholder, known_start_date: null}
         - {openstates_id: kehoe, district_number: 6, start_date: '2011-01-01', start_quality: placeholder, known_start_date: null}
         - {openstates_id: kehoe, district_number: 6, start_date: '2017-01-01', start_quality: dated, known_start_date: '2017-01-01'}
+
+  - name: seat_terms_a_seed_row_with_a_blank_start_is_undated
+    model: int_mo_legislators__seat_terms
+    description: >
+      An invented seed row (not a real case), #690. A legislator_seat_corrections row is dated because its start is
+      sourced, but only when it has one: a row with a blank start_date is undated like an Open States term with none
+      (start_date 1900-01-01, known_start_date null), so consumers never read the 1900 stand-in as a known start. A
+      seed row with a start (Zed Fixture's later SD27 term, from 2021-01-06) stays dated.
+    given:
+      - input: ref('stg_openstates__roles')
+        rows: []
+      - input: ref('legislator_seat_corrections')
+        rows:
+          - {openstates_id: fixture, chamber: upper, district: 27, start_date: null, end_date: '2021-01-05', source: invented}
+          - {openstates_id: fixture, chamber: upper, district: 27, start_date: '2021-01-06', end_date: '2025-01-07', source: invented}
+      - input: ref('stg_openstates__people')
+        rows:
+          - {openstates_id: fixture, full_name: Zed Fixture, family_name: Fixture}
+      - input: ref('stg_mo_senate__votes')
+        rows: []
+      - input: ref('stg_mo_house__members')
+        rows: []
+    expect:
+      rows:
+        - {openstates_id: fixture, district_number: 27, start_date: '1900-01-01', source_start_date: null, start_quality: undated, known_start_date: null}
+        - {openstates_id: fixture, district_number: 27, start_date: '2021-01-01', source_start_date: '2021-01-06', start_quality: dated, known_start_date: '2021-01-06'}
 
   - name: seat_terms_end_quality_against_the_house_roster
     model: int_mo_legislators__seat_terms

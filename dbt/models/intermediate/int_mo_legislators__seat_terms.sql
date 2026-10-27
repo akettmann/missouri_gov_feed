@@ -9,13 +9,14 @@
 --     mid-term for statewide office), each with its source.
 -- source_start_date/source_end_date carry the dates exactly as Open States (or the seed) gives them, without those
 -- adjustments (null start when undated; end 9999-12-31 while open).
--- Quality flags (#656) say how far each date can be trusted; they change no other column, so consumers can move to
--- them one by one. start_quality is dated, undated (no Open States start) or placeholder (an Open States start on
--- January 1, never a real start); known_start_date is the as-given start only when dated. end_quality is open, dated,
--- conflicts_with_journal (a Senate end the journal roll calls contradict: the terms int_mo_legislators__seats
--- re-dates) or conflicts_with_roster (a House end the House's session rosters contradict), with the evidence dates
--- behind it. The column docs give each rule. The evidence is read from staging (stg_mo_senate__votes,
--- stg_mo_house__members), never from a model carrying person_id: this model is upstream of int_officials__person_ids.
+-- Quality flags (#656) say how far each date can be trusted; they change no other column, so consumers can move to them
+-- one by one. start_quality is dated, undated (no start) or placeholder (an Open States start on January 1, never a
+-- real start); seed rows with a start are always dated and taken at face value, January 1 included, and a seed row with
+-- a blank start is undated. known_start_date is the as-given start only when dated. end_quality is open, dated,
+-- conflicts_with_journal (a Senate end the journal roll calls contradict: the terms int_mo_legislators__seats re-dates)
+-- or conflicts_with_roster (a House end the House's session rosters contradict), with the evidence dates behind it. The
+-- column docs give each rule. The evidence is read from staging (stg_mo_senate__votes, stg_mo_house__members), never
+-- from a model carrying person_id: this model is upstream of int_officials__person_ids.
 with roles as (
     select
         openstates_id,
@@ -58,7 +59,7 @@ terms as (
         {{ dbt.safe_cast('r.start_date', 'date') }} as source_start_date,
         coalesce(r.end_date, {{ dbt.safe_cast("'9999-12-31'", 'date') }}) as source_end_date,
         case
-            when r.is_seed then 'dated'
+            when r.is_seed and r.start_date is not null then 'dated'
             when r.start_date is null then 'undated'
             when extract(month from r.start_date) = 1 and extract(day from r.start_date) = 1 then 'placeholder'
             else 'dated'

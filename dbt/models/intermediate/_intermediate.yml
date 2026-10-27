@@ -427,9 +427,10 @@ models:
     office), each with its source. source_start_date/source_end_date carry the dates exactly as Open States (or
     the seed) gives them, without those adjustments (null start when undated; end 9999-12-31 while open). Quality
     flags (#656) say how far each date can be trusted; they change no other column, so consumers can move to them
-    one by one. start_quality is dated, undated (no Open States start) or placeholder (an Open States start on January
-    1, never a real start); known_start_date is the as-given start only when dated. end_quality is open, dated,
-    conflicts_with_journal (a Senate end the journal roll calls contradict: the terms int_mo_legislators__seats
+    one by one. start_quality is dated, undated (no start) or placeholder (an Open States start on January 1, never
+    a real start); seed rows with a start are always dated and taken at face value, January 1 included, and a seed
+    row with a blank start is undated. known_start_date is the as-given start only when dated. end_quality is open,
+    dated, conflicts_with_journal (a Senate end the journal roll calls contradict: the terms int_mo_legislators__seats
     re-dates) or conflicts_with_roster (a House end the House''s session rosters contradict), with the evidence
     dates behind it. The column docs give each rule. The evidence is read from staging (stg_mo_senate__votes, stg_mo_house__members),
     never from a model carrying person_id: this model is upstream of int_officials__person_ids. Grain: one row per
@@ -469,10 +470,10 @@ models:
       January 1 of 2011, 2013 and 2015 as a stand-in for "in office by then" (111 + 79 + 4 House terms and 24 +
       3 Senate terms); every other dated January start is January 3 to 11. 2017 has one January 1 start, Nick Schroer''s
       HD107 term, a near-true case (his first term began with the session on 2017-01-04): flagged all the same,
-      as the rule does not look at the year. Seed rows (legislator_seat_corrections) are always dated and taken
-      at face value, January 1 included: a seed start is where the correction begins, not necessarily the first
-      start in the seat (Mike Kehoe''s SD6 and Mike Parson''s SD28 rows start 2017-01-01, continuing terms Open
-      States starts in 2011).'
+      as the rule does not look at the year. Seed rows (legislator_seat_corrections) with a start are always dated
+      and taken at face value, January 1 included; a seed row with a blank start is undated. A seed start is where
+      the correction begins, not necessarily the first start in the seat (Mike Kehoe''s SD6 and Mike Parson''s SD28
+      rows start 2017-01-01, continuing terms Open States starts in 2011).'
     data_tests:
     - not_null
     - accepted_values:
