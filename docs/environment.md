@@ -213,6 +213,19 @@ schtasks /create /tn mogov-determinism /sc weekly /d SUN /st 06:00 /tr "cmd /c c
 ```
 
 or cron: `0 6 * * 0 cd ~/missouri_gov_feed && uv run python scripts/check_site_determinism.py --shuffle >> data/determinism.log 2>&1`.
+A scheduler does not run with your shell's PATH, so a scheduled run can fail silently (the log stays empty or holds
+only "command not found"). cron's PATH is usually just `/usr/bin:/bin`, which lacks `uv` (installed to
+`~/.local/bin`) and `pnpm`; set PATH on the line itself (adjust the pnpm directory, see `command -v pnpm`):
+
+```
+0 6 * * 0 PATH="$HOME/.local/bin:$HOME/.local/share/pnpm:$PATH" && cd ~/missouri_gov_feed && uv run python scripts/check_site_determinism.py --shuffle >> data/determinism.log 2>&1
+```
+
+`schtasks /create` without `/ru` makes the task run only while you are logged on. To have it run whether or not you are
+logged on, add `/ru <your user> /rp *` (prompts once for your password; `/rp *` is a documented way to ask for it and
+keeps it off the command line), and use full paths in `/tr` if `uv` or `pnpm` is not on the system PATH (user PATH
+entries are not always loaded for a non-interactive task).
+
 A non-zero exit means a tie needs a tiebreaker; fix the model or page, do not skip the check. What CI does cover is the
 script's compare and shuffle logic (`tests/test_site_determinism.py`: a tied sort is flagged, a total order passes).
 

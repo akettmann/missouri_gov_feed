@@ -41,7 +41,8 @@ def _shuffled_copy(src: Path, dst: Path, seed: float | None = None) -> None:
 
 
 def _build(exports: Path, out: Path) -> None:
-    env = {**os.environ, "MOGOV_EXPORTS": str(exports)}
+    # astro runs with cwd=frontend/, so a relative path would resolve there instead of against the caller's cwd.
+    env = {**os.environ, "MOGOV_EXPORTS": str(exports.resolve())}
     cmd = ["pnpm", "exec", "astro", "build", "--outDir", str(out)]
     subprocess.run(cmd, cwd=ROOT / "frontend", env=env, check=True, shell=os.name == "nt")
 

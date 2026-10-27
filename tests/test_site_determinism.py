@@ -59,3 +59,18 @@ def test_total_order_passes_under_shuffle(tmp_path):
         _exports(tmp_path), tmp_path / "w2", shuffle=True, seed=0.5, build=_fake_build("score desc, name")
     )
     assert diff == []
+
+
+def test_relative_exports_resolve_against_callers_cwd_not_frontend(tmp_path, monkeypatch):
+    (tmp_path / "ex").mkdir()
+    monkeypatch.chdir(tmp_path)
+    seen = {}
+
+    def fake_run(cmd, cwd, env, **kwargs):
+        seen["cwd"], seen["exports"] = Path(cwd), Path(env["MOGOV_EXPORTS"])
+
+    monkeypatch.setattr(det.subprocess, "run", fake_run)
+    det._build(Path("ex"), tmp_path / "out")
+    assert seen["cwd"].name == "frontend"
+    assert seen["exports"].is_absolute()
+    assert seen["exports"] == (tmp_path / "ex").resolve()
