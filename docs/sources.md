@@ -812,6 +812,11 @@ Quirks:
   and signature) follow Schedule J but belong to no schedule, and "Schedule A ... Investment Vehicle Details"
   blocks follow it too, so the parser stops emitting lines at the exclusions page and opens schedule A at those
   detail headers; otherwise that boilerplate and the vehicle names surfaced as J compensation sources.
+  Column headers wrap onto lines of their own ("Type(s) Current Year to Filing / Preceding Year", the schedule B, D,
+  H and I headers, the asset-type-code footnote, the PTR "IPO / IVD" labels); they are dropped by exact line match.
+  An entry wrapped over several lines is joined into one row on the tie schedules (C: a line with no amount; F: a
+  line not starting with the agreement date; C, E, F, J: an unbalanced parenthesis), so a tail like "Government"
+  or "KY, US)" is not a tie of its own (#599). Wrapped entries on the other schedules stay split lines.
 - Index type `H` is the New Filer Report (PDF header `Filing Type: New Filer Report`), filed by new members; a
   separate report from that year's Annual Report (O). The loader reads it like O/A/P/C/T. Other index types
   (D, X, G, E, B, W) are not downloaded.
