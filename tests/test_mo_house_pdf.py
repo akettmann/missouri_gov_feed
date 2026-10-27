@@ -1,9 +1,8 @@
 import hashlib
-import inspect
 import json
 import os
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import ClassVar
 
@@ -598,7 +597,7 @@ def test_an_extractor_upgrade_retries_a_remembered_timeout(links_landed, monkeyp
     monkeypatch.setattr(pdftext, "page_texts", _timing_out(calls))
     _run(monkeypatch, _site())
     first = len(calls)
-    monkeypatch.setattr(pdftext, "_EXTRACTOR", "pdfplumber-99.0")
+    monkeypatch.setattr(pdftext, "EXTRACTOR", "pdfplumber-99.0")
     _run(monkeypatch, _site())
     assert len(calls) > first
 
@@ -621,12 +620,37 @@ def test_a_remembered_timeout_is_reported_as_cached_without_reading_the_file(lin
     assert len(calls) == 1
 
 
-def test_previous_files_breaks_error_row_ties_by_part_name(links_landed, monkeypatch):
-    _run(monkeypatch, _site())
-    assert "filename = true" in inspect.getsource(m._read_previous_files)
-    assert "order by url, coalesce(checked_at, landed_at) nulls first, filename" in inspect.getsource(
-        m._read_previous_files
-    )
+def _doc_part(name: str, rows: list[tuple]) -> None:
+    folder = db.table_dir(m.DocFile.TABLE)
+    cols = "url varchar, kind varchar, session_code varchar, error varchar, landed_at timestamp, checked_at timestamp"
+    with duckdb.connect() as con:
+        con.execute(f"create table t ({cols})")
+        for row in rows:
+            con.execute("insert into t values (?, 'bill_text', '171', ?, ?, ?)", list(row))
+        con.execute(f"copy t to '{(folder / name).as_posix()}' (format parquet)")
+
+
+def test_previous_files_keeps_the_newest_row_and_breaks_ties_by_part_name(env):
+    old, new = datetime(2026, 1, 1), datetime(2026, 6, 1)
+    _doc_part("part-000-of-002.parquet", [("u-newer", "from-low-part", None, new), ("u-tie", "low", None, None)])
+    _doc_part("part-001-of-002.parquet", [("u-newer", "from-high-part", None, old), ("u-tie", "high", None, None)])
+    got = m.previous_files()
+    assert got["u-newer"].error == "from-low-part"  # newest checked_at wins even in the lower-named part
+    assert got["u-tie"].error == "high"  # both NULL: the higher-named part wins, deterministically
+
+
+def test_previous_files_falls_back_to_landed_at_when_checked_at_is_null(env):
+    old, new = datetime(2026, 1, 1), datetime(2026, 6, 1)
+    _doc_part("part-000-of-002.parquet", [("u", "newer-landed", new, None)])
+    _doc_part("part-001-of-002.parquet", [("u", "older-checked", None, old)])
+    assert m.previous_files()["u"].error == "newer-landed"
+
+
+def test_links_counts_a_link_row_once_while_two_shard_counts_coexist(links_landed):
+    before = {x.url: x.n_links for x in m.links(list(m.KINDS))}
+    folder = db.table_dir("mo_house_xml_bill_texts")
+    (folder / "part-001-of-002.parquet").write_bytes((folder / "part-000-of-001.parquet").read_bytes())
+    assert {x.url: x.n_links for x in m.links(list(m.KINDS))} == before
 
 
 def test_only_rows_fetched_this_run_log_failures(links_landed, monkeypatch):

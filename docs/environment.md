@@ -358,6 +358,10 @@ that owns no data leaves a hidden `.none` marker instead), so shards that start 
 Until then dbt would read both counts and double-count rows: building mid-transition shows up as
 uniqueness test failures on the staging models (loaders reading their own tables dedupe, dbt does not).
 
+Every shard of a loader must finish before any loader that reads its tables starts (not only before `dbt build`):
+`mo_house_pdf` reads `mo_house`'s link tables, and while `mo_house` is between shard counts a reader that doesn't
+dedupe sees every row twice. The loaders' own readers use `db.own_rows_sql`, which dedupes, but run stages in order.
+
 Only one run may write a given table's shard at a time. A sink takes an exclusive OS lock on
 `data/raw/<table>/.part-<i>-of-<N>.parquet.lock` when it opens and holds it until it finishes. A second
 `mogov load` of the same shard fails at once with `ShardBusyError: another run is already writing <table>

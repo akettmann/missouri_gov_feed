@@ -187,11 +187,11 @@ def _read_previous_files() -> dict[str, DocFile]:
             ).fetchall()
         }
         cols = ", ".join(n if n in have else f"null as {n}" for n in names)
-        # the newest row for a URL sorts last; the part file name makes ties (error rows have no landed_at) stable
-        rows = con.execute(
-            f"select {cols} from read_parquet('{db.raw_glob(DocFile.TABLE)}', union_by_name = true, filename = true) "
-            "order by url, coalesce(checked_at, landed_at) nulls first, filename"
-        ).fetchall()
+        # the newest row for a URL (checked_at, else landed_at; error rows may have neither); ties go to the part
+        # with the highest name; a shard-count change leaves two parts holding the URL until the new count lands
+        recency = "coalesce(checked_at, landed_at)" if "checked_at" in have else "landed_at"
+        own = db.own_rows_sql(DocFile.TABLE, ["url"], recency, union_by_name=True)
+        rows = con.execute(f"select {cols} from ({own}) order by url").fetchall()
     return {r[0]: DocFile(*r) for r in rows}
 
 
@@ -202,11 +202,13 @@ def links(kinds: list[str], sessions: set[str] | None = None) -> list[Link]:
     for kind in kinds:
         for table, col, idx, lr, ver in KINDS[kind]:
             if db.raw_exists(table):
+                # one row per link row even while two shard counts of the table coexist (else n_links doubles)
+                own = db.own_rows_sql(table, ["session_code", "file_name", idx], "session_code", union_by_name=True)
                 parts.append(
                     f"select trim({col}) as url, '{kind}' as kind, session_code, file_name, "
                     f"{lr}::varchar as lr_number, {ver}::varchar as version_code, "
                     f"{idx}::integer as idx "
-                    f"from read_parquet('{db.raw_glob(table)}', union_by_name = true) "
+                    f"from ({own}) "
                     f"where trim({col}) <> ''"
                 )
     if not parts:
@@ -413,7 +415,7 @@ CACHED = "(cached) "  # prefix on an error row reported from a timeout marker
 
 
 def _timeout_marker(sha256_hex: str) -> Path:
-    return pdftext.CACHE_DIR / "mo_house_pdf_timeouts" / f"{sha256_hex}-x{X_TOLERANCE}-{pdftext._EXTRACTOR}.json"
+    return pdftext.CACHE_DIR / "mo_house_pdf_timeouts" / f"{sha256_hex}-x{X_TOLERANCE}-{pdftext.EXTRACTOR}.json"
 
 
 def _cached_timeout(sha256_hex: str | None) -> str | None:
