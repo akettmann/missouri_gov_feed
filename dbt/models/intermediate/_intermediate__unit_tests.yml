@@ -34,6 +34,9 @@ unit_tests:
           - {session_code: '251', district_number: 4, surname_key: van schoiack, person_key: p_vanschoiack, party: Republican}
           - {session_code: '251', district_number: 89, surname_key: plocher, person_key: p_plocher, party: Republican}
           - {session_code: '241', district_number: 12, surname_key: brown, person_key: p_brown, party: Democratic}
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {person_id: p_senator, chamber: upper, district_number: 1, start_date: '2025-01-01', end_date: '9999-12-31'}
     expect:
       rows:
         - {member_token: SMITH 46, person_key: p_smith46}
