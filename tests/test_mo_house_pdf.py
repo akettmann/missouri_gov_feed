@@ -1,4 +1,5 @@
 import hashlib
+import inspect
 import json
 import os
 import time
@@ -471,3 +472,134 @@ def test_fetch_document_sends_validators_and_reports_304(monkeypatch):
     got = m.fetch_document(TEXT_1, interval=0, headers={"If-None-Match": '"v1"'})
     assert seen == [{"If-None-Match": '"v1"'}]
     assert (got.status, got.content, got.error, got.etag) == (304, None, None, '"v1"')
+
+
+def test_a_file_rewritten_at_the_same_size_with_a_new_mtime_is_read_again(links_landed, monkeypatch, env):
+    _run(monkeypatch, _site())
+    dest = env / "raw/mo_house_pdf/171/bill_text/0001H.01I.pdf"
+    other = PDF_A.replace(b"Hello", b"Jello")
+    assert len(other) == len(PDF_A)
+    old = dest.stat().st_mtime
+    dest.write_bytes(other)
+    os.utime(dest, (old + 3600, old + 3600))
+    _run(monkeypatch, _site())
+    row = next(r for r in _rows("mo_house_pdf_files") if r["url"] == TEXT_1)
+    assert row["sha256"] == hashlib.sha256(other).hexdigest()
+    assert "Jello" in next(r for r in _rows("mo_house_pdf_texts") if r["url"] == TEXT_1)["text"]
+
+
+def test_an_extraction_timeout_is_not_retried_until_the_negative_cache_expires(links_landed, monkeypatch):
+    real = pdftext.page_texts
+    calls: list[int] = []
+
+    def slow(data, **kw):
+        if data == PDF_B:
+            calls.append(1)
+            raise pdftext.ExtractTimeout("ran past 600 s")
+        return real(data, **kw)
+
+    monkeypatch.setattr(pdftext, "page_texts", slow)
+    _run(monkeypatch, _site())
+    first = len(calls)
+    assert first >= 1
+    row = next(r for r in _rows("mo_house_pdf_texts") if r["url"] == TEXT_2)
+    assert "ExtractTimeout" in row["error"] and row["text"] is None  # (cached) if another URL had the same bytes
+    _run(monkeypatch, _site())
+    assert len(calls) == first  # remembered by hash: not extracted again
+    assert next(r for r in _rows("mo_house_pdf_texts") if r["url"] == TEXT_2)["error"] == (
+        row["error"] if row["error"].startswith(m.CACHED) else m.CACHED + row["error"]
+    )
+    assert next(r for r in _rows("mo_house_pdf_files") if r["url"] == TEXT_2)["error"] is None  # file row stays good
+    # past the window the document is tried again
+    monkeypatch.setattr(m, "NEGATIVE_CACHE_S", -1)
+    _run(monkeypatch, _site())
+    assert len(calls) > first
+
+
+def _timing_out(calls):
+    real = pdftext.page_texts
+
+    def slow(data, **kw):
+        if data == PDF_B:
+            calls.append(1)
+            raise pdftext.ExtractTimeout("ran past 600 s")
+        return real(data, **kw)
+
+    return slow
+
+
+def test_an_unwritable_timeout_marker_does_not_fail_the_run(links_landed, monkeypatch):
+    monkeypatch.setattr(pdftext, "page_texts", _timing_out([]))
+
+    real_write = m.write_atomic
+
+    def broken(path, content):
+        if "mo_house_pdf_timeouts" in str(path):
+            raise OSError("disk full")
+        real_write(path, content)
+
+    monkeypatch.setattr(m, "write_atomic", broken)
+    _run(monkeypatch, _site())
+    row = next(r for r in _rows("mo_house_pdf_texts") if r["url"] == TEXT_2)
+    assert row["error"].startswith("ExtractTimeout") and row["text"] is None
+
+
+def test_an_extractor_upgrade_retries_a_remembered_timeout(links_landed, monkeypatch):
+    calls: list[int] = []
+    monkeypatch.setattr(pdftext, "page_texts", _timing_out(calls))
+    _run(monkeypatch, _site())
+    first = len(calls)
+    monkeypatch.setattr(pdftext, "_EXTRACTOR", "pdfplumber-99.0")
+    _run(monkeypatch, _site())
+    assert len(calls) > first
+
+
+def test_a_remembered_timeout_is_reported_as_cached_without_reading_the_file(links_landed, monkeypatch):
+    calls: list[int] = []
+    monkeypatch.setattr(pdftext, "page_texts", _timing_out(calls))
+    _run(monkeypatch, _site())
+    row = next(r for r in m.previous_files().values() if r.url == TEXT_2)
+    link = next(x for x in m.links(list(m.KINDS)) if x.url == TEXT_2)
+
+    def no_read(self):
+        raise AssertionError("file was read")
+
+    monkeypatch.setattr(m.Path, "read_bytes", no_read)
+    got = m.extract_landed(link, row)
+    assert got.error.startswith("(cached) ExtractTimeout")
+    # the in-extract check, with the bytes in hand
+    assert m.extract(link, PDF_B, None).error.startswith("(cached) ExtractTimeout")
+    assert len(calls) == 1
+
+
+def test_previous_files_breaks_error_row_ties_by_part_name(links_landed, monkeypatch):
+    _run(monkeypatch, _site())
+    assert "filename = true" in inspect.getsource(m._read_previous_files)
+    assert "order by url, coalesce(checked_at, landed_at) nulls first, filename" in inspect.getsource(
+        m._read_previous_files
+    )
+
+
+def test_only_rows_fetched_this_run_log_failures(links_landed, monkeypatch):
+    _run(monkeypatch, _site())
+    logged: list[str] = []
+    monkeypatch.setattr(m.log, "warning", lambda event, **kw: logged.append(kw.get("url")))
+    _run(monkeypatch, _site())
+    assert logged == [DEAD]  # SUMMARY is negative-cached (carried over) and stays quiet; DEAD was asked again
+
+
+def test_previous_files_retries_when_a_part_vanishes_mid_read(links_landed, monkeypatch):
+    _run(monkeypatch, _site())
+    real = m._read_previous_files
+    calls = []
+
+    def flaky():
+        calls.append(1)
+        if len(calls) == 1:
+            raise duckdb.IOException("No files found that match the pattern")
+        return real()
+
+    monkeypatch.setattr(m, "_read_previous_files", flaky)
+    monkeypatch.setattr(m.time, "sleep", lambda s: None)
+    assert TEXT_1 in m.previous_files()
+    assert len(calls) == 2

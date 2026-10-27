@@ -21,6 +21,7 @@ Options (environment): MOGOV_HOUSE_PDF_KINDS (comma list, default all) and MOGOV
 of session codes, default all).
 """
 
+import contextlib
 import hashlib
 import json
 import os
@@ -31,6 +32,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import ClassVar
 
+import duckdb
 import httpx
 
 from mogov import db, obs, pdftext
@@ -135,9 +137,21 @@ class Fetched:
     last_modified: str | None = None
 
 
-def previous_files() -> dict[str, DocFile]:
+def previous_files(attempts: int = 3) -> dict[str, DocFile]:
     """The state rows the last run landed, by URL (empty on a first run). Columns added since an older landing
-    read as NULL."""
+    read as NULL. A part another shard replaces or drops (a new shard count) between the glob and the read makes
+    the read fail with an IO error; the listing is then redone."""
+    for attempt in range(attempts):
+        try:
+            return _read_previous_files()
+        except duckdb.IOException:
+            if attempt + 1 == attempts:
+                raise
+            time.sleep(1)
+    return {}
+
+
+def _read_previous_files() -> dict[str, DocFile]:
     if not db.raw_exists(DocFile.TABLE):
         return {}
     names = list(db.row_columns(DocFile))
@@ -149,8 +163,10 @@ def previous_files() -> dict[str, DocFile]:
             ).fetchall()
         }
         cols = ", ".join(n if n in have else f"null as {n}" for n in names)
+        # the newest row for a URL sorts last; the part file name makes ties (error rows have no landed_at) stable
         rows = con.execute(
-            f"select {cols} from read_parquet('{db.raw_glob(DocFile.TABLE)}', union_by_name = true) order by url"
+            f"select {cols} from read_parquet('{db.raw_glob(DocFile.TABLE)}', union_by_name = true, filename = true) "
+            "order by url, coalesce(checked_at, landed_at) nulls first, filename"
         ).fetchall()
     return {r[0]: DocFile(*r) for r in rows}
 
@@ -369,13 +385,49 @@ def _text_row(link: Link, pages: list[str]) -> DocText:
     return DocText(*base, len(pages), "\n".join(pages), json.dumps(pages), None)
 
 
+CACHED = "(cached) "  # prefix on an error row reported from a timeout marker
+
+
+def _timeout_marker(sha256_hex: str) -> Path:
+    return pdftext.CACHE_DIR / "mo_house_pdf_timeouts" / f"{sha256_hex}-x{X_TOLERANCE}-{pdftext._EXTRACTOR}.json"
+
+
+def _cached_timeout(sha256_hex: str | None) -> str | None:
+    """The ExtractTimeout error recorded for this PDF within NEGATIVE_CACHE_S, else None. Without it a document
+    that runs out its budget would spend up to pdftext.MAX_SECONDS again on every run (#708)."""
+    if sha256_hex is None:
+        return None
+    try:
+        saved = json.loads(_timeout_marker(sha256_hex).read_text())
+        if time.time() - saved["at"] < NEGATIVE_CACHE_S:
+            return saved["error"]
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return None
+
+
+def _remember_timeout(sha256_hex: str, error: str) -> None:
+    write_atomic(_timeout_marker(sha256_hex), json.dumps({"at": time.time(), "error": error}).encode())
+
+
 def extract(link: Link, data: bytes | None, error: str | None) -> DocText:
-    """The text row for a document: per-page text via pdfplumber, or the error that stopped it."""
+    """The text row for a document: per-page text via pdfplumber, or the error that stopped it. A timeout is
+    remembered by the PDF's hash, so later runs report it without extracting again until NEGATIVE_CACHE_S passes."""
     base = (link.url, link.kind, link.session_code, link.file_name, link.lr_number, link.version_code, link.n_links)
     if data is None:
         return DocText(*base, None, None, None, error or "not fetched")
+    sha = hashlib.sha256(data).hexdigest()
+    if (cached := _cached_timeout(sha)) is not None:
+        return DocText(*base, None, None, None, CACHED + cached)
     try:
         pages = pdftext.page_texts(data, layout=False, x_tolerance=X_TOLERANCE)
+    except pdftext.ExtractTimeout as exc:
+        message = f"{type(exc).__name__}: {exc}"
+        log.warning("mo_house_pdf.extract_timeout", url=link.url, error=message)
+        # best effort: a marker that cannot be written only costs the next run another try
+        with contextlib.suppress(OSError):
+            _remember_timeout(sha, message)
+        return DocText(*base, None, None, None, message)
     except Exception as exc:  # a corrupt or runaway PDF is a row, not a failed run
         return DocText(*base, None, None, None, f"{type(exc).__name__}: {exc}")
     return _text_row(link, pages)
@@ -387,6 +439,11 @@ def extract_landed(link: Link, row: DocFile) -> DocText:
     pages = pdftext.cached_page_texts(row.sha256, layout=False, x_tolerance=X_TOLERANCE)
     if pages is not None:
         return _text_row(link, pages)
+    if (cached := _cached_timeout(row.sha256)) is not None:  # known to time out: do not even read the file
+        return DocText(
+            link.url, link.kind, link.session_code, link.file_name, link.lr_number, link.version_code, link.n_links,
+            None, None, None, CACHED + cached,
+        )  # fmt: skip
     return extract(link, (db.RAW_DIR / row.rel_path).read_bytes(), None)
 
 
@@ -429,7 +486,7 @@ def load(shard: db.Shard) -> dict[str, int]:
     previous = previous_files()
     with db.TableSink(shard, tables=[DocFile, DocText]) as sink:
         for file_row, text_row in _iter_rows(units(shard), set(kinds), sessions, previous):
-            if file_row.error:
+            if file_row.error and file_row is not previous.get(file_row.url):  # not a carried-over row
                 log.warning("mo_house_pdf.failed", url=file_row.url, error=file_row.error)
             sink.add(file_row)
             sink.add(text_row)
