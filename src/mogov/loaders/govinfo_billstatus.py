@@ -66,7 +66,8 @@ def max_age(congress: int, day: date) -> int:
     current = congress_on(day)
     if congress == current:
         return DAILY
-    if congress == current - 1 and (day.month, day.day) < OUTGOING_GRACE_END:
+    first_year = 1789 + 2 * (current - 1)  # a Congress starts in the odd year after 1788 + 2n
+    if congress == current - 1 and day.year == first_year and (day.month, day.day) < OUTGOING_GRACE_END:
         return DAILY
     return MONTHLY
 

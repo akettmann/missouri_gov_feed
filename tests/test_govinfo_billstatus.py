@@ -156,7 +156,9 @@ def test_load_uses_the_date_derived_default_when_nothing_is_configured(site, mon
         (date(2027, 3, 1), 119, 30 * 86400),  # grace is over
         (date(2027, 1, 5), 118, 30 * 86400),
         (date(2027, 1, 5), 121, 30 * 86400),
-        (date(2026, 10, 27), 118, 30 * 86400),  # not in an odd year's early months: no grace
+        (date(2026, 1, 15), 118, 30 * 86400),  # Jan-Feb of the Congress's second year: no grace
+        (date(2027, 1, 2), 118, 30 * 86400),  # before the 120th starts, 118th is two back
+        (date(2028, 1, 10), 119, 30 * 86400),  # second year of the 120th: no grace
     ],
 )
 def test_max_age_keeps_the_outgoing_congress_daily_until_march(day, congress, expected):
