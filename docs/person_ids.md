@@ -109,28 +109,41 @@ House roster's key that `person_ids` then reconciles.
 - Must withstand: undated same-surname terms (#136), a roster that outlives a member (#152), duplicate Open States
   records, a new Open States record after redistricting (#97: handled later by R2, not here).
 
-### R1. Curated `official_id_links` (`int_officials__person_ids.sql` lines 118-141, 416-432, 506-530)
+### R1. Curated `official_id_links` (`int_officials__person_ids.sql` lines 119-142, 417-433, 507-535)
 
 The seed `official_id_links.csv` holds reviewed pairs, each with a `relation`:
 
-- `same_person`: the whole person the rules merged the row's `alias_id` into takes the row's `person_id`
-  (`same_person`, lines 506-517, joined on the merged `person_id` at line 530), `basis = curated`. A row naming an
-  id the rules merged but did not choose (a `mohouse:` fallback key) still moves every id of that person, so it
-  never splits the person (#174 item 3). Two signed rows that send one merged person to different ids are a seed
-  error; the smaller `person_id` wins, so the output stays deterministic. Used for ids no seat rule can reach (a
+- `same_person`: the whole person the rules merged the row's `alias_id` into takes the `person_id` the rules
+  gave the row's `person_id` (`same_person`, lines 507-522, joined on the merged `person_id` at line 535),
+  `basis = curated`. Both sides are read through the merged persons, so a row may name any id of either person
+  and never splits one (#174 item 3):
+  - alias side: a row naming an id the rules merged but did not choose (a `mohouse:` fallback key) still moves
+    every id of that person.
+  - target side (#682): a row whose `person_id` is an id the rules merged into another id points at that
+    person's chosen id instead, so the moved person joins the target's whole person. A `person_id` the rules
+    never saw (a `mojudge:` id) is used as written. The target's own ids keep the `person_id` and `basis` the
+    rules gave them; only the moved person's ids become `curated`.
+
+  Two signed rows that send one merged person to different ids are a seed error; the smaller resolved
+  `person_id` wins, so the output stays deterministic. The resolution is one step: a row whose target person is
+  itself moved by another signed row (a chain) is not followed further (#691). Used for ids no seat rule can reach (a
   legislator who became a state judge).
 - `different_people`: the name of either id is kept out of R2 and R2b (`keep_apart`), and the ids are kept out
   of R2c.
 
-A row has an effect only when signed: `checked_by` and `checked_on` both filled (`signed_links`, lines 118-126,
+A row has an effect only when signed: `checked_by` and `checked_on` both filled (`signed_links`, lines 119-127,
 #174 item 1). The model ignores a row with only one of them, and the seed's `dbt_utils.expression_is_true` test in
 `dbt/seeds/_seeds.yml` (`checked_by` and `checked_on` both empty or both filled) fails the build on it, so a
 half-signed row cannot sit unnoticed. `assert_person_ids_name_continuity_gaps_plausible` exempts a pair on the
-same two-field sign-off.
+same two-field sign-off. The exemption covers only the pair the row names: every id of the moved person is
+`curated`, including ids the name rules joined to the named id, so that test checks `curated` persons as well
+as `name_continuity` ones (#682). An id the name rules wrongly joined to a signed person is still listed, not
+hidden behind the label.
 
 - Tests: `person_ids_follow_a_curated_link_to_a_judge`, `person_ids_ignore_unsigned_curated_links`,
   `person_ids_ignore_half_signed_curated_links`,
   `person_ids_redirect_the_whole_group_from_a_curated_link_to_a_non_chosen_alias`,
+  `person_ids_join_the_whole_target_person_of_a_curated_link_to_a_non_chosen_alias` (#682),
   `person_ids_keep_a_different_people_pair_apart`,
   `person_ids_keep_a_signed_different_people_pair_apart_across_given_name_variants`,
   `person_ids_keep_a_signed_different_people_id_out_of_the_house_member_id_rule`.
@@ -154,7 +167,8 @@ roster row's name is the Open States name when it matched one (its alias is then
 - No check on the gap between the ids' years or on how far apart the seats are (#174 item 2). The data test
   `assert_person_ids_name_continuity_gaps_plausible` (error, #660, #663) lists a merged id whose years neither
   touch another id of its person nor return to the same seat within 8 years; it lists nothing today. Stephen
-  Webber would be listed on his name alone; his signed `same_person` row makes him `curated` (#663).
+  Webber would be listed on his name alone; his signed `same_person` row makes him `curated` and exempts his
+  pair (#663).
 - An undated id has one evidence year, so it can never show a seat conflict (#519). The data test
   `assert_undated_open_states_ids_share_no_name` fails if such an id shares a name with another id.
 - Tests: `person_ids_join_a_redistricted_seat_change`, `person_ids_join_a_house_fallback_key_to_the_senate_record`,
