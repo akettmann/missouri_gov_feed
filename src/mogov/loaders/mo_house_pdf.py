@@ -40,6 +40,11 @@ DOCS_DIR = "mo_house_pdf"  # under RAW_DIR: <session>/<kind>/<file name>
 REQUEST_INTERVAL = 1.0  # seconds between request starts to the host, across all shards
 OPEN_SESSION_RECHECK_S = 7 * 86400
 RETRIES = 4
+# pdfplumber starts a new word when the gap between glyphs exceeds x_tolerance (default 3). The House's Word
+# output sets a space at exactly 3.0pt in 12pt Times (amendments, and some lines of bill text), so the default
+# glued "AMENDHouse Committee Substitute" together (#639). 2 splits those and still keeps kerned words whole.
+# It is part of the pdftext cache key: changing it re-extracts every document from the PDF already on disk.
+X_TOLERANCE = 2
 
 # kind -> link tables as (table, link column, index column, LR number expression, version code expression).
 # The Senate-act tables have the same columns as the bill tables.
@@ -247,7 +252,7 @@ def extract(link: Link, data: bytes | None, error: str | None) -> DocText:
     if data is None:
         return DocText(*base, None, None, None, error or "not fetched")
     try:
-        pages = pdftext.page_texts(data, layout=False)
+        pages = pdftext.page_texts(data, layout=False, x_tolerance=X_TOLERANCE)
     except Exception as exc:  # a corrupt PDF is a row, not a failed run
         return DocText(*base, None, None, None, f"{type(exc).__name__}: {exc}")
     return DocText(*base, len(pages), "\n".join(pages), json.dumps(pages), None)

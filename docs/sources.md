@@ -317,6 +317,14 @@ Quirks:
   `mo_house_pdf_texts` has one row per URL, not per link.
 - Small-caps and some display glyphs can extract as NUL characters (seen in `house_fd` text); that is stored as-is.
   None appeared in the 206 extracted slice documents.
+- Word spacing (#639): the House's Word output sets inter-word spaces at exactly 3.0pt (12pt Times), which is
+  pdfplumber's default `x_tolerance`, so the default glued words (`AMENDHouse Committee Substitute for House Bill
+  No.12,Page 3`), mostly in amendments, also on some bill-text lines. The loader extracts with `x_tolerance=2`
+  (`X_TOLERANCE`). On 14 amendments, tokens over 25 characters fell from 0.77% to 0.16% (the rest are underscore
+  rules) and the token count rose 26,666 to 31,170; 5 bill texts, 5 fiscal notes and 4 summaries did not get worse
+  (bill texts gained 20 tokens, the others were identical). `x_tolerance` is part of the `pdftext` cache key, so
+  changing it makes the next `mo_house_pdf` run re-extract every document from the PDF already on disk (no
+  re-download for closed sessions) and rewrite `mo_house_pdf_texts`; nothing else needs doing.
 
 ## mo_senate: Missouri Senate journals
 
