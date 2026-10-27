@@ -125,7 +125,8 @@ unit_tests:
       the first line's amount and owner code (a tail must not add an owner code). Schedule F: a line that does not start
       with the agreement's date. Schedules C, E, F, J: a line that closes a parenthesis the line above left open, or
       starts with one. The head line's page / line number stay the row's identity. A line with none of these signals is
-      still an entry (a one-line position, the first row under a header), and Schedule A rows are never joined (#599).
+      still an entry (a one-line position, the first row under a header); Schedule A joins only the tails it can recognise
+      (see house_fd_wrapped_entries_joined_a_b_d_h).
     given:
       - input: ref('stg_house_fd__pdf_lines')
         format: sql
@@ -172,6 +173,5 @@ unit_tests:
         - {doc_id: wrap, page: 4, line_no: 2, schedule: 'J: compensation over $5,000 from one source', owner_code: null, amount_range: null, line_text: 'Southern Star Pipeline, Inc. (Owensboro, Consulting services KY, US)'}
         - {doc_id: wrap, page: 4, line_no: 4, schedule: 'J: compensation over $5,000 from one source', owner_code: null, amount_range: null, line_text: 'Association of Electric Cooperatives Consulting services (Jefferson City, MO, US)'}
         - {doc_id: wrap, page: 4, line_no: 6, schedule: 'J: compensation over $5,000 from one source', owner_code: null, amount_range: null, line_text: 'Winton Policy Group (Jefferson City, MO, US) Consulting services'}
-        - {doc_id: wrap, page: 5, line_no: 2, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$15,001 - $50,000', line_text: 'Widget Fund [MF] $15,001 - $50,000'}
-        - {doc_id: wrap, page: 5, line_no: 3, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Dividends'}
+        - {doc_id: wrap, page: 5, line_no: 2, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$15,001 - $50,000', line_text: 'Widget Fund [MF] $15,001 - $50,000 Dividends'}
         - {doc_id: wrap, page: 5, line_no: 4, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Gadget Fund [MF] $1,001 - $15,000'}

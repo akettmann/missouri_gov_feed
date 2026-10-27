@@ -921,7 +921,17 @@ Quirks:
   H and I headers, the asset-type-code footnote, the PTR "IPO / IVD" labels); they are dropped by exact line match.
   An entry wrapped over several lines is joined into one row on the tie schedules (C: a line with no amount; F: a
   line not starting with the agreement date; C, E, F, J: an unbalanced parenthesis), so a tail like "Government"
-  or "KY, US)" is not a tie of its own (#599). Wrapped entries on the other schedules stay split lines.
+  or "KY, US)" is not a tie of its own (#599). Schedules A, B, D and H join too, so a wrapped entry is not counted
+  as several disclosure items (#641): A joins a line of only income-type words, only amounts, form-checkbox glyphs or
+  a ticker and asset-type code; B joins a line with no transaction type (P / S / E) before an amount, which is the
+  asset name wrapped under the account line, and a bond's maturity date does not make such a line an entry; D joins a
+  line with no amount (a line ending on "Over" starts the amount, a line of only amounts is the high end of a
+  range); H joins a line with no date. `Location:` / `Description:` / `Comments:` lines of B stay their own rows. The
+  schedule B column-header spill `$200?` is dropped. The row keeps the owner code and `amount_range` of its first
+  line only (#702). Residual cases that still split: an A asset name wrapped with no structural signal
+  ("Fidelity Managed Income II III [HE]" / "Unit Cl I [HE]"), and about 62 D lines whose description wraps and
+  whose amount's high end sits on the line ("Road $500,000"); a few A `DESCRIPTION:` lines join through the
+  open-parenthesis rule.
 - Index type `H` is the New Filer Report (PDF header `Filing Type: New Filer Report`), filed by new members; a
   separate report from that year's Annual Report (O). The loader reads it like O/A/P/C/T. Other index types
   (D, X, G, E, B, W) are not downloaded.
