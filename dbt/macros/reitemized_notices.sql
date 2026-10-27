@@ -126,6 +126,7 @@
     edit changes a short word: "Ann Smith" / "Anne Smith", "Joan" / "John" are two people, so every word that differs
     between the names (compared by position) must be 5+ letters in both names. "Lathrop GPM" / "Lanthrop GPM" and
     "Fran Froelich" / "Fran Froehlich" still pair. Compares up to 12 words; a longer name never pairs this way.
+    Names with different word counts never pair through this tier (a missing word has length 0).
     n_a, n_b are the word counts of a, b (columns or expressions). -#}
 {% macro name_typo_match(a, b, n_a, n_b) -%}
     (
