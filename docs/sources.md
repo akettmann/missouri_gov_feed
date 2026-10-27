@@ -222,9 +222,16 @@ Quirks:
   file inside a zip has no address of its own. Committee names change between sessions. The metric counts
   full-committee chairs separately from subcommittee chairs.
   The `COMMITTEELIST` lists carry no Co-Chair seats at all (2025 regular session: member pages show 3 co-chair posts the list lacks), and 253's list names fewer committees than 251 or 254 (no Conference Committee on Budget, 22 seats; neither of the two property tax special committees, 40 seats), so 253 shows 617 committee seats against 697 in 251 and 685 in 254. The joint committees are in the list. The profile says so under the 253 row. Re-checked against the typed XML raw (2026-10): no other landed file carries 253 co-chair seats. The 253 member pages have no `Committees` element at all, `UPCOMINGHEARINGLIST` names only a committee's chair, and bill files carry no committee roles. The House does not publish them in the exports, so the gap is accepted and not inferred from 251 or 254 (co-chairs of a joint committee are not guaranteed to carry over); 251 and 254 co-chair posts come from the member pages (3 in 251, 2 in 254).
-- Bill sponsorship success (share of a member's sponsored bills that passed) is not built yet: it needs the
-  bill status (`fct_bills.status` and `outcome`, from #34), but Senate bills before 2024 have no status (see
-  Bill status below), so it can only cover House bills and 2024 and later until #317 lands.
+- Bill sponsorship outcomes (`marts.fct_sponsorship_outcomes`, one row per official and House session) count the
+  House bills (HB) and House joint resolutions (HJR) a member was the primary sponsor of (`sponsor_type =
+  'Sponsor'`, one per bill) and what became of them: `bills_decided` (the denominator: every outcome but
+  `pending` and `awaiting governor`), `bills_passed_house` (the House's third-reading passage, including bills
+  that then died in the Senate), `bills_became_law` (`enacted` for an HB, `sent to voters` for an HJR; a bill
+  with `no governor action recorded` is decided but not counted as law) and the two shares over `bills_decided`
+  (null when it is 0). Resolutions (HR, HCR) and Senate sponsors are left out. Appropriation bills are kept
+  (the Budget chair sponsors them and almost all pass). Only current officials (`dim_official`) have an
+  `official_id`, so former members are absent: for 2017 only 27 of 1,224 House primary-sponsor rows match, for
+  2026 2,044 of 2,086. A member with House and Senate careers has rows for House sessions only.
 - PDF text extraction is cached by PDF content (`data/cache/pdftext/`). Before that, a re-run spent
   3–10 minutes per shard re-parsing PDFs that were already downloaded.
 - Bill status (`fct_bills.status`, `outcome`; `int_bills__status`) comes from each bill's `Action` list. The
