@@ -2,11 +2,108 @@
 # not this file, then regenerate.
 version: 2
 models:
+- name: stg_mo_senate__bill_actions
+  description: 'One row per action in a Senate bill''s history on senate.mo.gov (both chambers, enrollment and the
+    governor), newest first as served: action_index 0 is the top row. The wording is the Senate''s own ("S First
+    Read", "Second Read and Referred S Government Efficiency Committee"), not the House''s. journal_ref names the
+    journal page that records the action (it can name both chambers, "H2291 / S1216") and journal_url links the
+    PDF page. session_code is the House''s code for the session (seed mo_senate_session_codes), null for a session
+    with no seed row. action_seq is the chronological order within the bill, 1 = the first action (the reverse of
+    the served order). chamber is who acted, read from the wording: G when it names the Governor ("Signed by Governor"),
+    H or S when exactly one of the standalone tokens H / S appears ("H Third Read and Passed", "Referred H Budget",
+    "Second Read and Referred S Appropriations Committee", "SS S offered"), else null ("Perfected", "Signed by House
+    Speaker", or an action naming both). session_year is read from `list_year` when the loader wrote one, else from
+    the served `year` key (they agree).'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - session_year
+        - session_type
+        - bill_id
+        - action_index
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - session_year
+        - session_type
+        - bill_id
+        - action_seq
+  columns:
+  - name: bill_id
+    data_tests:
+    - not_null
+  - name: action
+    data_tests:
+    - not_null
+  - name: action_seq
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 1
+  - name: chamber
+    data_tests:
+    - accepted_values:
+        arguments:
+          values:
+          - S
+          - H
+          - G
+  - name: action_date
+    data_tests:
+    - not_null:
+        config:
+          severity: warn
 - name: stg_mo_senate__bill_topics
   description: 'Subject keywords per bill from the MO Senate topical index (regular sessions): Senate bills and
     the House bills that reached the Senate. subject_name is the keyword upper-cased into the House index''s spelling;
     the two indexes share their terms except "..., DEPARTMENT OF" (House "DEPT. OF") and "WORKERS'' COMPENSATION"
     (House drops the apostrophe). session_code follows the House codes (two-digit year + 1).'
+- name: stg_mo_senate__bills
+  description: 'One row per Senate bill or resolution (SB, SJR, SCR, SR) in senate.mo.gov''s bill list, for the
+    sessions the mo_senate_bills loader has landed (regular and extraordinary). The list is complete: it does not
+    depend on the bill having a topical-index keyword or reaching the House. session_code is the House''s code for
+    the session (seed mo_senate_session_codes), null for a session with no seed row (a test fails on that). bill_id
+    is the site''s own key, not the bill number. Resolutions have no handler. bill_type is the prefix (SB, SJR,
+    SCR, SR, ...). legislator_id is the sponsor''s id in the list''s `legislatorId` (the site''s own legislator
+    key, not the House''s). session_year is read from `list_year` when the loader wrote one (the year of the list
+    the bill came from), else from the served `year` key: the loader used to overwrite the served `year` with the
+    list''s year, and they agree.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - session_year
+        - session_type
+        - bill_id
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - session_year
+        - session_type
+        - bill
+  columns:
+  - name: session_year
+    data_tests:
+    - not_null
+  - name: session_type
+    data_tests:
+    - not_null
+  - name: bill
+    data_tests:
+    - not_null
+  - name: bill_type
+    data_tests:
+    - accepted_values:
+        arguments:
+          values:
+          - SB
+          - SJR
+          - SCR
+          - SR
+          - SRM
+          - SRB
 - name: stg_mo_senate__votes
   description: 'One row per (MO Senate journal vote, senator token). Tokens: surname, or "Brown (16)" when two senators
     share one. The context is the journal sentence introducing the vote.'

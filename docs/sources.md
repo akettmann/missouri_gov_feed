@@ -259,8 +259,9 @@ Quirks:
   therefore leave out Senate bills, almost all of them before 2024; House bills are complete.
   The same list names the special-session Senate bills (`stg_mo_house__senate_act_bills`, with titles, version, last
   action and effective date), which the Senate topical index never covers: `int_bills__list` adds those the index lacks
-  (2025's 253 SB 1, 3 and 4), for `fct_bills` and `fct_vote_bills` alike. Senate bills of older special sessions are still
-  missing (#237).
+  (2025's 253 SB 1, 3 and 4), for `fct_bills` and `fct_vote_bills` alike. Once `mo_senate_bills` has landed a session,
+  the Senate's own bill list is the source of that session's Senate bills instead (see mo_senate_bills below); Senate
+  bills of older special sessions are missing until it has (#237).
   Quirk: 143 bills (15 to 17 per regular session, 2017 to 2026, none in 2021; e.g. 2024 HB 1 and HB 2) list
   only "Message Received from the Governor, pursuant to Article IV, Section 27" as their action. They are
   re-listings, not new bills: the House repeats the previous regular session's appropriation bills (same bill
@@ -466,6 +467,13 @@ Quirks:
   and links to the journal PDF page (`.../25info/pdf-jrnl/DAY68.pdf#page=32`).
 - A bill whose fragment has no action table logs `mo_senate_bills.no_actions` and lands no action rows.
 - Resolutions have no handler: those keys are absent from the bill's JSON.
+- Revision bills are `SRB` (2018 `SRB975` and `SRB1024`, the "SB 975 & 1024 Revision" act), which the Revisor cites as
+  `S.B.`; the list carries them under no topical-index keyword (#627 for the Revisor link).
+- The Senate site returns an empty list for 2017 `E1` (the House has 173 and 174), so the 2017 special-session
+  Senate bills are not landed and stay missing from `int_bills__list`; the seed has no 2017 `E` row.
+- The Senate's `E1` is not always the House's first special session: 2018's only Senate extraordinary session (the
+  September STEM one, 5 bills) is House `184`; the House's `183` (May impeachment) has no Senate session.
+
 - A bill with no fiscal notes or amendments is answered with `No Fiscal Notes available for this bill.` /
   `No amendments available for this bill.` (HTTP 200, zero rows). Most bills have no fiscal note; bills that
   died in committee have only the introduced text. SRs have text versions and summaries like bills.
@@ -475,6 +483,22 @@ Quirks:
   fragment was the same without it. `CommitteeMinutes` answers HTTP 500 and is not requested (see #280).
 - Amendment links go to `BillInformation?handler=AmendmentPdf&year=YYYY&amendmentId=N`; text and fiscal-note
   links go to static PDFs (`/25info/pdf-bill/tat/SB1.pdf`, `/FiscalNotes/2025-1/0453S.04T.ORG.pdf`).
+In dbt (#586): `stg_mo_senate__bills` (one row per bill, parsed from the JSON) and `stg_mo_senate__bill_actions` (one
+row per action, date parsed) read the two raw tables; `mogov build` creates empty placeholders until the loader has
+run (`db.OPTIONAL_JSON_TABLES`), so a build without it still works. `stg_mo_senate__bills` also carries `bill_type`
+(the prefix: SB, SJR, SCR, SR, SRM, SRB) and `legislator_id` (the list's `legislatorId`, the sponsor's id on the
+Senate site); `stg_mo_senate__bill_actions` adds `action_seq` (1 = the oldest action; the site serves newest first)
+and `chamber` (`G` when the action names the Governor, `H` or `S` when the wording has the standalone token, null
+otherwise). The session year is read from the payload's `list_year` when the loader wrote one, else from the served
+`year` key (#613 may rename the key the loader adds). The seed `mo_senate_session_codes` maps
+(year, `R`/`E1`/`E2`) to the House's session code, with its evidence per row: `R` is the two-digit year + 1 (251),
+but the House has no 252, and 2025's June special session (`E1`) is 253, its September one (`E2`) 254. A session
+with no seed row fails `assert_senate_sessions_have_house_codes` and its bills stay out of `int_bills__list` until
+a row is added. `int_bills__list` takes Senate bills from this list for every session it has landed; for other
+sessions it keeps the topical index and the House `SenateActList`. To add a special session: find the House code
+whose bills share the Senate's titles and whose dates overlap, append `year,E<n>,<code>,"<evidence>"` to
+`dbt/seeds/mo_senate_session_codes.csv` (titles and dates in the evidence, as the 2019 to 2022 rows have), and
+`dbt seed`; the failing test's header repeats this. Status from the Senate's actions is #588.
 
 ## mo_senate_topics: Missouri Senate topical index
 

@@ -7,7 +7,8 @@
 --   drops (test records, other sessions' PDFs) names a vote that does not exist.
 --   Senate journal votes: the vote's measure ("HB 2", "SB 974") read from the journal text. Regular-session (R) and
 --   veto-session (V) journals match that year's regular session (the bill list fct_bills uses, int_bills__list: House
---   bills from the House export, Senate bills from the topical index). Extraordinary-session journals (S1, S2, T1,
+--   bills from the House export, Senate bills from the Senate's own bill list where it was landed, else the topical
+--   index). Extraordinary-session journals (S1, S2, T1,
 --   T2: the prefix does not map to a session suffix, 2018's S1 is 183 but T1 is 184) match the year's
 --   extraordinary sessions (YY3, YY4) instead, where the bill has a House XML action on the vote date. A Senate
 --   bill that has only House-side actions in the XML (the Senate's own steps are not listed) also matches when the
