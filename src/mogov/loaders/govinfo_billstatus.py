@@ -14,7 +14,8 @@ just Missouri's members: sponsors are matched to Missouri's delegation by `biogu
 
 Units: (congress, bill type) zips, so a shard downloads only the zips it owns (no file is fetched by two shards).
 The House `hr` zip is the biggest by far (33 MB); shard counts above the number of zips (8 per Congress) gain nothing.
-Congresses: MOGOV_BILLSTATUS_CONGRESSES (default 117,118,119, as for Voteview); types: MOGOV_BILLSTATUS_TYPES.
+Congresses: MOGOV_BILLSTATUS_CONGRESSES (default: the 117th to the one in session today);
+types: MOGOV_BILLSTATUS_TYPES.
 """
 
 import gzip
@@ -34,7 +35,9 @@ from mogov.parsers import govinfo_billstatus as parser
 log = obs.get_logger(__name__)
 
 BASE = "https://www.govinfo.gov/bulkdata/BILLSTATUS"
-CONGRESSES = [int(c) for c in os.environ.get("MOGOV_BILLSTATUS_CONGRESSES", "117,118,119").split(",")]
+FIRST_CONGRESS = 117  # start of the default window (the end follows the date); how far back to go is #621
+_configured = os.environ.get("MOGOV_BILLSTATUS_CONGRESSES")
+CONGRESSES: list[int] | None = [int(c) for c in _configured.split(",")] if _configured else None  # None: the default
 BILL_TYPES = os.environ.get("MOGOV_BILLSTATUS_TYPES", "hr,s,hjres,sjres,hconres,sconres,hres,sres").split(",")
 XML_DIR = "govinfo_billstatus_xml"  # under RAW_DIR: <congress>/<type>/<FILE>.xml.gz
 FILES_TABLE = "govinfo_billstatus_files"
@@ -43,7 +46,8 @@ TABLES = [FILES_TABLE, *parser.ALL_TABLES]
 
 def congress_on(day: date) -> int:
     """The Congress in session on `day`: the 119th began 2025-01-03, each Congress lasts two years and begins on
-    January 3 of an odd year (the days before that still belong to the previous one)."""
+    January 3 of an odd year (the days before that still belong to the previous one). The switch is on whole UTC
+    dates, so it comes about 17 hours before noon ET on January 3, when the new Congress is sworn in."""
     year = day.year - 1 if day.year % 2 == 1 and (day.month, day.day) < (1, 3) else day.year
     return (year - 1789) // 2 + 1
 
@@ -52,6 +56,12 @@ def current_congress() -> int:
     """Today's Congress, from the date, not from which Congresses are configured: a run that leaves out the
     newest Congress must not mistake an older one for the live one."""
     return congress_on(datetime.now(UTC).date())
+
+
+def default_congresses(day: date) -> list[int]:
+    """FIRST_CONGRESS through the Congress in session on `day`, so the newest one is picked up on its first day
+    without a config change (on 2027-01-03 the 120th joins and the 119th, now a finished Congress, goes monthly)."""
+    return list(range(FIRST_CONGRESS, congress_on(day) + 1))
 
 
 def zip_url(congress: int, bill_type: str) -> str:
@@ -82,7 +92,7 @@ def land_file(congress: int, bill_type: str, name: str, xml: bytes, url: str) ->
 @loader("govinfo_billstatus", service="www.govinfo.gov", slow=True)
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: one zip per (congress, bill type). Streams each zip member by member."""
-    units = [(c, t) for c in CONGRESSES for t in BILL_TYPES]
+    units = [(c, t) for c in (CONGRESSES or default_congresses(datetime.now(UTC).date())) for t in BILL_TYPES]
     mine = shard.take(units, key=lambda u: f"{u[0]}-{u[1]}")
     current = current_congress()
     progress = obs.Progress("zips", len(mine), log)
