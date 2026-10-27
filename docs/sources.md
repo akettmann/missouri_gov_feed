@@ -577,10 +577,14 @@ Quirks:
   state, is one gift when the names are equal after dropping MO/Missouri, "and"/"of"/"the", legal forms and middle
   initials ("MO Soybean Association" / "Missouri Soybean Association", "James Nutter" / "James B Nutter"), or are a
   typo apart (up to 2 letters, names of 10+ characters, same digits: "Lathrop GPM" / "Lanthrop GPM"; "LIUNA Local 110"
-  is not "LIUNA Local 100"). Measured October 2026: 7 TAP rows ($35.4k). Left in place on purpose: two or more
-  candidates on either side (a $5,000 gift to one committee on one day from several donors), names that differ by an
-  abbreviation ("deVries & Associates" / "DeVries and Assoc") or an added word ("Committee to Elect Jamie Burger HD"),
-  and different donors who happened to give the same amount.
+  is not "LIUNA Local 100"). Measured October 2026: 7 TAP rows ($35.4k). A third rule (#557) in the same tier
+  also pairs an abbreviation or an added word: word by word one name is a prefix of the other ("deVries & Associates" /
+  "DeVries and Assoc", "...Technical Ed" / "...Technical Education") and the longer name has at most two more words
+  ("Committee to Elect Jamie Burger HD"); the first word must be equal and the digits match. With several lines in the
+  group a notice is dropped only when it has exactly one name-compatible full-report line, that line has exactly one
+  name-compatible notice, and no line in the group lacks a donor name. Measured October 2026: 4 more TAP notices
+  ($10.9k). Left in place on purpose: two compatible candidates on either side, names that need outside knowledge
+  ("UP Railroad Company" / "Union Pacific Railroad Company"), and different donors who happened to give the same amount.
 - A few MECIDs are lower-case (`c000525`); the intermediate models upper-case them.
 - A committee-to-committee gift names the donor committee only. `cmte_id` / `mecid` is the receiving
   committee's ID, and there is no donor MECID. The same holds for MEC's direct export (see mec below).
