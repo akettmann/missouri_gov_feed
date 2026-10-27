@@ -1,0 +1,126 @@
+version: 2
+
+models:
+  - name: fct_federal_sponsorship_committees
+    description: >
+      The committees (and subcommittees) that handled each federal bill a Missouri member of Congress sponsored or
+      cosponsored, from the GovInfo BILLSTATUS bulk XML (loaded congresses, MOGOV_BILLSTATUS_CONGRESSES), with how far
+      the bill got there. It is fct_federal_sponsorship (same member, bill and role) times the committees the bill was
+      referred to; it answers which committees decide the bills an official puts their name on. A subcommittee is its
+      own row with is_subcommittee set and parent_system_code naming its committee; a bill referred to a subcommittee
+      also has a row for the parent. The step dates are the earliest of each step in that committee and are null when
+      the step did not happen: a bill referred and never acted on has only referred_date. A bill with no committee
+      referral (for example a simple resolution agreed to on the floor) has no row. Grain: (bioguide_id, bill_id,
+      role, committee_system_code).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [bioguide_id, bill_id, role, committee_system_code]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }} Null for members who are no longer in office."
+      - name: bioguide_id
+        data_type: varchar
+        description: Bioguide id of the member (joins congress_legislators).
+        data_tests: [not_null]
+      - name: role
+        data_type: varchar
+        description: "`sponsor` or `cosponsor` (as in fct_federal_sponsorship)."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['sponsor', 'cosponsor']
+      - name: bill_id
+        data_type: varchar
+        description: "`<congress>-<type>-<number>`, e.g. 118-hr-1; joins fct_federal_sponsorship for the bill's title and outcome."
+        data_tests: [not_null]
+      - name: congress
+        data_type: integer
+        description: Congress number (118 = 2023-2025).
+      - name: committee_system_code
+        data_type: varchar
+        description: Congress.gov's committee code (hsba00 House Financial Services); a subcommittee's code ends in a non-zero number (hsif03).
+        data_tests: [not_null]
+      - name: committee_name
+        data_type: varchar
+        description: Committee or subcommittee name as published.
+        data_tests: [not_null]
+      - name: committee_chamber
+        data_type: varchar
+        description: "`House`, `Senate` or `Joint`; a subcommittee takes its parent's."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['House', 'Senate', 'Joint']
+      - name: is_subcommittee
+        data_type: boolean
+        description: True for a subcommittee row.
+        data_tests: [not_null]
+      - name: parent_system_code
+        data_type: varchar
+        description: The parent committee's code for a subcommittee; null for a full committee.
+      - name: referred_date
+        data_type: date
+        description: Earliest "Referred to" date in this committee.
+      - name: hearing_date
+        data_type: date
+        description: Earliest "Hearings by" date in this committee (a full-committee hearing is recorded on the full committee, a subcommittee hearing on the subcommittee).
+      - name: markup_date
+        data_type: date
+        description: Earliest "Markup by" date in this committee.
+      - name: reported_date
+        data_type: date
+        description: Earliest "Reported by" or "Reported original measure" date, the committee sending the bill to the floor.
+      - name: discharged_date
+        data_type: date
+        description: Earliest "Discharged from" date, the committee losing the bill without reporting it.
+      - name: source_url
+        data_type: varchar
+        description: The bill's BILLSTATUS file on govinfo.gov.
+        data_tests: [not_null]
+
+  - name: fct_federal_sponsorship_subjects
+    description: >
+      The Congressional Research Service legislative subject terms of each federal bill a Missouri member of Congress
+      sponsored or cosponsored, from the GovInfo BILLSTATUS bulk XML. It is fct_federal_sponsorship (same member, bill
+      and role) times the bill's subjects; it answers what topics an official's name goes on. The terms are CRS's
+      controlled vocabulary ("Taxation", "Health care coverage and access"), many per bill; the one broader policy
+      area is policy_area in fct_federal_sponsorship. CRS tags a bill only after it is introduced, and not every
+      bill gets terms, so a bill with no row here has no subject yet, not no topic. Count subjects per member with
+      the role in view: a cosponsorship is weaker evidence of a member's priorities than a sponsorship. Grain:
+      (bioguide_id, bill_id, role, subject).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [bioguide_id, bill_id, role, subject]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }} Null for members who are no longer in office."
+      - name: bioguide_id
+        data_type: varchar
+        description: Bioguide id of the member (joins congress_legislators).
+        data_tests: [not_null]
+      - name: role
+        data_type: varchar
+        description: "`sponsor` or `cosponsor` (as in fct_federal_sponsorship)."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['sponsor', 'cosponsor']
+      - name: bill_id
+        data_type: varchar
+        description: "`<congress>-<type>-<number>`, e.g. 118-hr-1; joins fct_federal_sponsorship for the bill's title and outcome."
+        data_tests: [not_null]
+      - name: congress
+        data_type: integer
+        description: Congress number (118 = 2023-2025).
+      - name: subject
+        data_type: varchar
+        description: CRS legislative subject term.
+        data_tests: [not_null]
+      - name: source_url
+        data_type: varchar
+        description: The bill's BILLSTATUS file on govinfo.gov.
+        data_tests: [not_null]

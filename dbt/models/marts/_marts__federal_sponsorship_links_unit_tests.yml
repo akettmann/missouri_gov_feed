@@ -1,0 +1,78 @@
+# Unit tests for the committee and subject views of Missouri members' federal bills.
+version: 2
+
+unit_tests:
+  - name: federal_sponsorship_committees_steps_per_committee_and_subcommittee
+    model: fct_federal_sponsorship_committees
+    description: >
+      Bill 118-hr-1 (sponsor M1, cosponsor M2) went to full committee hsba00 and its subcommittee hsba15. The
+      committee row takes only the committee's own steps (referred 2023-02-01, reported on the earlier of its two
+      dates 2023-06-01, a markup that never happened is null) and the subcommittee row only the subcommittee's (a
+      hearing 2023-03-01 and a markup 2023-04-01, but the "Hearings By (full committee)" label of hsba00 is a hearing
+      too). A "Reported Original Measure" counts as reported; an "Unknown" and an undated activity count as nothing.
+      Bill 118-hr-2 went to hsag00 and was discharged. Bill 118-hr-3 (sponsor X1 of Kansas, not in the sponsorship
+      model) is absent, and 118-hr-4 has no committee, so no row. Joining the steps on position alone (not
+      subposition) copies the committee's dates onto the subcommittee and fails this test; counting only
+      "Reported by" misses the original measure.
+    given:
+      - input: ref('fct_federal_sponsorship')
+        rows:
+          - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-1, congress: 118}
+          - {official_id: null, bioguide_id: M2, role: cosponsor, bill_id: 118-hr-1, congress: 118}
+          - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-2, congress: 118}
+          - {official_id: o_m1, bioguide_id: M1, role: cosponsor, bill_id: 118-hr-4, congress: 118}
+      - input: ref('stg_govinfo_billstatus__committees')
+        rows:
+          - {bill_id: 118-hr-1, position: 0, subposition: null, system_code: hsba00, parent_system_code: null, name: Financial Services, chamber: House, is_subcommittee: false, source_url: 'https://g/1'}
+          - {bill_id: 118-hr-1, position: 0, subposition: 0, system_code: hsba15, parent_system_code: hsba00, name: Housing Subcommittee, chamber: House, is_subcommittee: true, source_url: 'https://g/1'}
+          - {bill_id: 118-hr-2, position: 0, subposition: null, system_code: hsag00, parent_system_code: null, name: Agriculture, chamber: House, is_subcommittee: false, source_url: 'https://g/2'}
+          - {bill_id: 118-hr-3, position: 0, subposition: null, system_code: hsag00, parent_system_code: null, name: Agriculture, chamber: House, is_subcommittee: false, source_url: 'https://g/3'}
+      - input: ref('stg_govinfo_billstatus__committee_activities')
+        rows:
+          - {bill_id: 118-hr-1, position: 0, subposition: null, activity_normalized: referred to, activity_date: '2023-02-01'}
+          - {bill_id: 118-hr-1, position: 0, subposition: null, activity_normalized: reported by, activity_date: '2023-07-01'}
+          - {bill_id: 118-hr-1, position: 0, subposition: null, activity_normalized: reported original measure, activity_date: '2023-06-01'}
+          - {bill_id: 118-hr-1, position: 0, subposition: null, activity_normalized: hearings by (full committee), activity_date: '2023-02-20'}
+          - {bill_id: 118-hr-1, position: 0, subposition: null, activity_normalized: unknown, activity_date: '2023-01-01'}
+          - {bill_id: 118-hr-1, position: 0, subposition: 0, activity_normalized: referred to, activity_date: '2023-02-02'}
+          - {bill_id: 118-hr-1, position: 0, subposition: 0, activity_normalized: hearings by (subcommittee), activity_date: '2023-03-01'}
+          - {bill_id: 118-hr-1, position: 0, subposition: 0, activity_normalized: markup by, activity_date: '2023-04-01'}
+          - {bill_id: 118-hr-1, position: 0, subposition: null, activity_normalized: bills of interest exchange of letters, activity_date: null}
+          - {bill_id: 118-hr-2, position: 0, subposition: null, activity_normalized: referred to, activity_date: '2023-03-01'}
+          - {bill_id: 118-hr-2, position: 0, subposition: null, activity_normalized: discharged from, activity_date: '2023-09-01'}
+    expect:
+      rows:
+        - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-1, congress: 118, committee_system_code: hsba00, committee_name: Financial Services, committee_chamber: House, is_subcommittee: false, parent_system_code: null, referred_date: '2023-02-01', hearing_date: '2023-02-20', markup_date: null, reported_date: '2023-06-01', discharged_date: null, source_url: 'https://g/1'}
+        - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-1, congress: 118, committee_system_code: hsba15, committee_name: Housing Subcommittee, committee_chamber: House, is_subcommittee: true, parent_system_code: hsba00, referred_date: '2023-02-02', hearing_date: '2023-03-01', markup_date: '2023-04-01', reported_date: null, discharged_date: null, source_url: 'https://g/1'}
+        - {official_id: null, bioguide_id: M2, role: cosponsor, bill_id: 118-hr-1, congress: 118, committee_system_code: hsba00, committee_name: Financial Services, committee_chamber: House, is_subcommittee: false, parent_system_code: null, referred_date: '2023-02-01', hearing_date: '2023-02-20', markup_date: null, reported_date: '2023-06-01', discharged_date: null, source_url: 'https://g/1'}
+        - {official_id: null, bioguide_id: M2, role: cosponsor, bill_id: 118-hr-1, congress: 118, committee_system_code: hsba15, committee_name: Housing Subcommittee, committee_chamber: House, is_subcommittee: true, parent_system_code: hsba00, referred_date: '2023-02-02', hearing_date: '2023-03-01', markup_date: '2023-04-01', reported_date: null, discharged_date: null, source_url: 'https://g/1'}
+        - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-2, congress: 118, committee_system_code: hsag00, committee_name: Agriculture, committee_chamber: House, is_subcommittee: false, parent_system_code: null, referred_date: '2023-03-01', hearing_date: null, markup_date: null, reported_date: null, discharged_date: '2023-09-01', source_url: 'https://g/2'}
+
+  - name: federal_sponsorship_subjects_one_row_per_member_bill_role_subject
+    model: fct_federal_sponsorship_subjects
+    description: >
+      Each Missouri sponsorship row of a bill gets that bill's subjects: 118-hr-1 has two subjects, so its sponsor M1
+      and cosponsor M2 get two rows each, and the same subject on a second bill is a second row. Bill 118-hr-2 has no
+      subject yet and gets no row (an inner join, not a null subject). A bill that only a non-Missouri member
+      sponsored (118-hr-3, absent from the sponsorship model) is not listed. Joining on the member instead of the bill
+      fails this test.
+    given:
+      - input: ref('fct_federal_sponsorship')
+        rows:
+          - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-1, congress: 118}
+          - {official_id: null, bioguide_id: M2, role: cosponsor, bill_id: 118-hr-1, congress: 118}
+          - {official_id: o_m1, bioguide_id: M1, role: cosponsor, bill_id: 118-hr-2, congress: 118}
+          - {official_id: o_m1, bioguide_id: M1, role: cosponsor, bill_id: 118-hr-5, congress: 118}
+      - input: ref('stg_govinfo_billstatus__subjects')
+        rows:
+          - {bill_id: 118-hr-1, position: 0, subject: Taxation, source_url: 'https://g/1'}
+          - {bill_id: 118-hr-1, position: 1, subject: Health care, source_url: 'https://g/1'}
+          - {bill_id: 118-hr-3, position: 0, subject: Taxation, source_url: 'https://g/3'}
+          - {bill_id: 118-hr-5, position: 0, subject: Taxation, source_url: 'https://g/5'}
+    expect:
+      rows:
+        - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-1, congress: 118, subject: Taxation, source_url: 'https://g/1'}
+        - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-1, congress: 118, subject: Health care, source_url: 'https://g/1'}
+        - {official_id: null, bioguide_id: M2, role: cosponsor, bill_id: 118-hr-1, congress: 118, subject: Taxation, source_url: 'https://g/1'}
+        - {official_id: null, bioguide_id: M2, role: cosponsor, bill_id: 118-hr-1, congress: 118, subject: Health care, source_url: 'https://g/1'}
+        - {official_id: o_m1, bioguide_id: M1, role: cosponsor, bill_id: 118-hr-5, congress: 118, subject: Taxation, source_url: 'https://g/5'}

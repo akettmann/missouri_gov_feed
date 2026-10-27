@@ -1032,6 +1032,15 @@ Quirks:
 - Amendments: BILLSTATUS keeps each amendment, with its own actions and recorded roll calls, under `<amendments>`.
   That element is not parsed, so no amendment roll call is linked to a bill and `fct_federal_vote_bills` has no
   amendment votes (#706).
+- Committees and subjects of Missouri members' bills (#737): `fct_federal_sponsorship_committees` (one row per
+  member, bill, role and committee or subcommittee, with the earliest referred, hearing, markup, reported and
+  discharged dates in that committee) and `fct_federal_sponsorship_subjects` (one row per member, bill, role and CRS
+  subject). Both are `fct_federal_sponsorship` times the staging rows, so they cover the same members and roles. On
+  the 118th hr and s: 3,991 committee rows over 1,560 of Missouri's sponsored or cosponsored bills (797 are
+  subcommittee rows), 10,342 subject rows over 719 bills; the rest have no subject yet. A cosponsorship is much
+  weaker evidence than a sponsorship, so read `role`. The "Re-Referred to" label (normalized `re referred to`) was
+  accepted in staging after one review build saw it; it does not occur in the 118th hr and s loaded for #737.
+  Related bills and subcommittee-level summaries are not in a mart yet.
 - Rate: the loader makes one request per zip (24 for the default window), not per bill.
 
 ## house_fd: U.S. House financial disclosures
