@@ -1,0 +1,94 @@
+@startuml person_ids
+title Person ids: which model feeds which (see docs/person_ids.md)
+skinparam componentStyle rectangle
+
+package "Inputs" {
+  [stg_openstates__roles\n(Open States seat-terms)] as roles
+  [seed legislator_seat_corrections] as corr
+  [stg_mo_house__members\n(House roster, member id)] as roster
+  [seed official_id_links\n(signed rows only)] as links
+  [stg_mo_senate__votes\n(journal tokens)] as sjv
+  [stg_mo_house__rollcall_votes\n(PDF tokens) + seed house_speakers] as hrv
+  [stg_mo_employee_pay__pay] as pay
+  [stg_mo_house__bill_sponsors] as spon
+}
+
+package "Identity (no vote or payroll evidence)" {
+  [int_mo_legislators__seat_terms\nJan-1 starts, 1900-01-01 sentinel] as terms
+  [int_mo_house__member_seat_keys\nseat match -> raw_person_key] as keys
+  [int_officials__identity_terms\n(alias, year, seat, member id)] as ident
+  [int_officials__person_ids\nalias_id -> person_id, basis] as pids
+}
+
+package "Attribution (reads person_id)" {
+  [int_mo_house__member_identity\nperson_key] as mident
+  [int_mo_legislators__seats_as_given\nOpen States dates + person_id] as given
+  [int_mo_senate__votes] as svotes
+  [int_mo_house__votes] as hvotes
+  [int_mo_legislators__seats\nSenate re-dated from journal] as seats
+  [int_officeholders__years\nroster drop rules] as years
+}
+
+package "Consumers" {
+  [int_officials__current -> dim_official] as dim
+  [fct_office_history] as hist
+  [int_mo_legislators__final_checks] as fchk
+  [fct_salaries] as sal
+  [fct_bill_sponsors] as bsp
+}
+
+roles --> terms
+corr --> terms
+roster --> keys
+terms --> keys
+keys --> ident
+terms --> ident
+ident --> pids
+links --> pids
+
+keys --> mident
+pids --> mident
+terms --> given
+pids --> given
+
+sjv --> svotes
+given --> svotes
+hrv --> hvotes
+mident --> hvotes
+given --> hvotes
+
+given --> seats
+svotes --> seats
+
+mident --> years
+seats --> years
+hvotes --> years
+
+pids --> dim
+pids --> hist
+dim --> hist
+seats --> fchk
+pay --> fchk
+pay --> sal
+seats --> sal
+years --> sal
+fchk --> sal
+dim --> sal
+spon --> bsp
+mident --> bsp
+seats --> bsp
+dim --> bsp
+
+note bottom of pids
+  Upstream of here nothing may read
+  int_mo_senate~__votes, int_mo_house~__votes,
+  int_mo_legislators~__seats, int_officeholders~__years
+  or payroll: they are keyed by person_id (dbt cycle).
+end note
+
+note bottom of svotes
+  Reads seats_as_given (Open States dates),
+  never int_mo_legislators~__seats,
+  which is re-dated from these votes.
+end note
+@enduml
