@@ -6,10 +6,11 @@ unit_tests:
     model: int_bills__status
     description: >
       Fixed wordings, "today" pinned to 2026-10-25. SB30 "Bill Combined (w/SCS SBs 901 & 820)" after a committee
-      report: combined into another bill (outcome stays failed: a policy question, #750), not enacted. SB31 the
+      report: combined into another bill (outcome stays failed: a policy question, #756), not enacted. SB31 the
       variant "Bill Combined w/(SCS SBS 975 & 1024)" after passing the Senate: still combined. SB32 reported only
       and no combine line: reported do pass. SB33 combined but later "Truly Agreed To and Finally Passed" and signed:
-      signed wins (the bill itself became law).
+      signed wins (the bill itself became law). SB34 combined, then also passed the Senate and the House on its own
+      number: combined ranks above passed both chambers in the model, so it stays combined into another bill.
     overrides:
       vars:
         as_of_date: '2026-10-25'
@@ -32,13 +33,17 @@ unit_tests:
             select '261', 'SB32', cast('2026-04-02' as date), 'SCS Reported from S Education Committee' union all
             select '261', 'SB33', cast('2026-04-20' as date), 'Bill Combined (w/SCS SBs 1 & 2)' union all
             select '261', 'SB33', cast('2026-05-10' as date), 'Truly Agreed To and Finally Passed' union all
-            select '261', 'SB33', cast('2026-06-20' as date), 'Signed by Governor'
+            select '261', 'SB33', cast('2026-06-20' as date), 'Signed by Governor' union all
+            select '261', 'SB34', cast('2026-04-03' as date), 'S Third Read and Passed' union all
+            select '261', 'SB34', cast('2026-04-20' as date), 'Bill Combined (w/SCS SBs 5 & 6)' union all
+            select '261', 'SB34', cast('2026-04-25' as date), 'H Third Read and Passed'
       - input: ref('mo_senate_action_flags')
         format: sql
         rows: |
             select '%Reported from S %' as action_pattern, 'any' as bill_type, 'reported' as flag union all
             select '%S Third Read and Passed%', 'any', 'passed_senate' union all
             select 'Bill Combined%', 'any', 'combined' union all
+            select '%H Third Read and Passed%', 'any', 'passed_house' union all
             select 'Truly Agreed To and Finally Passed', 'any', 'truly_agreed' union all
             select 'Signed by Governor%', 'any', 'approved'
     expect:
@@ -47,3 +52,4 @@ unit_tests:
         - {session_code: '261', bill: SB31, status: combined into another bill, outcome: failed}
         - {session_code: '261', bill: SB32, status: reported do pass, outcome: failed}
         - {session_code: '261', bill: SB33, status: signed, outcome: enacted}
+        - {session_code: '261', bill: SB34, status: combined into another bill, outcome: failed}

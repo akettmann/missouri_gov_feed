@@ -281,7 +281,7 @@ Quirks:
   which are House bills (#715). "Bill Combined (w/SCS SBs 901 & 820)" (also written "Bill Combined w/(SCS SBS 975 &
   1024)") means the bill's content went into a substitute for other bills: status "combined into another bill" (2024:
   21 bills, 2018: 3 in the sample). It is not enacted; whether the content became law is on the vehicle bill. Its
-  outcome is still "failed" once the session is over, which is a policy question (#750). "Removed S Consent Calendar"
+  outcome is still "failed" once the session is over, which is a policy question (#756). "Removed S Consent Calendar"
   maps to nothing (the bill is re-reported).
   The same list names the special-session Senate bills (`stg_mo_house__senate_act_bills`, with titles, version, last
   action and effective date), which the Senate topical index never covers: `int_bills__list` adds those the index lacks

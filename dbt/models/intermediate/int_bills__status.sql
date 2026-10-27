@@ -13,7 +13,7 @@
 --            combined into another bill when the Senate's history says "Bill Combined (w/SCS SBs ...)": its content
 --            went into a substitute for other bills (#750). It never passed on its own number, and whether that
 --            content became law is on the vehicle bill, so this is not enacted; its outcome follows the usual rules
---            (failed once the session is over), which is a policy question (#750). It ranks below truly agreed /
+--            (failed once the session is over), which is a policy question (#756). It ranks below truly agreed /
 --            adopted and above passed both chambers.
 --            relisted for governor message when every recorded action is the governor's Art. IV, s. 27 message
 --            (the budget/withholding message). These are not new bills: the House relists the previous regular
