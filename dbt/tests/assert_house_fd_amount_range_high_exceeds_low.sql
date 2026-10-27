@@ -8,10 +8,10 @@ with ranges as (
         page,
         line_no,
         amount_range,
-        {{ mogov.regex_extract('amount_range', '^\$([0-9,]+) - \$[0-9,]+$') }} as low_text,
-        {{ mogov.regex_extract('amount_range', '^\$[0-9,]+ - \$([0-9,]+)$') }} as high_text
+        {{ mogov.regex_extract('amount_range', '^\\$([0-9,]+) - \\$[0-9,]+$') }} as low_text,
+        {{ mogov.regex_extract('amount_range', '^\\$[0-9,]+ - \\$([0-9,]+)$') }} as high_text
     from {{ ref('int_house_fd__schedule_lines') }}
-    where {{ mogov.regex_matches('amount_range', '^\$[0-9,]+ - \$[0-9,]+$') }}
+    where {{ mogov.regex_matches('amount_range', '^\\$[0-9,]+ - \\$[0-9,]+$') }}
 ),
 
 parsed as (

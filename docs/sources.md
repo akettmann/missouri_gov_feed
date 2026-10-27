@@ -866,12 +866,20 @@ Quirks:
   least 3 letters (2 for "Ed" / "Education"): "Assoc" / "Associates", "Ins" / "Insurance", "Technical Ed" /
   "Technical Education". Person surnames are not on the list, so "John Hill" / "John Hillhouse", "Smith Alex" /
   "Smith Alexandra", "John Smith" / "John Smithson" and "Committee to Elect John Smith" / "... Smithson" stay unpaired,
-  and Roman numerals and 1-2 letter words must be equal ("Holding III" / "Holdings II"). An organisation abbreviated
-  in a way the list does not cover (a misspelling, "Mfg") is not paired by this rule. The typo rule (#735) only pairs names whose differing words are 5+ letters in both names, so a change to a short
+  and Roman numerals and 1-2 letter words must be equal ("Holding III" / "Holdings II"). Two different abbreviations of one word also pair (#740), through a map in the macro
+  `org_word_abbreviation` ("Ass" / "Assoc" / "Assn" / "Association", "Ed" / "Edu" / "Educ", "Int" / "Intl", "Com" / "Comm",
+  "Telecom" / "Telecomm", "Dist" / "District", "Govt" / "Government"; "Assoc" can also mean "Associates", a firm, but maps to
+  "association": no wrong match seen in the data; the map applies from word 2 on, so "John Ed Smith" / "John Edu Smith" pair by design). An organisation abbreviated in a way the list and the map do not cover
+  (a misspelling, "Mfg") is not paired by this rule. The typo rule (#735) only pairs names whose differing words are 5+ letters in both names, so a change to a short
   word ("Citizens for Ann Smith" / "Citizens for Anne Smith", "Joan" / "John", "Sara" / "Sarah") is two people and both
   lines stay; "Fran Froelich" / "Fran Froehlich" and "Lathrop GPM" / "Lanthrop GPM" still pair. Spacing
-  variants that change the word count or a short word ("Century Link" / "CenturyLink", "Fire Fighters" / "Firefighters",
-  "Kansas City Life" / "KansasCity Life") no longer pair either. A name whose loose key is empty
+  variants that change the word count ("Century Link" / "CenturyLink", "Fire Fighters" / "Firefighters", "Kansas City Life" /
+  "KansasCity Life", "Van Dyke" / "Vandyke") pair again (#753): with the spaces removed the two names are identical (6+ characters, different
+  word counts, so "Marc Anthony" / "Marca Nthony" does not pair). That is no looser than an exact match. October 2026: no notice/full-report
+  pair of the two feeds is a spacing variant, so no row changes. The typo rule cannot tell a person from an organisation, so 5+-letter first
+  name and surname variants (Frances / Francis, Peterson / Petersen) still pair when one lone notice and one lone full-report line share committee,
+  date, amount, city and state; no such pair exists in the data, and skipping word 1 would break real organisation typos ("Lathrop GPM" /
+  "Lanthrop GPM"). A name whose loose key is empty
   (only stop words, legal forms and initials) is never paired. On the October 2026 data the tightening changes no
   row (the same records: still 138 TAP notices and 78 direct-export notices dropped). With several lines in the
   group a notice is dropped only when it has exactly one name-compatible full-report line, that line has exactly one
@@ -997,8 +1005,9 @@ Quirks:
 - GovInfo data error: 119-hr-766 (the SEWER Act; actions end at referral) lists Public Law 119-120, which is
   really 119 S. 766 (that bill's own actions show it signed). `int_federal_bills__stage` therefore takes
   `became_law` from the actions only and keeps the laws list as the separate `has_law_number` flag; a test checks
-  each law maps to one `became_law` bill. The staging and sponsorship models still credit the law to 119-hr-766
-  (#729).
+  each law maps to one `became_law` bill. `fct_federal_sponsorship` reads `became_law` from that stage and only
+  shows a law number for such bills, so 119-hr-766's sponsors are not credited with the law; a second test checks
+  each law in the fact maps to one bill (#729).
 - Each action is often listed twice: the chamber's own and the Library of Congress's coded copy (`sourceSystem`
   names which). Roll calls cited by both appear twice in `_recorded_votes`. Count distinct roll calls, not rows.
 - `isOriginalCosponsor` is the text `True`/`False`; a cosponsor who later withdrew keeps their row with
@@ -1086,7 +1095,13 @@ Quirks:
   low end ("... $250,001 -" / "Road $500,000", or in the 2021+ layout "$500,001 - Dividends $2,501 -" / the asset
   name with "$1,000,000 $5,000"), and "Over" / "$1,000,000" reads "Over $1,000,000". When the asset's value is
   "None" ("... JT None Interest $1,001 - ..."), the first `$` on the line is the income range, not the asset's value,
-  and `amount_range` is `None`. Residual cases that still split:
+  and `amount_range` is `None`; the same for "Undetermined" (pensions, annuities, royalties: 47 A rows), which
+  `amount_range` reads as `Undetermined`. On A an income range wrapped after a complete value range joins too
+  ("Fidelity Trust => JT $15,001 - $50,000 Interest $201 -" / "Clark Cnty WA Sch Dist $1,000": the tail holds the
+  income high end and the asset name; the glyph line may sit between; 245 rows in all), and so does a value of
+  "Over" (or "Over None") with the amount on the next line ("Equity Trust CO => Over None" / "Berkshire Hathaway Inc.
+  New (BRK.B) $50,000,000" reads `Over $50,000,000`; `Location:` / `Description:` / `Comments:` lines ending on
+  "Over" are not heads). Residual cases that still split:
   an A asset name wrapped with no structural signal ("Fidelity Managed Income II III [HE]" / "Unit Cl I [HE]"), PTR
   (`P`) rows, which are not joined at all, and a few A `DESCRIPTION:` lines that join through the open-parenthesis
   rule.
