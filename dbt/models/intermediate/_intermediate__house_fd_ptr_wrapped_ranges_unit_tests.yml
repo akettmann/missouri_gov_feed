@@ -1,0 +1,74 @@
+# Unit tests for int_house_fd__schedule_lines: a PTR transaction whose amount range the PDF wrapped takes its high end
+# from the next line (#749), and the pinned behaviour of two neighbouring rules (#761 review notes).
+version: 2
+
+unit_tests:
+  - name: house_fd_ptr_wrapped_range_joined
+    model: int_house_fd__schedule_lines
+    description: >
+      PTR: a transaction line (owner code, two dates) that holds only the low end of its range ("$100,001 -") takes the
+      next line as its tail when that line has an amount and neither transaction dates nor a label: the high end, with
+      the part of the asset name that wrapped. The owner code and the low end stay those of the head. Lines that do
+      not join: a transaction line with a complete range, a transaction line of its own after a low-only head (it
+      carries its own dates), the "Filing Status:" / "Subholding Of:" / "Description:" lines (a description may hold
+      "$" amounts), and a low-only line without transaction dates (a bond name is no head).
+    given:
+      - input: ref('stg_house_fd__pdf_lines')
+        format: sql
+        rows: |
+          select 'p' as doc_id, 'u_p' as document_url, true as has_text, 1 as page, 1 as line_no, 'ID Owner Asset Transaction Date Notification Date Amount' as line_text union all
+          select 'p', 'u_p', true, 1, 2, 'JT Floyd County IN 4.00% 12/30/2031 P 12/05/2025 12/08/2025 $100,001 -' union all
+          select 'p', 'u_p', true, 1, 3, '[GS] $250,000' union all
+          select 'p', 'u_p', true, 1, 4, 'Filing Status: New' union all
+          select 'p', 'u_p', true, 1, 5, 'Subholding Of: Fidelity Trust' union all
+          select 'p', 'u_p', true, 1, 6, 'Amazon.com, Inc. - Common Stock S (partial) 03/16/2026 03/16/2026 $1,001 - $15,000' union all
+          select 'p', 'u_p', true, 1, 7, '(AMZN) [ST]' union all
+          select 'p', 'u_p', true, 1, 8, 'Description: sold @ $27.645/share' union all
+          select 'p', 'u_p', true, 1, 9, 'JT Head One P 06/22/2026 06/23/2026 $250,001 -' union all
+          select 'p', 'u_p', true, 1, 10, 'JT Head Two S 06/10/2026 06/11/2026 $15,001 -' union all
+          select 'p', 'u_p', true, 1, 11, 'EQUITY MASTER FD LLC UNIT CL I $50,000' union all
+          select 'p', 'u_p', true, 1, 12, 'JT Head Three P 06/12/2026 06/13/2026 $15,001 -' union all
+          select 'p', 'u_p', true, 1, 13, 'Description: sold @ $27.645/share' union all
+          select 'p', 'u_p', true, 1, 14, 'Bond Name 5% 07/01/2031 $1,001 -' union all
+          select 'p', 'u_p', true, 1, 15, 'Tail Without Head $5,000'
+    expect:
+      rows:
+        - {doc_id: p, page: 1, line_no: 2, schedule: 'PTR: transactions', owner_code: JT, amount_range: '$100,001 - $250,000', line_text: 'JT Floyd County IN 4.00% 12/30/2031 P 12/05/2025 12/08/2025 $100,001 - [GS] $250,000'}
+        - {doc_id: p, page: 1, line_no: 4, schedule: 'PTR: transactions', owner_code: null, amount_range: null, line_text: 'Filing Status: New'}
+        - {doc_id: p, page: 1, line_no: 5, schedule: 'PTR: transactions', owner_code: null, amount_range: null, line_text: 'Subholding Of: Fidelity Trust'}
+        - {doc_id: p, page: 1, line_no: 6, schedule: 'PTR: transactions', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Amazon.com, Inc. - Common Stock S (partial) 03/16/2026 03/16/2026 $1,001 - $15,000'}
+        - {doc_id: p, page: 1, line_no: 7, schedule: 'PTR: transactions', owner_code: null, amount_range: null, line_text: '(AMZN) [ST]'}
+        - {doc_id: p, page: 1, line_no: 8, schedule: 'PTR: transactions', owner_code: null, amount_range: '$27', line_text: 'Description: sold @ $27.645/share'}
+        - {doc_id: p, page: 1, line_no: 9, schedule: 'PTR: transactions', owner_code: JT, amount_range: '$250,001', line_text: 'JT Head One P 06/22/2026 06/23/2026 $250,001 -'}
+        - {doc_id: p, page: 1, line_no: 10, schedule: 'PTR: transactions', owner_code: JT, amount_range: '$15,001 - $50,000', line_text: 'JT Head Two S 06/10/2026 06/11/2026 $15,001 - EQUITY MASTER FD LLC UNIT CL I $50,000'}
+        - {doc_id: p, page: 1, line_no: 12, schedule: 'PTR: transactions', owner_code: JT, amount_range: '$15,001', line_text: 'JT Head Three P 06/12/2026 06/13/2026 $15,001 -'}
+        - {doc_id: p, page: 1, line_no: 13, schedule: 'PTR: transactions', owner_code: null, amount_range: '$27', line_text: 'Description: sold @ $27.645/share'}
+        - {doc_id: p, page: 1, line_no: 14, schedule: 'PTR: transactions', owner_code: null, amount_range: '$1,001', line_text: 'Bond Name 5% 07/01/2031 $1,001 -'}
+        - {doc_id: p, page: 1, line_no: 15, schedule: 'PTR: transactions', owner_code: null, amount_range: '$5,000', line_text: 'Tail Without Head $5,000'}
+
+  - name: house_fd_wrapped_range_tail_rules_pinned
+    model: int_house_fd__schedule_lines
+    description: >
+      Pins two rules of the A / B / D continuation (#761 review). (1) Schedule A: an income range wrapped after its low
+      end ("$15,001 - $50,000 Interest $201 -") does not take a following line that is itself a value "Over $..." entry
+      as its tail. (2) A value "Over" with the amount on the next line reads "Over $<first $ of the tail>" on schedules
+      B and D too: the tail "Name [GS] $1,000,000 $2,000" gives "Over $1,000,000".
+    given:
+      - input: ref('stg_house_fd__pdf_lines')
+        format: sql
+        rows: |
+          select 'o' as doc_id, 'u_o' as document_url, true as has_text, 1 as page, 1 as line_no, 'Schedule A: Assets and "Unearned" Income' as line_text union all
+          select 'o', 'u_o', true, 1, 2, 'Fidelity Trust ⇒ JT $15,001 - $50,000 Interest $201 -' union all
+          select 'o', 'u_o', true, 1, 3, 'Big Holding Co Over $1,000,000' union all
+          select 'o', 'u_o', true, 2, 1, 'Schedule B: Transactions' union all
+          select 'o', 'u_o', true, 2, 2, 'Brokerage Acct 03/02/2020 P Over' union all
+          select 'o', 'u_o', true, 2, 3, 'Muni Bond 5% [GS] $1,000,000 $2,000' union all
+          select 'o', 'u_o', true, 3, 1, 'Schedule D: Liabilities' union all
+          select 'o', 'u_o', true, 3, 2, 'Town Bank July 2009 Mortgage Over' union all
+          select 'o', 'u_o', true, 3, 3, '$1,000,000 $5,000'
+    expect:
+      rows:
+        - {doc_id: o, page: 1, line_no: 2, schedule: 'A: assets & unearned income', owner_code: JT, amount_range: '$15,001 - $50,000', line_text: 'Fidelity Trust ⇒ JT $15,001 - $50,000 Interest $201 -'}
+        - {doc_id: o, page: 1, line_no: 3, schedule: 'A: assets & unearned income', owner_code: null, amount_range: 'Over $1,000,000', line_text: 'Big Holding Co Over $1,000,000'}
+        - {doc_id: o, page: 2, line_no: 2, schedule: 'B: transactions', owner_code: null, amount_range: 'Over $1,000,000', line_text: 'Brokerage Acct 03/02/2020 P Over Muni Bond 5% [GS] $1,000,000 $2,000'}
+        - {doc_id: o, page: 3, line_no: 2, schedule: 'D: liabilities', owner_code: null, amount_range: 'Over $1,000,000', line_text: 'Town Bank July 2009 Mortgage Over $1,000,000 $5,000'}
