@@ -649,38 +649,49 @@ models:
     roster falls back to mohouse:<member id> when its seat can''t be tied to an Open States record. Every id seen
     in int_officials__identity_terms gets one row: alias_id (as the source gave it) -> person_id (what the pipeline
     calls the person). Rules, in order: 1. seed official_id_links, same_person: a curated id for a person the name
-    rule can''t join (statewide officers, judges). basis = curated. 2. ids with the same exact full name (case,
-    punctuation and spacing ignored: "Van Schoiack" and "VanSchoiack" are one name, #228) are one person, basis
-    = name_continuity, unless two of them hold different seats in more than one shared year. The same seat in the
-    same year is how a split shows (Jean Evans, Joe Adams); different seats across several shared years mean two
-    people, while a single shared year is a hand-over between seats. A pair listed as different_people in official_id_links
-    also keeps that whole name apart. 2b. two names that differ only in the given name, one being the start of the
-    other ("Steve"/"Steven" Roberts, "Ken"/"Kenneth" Jamison; #263), are one person when each name belongs to exactly
-    one such pair and the names never hold different seats in the same year (across all ids of both names), and
-    either hold a seat at the same time (their dated terms in one seat overlap: start_a < end_b and start_b < end_a,
-    an open term ending 9999-12-31; the same start day overlaps, one term ending the day the other starts does not),
-    or follow each other within a year in a different chamber (a move, as Roberts went House to Senate). Overlap
-    alone is not enough: Open States often leaves a member who left mid-term with the normal term end, so a special-election
-    successor overlaps on paper (Silvey to 2018-12-31, Lauren Arthur from 2018-09-12, SD17). The shared-seat case
-    also needs one term to be a stub (under 90 days) inside the other, starting within 31 days of it; equal or nested
-    multi-year terms do not qualify (Open States'' placeholder 2013-01-01 starts, #332). Years alone cannot decide
-    the shared-seat case: Kenneth Jamison (2025 only) inside Ken Jamison (2025-26) is a duplicate, but Danielle
-    Smith (2019 only, or 2026 only after a special election) inside a Dan Smith successor''s span looks the same
-    by year. Dates tell them apart: Kenneth''s term is a 26-day stub that overlaps Ken''s, while a successor''s
-    term starts on or after the predecessor''s ends (or is no stub). Undated House-roster rows prove no overlap.
-    A name left with more than one partner (a chain or a fork) is ambiguous and joins nothing. 2c. MO House member
-    id continuity (#151): the House keeps one member id per person across sessions and name changes (Mazzie Boyd,
-    2023, and Mazzie Christensen, 2024-26, are member 2381), so ids that share a House member id are one person
+    rule can''t join (statewide officers, judges). basis = curated. A row moves the whole person its alias_id was
+    merged into by the rules below, so naming a merged id the rules did not choose does not split the person (#174).
+    2. ids with the same exact full name (case, punctuation and spacing ignored: "Van Schoiack" and "VanSchoiack"
+    are one name, #228) are one person, basis = name_continuity, unless two of them hold different seats in more
+    than one shared year. The same seat in the same year is how a split shows (Jean Evans, Joe Adams); different
+    seats across several shared years mean two people, while a single shared year is a hand-over between seats.
+    A pair listed as different_people in official_id_links also keeps that whole name apart. 2b. two names that
+    differ only in the given name, one being the start of the other ("Steve"/"Steven" Roberts, "Ken"/"Kenneth" Jamison;
+    #263), are one person when each name belongs to exactly one such pair and the names never hold different seats
+    in the same year (across all ids of both names), and either hold a seat at the same time (their dated terms
+    in one seat overlap: start_a < end_b and start_b < end_a, an open term ending 9999-12-31; the same start day
+    overlaps, one term ending the day the other starts does not), or follow each other within a year in a different
+    chamber (a move, as Roberts went House to Senate). Overlap alone is not enough: Open States often leaves a member
+    who left mid-term with the normal term end, so a special-election successor overlaps on paper (Silvey to 2018-12-31,
+    Lauren Arthur from 2018-09-12, SD17). The shared-seat case also needs one term to be a stub (under 90 days)
+    inside the other, starting within 31 days of it; equal or nested multi-year terms do not qualify (Open States''
+    placeholder 2013-01-01 starts, #332). Years alone cannot decide the shared-seat case: Kenneth Jamison (2025
+    only) inside Ken Jamison (2025-26) is a duplicate, but Danielle Smith (2019 only, or 2026 only after a special
+    election) inside a Dan Smith successor''s span looks the same by year. Dates tell them apart: Kenneth''s term
+    is a 26-day stub that overlaps Ken''s, while a successor''s term starts on or after the predecessor''s ends
+    (or is no stub). Undated House-roster rows prove no overlap. A name left with more than one partner (a chain
+    or a fork) is ambiguous and joins nothing. 2d. duplicate stubs (#294, #292): Open States holds some members
+    twice, once as a stub. An Open States id whose only seat-term is a dated stub under 90 days joins another name
+    when that name''s dated term (90 days or more) in the same office and district contains the stub and starts
+    at most 7 days before it, the surnames match (one side may drop a one-letter middle initial: "David A." / "David"
+    Dolan) and the given names fit (mogov.first_name_fit: "Martin" / "Marty" Jacobs; not "Daniel" / "Robert"), basis
+    = duplicate_stub. Every id of the stub''s name must be such a stub, the stub must have exactly one such partner
+    name, neither name may be kept apart, and a stub name already in a rule 2b pair (Kenneth / Ken Jamison) is left
+    to rule 2b. A special-election successor never qualifies: its term starts on or after the predecessor''s ends,
+    or (when Open States leaves a departed member''s normal term end) months after the predecessor''s term starts.
+    The stub''s name joins the other name''s group, so rule 2c still applies to the joined person. 2c. MO House
+    member id continuity (#151): the House keeps one member id per person across sessions and name changes (Mazzie
+    Boyd, 2023, and Mazzie Christensen, 2024-26, are member 2381), so ids that share a House member id are one person
     whatever their names, basis = member_id_continuity. This is applied after rules 2 and 2b and joins the persons
     they made, so it also reaches ids the name rules keep apart. It skips an id that carries more than one member
     id (Open States'' Rick Roeber holds member 2215 and, through a seat-match error, Rebecca Roeber''s 1790, #152:
     the shared 1790 would join two people) and any id listed as different_people in official_id_links. Only ids
     with a roster row (a House member id) take part; Senate-only ids rely on names. 3. otherwise the id is its own
     person, basis = self. Among merged ids the person_id is an Open States id over mohouse:, then the one whose
-    service ends latest, then the smaller id. The choice never looks at the latest roster year, so an official''s
-    id does not change when they leave office. Curated rows (official_id_links) take effect only once a maintainer
-    has signed them off (checked_by filled). Grain: one row per id a legislator has been given, with the stable
-    person_id.'
+    service ends latest, then the one that is not a duplicate stub, then the smaller id. The choice never looks
+    at the latest roster year, so an official''s id does not change when they leave office. Curated rows (official_id_links)
+    take effect only once a maintainer has signed them off (checked_by and checked_on both filled, #174). Grain:
+    one row per id a legislator has been given, with the stable person_id.'
 - name: int_officials__wikidata
   description: 'Wikidata QID per official: from roster cross-references when present, else a unique exact name match
     against living Missouri officeholders on Wikidata. Grain: one row per official with a Wikidata QID.'
