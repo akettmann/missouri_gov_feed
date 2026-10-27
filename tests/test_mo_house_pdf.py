@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import time
+from pathlib import Path
 
 import duckdb
 import pytest
@@ -325,3 +326,15 @@ def test_fetch_document_reports_status_and_never_raises(monkeypatch):
     got = m.fetch_document(TEXT_1, interval=0)
     assert (got.status, got.error, got.content) == (404, "HTTP 404", None) and len(calls) == 2
     assert m.fetch_document("ftp://x/y.pdf").error == "not an http(s) URL"
+
+
+def test_amendment_words_not_glued():
+    """Real page 1 of 203 HB12 amendment 5794H02.11H: spaces are 3.0pt, the pdfplumber default x_tolerance, so the
+    default glued them (#639). The loader's setting keeps the words apart; the old call (no x_tolerance) did not."""
+    pdf = (Path(__file__).parent / "fixtures" / "mo_house_amendment_5794H02_11H_p1.pdf").read_bytes()
+    text = pdftext.page_texts(pdf, layout=False, x_tolerance=m.X_TOLERANCE)[0]
+    assert "AMEND House Committee Substitute for House Bill No. 12, Page 3," in text
+    old = pdftext.page_texts(pdf, layout=False)[0]
+    assert "AMENDHouse" in old and "AMEND House" not in old
+    row = m.extract(m.Link(AMEND, "amendment", "171", "171-HB1.XML", None, None, 1), pdf, None)
+    assert "AMEND House Committee Substitute" in row.text

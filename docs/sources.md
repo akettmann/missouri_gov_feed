@@ -329,6 +329,20 @@ Quirks:
 - Small-caps and some display glyphs can extract as NUL characters (seen in `house_fd` text); that is stored as-is.
   None appeared in the 206 extracted slice documents or in a 524-document slice of the 2018 and 2022-2025 special
   sessions; `clean_pdf_text` strips them (and other control characters) in dbt anyway, proven on a fixed row.
+- Word spacing (#639): the House's Word output sets inter-word spaces at exactly 3.0pt (12pt Times), which is
+  pdfplumber's default `x_tolerance`, so the default glued words (`AMENDHouse Committee Substitute for House Bill
+  No.12,Page 3`), mostly in amendments, also on some bill-text lines. The loader extracts with `x_tolerance=2`
+  (`X_TOLERANCE`). On 14 amendments, tokens over 25 characters fell from 0.77% to 0.16% (the rest are underscore
+  rules) and the token count rose 26,666 to 31,170; 5 bill texts, 5 fiscal notes and 4 summaries did not get worse
+  (bill texts gained 20 tokens, the others were identical). That sample understates appropriation bills: dot
+  leaders are spaced glyphs (gaps 1.7-2.7pt) that now split, so 211 HB2 (0002H.03C, 27 pages) went from 7,139 to
+  14,719 tokens and 52,391 to 59,971 chars (+14%), `Fund.....$25,927,525` becoming `Fund.. . . . . $25,927,525`;
+  171 HB1 grew 9% in chars and its 8 long tokens fell to 0; 231 0619H.01I's 5 glued whole lines fell to 0. Fiscal
+  notes, summaries and 4 of 7 amendments were byte-identical and no mid-word splits were found. For future amount
+  parsing: leaders extract as `. . . .` and an amount can stay glued to the last dot (`.7,771,056`). Re-extraction
+  of the ~68.7k PDFs costs up to ~10 CPU-hours (about 1.3 h wall with 8 shards). `x_tolerance` is part of the `pdftext` cache key,
+  so changing it makes the next `mo_house_pdf` run re-extract every document from the PDF already on disk (no
+  re-download for closed sessions) and rewrite `mo_house_pdf_texts`; old `pdftext` cache entries remain as orphans.
 
 ## mo_senate: Missouri Senate journals
 
