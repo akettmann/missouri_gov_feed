@@ -72,8 +72,8 @@ models:
     one row per (bill, committee or subcommittee, activity). activity is the label as published ("Referred to",
     "Markup by", "Reported by", "Hearings by", "Discharged from"); the wording differs between the House and Senate
     and over time ("Referred To" vs "Referred to", "Markup by" vs "Markup By"), so filter on activity_normalized
-    (lower case, hyphens as spaces, trimmed). activity_date is null only for "Bills of Interest - Exchange of Letters",
-    which the file publishes without a date. position / subposition point at the row in stg_govinfo_billstatus__committees
+    (lower case, hyphens as one space, trimmed). activity_date is null only for "Bills of Interest - Exchange of
+    Letters", which the file publishes without a date. position / subposition point at the row in stg_govinfo_billstatus__committees
     (subposition is null for a full committee).'
   data_tests:
   - dbt_utils.unique_combination_of_columns:
@@ -86,7 +86,7 @@ models:
   - dbt_utils.expression_is_true:
       name: stg_govinfo_billstatus__committee_activities_date_null_only_for_exchange_of_letters
       arguments:
-        expression: activity_date is not null or activity_normalized = 'bills of interest   exchange of letters'
+        expression: activity_date is not null or activity_normalized = 'bills of interest exchange of letters'
   columns:
   - name: bill_id
     data_tests:
@@ -104,6 +104,7 @@ models:
         arguments:
           values:
           - referred to
+          - re referred to
           - markup by
           - reported by
           - reported original measure
@@ -111,7 +112,7 @@ models:
           - hearings by (full committee)
           - hearings by (subcommittee)
           - discharged from
-          - bills of interest   exchange of letters
+          - bills of interest exchange of letters
           - unknown
   - name: activity_date
     description: Never in the future and never before 2003 (the first Congress loaded, the 108th, starts then).

@@ -11,7 +11,7 @@ with src as (
         {{ dbt.safe_cast(mogov.json_str('payload', '$.related_position'), dbt.type_int()) }} as related_position,
         {{ dbt.safe_cast(mogov.json_str('payload', '$.position'), dbt.type_int()) }} as position,
         {{ mogov.json_str('payload', '$.relationship_type') }} as relationship_type,
-        lower(trim(replace({{ mogov.json_str('payload', '$.relationship_type') }}, '-', ' ')))
+        {{ mogov.billstatus_label_normalized(mogov.json_str('payload', '$.relationship_type')) }}
             as relationship_type_normalized,
         {{ mogov.json_str('payload', '$.identified_by') }} as identified_by,
         source_url
@@ -24,9 +24,10 @@ self_relations as (
         {{ dbt.safe_cast(mogov.json_str('payload', '$.position'), dbt.type_int()) }} as related_position
     from {{ source('govinfo_billstatus', 'related_bills') }}
     where
-        {{ dbt.safe_cast(mogov.json_str('payload', '$.related_congress'), dbt.type_string()) }} || '-'
-        || lower({{ mogov.json_str('payload', '$.related_bill_type') }}) || '-'
-        || {{ dbt.safe_cast(mogov.json_str('payload', '$.related_number'), dbt.type_string()) }}
+        {{ mogov.billstatus_related_bill_id(
+            mogov.json_str('payload', '$.related_congress'),
+            mogov.json_str('payload', '$.related_bill_type'),
+            mogov.json_str('payload', '$.related_number')) }}
         = {{ mogov.json_str('payload', '$.bill_id') }}
 )
 

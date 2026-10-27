@@ -25,8 +25,8 @@ keyed as (
         related_congress,
         related_bill_type,
         related_number,
-        {{ dbt.safe_cast('related_congress', dbt.type_string()) }} || '-' || related_bill_type || '-'
-        || {{ dbt.safe_cast('related_number', dbt.type_string()) }} as related_bill_id,
+        {{ mogov.billstatus_related_bill_id('related_congress', 'related_bill_type', 'related_number') }}
+            as related_bill_id,
         title,
         latest_action_date,
         latest_action_text,
@@ -36,4 +36,4 @@ keyed as (
 
 select *
 from keyed
-where related_bill_id <> bill_id
+where related_bill_id is null or related_bill_id <> bill_id

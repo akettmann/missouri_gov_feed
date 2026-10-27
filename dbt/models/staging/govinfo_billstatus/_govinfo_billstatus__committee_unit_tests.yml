@@ -73,7 +73,7 @@ unit_tests:
   - name: billstatus_activity_normalized_unifies_case_and_hyphens
     model: stg_govinfo_billstatus__committee_activities
     description: >
-      activity_normalized is lower case, hyphens as spaces and trimmed, so the case variants (Markup By / Markup by)
+      activity_normalized is lower case, hyphens as spaces, runs of spaces and hyphens collapsed to one space, and trimmed, so the case variants (Markup By / Markup by)
       and the undated "Bills of Interest - Exchange of Letters" (no date in the file) map to one value each.
     given:
       - input: source('govinfo_billstatus', 'committee_activities')
@@ -81,12 +81,14 @@ unit_tests:
         rows: |
             select cast('{"bill_id": "118-hr-1", "position": 0, "subposition": null, "activity_position": 0, "system_code": "hsba00", "activity": "Markup By", "activity_date": "2023-05-01T10:00:00Z"}' as varchar) as payload, 'u' as source_url union all
             select cast('{"bill_id": "118-hr-1", "position": 0, "subposition": null, "activity_position": 1, "system_code": "hsba00", "activity": "Markup by ", "activity_date": "2023-05-02T10:00:00Z"}' as varchar) as payload, 'u' as source_url union all
-            select cast('{"bill_id": "118-hr-3935", "position": 0, "subposition": null, "activity_position": 0, "system_code": "hssy00", "activity": "Bills of Interest - Exchange of Letters", "activity_date": null}' as varchar) as payload, 'u' as source_url
+            select cast('{"bill_id": "118-hr-3935", "position": 0, "subposition": null, "activity_position": 0, "system_code": "hssy00", "activity": "Bills of Interest - Exchange of Letters", "activity_date": null}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-hr-2", "position": 0, "subposition": null, "activity_position": 0, "system_code": "hsba00", "activity": " Markup  by -- Full  Committee ", "activity_date": null}' as varchar) as payload, 'u' as source_url
     expect:
       rows:
         - {bill_id: 118-hr-1, position: 0, subposition: null, activity_position: 0, system_code: hsba00, activity: Markup By, activity_normalized: markup by, activity_date: '2023-05-01'}
         - {bill_id: 118-hr-1, position: 0, subposition: null, activity_position: 1, system_code: hsba00, activity: 'Markup by ', activity_normalized: markup by, activity_date: '2023-05-02'}
-        - {bill_id: 118-hr-3935, position: 0, subposition: null, activity_position: 0, system_code: hssy00, activity: Bills of Interest - Exchange of Letters, activity_normalized: bills of interest   exchange of letters, activity_date: null}
+        - {bill_id: 118-hr-3935, position: 0, subposition: null, activity_position: 0, system_code: hssy00, activity: Bills of Interest - Exchange of Letters, activity_normalized: bills of interest exchange of letters, activity_date: null}
+        - {bill_id: 118-hr-2, position: 0, subposition: null, activity_position: 0, system_code: hsba00, activity: ' Markup  by -- Full  Committee ', activity_normalized: markup by full committee, activity_date: null}
 
   - name: billstatus_relationship_type_normalized_unifies_hyphens_and_self_relations_are_dropped
     model: stg_govinfo_billstatus__related_bill_relationships
