@@ -223,3 +223,45 @@ unit_tests:
         - {session_code: '251', bill: HB1, document_kind: amendment, document_url: 'https://documents.house.mo.gov/a/am1.pdf', document_index: 1, label: House Amendment 1}
         - {session_code: '251', bill: HB1, document_kind: amendment, document_url: 'https://documents.house.mo.gov/a/am2.pdf', document_index: 2, label: House Amendment 2}
         - {session_code: '251', bill: HB1, document_kind: amendment_map, document_url: 'https://documents.house.mo.gov/m/am1.pdf', document_index: 1, label: House Amendment 1}
+
+  - name: vote_bills_skip_unpublished_roll_calls
+    model: fct_vote_bills
+    description: >
+      The bill XML links roll-call PDFs the House never published (#538: 241 HB2634 names 062.013.pdf, which is not a
+      PDF) and staging drops roll calls that are not real votes. A link counts only when the roll call is in
+      stg_mo_house__rollcalls: rc/1 links to HB1, but HB2's rc/2 (not staged) links to nothing. A link that joins
+      the bill without checking staging fails this test.
+    given:
+      - input: ref('int_bills__status')
+        format: sql
+        rows: |
+            select '241' as session_code, 'HB1' as bill, 'signed' as status
+      - input: ref('int_bills__list')
+        format: sql
+        rows: |
+            select '241' as session_code, 'HB1' as bill union all
+            select '241', 'HB2'
+      - input: ref('stg_mo_house__bill_rollcalls')
+        format: sql
+        rows: |
+            select '241' as session_code, 'HB1' as bill, 'Perfected' as bill_version, 'rc/1' as rollcall_url union all
+            select '241', 'HB2', 'Perfected', 'rc/2'
+      - input: ref('stg_mo_house__rollcalls')
+        format: sql
+        rows: |
+            select 'rc/1' as rollcall_url, '241' as session_code, 'HB 1' as measure
+      - input: ref('int_mo_senate__votes')
+        format: sql
+        rows: |
+            select cast(null as varchar) as vote_id, cast(null as date) as vote_date, cast(null as varchar) as measure,
+                cast(null as varchar) as source_url
+            where 1 = 0
+      - input: ref('stg_mo_house__bill_actions')
+        format: sql
+        rows: |
+            select cast(null as varchar) as session_code, cast(null as varchar) as bill,
+                cast(null as date) as action_date
+            where 1 = 0
+    expect:
+      rows:
+        - {chamber: state_house, vote_id: rc/1, session_code: '241', bill: HB1, bill_version: Perfected, matched_by: roll-call link}

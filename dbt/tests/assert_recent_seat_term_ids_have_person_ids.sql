@@ -15,5 +15,6 @@ cross join latest as l
 left join {{ ref('int_officials__person_ids') }} as x on t.openstates_id = x.alias_id
 where
     t.end_date > {{ dbt.safe_cast("'2015-01-15'", 'date') }}
-    and t.start_date <= {{ dbt.safe_cast("cast(l.year as varchar) || '-12-31'", 'date') }}
+    and t.start_date
+    <= {{ dbt.safe_cast(dbt.concat([dbt.safe_cast('l.year', dbt.type_string()), "'-12-31'"]), 'date') }}
     and x.alias_id is null

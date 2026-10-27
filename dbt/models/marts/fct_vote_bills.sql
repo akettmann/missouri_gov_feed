@@ -3,6 +3,8 @@
 --   doesn't name (all votes on Senate bills, some on House bills) fall back to the measure printed on the PDF
 --   ("HCS HB 2", "SS SCS SBs 49 & 118"): every bill number it names, matched to that session's bills (int_bills__list,
 --   the list fct_bills uses, so special-session Senate bills the House XML lists are matched too).
+--   Only roll calls in stg_mo_house__rollcalls are linked: a link to a PDF that was never published or that staging
+--   drops (test records, other sessions' PDFs) names a vote that does not exist.
 --   Senate journal votes: the vote's measure ("HB 2", "SB 974") read from the journal text. Regular-session (R) and
 --   veto-session (V) journals match that year's regular session (the bill list fct_bills uses, int_bills__list: House
 --   bills from the House export, Senate bills from the topical index). Extraordinary-session journals (S1, S2, T1,
@@ -161,6 +163,10 @@ select distinct
     r.bill_version,
     'roll-call link' as matched_by
 from {{ ref('stg_mo_house__bill_rollcalls') }} as r
+-- only roll calls that survived staging: the XML also links PDFs the House never published (the fetch returns
+-- something that is not a PDF, e.g. 55 links in 2020-2024), and staging drops out-of-year, test and duplicate PDFs.
+-- Those have no votes, so a link to them would point at a vote_id nothing else knows.
+inner join {{ ref('stg_mo_house__rollcalls') }} as sr on r.rollcall_url = sr.rollcall_url
 left join relisted as rl on r.session_code = rl.session_code and r.bill = rl.bill
 where r.rollcall_url is not null and rl.bill is null
 

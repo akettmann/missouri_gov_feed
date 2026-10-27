@@ -835,10 +835,11 @@ unit_tests:
   - name: person_ids_join_an_undated_open_states_term_to_a_roster_key_in_the_same_seat
     model: int_officials__person_ids
     description: >
-      The shape an undated Open States term (#512) takes when the House seat match does not tie the roster to it:
-      Rebecca Roeber, HD34, is mohouse:1790 on the roster in 2017-2020, and her Open States term has no start and ends
-      2019-07-30, so identity_terms gives it one row, 2019, with no start and no House member id. Same exact name and
-      the same seat in the one shared year, so the two ids are one person (name_continuity), and the Open States id
+      A hypothetical shape: an undated Open States term (#512) that the House seat match has not tied to the roster.
+      It is modelled on Rebecca Roeber, HD34 (mohouse:1790 on the roster in 2017-2020; her Open States term has no
+      start and ends 2019-07-30), but in current data her roster rows already carry her Open States id
+      (ocd-person/ad28c002), so this exact case does not occur. The Open States term has one identity_terms row, 2019, with no start and no House member id.
+      Same exact name and the same seat in the one shared year, so the two ids are one person (name_continuity), and the Open States id
       wins over the fallback key. Without the undated row the Open States id had no evidence and the two stayed apart.
     given:
       - input: ref('int_officials__identity_terms')
