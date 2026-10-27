@@ -18,7 +18,7 @@ import json
 import os
 import sys
 import typing
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -28,6 +28,7 @@ import duckdb
 import structlog
 
 from mogov.config import RAW_DIR
+from mogov.http import tmp_sibling
 
 log = structlog.get_logger()
 
@@ -97,13 +98,15 @@ def own_rows_sql(table: str, keys: Iterable[str], recency: str = "landed_at", *,
     coexisting (a shard-count change leaves the old parts until the new count has fully landed, see
     `_drop_other_shard_counts`). Keeps one row per `keys`: the latest by `recency`, ties broken by the part file
     name, which is unique, so the choice is deterministic. `recency` is any expression; rows where it is NULL rank
-    oldest. `union_by_name` reads parts whose columns differ (columns added since an older landing are NULL)."""
+    oldest. `union_by_name` reads parts whose columns differ (columns added since an older landing are NULL).
+    The part name is read into a private column (`_own_part`), not DuckDB's default `filename`, so a table that
+    has its own `filename` column (every `replace_csv` table does) comes back intact."""
     cols = ", ".join(keys)
     by_name = "union_by_name = true, " if union_by_name else ""
     return (
-        f"select * exclude (_rn, filename) from (select *, row_number() over ("
-        f"partition by {cols} order by {recency} desc nulls last, filename desc) as _rn "
-        f"from read_parquet('{raw_glob(table)}', {by_name}filename = true)) where _rn = 1"
+        f"select * exclude (_own_rn, _own_part) from (select *, row_number() over ("
+        f"partition by {cols} order by {recency} desc nulls last, _own_part desc) as _own_rn "
+        f"from read_parquet('{raw_glob(table)}', {by_name}filename = '_own_part')) where _own_rn = 1"
     )
 
 
@@ -119,7 +122,7 @@ def migrate_legacy_layout() -> None:
 def _publish(con: duckdb.DuckDBPyConnection, select_sql: str, table: str, shard: Shard, params=None) -> int:
     folder = table_dir(table)
     dest = folder / shard.part_name
-    tmp = folder / f".{shard.part_name}.{os.getpid()}.part"
+    tmp = tmp_sibling(dest)
     try:
         con.execute(f"copy ({select_sql}) to '{tmp.as_posix()}' (format parquet, compression zstd)", params or [])
         tmp.replace(dest)
@@ -198,9 +201,15 @@ else:
         fcntl.flock(fd, fcntl.LOCK_UN)
 
 
+def _scratch_path(table: str, shard: Shard) -> Path:
+    """A fresh JSONL scratch file for a sink. Named like http.tmp_sibling (pid + uuid): the pid alone is not
+    unique across containers sharing a directory. `_clear_stale_scratch` matches it by the `.<part>.` prefix."""
+    return tmp_sibling(table_dir(table) / shard.part_name).with_suffix(".jsonl")
+
+
 def _clear_stale_scratch(table: str, shard: Shard) -> None:
     """Delete this shard's scratch files for <table> left by runs that were killed before they could clean up
-    (they are named .<part>.<pid>.jsonl / .<part>.<pid>.part, so each is one dead run's). A shard is a single
+    (they are named .<part>.<pid>.<uuid>.jsonl / .part, so each is one dead run's). A shard is a single
     writer, and a killed run's rows are never wanted, so starting a sink for the shard makes them stale."""
     folder = table_dir(table)
     # a run that starts and then crashes must count as "not landed", not as the empty shard an old marker says
@@ -269,18 +278,28 @@ def _drop_other_shard_counts(folder: Path, shard: Shard) -> None:
             _unlink_lock_if_free(lock_path)
 
 
+@contextlib.contextmanager
+def _shard_locked(table: str, shard: Shard) -> Iterator[None]:
+    """Hold the (table, shard) lock for a one-shot write (remove_part, replace_csv), as a sink does for its life.
+    The lock is non-blocking, so it can never deadlock: a second holder, even in the same process (flock locks
+    belong to the open file, not the process), fails at once with ShardBusyError. Callers must not nest it with
+    a sink on the same (table, shard)."""
+    lock = _ShardLock(table, shard)
+    lock.acquire()
+    try:
+        yield
+    finally:
+        lock.release()
+
+
 def remove_part(table: str, shard: Shard = UNSHARDED) -> None:
     """This shard has nothing for <table> (e.g. it owns none of its files): drop any part it wrote before.
     Parts from a previous shard count stay until every shard of the new count has landed (this one is recorded
     with a `.none` marker, so owning nothing doesn't stall that), so the table is never left empty mid-run."""
     folder = table_dir(table)
-    lock = _ShardLock(table, shard)
-    lock.acquire()  # fail fast if a sink is writing this shard
-    try:
+    with _shard_locked(table, shard):
         (folder / shard.part_name).unlink(missing_ok=True)
         _none_marker(folder, shard).write_bytes(b"")
-    finally:
-        lock.release()
     _drop_other_shard_counts(folder, shard)
 
 
@@ -332,7 +351,7 @@ class JsonSink:
         if table not in self._files:
             _lock_shard(self._locks, table, self.shard)
             _clear_stale_scratch(table, self.shard)
-            path = table_dir(table) / f".{self.shard.part_name}.{os.getpid()}.jsonl"
+            path = _scratch_path(table, self.shard)
             self._files[table] = (path, path.open("w", encoding="utf-8"))
         return self._files[table][1]
 
@@ -407,7 +426,7 @@ class TableSink:
         if table not in self._files:
             _lock_shard(self._locks, table, self.shard)
             _clear_stale_scratch(table, self.shard)
-            path = table_dir(table) / f".{self.shard.part_name}.{os.getpid()}.jsonl"
+            path = _scratch_path(table, self.shard)
             self._types[table] = row_type
             self._files[table] = (path, path.open("w", encoding="utf-8"))
         return self._files[table][1]
@@ -469,7 +488,7 @@ def replace_csv(table: str, path: Path | list[Path], *, shard: Shard = UNSHARDED
         return 0
     opts = {"all_varchar": True, "header": True, "union_by_name": True, "filename": True, **read_opts}
     opt_sql = ", ".join(f"{k} = {_sql_literal(v)}" for k, v in opts.items())
-    with _connect() as con:
+    with _shard_locked(table, shard), _connect() as con:  # fail fast if a sink or another run is writing this shard
         return _publish(con, f"select * from read_csv({_sql_literal(paths)}, {opt_sql})", table, shard)
 
 

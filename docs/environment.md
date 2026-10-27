@@ -356,7 +356,10 @@ Each shard replaces only its own part. If you change the shard count, run every 
 `dbt build`. Parts left by the old count are deleted only once every shard of the new count has landed (a shard
 that owns no data leaves a hidden `.none` marker instead), so shards that start late still see the old history.
 Until then dbt would read both counts and double-count rows: building mid-transition shows up as
-uniqueness test failures on the staging models (loaders reading their own tables dedupe, dbt does not).
+uniqueness test failures on the staging models (loaders reading their own tables dedupe, dbt does not). One
+consequence: a file that exists only in an old-count part (say one the House stopped publishing) is still listed
+by `mo_house.landed_files` until the transition completes and the old parts are deleted, so shard 0 of the new
+count may parse it once more; it disappears on the next run.
 
 Every shard of a loader must finish before any loader that reads its tables starts (not only before `dbt build`):
 `mo_house_pdf` reads `mo_house`'s link tables, and while `mo_house` is between shard counts a reader that doesn't
@@ -378,9 +381,11 @@ is treated as left by a crashed process. Cloud Run tasks run on separate machine
 only helps as far as Cloud Storage FUSE honours exclusive creates; expect some duplicate downloads.
 
 Temp files: every writer in the cache (`write_atomic`, large downloads, the CourtListener case filter) writes
-`.<name>.<pid>.<32 hex>.part` and renames it into place; a failed writer deletes its own. A crash leaves the file
-behind, so the first `write_atomic` in each process sweeps the cache directory (once per process, not per write),
-and each large download sweeps its own name, deleting only such files untouched for 24 hours. A live writer's
+`.<name>.<pid>.<32 hex>.part` and renames it into place (the raw-table writers in `db.py` do the same for their
+`.part` and `.jsonl` scratch files); a failed writer deletes its own. A crash leaves the file
+behind, so the first `write_atomic` into a directory in each process sweeps that directory (every directory it
+writes to, not only the cache: raw dirs such as the `mo_house` XML dirs and govinfo `<congress>/<bill_type>/` too;
+once per directory per process, not per write), and each large download sweeps its own name, deleting only such files untouched for 24 hours. A live writer's
 file is always fresh (a small file takes milliseconds; a download rewrites its file continuously), and on a
 Cloud Storage FUSE mount a file still open for writing is not yet an object, so another task cannot list it.
 

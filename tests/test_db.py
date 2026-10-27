@@ -368,3 +368,42 @@ def test_remove_part_refuses_while_a_sink_holds_the_shard(raw_dir):
         sink.add("t", "k", {})
         with pytest.raises(db.ShardBusyError):
             db.remove_part("t", db.Shard(1, 2))
+
+
+def test_replace_csv_refuses_while_a_sink_holds_the_shard(raw_dir):
+    csv_path = raw_dir / "in.csv"
+    csv_path.write_text("a\n1\n")
+    with db.JsonSink(db.Shard(1, 2), tables=["t"]) as sink:
+        sink.add("t", "k", {})
+        with pytest.raises(db.ShardBusyError):
+            db.replace_csv("t", csv_path, shard=db.Shard(1, 2))
+    assert db.replace_csv("t", csv_path, shard=db.Shard(1, 2)) == 1  # and the lock is free again afterwards
+
+
+def test_replace_csv_releases_the_lock_on_failure(raw_dir):
+    bad = raw_dir / "missing.csv"
+    with pytest.raises(duckdb.Error):
+        db.replace_csv("t", bad)
+    csv_path = raw_dir / "in.csv"
+    csv_path.write_text("a\n1\n")
+    assert db.replace_csv("t", csv_path) == 1
+
+
+def test_sink_scratch_and_publish_temp_names_are_unique_per_run(raw_dir):
+    names = []
+    for _ in range(2):
+        with db.JsonSink(tables=["t"]) as sink:
+            sink.add("t", "k", {})
+            names.extend(p.name for p in (raw_dir / "t").glob(".*.jsonl"))
+    assert len(names) == 2 and names[0] != names[1]  # pid alone repeats across runs / containers
+    assert all(len(n.split(".")) == 6 for n in names)  # "", part-..-of-.., parquet, pid, uuid, jsonl
+
+
+def test_own_rows_sql_keeps_a_tables_own_filename_column(raw_dir):
+    csv_path = raw_dir / "in.csv"
+    csv_path.write_text("k,v\na,1\nb,2\n")
+    db.replace_csv("t", csv_path)  # replace_csv tables carry a `filename` column of their own
+    rows = duckdb.sql(db.own_rows_sql("t", ["k"], "0")).fetchall()
+    cols = duckdb.sql(db.own_rows_sql("t", ["k"], "0")).columns
+    assert cols == ["k", "v", "filename"]
+    assert sorted(r[0] for r in rows) == ["a", "b"] and all(r[2].endswith("in.csv") for r in rows)
