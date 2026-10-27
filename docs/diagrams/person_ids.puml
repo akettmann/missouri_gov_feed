@@ -4,6 +4,7 @@ skinparam componentStyle rectangle
 
 package "Inputs" {
   [stg_openstates__roles\n(Open States seat-terms)] as roles
+  [stg_openstates__people\n(Open States names)] as people
   [seed legislator_seat_corrections] as corr
   [stg_mo_house__members\n(House roster, member id)] as roster
   [seed official_id_links\n(signed rows only)] as links
@@ -38,6 +39,8 @@ package "Consumers" {
 }
 
 roles --> terms
+people --> terms
+people --> ident
 corr --> terms
 roster --> keys
 terms --> keys

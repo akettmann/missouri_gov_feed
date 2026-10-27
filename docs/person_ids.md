@@ -40,7 +40,7 @@ Source: [diagrams/person_ids.puml](diagrams/person_ids.puml)
 
 | stage | model | reads | **may not** read (it would make a dbt cycle) |
 |---|---|---|---|
-| seat-terms | `int_mo_legislators__seat_terms` | `stg_openstates__roles`, seed `legislator_seat_corrections` | anything keyed by `person_id` |
+| seat-terms | `int_mo_legislators__seat_terms` | `stg_openstates__roles`, `stg_openstates__people`, seed `legislator_seat_corrections` | anything keyed by `person_id` |
 | House seat match | `int_mo_house__member_seat_keys` | `stg_mo_house__members`, `int_mo_legislators__seat_terms` | `int_officials__person_ids` (it feeds it), so it works on raw Open States ids |
 | identity evidence | `int_officials__identity_terms` | the two above, `stg_openstates__people` | votes, payroll, `int_mo_legislators__seats` |
 | person ids | `int_officials__person_ids` | `int_officials__identity_terms`, seed `official_id_links` | `int_mo_senate__votes`, `int_mo_house__votes`, `int_mo_legislators__seats`, `int_officeholders__years`, payroll. All of these attribute rows through `person_id` |
@@ -66,9 +66,12 @@ What this means in practice:
 
 ## Rules in precedence order
 
-The rules run in this order. A later rule can join persons that an earlier one made. The final `basis`
-(`int_officials__person_ids.sql` lines 390-398) is taken in this precedence: `curated` over
-`member_id_continuity` over `name_continuity` over `self`.
+R1 is split in two. Its `different_people` rows are applied first, before R2, R2b and R2c: they only take ids
+or names out of those rules (`separated` and `keep_apart`, lines 90-101; `member_aliases`, lines 300-306). R2,
+R2b and R2c then run in that order, and a later rule can join persons that an earlier one made. Its
+`same_person` rows are applied last, in the final select (lines 382-401): they override every earlier rule, and
+can split a group that the earlier rules made. The final `basis` (lines 390-398) is taken in this precedence:
+`curated` over `member_id_continuity` over `name_continuity` over `self`.
 
 ### R0. House seat match (`int_mo_house__member_seat_keys`)
 
@@ -92,7 +95,7 @@ House roster's key that `person_ids` then reconciles.
 - Tests: unit tests `house_seat_match_breaks_same_surname_ties_on_given_name`,
   `house_departed_member_keeps_own_person_when_roster_outlives_term`,
   `house_member_with_two_given_name_anchors_keeps_the_seat_match`,
-  `house_given_name_anchor_ends_at_a_word_boundary` (`_intermediate__person_ids_unit_tests.yml`); data test
+  `house_given_name_anchor_ends_at_a_word_boundary` (#498) (`_intermediate__person_ids_unit_tests.yml`); data test
   `unique_combination_of_columns(session_code, district_number)` (`_intermediate.yml`), because grouping by seat,
   not member, could hand one member's id to a mid-session replacement (#475).
 - Must withstand: undated same-surname terms (#136), a roster that outlives a member (#152), duplicate Open States
@@ -116,20 +119,26 @@ its name group redirects only that alias, which splits the group (#174 item 3, p
   `person_ids_keep_a_different_people_pair_apart`,
   `person_ids_keep_a_signed_different_people_pair_apart_across_given_name_variants`,
   `person_ids_keep_a_signed_different_people_id_out_of_the_house_member_id_rule`.
-- Today: one row (Joe Don McGaugh, Open States id to his `mojudge:` id), unsigned, so it changes nothing.
+- Today: two rows, both unsigned, so they change nothing: Joe Don McGaugh (Open States id to his `mojudge:`
+  id) and Stephen Webber (his two Open States ids, already joined by R2; waiting for a sign-off, #663).
 
 ### R2. Exact name, spaces ignored (lines 46-101, 250-285)
 
 Ids whose full name keys are equal with spaces removed (`sq`; "Van Schoiack" = "VanSchoiack", #228) are one
-person, `basis = name_continuity`. An id's name is `max(name_key)` over its identity rows (line 51); a
-`mohouse:` id's name is the Open States name when the roster row matched one, else the roster's own name
-(`int_officials__identity_terms.sql` line 61).
+person, `basis = name_continuity`. An id's name is `max(name_key)` over its identity rows (line 51). A
+roster row's name is the Open States name when it matched one (its alias is then the Open States id); a
+`mohouse:` id carries the roster's own name (`int_officials__identity_terms.sql` line 61;
+`int_mo_house__member_seat_keys.sql` line 110 gives `mohouse:` only when no Open States id matched).
 
 - **Seat-conflict exception** (lines 73-88): if two ids of the name hold different seats (office or district)
-  in **more than one** shared year, the whole name is kept apart and every id of it stays `self`. One shared
-  year is allowed: a hand-over (Lauren Arthur in HD18 and SD17 in 2018).
-- No check on the gap between the ids' years or on how far apart the seats are (#174 item 2; a sanity test
-  for long-gap merges is planned, see #660).
+  in **more than one** shared year, the whole name is kept apart and every id of it stays `self` under the name
+  rules (R2, R2b). R2c can still join them through a shared House member id, unless a signed
+  `different_people` row excludes them. One shared year is allowed: a hand-over (Lauren Arthur in HD18 and
+  SD17 in 2018).
+- No check on the gap between the ids' years or on how far apart the seats are (#174 item 2). The data test
+  `assert_person_ids_name_continuity_gaps_plausible` (warn, #660) lists a merged id whose years neither touch
+  another id of its person nor return to the same seat within 8 years; today it lists Stephen Webber, whose
+  link waits for a sign-off (#663).
 - An undated id has one evidence year, so it can never show a seat conflict (#519). The data test
   `assert_undated_open_states_ids_share_no_name` fails if such an id shares a name with another id.
 - Tests: `person_ids_join_a_redistricted_seat_change`, `person_ids_join_a_house_fallback_key_to_the_senate_record`,
@@ -248,8 +257,8 @@ token stays unattributed.
 - Tests: `house_vote_tokens_attribute_to_one_member_or_none` (`_intermediate__unit_tests.yml`),
   `house_vote_tokens_match_compound_and_suffixed_surnames`, `house_vote_tokens_shared_surname_resolved_by_seat_dates`,
   `house_vote_tokens_cross_session_fallback_uses_seat_dates`, `house_vote_tokens_exact_surname_beats_suffix_stripped`
-  (`_intermediate__mo_house_votes_unit_tests.yml`); data test `assert_house_vote_tokens_attributed` (warn;
-  an error-level version is planned, see #660, from #629 item 3).
+  (`_intermediate__mo_house_votes_unit_tests.yml`); data test `assert_house_vote_tokens_attributed` (warn) and,
+  at error level, `assert_vote_attribution_share_per_session` (#660, from #629 item 3).
 - Open: in the fallback, seat coverage outranks name fit, which can pick the wrong person in a rare shape, and
   there is no grace window for a seat that ends just before the vote (#629 items 1-2). Open States House dates
   disagree with attendance for many members (#565), so they are only a tie-break, never a hard filter in the own
@@ -275,8 +284,8 @@ House terms keep Open States' dates.
 
 A House roster row is kept for a year unless either:
 
-1. the row carries an Open States id and that person's last Open States House term ended before January 15 of
-   the year (line 91, #152). In practice this fires only on rows the name-anchor override assigned; or
+1. the row carries an Open States id and that person's last Open States House term ended on or before January 15
+   of the year (line 91 keeps it only when `last_end_date > handover_date`, #152). In practice this fires only on rows the name-anchor override assigned; or
 2. the person's last attributed roll-call vote was before January 15, in a year that has House roll calls on or
    after January 15 (line 92, #491). The Speaker is attributed from the seed, so this works for Speakers too.
 
@@ -285,7 +294,7 @@ A Senate year is kept only when all 34 districts have a dated holder (lines 117-
 - Tests: `officeholders_house_row_dropped_when_the_roster_outlives_the_members_last_term`,
   `officeholders_house_row_dropped_when_the_members_last_roll_call_is_before_the_handover`,
   `officeholders_house_roster_kept_whole_in_a_year_with_no_roll_calls_after_the_handover`,
-  `officeholders_senate_seats_as_dated_by_the_seat_table`; data tests `assert_officeholders_house_roster_not_mass_dropped`,
+  `officeholders_senate_seats_as_dated_by_the_seat_table`; data tests `assert_officeholders_every_year_has_both_chambers`,
   `assert_officeholders_per_year_plausible`.
 - Open: a member whose later votes go unattributed could be dropped for a year they served (#547 item 1).
 
@@ -301,7 +310,9 @@ aside before pairing.
 - Senate last-vote cap: Ryan Silvey's SD17 seat ends at his last vote, 2017-09-13, so his 2018 payment ($1,836.67,
   about 19 days) is not a final check (his seat did not end in December or January) and is not tied to his seat.
   Will Kraus (SD8, last vote 2017-07-25) has no 2018 pay, so the cap agrees with payroll for him. This is
-  today's behaviour (option 1 of #551, a `needs-user` decision).
+  today's behaviour (option 1 of #551, a `needs-user` decision). Today neither has any `fct_salaries` row at
+  all: the seat pairing keeps only officials in `dim_official` (`by_seat`, line 320), which lists current
+  officials, and neither Silvey nor Kraus is one.
 - Tests: the `salaries_*` tests in `_marts__salaries_unit_tests.yml` and the `final_checks_*` tests in
   `_intermediate__final_checks_unit_tests.yml`; data test `assert_salaries_final_checks_not_paid_again_later`.
 
@@ -310,8 +321,10 @@ aside before pairing.
 A representative is matched on (session, listed district) through the House roster with the surname inside the
 sponsor name (lines 44-60). The House XML lists a member's latest district for every session, so after the
 2022-23 redistricting a member also matches on (session, surname, given name) among roster members who held the
-listed district in some session (lines 62-94, #636). A House-era row listed as 200 + a later senate district
-matches the House roster when that person later held the senate seat (lines 96-121, #646). A senator matches
+listed district in some session, but only when no member of the listed district fits the sponsor name that
+session (the `not exists own` check; lines 62-94, #636). A House-era row listed as 200 + a senate district
+matches a House roster member of that session (surname and given name) who held that senate seat at any time,
+before or after; the model does not check that the senate seat came later (lines 96-121, #646). A senator matches
 the senate seat held that year (lines 123-146). Two candidate people leave the row unmatched.
 
 - Tests: `bill_sponsors_match_redistricted_members_by_surname_and_held_district`,
@@ -341,18 +354,20 @@ local load, which may be older than the sources today.
 | `mohouse:` fallback ids | 14 raw keys on 72 roster rows (30 in 2017, 27 in 2018); every one is joined to an Open States id, so no `mohouse:` person key is left | R2 / R2c | #97 #491 |
 | Roster rows that outlive a member | 3 rows dropped: Mike Cierpiot 2018 (HD30), Scott Fitzpatrick 2019 (HD158), Rebecca Roeber 2020 (HD34) | Roster drop rules | #152 #491 |
 | Vote tokens: compound surnames, suffixes, truncation, shared surnames | 0 of 967,853 House vote rows unattributed (6.4k before #539); 0 of 75,677 Senate | Token rules above | #539 #581 #629 |
-| House seat dates vs roll-call attendance | 11,773 attributed House votes fall outside every dated Open States House seat of that person (most from the 2017 class: PHILLIPS and ADAMS 1,545 each, ARTHUR, RHOADS, MCCANN BEATTY, ALFERMAN 1,532 each) | House seat dates are only a tie-break | #565 |
+| House seat dates vs roll-call attendance | 13,133 attributed House votes fall outside every Open States House seat of that person (`int_mo_legislators__seats_as_given`): 11,773 by people with an Open States House seat (plus 1,360 by Cierpiot, 681, and Crawford, 679, who have none). Most are from the 2017 class: PHILLIPS and ADAMS 1,545 each, ALFERMAN, ARTHUR, CORNEJO, MCCANN BEATTY, RHOADS 1,532 each | House seat dates are only a tie-break | #565 |
 | Senate last-vote cap vs payroll | Silvey and Kraus (above) | Today: the cap (option 1) | #551 |
 | Federal judges without an `fjc_id` | Sarah Pitlyk and 6 newer judges (from the issue, not re-measured) | Out of scope for legislator ids: a known gap | #322 |
-| Unsigned curated row | `official_id_links.csv` has 1 row (Joe Don McGaugh, Open States id to `mojudge:`), `checked_by` empty | No effect until signed | #174 |
+| Unsigned curated rows | `official_id_links.csv` has 2 rows (Joe Don McGaugh, Open States id to `mojudge:`; Stephen Webber, his two Open States ids), `checked_by` empty | No effect until signed | #174 #663 |
 
 In all, `int_officials__person_ids` has 501 aliases and 473 persons: 473 `self`, 27 `name_continuity`, 1
 `member_id_continuity`, 0 `curated`. Data tests `assert_official_ids_one_per_person`,
 `assert_house_member_id_one_person`, `assert_undated_open_states_ids_share_no_name`,
 `assert_recent_seat_term_ids_have_person_ids`, `assert_senate_terms_have_votes`,
 `assert_senate_vote_tokens_attributed`, `assert_house_vote_tokens_attributed`,
-`assert_officeholders_house_roster_not_mass_dropped`, `assert_salaries_final_checks_not_paid_again_later` and
-`assert_bill_sponsors_roster_members_matched` pass on that copy.
+`assert_vote_attribution_share_per_session`, `assert_officeholders_every_year_has_both_chambers`,
+`assert_salaries_final_checks_not_paid_again_later`, `assert_salaries_legislature_pay_within_held_terms` and
+`assert_bill_sponsors_roster_members_matched` pass on that copy; `assert_person_ids_name_continuity_gaps_plausible`
+warns on Stephen Webber's two ids (#663).
 
 ## Case registry
 
@@ -385,7 +400,7 @@ Owner: #657.
 | Dean Van Schoiack (`mohouse:2243`) | #228 | `int_officials__person_ids` | R2 spaces ignored | `person_ids_ignore_spacing_inside_a_surname` |
 | Steven / Steve Roberts (House 2017-20, Senate 2021+) | #263 | `int_officials__person_ids` | R2b chamber move | `person_ids_join_a_given_name_variant_across_chambers` |
 | Ken / Kenneth Jamison (HD15, 2025 stub) | #263 | `int_officials__person_ids` | R2b shared-seat stub | `person_ids_join_a_given_name_variant_in_the_same_seat` |
-| Fitzwater / Dinkins, Silvey / Lauren Arthur, Kraus / Cierpiot (successors overlapping on paper) | #313 | `int_officials__person_ids` | R2b stub requirement | `person_ids_keep_a_mid_term_departure_successor_apart` (Dan/Danielle Smith shape) |
+| Fitzwater / Dinkins, Silvey / Lauren Arthur, Kraus / Cierpiot (successors overlapping on paper) | #313 | `int_officials__person_ids` | shape only: these pairs are not given-name variants, so R2b never compares them; the stub requirement guards the same shape in variant pairs | `person_ids_keep_a_mid_term_departure_successor_apart` (Dan/Danielle Smith shape) |
 | Jason Smith / Shawn Sisco (HD120), Fowler / Hubrecht (HD151) | #332 | `int_officials__person_ids` | R2b stub requirement | `person_ids_keep_placeholder_start_same_span_given_name_variants_apart`, `person_ids_keep_a_long_term_nested_in_a_longer_one_given_name_variants_apart` |
 | Stephen Webber (House to 2016-12-31, Senate from 2025) | #504 | `int_officials__identity_terms` | evidence years before the roster, then R2 | `identity_terms_cover_the_year_before_the_first_roster`; person_ids: TODO (#657) |
 | Tom Dempsey, Paul LeVota (2015 resignations) | #512 | `int_officials__identity_terms` | evidence years before the roster | TODO (#657); data test `assert_recent_seat_term_ids_have_person_ids` |
