@@ -10,13 +10,14 @@ async function run(rows, examples = 5) {
   await conn.run(`create table ov (official_id varchar, industry varchar, chamber varchar, vote_id varchar,
     session_code varchar, vote_date date, bill varchar, short_title varchar, vote_cast varchar, vote_description varchar,
     vote_source_url varchar, bill_source_url varchar)`);
-  for (const [vote_id, date, bill, desc, chamber = "state_senate", session = "S1"] of rows) {
-    await conn.run(`insert into ov values ('A','Gas',?,?,?,?,?,'t','yea',?,?,'b')`, [
+  for (const [vote_id, date, bill, desc, chamber = "state_senate", session = "S1", cast = "yea"] of rows) {
+    await conn.run(`insert into ov values ('A','Gas',?,?,?,?,?,'t',?,?,?,'b')`, [
       chamber,
       vote_id,
       session,
       date,
       bill,
+      cast,
       desc,
       vote_id,
     ]);
@@ -130,5 +131,49 @@ test("the same bill number in two sessions is two examples", async () => {
   assert.deepEqual(
     rows.map((r) => r.vote_date),
     ["2020-05-10", "2018-05-10"],
+  );
+});
+
+test("recusals are listed past the cap and flagged as not recent (#154)", async () => {
+  const rows = await run(
+    [
+      [`${J}0`, "2022-05-10", "SB3", PASS],
+      [`${J}0`, "2022-05-09", "SB2", PASS],
+      [`${J}0`, "2021-05-09", "SB1", PASS, "state_senate", "S1", "recused"],
+    ],
+    2,
+  );
+  assert.deepEqual(
+    rows.map((r) => [r.bill, r.vote_cast, r.recent]),
+    [
+      ["SB3", "yea", true],
+      ["SB2", "yea", true],
+      ["SB1", "recused", false],
+    ],
+  );
+});
+
+test("a recusal already among the recent bills is not repeated (#154)", async () => {
+  const rows = await run([[`${J}0`, "2022-05-10", "SB3", PASS, "state_senate", "S1", "recused"]]);
+  assert.deepEqual(
+    rows.map((r) => [r.bill, r.recent]),
+    [["SB3", true]],
+  );
+});
+
+test("a recusal on an earlier day of a bill is listed next to that bill's later yea (#154)", async () => {
+  const rows = await run(
+    [
+      [`${J}0`, "2022-05-09", "SB3", AMEND, "state_senate", "S1", "recused"],
+      [`${J}1`, "2022-05-10", "SB3", PASS],
+    ],
+    5,
+  );
+  assert.deepEqual(
+    rows.map((r) => [r.vote_cast, r.recent]),
+    [
+      ["yea", true],
+      ["recused", false],
+    ],
   );
 });

@@ -376,6 +376,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
                cast(count(distinct vote_id) as integer) as roll_calls,
                cast(count(distinct case when vote_cast = 'yea' then vote_id end) as integer) as yea,
                cast(count(distinct case when vote_cast = 'nay' then vote_id end) as integer) as nay,
+               cast(count(distinct case when vote_cast = 'recused' then vote_id end) as integer) as recused,
                cast(count(distinct case when vote_cast not in ('yea', 'nay') then vote_id end) as integer) as other,
                cast(count(distinct bill) as integer) as bills
         from {rpt_interest_vote_overlap}

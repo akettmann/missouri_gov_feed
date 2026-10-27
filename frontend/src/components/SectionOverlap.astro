@@ -46,6 +46,7 @@ const industryLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).repl
             <th class="num">Roll calls</th>
             <th class="num">Yea</th>
             <th class="num">Nay</th>
+            <th class="num">Recused</th>
             <th>Recent bills voted on</th>
           </tr>
         </thead>
@@ -67,9 +68,15 @@ const industryLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).repl
               <td class="num">{count(o.roll_calls)}</td>
               <td class="num">{count(o.yea)}</td>
               <td class="num">{count(o.nay)}</td>
+              <td class="num">{count(o.recused)}</td>
               <td>
                 <details>
-                  <summary class="small">{mostRecentBillsLabel(o.examples.length)}</summary>
+                  <summary class="small">
+                    {mostRecentBillsLabel(
+                      o.examples.filter((e) => e.recent).length,
+                      o.examples.filter((e) => !e.recent).length,
+                    )}
+                  </summary>
                   <ul class="ex small">
                     {o.examples.map((e) => (
                       <li>
@@ -87,6 +94,14 @@ const industryLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).repl
         </tbody>
       </table>
     </div>
+  )}
+  {overlap !== null && overlap.length > 0 && (
+    <p class="muted small">
+      "Roll calls" counts every recorded vote on these bills, including absences and non-votes, so Yea, Nay
+      and Recused may not add up to it. "Recused" is a Missouri Senate Rule 91 recusal: the senator was on the
+      floor and excused themselves from the vote. Each bill the senator recused on is listed, even past the
+      most recent bills.
+    </p>
   )}
 </section>
 

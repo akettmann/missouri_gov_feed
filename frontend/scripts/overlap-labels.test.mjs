@@ -7,6 +7,13 @@ test("one example reads singular, several plural", () => {
   assert.equal(mostRecentBillsLabel(5), "5 most recent bills");
 });
 
+test("recusals listed beyond the recent bills are named in the label (#154)", () => {
+  assert.equal(mostRecentBillsLabel(5, 1), "5 most recent bills + 1 recusal");
+  assert.equal(mostRecentBillsLabel(5, 3), "5 most recent bills + 3 recusals");
+  assert.equal(mostRecentBillsLabel(0, 2), "2 recusals");
+  assert.equal(mostRecentBillsLabel(5, 0), "5 most recent bills");
+});
+
 test("Senate journal PDFs are labeled as the day's journal, House votes as roll call", () => {
   assert.equal(
     voteLinkLabel("https://www.senate.mo.gov/22info/Journals/RDay45-2022.pdf#vote3"),
