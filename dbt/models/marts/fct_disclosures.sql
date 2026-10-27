@@ -19,7 +19,6 @@ with house_members as (
         f.doc_id,
         f.filing_year,
         f.filing_kind,
-        f.filing_type,
         f.filing_date,
         f.document_url,
         pc.period_end
@@ -49,13 +48,12 @@ house_amendment_base as (
         a.doc_id,
         b.document_url as base_url,
         b.filing_kind as base_kind,
-        b.filing_type as base_type,
         row_number() over (
             partition by a.official_id, a.doc_id
             order by
                 case
                     when b.period_end = a.period_end then 2
-                    when a.period_end is not null and (b.filing_kind = 'annual report' or b.filing_type = 'H') then 0
+                    when a.period_end is not null and b.filing_kind in ('annual report', 'new filer report') then 0
                     else 1
                 end desc,
                 b.filing_date desc,
@@ -66,7 +64,7 @@ house_amendment_base as (
         on
             a.official_id = b.official_id
             and a.filing_year = b.filing_year
-            and (b.filing_kind in ('annual report', 'candidate report', 'termination report') or b.filing_type = 'H')
+            and b.filing_kind in ('annual report', 'candidate report', 'termination report', 'new filer report')
             and a.filing_date >= b.filing_date
     where a.filing_kind = 'amended report'
 ),
@@ -76,7 +74,7 @@ house_amends as (
         official_id,
         doc_id,
         case
-            when base_kind in ('candidate report', 'termination report') or base_type = 'H' then base_url
+            when base_kind in ('candidate report', 'termination report', 'new filer report') then base_url
         end as amends_url
     from house_amendment_base
     where base_rank = 1

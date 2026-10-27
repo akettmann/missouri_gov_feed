@@ -270,9 +270,14 @@ Quirks:
   A Senate bill whose Actions tab was not landed (`mo_senate_bills.fragment_rejected`) has no actions in either
   feed and so no status: unknown, not a stage. For a session the `mo_senate_bills` loader has not landed, a Senate
   bill that never reached the House still has a null status (a lookback of ten years lands 2017 on). Until then
-  counts of failed, pending or enacted bills leave out those Senate bills; House bills are complete. Not yet seen
-  in the Senate's wording: bill withdrawals, a veto override ("Passed over Veto" is the House's phrase) and a
-  line-item veto (#715).
+  counts of failed, pending or enacted bills leave out those Senate bills; House bills are complete. Withdrawals read "Bill Withdrawn" (2024 SB 961, 1121, 1122, 1171, 1339: status "withdrawn"). A veto
+  override reads "Legislature voted to override Governor's veto" (the House's "Passed over Veto" is a different phrase),
+  preceded by one "Motion to override Governor's veto S adopted" and one "... H adopted" line that map to nothing on
+  their own (2016 SB 608, 641, 656, 844 and 994 were overridden on 2016-09-14). No other override of a Senate bill
+  was found (checked: the 2018 sample, 2021 SB 53 was signed, a full sweep of 2023's 723 SBs; 2017, 2019, 2020 and 2022
+  were not swept). The failed or skipped ones end "No motion made to override Governor's veto" (2023 SB 189; 2018
+  SCR 50 adds "when called from calendar") and map to nothing. A line-item veto never shows in the Senate feed: it is limited to appropriations, which are House bills
+  (#715).
   The same list names the special-session Senate bills (`stg_mo_house__senate_act_bills`, with titles, version, last
   action and effective date), which the Senate topical index never covers: `int_bills__list` adds those the index lacks
   (2025's 253 SB 1, 3 and 4), for `fct_bills` and `fct_vote_bills` alike. Once `mo_senate_bills` has landed a session,
@@ -359,13 +364,15 @@ fiscal_notes,amendments}`), so run `mo_house` first; no crawl is needed.
   `pdftext.MAX_SECONDS` (600 s, checked between pages); past that the document lands as an error row
   (`ExtractTimeout`) instead of hanging the shard. A single page that never returns is not interrupted. A timeout is remembered by the
   PDF's hash and the pdfplumber version (`<cache>/mo_house_pdf_timeouts/`) for the same 30 days, so later runs
-  report the error row (prefixed `(cached) `) without extracting again; an extractor upgrade retries on its own, or
+  report the error row (prefixed `(cached) `; the first run's row has no prefix, so a rerun is not byte-identical for
+  that column, which is by design: the prefix is the only record that nothing was re-extracted) without extracting again; an extractor upgrade retries on its own, or
   delete the marker file to retry sooner. The marker is written best-effort: if it cannot be written the row still
   lands and the next run tries again.
-- Changing the shard count: `db` drops the old-count parts when the first new-count shard publishes, so a shard that
-  starts later (Cloud Run waves) no longer sees the earlier rows for its URLs: one round of re-hashing, and error
-  history is lost for them. Run a full unfiltered load after changing `--shards`. `previous_files()` retries its read
-  when a part vanishes mid-listing. Tracked in #712.
+- Changing the shard count: `db` keeps the old-count parts until every shard of the new count has landed, so a shard
+  that starts late (Cloud Run waves) still sees the earlier rows for its URLs. `previous_files()` and `links()` read
+  through `db.own_rows_sql`, so while both counts exist a URL has one state row (the newest `checked_at`/`landed_at`,
+  ties to the highest part name) and `n_links` counts each link row once (a row is session, file, index; for the Senate-act tables, which hold many bills per file, also the bill); `previous_files()` also retries its read when
+  a part vanishes mid-listing. Finish every shard of `mo_house` before `mo_house_pdf` runs (see docs/environment.md).
 - A URL that is new to an already-started session/kind but outside a filtered run's kinds/sessions gets no row, so
   `assert_house_documents_have_landed_rows` fails until a full (unfiltered) run; normal syncs are unaffected.
 - Only rows fetched this run log `mo_house_pdf.failed`; carried-over and negative-cached error rows are quiet.
@@ -1105,7 +1112,8 @@ Quirks:
   The Clerk index does not say which report a House amendment amends, so it is taken to amend the latest annual,
   candidate or termination report the filer filed that year on or before it (an amendment of a candidate or
   termination report supersedes that report only) (#142, #463). Index type H is a New Filer Report (the PDF header says
-  "Filing Type: New Filer Report"; e.g. Carey OH15 #10050139, Alford MO04 #10051960), a separate report from the
+  "Filing Type: New Filer Report"; e.g. Carey OH15 #10050139, Alford MO04 #10051960; staging labels it
+  `filing_kind = 'new filer report'`, #573), a separate report from the
   Annual Report (O) of the same year, so it is a base like a candidate report: an amendment filed after an H amends
   it and supersedes it, while an H and an O of one year are both kept latest (Carey OH15 2022, Wied WI08 2025; for
   O, A, H, A as in Miller WV03 2018 the first A supersedes the O and the second the H). Whether both should be

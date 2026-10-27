@@ -1,5 +1,7 @@
 -- Sanity check (#317): in every finished session whose Senate action history is loaded, at least 95% of the
--- HB/SB/HJR/SJR rows of fct_bills have a status. A mass gap means the Senate actions did not land, or the wording
+-- House-origin (HB/HJR) rows and at least 95% of the Senate-origin (SB/SJR) rows of fct_bills each have a status
+-- (checked per chamber, so a gap in one chamber's rows cannot hide behind the other's; #715). A mass gap means the
+-- Senate actions did not land, or the wording
 -- mapping (seed mo_senate_action_flags) stopped matching. The few Senate bills whose Actions tab was rejected at
 -- load time (under 5% of a shard, #637) have no status by design (unknown, not a stage). Sessions before this
 -- year only, and only those the Senate action history covers.
@@ -11,6 +13,8 @@ with covered as (
 
 select
     b.session_code,
+    case when {{ mogov.regex_extract('b.bill', '^([A-Z]+)') }} in ('SB', 'SJR') then 'senate' else 'house' end
+        as origin_chamber,
     count(*) as bills,
     sum(case when b.status is null then 1 else 0 end) as without_status
 from {{ ref('fct_bills') }} as b
@@ -18,5 +22,7 @@ inner join covered as c on b.session_code = c.session_code
 where
     b.session_year < extract(year from current_date)
     and {{ mogov.regex_extract('b.bill', '^([A-Z]+)') }} in ('HB', 'SB', 'HJR', 'SJR')
-group by b.session_code
+group by
+    b.session_code,
+    case when {{ mogov.regex_extract('b.bill', '^([A-Z]+)') }} in ('SB', 'SJR') then 'senate' else 'house' end
 having sum(case when b.status is null then 1 else 0 end) > 0.05 * count(*)
