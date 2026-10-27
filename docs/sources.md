@@ -60,7 +60,7 @@ the only per-member House vote record.
   `rollcalls`, `hearings`, `summaries`, `fiscal_notes`, `witnesses` (each child row carries a `bill`
   column naming its Senate bill; the list has no sponsor or subject children, the sponsor is on the bill row as
   `sponsor_name`/`sponsor_district`/`sponsor_link`). Bill, text, amendment, summary, fiscal-note and witness-form
-  links reach `marts.fct_bill_documents`. Hearing notices (`_bill_hearings`, and the SenateActList's) reach `marts.fct_bill_hearings` (18,739 + 593 rows, 2017-2026; one row per notice, a moved hearing is noticed again and the XML has no cancelled flag; comments holding an email address are withheld). The roll-call PDFs land as `mo_house_rollcalls` and
+  links reach `marts.fct_bill_documents`. Hearing notices (`_bill_hearings`, and the SenateActList's) reach `marts.fct_bill_hearings` (18,739 + 593 rows, 2017-2026; one row per notice, a moved hearing is noticed again and the XML has no cancelled flag; email addresses and phone numbers in comments are replaced by a marker; an exact repeat of a notice is flagged `is_superseded`). The roll-call PDFs land as `mo_house_rollcalls` and
   `mo_house_rollcall_votes`.
 - Window: `MOGOV_LOOKBACK_YEARS` (default 10). Roll-call PDFs go back to 2014.
 - Shard units: session codes (XML) and session days (roll-call PDFs).
