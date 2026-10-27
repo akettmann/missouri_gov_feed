@@ -413,3 +413,29 @@ def test_repeal_rows_in_any_attribute_layout():
         {"kind": "repealed", "section": "1.5", "bid": 3, "note": "(Repealed 1975)", "date": "1/2/1975"},
         {"kind": "transferred", "section": "2.5", "bid": 4, "note": "(Transferred; now 3.5)", "date": None},
     ]
+
+
+@pytest.mark.parametrize(
+    "href",
+    [
+        "https://example.com/main/OneChapter.aspx?chapter=7",
+        "http://revisor.mo.gov/main/OneChapter.aspx?chapter=7",
+        "//example.com/main/OneChapter.aspx?chapter=7",
+    ],
+)
+def test_links_to_other_hosts_are_not_followed(href):
+    assert mo_revisor.chapter_link(href) is None
+    assert (
+        mo_revisor.section_link(href.replace("OneChapter", "PageSelect").replace("chapter=7", "section=1.5&bid=3"))
+        is None
+    )
+    assert parse_toc(f"<details><summary><span>T</span></summary><a href='{href}'>7 Seven</a></details>") == []
+    assert mo_revisor.chapter_link("/main/OneChapter.aspx?chapter=7") == "7"
+
+
+def test_parser_never_touches_the_network():
+    page = (
+        '<!DOCTYPE html SYSTEM "http://example.invalid/x.dtd">'
+        '<a href="/main/PageSelect.aspx?section=1.5&amp;bid=3">s</a>'
+    )
+    assert parse_chapter(page) == [("1.5", 3)]
