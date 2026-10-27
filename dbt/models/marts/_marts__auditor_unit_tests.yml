@@ -6,11 +6,10 @@ unit_tests:
     model: fct_audit_report_officeholders
     description: >
       r1 is the Treasurer's final audit "Period July 1, 2016 through January 9, 2017": it ends on the day Schmitt
-      took office, so Zweifel (2009-2017) is credited and Schmitt (2017-2019, term from January 15) is not. r2 is
+      took office, so Zweifel (2009-2017) is credited and Schmitt (2017-2019, term from 2017-01-09) is not. r2 is
       "Year Ended June 30, 2012" (2011-07-01 to 2012-06-30): Steelman's term ended 2009, Zweifel's covers it. r3 is
       a period spanning two holders (Governor, 2017-06-01 to 2018-12-31): Greitens (2017-2018) and Parson (2018-2025)
-      are both credited; Nixon's term ended in the 2017 inauguration year, so it ends January 15 2017 and he is not. Two current officials share Greitens' first and last name, so no
-      official_id is guessed for him. r4 is a county audit and r5 an "other" report: neither has rows, even
+      are both credited; Nixon's term ended 2017-01-09, so he is not. Greitens has no official_id. r4 is a county audit and r5 an "other" report: neither has rows, even
       though they name the same period.
     given:
       - input: ref('int_mo_auditor__reports')
@@ -20,21 +19,14 @@ unit_tests:
           - {report_number: r3, entity_type: statewide_office, office: governor, release_date: '2019-09-11', audit_period_start: '2017-06-01', audit_period_end: '2018-12-31'}
           - {report_number: r4, entity_type: county, office: null, release_date: '2018-03-01', audit_period_start: '2016-07-01', audit_period_end: '2017-06-30'}
           - {report_number: r5, entity_type: other, office: null, release_date: '2018-03-01', audit_period_start: '2016-07-01', audit_period_end: '2017-06-30'}
-      - input: ref('int_bluebook__statewide_officeholders')
+      - input: ref('int_statewide__terms')
         rows:
-          - {office: state_treasurer, full_name: Sarah Steelman, party: R, term_start_year: 2005, term_end_year: 2009}
-          - {office: state_treasurer, full_name: Clint Zweifel, party: D, term_start_year: 2009, term_end_year: 2017}
-          - {office: state_treasurer, full_name: Eric S. Schmitt, party: R, term_start_year: 2017, term_end_year: 2019}
-          - {office: governor, full_name: Jeremiah W. (Jay) Nixon, party: D, term_start_year: 2009, term_end_year: 2017}
-          - {office: governor, full_name: Eric Greitens, party: R, term_start_year: 2017, term_end_year: 2018}
-          - {office: governor, full_name: Michael L. Parson, party: R, term_start_year: 2018, term_end_year: 2025}
-      - input: ref('statewide_office_handovers')
-        rows:
-          - {office: governor, family_name: nobody, term_start_year: 1900, term_start: null, term_end: null}
-      - input: ref('int_officials__name_keys')
-        rows:
-          - {official_id: dup_a, variant_key: eric greitens, given_key: eric, family_key: greitens}
-          - {official_id: dup_b, variant_key: eric greitens, given_key: eric, family_key: greitens}
+          - {office: state_treasurer, full_name: Sarah Steelman, party: R, term_start_year: 2005, term_end_year: 2009, term_start: '2005-01-10', term_end: '2009-01-12', official_id: null}
+          - {office: state_treasurer, full_name: Clint Zweifel, party: R, term_start_year: 2009, term_end_year: 2017, term_start: '2009-01-12', term_end: '2017-01-09', official_id: null}
+          - {office: state_treasurer, full_name: Eric S. Schmitt, party: R, term_start_year: 2017, term_end_year: 2019, term_start: '2017-01-09', term_end: '2019-12-31', official_id: null}
+          - {office: governor, full_name: Jeremiah W. (Jay) Nixon, party: R, term_start_year: 2009, term_end_year: 2017, term_start: '2009-01-12', term_end: '2017-01-09', official_id: null}
+          - {office: governor, full_name: Eric Greitens, party: R, term_start_year: 2017, term_end_year: 2018, term_start: '2017-01-09', term_end: '2018-12-31', official_id: null}
+          - {office: governor, full_name: Michael L. Parson, party: R, term_start_year: 2018, term_end_year: 2025, term_start: '2018-01-08', term_end: '2025-01-13', official_id: null}
     expect:
       rows:
         - {report_number: r1, office: state_treasurer, full_name: Clint Zweifel, official_id: null, link_basis: audit_period}
@@ -57,21 +49,15 @@ unit_tests:
           - {report_number: r1, entity_type: statewide_office, office: lt_governor, release_date: '2019-07-18', audit_period_start: null, audit_period_end: null}
           - {report_number: r2, entity_type: statewide_office, office: lt_governor, release_date: '2019-01-08', audit_period_start: null, audit_period_end: null}
           - {report_number: r3, entity_type: statewide_office, office: governor, release_date: '2026-07-02', audit_period_start: null, audit_period_end: null}
-      - input: ref('int_bluebook__statewide_officeholders')
+      - input: ref('int_statewide__terms')
         rows:
-          - {office: lt_governor, full_name: Peter D. Kinder, party: R, term_start_year: 2005, term_end_year: 2017}
-          - {office: lt_governor, full_name: Michael L. Parson, party: R, term_start_year: 2017, term_end_year: 2018}
-          - {office: lt_governor, full_name: Mike Kehoe, party: R, term_start_year: 2018, term_end_year: 2025}
-          - {office: lt_governor, full_name: David Wasinger, party: R, term_start_year: 2025, term_end_year: null}
-          - {office: governor, full_name: Eric Greitens, party: R, term_start_year: 2017, term_end_year: 2018}
-          - {office: governor, full_name: Michael L. Parson, party: R, term_start_year: 2018, term_end_year: 2025}
-          - {office: governor, full_name: Mike Kehoe, party: R, term_start_year: 2025, term_end_year: null}
-      - input: ref('statewide_office_handovers')
-        rows:
-          - {office: governor, family_name: nobody, term_start_year: 1900, term_start: null, term_end: null}
-      - input: ref('int_officials__name_keys')
-        rows:
-          - {official_id: kehoe_id, variant_key: mike kehoe, given_key: mike, family_key: kehoe}
+          - {office: lt_governor, full_name: Peter D. Kinder, party: R, term_start_year: 2005, term_end_year: 2017, term_start: '2005-01-10', term_end: '2017-01-09', official_id: null}
+          - {office: lt_governor, full_name: Michael L. Parson, party: R, term_start_year: 2017, term_end_year: 2018, term_start: '2017-01-09', term_end: '2018-12-31', official_id: null}
+          - {office: lt_governor, full_name: Mike Kehoe, party: R, term_start_year: 2018, term_end_year: 2025, term_start: '2018-01-08', term_end: '2025-01-13', official_id: kehoe_id}
+          - {office: lt_governor, full_name: David Wasinger, party: R, term_start_year: 2025, term_end_year: null, term_start: '2025-01-13', term_end: '9999-12-31', official_id: null}
+          - {office: governor, full_name: Eric Greitens, party: R, term_start_year: 2017, term_end_year: 2018, term_start: '2017-01-09', term_end: '2018-12-31', official_id: null}
+          - {office: governor, full_name: Michael L. Parson, party: R, term_start_year: 2018, term_end_year: 2025, term_start: '2018-01-08', term_end: '2025-01-13', official_id: null}
+          - {office: governor, full_name: Mike Kehoe, party: R, term_start_year: 2025, term_end_year: null, term_start: '2025-01-13', term_end: '9999-12-31', official_id: kehoe_id}
     expect:
       rows:
         - {report_number: r1, full_name: Michael L. Parson, official_id: null, link_basis: release_window, window_start: '2018-01-01', window_end: '2019-07-18'}
@@ -88,9 +74,8 @@ unit_tests:
       Schmitt is credited, not Hawley (whom the whole-year convention would keep through December 31). r2 (AG, period
       2018-06-01 to 2018-12-31) credits Hawley alone. r3 (Governor, period 2018-05-01 to 2018-05-31) is before
       Greitens resigned on 2018-06-01, so Greitens only; r4 (same office, 2018-06-02 to 2018-06-30) is after it,
-      so Parson only. r5 (AG, 2025-10-01 to 2025-12-31) is after Bailey left on 2025-09-08: Hanaway only. Hawley is printed
-      "Josh Hawley" in the Manual while the official is "Joshua Hawley" with the variant "Josh Hawley", so he gets
-      his official_id from the variant key; a given/family key that fits two officials (Eric Schmitt) stays null.
+      so Parson only. r5 (AG, 2025-10-01 to 2025-12-31) is after Bailey left on 2025-09-08: Hanaway only. The terms come from int_statewide__terms
+      with the dates the handover seed gives; how a name finds its official_id is tested there.
     given:
       - input: ref('int_mo_auditor__reports')
         rows:
@@ -99,28 +84,14 @@ unit_tests:
           - {report_number: r3, entity_type: statewide_office, office: governor, release_date: '2019-03-01', audit_period_start: '2018-05-01', audit_period_end: '2018-05-31'}
           - {report_number: r4, entity_type: statewide_office, office: governor, release_date: '2019-03-01', audit_period_start: '2018-06-02', audit_period_end: '2018-06-30'}
           - {report_number: r5, entity_type: statewide_office, office: attorney_general, release_date: '2026-03-01', audit_period_start: '2025-10-01', audit_period_end: '2025-12-31'}
-      - input: ref('int_bluebook__statewide_officeholders')
+      - input: ref('int_statewide__terms')
         rows:
-          - {office: attorney_general, full_name: Josh Hawley, party: R, term_start_year: 2017, term_end_year: 2019}
-          - {office: attorney_general, full_name: Eric Schmitt, party: R, term_start_year: 2019, term_end_year: 2023}
-          - {office: attorney_general, full_name: Andrew Bailey, party: R, term_start_year: 2023, term_end_year: 2025}
-          - {office: attorney_general, full_name: Catherine L. Hanaway, party: R, term_start_year: 2025, term_end_year: null}
-          - {office: governor, full_name: Eric Greitens, party: R, term_start_year: 2017, term_end_year: 2018}
-          - {office: governor, full_name: Michael L. Parson, party: R, term_start_year: 2018, term_end_year: 2025}
-      - input: ref('statewide_office_handovers')
-        rows:
-          - {office: attorney_general, family_name: Hawley, term_start_year: 2017, term_start: null, term_end: '2019-01-03'}
-          - {office: attorney_general, family_name: Schmitt, term_start_year: 2019, term_start: '2019-01-03', term_end: '2023-01-03'}
-          - {office: attorney_general, family_name: Bailey, term_start_year: 2023, term_start: '2023-01-03', term_end: '2025-09-08'}
-          - {office: attorney_general, family_name: Hanaway, term_start_year: 2025, term_start: '2025-09-08', term_end: null}
-          - {office: governor, family_name: Greitens, term_start_year: 2017, term_start: null, term_end: '2018-06-01'}
-          - {office: governor, family_name: Parson, term_start_year: 2018, term_start: '2018-06-01', term_end: null}
-      - input: ref('int_officials__name_keys')
-        rows:
-          - {official_id: hawley_id, variant_key: joshua hawley, given_key: joshua, family_key: hawley}
-          - {official_id: hawley_id, variant_key: josh hawley, given_key: joshua, family_key: hawley}
-          - {official_id: schmitt_a, variant_key: eric schmitt, given_key: eric, family_key: schmitt}
-          - {official_id: schmitt_b, variant_key: eric schmitt, given_key: eric, family_key: schmitt}
+          - {office: attorney_general, full_name: Josh Hawley, party: R, term_start_year: 2017, term_end_year: 2019, term_start: '2017-01-09', term_end: '2019-01-03', official_id: hawley_id}
+          - {office: attorney_general, full_name: Eric Schmitt, party: R, term_start_year: 2019, term_end_year: 2023, term_start: '2019-01-03', term_end: '2023-01-03', official_id: null}
+          - {office: attorney_general, full_name: Andrew Bailey, party: R, term_start_year: 2023, term_end_year: 2025, term_start: '2023-01-03', term_end: '2025-09-08', official_id: null}
+          - {office: attorney_general, full_name: Catherine L. Hanaway, party: R, term_start_year: 2025, term_end_year: null, term_start: '2025-09-08', term_end: '9999-12-31', official_id: null}
+          - {office: governor, full_name: Eric Greitens, party: R, term_start_year: 2017, term_end_year: 2018, term_start: '2017-01-09', term_end: '2018-06-01', official_id: null}
+          - {office: governor, full_name: Michael L. Parson, party: R, term_start_year: 2018, term_end_year: 2025, term_start: '2018-06-01', term_end: '2025-01-13', official_id: null}
     expect:
       rows:
         - {report_number: r1, full_name: Eric Schmitt, official_id: null}

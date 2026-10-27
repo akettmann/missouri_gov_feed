@@ -13,7 +13,9 @@
        exactly ONE leftover notice and exactly ONE leftover full-report line (a donor-less line counts, so it blocks the
        match) is a pair when both lines name the same city and state and the donor names are loose_name_key twins, or
        within a couple of letters of each other (typos: "Lathrop GPM" / "Lanthrop GPM") on names of 10+ characters
-       with the same digits ("LIUNA Local 110 PAC Fund" is not "LIUNA Local 100 PAC Fund"). With two or more leftover
+       with the same digits ("LIUNA Local 110 PAC Fund" is not "LIUNA Local 100 PAC Fund"), and only when every word
+       that differs between the two names is 5+ letters long in both ("Citizens for Ann Smith" is not "Citizens for
+       Anne Smith", #735; see name_typo_match). With two or more leftover
        lines on either side it is unknowable who gave what, so every notice is kept.
 
     3. Abbreviations and added words (#557, #634). The same tier also pairs names where, word by word, one is a prefix of the
@@ -119,6 +121,31 @@
     )
 {%- endmacro %}
 
+{#- True when two loose_name_keys differ by a typo (#542, #735): both names 10+ characters, at most two edits and at
+    most one edit per ten characters (the digits are compared by the caller). A name is not a typo of another when the
+    edit changes a short word: "Ann Smith" / "Anne Smith", "Joan" / "John" are two people, so every word that differs
+    between the names (compared by position) must be 5+ letters in both names. "Lathrop GPM" / "Lanthrop GPM" and
+    "Fran Froelich" / "Fran Froehlich" still pair. Compares up to 12 words; a longer name never pairs this way.
+    Names with different word counts never pair through this tier (a missing word has length 0).
+    n_a, n_b are the word counts of a, b (columns or expressions). -#}
+{% macro name_typo_match(a, b, n_a, n_b) -%}
+    (
+        length({{ a }}) >= 10
+        and length({{ b }}) >= 10
+        and {{ mogov.edit_distance(a, b) }} <= 2
+        and 10 * {{ mogov.edit_distance(a, b) }} <= greatest(length({{ a }}), length({{ b }}))
+        and greatest({{ n_a }}, {{ n_b }}) <= 12
+        {%- for i in range(1, 13) %}
+        {%- set wa = "coalesce(" ~ dbt.split_part(a, "' '", i) ~ ", '')" %}
+        {%- set wb = "coalesce(" ~ dbt.split_part(b, "' '", i) ~ ", '')" %}
+        and (
+            {{ wa }} = {{ wb }}
+            or (length({{ wa }}) >= 5 and length({{ wb }}) >= 5)
+        )
+        {%- endfor %}
+    )
+{%- endmacro %}
+
 {% macro drop_reitemized_notices(rel) -%}
 with
 
@@ -219,13 +246,7 @@ compatible as (
                 {{ mogov.regex_replace_all('notice_loose', '[^0-9]', '') }}
                 = {{ mogov.regex_replace_all('full_report_loose', '[^0-9]', '') }}
                 and (
-                    (
-                        length(notice_loose) >= 10
-                        and length(full_report_loose) >= 10
-                        and {{ mogov.edit_distance('notice_loose', 'full_report_loose') }} <= 2
-                        and 10 * {{ mogov.edit_distance('notice_loose', 'full_report_loose') }}
-                        <= greatest(length(notice_loose), length(full_report_loose))
-                    )
+                    {{ mogov.name_typo_match('notice_loose', 'full_report_loose', 'notice_words', 'full_report_words') }}
                     or {{ mogov.name_words_match('notice_loose', 'full_report_loose', 'notice_words', 'full_report_words') }}
                 )
         )

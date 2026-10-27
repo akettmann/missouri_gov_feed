@@ -846,7 +846,10 @@ def read_landed(path: str) -> bytes:
 
 
 def landed_files(shard: db.Shard) -> list[tuple[str, str, str]]:
-    """(session_code, file_name, path) of this shard's landed files, from the state table."""
+    """(session_code, file_name, path) of this shard's landed files, from the state table. While two shard counts
+    coexist (see db._drop_other_shard_counts) a file present only in an old-count part is still listed, so the
+    shard that owns its session re-parses it once; it drops out when the transition completes. Accepted: filtering
+    by the current count would hide files from shards that have not landed yet."""
     if not db.raw_exists(XmlFile.TABLE):
         return []
     with db.connect() as con:

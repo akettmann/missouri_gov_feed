@@ -163,7 +163,7 @@ unit_tests:
       rows:
         - {doc_id: wrap, page: 1, line_no: 2, schedule: 'C: earned income', owner_code: null, amount_range: '$23,542', line_text: 'KCMO Pension Plan, Benefit from Pension Plan, per $23,542.00 N/A Employee, Kansas City, MO agreement between Cleaver and KCMO City Government Comments: spouse SP account'}
         - {doc_id: wrap, page: 1, line_no: 6, schedule: 'C: earned income', owner_code: null, amount_range: null, line_text: 'Heartland Tractor Spouse Salary N/A'}
-        - {doc_id: wrap, page: 1, line_no: 7, schedule: 'C: earned income', owner_code: SP, amount_range: '$1,000', line_text: 'Beta Corp SP Salary $1,000.00 $2,000.00'}
+        - {doc_id: wrap, page: 1, line_no: 7, schedule: 'C: earned income', owner_code: null, amount_range: '$1,000', line_text: 'Beta Corp SP Salary $1,000.00 $2,000.00'}
         - {doc_id: wrap, page: 2, line_no: 2, schedule: 'E: positions', owner_code: null, amount_range: null, line_text: 'Board Member Jazz District Corporation'}
         - {doc_id: wrap, page: 2, line_no: 3, schedule: 'E: positions', owner_code: null, amount_range: null, line_text: 'Partner (together with brothers and spouses Graves Brothers Farms and Lesley Graves)'}
         - {doc_id: wrap, page: 2, line_no: 5, schedule: 'E: positions', owner_code: null, amount_range: null, line_text: 'Trustee Real Estate Trust'}

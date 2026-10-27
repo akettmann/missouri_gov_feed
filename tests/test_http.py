@@ -1,5 +1,6 @@
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -150,3 +151,16 @@ def test_write_atomic_first_call_sweeps_crashed_small_file_leftovers(tmp_path, m
     os.utime(again, (0, 0))
     http.write_atomic(tmp_path / "d.bin", b"d")
     assert again.exists()
+
+
+def test_sweep_dir_once_treats_relative_and_absolute_spellings_as_one_directory(tmp_path, monkeypatch):
+    import os
+
+    monkeypatch.setattr(http, "_swept_dirs", set())
+    monkeypatch.chdir(tmp_path)
+    http.sweep_dir_once(Path("."))
+    late = _part(tmp_path, "late.bin")  # crashed writer's leftover appearing after the first sweep
+    late.write_bytes(b"x")
+    os.utime(late, (0, 0))
+    http.sweep_dir_once(tmp_path)  # same directory, absolute: already swept
+    assert late.exists()

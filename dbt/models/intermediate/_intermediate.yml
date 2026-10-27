@@ -833,6 +833,41 @@ models:
 - name: int_officials__wikidata
   description: 'Wikidata QID per official: from roster cross-references when present, else a unique exact name match
     against living Missouri officeholders on Wikidata. Grain: one row per official with a Wikidata QID.'
+- name: int_statewide__terms
+  description: 'One row per statewide-office term in the Official Manual''s historical listings (int_bluebook__statewide_officeholders)
+    with exact start and end dates, and the current official who served it when there is one. The Manual gives whole
+    years only. Dates come from, in order: 1. the statewide_office_handovers seed when a row matches (office, term
+    start year, family name): a hand-over on a day other than the regular one (a resignation, death or appointment;
+    Hawley left the Attorney General''s office on 2019-01-03); 2. the observed swearing-in practice: a term begins
+    on the second Monday of January of its first year and ends on the second Monday of January of its last year
+    when that is an inauguration year (2017, 2021, 2025; the auditor''s 2015, 2019, 2023). RSMo 27.010 sets this
+    for the Attorney General only; the other five offices are the same by practice (2017-01-09, 2019-01-14, 2021-01-11,
+    2023-01-09, 2025-01-13); 3. otherwise the term ended mid-term in its last year and no date is known: December
+    31 of that year. The test assert_statewide_handovers_cover_mid_term_changes lists those that still need a seed
+    row. An open term (term_end_year null) ends 9999-12-31. official_id is the person''s dim_official id when they
+    also hold a tracked office today (matched on first and last name, or on a known variant such as "Josh Hawley"
+    for Open States'' "Joshua"; null for people who left public life). A name that fits two current officials matches
+    neither. A former governor who is now a senator links to the senator''s profile.'
+  data_tests:
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: term_start <= term_end
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - office
+        - full_name
+        - term_start_year
+  columns:
+  - name: office
+    data_tests:
+    - not_null
+  - name: term_start
+    data_tests:
+    - not_null
+  - name: term_end
+    data_tests:
+    - not_null
 - name: int_tap_mec__contributions
   description: 'TAP MEC contributions without the 24-hour notices that a full report itemizes again (#156): stg_tap_mec__contributions
     keeps every row of the source; everything that totals gifts (committee receipts, donor summaries, the campaign-finance
