@@ -334,7 +334,7 @@ def test_reserved_bill_with_billtype_and_billnumber_keeps_its_real_id():
 
 
 # ---- committees, subjects, related bills (#625) --------------------------------------------------------------
-# Trimmed-free copies of real 118th files: H.J.Res. 99 (a committee with a subcommittee), H.J.Res. 126 (a committee
+# Untrimmed copies of real 118th files: H.J.Res. 99 (a committee with a subcommittee), H.J.Res. 126 (a committee
 # with three dated activities, two related bills) and S.J.Res. 9 (related bills carrying two relationship types).
 HJRES99 = (FIXTURES / "BILLSTATUS-118hjres99.xml").read_bytes()
 HJRES126 = (FIXTURES / "BILLSTATUS-118hjres126.xml").read_bytes()
