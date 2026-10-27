@@ -425,8 +425,91 @@ models:
     1. Open States starts the 2017 class on January 11, but the session (and their votes) began January 4. * seed
     legislator_seat_corrections adds terms Open States lacks or cuts short (senators who left mid-term for statewide
     office), each with its source. source_start_date/source_end_date carry the dates exactly as Open States (or
-    the seed) gives them, without those adjustments (null start when undated; end 9999-12-31 while open). Grain:
-    one row per Open States legislative seat-term, under the id Open States gave.'
+    the seed) gives them, without those adjustments (null start when undated; end 9999-12-31 while open). Quality
+    flags (#656) say how far each date can be trusted; they change no other column, so consumers can move to them
+    one by one. start_quality is dated, undated (no Open States start) or placeholder (an Open States start on January
+    1, never a real start); known_start_date is the as-given start only when dated. end_quality is open, dated,
+    conflicts_with_journal (a Senate end the journal roll calls contradict: the terms int_mo_legislators__seats
+    re-dates) or conflicts_with_roster (a House end the House''s session rosters contradict), with the evidence
+    dates behind it. The column docs give each rule. The evidence is read from staging (stg_mo_senate__votes, stg_mo_house__members),
+    never from a model carrying person_id: this model is upstream of int_officials__person_ids. Grain: one row per
+    Open States legislative seat-term, under the id Open States gave.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - openstates_id
+        - chamber
+        - district_number
+        - start_date
+        - end_date
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: (known_start_date is null) = (start_quality <> 'dated')
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: start_quality <> 'dated' or known_start_date = source_start_date
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: (end_quality = 'open') = (source_end_date = cast('9999-12-31' as date)) or end_quality like
+          'conflicts%'
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: (end_quality <> 'conflicts_with_journal' or chamber = 'upper') and (end_quality <> 'conflicts_with_roster'
+          or chamber = 'lower')
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: end_quality <> 'conflicts_with_roster' or (evidence_first_date is not null and evidence_last_date
+          >= evidence_first_date)
+  columns:
+  - name: start_quality
+    description: 'How far the start date can be trusted. dated: Open States (or the seed) gives a real start. undated:
+      Open States gives none (start_date is 1900-01-01). placeholder: an Open States start on January 1 (as given),
+      which is never a real start: the General Assembly convenes in the first half of January, and Open States uses
+      January 1 of 2011, 2013, 2015 and 2017 as a stand-in for "in office by then" (111 + 79 + 4 House terms and
+      24 + 3 Senate terms start on January 1 of 2011, 2013 or 2015, one House term on 2017-01-01; every other dated
+      January start is January 4 to 11). Seed rows (legislator_seat_corrections) are always dated.'
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - dated
+          - undated
+          - placeholder
+  - name: known_start_date
+    description: source_start_date when start_quality is dated, else null. Never invented.
+  - name: end_quality
+    description: 'How far the end date can be trusted. conflicts_with_journal (Senate): a closed term whose end
+      is more than a year after its last journal token, or that runs into the journal years with no token, where
+      the journals cover every year of the term from their first date; the terms int_mo_legislators__seats re-dates.
+      A smaller gap stays dated (Jason Holsman resigned 2020-01-16 and voted last 2020-01-13). conflicts_with_roster
+      (House): the term ended before the January 15 handover of a roster year whose list has a member with its surname
+      in its district while no Open States House term matching that member runs into the year (Lauren Arthur, HD18,
+      ends 2016-12-31; the 2017-2018 rosters list her), or the list names someone else in its district every roster
+      year from some point to the term''s end, counting only years the term runs from before January 15 to past
+      May 31 (a member who left during a session is missing from its end-of-session list) and the district is listed
+      at all. Surnames match ignoring spacing and generational suffixes (Van Schoiack, Franks Jr.), or by the last
+      word of a compound roster surname. Otherwise open (no end date) or dated. A flag is evidence that the sources
+      disagree, not a correction: a roster can also outlive a member (#152).'
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - open
+          - dated
+          - conflicts_with_roster
+          - conflicts_with_journal
+  - name: evidence_first_date
+    description: 'Senate terms: the first journal vote whose token matches the term (its surname key, and district
+      when the journal gives one, on a date inside start_date..end_date, naming only one (surname key, district)
+      among the Senate terms that day; so a person Open States holds under two ids in one seat is one candidate,
+      not an ambiguous pair), for every term with one, flagged or not; null when the term has none. House terms:
+      January 1 of the first roster year behind a conflicts_with_roster flag; null otherwise.'
+  - name: evidence_last_date
+    description: 'Senate terms: the last matching journal vote, as evidence_first_date. House terms: December 31
+      of the last roster year behind a conflicts_with_roster flag; null otherwise.'
 - name: int_mo_legislators__seats
   description: 'Every Missouri legislative seat-term in Open States (current and retired people), keyed for matching:
     chamber, district number, surname key, and date range (open-ended where Open States has no date), plus person_id,
