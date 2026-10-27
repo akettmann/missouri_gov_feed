@@ -43,6 +43,15 @@ export function excusalCell(chamber: string, formatted: string): string {
   return recordsExcusals(chamber) ? formatted : "—";
 }
 
+/** The column+row decision behind the table cell: only columns flagged `excusal` are dashed, by the row's chamber. */
+export function excusalCellFor(
+  col: { excusal?: boolean },
+  row: { chamberId?: unknown },
+  formatted: string,
+): string {
+  return col.excusal ? excusalCell(String(row.chamberId), formatted) : formatted;
+}
+
 /** Public wording for a vote_cast value. Recusals are not absences, so say what they are. */
 export function voteCastLabel(voteCast: string): string {
   return voteCast === "recused" ? "recused (Senate Rule 91)" : voteCast;

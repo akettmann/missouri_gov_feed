@@ -1,7 +1,7 @@
 // Chart specs for the profile sections. Each spec turns a bundle into table rows; the server renders the
 // table (works without JS) and the client renders the same rows as an Observable Plot chart, re-running
 // the spec when "hide possible matches" changes. Pure TS, safe to bundle for the browser.
-import { excusalCell, missedShares } from "./attendance";
+import { excusalCellFor, missedShares } from "./attendance";
 import type { OfficialBundle } from "./exports/types";
 import { count, money, pct, sessionLabel } from "./format";
 import { DONOR_GROUPS, GIFT_GROUPS, giftGroup, sumBy, withoutMedium } from "./rollups";
@@ -66,7 +66,7 @@ export const MEDIUM_SUFFIX = " (possible match)";
 /** Table cell text; the label's "(possible match)" suffix (needed to keep chart bars distinct) becomes a badge. */
 export function cellText(c: Column, r: Row): string {
   const text = cellValue(c, r);
-  return c.excusal ? excusalCell(String(r.chamberId), text) : text;
+  return excusalCellFor(c, r, text);
 }
 
 function cellValue(c: Column, r: Row): string {
@@ -393,7 +393,7 @@ export const VIZ: Record<string, VizSpec> = {
     views: ["attendance", "attendance-missed"],
     viewLabel: "Attended",
     usesConfidence: false,
-    note: "● this official · ○ chamber average. Attended = voted yea, nay or present on a recorded vote.",
+    note: "● this official · ○ chamber average. Attended = voted yea, nay or present on a recorded vote. In the table, Absent with leave and Recused show a dash (—) where the source records none: only the MO Senate records leave and recusals.",
     columns: [
       { key: "session", label: "Session" },
       { key: "official", label: "Attended", pct: true },
