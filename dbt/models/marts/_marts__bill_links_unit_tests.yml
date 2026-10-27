@@ -215,6 +215,18 @@ unit_tests:
         rows: |
             select cast('251' as varchar) as session_code, cast('HB1' as varchar) as bill, cast(1 as bigint) as amendment_index, cast('House Amendment 1' as varchar) as description, cast('https://documents.house.mo.gov/a/am1.pdf' as varchar) as amendment_url, cast('https://documents.house.mo.gov/m/am1.pdf' as varchar) as map_url union all
             select '251', 'HB1', 2, 'House Amendment 2', 'https://documents.house.mo.gov/a/am2.pdf', null
+      - input: ref('stg_mo_senate__bill_texts')
+        format: sql
+        rows: |
+            select cast(null as varchar) as session_code, cast(null as varchar) as bill, cast(null as integer) as doc_index, cast(null as varchar) as document_url, cast(null as varchar) as label where false
+      - input: ref('stg_mo_senate__bill_fiscal_notes')
+        format: sql
+        rows: |
+            select cast(null as varchar) as session_code, cast(null as varchar) as bill, cast(null as integer) as doc_index, cast(null as varchar) as document_url, cast(null as varchar) as label where false
+      - input: ref('stg_mo_senate__bill_amendments')
+        format: sql
+        rows: |
+            select cast(null as varchar) as session_code, cast(null as varchar) as bill, cast(null as integer) as doc_index, cast(null as varchar) as document_url, cast(null as varchar) as label where false
       - input: ref('stg_mo_house__document_texts')
         format: sql
         rows: |
@@ -224,15 +236,15 @@ unit_tests:
             select 'https://documents.house.mo.gov/f/1.pdf', 'summary', 9, 9, true, null
     expect:
       rows:
-        - {session_code: '251', bill: HB1, document_kind: summary, document_url: 'https://documents.house.mo.gov/s/a.pdf', document_index: 1, label: Perfected, page_count: 3, text_length: 1200, has_text: true, fetch_error: null}
-        - {session_code: '251', bill: HB1, document_kind: fiscal_note, document_url: 'https://documents.house.mo.gov/f/1.pdf', document_index: 1, label: null, page_count: null, text_length: null, has_text: null, fetch_error: null}
-        - {session_code: '251', bill: SB7, document_kind: witness_form, document_url: 'https://documents.house.mo.gov/w/SB7.pdf', document_index: 1, label: Testimony, page_count: null, text_length: null, has_text: null, fetch_error: null}
-        - {session_code: '251', bill: HB1, document_kind: bill_text, document_url: 'https://documents.house.mo.gov/t/1.pdf', document_index: 1, label: Intro web, page_count: null, text_length: null, has_text: null, fetch_error: null}
-        - {session_code: '251', bill: HB1, document_kind: bill_text, document_url: 'https://documents.house.mo.gov/t/2.pdf', document_index: 2, label: Perfected, page_count: 40, text_length: 0, has_text: false, fetch_error: null}
-        - {session_code: '251', bill: HB1, document_kind: text_map, document_url: 'https://documents.house.mo.gov/m/1.pdf', document_index: 1, label: Intro web, page_count: null, text_length: null, has_text: null, fetch_error: null}
-        - {session_code: '251', bill: HB1, document_kind: amendment, document_url: 'https://documents.house.mo.gov/a/am1.pdf', document_index: 1, label: House Amendment 1, page_count: null, text_length: null, has_text: null, fetch_error: null}
-        - {session_code: '251', bill: HB1, document_kind: amendment, document_url: 'https://documents.house.mo.gov/a/am2.pdf', document_index: 2, label: House Amendment 2, page_count: null, text_length: 0, has_text: false, fetch_error: not a PDF}
-        - {session_code: '251', bill: HB1, document_kind: amendment_map, document_url: 'https://documents.house.mo.gov/m/am1.pdf', document_index: 1, label: House Amendment 1, page_count: null, text_length: null, has_text: null, fetch_error: null}
+        - {session_code: '251', bill: HB1, document_kind: summary, document_url: 'https://documents.house.mo.gov/s/a.pdf', document_index: 1, label: Perfected, page_count: 3, text_length: 1200, has_text: true, fetch_error: null, source_site: house}
+        - {session_code: '251', bill: HB1, document_kind: fiscal_note, document_url: 'https://documents.house.mo.gov/f/1.pdf', document_index: 1, label: null, page_count: null, text_length: null, has_text: null, fetch_error: null, source_site: house}
+        - {session_code: '251', bill: SB7, document_kind: witness_form, document_url: 'https://documents.house.mo.gov/w/SB7.pdf', document_index: 1, label: Testimony, page_count: null, text_length: null, has_text: null, fetch_error: null, source_site: house}
+        - {session_code: '251', bill: HB1, document_kind: bill_text, document_url: 'https://documents.house.mo.gov/t/1.pdf', document_index: 1, label: Intro web, page_count: null, text_length: null, has_text: null, fetch_error: null, source_site: house}
+        - {session_code: '251', bill: HB1, document_kind: bill_text, document_url: 'https://documents.house.mo.gov/t/2.pdf', document_index: 2, label: Perfected, page_count: 40, text_length: 0, has_text: false, fetch_error: null, source_site: house}
+        - {session_code: '251', bill: HB1, document_kind: text_map, document_url: 'https://documents.house.mo.gov/m/1.pdf', document_index: 1, label: Intro web, page_count: null, text_length: null, has_text: null, fetch_error: null, source_site: house}
+        - {session_code: '251', bill: HB1, document_kind: amendment, document_url: 'https://documents.house.mo.gov/a/am1.pdf', document_index: 1, label: House Amendment 1, page_count: null, text_length: null, has_text: null, fetch_error: null, source_site: house}
+        - {session_code: '251', bill: HB1, document_kind: amendment, document_url: 'https://documents.house.mo.gov/a/am2.pdf', document_index: 2, label: House Amendment 2, page_count: null, text_length: 0, has_text: false, fetch_error: not a PDF, source_site: house}
+        - {session_code: '251', bill: HB1, document_kind: amendment_map, document_url: 'https://documents.house.mo.gov/m/am1.pdf', document_index: 1, label: House Amendment 1, page_count: null, text_length: null, has_text: null, fetch_error: null, source_site: house}
 
   - name: vote_bills_skip_unpublished_roll_calls
     model: fct_vote_bills

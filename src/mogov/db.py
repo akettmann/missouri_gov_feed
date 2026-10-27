@@ -581,6 +581,10 @@ OPTIONAL_JSON_TABLES = {
     "epa_frs_alt_names": "epa_frs",  # added for U+FFFD name repair (#260); older raw dirs lack it
     "mo_senate_bill_list": "mo_senate_bills",  # a slow loader (~1 request/s per bill, #585): builds run without it
     "mo_senate_bill_actions": "mo_senate_bills",
+    "mo_senate_bill_texts": "mo_senate_bills",  # the bill page's document tabs (#587): older landings lack them
+    "mo_senate_bill_fiscal_notes": "mo_senate_bills",
+    "mo_senate_bill_amendments": "mo_senate_bills",
+    "mo_senate_bill_summaries": "mo_senate_bills",
     "govinfo_billstatus_files": "govinfo_billstatus",  # new source (#283): older raw dirs lack it
     "govinfo_billstatus_bills": "govinfo_billstatus",
     "govinfo_billstatus_sponsors": "govinfo_billstatus",
