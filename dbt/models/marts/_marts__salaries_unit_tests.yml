@@ -808,7 +808,7 @@ unit_tests:
     description: >
       An invented member (not a real case): the roster spells "Zed Van Fixture" with a space in the surname and the
       payroll prints "VANFIXTURE, ROBERT Q", a legal first name that does not fit Zed. The by-name step needs the
-      first name to fit, so it can't pick the row up; only the seat match can, by rule 1 (the only member of the
+      first name to fit, so it can't pick the row up; only the seat match can, by seat (the only member of the
       House with the surname that year, and the only payee), which needs the seat side to ignore spaces too. Paired
       at medium, since the first name doesn't fit (#679).
     given:

@@ -165,11 +165,13 @@ Quirks:
   Last, the seat dates break a tie between the remaining candidates only when one of their seats covers the vote
   date. The full rules, their tests and the open cases (#565, #629) are in [person_ids.md](person_ids.md).
 - A member's seat is matched to an Open States person (district, date and surname; when several same-surname terms overlap, the one whose name starts with the member's given name); when that fails the key is `mohouse:<member id>`.
-  Open States also holds some people twice (after a redistricting or a move to the Senate). Both are
+  Open States also holds some people twice (after a redistricting or a move to the Senate, or as a short duplicate
+  stub: three 2025-01-08 to 2025-02-03 stubs, Kenneth Jamison, Martin Jacobs and David A. Dolan, each beside the
+  member's full record in the same seat). All are
   reconciled to one stable `official_id` per person by `int_officials__person_ids` (the same MO House member id, which follows a name change such as Mazzie Boyd/Christensen, member 2381, #151; otherwise the same exact name, or names that differ only in the given
   name like Steve/Steven or Ken/Kenneth (#228, #263), no conflicting seats, and
   either overlapping dated terms in one seat or a chamber move (years alone cannot tell a duplicate record, Kenneth
-  Jamison's 2025 stub inside Ken's term, from a successor like Danielle after Dan Smith; dates can, using the dates exactly as Open States gives them: the January-1 adjustment used for year membership would make a January successor overlap a predecessor ending Jan 6-9. Known edge: `int_officials__identity_terms` collapses each (id, year, seat, House member id) to min(start)/max(end), spanning any gap if one id held the seat in two terms in a year); seed `official_id_links` for statewide officers and judges), #97. The rules in precedence order, with the
+  Jamison's 2025 stub inside Ken's term, from a successor like Danielle after Dan Smith; dates can, using the dates exactly as Open States gives them: the January-1 adjustment used for year membership would make a January successor overlap a predecessor ending Jan 6-9. Known edge: `int_officials__identity_terms` collapses each (id, year, seat, House member id) to min(start)/max(end), spanning any gap if one id held the seat in two terms in a year); a duplicate stub (rule 2d: an id whose only term is under 90 days, inside another name's term in the same seat and starting within 7 days of it, with the same surname and a fitting given name, so Jacobs and Dolan, which rule 2b's given-name prefix misses; Jamison is joined by rule 2b); seed `official_id_links` for statewide officers and judges), #97. The rules in precedence order, with the
   known bad inputs and a registry of the people each case covers, are in [person_ids.md](person_ids.md).
 - The site asks clients not to poll its XML more than every 30 minutes. Cached copies keep it well
   under that.

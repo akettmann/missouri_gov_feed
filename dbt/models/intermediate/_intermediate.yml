@@ -467,7 +467,7 @@ models:
       Open States gives none (start_date is 1900-01-01). placeholder: any Open States start on January 1 (as given),
       which is never a real start, as the General Assembly convenes in the first half of January. Open States uses
       January 1 of 2011, 2013 and 2015 as a stand-in for "in office by then" (111 + 79 + 4 House terms and 24 +
-      3 Senate terms); every other dated January start is January 4 to 11. 2017 has one January 1 start, Nick Schroer''s
+      3 Senate terms); every other dated January start is January 3 to 11. 2017 has one January 1 start, Nick Schroer''s
       HD107 term, a near-true case (his first term began with the session on 2017-01-04): flagged all the same,
       as the rule does not look at the year. Seed rows (legislator_seat_corrections) are always dated and taken
       at face value, January 1 included: a seed start is where the correction begins, not necessarily the first

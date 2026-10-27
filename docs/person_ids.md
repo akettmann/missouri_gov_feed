@@ -72,12 +72,13 @@ What this means in practice:
 
 ## Rules in precedence order
 
-R1 is split in two. Its `different_people` rows are applied first, before R2, R2b and R2c: they only take ids
-or names out of those rules (`separated` and `keep_apart`, lines 90-101; `member_aliases`, lines 300-306). R2,
-R2b and R2c then run in that order, and a later rule can join persons that an earlier one made. Its
-`same_person` rows are applied last, in the final select (lines 382-401): they override every earlier rule, and
-can split a group that the earlier rules made. The final `basis` (lines 390-398) is taken in this precedence:
-`curated` over `member_id_continuity` over `name_continuity` over `self`.
+R1 is split in two. Its `different_people` rows are applied first, before R2, R2b, R2d and R2c: they only take
+ids or names out of those rules (`separated` and `keep_apart`, lines 128-141; `member_aliases`, lines 416-432).
+R2, R2b, R2d and R2c then run in that order, and a later rule can join persons that an earlier one made. Its
+`same_person` rows are applied last (`same_person` and the final select, lines 506-530): they override every
+earlier rule and move the whole person the rules made, so they never split it. The final `basis` (lines 522-528)
+is taken in this precedence: `curated` over `member_id_continuity` over `duplicate_stub` over `name_continuity`
+over `self`.
 
 ### R0. House seat match (`int_mo_house__member_seat_keys`)
 
@@ -108,21 +109,28 @@ House roster's key that `person_ids` then reconciles.
 - Must withstand: undated same-surname terms (#136), a roster that outlives a member (#152), duplicate Open States
   records, a new Open States record after redistricting (#97: handled later by R2, not here).
 
-### R1. Curated `official_id_links` (`int_officials__person_ids.sql` lines 90-101, 300-306, 382-401)
+### R1. Curated `official_id_links` (`int_officials__person_ids.sql` lines 118-141, 416-432, 506-530)
 
 The seed `official_id_links.csv` holds reviewed pairs, each with a `relation`:
 
-- `same_person`: the alias, and every alias whose computed person is that alias (the `by_person` join, line
-  401), takes the row's `person_id`. `basis = curated`. Used for ids no seat rule can reach (a legislator who
-  became a state judge).
+- `same_person`: the whole person the rules merged the row's `alias_id` into takes the row's `person_id`
+  (`same_person`, lines 506-517, joined on the merged `person_id` at line 530), `basis = curated`. A row naming an
+  id the rules merged but did not choose (a `mohouse:` fallback key) still moves every id of that person, so it
+  never splits the person (#174 item 3). Two signed rows that send one merged person to different ids are a seed
+  error; the smaller `person_id` wins, so the output stays deterministic. Used for ids no seat rule can reach (a
+  legislator who became a state judge).
 - `different_people`: the name of either id is kept out of R2 and R2b (`keep_apart`), and the ids are kept out
   of R2c.
 
-A row has an effect only when signed: `checked_by` is not null (lines 94, 304, 387). `checked_on` is not
-checked (#174 item 1, planned, see #661). A signed `same_person` row aimed at an alias that is not the chosen id of
-its name group redirects only that alias, which splits the group (#174 item 3, planned, see #661).
+A row has an effect only when signed: `checked_by` and `checked_on` both filled (`signed_links`, lines 118-126,
+#174 item 1). The model ignores a row with only one of them, and the seed's `dbt_utils.expression_is_true` test in
+`dbt/seeds/_seeds.yml` (`checked_by` and `checked_on` both empty or both filled) fails the build on it, so a
+half-signed row cannot sit unnoticed. `assert_person_ids_name_continuity_gaps_plausible` exempts a pair on the
+same two-field sign-off.
 
 - Tests: `person_ids_follow_a_curated_link_to_a_judge`, `person_ids_ignore_unsigned_curated_links`,
+  `person_ids_ignore_half_signed_curated_links`,
+  `person_ids_redirect_the_whole_group_from_a_curated_link_to_a_non_chosen_alias`,
   `person_ids_keep_a_different_people_pair_apart`,
   `person_ids_keep_a_signed_different_people_pair_apart_across_given_name_variants`,
   `person_ids_keep_a_signed_different_people_id_out_of_the_house_member_id_rule`.
@@ -193,7 +201,45 @@ Two names that differ only in the given name, one given name the start of the ot
 - Must withstand: mid-term departures recorded with the normal end (#313), placeholder starts (#332), undated
   ids (#519: the chamber-move check compares first and last year, the same year for an undated id).
 - Does not cover: Martin/Marty Jacobs (#292, not a prefix) or David Dolan/David A. Dolan (#294, a middle initial).
-  Both are the same 26-day 2025 duplicate stub as Kenneth Jamison. Planned, see #661: a duplicate-stub rule.
+  Both are the same 26-day 2025 duplicate stub as Kenneth Jamison; R2d joins them (#661).
+
+### R2d. Duplicate stubs (lines 288-367)
+
+Open States holds some members twice, once as a short stub record (#292, #294). An Open States id joins another
+name, `basis = duplicate_stub`, when all of these hold:
+
+1. **The id is a stub** (`stub_terms`, lines 288-308): its only seat-term (one office and district, start and end
+   both given) lasts under 90 days. `mohouse:` ids are never stubs.
+2. **Another name's term contains it** (`stub_candidates`, lines 310-336): a term of another name in the same
+   office and district that lasts 90 days or more, starts on or before the stub's start and at most 7 days before
+   it, and ends on or after the stub's end. A special-election successor never qualifies: its term starts on or
+   after the predecessor's ends, or, when Open States leaves a departed member with the normal term end, months
+   after the predecessor's term starts.
+3. **The surnames match**: the names after the given name are equal, or equal once one side drops a leading
+   one-letter middle initial ("David A. Dolan" and "David Dolan"; not "David B. Dolan" and "David A. Dolan").
+4. **The given names fit**: `mogov.first_name_fit` of at least 1 (equal, one the start of the other, or the same
+   first three letters: "Martin" and "Marty"; not "Daniel" and "Robert").
+5. **Exactly one candidate** (`stub_links`, lines 338-348): a stub name that fits two other names joins neither.
+6. **Guards** (`stub_groups`, lines 350-367): every id of the stub's name is such a stub (a name that also has a
+   full term is a person of its own); neither name is in `keep_apart` (R2's seat conflict, or a signed
+   `different_people` row: listing either id is the maintainer's way to undo a wrong R2d join); the stub name is
+   not already in an R2b pair (Kenneth / Ken Jamison is left to R2b); the other name is not itself a stub name
+   (no chains).
+
+The stub's name joins the other name's group (its R2b group, if it has one), so R2c still applies to the joined
+person. Only the stub name's ids get `basis = duplicate_stub`, and only when they are not the chosen id; a stub
+ranks below a non-stub with the same last year when the person_id is chosen.
+
+- Tests: `person_ids_join_a_duplicate_stub_with_a_middle_initial`, `person_ids_join_a_duplicate_stub_with_a_nickname`,
+  `person_ids_keep_a_same_day_stub_with_another_given_name_apart`,
+  `person_ids_keep_a_stub_that_starts_after_the_other_term_ends_apart`,
+  `person_ids_keep_a_stub_late_in_a_departed_members_term_apart`, `person_ids_join_no_duplicate_stub_with_two_candidates`,
+  `person_ids_keep_a_stub_apart_when_its_name_has_another_id`, `person_ids_join_no_chain_of_duplicate_stubs`,
+  `person_ids_keep_a_duplicate_stub_apart_when_its_name_is_signed_different_people`,
+  `person_ids_keep_a_duplicate_stub_apart_when_the_other_name_is_signed_different_people`,
+  `person_ids_keep_a_same_seat_stub_with_another_surname_apart`.
+- Today: 2 ids, Martin Jacobs (HD38) joined to Marty Jacobs and David A. Dolan (HD148) joined to David Dolan.
+- Must withstand: mid-term departures recorded with the normal end (#313), special-election successors.
 
 ### R2c. House member id continuity (lines 287-380)
 
@@ -216,10 +262,11 @@ Christensen 2024-26 are member 2381, #151). Ids that share a member id are one p
 
 The id is its own person, `basis = self`.
 
-### Choosing the person_id (lines 261-277, 349-362)
+### Choosing the person_id (lines 382-412, 472-485)
 
 Among the merged ids, in order: an Open States id over a `mohouse:` one, then the id whose identity years end
-latest, then the smallest id. The last key is unique, so the choice is deterministic. It never looks at who serves
+latest, then the one that is not an R2d duplicate stub, then the smallest id. R2c picks among the persons it
+joins with the same keys except the stub one (`member_ranked`, lines 472-485). The last key is unique, so the choice is deterministic. It never looks at who serves
 in the latest roster year, so an official's id does not change when they leave office.
 
 - Test: `person_ids_keep_the_id_after_the_official_leaves_office`; data tests `assert_official_ids_one_per_person`,
@@ -364,10 +411,10 @@ local load, which may be older than the sources today.
 | bad input | count today | how it is handled | issues |
 |---|---|---|---|
 | Undated Open States starts (`1900-01-01` sentinel in `int_mo_legislators__seat_terms`) | 198 terms (173 House, 25 Senate), all ending 2018-12-31 to 2023-01-04 | Identity: last year only (R2 evidence). Senate: dated from the first journal vote (all 25). House: R0 treats them as covering everything before their end; payroll counts them from the first roster year | #136 #227 #512 #516 #519 |
-| January-1 starts that are placeholders (`2011-01-01`, `2013-01-01`, `2015-01-01` in the source) | 221 terms (194 House, 27 Senate); 11 still run past 2017-01-15. The four `2015-01-01` ones (Cloria Brown, Justin Alferman, Nick King, Lauren Arthur) all end 2016-12-31. `start_quality = 'placeholder'` flags any January-1 start, so 222 terms: these plus one `2017-01-01` start, Nick Schroer HD107, near-true (his first term began with the session on 2017-01-04) | R2b needs a short stub, so equal or nested placeholder terms never join | #332 #656 #675 |
+| January-1 starts that are placeholders (`2011-01-01`, `2013-01-01`, `2015-01-01` in the source) | 221 terms (194 House, 27 Senate); 11 of these 221 still run past 2017-01-15 (12 of the 222 below, with Schroer's). The four `2015-01-01` ones (Cloria Brown, Justin Alferman, Nick King, Lauren Arthur) all end 2016-12-31. `start_quality = 'placeholder'` flags any January-1 start, so 222 terms: these plus one `2017-01-01` start, Nick Schroer HD107, near-true (his first term began with the session on 2017-01-04) | R2b needs a short stub, so equal or nested placeholder terms never join | #332 #656 #675 |
 | Seed starts (`legislator_seat_corrections`) | 3 rows: Wayne Wallingford SD27 from 2013-01-09; Mike Kehoe SD6 and Mike Parson SD28 from 2017-01-01 | Always `start_quality = 'dated'` and taken at face value, January 1 included. A seed start is where the correction begins, not a first start: Kehoe's and Parson's 2017-01-01 continue terms Open States starts on 2011-01-01 | #656 #675 |
 | Open States ends that are really mid-term departures, or wrong ends | Senate: the ends of 6 terms re-dated (Keaveny, Schmitt, Schaefer, Pearce end 2017-01-03, the day before the journals begin; Kraus capped at 2017-07-25, Silvey at 2017-09-13). House: Lauren Arthur HD18 ends 2016-12-31 though she voted through 2018 | Senate: re-dating from the journal. House: no re-dating; R2's one-year hand-over joins her roster key to her Senate id | #313 #491 #522 #525 |
-| 2025-01-08 to 2025-02-03 duplicate stub records | 3: Kenneth Jamison (HD15, joined by R2b), David A. Dolan (HD148) and Martin Jacobs (HD38), not joined | Planned, see #661 | #263 #292 #294 |
+| 2025-01-08 to 2025-02-03 duplicate stub records | 3: Kenneth Jamison (HD15), David A. Dolan (HD148) and Martin Jacobs (HD38) | Kenneth by R2b (a given-name prefix); Dolan and Jacobs by R2d, `basis = duplicate_stub` (the 2 `duplicate_stub` aliases below) | #263 #292 #294 #661 |
 | Redistricting 2022-23 | 27 `name_continuity` aliases in all; the redistricted ones are among them | R2 (same name, different seats in different years); bill sponsors match on the held district | #97 #636 |
 | Name variants | spacing (Van Schoiack), given-name prefixes (Steve/Steven Roberts, Ken/Kenneth Jamison), name change (Mazzie Boyd/Christensen, the 1 `member_id_continuity` alias) | R2 `sq`, R2b, R2c | #152 #228 #263 #504 |
 | `mohouse:` fallback ids | 14 raw keys on 72 roster rows (30 in 2017, 27 in 2018); every one is joined to an Open States id, so no `mohouse:` person key is left | R2 / R2c | #97 #491 |
@@ -426,8 +473,8 @@ the test after "protected by", where given, is the one that fails if the case br
 | Tom Dempsey (SD23), Paul LeVota (SD11) (2015 resignations) | #512 | `int_officials__identity_terms`, `int_officials__person_ids` | 2015 evidence row; own person | named: `identity_terms_cases_cover_the_two_years_before_the_roster`, `person_ids_cases_give_undated_senators_rows_without_wrong_merges` *(not breakable here: no rule joins them, so it only guards against wrong merges; protected by `identity_terms_cases_cover_the_two_years_before_the_roster`)*; shape: `identity_terms_cover_the_year_before_the_first_roster`; data test `assert_recent_seat_term_ids_have_person_ids` |
 | Paul Wieland, Bob Onder, Jeanie Riddle, Dan Brown, Jill Schupp, Dave Schatz, Rebecca Roeber (undated terms) | #512 | `int_officials__identity_terms`, `int_officials__person_ids` | undated term: last year only; own person, not merged with the successors Justin Brown or Ben Brown | named: `identity_terms_cases_give_undated_senators_their_last_year`, `person_ids_cases_give_undated_senators_rows_without_wrong_merges` *(not breakable here: it only guards against wrong merges; protected by `identity_terms_cases_give_undated_senators_their_last_year`)*; shape: `identity_terms_undated_start_counts_for_its_last_year` |
 | Paul Wieland, Dan Brown, each beside a hypothetical dated neighbour | #519 | `int_officials__person_ids` | documented weakness: a same-name neighbour joins by R2 and a variant by R2b | named: `person_ids_cases_undated_id_beside_a_same_name_dated_id`; shape: `person_ids_join_an_undated_open_states_term_to_a_roster_key_in_the_same_seat`; data test `assert_undated_open_states_ids_share_no_name` guards real data |
-| David Dolan / David A. Dolan (HD148, 2025 stub) | #294 | `int_officials__person_ids` | none today; planned, see #661 | TODO (#661) |
-| Martin / Marty Jacobs (HD38, 2025 stub) | #292 | `int_officials__person_ids` | none today; planned, see #661 | TODO (#661) |
+| David Dolan / David A. Dolan (HD148, 2025 stub) | #294 #661 | `int_officials__person_ids` | R2d duplicate stub, a dropped middle initial: the stub joins David Dolan, `basis = duplicate_stub` | shape (his name, seat, dates and member id; invented ids): `person_ids_join_a_duplicate_stub_with_a_middle_initial`; guards: `person_ids_join_no_duplicate_stub_with_two_candidates` (David B. Dolan), `person_ids_keep_a_stub_that_starts_after_the_other_term_ends_apart` |
+| Martin / Marty Jacobs (HD38, 2025 stub) | #292 #661 | `int_officials__person_ids` | R2d duplicate stub, a nickname (`first_name_fit`): Martin joins Marty, `basis = duplicate_stub` | shape (his names, seat, dates and member id; invented ids): `person_ids_join_a_duplicate_stub_with_a_nickname`; guards: `person_ids_keep_a_stub_late_in_a_departed_members_term_apart`, `person_ids_join_no_duplicate_stub_with_two_candidates` |
 
 <!-- #657 edits only this subsection -->
 
@@ -442,7 +489,7 @@ Owner: #658.
 | Will Kraus (SD8, to 2017-07-25), Ryan Silvey (SD17, to 2017-09-13) (capped at last vote) | #522 #551 | `int_mo_legislators__seats` | last-vote cap, today's behaviour (Silvey's end changes if #551 is decided otherwise) | same test (synthetic rows); named: `senate_seat_terms_of_named_senators_dated_from_the_journal` |
 | Jason Holsman (resigned 2020-01-16, last vote 2020-01-13); Lauren Arthur (SD17 to 2024-07-21, last vote 2024-05-13) | #522 | `int_mo_legislators__seats` | gap under a year is not capped | `senate_seat_terms_of_named_senators_dated_from_the_journal` |
 | Senate years 2017-2018 present (all 34 districts dated); 2019 dropped when SD4 lacks a holder | #516 | `int_officeholders__years` | 34-district rule | `officeholders_senate_seats_as_dated_by_the_seat_table` (synthetic); named: `officeholders_named_senate_holders_in_2017_and_2018` |
-| Mike Cierpiot (SD8 from 2018; Kraus alone in 2017) | #525 | `int_officeholders__years` | Open States start kept (2018-01-01 in the seat table; first vote 2018-01-08); January 15 handover | `senate_seat_terms_of_named_senators_dated_from_the_journal`, `officeholders_named_senate_holders_in_2017_and_2018` |
+| Mike Cierpiot (SD8 from 2018; Kraus alone in 2017) | #525 | `int_officeholders__years` | Open States start 2018-01-03 (the journal oath, #525), counted from 2018-01-01 in the seat table; first vote 2018-01-08; January 15 handover | `senate_seat_terms_of_named_senators_dated_from_the_journal`, `officeholders_named_senate_holders_in_2017_and_2018` |
 | Ryan Silvey (SD17 2017) / Lauren Arthur (SD17 2018) | #522 #551 | `int_officeholders__years` | capped end, today's behaviour | `officeholders_named_senate_holders_in_2017_and_2018` |
 | Rebecca Roeber (HD34 2020 dropped; Rick Roeber listed 2021 only) | #152 | `int_officeholders__years` | drop rule 1 | `officeholders_house_row_dropped_when_the_roster_outlives_the_members_last_term`; named: `officeholders_named_house_rows_dropped_or_kept` |
 | Scott Fitzpatrick (HD158 2019) | #491 | `int_officeholders__years` | drop rule 2 | `officeholders_house_row_dropped_when_the_members_last_roll_call_is_before_the_handover`; named: `officeholders_named_house_rows_dropped_or_kept` |
@@ -467,11 +514,11 @@ are the older ones with invented people.
 |---|---|---|---|---|
 | David (Tyson) Smith / Cody Smith | #227 | `fct_salaries` | undated seat counts from first roster year; middle initial. David gets only DAVID T 2021, 2024 and 2025 (medium) and no 2017-20 pay; the 2025 `SMITH, DAVID C` $1,636 check is not David's (Cody has no current official, so the test does not show his pairing) | named: `salaries_case_227_cody_and_david_smith_keep_their_own_pay`; shape: `salaries_pay_from_before_the_first_term_never_matches`, `salaries_pair_a_middle_initial_with_the_name_the_member_goes_by` |
 | Ken / Kenneth Jamison (two seat rows in 2025) | #263 | `fct_salaries` | paid once | `salaries_pay_once_for_a_member_with_two_seat_rows_in_a_year` |
-| Steve / Steven Roberts (Lane Roberts keeps his own) | #263 | `fct_salaries` | House pay 2017 and 2020 (high), the 2021 House check and Senate pay (medium) all go to the Senate id `20ad6a34` | named: `salaries_case_263_steve_roberts_house_and_senate_pay_is_one_official`; shape: `salaries_keep_earlier_pay_when_another_seat_holder_has_a_fitting_first_name` |
-| Dean Van Schoiack (payroll `VANSCHOIACK`, roster `Van Schoiack`, Open States `VanSchoiack`) | #228 | `fct_salaries` | spaces ignored; the 2025 seat row uses the roster spelling | named: `salaries_case_228_van_schoiack_matches_across_the_two_spellings`; shape: `salaries_match_a_surname_spelled_with_a_space_by_name` |
-| Stephen Webber, Lincoln Hough, Denny Hoskins (2017 checks of House seats that ended 2016-12-31) | #504 #227 | `fct_salaries`, `int_mo_legislators__final_checks` | final check, paired to the same id as the person's Senate pay (Hoskins' is under `STATE REPRESENTATIVE-LEADERSHP`) | named: `salaries_case_504_2017_final_checks_of_seats_ended_2016_stay_with_their_member`, `final_checks_case_2017_checks_of_house_seats_ended_2016` |
+| Steve / Steven Roberts (Lane Roberts keeps his own) | #263 | `fct_salaries` | House pay 2017 and 2020 (high) and Senate pay (medium) go to the Senate id `20ad6a34`. The test's 2021 House check is dropped as ambiguous: the fixture adds an invented, unmerged `528445cb` "Steven Roberts" official, so two officials fit `ROBERTS, STEVEN`. The real build still gives that check to `20ad6a34` (medium) | named: `salaries_case_263_steve_roberts_house_and_senate_pay_is_one_official`; shape: `salaries_keep_earlier_pay_when_another_seat_holder_has_a_fitting_first_name` |
+| Dean Van Schoiack (payroll `VANSCHOIACK`, roster `Van Schoiack`, Open States `VanSchoiack`) | #228 | `fct_salaries` | spaces ignored: in the test 2021 and 2025 pair by seat (the 2025 seat row uses the roster spelling), and 2023 and 2024, with no seat, take the by-name path through `family_key` ('van schoiack') | named: `salaries_case_228_van_schoiack_matches_across_the_two_spellings`; shape: `salaries_match_a_surname_spelled_with_a_space_by_name` |
+| Stephen Webber, Lincoln Hough, Denny Hoskins (2017 checks of House seats that ended 2016-12-31) | #504 #227 | `fct_salaries`, `int_mo_legislators__final_checks` | final check, paired to the same id as the person's Senate pay (Hoskins' is under `STATE REPRESENTATIVE-LEADERSHP`) | named: `salaries_case_504_2017_final_checks_of_seats_ended_2016_stay_with_their_member` (by-name pairing; its `int_mo_legislators__final_checks` input is empty, `rows: []`), `final_checks_case_2017_checks_of_house_seats_ended_2016` (covers `int_mo_legislators__final_checks`) |
 | Linda Black / Rusty Black, John Black (final check) | #97 #250 | `int_mo_legislators__final_checks`, `fct_salaries` | final check set aside: Linda's 2017 `BLACK, LINDA R.` check does not block Rusty (`BLACK, JAMES R`), who gets 2017, 2019, 2023 House and 2023 Senate pay | named: `salaries_case_250_linda_blacks_final_check_does_not_block_rusty_black`; shape: `final_checks_a_small_december_departure_payment_is_the_departed_members`, `salaries_a_final_check_is_the_departed_members_not_a_claim_on_the_seat` |
-| Ryan Silvey (2018 payment after the 2017-09-13 cap) | #551 | `fct_salaries`, `int_mo_legislators__final_checks` | not a final check and paired with no one, today's behaviour (pending the #551 decision); his 2017 pay is his by seat | named: `salaries_case_551_silvey_2018_payment_is_not_paired_while_his_seat_ends_at_his_last_vote`, `final_checks_case_551_silvey_2018_payment_is_not_one_while_his_seat_ends_at_his_last_vote` |
+| Ryan Silvey (2018 payment after the 2017-09-13 cap) | #551 | `fct_salaries`, `int_mo_legislators__final_checks` | not a final check and paired with no one, today's behaviour (pending the #551 decision); his 2017 pay is his by seat (not shown in the real build: no current official) | named: `salaries_case_551_silvey_2018_payment_is_not_paired_while_his_seat_ends_at_his_last_vote`, `final_checks_case_551_silvey_2018_payment_is_not_one_while_his_seat_ends_at_his_last_vote` |
 | Will Kraus (SD8, capped at 2017-07-25) | #551 | `fct_salaries`, `int_mo_legislators__final_checks` | cap agrees with payroll: his partial 2017 pay is his by seat (medium, WILLIAM for Will). The fixtures have no 2018 Kraus row because payroll has none | named: the same two `*_case_551_*` tests |
 | Mike Moon, Rusty Black, Mike Henderson, Maggie Nurrenbern, Cody Smith (legal first name: CHRIS, JAMES, JAMES, MARGARET, DAVID); Mark Matthiesen, John Simmons (returned to the House later) | #660 | `int_mo_legislators__final_checks`, `fct_salaries` | `final_checks` leaves these last House checks out (only Travis Smith's 2025 row is in), and `fct_salaries` pairs the last checks of Moon, Henderson, Nurrenbern and Simmons by seat (the seat ends in January) and Matthiesen's 2019 one by name; Rusty Black's pairing is in the #250 test. Cody Smith's is not shown (no current official) | named: `final_checks_case_last_house_checks_left_out_by_legal_first_name_or_a_return`, `salaries_case_legal_first_name_and_returning_member_last_house_checks_pair_by_seat` |
 
