@@ -623,6 +623,13 @@ Quirks:
 - Scanned paper filings (DocID 8xxxxxxx/9xxxxxxx) have no text layer. They land as one
   `has_text = false` row, so the gap is visible.
 - Periodic transaction reports live under `ptr-pdfs/`; everything else is under `financial-pdfs/`.
+- From 2021 on, the PDFs set their small-caps text (schedule headers, the Location/Description/Comments labels,
+  the page section titles) in a font that text extraction turns into NUL characters: the capital stays and each
+  smaller letter becomes one NUL, so `Schedule A:` lands as `S` + 7 NULs + ` A:`. Values (asset names, amounts)
+  extract normally. The raw lines are stored unchanged; `int_house_fd__schedule_lines` restores the words from
+  the exact NUL counts (macro `mogov.house_fd_restore_text`) and strips any NUL left, so no NUL reaches the
+  marts. Before this fix no 2022+ report (and 8 of 25 in 2021) produced a schedule line (#576); a sanity test now
+  fails if under 90% of a year's text PDFs do.
 
 ## senate_efd: U.S. Senate eFD (opt-in)
 

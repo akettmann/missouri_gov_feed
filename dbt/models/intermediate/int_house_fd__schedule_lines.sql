@@ -1,7 +1,15 @@
 -- House disclosure PDF text, each line tagged with the schedule it falls under (the nearest preceding
 -- "Schedule X:" header in the same document). Column-header rows, "None disclosed." and boilerplate drop out.
+-- PDFs from 2021 on extract their small-caps text with NUL characters; the words are restored first (#576).
 with lines as (
-    select * from {{ ref('stg_house_fd__pdf_lines') }}
+    select
+        doc_id,
+        document_url,
+        has_text,
+        page,
+        line_no,
+        {{ mogov.house_fd_restore_text('line_text') }} as line_text
+    from {{ ref('stg_house_fd__pdf_lines') }}
 ),
 
 sequenced as (
