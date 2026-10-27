@@ -271,6 +271,12 @@ seeds:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [alias_id, person_id, relation]
+      # a maintainer signs a row off by filling checked_by and checked_on together (#174); a half-signed row is
+      # ignored by int_officials__person_ids, so flag it
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: >-
+              (case when checked_by is null then 0 else 1 end) = (case when checked_on is null then 0 else 1 end)
     columns:
       - name: alias_id
         data_tests: [not_null]
