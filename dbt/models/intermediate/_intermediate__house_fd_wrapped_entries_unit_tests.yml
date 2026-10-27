@@ -11,7 +11,7 @@ unit_tests:
       head line keeps the amount and owner code. A line with an asset name and an amount is its own entry, and
       Location / Description lines stay lines of their own. Schedule B: a line with no transaction
       type before an amount is the asset name wrapped under the account line, even when it holds a bond maturity date
-      ("Rev 5% 07/01/2031 [GS]"); the column-header spill "$200?" is
+      ("Rev 5% 07/01/2031 [GS]"); the column-header spills "$200?" and "$1,000?" are
       dropped. Schedule D: a line with no amount belongs to the entry above, a line ending on "Over" starts one.
       A range the PDF wrapped takes its high end from the tail (A, B, D: the line above holds only the low end, with
       the checkbox glyphs possibly between): "$50,001 -" / "$100,000", "$250,001 -" / "Residence
@@ -36,6 +36,15 @@ unit_tests:
           select 'w', 'u_w', true, 1, 11, 'gfedc' union all
           select 'w', 'u_w', true, 1, 12, 'Baillie Gifford Fund - Class I (BGEGX) [MF] $500,000 $15,000' union all
           select 'w', 'u_w', true, 1, 13, 'Next Fund [MF] $1,001 - $15,000' union all
+          select 'w', 'u_w', true, 1, 14, 'Fidelity Trust ⇒ JT None Interest $1,001 - gfedc' union all
+          select 'w', 'u_w', true, 1, 15, 'New York NY [GS] $2,500' union all
+          select 'w', 'u_w', true, 1, 16, 'Low Only Fund [MF] $1,001 -' union all
+          select 'w', 'u_w', true, 1, 17, 'Own Range Fund [MF] $15,001 - $50,000' union all
+          select 'w', 'u_w', true, 1, 18, 'Sam Farms $100,001 -' union all
+          select 'w', 'u_w', true, 1, 19, '$1,000?' union all
+          select 'w', 'u_w', true, 1, 20, 'Grain Bin $250,000' union all
+          select 'w', 'u_w', true, 1, 21, 'Rental Trust ⇒ JT $50,001 - None Interest $1,001 -' union all
+          select 'w', 'u_w', true, 1, 22, 'Rental Property [RP] $100,000 $5,000' union all
           select 'w', 'u_w', true, 2, 1, 'Schedule B: Transactions' union all
           select 'w', 'u_w', true, 2, 2, '$200?' union all
           select 'w', 'u_w', true, 2, 3, 'Fidelity Trust ⇒ JT 09/5/2019 S $100,001 -' union all
@@ -73,6 +82,11 @@ unit_tests:
         - {doc_id: w, page: 1, line_no: 9, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Location: Salem, MO, US'}
         - {doc_id: w, page: 1, line_no: 10, schedule: 'A: assets & unearned income', owner_code: JT, amount_range: '$250,001 - $500,000', line_text: 'Fidelity Trust ⇒ JT $250,001 - Dividends $5,001 - gfedc Baillie Gifford Fund - Class I (BGEGX) [MF] $500,000 $15,000'}
         - {doc_id: w, page: 1, line_no: 13, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Next Fund [MF] $1,001 - $15,000'}
+        - {doc_id: w, page: 1, line_no: 14, schedule: 'A: assets & unearned income', owner_code: JT, amount_range: 'None', line_text: 'Fidelity Trust ⇒ JT None Interest $1,001 - gfedc New York NY [GS] $2,500'}
+        - {doc_id: w, page: 1, line_no: 16, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$1,001', line_text: 'Low Only Fund [MF] $1,001 -'}
+        - {doc_id: w, page: 1, line_no: 17, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$15,001 - $50,000', line_text: 'Own Range Fund [MF] $15,001 - $50,000'}
+        - {doc_id: w, page: 1, line_no: 18, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$100,001 - $250,000', line_text: 'Sam Farms $100,001 - Grain Bin $250,000'}
+        - {doc_id: w, page: 1, line_no: 21, schedule: 'A: assets & unearned income', owner_code: JT, amount_range: '$50,001 - $100,000', line_text: 'Rental Trust ⇒ JT $50,001 - None Interest $1,001 - Rental Property [RP] $100,000 $5,000'}
         - {doc_id: w, page: 2, line_no: 3, schedule: 'B: transactions', owner_code: JT, amount_range: '$100,001 - $250,000', line_text: 'Fidelity Trust ⇒ JT 09/5/2019 S $100,001 - Vanguard Windsor II [MF] (partial) $250,000'}
         - {doc_id: w, page: 2, line_no: 5, schedule: 'B: transactions', owner_code: SP, amount_range: '$1,001 - $15,000', line_text: 'Enterprise 401k - SP Monthly P $1,001 - $15,000 Dodge & Cox Stock Fund [MF]'}
         - {doc_id: w, page: 2, line_no: 7, schedule: 'B: transactions', owner_code: null, amount_range: null, line_text: 'Description: Inherited Asset'}

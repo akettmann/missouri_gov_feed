@@ -1010,22 +1010,24 @@ Quirks:
   detail headers; otherwise that boilerplate and the vehicle names surfaced as J compensation sources.
   Column headers wrap onto lines of their own ("Type(s) Current Year to Filing / Preceding Year", the schedule B, D,
   H and I headers, the asset-type-code footnote, the PTR "IPO / IVD" labels); they are dropped by exact line match.
-  An entry wrapped over several lines is joined into one row on the tie schedules (C: a line with no amount; F: a
-  line not starting with the agreement date) and, so a wrapped entry is not counted as several disclosure items, on
-  A, B, D and H (#599, #641). On every one of those schedules a line that closes a parenthesis the entry above left
+  An entry wrapped over several lines is joined into one row. On the tie schedules a line is a tail when it has no
+  amount (C) or does not start with the agreement date (F); on A, B, D and H the same is done so a wrapped entry is
+  not counted as several disclosure items (#599, #641). On every one of those schedules a line that closes a parenthesis the entry above left
   open (or starts with one) is joined too, so a tail like "KY, US)" is not an entry of its own. A joins a line of only
   income-type words, only amounts, form-checkbox glyphs or a ticker and asset-type code; B joins a line with no
   transaction type (P / S / E) before an amount, which is the asset name wrapped under the account line, and a bond's
   maturity date does not make such a line an entry; D joins a line with no amount (a line ending on "Over" starts the
   amount, a line of only amounts is the high end of a range) and a `Comments:` line; H joins a line with no date and
   a `Comments:` line. A and B keep `Location:` / `Description:` / `Comments:` lines as rows of their own. The
-  schedule B column-header spill `$200?` is dropped.
+  schedule B column-header spills `$200?` and `$1,000?` are dropped.
   The row keeps the owner code of its first line, and only on the schedules that have an owner column (A, B, D, and
   the PTR; on D the code opens the line): "DC" in a Schedule H itinerary ("Washington, DC") is a city, not a
   dependent child (#702). `amount_range` starts on the first line too, and a range the PDF wrapped takes its high end
   from the tail: A, B and D join a line with an amount but no range of its own when the line above holds only the
   low end ("... $250,001 -" / "Road $500,000", or in the 2021+ layout "$500,001 - Dividends $2,501 -" / the asset
-  name with "$1,000,000 $5,000"), and "Over" / "$1,000,000" reads "Over $1,000,000". Residual cases that still split:
+  name with "$1,000,000 $5,000"), and "Over" / "$1,000,000" reads "Over $1,000,000". When the asset's value is
+  "None" ("... JT None Interest $1,001 - ..."), the first `$` on the line is the income range, not the asset's value,
+  and `amount_range` is `None`. Residual cases that still split:
   an A asset name wrapped with no structural signal ("Fidelity Managed Income II III [HE]" / "Unit Cl I [HE]"), PTR
   (`P`) rows, which are not joined at all, and a few A `DESCRIPTION:` lines that join through the open-parenthesis
   rule.

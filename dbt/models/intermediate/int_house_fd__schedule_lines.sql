@@ -89,6 +89,7 @@ kept as (
             'liability',
             'exp.',
             '$200?',
+            '$1,000?',
             'date exp.',
             'date own exp.',
             'trip details inclusions',
@@ -248,6 +249,8 @@ select
     case
         when
             {{ mogov.regex_matches('e.line_text', '^[^$]*\\$[0-9,]+ -( [^$0-9]|$)') }}
+            -- "None" before the first "$": the asset's value is None and that "$" starts the income range
+            and not {{ mogov.regex_matches('e.line_text', '^([^$]* )?None [^$]*\\$') }}
             and e.line_text != j.line_text
             then
                 {{ mogov.regex_extract('e.line_text', '(\\$[0-9,]+)') }}
