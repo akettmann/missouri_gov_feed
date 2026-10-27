@@ -71,10 +71,10 @@ models:
         description: Earliest "Markup by" date in this committee.
       - name: reported_date
         data_type: date
-        description: Earliest "Reported by" or "Reported original measure" date, the committee sending the bill to the floor.
+        description: Earliest "Reported by" or "Reported original measure" date. For a subcommittee, the bill was forwarded to the full committee; for a full committee, it was reported to the chamber.
       - name: discharged_date
         data_type: date
-        description: Earliest "Discharged from" date, the committee losing the bill without reporting it.
+        description: Earliest "Discharged from" date, the committee losing the bill without reporting it. A House full committee's date can be the day its subcommittee was discharged (Congress.gov records it under the parent too), so a full-committee row with a later markup_date or reported_date was not necessarily discharged itself; check reported_date.
       - name: source_url
         data_type: varchar
         description: The bill's BILLSTATUS file on govinfo.gov.
