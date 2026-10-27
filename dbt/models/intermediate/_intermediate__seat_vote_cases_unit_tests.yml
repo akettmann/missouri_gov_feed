@@ -90,11 +90,14 @@ unit_tests:
       Silvey in 2017 (ended 2017-09-13, today's #551 behaviour), Arthur in 2018. Keaveny, Schmitt, Schaefer and Pearce
       (ended 2017-01-03, before the January 15 handover) are not 2017 holders: their successors are (Jacob Hummel SD4,
       Andrew Koenig SD15, Caleb Rowden SD19, Denny Hoskins SD21). Jolie Justus (SD10, ended 2016-12-31) is not listed.
+      2019 has a House roster but no Senate year: Hummel's SD4 term ends 2018-12-31 and the fixture leaves out his
+      successor (Karla May), so SD4 has no 2019 holder and the 34-district rule drops the whole Senate year.
     given:
       - input: ref('int_mo_house__member_identity')
         rows:
           - {session_code: '171', session_year: 2017, person_key: 'ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff', full_name: Lauren Arthur, district_number: 18}
           - {session_code: '181', session_year: 2018, person_key: 'ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff', full_name: Lauren Arthur, district_number: 18}
+          - {session_code: '191', session_year: 2019, person_key: 'ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07', full_name: Rebecca Roeber, district_number: 34}
       - input: ref('stg_openstates__people')
         rows: []
         format: dict
@@ -157,6 +160,7 @@ unit_tests:
       rows:
         - {year: 2017, office: state_house, district: '18', full_name: Lauren Arthur}
         - {year: 2018, office: state_house, district: '18', full_name: Lauren Arthur}
+        - {year: 2019, office: state_house, district: '34', full_name: Rebecca Roeber}
         - {year: 2017, office: state_senate, district: '4', full_name: Jacob Hummel}
         - {year: 2017, office: state_senate, district: '7', full_name: Jason Holsman}
         - {year: 2017, office: state_senate, district: '8', full_name: Will Kraus}
