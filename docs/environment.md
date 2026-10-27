@@ -421,5 +421,11 @@ instead run `mogov run` as a job, it is strict by default; set `MOGOV_ALLOW_FAIL
    `mogov-build` again. Use Cloud Workflows, or Cloud Scheduler triggers spaced far
    enough apart. See [sync.md](sync.md) for cadences.
 
+The HTTP cache is `$MOGOV_DATA_DIR/cache` (`/data/cache`), so it lives on the mounted bucket and survives
+between job runs. Loaders that re-fetch on a schedule (`govinfo_billstatus` re-reads the in-session Congress's zips
+daily and older ones monthly) judge freshness by the cached file's modification time, which Cloud Storage FUSE
+keeps (the object's update time). Keep `/data` mounted on every load job; without it each run starts cold and
+downloads every zip again.
+
 Metrics: set `OTEL_EXPORTER_OTLP_ENDPOINT` to an OTLP/HTTP collector, for example an OpenTelemetry
 Collector sidecar that exports to Cloud Monitoring.

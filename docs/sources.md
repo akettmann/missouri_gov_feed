@@ -182,6 +182,14 @@ Quirks:
   (`matched_by = 'measure text'`). In October 2026 5,274 of 6,449 roll calls were linked; most of the rest
   are procedural (approve journal, quorum calls, rules, previous question).
 - Bill sponsors list senators (conferees, handlers) with district 200 + their senate district.
+  The XML lists a member's *latest* district in every session, so a representative who later moved to the Senate
+  has his House-era sponsor, co-sponsor, handler and House-conferee rows listed as 200 + a senate district
+  (Mike Moon on 191-HB161: 229). `fct_bill_sponsors` reads those rows as House rows when the bill is a House bill
+  (or the row is a handler or House conferee) and matches them to the session's House roster on surname and given
+  name, provided that person later held the listed senate seat (#646, 1,559 rows; 1,266 of them now reach an
+  official, 776 as primary sponsor, the other 293 are former members). The district shown is then the roster's.
+  Senate conferees, and sponsors of Senate bills, keep the listed-district reading. The redistricting match
+  (members whose House district number changed) also requires the given name (#647).
 - The bill XML only links roll calls nested under a House bill. It misses House votes on Senate bills
   (third reading, conference reports) and procedural votes ("APPROVE JOURNAL", "QUORUM", "PQ"). Until
   October 2026 the loader found PDFs only through the XML: 3,873 roll calls, 108 of them on Senate
@@ -233,8 +241,8 @@ Quirks:
   with `no governor action recorded` is decided but not counted as law) and the two shares over `bills_decided`
   (null when it is 0). Resolutions (HR, HCR) and Senate sponsors are left out. Appropriation bills are kept
   (the Budget chair sponsors them and almost all pass). Only current officials (`dim_official`) have an
-  `official_id`, so former members are absent: for 2017 only 27 of 1,224 House primary-sponsor rows match, for
-  2026 2,044 of 2,086. A member with House and Senate careers has rows for House sessions only.
+  `official_id`, so former members are absent: for 2017 only 136 of 1,263 House primary-sponsor rows match (October 2026), for
+  2026 1,982 of 2,022. A member with House and Senate careers has rows for House sessions only.
   Survivorship: the earliest sessions (2017-2018) hold only members still in office today, mostly long-serving
   leaders, so their shares are not comparable with recent sessions. The profile page ("Bills sponsored in the
   House") shows the counts with their n, a percent only when `bills_decided >= 5`, and this caveat.
@@ -288,7 +296,10 @@ fiscal_notes,amendments}`), so run `mo_house` first; no crawl is needed.
 - Text: `mo_house_pdf_texts`, one row per URL: kind, session, bill file name, LR number and version code from the
   first link row naming the URL (`n_links` counts the rest), `page_count`, joined `text`, `pages_json` (per-page
   text as a JSON array) and `error`. Text is pdfplumber's `extract_text()` via `mogov.pdftext` (cached by PDF
-  hash), stored as-is; clean-up belongs in dbt (#593). Statute links (#594) are not parsed here.
+  hash), stored as-is; clean-up is in dbt: `stg_mo_house__document_texts` strips control characters (#593) and
+  `fct_bill_document_texts` is the mart (one row per URL; `fct_bill_documents` carries `page_count`, `text_length`,
+  `has_text`, `fetch_error`). The tables are optional for dbt: a build without the loader gets empty placeholders
+  (`db.OPTIONAL_TYPED_TABLES`). Statute links (#594) are not parsed here.
 - Not fetched: witness forms (`mo_house_xml_bill_witnesses`; they print citizens' contact details, #244) and
   change-map PDFs (`map_link`). `fetch_document` and the `KINDS` table are the reusable seam for adding a kind.
 - Rate: every request waits at the host-wide throttle (`REQUEST_INTERVAL` = 1 s, shared by every shard and by
@@ -316,15 +327,22 @@ Quirks:
 - A summary PDF is linked by every version of a bill that shares it (23,648 link rows, 23,291 distinct URLs), so
   `mo_house_pdf_texts` has one row per URL, not per link.
 - Small-caps and some display glyphs can extract as NUL characters (seen in `house_fd` text); that is stored as-is.
-  None appeared in the 206 extracted slice documents.
+  None appeared in the 206 extracted slice documents or in a 524-document slice of the 2018 and 2022-2025 special
+  sessions; `clean_pdf_text` strips them (and other control characters) in dbt anyway, proven on a fixed row.
 - Word spacing (#639): the House's Word output sets inter-word spaces at exactly 3.0pt (12pt Times), which is
   pdfplumber's default `x_tolerance`, so the default glued words (`AMENDHouse Committee Substitute for House Bill
   No.12,Page 3`), mostly in amendments, also on some bill-text lines. The loader extracts with `x_tolerance=2`
   (`X_TOLERANCE`). On 14 amendments, tokens over 25 characters fell from 0.77% to 0.16% (the rest are underscore
   rules) and the token count rose 26,666 to 31,170; 5 bill texts, 5 fiscal notes and 4 summaries did not get worse
-  (bill texts gained 20 tokens, the others were identical). `x_tolerance` is part of the `pdftext` cache key, so
-  changing it makes the next `mo_house_pdf` run re-extract every document from the PDF already on disk (no
-  re-download for closed sessions) and rewrite `mo_house_pdf_texts`; nothing else needs doing.
+  (bill texts gained 20 tokens, the others were identical). That sample understates appropriation bills: dot
+  leaders are spaced glyphs (gaps 1.7-2.7pt) that now split, so 211 HB2 (0002H.03C, 27 pages) went from 7,139 to
+  14,719 tokens and 52,391 to 59,971 chars (+14%), `Fund.....$25,927,525` becoming `Fund.. . . . . $25,927,525`;
+  171 HB1 grew 9% in chars and its 8 long tokens fell to 0; 231 0619H.01I's 5 glued whole lines fell to 0. Fiscal
+  notes, summaries and 4 of 7 amendments were byte-identical and no mid-word splits were found. For future amount
+  parsing: leaders extract as `. . . .` and an amount can stay glued to the last dot (`.7,771,056`). Re-extraction
+  of the ~68.7k PDFs costs up to ~10 CPU-hours (about 1.3 h wall with 8 shards). `x_tolerance` is part of the `pdftext` cache key,
+  so changing it makes the next `mo_house_pdf` run re-extract every document from the PDF already on disk (no
+  re-download for closed sessions) and rewrite `mo_house_pdf_texts`; old `pdftext` cache entries remain as orphans.
 
 ## mo_senate: Missouri Senate journals
 
@@ -777,8 +795,14 @@ rule against `/bulkdata`, US government work (the page states no licence). Congr
   download). The House `hr` zip is by far the largest, so more shards than zips (8 per Congress) gain nothing.
 - Everything is landed (all states): cosponsor lists need the whole file anyway, and the Missouri filter
   (sponsor `state` = MO) is applied in dbt, in `fct_federal_sponsorship` (one row per Missouri member, bill and
-  role, with `became_law` and the Public Law number).
-- Cache: the newest Congress's zips daily (bills move all the time), older Congresses monthly. A 404 for a zip
+  role, with `became_law`, `law_type` and `law_number`).
+- Laws: `law_type` is Public Law or Private Law; the two are numbered separately (118-5 can be either). A private
+  law relieves a named person or entity; the 118th Congress's hr/s/sjres/hconres bills have 269 public and no
+  private laws. `became_law` is true for either type, so read `law_type` before calling a law broad policy. A
+  bill with two laws shows the earliest by number (compared as integers).
+- Cache: the zips of the Congress in session today (derived from the date, not from the configured list) are
+  re-read daily (bills move all the time), others monthly. The cache is `<MOGOV_DATA_DIR>/cache`, which on Cloud Run
+  Jobs is the mounted bucket (see environment.md), so the schedule holds across runs. A 404 for a zip
   (a bill type with no zip for a Congress) is logged and skipped.
 
 Quirks:
@@ -820,6 +844,11 @@ Quirks:
   and signature) follow Schedule J but belong to no schedule, and "Schedule A ... Investment Vehicle Details"
   blocks follow it too, so the parser stops emitting lines at the exclusions page and opens schedule A at those
   detail headers; otherwise that boilerplate and the vehicle names surfaced as J compensation sources.
+  Column headers wrap onto lines of their own ("Type(s) Current Year to Filing / Preceding Year", the schedule B, D,
+  H and I headers, the asset-type-code footnote, the PTR "IPO / IVD" labels); they are dropped by exact line match.
+  An entry wrapped over several lines is joined into one row on the tie schedules (C: a line with no amount; F: a
+  line not starting with the agreement date; C, E, F, J: an unbalanced parenthesis), so a tail like "Government"
+  or "KY, US)" is not a tie of its own (#599). Wrapped entries on the other schedules stay split lines.
 - Index type `H` is the New Filer Report (PDF header `Filing Type: New Filer Report`), filed by new members; a
   separate report from that year's Annual Report (O). The loader reads it like O/A/P/C/T. Other index types
   (D, X, G, E, B, W) are not downloaded.

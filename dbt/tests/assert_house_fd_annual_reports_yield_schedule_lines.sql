@@ -1,5 +1,7 @@
--- Sanity check on the House disclosure PDF parser: in every year, nearly all of the annual-report PDFs with
--- extractable text yield schedule lines. When the parser stops recognizing a year's schedule headers, its reports
+-- Sanity check on the House disclosure PDF parser: in every year, nearly all of the annual and candidate report PDFs
+-- with extractable text yield schedule lines (extension requests, threshold notices, amendments and the other
+-- filing types in financial-pdfs/ are short forms with no schedules, so they are left out: #599).
+-- When the parser stops recognizing a year's schedule headers, its reports
 -- silently fall back to a single "not text-extractable" row: it happened for every report from 2022 on (and 8 of
 -- the 25 from 2021) when the PDFs began extracting their small-caps headers as NUL characters (#576).
 -- A header-only report (every schedule "None disclosed.", nothing but form boilerplate: 9 of them today) yields
@@ -15,7 +17,14 @@ with docs as (
         count(*) as line_count,
         sum(case when lower(line_text) in ('none disclosed.', 'none disclosed') then 1 else 0 end) as none_lines
     from {{ ref('stg_house_fd__pdf_lines') }}
-    where has_text and document_url like '%/financial-pdfs/%'
+    where
+        has_text
+        and document_url like '%/financial-pdfs/%'
+        and doc_id in (
+            select f.doc_id
+            from {{ ref('stg_house_fd__filings') }} as f
+            where f.filing_kind in ('annual report', 'candidate report')
+        )
     group by doc_id, document_url
 ),
 

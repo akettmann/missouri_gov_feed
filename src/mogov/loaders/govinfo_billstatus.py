@@ -3,7 +3,9 @@
 https://www.govinfo.gov/bulkdata/BILLSTATUS/{congress}/{type}/BILLSTATUS-{congress}-{type}.zip is one zip per
 Congress and bill type (hr, s, hjres, sjres, hconres, sconres, hres, sres); each member is one bill's XML. No key
 and no robots.txt rule against /bulkdata. The newest Congress's zips are rebuilt as bills move, so they are
-re-downloaded daily; a finished Congress's zips are re-read monthly.
+re-downloaded daily; a finished Congress's zips are re-read monthly. "Newest" is the Congress in session today
+(from the date), whatever MOGOV_BILLSTATUS_CONGRESSES lists. The zips are cached under CACHE_DIR
+(`<MOGOV_DATA_DIR>/cache`); on Cloud Run Jobs that is the mounted bucket, so the re-fetch rules hold across runs.
 
 Each XML file is landed unchanged as gzip under RAW_DIR/govinfo_billstatus_xml/<congress>/<type>/ and described in
 `govinfo_billstatus_files` (path, URL, size, hash, landing time); `mogov.parsers.govinfo_billstatus` parses the same
@@ -19,7 +21,7 @@ import gzip
 import hashlib
 import os
 import zipfile
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import httpx
 
@@ -34,10 +36,22 @@ log = obs.get_logger(__name__)
 BASE = "https://www.govinfo.gov/bulkdata/BILLSTATUS"
 CONGRESSES = [int(c) for c in os.environ.get("MOGOV_BILLSTATUS_CONGRESSES", "117,118,119").split(",")]
 BILL_TYPES = os.environ.get("MOGOV_BILLSTATUS_TYPES", "hr,s,hjres,sjres,hconres,sconres,hres,sres").split(",")
-CURRENT_CONGRESS = max(CONGRESSES)
 XML_DIR = "govinfo_billstatus_xml"  # under RAW_DIR: <congress>/<type>/<FILE>.xml.gz
 FILES_TABLE = "govinfo_billstatus_files"
 TABLES = [FILES_TABLE, *parser.ALL_TABLES]
+
+
+def congress_on(day: date) -> int:
+    """The Congress in session on `day`: the 119th began 2025-01-03, each Congress lasts two years and begins on
+    January 3 of an odd year (the days before that still belong to the previous one)."""
+    year = day.year - 1 if day.year % 2 == 1 and (day.month, day.day) < (1, 3) else day.year
+    return (year - 1789) // 2 + 1
+
+
+def current_congress() -> int:
+    """Today's Congress, from the date, not from which Congresses are configured: a run that leaves out the
+    newest Congress must not mistake an older one for the live one."""
+    return congress_on(datetime.now(UTC).date())
 
 
 def zip_url(congress: int, bill_type: str) -> str:
@@ -70,12 +84,13 @@ def load(shard: db.Shard) -> dict[str, int]:
     """Units: one zip per (congress, bill type). Streams each zip member by member."""
     units = [(c, t) for c in CONGRESSES for t in BILL_TYPES]
     mine = shard.take(units, key=lambda u: f"{u[0]}-{u[1]}")
+    current = current_congress()
     progress = obs.Progress("zips", len(mine), log)
     with db.JsonSink(shard, source_url=BASE, tables=TABLES) as sink:
         for congress, bill_type in mine:
             url = zip_url(congress, bill_type)
             dest = CACHE_DIR / "govinfo_billstatus" / f"BILLSTATUS-{congress}-{bill_type}.zip"
-            max_age = 86400 if congress == CURRENT_CONGRESS else 30 * 86400
+            max_age = 86400 if congress == current else 30 * 86400
             try:
                 fetch_to_file(url, dest, max_age=max_age)
             except httpx.HTTPStatusError as e:
