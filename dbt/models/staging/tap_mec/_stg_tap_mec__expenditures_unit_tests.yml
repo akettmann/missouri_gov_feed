@@ -1,0 +1,46 @@
+# #204: a first name that is really a description of the payment, with the company repeating the last name.
+version: 2
+
+unit_tests:
+  - name: tap_expenditures_description_first_name
+    model: stg_tap_mec__expenditures
+    description: >
+      'NDC Mailing for' / 'USPS' / company 'USPS' is the post office, not "NDC Mailing for USPS" (d1): the first
+      name ends in a linking word and the company repeats the last name. A real person whose first name has several
+      words stays "First Last" (d2: 'Barbara Anne' / 'Washington'). Words other than the linking words do not
+      trigger it: a couple ('Ken and' style first names, d3), a first name ending in 'of' (d4, half of 'State of'
+      / 'Missouri'), and a first name that only contains 'for' mid-name (d5). Without the company repeating the
+      last name the rule is off (d6 keeps the company).
+    given:
+      - input: source('tap_mec', 'expenditures')
+        format: sql
+        rows: |
+          select
+              cast('d1' as varchar) as cd3_b_id,
+              cast('C1' as varchar) as mecid,
+              cast('Committee' as varchar) as committee_name,
+              cast('USPS' as varchar) as company,
+              cast('NDC Mailing for' as varchar) as first_name,
+              cast('USPS' as varchar) as last_name,
+              cast(null as varchar) as purpose,
+              cast(null as varchar) as expenditure_type,
+              cast('1' as varchar) as amount,
+              cast(null as varchar) as date_clean,
+              cast(null as varchar) as year_clean,
+              cast(null as varchar) as city_final,
+              cast(null as varchar) as state_norm,
+              cast(null as varchar) as report,
+              cast('FALSE' as varchar) as dupe_flag
+          union all select 'd2', 'C1', 'Committee', 'Washington', 'Barbara Anne', 'Washington', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'd3', 'C1', 'Committee', 'Brown', 'Ken and', 'Brown', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'd4', 'C1', 'Committee', 'Missouri', 'State of', 'Missouri', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'd5', 'C1', 'Committee', 'Forbes', 'Mary for Jo', 'Forbes', null, null, '1', null, null, null, null, null, 'FALSE'
+          union all select 'd6', 'C1', 'Committee', 'Acme', 'NDC Mailing for', 'USPS', null, null, '1', null, null, null, null, null, 'FALSE'
+    expect:
+      rows:
+        - {record_id: d1, payee_name: USPS}
+        - {record_id: d2, payee_name: Barbara Anne Washington}
+        - {record_id: d3, payee_name: Ken and Brown}
+        - {record_id: d4, payee_name: State of Missouri}
+        - {record_id: d5, payee_name: Mary for Jo Forbes}
+        - {record_id: d6, payee_name: Acme}
