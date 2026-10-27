@@ -427,7 +427,9 @@ models:
     own somewhere. The older notes also list several bills of one act after commas ("A.L. 1978 H.B. 971, S.B. 628").
     A piece that is only a bill ("S.B. 628", "merged with S.B. 5") continues the act before it (same year, session
     and change), as long as only such pieces come between (or the act is just a year, "A.L. 1985, H.B. 366"); after
-    a page cite ("p. 509") or an RSMo piece there is no act to continue. Parse bounds (macros/session_law_bounds.sql):
+    a page cite ("p. 509") or an RSMo piece there is no act to continue. A section cite may follow a bill ("H.B.
+    1574 § 6 and S.B. 721 § 2", "H.B. 1807, et al. § 301.4044 and S.B. 480"): it is read past, so the bill after
+    "and" is kept; the typo ".S.B. 58" (stray period) is read as "S.B. 58". Parse bounds (macros/session_law_bounds.sql):
     a note is read up to 60 acts (longest real note: 43, RSMo 301.010), an act up to 10 "merged with" bills (longest:
     6) and 6 "&"/"and" bills (longest: 4). Parts past a bound would be dropped silently, and notes list acts oldest
     first, so the newest acts would go; assert_session_law_bounds_not_exceeded fails the build when real data needs
