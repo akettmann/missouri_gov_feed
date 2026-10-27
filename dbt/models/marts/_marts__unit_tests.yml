@@ -820,3 +820,37 @@ unit_tests:
         - {official_id: judge1, role: judge, case_name: Case 4, source_url: 'https://x/4a'}
         - {official_id: judge1, role: judge, case_name: Case 5, source_url: 'https://x/5a'}
         - {official_id: judge1, role: judge, case_name: Case 6, source_url: 'https://x/6a'}
+
+  - name: federal_sponsorship_keeps_mo_members_and_flags_laws
+    model: fct_federal_sponsorship
+    description: >
+      Only members whose bill-file state is MO are kept (X1 is a Kansas sponsor). A cosponsor who withdrew is
+      dropped. became_law comes only from the laws list: bill 119-hr-1 has a law and is true for its sponsor and
+      for the cosponsor; 119-hr-2 has none (its latest action text claims a law, which is ignored) so it is false.
+      Reading the outcome from the latest action text, or keeping withdrawn cosponsors, fails this test. A current
+      member is linked to dim_official by bioguide; a past member keeps a null official_id.
+    given:
+      - input: ref('stg_govinfo_billstatus__bills')
+        rows:
+          - {bill_id: 119-hr-1, congress: 119, bill_type: hr, bill_number: 1, introduced_date: '2025-01-03', title: One, policy_area: Economics, latest_action_date: '2025-07-04', latest_action_text: Became Public Law No. 119-21., legislation_url: 'https://c/1'}
+          - {bill_id: 119-hr-2, congress: 119, bill_type: hr, bill_number: 2, introduced_date: '2025-01-03', title: Two, policy_area: null, latest_action_date: '2025-02-01', latest_action_text: Became Public Law No. 119-99., legislation_url: 'https://c/2'}
+      - input: ref('stg_govinfo_billstatus__sponsors')
+        rows:
+          - {bill_id: 119-hr-1, position: 0, bioguide_id: M1, full_name: 'Rep. M One', party: R, state: MO}
+          - {bill_id: 119-hr-2, position: 0, bioguide_id: X1, full_name: 'Rep. X One', party: R, state: KS}
+      - input: ref('stg_govinfo_billstatus__cosponsors')
+        rows:
+          - {bill_id: 119-hr-1, position: 0, bioguide_id: M2, full_name: 'Rep. M Two', party: D, state: MO, is_original_cosponsor: true, sponsorship_withdrawn_date: null}
+          - {bill_id: 119-hr-1, position: 1, bioguide_id: M3, full_name: 'Rep. M Three', party: D, state: MO, is_original_cosponsor: false, sponsorship_withdrawn_date: '2025-03-01'}
+          - {bill_id: 119-hr-2, position: 1, bioguide_id: M1, full_name: 'Rep. M One', party: R, state: MO, is_original_cosponsor: false, sponsorship_withdrawn_date: null}
+      - input: ref('stg_govinfo_billstatus__laws')
+        rows:
+          - {bill_id: 119-hr-1, law_type: Public Law, law_number: 119-21}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: o_m1, bioguide_id: M1}
+    expect:
+      rows:
+        - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 119-hr-1, public_law_number: 119-21, became_law: true, is_original_cosponsor: false}
+        - {official_id: null, bioguide_id: M2, role: cosponsor, bill_id: 119-hr-1, public_law_number: 119-21, became_law: true, is_original_cosponsor: true}
+        - {official_id: o_m1, bioguide_id: M1, role: cosponsor, bill_id: 119-hr-2, public_law_number: null, became_law: false, is_original_cosponsor: false}
