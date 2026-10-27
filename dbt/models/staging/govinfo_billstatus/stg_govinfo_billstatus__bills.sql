@@ -3,6 +3,11 @@
 -- a bill became law is read from the laws list (stg_govinfo_billstatus__laws), never from this text. Only about a third
 -- of the files carry their congress.gov link, so the rest get it built from the type, congress and number
 -- (https://www.congress.gov/bill/118th-congress/house-joint-resolution/7), which is the form the files use.
+-- Some House bills are placeholders reserved for the Speaker or the Minority Leader (titled Reserved for the Speaker.
+-- or Reserved for the Minority Leader.), eleven in the 117th (hr2, hr9-17 and hr20) and nine in the 118th. They are
+-- ordinary bills whose only action is Introduced in House and that have no roll
+-- calls, kept as rows. No is_reserved flag exists, so a count of bills introduced per Congress includes them unless it
+-- filters on those titles.
 with src as (
     select
         {{ mogov.json_str('payload', '$.bill_id') }} as bill_id,

@@ -945,14 +945,17 @@ rule against `/bulkdata`, US government work (the page states no licence). Congr
   (sponsor `state` = MO) is applied in dbt, in `fct_federal_sponsorship` (one row per Missouri member, bill and
   role, with `became_law`, `law_type` and `law_number`).
 - Votes to bills: `fct_federal_vote_bills` links each cited roll call to its Voteview roll call (one row per roll
-  call and bill). BILLSTATUS cites the chamber clerk's roll number within the session; Voteview's `rollnumber`
+  call and bill). The bill is the one the roll call was "taken on", not always the one it decided: of the 1,708
+  linked rows in the 117th and 118th, 136 are motions to recommit and 130 order the previous question on a rule,
+  and cloture, motion-to-proceed, tabling and discharge votes are in there too. Read `vote_question`. BILLSTATUS cites the chamber clerk's roll number within the session; Voteview's `rollnumber`
   runs across the whole Congress (House session 2 starts at 720 in the 118th), so the join uses Voteview's
-  `clerk_rollnumber` and `session`, not `rollnumber`. On the 118th and 119th, all 1,646 cited roll calls were
-  found in Voteview and every one names the same bill as Voteview's own `bill_number` text. Only roll calls a bill
+  `clerk_rollnumber` and `session`, not `rollnumber`. On the 117th and 118th (checked 2026-10-27) all 914 and 794 distinct cited roll calls were found in Voteview
+  (117th: House 764, Senate 150 rows; 118th: House 661, Senate 133). On the 118th and 119th, all 1,646 cited roll
+  calls were found in Voteview and every one names the same bill as Voteview's own `bill_number` text. Only roll calls a bill
   action cites are linked (118th: 794 of 1,926 roll calls; 119th so far: 852 of 1,589), so votes on nominations,
   quorum calls and amendments to a bill the file does not cite for them have no bill here.
 - Laws: `law_type` is Public Law or Private Law; the two are numbered separately (118-5 can be either). A private
-  law relieves a named person or entity; the 118th Congress's hr/s/sjres/hconres bills have 274 public (including 5 H.J.Res.) and
+  law relieves a named person or entity; the 118th Congress's hr/s/hjres bills have 274 public laws (hr 178, s 91, hjres 5) and
   no private laws. `became_law` is true for either type, so read `law_type` before calling a law broad policy. A
   bill with two laws shows the earliest by number (compared as integers).
 - Stage and veto outcomes: `int_federal_bills__stage` (one row per bill) reads how far each bill got from the
@@ -967,6 +970,9 @@ rule against `/bulkdata`, US government work (the page states no licence). Congr
   Senate. 118th and 119th (loaded 2026-10-27): 412 laws (118th: 274; 119th: 138 = 136 public + 2 private), 15 vetoes
   (118th: 13; 119th: 2), every veto sustained or never put to an override vote, no override in these two Congresses.
   `became_law` comes from the actions only; `has_law_number` flags the laws list separately (see the quirk below).
+  The test `assert_federal_bills_stage_plausible` fails the build on impossible counts, but a bill whose actions say
+  it became law while the laws list lacks it is only a warning (`assert_federal_bills_became_law_on_laws_list`):
+  GovInfo can add the 36000 action a day or so before it updates `<laws>` for a just-signed bill.
   A concurrent resolution (hconres, sconres) adopted by both chambers is `agreed_to`, like a simple resolution; it
   is never presented. `goes_to_president` is true for every hr, s, hjres and sjres, including a joint resolution
   proposing a constitutional amendment (that goes to the states; none in the 118th or 119th). BILLSTATUS has no
@@ -998,7 +1004,8 @@ Quirks:
 - `isOriginalCosponsor` is the text `True`/`False`; a cosponsor who later withdrew keeps their row with
   `sponsorshipWithdrawnDate` set (the mart drops them). `district` is present for House members only.
 - Sponsors carry the member's state at the time of the bill; a member who changed states has rows under both.
-- Eleven reserved 117th House bills (hr2, hr9-17, hr20; "Reserved for the Speaker." / "...Minority Leader.") use `<billType>` and `<billNumber>` where every other file uses `<type>` and `<number>`. The parser reads either, so they keep their real id (`117-hr-2`); they are real bills with no sponsors, cosponsors or votes, and are recognizable by that title.
+- Eleven reserved 117th House bills (hr2, hr9-17, hr20; "Reserved for the Speaker." / "...Minority Leader.") use `<billType>` and `<billNumber>` where every other file uses `<type>` and `<number>`. The parser reads either, so they keep their real id (`117-hr-2`); they are real bills with no sponsors, cosponsors or votes, and are recognizable by that title. The 118th has nine such
+  reserved bills too (hr3, hr4, hr6, hr8, hr9, hr10, hr13, hr18, hr19); every one's only action is "Introduced in House". They stay in `stg_govinfo_billstatus__bills` as ordinary empty bills, so a count of bills introduced per Congress includes them; there is no `is_reserved` flag, filter on the two titles.
 - Committees, subjects and related bills (staging only so far; checked on the 118th hr and s, 16,213 bills, and the
   117th hr and s, 15,066 bills): a subcommittee is its own row with `subposition` set and `parent_system_code`; the
   file gives it no chamber, so staging takes the parent's.
@@ -1029,7 +1036,7 @@ Quirks:
   the parser looks through the wrapper if one ever has entries.
 - Amendments: BILLSTATUS keeps each amendment, with its own actions and recorded roll calls, under `<amendments>`.
   That element is not parsed, so no amendment roll call is linked to a bill and `fct_federal_vote_bills` has no
-  amendment votes (#706).
+  amendment votes (parsing them is #738).
 - Rate: the loader makes one request per zip (24 for the default window), not per bill.
 
 ## house_fd: U.S. House financial disclosures
