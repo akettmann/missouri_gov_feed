@@ -284,7 +284,10 @@ fiscal_notes,amendments}`), so run `mo_house` first; no crawl is needed.
 - Text: `mo_house_pdf_texts`, one row per URL: kind, session, bill file name, LR number and version code from the
   first link row naming the URL (`n_links` counts the rest), `page_count`, joined `text`, `pages_json` (per-page
   text as a JSON array) and `error`. Text is pdfplumber's `extract_text()` via `mogov.pdftext` (cached by PDF
-  hash), stored as-is; clean-up belongs in dbt (#593). Statute links (#594) are not parsed here.
+  hash), stored as-is; clean-up is in dbt: `stg_mo_house__document_texts` strips control characters (#593) and
+  `fct_bill_document_texts` is the mart (one row per URL; `fct_bill_documents` carries `page_count`, `text_length`,
+  `has_text`, `fetch_error`). The tables are optional for dbt: a build without the loader gets empty placeholders
+  (`db.OPTIONAL_TYPED_TABLES`). Statute links (#594) are not parsed here.
 - Not fetched: witness forms (`mo_house_xml_bill_witnesses`; they print citizens' contact details, #244) and
   change-map PDFs (`map_link`). `fetch_document` and the `KINDS` table are the reusable seam for adding a kind.
 - Rate: every request waits at the host-wide throttle (`REQUEST_INTERVAL` = 1 s, shared by every shard and by
@@ -312,7 +315,8 @@ Quirks:
 - A summary PDF is linked by every version of a bill that shares it (23,648 link rows, 23,291 distinct URLs), so
   `mo_house_pdf_texts` has one row per URL, not per link.
 - Small-caps and some display glyphs can extract as NUL characters (seen in `house_fd` text); that is stored as-is.
-  None appeared in the 206 extracted slice documents.
+  None appeared in the 206 extracted slice documents or in a 524-document slice of the 2018 and 2022-2025 special
+  sessions; `clean_pdf_text` strips them (and other control characters) in dbt anyway, proven on a fixed row.
 
 ## mo_senate: Missouri Senate journals
 
