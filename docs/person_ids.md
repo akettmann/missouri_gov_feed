@@ -26,7 +26,7 @@ Contents:
 | `ocd-person/<uuid>` | Open States, one per Open States person record | Open States sometimes holds one person under two records (redistricting, a chamber move, a duplicate stub) |
 | `mohouse:<member id>` | `int_mo_house__member_seat_keys`, when a House roster row cannot be tied to one Open States record | The House keeps one member id per person, but the fallback key changes when a later office has an Open States id |
 | `mojudge:<name office circuit>` | state judges (Official Manual) | Not joined to legislator ids unless a signed `official_id_links` row says so |
-| `statewide:<office>` | statewide officers with no Open States id | |
+| `statewide:<office>:<name key>` | statewide officers with no Open States id | Yes: the name is part of the id, so a successor in the office gets a new id (#760) |
 | `bioguide:<id>`, `fjc:<nid>` | congress-legislators, the Federal Judicial Center | Stable. They are not part of the legislator rules. Federal judges without a CourtListener `fjc_id` are a known gap (#322) |
 
 `int_officials__person_ids` maps every legislator id seen in `int_officials__identity_terms` (`alias_id`) to one

@@ -1279,8 +1279,12 @@ Chapter PDFs (executive, legislative, judicial), one row per text line.
   lieutenant governor, secretary of state, auditor, treasurer and attorney general since 1820, terms in whole years)
   into `int_bluebook__statewide_officeholders`.
   `int_statewide__terms` dates those terms (seed `statewide_office_handovers`, else the second Monday of January) and links
-  each to the current official of the same name; `fct_office_history` lists the earlier statewide terms of current
-  officials from it (terms from 2000 on; Malek's 2023 appointment as Treasurer, Fitzpatrick's 2019-2023 Treasurer term).
+  each to the current official of the same name, but only when the official's known service corroborates the match
+  (the office they hold today, or an overlap with dated Open States / congress-legislators / Wikidata service; the
+  1871 governor Benjamin Gratz Brown is not the legislator Ben Brown, #760); `fct_office_history` lists the earlier
+  statewide terms of current officials from it (Malek's 2023 appointment as Treasurer, Fitzpatrick's 2019-2023
+  Treasurer term) and lists one row per statewide term even when sources title it differently ("Governor", "Governor
+  of Missouri").
 
 Quirks:
 - PDF file names differ between editions. Links are scraped from the edition page, with a fallback to

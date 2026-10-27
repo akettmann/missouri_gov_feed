@@ -25,6 +25,18 @@ unit_tests:
       - input: ref('int_officials__name_keys')
         rows:
           - {official_id: x, variant_key: nobody, given_key: nobody, family_key: nobody}
+      - input: ref('int_officials__current')
+        rows: []
+      - input: ref('stg_openstates__roles')
+        rows: []
+      - input: ref('int_officials__person_ids')
+        rows: []
+      - input: ref('stg_congress__terms')
+        rows: []
+      - input: ref('int_officials__wikidata')
+        rows: []
+      - input: ref('stg_wikidata__facts')
+        rows: []
     expect:
       rows:
         - {office: governor, full_name: Michael L. Parson, term_start: '2018-01-08', term_end: '2025-01-13'}
@@ -67,12 +79,83 @@ unit_tests:
           - {official_id: hawley_id, variant_key: josh hawley, given_key: joshua, family_key: hawley}
           - {official_id: schmitt_a, variant_key: eric schmitt, given_key: eric, family_key: schmitt}
           - {official_id: schmitt_b, variant_key: eric schmitt, given_key: eric, family_key: schmitt}
+      - input: ref('int_officials__current')
+        rows:
+          - {official_id: hawley_id, bioguide_id: H1, office: us_senate, current_term_start: '2025-01-03', current_term_end: '2031-01-03'}
+      - input: ref('stg_openstates__roles')
+        rows: []
+      - input: ref('int_officials__person_ids')
+        rows: []
+      - input: ref('stg_congress__terms')
+        rows:
+          - {bioguide_id: H1, start_date: '2019-01-03', end_date: '2025-01-03'}
+      - input: ref('int_officials__wikidata')
+        rows: []
+      - input: ref('stg_wikidata__facts')
+        rows: []
     expect:
       rows:
-        - {office: attorney_general, full_name: Josh Hawley, term_start: '2017-01-09', term_end: '2019-01-03', official_id: hawley_id}
-        - {office: attorney_general, full_name: Eric Schmitt, term_start: '2019-01-03', term_end: '2023-01-03', official_id: null}
-        - {office: governor, full_name: Eric Greitens, term_start: '2017-01-09', term_end: '2018-06-01', official_id: null}
-        - {office: governor, full_name: Michael L. Parson, term_start: '2018-06-01', term_end: '2025-01-13', official_id: null}
-        - {office: state_auditor, full_name: Thomas A. Schweich, term_start: '2011-01-10', term_end: '2015-02-26', official_id: null}
-        - {office: state_auditor, full_name: John D. Watson, term_start: '2015-02-27', term_end: '2015-04-27', official_id: null}
-        - {office: state_auditor, full_name: Nicole Galloway, term_start: '2015-04-27', term_end: '2023-01-09', official_id: null}
+        - {office: attorney_general, full_name: Josh Hawley, term_start: '2017-01-09', term_end: '2019-01-03', official_id: hawley_id, official_id_basis: service_overlap}
+        - {office: attorney_general, full_name: Eric Schmitt, term_start: '2019-01-03', term_end: '2023-01-03', official_id: null, official_id_basis: null}
+        - {office: governor, full_name: Eric Greitens, term_start: '2017-01-09', term_end: '2018-06-01', official_id: null, official_id_basis: null}
+        - {office: governor, full_name: Michael L. Parson, term_start: '2018-06-01', term_end: '2025-01-13', official_id: null, official_id_basis: null}
+        - {office: state_auditor, full_name: Thomas A. Schweich, term_start: '2011-01-10', term_end: '2015-02-26', official_id: null, official_id_basis: null}
+        - {office: state_auditor, full_name: John D. Watson, term_start: '2015-02-27', term_end: '2015-04-27', official_id: null, official_id_basis: null}
+        - {office: state_auditor, full_name: Nicole Galloway, term_start: '2015-04-27', term_end: '2023-01-09', official_id: null, official_id_basis: null}
+
+  - name: statewide_terms_keep_a_name_match_only_when_the_persons_service_corroborates_it
+    model: int_statewide__terms
+    description: >
+      A name is not an identity (#760). The legislator Ben Brown has Open States service from 2023 and shares a name
+      with Governor Benjamin Gratz Brown (1871-1873): no overlap, so no official_id (the old model linked them and
+      only fct_office_history filtered on the year). A 1993-2009 Attorney General term that began before the year 2000
+      and ran past it is kept for a person who served as a state senator in 2005 (the blunt year >= 2000 cut dropped
+      it). A term that began within a year of the person's service counts (a Treasurer term ending the January a
+      Wikidata position starts), one 30 years away does not. Malek has no dated service but the office he holds
+      today, so his earlier Treasurer term is same_office. A different office with no overlap stays null even for a
+      current officer with that name.
+    given:
+      - input: ref('int_bluebook__statewide_officeholders')
+        rows:
+          - {office: governor, full_name: Benjamin Gratz Brown, party: R, term_start_year: 1871, term_end_year: 1873}
+          - {office: attorney_general, full_name: Jay Nixon, party: D, term_start_year: 1993, term_end_year: 2009}
+          - {office: state_treasurer, full_name: Vivek Malek, party: R, term_start_year: 2023, term_end_year: null}
+          - {office: state_auditor, full_name: Wendy Wells, party: R, term_start_year: 1985, term_end_year: 1989}
+          - {office: state_auditor, full_name: Tina Tanner, party: R, term_start_year: 2011, term_end_year: 2015}
+      - input: ref('statewide_office_handovers')
+        rows:
+          - {office: governor, family_name: nobody, term_start_year: 1900, term_start: null, term_end: null}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: brown_id, variant_key: ben brown, given_key: ben, family_key: brown}
+          - {official_id: nixon_id, variant_key: jay nixon, given_key: jay, family_key: nixon}
+          - {official_id: malek_id, variant_key: vivek malek, given_key: vivek, family_key: malek}
+          - {official_id: wells_id, variant_key: wendy wells, given_key: wendy, family_key: wells}
+          - {official_id: tanner_id, variant_key: tina tanner, given_key: tina, family_key: tanner}
+      - input: ref('int_officials__current')
+        rows:
+          - {official_id: brown_id, office: state_senate, current_term_start: '2023-01-04', current_term_end: null}
+          - {official_id: nixon_id, office: state_senate, current_term_start: '2005-01-05', current_term_end: '2007-01-03'}
+          - {official_id: malek_id, office: state_treasurer, current_term_start: '2025-01-13', current_term_end: '2029-01-08'}
+          - {official_id: wells_id, office: state_house, current_term_start: '2025-01-08', current_term_end: '2027-01-06'}
+          - {official_id: tanner_id, office: state_house, current_term_start: null, current_term_end: null}
+      - input: ref('stg_openstates__roles')
+        rows:
+          - {openstates_id: brown_id, start_date: '2023-01-04', end_date: null}
+      - input: ref('int_officials__person_ids')
+        rows: []
+      - input: ref('stg_congress__terms')
+        rows: []
+      - input: ref('int_officials__wikidata')
+        rows:
+          - {official_id: tanner_id, qid: Q9}
+      - input: ref('stg_wikidata__facts')
+        rows:
+          - {qid: Q9, fact_kind: position held, start_date: '2015-06-01', end_date: null}
+    expect:
+      rows:
+        - {office: governor, full_name: Benjamin Gratz Brown, official_id: null, official_id_basis: null}
+        - {office: attorney_general, full_name: Jay Nixon, official_id: nixon_id, official_id_basis: service_overlap}
+        - {office: state_treasurer, full_name: Vivek Malek, official_id: malek_id, official_id_basis: same_office}
+        - {office: state_auditor, full_name: Wendy Wells, official_id: null, official_id_basis: null}
+        - {office: state_auditor, full_name: Tina Tanner, official_id: tanner_id, official_id_basis: service_overlap}
