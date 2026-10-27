@@ -35,3 +35,9 @@ test("recused cell: a count for Senate rows, a dash where the source records non
   assert.equal(recusedCell(0), "0");
   assert.equal(recusedCell(null), "\u2014");
 });
+
+test("recused cell: senate-only plain number, mixed rows name their Senate roll calls, House-only dash", () => {
+  assert.equal(recusedCell(2, 10, 10), "2");
+  assert.equal(recusedCell(0, 39, 444), "0 of 39 Senate");
+  assert.equal(recusedCell(null, 0, 12), "\u2014");
+});

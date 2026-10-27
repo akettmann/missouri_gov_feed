@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DuckDBInstance } from "@duckdb/node-api";
-import { overlapExamplesSql, recusedSql } from "../src/lib/exports/overlapQuery.ts";
+import { overlapExamplesSql, recusedSql, senateRollCallsSql } from "../src/lib/exports/overlapQuery.ts";
 
 // Fixed rows shaped like SB724 on 2022-05-10: an amendment first (lowest id), passage in the middle, a later
 // emergency-clause vote, and Senate ids where plain string order puts vote10 before vote2.
@@ -195,12 +195,12 @@ test("recused rollup is null for House-only groups, a count when any vote is a S
   }
   const rows = (
     await conn.runAndReadAll(
-      `select official_id, ${recusedSql()} as recused from ov group by official_id order by official_id`,
+      `select official_id, ${recusedSql()} as recused, ${senateRollCallsSql()} as senate from ov group by official_id order by official_id`,
     )
   ).getRowObjectsJson();
   assert.deepEqual(rows, [
-    { official_id: "house_only", recused: null },
-    { official_id: "mixed", recused: 2 },
-    { official_id: "senate_only", recused: 0 },
+    { official_id: "house_only", recused: null, senate: 0 },
+    { official_id: "mixed", recused: 2, senate: 2 },
+    { official_id: "senate_only", recused: 0, senate: 1 },
   ]);
 });

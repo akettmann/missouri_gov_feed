@@ -19,6 +19,12 @@ export function mostRecentBillsLabel(n: number, extraRecusals = 0): string {
 }
 
 /** The "Recused" cell: a count for Senate votes, an em dash where the source records no recusals (House). */
-export function recusedCell(recused: number | null): string {
-  return recused === null ? "—" : String(recused);
+export function recusedCell(
+  recused: number | null,
+  senateRollCalls = 0,
+  rollCalls = senateRollCalls,
+): string {
+  if (recused === null) return "—";
+  // Mixed chamber: the House votes in roll_calls record no recusals, so say which roll calls the count covers.
+  return senateRollCalls < rollCalls ? `${recused} of ${senateRollCalls} Senate` : String(recused);
 }
