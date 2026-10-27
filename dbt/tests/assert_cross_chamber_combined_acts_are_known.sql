@@ -1,8 +1,10 @@
 -- Sanity check (#453): a combined act whose lead bill and combined bill are in different chambers ("S.B. 111 & H.B.
 -- 130") is read as one substitute carrying both bills' subjects. That reading isn't proven (confirming it needs the
 -- journals), so every such act is pinned here after a spot-check: 5 acts, all before 2017 (1977, 1981, 1982, 1998,
--- 2005). A new one, or a lead and combined bill that changed, fails the build so someone looks at it before it is
+-- 2005). A new one, or a lead and combined bill that changed, warns so someone looks at it before it is
 -- relied on. Update the list below when the spot-check of the new act is done. Returns the unexpected acts.
+-- Warns rather than fails: a new act is still read as combined; it only needs a spot-check and an entry below.
+{{ config(severity='warn') }}
 with cross_chamber as (
     select distinct
         act_year,

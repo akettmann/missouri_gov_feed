@@ -371,8 +371,8 @@ Quirks:
   1998 SB 820 and HB 1587 (1), 2005 HB 353 and SB 254 (2). The section text never names the bill, so the
   combined-act reading (the first bill passed, the other's subject went into it) can't be confirmed from the
   Revisor; it needs the journals. The data argues against it for some: HB 130 (1977) and SB 16 (1981) are the lead
-  bill of 53 and 259 other sections, and HB 1096 and SB 649 (1982) each lead others. The model still reads these
-  as combined (issue #571); `assert_cross_chamber_combined_acts_are_known` pins the five so a new one gets looked at.
+  bill of 53 and 259 other sections, and HB 1096 (1982) leads 5 others. The model still reads these
+  as combined (issue #571); `assert_cross_chamber_combined_acts_are_known` pins the five so a new one gets looked at (it warns; add the act to the `known` CTE in that test after a spot-check).
 - **Rate limit.** The site blocks an IP address that sends requests less than a second apart several times in
   30 seconds. First it serves a warning page with status 200 in place of the page asked for (the same page it
   serves for a page that doesn't exist). If requests keep coming, every request from that IP, browsers
