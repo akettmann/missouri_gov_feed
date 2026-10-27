@@ -53,8 +53,8 @@ models:
     is over once its year has ended; a regular session also once June starts (it adjourns in mid-May) and an extraordinary
     session 30 days after its last action (the latest of either feed). var as_of_date pins "today" (unit tests).
     action_count and the governor-message count come from the House XML''s actions only: they drive the relisting
-    rule, which is about House appropriation bills. Grain: one row per (session, bill) in the House XML export,
-    House and Senate bills.'
+    rule, which is about House appropriation bills. Grain: one row per (session, bill) with an action in either
+    feed (Senate-only bills included).'
 - name: int_bills__subjects
   description: 'Subject index terms per bill from both chambers'' indexes. A House bill keeps the House XML''s own
     terms (2024 sessions on); the Senate topical index fills in House bills without them (earlier sessions, when

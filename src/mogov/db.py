@@ -92,16 +92,18 @@ def raw_glob(table: str) -> str:
     return (table_dir(table) / "*.parquet").as_posix()
 
 
-def own_rows_sql(table: str, keys: Iterable[str], recency: str = "landed_at") -> str:
+def own_rows_sql(table: str, keys: Iterable[str], recency: str = "landed_at", *, union_by_name: bool = False) -> str:
     """A `select` over a raw table that a loader reads back to learn its own state, tolerating two shard counts
     coexisting (a shard-count change leaves the old parts until the new count has fully landed, see
     `_drop_other_shard_counts`). Keeps one row per `keys`: the latest by `recency`, ties broken by the part file
-    name, which is unique, so the choice is deterministic."""
+    name, which is unique, so the choice is deterministic. `recency` is any expression; rows where it is NULL rank
+    oldest. `union_by_name` reads parts whose columns differ (columns added since an older landing are NULL)."""
     cols = ", ".join(keys)
+    by_name = "union_by_name = true, " if union_by_name else ""
     return (
         f"select * exclude (_rn, filename) from (select *, row_number() over ("
-        f"partition by {cols} order by {recency} desc, filename desc) as _rn "
-        f"from read_parquet('{raw_glob(table)}', filename = true)) where _rn = 1"
+        f"partition by {cols} order by {recency} desc nulls last, filename desc) as _rn "
+        f"from read_parquet('{raw_glob(table)}', {by_name}filename = true)) where _rn = 1"
     )
 
 
