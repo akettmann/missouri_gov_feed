@@ -125,7 +125,8 @@ flags as (
         end) as passed_senate,
         max(case when description like 'Third Read and Defeated%' or senate_flag = 'defeated' then 1 else 0 end)
             as defeated,
-        max(case when description in ('Withdrawn (H)', 'Withdrawn (S)') then 1 else 0 end) as withdrawn,
+        max(case when description in ('Withdrawn (H)', 'Withdrawn (S)') or senate_flag = 'withdrawn' then 1 else 0 end)
+            as withdrawn,
         max(case when description in ('Adopted (H)', 'Adopted (S)') or senate_flag = 'adopted' then 1 else 0 end)
             as adopted,
         max(

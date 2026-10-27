@@ -325,19 +325,19 @@ unit_tests:
           - {doc_id: '1000', filing_year: 2023, filing_kind: amended report, filing_date: '2024-06-01', state_district: MO13, last_name: Cyan, document_url: 'https://x/1000.PDF'}
           - {doc_id: '300', filing_year: 2023, filing_kind: amended report, filing_date: '2024-06-01', state_district: MO13, last_name: Cyan, document_url: 'https://x/300.PDF'}
           - {doc_id: v1, filing_year: 2023, filing_kind: candidate report, filing_type: C, filing_date: '2023-03-01', state_district: MO14, last_name: Violet, document_url: u_v1}
-          - {doc_id: v2, filing_year: 2023, filing_kind: other, filing_type: H, filing_date: '2024-05-01', state_district: MO14, last_name: Violet, document_url: u_v2}
+          - {doc_id: v2, filing_year: 2023, filing_kind: new filer report, filing_type: H, filing_date: '2024-05-01', state_district: MO14, last_name: Violet, document_url: u_v2}
           - {doc_id: v3, filing_year: 2023, filing_kind: amended report, filing_type: A, filing_date: '2024-07-01', state_district: MO14, last_name: Violet, document_url: u_v3}
           - {doc_id: w1, filing_year: 2023, filing_kind: candidate report, filing_type: C, filing_date: '2023-03-01', state_district: MO15, last_name: Amber, document_url: u_w1}
-          - {doc_id: w2, filing_year: 2023, filing_kind: other, filing_type: H, filing_date: '2024-05-01', state_district: MO15, last_name: Amber, document_url: u_w2}
+          - {doc_id: w2, filing_year: 2023, filing_kind: new filer report, filing_type: H, filing_date: '2024-05-01', state_district: MO15, last_name: Amber, document_url: u_w2}
           - {doc_id: w3, filing_year: 2023, filing_kind: amended report, filing_type: A, filing_date: '2024-07-01', state_district: MO15, last_name: Amber, document_url: u_w3}
-          - {doc_id: x1, filing_year: 2023, filing_kind: other, filing_type: H, filing_date: '2024-03-01', state_district: MO16, last_name: Carey, document_url: u_x1}
+          - {doc_id: x1, filing_year: 2023, filing_kind: new filer report, filing_type: H, filing_date: '2024-03-01', state_district: MO16, last_name: Carey, document_url: u_x1}
           - {doc_id: x2, filing_year: 2023, filing_kind: annual report, filing_type: O, filing_date: '2024-05-01', state_district: MO16, last_name: Carey, document_url: u_x2}
-          - {doc_id: l1, filing_year: 2023, filing_kind: other, filing_type: H, filing_date: '2024-03-01', state_district: MO17, last_name: Lone, document_url: u_l1}
+          - {doc_id: l1, filing_year: 2023, filing_kind: new filer report, filing_type: H, filing_date: '2024-03-01', state_district: MO17, last_name: Lone, document_url: u_l1}
           - {doc_id: y1, filing_year: 2023, filing_kind: annual report, filing_type: O, filing_date: '2024-01-10', state_district: MO18, last_name: Miller, document_url: u_y1}
           - {doc_id: y2, filing_year: 2023, filing_kind: amended report, filing_type: A, filing_date: '2024-02-01', state_district: MO18, last_name: Miller, document_url: u_y2}
-          - {doc_id: y3, filing_year: 2023, filing_kind: other, filing_type: H, filing_date: '2024-03-01', state_district: MO18, last_name: Miller, document_url: u_y3}
+          - {doc_id: y3, filing_year: 2023, filing_kind: new filer report, filing_type: H, filing_date: '2024-03-01', state_district: MO18, last_name: Miller, document_url: u_y3}
           - {doc_id: y4, filing_year: 2023, filing_kind: amended report, filing_type: A, filing_date: '2024-04-01', state_district: MO18, last_name: Miller, document_url: u_y4}
-          - {doc_id: z1, filing_year: 2023, filing_kind: other, filing_type: H, filing_date: '2024-03-01', state_district: MO19, last_name: Zed, document_url: u_z1}
+          - {doc_id: z1, filing_year: 2023, filing_kind: new filer report, filing_type: H, filing_date: '2024-03-01', state_district: MO19, last_name: Zed, document_url: u_z1}
           - {doc_id: z2, filing_year: 2023, filing_kind: amended report, filing_type: A, filing_date: '2024-05-01', state_district: MO19, last_name: Zed, document_url: u_z2}
       - input: ref('stg_house_fd__pdf_lines')
         rows: []

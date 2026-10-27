@@ -1,0 +1,25 @@
+# Unit test for stg_house_fd__filings: fixed index rows -> exact filing_kind labels (#573).
+version: 2
+
+unit_tests:
+  - name: house_fd_filing_type_h_is_new_filer_report
+    model: stg_house_fd__filings
+    description: >
+      Index type H is a New Filer Report (the PDF header reads "Filing Type: New Filer Report"), not an annual
+      report and not an undocumented "other". O, A and D keep their labels; the undocumented W stays "other".
+    given:
+      - input: source('house_fd', 'index')
+        format: sql
+        rows: |
+            select cast('{"DocID": "1", "Prefix": "Hon.", "First": "Mark", "Last": "Alford", "StateDst": "MO04", "Year": "2022", "FilingType": "H", "FilingDate": "8/11/2023"}' as varchar) as payload union all
+            select cast('{"DocID": "2", "Prefix": "Hon.", "First": "Mark", "Last": "Alford", "StateDst": "MO04", "Year": "2022", "FilingType": "O", "FilingDate": "5/15/2023"}' as varchar) as payload union all
+            select cast('{"DocID": "3", "Prefix": "Hon.", "First": "Mark", "Last": "Alford", "StateDst": "MO04", "Year": "2022", "FilingType": "A", "FilingDate": "9/01/2023"}' as varchar) as payload union all
+            select cast('{"DocID": "4", "Prefix": "Hon.", "First": "Mark", "Last": "Alford", "StateDst": "MO04", "Year": "2022", "FilingType": "D", "FilingDate": "9/02/2023"}' as varchar) as payload union all
+            select cast('{"DocID": "5", "Prefix": "Hon.", "First": "Mark", "Last": "Alford", "StateDst": "MO04", "Year": "2022", "FilingType": "W", "FilingDate": "9/03/2023"}' as varchar) as payload
+    expect:
+      rows:
+        - {doc_id: '1', filing_type: H, filing_kind: new filer report}
+        - {doc_id: '2', filing_type: O, filing_kind: annual report}
+        - {doc_id: '3', filing_type: A, filing_kind: amended report}
+        - {doc_id: '4', filing_type: D, filing_kind: candidate threshold notice}
+        - {doc_id: '5', filing_type: W, filing_kind: other}
