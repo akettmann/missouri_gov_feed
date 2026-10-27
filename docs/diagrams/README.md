@@ -106,6 +106,12 @@ Federal Judicial Center directory of federal judges. Source: [sources/fjc_judges
 
 ![fjc_judges](sources/fjc_judges.svg)
 
+### mo_house_pdf
+
+Missouri House bill document PDFs and their text. Source: [sources/mo_house_pdf.puml](sources/mo_house_pdf.puml)
+
+![mo_house_pdf](sources/mo_house_pdf.svg)
+
 ### house_fd
 
 U.S. House Clerk financial disclosures. Source: [sources/house_fd.puml](sources/house_fd.puml)
@@ -156,7 +162,7 @@ Missouri Senate topical index of bills. Source: [sources/mo_senate_topics.puml](
 
 ### mo_senate_bills
 
-Missouri Senate bill list and action history. Source: [sources/mo_senate_bills.puml](sources/mo_senate_bills.puml)
+Missouri Senate bill list, action history and document lists. Source: [sources/mo_senate_bills.puml](sources/mo_senate_bills.puml)
 
 ![mo_senate_bills](sources/mo_senate_bills.svg)
 

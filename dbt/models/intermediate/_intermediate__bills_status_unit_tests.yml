@@ -81,3 +81,35 @@ unit_tests:
         - {session_code: '243', bill: HB1, status: relisted for governor message, outcome: null, relisted_from_session_code: null}
         - {session_code: '171', bill: HB2001, status: relisted for governor message, outcome: null, relisted_from_session_code: null}
         - {session_code: '211', bill: HB16, status: signed, outcome: enacted, relisted_from_session_code: null}
+
+  - name: bill_status_passed_house_flag
+    model: int_bills__status
+    description: >
+      passed_house is true when the actions hold the House's Third Read and Passed (or Adopted), whatever happened
+      next: HB1 passed the House and stopped; HB2 passed and was then withdrawn (status "withdrawn", yet true). HB3
+      (only referred), HB4 (only a Withdrawn (H)) and SB5 (a Senate bill in the House's list, not yet passed
+      here) are false.
+    overrides:
+      vars:
+        as_of_date: '2026-10-25'
+    given:
+      - input: ref('stg_mo_house__bills')
+        format: sql
+        rows: |
+            select '261' as session_code, 'HB1' as bill, 'HB 1' as current_bill_string
+      - input: ref('stg_mo_house__bill_actions')
+        format: sql
+        rows: |
+            select '261' as session_code, 'HB1' as bill, 'house_bill_list' as listed_in, cast('2026-03-05' as date) as action_date, 'Third Read and Passed (H)' as description union all
+            select '261', 'HB2', 'house_bill_list', cast('2026-03-05' as date), 'Third Read and Passed (H)' union all
+            select '261', 'HB2', 'house_bill_list', cast('2026-03-09' as date), 'Withdrawn (H)' union all
+            select '261', 'HB3', 'house_bill_list', cast('2026-01-10' as date), 'Referred: General Laws(H)' union all
+            select '261', 'HB4', 'house_bill_list', cast('2026-02-01' as date), 'Withdrawn (H)' union all
+            select '261', 'SB5', 'senate_act_list', cast('2026-04-01' as date), 'Reported to the House and First Read (H)'
+    expect:
+      rows:
+        - {session_code: '261', bill: HB1, passed_house: true}
+        - {session_code: '261', bill: HB2, passed_house: true}
+        - {session_code: '261', bill: HB3, passed_house: false}
+        - {session_code: '261', bill: HB4, passed_house: false}
+        - {session_code: '261', bill: SB5, passed_house: false}

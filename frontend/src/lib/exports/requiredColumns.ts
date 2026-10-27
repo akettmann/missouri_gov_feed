@@ -22,6 +22,17 @@ export const REQUIRED_COLUMNS: Record<string, readonly string[]> = {
     "is_current_official",
     "source_url",
   ],
+  fct_sponsorship_outcomes: [
+    "official_id",
+    "session_code",
+    "session_year",
+    "is_session_over",
+    "bills_sponsored",
+    "bills_decided",
+    "bills_passed_house",
+    "bills_became_law",
+    "source_url",
+  ],
   fct_committee_memberships: [
     "official_id",
     "session_code",

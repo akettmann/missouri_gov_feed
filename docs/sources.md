@@ -10,9 +10,10 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | Loader | Source | Data it provides | Coverage | Gate |
 |---|---|---|---|---|
 | `mo_house` | Missouri House (documents.house.mo.gov) | members, bills, per-member roll-call votes | `MOGOV_LOOKBACK_YEARS` (default 10; PDFs from 2014) | |
+| `mo_house_pdf` | Missouri House bill documents (documents.house.mo.gov) | the PDFs behind the `mo_house` document links (bill text versions, summaries, fiscal notes, amendments), unchanged, with their extracted text | every link `mo_house` landed (about 68.7k PDFs, sessions 171-261) | stage 2; slow: ~1 request/s |
 | `mo_senate` | Missouri Senate journals (senate.mo.gov) | per-senator roll-call votes | `MOGOV_LOOKBACK_YEARS` | |
 | `mo_senate_topics` | Missouri Senate topical index (senate.mo.gov) | Senate bills, subject terms for Senate bills and House bills that reached the Senate | `MOGOV_LOOKBACK_YEARS` (regular sessions) | |
-| `mo_senate_bills` | Missouri Senate bill tracking (senate.mo.gov) | every Senate bill and resolution of each session (regular and extraordinary) and its full action history, with journal references | `MOGOV_LOOKBACK_YEARS` | slow: ~1 request/s, one request per bill |
+| `mo_senate_bills` | Missouri Senate bill tracking (senate.mo.gov) | every Senate bill and resolution of each session (regular and extraordinary) and its full action history, with journal references, plus its text-version, fiscal-note, amendment and summary lists | `MOGOV_LOOKBACK_YEARS` | slow: ~1 request/s, five requests per bill (`MOGOV_SENATE_BILL_DOCS=0`: one) |
 | `mo_revisor` | Missouri Revisor of Statutes (revisor.mo.gov) | statute text (RSMo) by section version, repeals and transfers, which bills enacted, amended or repealed each section | current statutes; repeals since 1945 | slow: ~1 request/s |
 | `mec` | Missouri Ethics Commission | state campaign contributions and spending, candidate↔committee links, lobbyist gifts | 2023+ | opt-in |
 | `tap_mec` | MEC via The Accountability Project | state campaign finance and lobbyist gifts | 2011–2022 (gifts from 2004) | |
@@ -223,9 +224,19 @@ Quirks:
   file inside a zip has no address of its own. Committee names change between sessions. The metric counts
   full-committee chairs separately from subcommittee chairs.
   The `COMMITTEELIST` lists carry no Co-Chair seats at all (2025 regular session: member pages show 3 co-chair posts the list lacks), and 253's list names fewer committees than 251 or 254 (no Conference Committee on Budget, 22 seats; neither of the two property tax special committees, 40 seats), so 253 shows 617 committee seats against 697 in 251 and 685 in 254. The joint committees are in the list. The profile says so under the 253 row. Re-checked against the typed XML raw (2026-10): no other landed file carries 253 co-chair seats. The 253 member pages have no `Committees` element at all, `UPCOMINGHEARINGLIST` names only a committee's chair, and bill files carry no committee roles. The House does not publish them in the exports, so the gap is accepted and not inferred from 251 or 254 (co-chairs of a joint committee are not guaranteed to carry over); 251 and 254 co-chair posts come from the member pages (3 in 251, 2 in 254).
-- Bill sponsorship success (share of a member's sponsored bills that passed) is not built yet: it needs the
-  bill status (`fct_bills.status` and `outcome`, from #34), but Senate bills before 2024 have no status (see
-  Bill status below), so it can only cover House bills and 2024 and later until #317 lands.
+- Bill sponsorship outcomes (`marts.fct_sponsorship_outcomes`, one row per official and House session) count the
+  House bills (HB) and House joint resolutions (HJR) a member was the primary sponsor of (`sponsor_type =
+  'Sponsor'`, one per bill) and what became of them: `bills_decided` (the denominator: every outcome but
+  `pending` and `awaiting governor`), `bills_passed_house` (the House's third-reading passage, including bills
+  that then died in the Senate), `bills_became_law` (`enacted` for an HB, `sent to voters` for an HJR; a bill
+  with `no governor action recorded` is decided but not counted as law) and the two shares over `bills_decided`
+  (null when it is 0). Resolutions (HR, HCR) and Senate sponsors are left out. Appropriation bills are kept
+  (the Budget chair sponsors them and almost all pass). Only current officials (`dim_official`) have an
+  `official_id`, so former members are absent: for 2017 only 27 of 1,224 House primary-sponsor rows match, for
+  2026 2,044 of 2,086. A member with House and Senate careers has rows for House sessions only.
+  Survivorship: the earliest sessions (2017-2018) hold only members still in office today, mostly long-serving
+  leaders, so their shares are not comparable with recent sessions. The profile page ("Bills sponsored in the
+  House") shows the counts with their n, a percent only when `bills_decided >= 5`, and this caveat.
 - PDF text extraction is cached by PDF content (`data/cache/pdftext/`). Before that, a re-run spent
   3–10 minutes per shard re-parsing PDFs that were already downloaded.
 - Bill status (`fct_bills.status`, `outcome`; `int_bills__status`) comes from each bill's `Action` list. The
@@ -257,6 +268,55 @@ Quirks:
 - Session codes: 1 is the regular session and 2–4 are special sessions, in order. Code 2 doesn't appear in
   2017–2026: the first special session of a year is 3. 2018's 183 was a legislature-called session with
   resolutions only.
+
+## mo_house_pdf: Missouri House bill documents
+
+Flow: [diagrams/sources/mo_house_pdf.svg](diagrams/sources/mo_house_pdf.svg)
+
+Stage 2 companion of `mo_house` (issue #591, part of #241): fetches the PDFs that the House XML links and
+extracts their text. It reads the link tables `mo_house` landed (`mo_house_xml_{bill,senate_act}_{texts,summaries,
+fiscal_notes,amendments}`), so run `mo_house` first; no crawl is needed.
+
+- Kinds and counts (distinct URLs, sessions 171-261, measured 2026-10-26): `bill_text` 22,439 (`text_link`),
+  `summary` 23,291 (`summary_text_link`), `fiscal_note` 13,304 (`fiscal_note_link`), `amendment` 9,686
+  (`amendment_text`, which holds the PDF link). 68,720 in all.
+- Raw bytes: each PDF is stored unchanged at `<raw dir>/mo_house_pdf/<session>/<kind>/<file name>`, with one state
+  row per URL in `mo_house_pdf_files` (session, kind, relative path, size, sha256, HTTP status, error, last write).
+  Size: about 3-6 GB for the full set (a 206-PDF slice averaged 68 KB: amendments 69 KB, bill texts 85 KB, fiscal
+  notes 96 KB, summaries 32 KB; appropriation bills and omnibus substitutes run to hundreds of pages). The HTTP
+  cache is not used for the PDFs (it is wiped on Cloud Run and would double the disk).
+- Text: `mo_house_pdf_texts`, one row per URL: kind, session, bill file name, LR number and version code from the
+  first link row naming the URL (`n_links` counts the rest), `page_count`, joined `text`, `pages_json` (per-page
+  text as a JSON array) and `error`. Text is pdfplumber's `extract_text()` via `mogov.pdftext` (cached by PDF
+  hash), stored as-is; clean-up belongs in dbt (#593). Statute links (#594) are not parsed here.
+- Not fetched: witness forms (`mo_house_xml_bill_witnesses`; they print citizens' contact details, #244) and
+  change-map PDFs (`map_link`). `fetch_document` and the `KINDS` table are the reusable seam for adding a kind.
+- Rate: every request waits at the host-wide throttle (`REQUEST_INTERVAL` = 1 s, shared by every shard and by
+  `mo_house` on one machine). Measured on a 216-URL slice with 2 shards: 225 s, one request a second; more shards
+  do not go faster. The first full run is therefore about 68.7k requests, around 19 hours; use
+  `MOGOV_HOUSE_PDF_KINDS=bill_text` (comma list of `bill_text,summary,fiscal_note,amendment`) and
+  `MOGOV_HOUSE_PDF_SESSIONS=261` (session codes) to run it in pieces. The options only limit what is fetched: documents already on
+  disk outside them still get their rows, so the pieces add up (a piece does not drop the earlier pieces' rows).
+  Use the same `--shards` for every piece.
+- Freshness: published versions have versioned file names, so a file already on disk for a closed session is read,
+  never fetched; the open session's files (current year or later) are re-fetched when older than 7 days and replaced
+  only if the bytes changed. A re-run of the 216-URL slice made only the 10 requests for URLs that had failed, in
+  about 30 s, and rewrote no file. The text is re-extracted from the landed bytes each run (a cache hit when `data/cache`
+  survives).
+- Shard units: distinct document URLs, split by the URL's hash (`--shards`/`--shard`). Failures (HTTP errors,
+  timeouts, a non-PDF answer) land as rows with `error` set and are retried on the next run.
+
+Quirks:
+- The site answers some bad links with `200` and an HTML error page ("Missouri House of Representatives - Error"),
+  so a PDF is recognized by its `%PDF-` header, not the status. Seen in the slice: 10 of 50 summaries (resolution
+  summaries such as `sumpdf/HR0001I.pdf` in 173, 174, 183, 184, 204). They land as `error = 'not a PDF'` and no file.
+- Two fiscal-note links point to `www.moga.mo.gov/OverSight/...htm` (HTML, 2018, a host that did not answer when
+  probed); they land as error rows. Two bill-text links use `house.mo.gov` rather than `documents.house.mo.gov`; such
+  a file is stored as `<host>__<file name>` so it cannot collide with the same name on the main host.
+- A summary PDF is linked by every version of a bill that shares it (23,648 link rows, 23,291 distinct URLs), so
+  `mo_house_pdf_texts` has one row per URL, not per link.
+- Small-caps and some display glyphs can extract as NUL characters (seen in `house_fd` text); that is stored as-is.
+  None appeared in the 206 extracted slice documents.
 
 ## mo_senate: Missouri Senate journals
 
@@ -330,7 +390,7 @@ Quirks:
   term 2018-01-03. Nothing loaded dates his seating within 2017-09-14 to 2018-01-03 more closely. Only the
   2025-2026 Official Manual is loaded, so it gives no evidence for earlier years.
 
-## mo_senate_bills: Missouri Senate bill list and action history
+## mo_senate_bills: Missouri Senate bill list, action history and document lists
 
 Flow: [diagrams/sources/mo_senate_bills.svg](diagrams/sources/mo_senate_bills.svg)
 
@@ -344,13 +404,26 @@ lists actions for House bills and for Senate bills only once they reach the Hous
   number, sponsor and handler, description, links) plus `year` and `session_type`. `mo_senate_bill_actions`,
   one row per action: `year`, `session_type`, `bill_id`, `bill` (e.g. `SB1`), `action_index` (0 = top row as
   served, newest first), `action_date` (as printed, MM/DD/YYYY), `action`, `journal_ref`, `journal_url`.
+- Also lands the bill page's other tabs (`handler=BillText`, `FiscalNotes`, `Amendments`, `Summaries`), each
+  row carrying `year`, `session_type`, `bill_id`, `bill` and `doc_index` (position as served), keyed
+  `year/session/billId/doc_index`, in the same shard as the bill. The PDFs behind the links are not fetched.
+  - `mo_senate_bill_texts`: `url`, `title` (`SB 1 - 0453S.04T`), `label` as printed (`0453S.04T - Truly Agreed
+    to and Finally Passed`) and its two halves `lr_number` and `version`.
+  - `mo_senate_bill_fiscal_notes`: `url`, `title`, `label` as printed (`Perfected (0453S.04P.ORG)`).
+  - `mo_senate_bill_amendments`: `amendment_id` (from the PDF url), `url`, `title`, `label` (date, who offered
+    it, LR number), `status` (the chip, e.g. `2/4/2025 - Adopted`).
+  - `mo_senate_bill_summaries`: `summary_id`, `label` (the version, e.g. `Introduced`) and `text` exactly as
+    printed (tabs and CR LF kept).
 - Window: `MOGOV_LOOKBACK_YEARS`: the regular session (`R`) of each year plus every extraordinary session
   (`E1`, `E2`, ... until one comes back empty). Shard units: bills, split by a stable hash of
   `year/session/billId`. Every shard reads every session list once (cached) and takes its bills, so the split
   does not depend on listing order or on who else is running.
-- Pace: one request per bill, ~1 request/second to the host (accepted by the maintainer in #584), a lock
-  shared by every process on the machine, so shards add no speed. A regular session is ~1,000 bills, about
-  17 minutes cold; a year or more of lookback takes hours. Past sessions are cached 30 days, the current
+- Pace: five requests per bill (Actions, BillText, FiscalNotes, Amendments, Summaries), ~1 request/second to
+  the host (accepted by the maintainer in #584), a lock shared by every process on the machine, so shards add
+  no speed. A regular session is ~1,000 bills: about 85 minutes cold (~17 of them for the action histories
+  alone); the default ten-year lookback is ~50,000 requests, about 14 hours cold. `MOGOV_SENATE_BILL_DOCS=0`
+  fetches only the bill lists and Actions (one request per bill) and leaves the four document tables as they
+  were last landed. Past sessions are cached 30 days, the current
   year 1 day. Cloud Run tasks do not share a filesystem, so each task slows to `1 s x CLOUD_RUN_TASK_COUNT`.
 - Bill lists come from the `const bills = [...]` array in a script element, read with a JSON parser; the
   bill cards in the page are not parsed.
@@ -372,6 +445,15 @@ Quirks:
 - The Senate's `E1` is not always the House's first special session: 2018's only Senate extraordinary session (the
   September STEM one, 5 bills) is House `184`; the House's `183` (May impeachment) has no Senate session.
 
+- A bill with no fiscal notes or amendments is answered with `No Fiscal Notes available for this bill.` /
+  `No amendments available for this bill.` (HTTP 200, zero rows). Most bills have no fiscal note; bills that
+  died in committee have only the introduced text. SRs have text versions and summaries like bills.
+- Fragments are checked before they are cached: a body with neither the tab's container nor a `No ...
+  available` notice (an error or block page served with 200) is rejected and not cached.
+- `FiscalNotes` is sent with `sessionType=<session>` as the site's tab does; in a probe (2026-10-26) the
+  fragment was the same without it. `CommitteeMinutes` answers HTTP 500 and is not requested (see #280).
+- Amendment links go to `BillInformation?handler=AmendmentPdf&year=YYYY&amendmentId=N`; text and fiscal-note
+  links go to static PDFs (`/25info/pdf-bill/tat/SB1.pdf`, `/FiscalNotes/2025-1/0453S.04T.ORG.pdf`).
 In dbt (#586): `stg_mo_senate__bills` (one row per bill, parsed from the JSON) and `stg_mo_senate__bill_actions` (one
 row per action, date parsed) read the two raw tables; `mogov build` creates empty placeholders until the loader has
 run (`db.OPTIONAL_JSON_TABLES`), so a build without it still works. The seed `mo_senate_session_codes` maps
@@ -630,10 +712,14 @@ Quirks:
   state, is one gift when the names are equal after dropping MO/Missouri, "and"/"of"/"the", legal forms and middle
   initials ("MO Soybean Association" / "Missouri Soybean Association", "James Nutter" / "James B Nutter"), or are a
   typo apart (up to 2 letters, names of 10+ characters, same digits: "Lathrop GPM" / "Lanthrop GPM"; "LIUNA Local 110"
-  is not "LIUNA Local 100"). Measured October 2026: 7 TAP rows ($35.4k). Left in place on purpose: two or more
-  candidates on either side (a $5,000 gift to one committee on one day from several donors), names that differ by an
-  abbreviation ("deVries & Associates" / "DeVries and Assoc") or an added word ("Committee to Elect Jamie Burger HD"),
-  and different donors who happened to give the same amount.
+  is not "LIUNA Local 100"). Measured October 2026: 7 TAP rows ($35.4k). A third rule (#557) in the same tier
+  also pairs an abbreviation or an added word: word by word one name is a prefix of the other ("deVries & Associates" /
+  "DeVries and Assoc", "...Technical Ed" / "...Technical Education") and the longer name has at most two more words
+  ("Committee to Elect Jamie Burger HD"); the first word must be equal and the digits match. With several lines in the
+  group a notice is dropped only when it has exactly one name-compatible full-report line, that line has exactly one
+  name-compatible notice, and no line in the group lacks a donor name. Measured October 2026: 4 more TAP notices
+  ($10.9k). Left in place on purpose: two compatible candidates on either side, names that need outside knowledge
+  ("UP Railroad Company" / "Union Pacific Railroad Company"), and different donors who happened to give the same amount.
 - A few MECIDs are lower-case (`c000525`); the intermediate models upper-case them.
 - A committee-to-committee gift names the donor committee only. `cmte_id` / `mecid` is the receiving
   committee's ID, and there is no donor MECID. The same holds for MEC's direct export (see mec below).

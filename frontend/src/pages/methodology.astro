@@ -129,6 +129,30 @@ const tables = freshness();
     </p>
   </section>
 
+  <section class="card" id="sponsorship">
+    <h2>Bills sponsored in the House</h2>
+    <p>
+      For each current House member and House session, we count the House bills (HB) and House joint
+      resolutions (HJR) they are the primary sponsor of, as the House's own bill actions list them.
+      Co-sponsors, handlers and conferees are not counted, and neither are resolutions (HR, HCR), which are
+      adopted on a voice vote or not at all, or Senate bills. Appropriation bills are included: the Budget
+      chair sponsors them and nearly all pass, so that member's share is high for that reason.
+    </p>
+    <p>
+      A bill is <em>decided</em> unless it is still pending (the session is open) or awaiting the governor.
+      <em>Passed the House</em> counts decided bills the House passed on third reading, including ones that
+      then died in the Senate or were vetoed. <em>Became law</em> counts an enacted HB (signed, line-item
+      vetoed, veto overridden or filed without signature) or an HJR sent to the voters; a truly agreed bill
+      with no governor action recorded is decided but not counted as law. A percent is shown only when at
+      least 5 bills were decided; it is the count over the decided bills, not a score.
+    </p>
+    <p>
+      Only current officials have profiles, so bills sponsored by members who have since left office are not
+      counted. That makes the earliest sessions (2017 and 2018) a survivor group, mostly long-serving leaders,
+      and their numbers are not comparable with recent sessions.
+    </p>
+  </section>
+
   <section class="card" id="attendance">
     <h2>Attendance</h2>
     <p>
@@ -152,11 +176,11 @@ const tables = freshness();
     </ul>
     <p>
       Only the MO Senate records leave and recusals. The MO House and Congress sources don't, so a 0 in those
-      bars does not mean the official was never excused: an excused House absence shows up as plain absent.
-      The chamber average tick is 100 minus the whole chamber's attendance for that session (every member who
-      voted that session, not only the officials this site covers). It lumps all non-attended positions
-      together, because the export doesn't split out the chamber's excused absences or recusals, so compare it
-      with the end of the official's whole bar, not with one part alone.
+      bars (or a dash in the table) does not mean the official was never excused: an excused House absence
+      shows up as plain absent. The chamber average tick is 100 minus the whole chamber's attendance for that
+      session (every member who voted that session, not only the officials this site covers). It lumps all
+      non-attended positions together, because the export doesn't split out the chamber's excused absences or
+      recusals, so compare it with the end of the official's whole bar, not with one part alone.
     </p>
   </section>
 

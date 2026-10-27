@@ -28,3 +28,16 @@ export function recusedCell(
   // Mixed chamber: the House votes in roll_calls record no recusals, so say which roll calls the count covers.
   return senateRollCalls < rollCalls ? `${recused} of ${senateRollCalls} Senate` : String(recused);
 }
+
+/**
+ * The note's two-chamber sentence, or null when the page has no mixed row (Senate-only or House-only members).
+ * It quotes the first mixed row's own numbers, so the example is never someone else's data.
+ */
+export function mixedChamberNote(
+  rows: readonly { recused: number | null; senate_roll_calls: number; roll_calls: number }[],
+): string | null {
+  const mixed = rows.find((r) => r.recused !== null && r.senate_roll_calls < r.roll_calls);
+  if (mixed === undefined) return null;
+  const cell = recusedCell(mixed.recused, mixed.senate_roll_calls, mixed.roll_calls);
+  return `For a legislator who served in both chambers, the count covers only their Senate roll calls ("${cell}").`;
+}

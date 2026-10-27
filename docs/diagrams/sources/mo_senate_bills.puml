@@ -1,5 +1,5 @@
 @startuml mo_senate_bills
-title mo_senate_bills: MO Senate bill list and action history
+title mo_senate_bills: MO Senate bill list, actions and document lists
 start
 :years of the lookback window;
 :GET senate.mo.gov/BillTracking/Bills/BillList?year=YYYY&session=R
@@ -19,8 +19,14 @@ repeat
   current year cached 1 day, past years 30 days);
   :parse the action table (newest first):
   date, action, journal ref and link;
+  :GET the same URL with handler=BillText, FiscalNotes,
+  Amendments, Summaries (4 more requests, skipped when
+  MOGOV_SENATE_BILL_DOCS=0; an error page is not cached);
+  :parse each list: one row per link or summary;
 repeat while (more owned bills?)
 :mo_senate_bill_list (one row per bill)
-mo_senate_bill_actions (one row per action);
+mo_senate_bill_actions (one row per action)
+mo_senate_bill_texts, _fiscal_notes, _amendments (one row per link)
+mo_senate_bill_summaries (one row per summary);
 stop
 @enduml

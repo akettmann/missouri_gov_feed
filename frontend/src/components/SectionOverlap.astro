@@ -7,12 +7,13 @@ import type { OfficialBundle } from "../lib/exports/types";
 import { voteCastLabel } from "../lib/attendance";
 import { count, money } from "../lib/format";
 import { href } from "../lib/site";
-import { mostRecentBillsLabel, recusedCell, voteLinkLabel } from "../lib/overlapLabels";
+import { mixedChamberNote, mostRecentBillsLabel, recusedCell, voteLinkLabel } from "../lib/overlapLabels";
 
 interface Props {
   bundle: OfficialBundle;
 }
 const { overlap } = Astro.props.bundle;
+const chamberNote = overlap === null ? null : mixedChamberNote(overlap);
 const industryLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).replaceAll("_", " ");
 ---
 
@@ -100,10 +101,9 @@ const industryLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).repl
       "Roll calls" counts every recorded vote on these bills, including absences and non-votes, so Yea, Nay
       and Recused may not add up to it. "Recused" is a Missouri Senate Rule 91 recusal: the legislator was on
       the floor and excused themselves from the vote. Only the Senate records recusals (the House source does
-      not), so a dash means not recorded, not never. For a legislator who served in both chambers, the count
-      covers only their Senate roll calls ("0 of 39 Senate"). Recused counts roll calls; the list shows one
-      vote per bill (the latest), so a bill recused on at several roll calls appears once. Every bill with a
-      recusal is listed, even past the most recent bills.
+      not), so a dash means not recorded, not never.{chamberNote !== null && ` ${chamberNote}`} Recused counts
+      roll calls; the list shows one vote per bill (the latest), so a bill recused on at several roll calls
+      appears once. Every bill with a recusal is listed, even past the most recent bills.
     </p>
   )}
 </section>
