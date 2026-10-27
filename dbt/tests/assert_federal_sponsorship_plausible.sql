@@ -20,8 +20,8 @@ from {{ ref('fct_federal_sponsorship') }}
 where
     became_law
     and (
-        public_law_number is null
-        or public_law_number not like {{ dbt.safe_cast('congress', dbt.type_string()) }} || '-%'
+        law_number is null
+        or law_number not like {{ dbt.safe_cast('congress', dbt.type_string()) }} || '-%'
     )
 union all
 select

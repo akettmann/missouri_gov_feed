@@ -85,20 +85,37 @@ models:
     data_tests:
     - not_null
 - name: stg_govinfo_billstatus__laws
-  description: Public Law numbers of federal bills from the GovInfo BILLSTATUS bulk XML, one row per (bill, law).
-    Only bills that were enacted have one; law_number is "<congress>-<n>" (118-1). A bill can carry two (a measure
-    folded into another).
+  description: Law numbers of federal bills from the GovInfo BILLSTATUS bulk XML, one row per (bill, law). Only
+    bills that were enacted have one. law_type is "Public Law" or "Private Law"; law_number is "<congress>-<n>"
+    (118-1) and is numbered separately per type, so 118-5 can exist as both. A bill can carry two (a measure folded
+    into another). law_congress and law_sequence are the two parts as integers, because the text sorts wrongly ("118-100"
+    < "118-21").
   data_tests:
   - dbt_utils.unique_combination_of_columns:
       arguments:
         combination_of_columns:
         - bill_id
+        - law_type
         - law_number
   columns:
   - name: bill_id
     data_tests:
     - not_null
+  - name: law_type
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - Public Law
+          - Private Law
   - name: law_number
+    data_tests:
+    - not_null
+  - name: law_congress
+    data_tests:
+    - not_null
+  - name: law_sequence
     data_tests:
     - not_null
 - name: stg_govinfo_billstatus__recorded_votes

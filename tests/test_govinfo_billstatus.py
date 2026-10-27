@@ -1,6 +1,7 @@
 import gzip
 import io
 import zipfile
+from datetime import date
 from pathlib import Path
 
 import duckdb
@@ -105,6 +106,47 @@ def test_entities_are_not_resolved():
     assert "root:" not in (parser.parse_bill(xml, "f.xml")["bills"][0][1]["title"] or "")
 
 
+# ---- current Congress ----------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("day", "congress"),
+    [
+        (date(2025, 1, 3), 119),
+        (date(2026, 10, 27), 119),
+        (date(2027, 1, 2), 119),  # still the 119th until January 3
+        (date(2027, 1, 3), 120),
+        (date(2023, 6, 1), 118),
+        (date(2017, 1, 2), 114),
+    ],
+)
+def test_congress_comes_from_the_date(day, congress):
+    assert loader.congress_on(day) == congress
+
+
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [
+        ([118, 119], {"sjres119": 86400, "sjres118": 30 * 86400}),
+        ([117, 118], {"sjres118": 30 * 86400, "sjres117": 30 * 86400}),  # the 119th is not loaded: none is live
+    ],
+)
+def test_only_the_congress_in_session_is_refetched_daily(site, monkeypatch, configured, expected):
+    ages = {}
+    fake = loader.fetch_to_file
+
+    def spy(url, dest, *, max_age):
+        ages[url.split("/")[-2] + url.split("/")[-3]] = max_age
+        return fake(url, dest, max_age=max_age)
+
+    monkeypatch.setattr(loader, "fetch_to_file", spy)
+    monkeypatch.setattr(loader, "CONGRESSES", configured)
+    monkeypatch.setattr(loader, "BILL_TYPES", ["sjres"])
+    monkeypatch.setattr(loader, "current_congress", lambda: 119)
+    loader.load(db.UNSHARDED)
+    assert ages == expected
+
+
 # ---- loader --------------------------------------------------------------------------------------------------
 
 
@@ -140,7 +182,6 @@ def site(tmp_path, monkeypatch):
     monkeypatch.setattr(db, "RAW_DIR", tmp_path / "raw")
     monkeypatch.setattr(loader, "CACHE_DIR", tmp_path / "cache")
     monkeypatch.setattr(loader, "CONGRESSES", [118])
-    monkeypatch.setattr(loader, "CURRENT_CONGRESS", 118)
     monkeypatch.setattr(loader, "BILL_TYPES", ["hjres", "sjres", "sres"])
     monkeypatch.setattr(loader, "fetch_to_file", fake_fetch_to_file)
     return requests

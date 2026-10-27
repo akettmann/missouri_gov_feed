@@ -769,8 +769,14 @@ rule against `/bulkdata`, US government work (the page states no licence). Congr
   download). The House `hr` zip is by far the largest, so more shards than zips (8 per Congress) gain nothing.
 - Everything is landed (all states): cosponsor lists need the whole file anyway, and the Missouri filter
   (sponsor `state` = MO) is applied in dbt, in `fct_federal_sponsorship` (one row per Missouri member, bill and
-  role, with `became_law` and the Public Law number).
-- Cache: the newest Congress's zips daily (bills move all the time), older Congresses monthly. A 404 for a zip
+  role, with `became_law`, `law_type` and `law_number`).
+- Laws: `law_type` is Public Law or Private Law; the two are numbered separately (118-5 can be either). A private
+  law relieves a named person or entity; the 118th Congress's hr/s/sjres/hconres bills have 269 public and no
+  private laws. `became_law` is true for either type, so read `law_type` before calling a law broad policy. A
+  bill with two laws shows the earliest by number (compared as integers).
+- Cache: the zips of the Congress in session today (derived from the date, not from the configured list) are
+  re-read daily (bills move all the time), others monthly. The cache is `<MOGOV_DATA_DIR>/cache`, which on Cloud Run
+  Jobs is the mounted bucket (see environment.md), so the schedule holds across runs. A 404 for a zip
   (a bill type with no zip for a Congress) is logged and skipped.
 
 Quirks:

@@ -821,6 +821,37 @@ unit_tests:
         - {official_id: judge1, role: judge, case_name: Case 5, source_url: 'https://x/5a'}
         - {official_id: judge1, role: judge, case_name: Case 6, source_url: 'https://x/6a'}
 
+  - name: federal_sponsorship_private_law_is_a_law_with_its_own_type
+    model: fct_federal_sponsorship
+    description: >
+      A Private Law counts as became_law but is labelled by law_type, so it is not read as a Public Law. Public and
+      private laws are numbered separately: bill 119-s-1 carries both Private Law 119-5 and Public Law 119-5, the
+      tie on number going to the Public Law. Dropping law_type from the output or the tie-break fails this test.
+    given:
+      - input: ref('stg_govinfo_billstatus__bills')
+        rows:
+          - {bill_id: 119-s-1, congress: 119, bill_type: s, bill_number: 1, introduced_date: '2025-01-03', title: One, policy_area: null, latest_action_date: '2025-02-01', latest_action_text: x, legislation_url: 'https://c/1'}
+          - {bill_id: 119-s-2, congress: 119, bill_type: s, bill_number: 2, introduced_date: '2025-01-03', title: Two, policy_area: null, latest_action_date: '2025-02-01', latest_action_text: x, legislation_url: 'https://c/2'}
+      - input: ref('stg_govinfo_billstatus__sponsors')
+        rows:
+          - {bill_id: 119-s-1, position: 0, bioguide_id: M1, full_name: 'Sen. M One', party: R, state: MO}
+          - {bill_id: 119-s-2, position: 0, bioguide_id: M1, full_name: 'Sen. M One', party: R, state: MO}
+      - input: ref('stg_govinfo_billstatus__cosponsors')
+        rows:
+          - {bill_id: 119-s-1, position: 0, bioguide_id: M9, full_name: 'Sen. M Nine', party: D, state: MO, is_original_cosponsor: false, sponsorship_withdrawn_date: '2025-03-01'}
+      - input: ref('stg_govinfo_billstatus__laws')
+        rows:
+          - {bill_id: 119-s-1, law_type: Private Law, law_number: 119-5, law_congress: 119, law_sequence: 5}
+          - {bill_id: 119-s-1, law_type: Public Law, law_number: 119-5, law_congress: 119, law_sequence: 5}
+          - {bill_id: 119-s-2, law_type: Private Law, law_number: 119-6, law_congress: 119, law_sequence: 6}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: o_m1, bioguide_id: M1}
+    expect:
+      rows:
+        - {bill_id: 119-s-1, role: sponsor, law_type: Public Law, law_number: 119-5, became_law: true}
+        - {bill_id: 119-s-2, role: sponsor, law_type: Private Law, law_number: 119-6, became_law: true}
+
   - name: federal_sponsorship_keeps_mo_members_and_flags_laws
     model: fct_federal_sponsorship
     description: >
@@ -828,7 +859,8 @@ unit_tests:
       dropped. became_law comes only from the laws list: bill 119-hr-1 has a law and is true for its sponsor and
       for the cosponsor; 119-hr-2 has none (its latest action text claims a law, which is ignored) so it is false.
       Reading the outcome from the latest action text, or keeping withdrawn cosponsors, fails this test. A current
-      member is linked to dim_official by bioguide; a past member keeps a null official_id.
+      member is linked to dim_official by bioguide; a past member keeps a null official_id. Bill 119-hr-1 carries
+      two laws, 119-100 listed first: the earlier one by number (119-21) is kept, which a text min() gets wrong.
     given:
       - input: ref('stg_govinfo_billstatus__bills')
         rows:
@@ -845,12 +877,13 @@ unit_tests:
           - {bill_id: 119-hr-2, position: 1, bioguide_id: M1, full_name: 'Rep. M One', party: R, state: MO, is_original_cosponsor: false, sponsorship_withdrawn_date: null}
       - input: ref('stg_govinfo_billstatus__laws')
         rows:
-          - {bill_id: 119-hr-1, law_type: Public Law, law_number: 119-21}
+          - {bill_id: 119-hr-1, law_type: Public Law, law_number: 119-100, law_congress: 119, law_sequence: 100}
+          - {bill_id: 119-hr-1, law_type: Public Law, law_number: 119-21, law_congress: 119, law_sequence: 21}
       - input: ref('dim_official')
         rows:
           - {official_id: o_m1, bioguide_id: M1}
     expect:
       rows:
-        - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 119-hr-1, public_law_number: 119-21, became_law: true, is_original_cosponsor: false}
-        - {official_id: null, bioguide_id: M2, role: cosponsor, bill_id: 119-hr-1, public_law_number: 119-21, became_law: true, is_original_cosponsor: true}
-        - {official_id: o_m1, bioguide_id: M1, role: cosponsor, bill_id: 119-hr-2, public_law_number: null, became_law: false, is_original_cosponsor: false}
+        - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 119-hr-1, law_type: Public Law, law_number: 119-21, became_law: true, is_original_cosponsor: false}
+        - {official_id: null, bioguide_id: M2, role: cosponsor, bill_id: 119-hr-1, law_type: Public Law, law_number: 119-21, became_law: true, is_original_cosponsor: true}
+        - {official_id: o_m1, bioguide_id: M1, role: cosponsor, bill_id: 119-hr-2, law_type: null, law_number: null, became_law: false, is_original_cosponsor: false}

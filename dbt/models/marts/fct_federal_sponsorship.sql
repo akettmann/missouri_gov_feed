@@ -1,6 +1,7 @@
 -- Federal bills sponsored or cosponsored by Missouri's members of Congress (sponsor state MO in the BILLSTATUS file),
 -- one row per (member, bill, role), with the bill's outcome as a fact: became_law is true when the bill carries a
--- Public Law number. A cosponsor who withdrew is dropped. official_id is set for current members (null for past ones).
+-- law number (a Public Law or a Private Law; law_type says which). A cosponsor who withdrew is dropped.
+-- official_id is set for current members (null for past ones).
 with mo as (
     select
         s.bill_id,
@@ -24,12 +25,18 @@ with mo as (
     where c.sponsorship_withdrawn_date is null
 ),
 
+-- A bill can carry two laws; keep the earliest by number (numerically: 118-21 before 118-100), a Public Law before a
+-- Private one on a tie.
 laws as (
     select
         bill_id,
-        min(law_number) as public_law_number
+        law_type,
+        law_number,
+        row_number() over (
+            partition by bill_id
+            order by law_congress, law_sequence, case when law_type = 'Public Law' then 0 else 1 end
+        ) as law_rank
     from {{ ref('stg_govinfo_billstatus__laws') }}
-    group by bill_id
 )
 
 select
@@ -48,11 +55,12 @@ select
     b.policy_area,
     b.latest_action_date,
     b.latest_action_text,
-    l.public_law_number,
+    l.law_type,
+    l.law_number,
     l.bill_id is not null as became_law,
     b.legislation_url as source_url
 from mo
 inner join {{ ref('stg_govinfo_billstatus__bills') }} as b on mo.bill_id = b.bill_id
-left join laws as l on mo.bill_id = l.bill_id
+left join laws as l on mo.bill_id = l.bill_id and l.law_rank = 1
 left join {{ ref('dim_official') }} as o on mo.bioguide_id = o.bioguide_id
 where mo.state = 'MO'
