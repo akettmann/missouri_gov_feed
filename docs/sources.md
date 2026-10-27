@@ -1102,9 +1102,12 @@ Quirks:
   "Over" (or "Over None") with the amount on the next line ("Equity Trust CO => Over None" / "Berkshire Hathaway Inc.
   New (BRK.B) $50,000,000" reads `Over $50,000,000`; `Location:` / `Description:` / `Comments:` lines ending on
   "Over" are not heads). Residual cases that still split:
-  an A asset name wrapped with no structural signal ("Fidelity Managed Income II III [HE]" / "Unit Cl I [HE]"), PTR
-  (`P`) rows, which are not joined at all, and a few A `DESCRIPTION:` lines that join through the open-parenthesis
-  rule.
+  an A asset name wrapped with no structural signal ("Fidelity Managed Income II III [HE]" / "Unit Cl I [HE]"),
+  and a few A `DESCRIPTION:` lines that join through the open-parenthesis
+  rule. On the PTR, a transaction line (owner code, two dates) that holds only the low end of its range joins the next
+  line when that has an amount, no transaction dates of its own and no `Description:` / `Location:` / `Comments:` /
+  `Filing Status:` / `Subholding Of:` label ("JT ... P 12/05/2025 12/08/2025 $100,001 -" / "[GS] $250,000", #749); the
+  rest of a wrapped PTR asset name ("NITTANYMED [GS]") is not joined.
 - Index type `H` is the New Filer Report (PDF header `Filing Type: New Filer Report`), filed by new members; a
   separate report from that year's Annual Report (O). The loader reads it like O/A/P/C/T. Other index types
   (D, X, G, E, B, W) are not downloaded.
