@@ -4,8 +4,9 @@
 -- int_officials__identity_terms gets one row: alias_id (as the source gave it) -> person_id (what the pipeline calls
 -- the person). Rules, in order:
 --   1. seed official_id_links, same_person: a curated id for a person the name rule can't join (statewide officers,
---      judges). basis = curated. A row moves the whole person its alias_id was merged into by the rules below, so
---      naming a merged id the rules did not choose does not split the person (#174).
+--      judges). basis = curated. A row moves the whole person its alias_id was merged into by the rules below to the
+--      person its person_id was merged into, so naming a merged id the rules did not choose, on either side, does
+--      not split the person (#174, #682).
 --   2. ids with the same exact full name (case, punctuation and spacing ignored: "Van Schoiack" and "VanSchoiack"
 --      are one name, #228) are one person, basis = name_continuity, unless two of them hold different seats in more
 --      than one shared year. The same seat in the
@@ -504,14 +505,18 @@ merged as (
 ),
 
 -- a signed same_person row moves the whole person its alias_id was merged into, so naming an id the rules merged
--- but did not choose still moves every id of that person (#174). Two signed rows sending one person to different
--- ids are a seed error; the smaller id is taken so the output stays deterministic.
+-- but did not choose still moves every id of that person (#174). Its target is read the same way: a person_id the
+-- rules merged into another id is replaced by that person's chosen id, so the moved person joins the target's
+-- whole person instead of splitting it (#682). A target no rule saw (a mojudge: id) is kept as written. Two signed
+-- rows sending one person to different ids are a seed error; the smaller id is taken so the output stays
+-- deterministic.
 same_person as (
     select
         n.person_id as merged_person_id,
-        min(l.person_id) as person_id
+        min(coalesce(t.person_id, l.person_id)) as person_id
     from signed_links as l
     inner join merged as n on l.alias_id = n.alias_id
+    left join merged as t on l.person_id = t.alias_id
     where l.relation = 'same_person'
     group by n.person_id
 )

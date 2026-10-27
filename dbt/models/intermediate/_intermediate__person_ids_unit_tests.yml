@@ -974,6 +974,110 @@ unit_tests:
         - {alias_id: ocd-person/dolan-a, person_id: ocd-person/dolan-a, basis: self}
         - {alias_id: ocd-person/dolan-b, person_id: ocd-person/dolan-b, basis: self}
 
+  - name: person_ids_keep_a_stub_apart_when_its_name_has_another_id
+    model: int_officials__person_ids
+    description: >
+      Rule 2d joins a stub name only when every id of that name is a duplicate stub. Here "Martin Jacobs" has a
+      26-day stub inside "Marty Jacobs" (HD38, 2025) and also a second id with a full term in another seat (HD40,
+      2019-2020). That second id is no stub, so the name is a person of its own, not a duplicate record of Marty:
+      the two Martin ids join each other by rule 2 and Marty stays apart.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/marty, year: 2025, office: state_house, district: '38', name_key: marty jacobs, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/martin-stub, year: 2025, office: state_house, district: '38', name_key: martin jacobs, term_start: '2025-01-08', term_end: '2025-02-03'}
+          - {alias_id: ocd-person/martin-full, year: 2019, office: state_house, district: '40', name_key: martin jacobs, term_start: '2019-01-09', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/martin-full, year: 2020, office: state_house, district: '40', name_key: martin jacobs, term_start: '2019-01-09', term_end: '2021-01-06'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/marty, person_id: ocd-person/marty, basis: self}
+        - {alias_id: ocd-person/martin-stub, person_id: ocd-person/martin-stub, basis: self}
+        - {alias_id: ocd-person/martin-full, person_id: ocd-person/martin-stub, basis: name_continuity}
+
+  - name: person_ids_join_no_chain_of_duplicate_stubs
+    model: int_officials__person_ids
+    description: >
+      Rule 2d does not chain: a stub joins another name only when that name is no stub name itself. "Martyn
+      Jacobs" is a stub inside the full HD40 term of "Martin Jacobs", and Martin's other id is a stub inside
+      "Martha Jacobs" (HD38). Martin is a stub name, so Martyn does not join it; Martin does not join Martha either,
+      since Martin's HD40 id is no stub. The two Martin ids join each other by rule 2.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/martha, year: 2025, office: state_house, district: '38', name_key: martha jacobs, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/martin-stub, year: 2025, office: state_house, district: '38', name_key: martin jacobs, term_start: '2025-01-08', term_end: '2025-02-03'}
+          - {alias_id: ocd-person/martin-full, year: 2019, office: state_house, district: '40', name_key: martin jacobs, term_start: '2019-01-09', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/martin-full, year: 2020, office: state_house, district: '40', name_key: martin jacobs, term_start: '2019-01-09', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/martyn, year: 2019, office: state_house, district: '40', name_key: martyn jacobs, term_start: '2019-01-09', term_end: '2019-02-04'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/martha, person_id: ocd-person/martha, basis: self}
+        - {alias_id: ocd-person/martin-stub, person_id: ocd-person/martin-stub, basis: self}
+        - {alias_id: ocd-person/martin-full, person_id: ocd-person/martin-stub, basis: name_continuity}
+        - {alias_id: ocd-person/martyn, person_id: ocd-person/martyn, basis: self}
+
+  - name: person_ids_keep_a_duplicate_stub_apart_when_its_name_is_signed_different_people
+    model: int_officials__person_ids
+    description: >
+      A signed different_people row is the maintainer's way to undo a wrong rule 2d join: listing the stub's id keeps
+      its whole name apart. The Marty / Martin Jacobs stub shape would join, but Martin's id is in a signed
+      different_people row (against another record), so Martin stays his own person.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/marty, year: 2025, office: state_house, district: '38', name_key: marty jacobs, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/martin, year: 2025, office: state_house, district: '38', name_key: martin jacobs, term_start: '2025-01-08', term_end: '2025-02-03'}
+          - {alias_id: ocd-person/other, year: 2025, office: state_senate, district: '9', name_key: some other}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: ocd-person/martin, person_id: ocd-person/other, relation: different_people, checked_by: maintainer, checked_on: '2026-01-01'}
+    expect:
+      rows:
+        - {alias_id: ocd-person/marty, person_id: ocd-person/marty, basis: self}
+        - {alias_id: ocd-person/martin, person_id: ocd-person/martin, basis: self}
+        - {alias_id: ocd-person/other, person_id: ocd-person/other, basis: self}
+
+  - name: person_ids_keep_a_duplicate_stub_apart_when_the_other_name_is_signed_different_people
+    model: int_officials__person_ids
+    description: >
+      The same escape hatch on the other side: the Marty / Martin Jacobs stub shape would join, but Marty's id is in a
+      signed different_people row (against another record), so his name is kept apart and the stub does not join it.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/marty, year: 2025, office: state_house, district: '38', name_key: marty jacobs, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/martin, year: 2025, office: state_house, district: '38', name_key: martin jacobs, term_start: '2025-01-08', term_end: '2025-02-03'}
+          - {alias_id: ocd-person/other, year: 2025, office: state_senate, district: '9', name_key: some other}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: ocd-person/marty, person_id: ocd-person/other, relation: different_people, checked_by: maintainer, checked_on: '2026-01-01'}
+    expect:
+      rows:
+        - {alias_id: ocd-person/marty, person_id: ocd-person/marty, basis: self}
+        - {alias_id: ocd-person/martin, person_id: ocd-person/martin, basis: self}
+        - {alias_id: ocd-person/other, person_id: ocd-person/other, basis: self}
+
+  - name: person_ids_keep_a_same_seat_stub_with_another_surname_apart
+    model: int_officials__person_ids
+    description: >
+      Rule 2d needs the surnames to match. A "Martin Smith" stub with the duplicate shape (26 days from the same day,
+      inside the HD38 term of "Marty Jacobs", given names that fit) is another person.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/marty, year: 2025, office: state_house, district: '38', name_key: marty jacobs, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/martin, year: 2025, office: state_house, district: '38', name_key: martin smith, term_start: '2025-01-08', term_end: '2025-02-03'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/marty, person_id: ocd-person/marty, basis: self}
+        - {alias_id: ocd-person/martin, person_id: ocd-person/martin, basis: self}
+
   - name: person_ids_ignore_half_signed_curated_links
     model: int_officials__person_ids
     description: >
@@ -1016,3 +1120,73 @@ unit_tests:
         - {alias_id: ocd-person/mcgaugh, person_id: 'mojudge:joe don mcgaugh', basis: curated}
         - {alias_id: 'mohouse:658', person_id: 'mojudge:joe don mcgaugh', basis: curated}
         - {alias_id: ocd-person/someone-else, person_id: ocd-person/someone-else, basis: self}
+
+  - name: person_ids_join_the_whole_target_person_of_a_curated_link_to_a_non_chosen_alias
+    model: int_officials__person_ids
+    description: >
+      A signed same_person row whose person_id (its target) is an id the name rule merged but did not choose (the
+      fallback key mohouse:7, merged into the Open States id ocd-person/lee) sends the row's person to the target's
+      chosen id, so the alias and both ids of the target person end up as one person, not two (#682, the target side
+      of #174 item 3). Only the moved person is basis curated; the target's ids keep the basis the rules gave them.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/lee, year: 2019, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: 'mohouse:7', year: 2019, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: ocd-person/wu, year: 2025, office: state_senate, district: '3', name_key: ann wu}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: ocd-person/wu, person_id: 'mohouse:7', relation: same_person, checked_by: maintainer, checked_on: '2026-01-01'}
+    expect:
+      rows:
+        - {alias_id: ocd-person/lee, person_id: ocd-person/lee, basis: self}
+        - {alias_id: 'mohouse:7', person_id: ocd-person/lee, basis: name_continuity}
+        - {alias_id: ocd-person/wu, person_id: ocd-person/lee, basis: curated}
+
+  - name: person_ids_take_the_smallest_resolved_target_of_two_curated_links
+    model: int_officials__person_ids
+    description: >
+      Two signed same_person rows send one person (ocd-person/wu) to different ids: one to the fallback key mohouse:7,
+      which the name rule merged into ocd-person/lee, and one to ocd-person/zz. Each target is resolved to its
+      person's chosen id first and the smaller resolved id wins (ocd-person/lee over ocd-person/zz), not the smaller
+      id as written (mohouse:7). The seed error itself is caught by assert_signed_same_person_links_end_in_one_person
+      (#691).
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/lee, year: 2019, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: 'mohouse:7', year: 2019, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: ocd-person/wu, year: 2025, office: state_senate, district: '3', name_key: ann wu}
+          - {alias_id: ocd-person/zz, year: 2025, office: state_senate, district: '4', name_key: ann zz}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: ocd-person/wu, person_id: 'mohouse:7', relation: same_person, checked_by: maintainer, checked_on: '2026-01-01'}
+          - {alias_id: ocd-person/wu, person_id: ocd-person/zz, relation: same_person, checked_by: maintainer, checked_on: '2026-01-01'}
+    expect:
+      rows:
+        - {alias_id: ocd-person/lee, person_id: ocd-person/lee, basis: self}
+        - {alias_id: 'mohouse:7', person_id: ocd-person/lee, basis: name_continuity}
+        - {alias_id: ocd-person/wu, person_id: ocd-person/lee, basis: curated}
+        - {alias_id: ocd-person/zz, person_id: ocd-person/zz, basis: self}
+
+  - name: person_ids_keep_the_chosen_id_when_curated_links_join_ids_already_one_person
+    model: int_officials__person_ids
+    description: >
+      Signed same_person rows in both directions between two ids the name rule already joined (as Stephen Webber's
+      row names two ids of one person): the person keeps the id the rules chose (ocd-person/lee, not the fallback key
+      mohouse:7 either row names), and every id of it becomes basis curated (#691).
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/lee, year: 2019, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: 'mohouse:7', year: 2019, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: ocd-person/wu, year: 2025, office: state_senate, district: '3', name_key: ann wu}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: 'mohouse:7', person_id: ocd-person/lee, relation: same_person, checked_by: maintainer, checked_on: '2026-01-01'}
+          - {alias_id: ocd-person/lee, person_id: 'mohouse:7', relation: same_person, checked_by: maintainer, checked_on: '2026-01-01'}
+    expect:
+      rows:
+        - {alias_id: ocd-person/lee, person_id: ocd-person/lee, basis: curated}
+        - {alias_id: 'mohouse:7', person_id: ocd-person/lee, basis: curated}
+        - {alias_id: ocd-person/wu, person_id: ocd-person/wu, basis: self}
