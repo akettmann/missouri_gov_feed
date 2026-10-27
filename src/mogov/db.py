@@ -17,6 +17,7 @@ import errno
 import json
 import os
 import sys
+import time
 import typing
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
@@ -28,7 +29,7 @@ import duckdb
 import structlog
 
 from mogov.config import RAW_DIR
-from mogov.http import tmp_sibling
+from mogov.http import PART_STALE_S, tmp_sibling
 
 log = structlog.get_logger()
 
@@ -241,6 +242,52 @@ def _unlink_lock_if_free(lock_path: Path) -> None:
         lock_path.unlink(missing_ok=True)
 
 
+def _lock_held_by_live_run(lock_path: Path) -> bool:
+    """True when a live run holds `lock_path`. A missing lock file, or a filesystem that can't lock at all (the
+    case where the sink itself ran unlocked), is not "held": callers must then rely on the age gate alone."""
+    try:
+        fh = lock_path.open("r+b")  # never creates
+    except OSError:
+        return False
+    try:
+        try:
+            _lock_fd(fh.fileno())
+        except BlockingIOError:
+            return True
+        except OSError:
+            return False
+        _unlock_fd(fh.fileno())
+        return False
+    finally:
+        fh.close()
+
+
+def _sweep_old_count_scratch(folder: Path, suffix: str) -> None:
+    """Delete scratch files (`.part-<i>-of-<N>.parquet.<pid>.<uuid>.jsonl` / `.part`) that a killed run left
+    under a different shard count; `_clear_stale_scratch` only ever cleans its own shard of the current count.
+
+    Never removes a live writer's scratch (an old-count run still in progress): a file goes only if (1) the
+    old shard's lock is not held (a live sink holds it for its whole life), and (2) the file was untouched for
+    PART_STALE_S (24 h), the same age gate as http.sweep_dir_once. (2) covers filesystems without working
+    locks, such as Cloud Storage FUSE on Cloud Run, where (1) can't see a writer; there a live writer's file
+    is also not yet an object other tasks can list, and its own container keeps rewriting it, so it is fresh."""
+    now = time.time()
+    for ext in ("jsonl", "part"):
+        for scratch in folder.glob(f".part-*-of-*.parquet.*.{ext}"):
+            # ['', 'part-000-of-003', 'parquet', pid, uuid, ext]
+            fields = scratch.name.split(".")
+            if len(fields) != 6 or f"{fields[1]}.parquet".endswith(suffix):  # not ours to judge, or current count
+                continue
+            try:
+                if now - scratch.stat().st_mtime <= PART_STALE_S:
+                    continue
+            except OSError:
+                continue
+            if _lock_held_by_live_run(folder / f".{fields[1]}.parquet.lock"):
+                continue
+            scratch.unlink(missing_ok=True)
+
+
 def _none_marker(folder: Path, shard: Shard) -> Path:
     return folder / f".{shard.part_name}.none"
 
@@ -254,7 +301,7 @@ def _count_is_complete(folder: Path, count: int) -> bool:
 
 
 def _drop_other_shard_counts(folder: Path, shard: Shard) -> None:
-    """Remove parts, `.none` markers and lock files written under a different shard count, but only once
+    """Remove parts, `.none` markers, scratch files and lock files written under a different shard count, but only once
     every shard of this shard's count has landed.
 
     Cloud Run tasks start in waves, so the first new-count shard to publish must not delete old-count parts:
@@ -273,6 +320,7 @@ def _drop_other_shard_counts(folder: Path, shard: Shard) -> None:
     for marker in folder.glob(".part-*-of-*.parquet.none"):
         if not marker.name.endswith(f"{suffix}.none"):
             marker.unlink(missing_ok=True)
+    _sweep_old_count_scratch(folder, suffix)  # before the locks go: the lock says whether a writer is live
     for lock_path in folder.glob(".part-*-of-*.parquet.lock"):
         if not lock_path.name.endswith(f"{suffix}.lock"):
             _unlink_lock_if_free(lock_path)
