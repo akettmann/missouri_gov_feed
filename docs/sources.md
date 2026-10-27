@@ -19,7 +19,7 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `tap_mec` | MEC via The Accountability Project | state campaign finance and lobbyist gifts | 2011–2022 (gifts from 2004) | |
 | `fec` | Federal Election Commission | federal candidates, committees, PAC contributions, donor aggregates | `MOGOV_FEC_CYCLES` | API key for aggregates |
 | `voteview` | Voteview | Congress roll calls, votes, DW-NOMINATE ideology | `MOGOV_VOTEVIEW_CONGRESSES` | |
-| `govinfo_billstatus` | GovInfo BILLSTATUS bulk XML (govinfo.gov) | federal bills: sponsor, cosponsors, actions, roll calls cited, Public Law number | `MOGOV_BILLSTATUS_CONGRESSES` (default 117 to today's Congress) | |
+| `govinfo_billstatus` | GovInfo BILLSTATUS bulk XML (govinfo.gov) | federal bills: sponsor, cosponsors, actions, roll calls cited, Public Law number, committee referrals, subjects, related bills | `MOGOV_BILLSTATUS_CONGRESSES` (default 117 to today's Congress) | |
 | `house_fd` | U.S. House Clerk | House members' financial disclosures and trades | 2015+ | |
 | `senate_efd` | U.S. Senate eFD | senators' financial disclosures | as filed | opt-in |
 | `courtlistener_bulk` | CourtListener bulk files | judges, positions, education, federal judges' disclosures | quarterly snapshot | |
@@ -935,8 +935,10 @@ rule against `/bulkdata`, US government work (the page states no licence). Congr
 
 - Lands: every XML file unchanged as gzip under `data/raw/govinfo_billstatus_xml/<congress>/<type>/` plus
   `govinfo_billstatus_files` (path, URL, size, sha256, landing time); parsed with lxml into one JSON row per entity:
-  `govinfo_billstatus_bills`, `_sponsors`, `_cosponsors`, `_actions`, `_recorded_votes`, `_laws`.
-  Committees, subjects, summaries, titles and text versions stay in the raw XML only.
+  `govinfo_billstatus_bills`, `_sponsors`, `_cosponsors`, `_actions`, `_recorded_votes`, `_laws`, and (#625)
+  `_committees` (committees and subcommittees a bill was referred to), `_committee_activities` (their dated steps),
+  `_subjects` (CRS legislative subject terms), `_related_bills` and `_related_bill_relationships`. Summaries,
+  titles, text versions and amendments (with the roll calls recorded on them) stay in the raw XML only.
 - Shard units: (congress, bill type) zips, each downloaded by exactly one shard (so no shard repeats another's
   download). The House `hr` zip is by far the largest, so more shards than zips (8 per Congress) gain nothing.
 - Everything is landed (all states): cosponsor lists need the whole file anyway, and the Missouri filter
@@ -997,6 +999,37 @@ Quirks:
   `sponsorshipWithdrawnDate` set (the mart drops them). `district` is present for House members only.
 - Sponsors carry the member's state at the time of the bill; a member who changed states has rows under both.
 - Eleven reserved 117th House bills (hr2, hr9-17, hr20; "Reserved for the Speaker." / "...Minority Leader.") use `<billType>` and `<billNumber>` where every other file uses `<type>` and `<number>`. The parser reads either, so they keep their real id (`117-hr-2`); they are real bills with no sponsors, cosponsors or votes, and are recognizable by that title.
+- Committees, subjects and related bills (staging only so far; checked on the 118th hr and s, 16,213 bills, and the
+  117th hr and s, 15,066 bills): a subcommittee is its own row with `subposition` set and `parent_system_code`; the
+  file gives it no chamber, so staging takes the parent's.
+  - Activity labels vary in case and wording, so filter on `activity_normalized` (lower case, hyphens as spaces,
+    trimmed). Seen: "Referred to" / "Referred To", "Markup by" / "Markup By", "Reported by" / "Reported By",
+    "Discharged from" / "Discharged From", "Hearings by" (117th), "Hearings By (full committee)" and "Hearings By
+    (subcommittee)" (118th), "Reported Original Measure" / "Reported original measure", "Unknown" and "Bills of
+    Interest - Exchange of Letters". The last has no `<date>` in the file, so `activity_date` is null for exactly
+    those rows (44 in the 118th hr and s, e.g. 118-hr-3935 on hssy00); the not-null rule is relaxed for that label
+    only. Activity counts, 118th hr and s: "Referred to" 25,770, "Markup by" 2,202, "Reported by" 1,692,
+    "Discharged from" 790, "Hearings by" 777 (206 full committee, 571 subcommittee), "Unknown" 265, "Reported
+    Original Measure" 56, "Bills of Interest" 44.
+  - A bill's one policy area is `policy_area` on the bills model; the legislative subjects are many per bill and
+    only some bills have any (118th hr and s: 6,021 of 16,213 bills; 117th: 9,275 of 15,066).
+  - Related bills carry one or more relationship types, and the label is not stable: use
+    `relationship_type_normalized`. Seen: "Identical bill", "Related bill", "Procedurally related" and
+    "Procedurally-related" (one value once normalized), "Text similarities" (59 in the 118th hr and s), "Related
+    document" (6, 117th). The link is listed on both bills 98% of the time in the 118th hr and s (11,946 of the
+    12,171 relations whose other bill is loaded), not always.
+  - CRS sometimes lists a bill as related to itself (34 of 12,472 related-bill rows in the 118th hr and s, e.g.
+    118-hr-9541, hr-292, hr-8205). Staging drops those rows (and their relationship rows), so `position` and
+    `related_position` have gaps; the raw table keeps them.
+  - `related_bill_id` joins the bills model only when that Congress and type are loaded (a 117th bill relates to a
+    118th one and the reverse). The 118th relates back only to the 116th through the 119th; the allowed range is
+    93 to 125 so a deeper backfill does not trip the test.
+- The older export of the eleven reserved 117th bills wraps these lists one level deeper
+  (`<committees><billCommittees/>`, `<subjects><billSubjects><legislativeSubjects/>`); all eleven are empty, and
+  the parser looks through the wrapper if one ever has entries.
+- Amendments: BILLSTATUS keeps each amendment, with its own actions and recorded roll calls, under `<amendments>`.
+  That element is not parsed, so no amendment roll call is linked to a bill and `fct_federal_vote_bills` has no
+  amendment votes (#706).
 - Rate: the loader makes one request per zip (24 for the default window), not per bill.
 
 ## house_fd: U.S. House financial disclosures

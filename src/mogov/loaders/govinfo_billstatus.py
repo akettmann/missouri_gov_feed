@@ -10,8 +10,9 @@ on Cloud Run Jobs that is the mounted bucket, so the re-fetch rules hold across 
 
 Each XML file is landed unchanged as gzip under RAW_DIR/govinfo_billstatus_xml/<congress>/<type>/ and described in
 `govinfo_billstatus_files` (path, URL, size, hash, landing time); `mogov.parsers.govinfo_billstatus` parses the same
-bytes with lxml into one row per bill, sponsor, cosponsor, action, recorded vote and law. Everything is landed, not
-just Missouri's members: sponsors are matched to Missouri's delegation by `bioguideId` in dbt.
+bytes with lxml into one row per bill, sponsor, cosponsor, action, recorded vote, law, committee (and its
+activities), subject and related bill. Everything is landed, not just Missouri's members: sponsors are matched
+to Missouri's delegation by `bioguideId` in dbt.
 
 Units: (congress, bill type) zips, so a shard downloads only the zips it owns (no file is fetched by two shards).
 The House `hr` zip is the biggest by far (33 MB); shard counts above the number of zips (8 per Congress) gain nothing.
