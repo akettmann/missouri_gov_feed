@@ -51,6 +51,33 @@ seeds:
     columns:
       - name: office
         data_tests: [unique, not_null]
+  - name: statewide_office_handovers
+    description: >
+      Exact hand-over dates for statewide officeholders whose Official Manual term is in whole years but who left or
+      arrived mid-term, or on a day other than the regular January hand-over (#606): Hawley left the Attorney
+      General's office on 2019-01-03 for Schmitt, Greitens resigned on 2018-06-01 and Parson succeeded him, and so on.
+      fct_audit_report_officeholders uses term_start / term_end when a row matches (office, term start year, family
+      name) and otherwise the year-based convention. A blank date keeps the convention for that side. Dates are from
+      each row's source_url (checked_on); Watson's interim auditor term (2015) is left out because no source dated
+      his swearing-in. Add a row when a new mid-term change appears in int_bluebook__statewide_officeholders.
+    config:
+      column_types: {office: varchar, family_name: varchar, term_start_year: integer, term_start: date, term_end: date, source_url: varchar, checked_on: date}
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [office, family_name, term_start_year]
+    columns:
+      - name: office
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('statewide_officials')
+                field: office
+      - name: source_url
+        data_tests: [not_null]
+      - name: checked_on
+        data_tests: [not_null]
   - name: house_speakers
     description: >
       Speaker of the Missouri House per year (the district number is the Speaker's seat); roll-call PDFs list the
