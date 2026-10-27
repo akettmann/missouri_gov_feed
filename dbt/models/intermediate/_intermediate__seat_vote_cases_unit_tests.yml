@@ -20,8 +20,9 @@ unit_tests:
       2018-12-31 with no journal vote, started before the journals, ends the day before them (2017-01-03): Joseph
       Keaveny (SD4), Eric Schmitt (SD15), Kurt Schaefer (SD19), David Pearce (SD21); Pearce's SD31 term, which ended
       in 2012, keeps its dates. Not capped: Holsman resigned 2020-01-16 with his last vote 2020-01-13 (under a year),
-      Lauren Arthur (SD17 from a dated 2018-09-12 start, last vote 2024-05-13, end 2024-07-21) and Cierpiot (dated
-      2018-01-01 start, open end; first vote 2018-01-08, #525) keep their Open States dates.
+      Lauren Arthur (SD17 from a dated 2018-09-12 start, last vote 2024-05-13, end 2024-07-21) keeps her Open States
+      dates. Cierpiot (open end; first vote 2018-01-08, #525) keeps his start: Open States has 2018-01-03 (the
+      journal oath), and the January-1 rule in seat_terms makes it 2018-01-01.
     given:
       - input: ref('int_mo_legislators__seats_as_given')
         rows:
