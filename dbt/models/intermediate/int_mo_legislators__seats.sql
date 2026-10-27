@@ -20,8 +20,9 @@
 --     before the journals began, it ends the day before the first journal date (the latest it can have ended);
 --     otherwise (an undated start, or a start inside the journal years) the term is dropped.
 -- The last two rules need the journals to cover the term: with no journal loaded, or a calendar year inside the term
--- (from the journals' first to last date) with no journal vote at all, a term is left as Open States gives it, never
--- dropped or capped for lacking votes (#534). Only the first rule (an undated start) needs a vote of the term itself.
+-- (from the journals' first date to the term's end; to the journals' last date for an open term) with no journal vote
+-- at all, which includes years after the journals stop, a term is left as Open States gives it, never dropped or
+-- capped for lacking votes (#534). Only the first rule (an undated start) needs a vote of the term itself.
 with as_given as (
     select * from {{ ref('int_mo_legislators__seats_as_given') }}
 ),
@@ -50,7 +51,14 @@ term_years as (
         s.start_date,
         s.end_date,
         extract(year from case when s.start_date > j.first_date then s.start_date else j.first_date end) as year_from,
-        extract(year from case when s.end_date < j.last_date then s.end_date else j.last_date end) as year_to
+        -- a closed term counts to its own end, so years after the journal's last date (a journal that stops early)
+        -- have no votes and leave the term as given; only an open term stops at the journal's last date
+        extract(
+            year from case
+                when s.end_date < {{ dbt.safe_cast("'9999-12-31'", 'date') }} then s.end_date
+                else j.last_date
+            end
+        ) as year_to
     from as_given as s
     cross join journal as j
     where s.chamber = 'upper'

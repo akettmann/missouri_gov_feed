@@ -83,8 +83,8 @@ unit_tests:
       the journals (#534). Here the journal has votes in 2017 and 2019 only, so 2018 is missing and a partial raw load
       is assumed. c01 ends 2018-12-31 with its last vote in 2017: not capped. c02 ends 2018-12-31 with no vote:
       not dropped or moved to 2017-01-03. c03 ends 2017-12-31, a year the journal covers, with no vote and a dated start
-      before the journals: ends the day before the journals begin (2017-01-31 here) as usual. c04 has a vote in every
-      year it spans within the journals (2019 only): capped by its last vote.
+      before the journals: ends the day before the journals begin (2017-01-31 here) as usual. c04 ends 2020-12-31, a
+      year after the journals stop (no 2020 votes): not capped, as the journals may simply not reach 2020.
     given:
       - input: ref('int_mo_legislators__seats_as_given')
         rows:
@@ -101,4 +101,29 @@ unit_tests:
         - {openstates_id: c01, district_number: 1, start_date: '2011-01-01', end_date: '2018-12-31'}
         - {openstates_id: c02, district_number: 2, start_date: '2011-01-01', end_date: '2018-12-31'}
         - {openstates_id: c03, district_number: 3, start_date: '2011-01-01', end_date: '2017-01-31'}
-        - {openstates_id: c04, district_number: 4, start_date: '2019-01-01', end_date: '2019-02-01'}
+        - {openstates_id: c04, district_number: 4, start_date: '2019-01-01', end_date: '2020-12-31'}
+
+  - name: senate_seat_terms_untouched_when_the_journal_stops_early
+    model: int_mo_legislators__seats
+    description: >
+      A journal that stops before a closed term ends (a partial raw load, e.g. only 2017-2019) does not cover the
+      years after it, so the term is neither capped nor dropped (#534). The journal has votes in 2017-2019 only.
+      d01 ends 2021-12-31, last voted 2019-02-01: not capped. d02 started 2018 and ended 2021-12-31 with no vote:
+      not dropped. d03 ends 2019-12-31, inside the journal years, last voted 2017-02-01: capped as usual.
+    given:
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {openstates_id: d01, person_id: d01, chamber: upper, district_number: 1, start_date: '2017-01-01', end_date: '2021-12-31'}
+          - {openstates_id: d02, person_id: d02, chamber: upper, district_number: 2, start_date: '2018-01-01', end_date: '2021-12-31'}
+          - {openstates_id: d03, person_id: d03, chamber: upper, district_number: 3, start_date: '2017-01-01', end_date: '2019-12-31'}
+      - input: ref('int_mo_senate__votes')
+        rows:
+          - {person_key: d01, vote_date: '2017-02-01'}
+          - {person_key: d01, vote_date: '2018-02-01'}
+          - {person_key: d01, vote_date: '2019-02-01'}
+          - {person_key: d03, vote_date: '2017-02-01'}
+    expect:
+      rows:
+        - {openstates_id: d01, district_number: 1, start_date: '2017-01-01', end_date: '2021-12-31'}
+        - {openstates_id: d02, district_number: 2, start_date: '2018-01-01', end_date: '2021-12-31'}
+        - {openstates_id: d03, district_number: 3, start_date: '2017-01-01', end_date: '2017-02-01'}

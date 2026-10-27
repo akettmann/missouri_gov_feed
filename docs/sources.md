@@ -294,7 +294,8 @@ Quirks:
   Open States' own dates (`int_mo_legislators__seats_as_given`), so the correction does not feed back into who a
   vote belongs to.
   Dropping or capping a term for lacking votes only happens when the journals cover it: with no journal loaded, or a
-  calendar year of the term with no journal vote, the term stays as Open States gives it (#534). Two dbt tests guard
+  calendar year of the term with no journal vote (including years after the journals stop, for a closed term), the
+  term stays as Open States gives it (#534). Two dbt tests guard
   the attribution these rules trust: `assert_senate_vote_tokens_attributed` (more than 0.05% of vote rows
   unattributed; 0 of 75,677 today) and `assert_senate_terms_have_votes` (a closed Senate term with no attributed
   vote, other than the four who never voted in the journals). The last-vote cap ends Ryan Silvey's term 2017-09-13

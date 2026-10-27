@@ -373,9 +373,10 @@ models:
     Where it started before the journals began, it ends the day before the first journal date (the latest it can
     have ended); otherwise (an undated start, or a start inside the journal years) the term is dropped. The last
     two rules need the journals to cover the term: with no journal loaded, or a calendar year inside the term (from
-    the journals'' first to last date) with no journal vote at all, a term is left as Open States gives it, never
-    dropped or capped for lacking votes (#534). Only the first rule (an undated start) needs a vote of the term
-    itself. Grain: one row per Open States legislative seat-term.'
+    the journals'' first date to the term''s end; to the journals'' last date for an open term) with no journal
+    vote at all, which includes years after the journals stop, a term is left as Open States gives it, never dropped
+    or capped for lacking votes (#534). Only the first rule (an undated start) needs a vote of the term itself.
+    Grain: one row per Open States legislative seat-term.'
 - name: int_mo_legislators__seats_as_given
   description: 'Every Missouri legislative seat-term in Open States (current and retired people), keyed for matching:
     chamber, district number, surname key, and date range (open-ended where Open States has no date), plus person_id,
