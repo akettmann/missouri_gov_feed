@@ -391,3 +391,47 @@ seeds:
                 field: session_code
       - name: evidence
         data_tests: [not_null]
+  - name: mo_senate_action_flags
+    description: >
+      Which stage a Senate bill's own action wording records (#588): senate.mo.gov's action history for a bill
+      (stg_mo_senate__bill_actions.action) says "Second Read and Referred S Education Committee", "S Third Read and
+      Passed", "Signed by Governor" where the House XML says "Referred: Education(H)", "Third Read and Passed (S)",
+      "Approved by Governor (G)". int_bills__status reads a stage flag per matching row. action_pattern is a SQL LIKE
+      pattern (matched ignoring case, the whole action text); bill_type is the bill's prefix (SB, SJR, SCR, SR, ...)
+      or `any`; flag is one of the int_bills__status flags. An action no row matches counts for no stage, so a new
+      phrasing never lifts a bill to a wrong stage: add a row to count it. Substitute and amendment actions (SS for
+      SCS S withdrawn, HCS H defeated, SA 1 S offered & defeated) are deliberately not mapped: they are not the bill.
+      `S adopted` / `H adopted` also appear on substitutes ("SCS S adopted"), which the exact-text patterns skip.
+    config:
+      column_types: {action_pattern: varchar, bill_type: varchar, flag: varchar, evidence: varchar}
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [action_pattern, bill_type, flag]
+    columns:
+      - name: action_pattern
+        data_tests: [not_null]
+      - name: bill_type
+        data_tests: [not_null]
+      - name: flag
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [referred, reported, perfected, passed_senate, passed_house, defeated, adopted, truly_agreed,
+                         approved, vetoed, vetoed_in_part, veto_overridden, delivered_to_sos]
+  - name: mo_senate_action_flag_examples
+    description: >
+      Golden examples for mo_senate_action_flags (#588): real Senate action wordings with the stage flag each must
+      map to (`none` = no stage), checked by assert_senate_action_flags_map_known_wordings. A phrasing can appear
+      on several rows (the House's adoption of a Senate concurrent resolution is both passed_house and adopted).
+      Substitute, amendment, enrollment and Governor-message wordings are listed with `none` on purpose.
+    config:
+      column_types: {action: varchar, bill_type: varchar, expected_flag: varchar}
+    columns:
+      - name: action
+        data_tests: [not_null]
+      - name: bill_type
+        data_tests: [not_null]
+      - name: expected_flag
+        data_tests: [not_null]

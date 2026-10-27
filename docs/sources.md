@@ -259,11 +259,20 @@ Quirks:
   `SenateActList` file adds the Senate bills that reached the House, but only with their House-side and governor
   actions. In 2024 it stops at the speaker's signature for 17 of its 38 bills: 2024 SB 727 was signed into law, yet the list ends at
   "Signed by House Speaker". Such bills get the outcome "no governor action recorded", not "failed". Senate bills
-  that never reached the House have no actions in any source we load, so their status is null: 906 of 972 SBs
-  and 56 of 58 SJRs in 2026. `SenateActList` exists only for 2024 and later, so every Senate bill of 2017 to
-  2023 has a null status and outcome, enacted ones included (2017 to 2023: 0 of 4,143 SBs have a status; 2024: 29
-  of 796, none enacted because the list stops before the governor). Counts of failed, pending or enacted bills
-  therefore leave out Senate bills, almost all of them before 2024; House bills are complete.
+  that never reached the House have no actions in this export. From the Senate's own action history
+  (`mo_senate_bills`, below) they do (#588): `int_bills__status` reads `stg_mo_senate__bill_actions` too and maps the
+  Senate's wording to the same stage flags through the seed `mo_senate_action_flags` (one row per phrasing; an
+  action no row matches counts for no stage, and substitute or amendment actions such as "SS for SCS S withdrawn"
+  or "HCS H defeated" are deliberately unmapped). A bill in both feeds takes the furthest stage of either, so 2024
+  SB 727 ("Signed by House Speaker" in the House list) is now signed and enacted from the Senate's "Signed by
+  Governor"; a law without signature shows as "Governor took no action, sent to Secretary of State/Article III,
+  Sec. 31" (2024 SB 751) and is enacted. The relisting rule and `action_count` still use the House XML actions only.
+  A Senate bill whose Actions tab was not landed (`mo_senate_bills.fragment_rejected`) has no actions in either
+  feed and so no status: unknown, not a stage. For a session the `mo_senate_bills` loader has not landed, a Senate
+  bill that never reached the House still has a null status (a lookback of ten years lands 2017 on). Until then
+  counts of failed, pending or enacted bills leave out those Senate bills; House bills are complete. Not yet seen
+  in the Senate's wording: bill withdrawals, a veto override ("Passed over Veto" is the House's phrase) and a
+  line-item veto (#715).
   The same list names the special-session Senate bills (`stg_mo_house__senate_act_bills`, with titles, version, last
   action and effective date), which the Senate topical index never covers: `int_bills__list` adds those the index lacks
   (2025's 253 SB 1, 3 and 4), for `fct_bills` and `fct_vote_bills` alike. Once `mo_senate_bills` has landed a session,
@@ -277,8 +286,7 @@ Quirks:
   128) the bill string is identical and the original is already "enacted"; the 15 of 2017 repeat the unloaded
   2016 session (161). They get status "relisted for governor message", a null outcome (it is on the original) and
   `relisted_from_session_code` naming the original's session (null for 2017), rather than "introduced" /
-  "failed" (#396). Leave them out of per-session bill counts. Loading
-  Senate-side actions is #317 (and #237).
+  "failed" (#396). Leave them out of per-session bill counts.
 - `ActivitySequence` (action order) is only present from 2024. About 1,000 of 138,000 actions are repeated word
   for word under one `Guid` (mostly 2017–2018); staging keeps them once.
 - Session codes: 1 is the regular session and 2–4 are special sessions, in order. Code 2 doesn't appear in
@@ -505,7 +513,7 @@ a row is added. `int_bills__list` takes Senate bills from this list for every se
 sessions it keeps the topical index and the House `SenateActList`. To add a special session: find the House code
 whose bills share the Senate's titles and whose dates overlap, append `year,E<n>,<code>,"<evidence>"` to
 `dbt/seeds/mo_senate_session_codes.csv` (titles and dates in the evidence, as the 2019 to 2022 rows have), and
-`dbt seed`; the failing test's header repeats this. Status from the Senate's actions is #588.
+`dbt seed`; the failing test's header repeats this. Status from the Senate's actions is `int_bills__status` (#588; see mo_house_xml above).
 
 ## mo_senate_topics: Missouri Senate topical index
 
