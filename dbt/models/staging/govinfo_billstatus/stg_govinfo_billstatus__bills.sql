@@ -1,6 +1,6 @@
 -- Federal bills from the GovInfo BILLSTATUS bulk XML (loaded Congresses, all states), one row per bill. bill_type is
 -- lower-case (hr, s, hjres, sjres, hconres, sconres, hres, sres). The latest action is the text as published; whether
--- a bill became law is read from the laws list (stg_govinfo_billstatus__laws), never from this text. Only about a third
+-- a bill became law is read from the actions (int_federal_bills__stage), never from this text. Only about a third
 -- of the files carry their congress.gov link, so the rest get it built from the type, congress and number
 -- (https://www.congress.gov/bill/118th-congress/house-joint-resolution/7), which is the form the files use.
 with src as (
