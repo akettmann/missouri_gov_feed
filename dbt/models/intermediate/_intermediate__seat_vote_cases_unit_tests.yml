@@ -1,0 +1,400 @@
+# Named-person cases for the rules decided downstream of person ids (#649, #658): Senate seat dating
+# (int_mo_legislators__seats), officeholders by year (int_officeholders__years) and House vote-token attribution
+# (int_mo_house__votes). Each fixture copies the real rows of the people named (Open States ids, districts, dates,
+# PDF tokens, session codes, roll-call URLs) from the production tables, so a regression in a rule fails on the real
+# case it was written for. The synthetic tests of the same rules stay in _intermediate__seats_unit_tests.yml,
+# _intermediate__officeholders_unit_tests.yml and _intermediate__mo_house_votes_unit_tests.yml.
+version: 2
+
+unit_tests:
+  - name: senate_seat_terms_of_named_senators_dated_from_the_journal
+    model: int_mo_legislators__seats
+    description: >
+      Real Open States Senate terms and journal votes (first and last vote of each term; the journals begin
+      2017-01-04; Mike Cierpiot's first vote of each year 2018-2024 stands in for the rest of the journal, so every
+      year of every term has votes). #516, undated start becomes the term's first journal vote: Paul Wieland (SD22),
+      Jeanie Riddle (SD10) and Jason Holsman (SD7) start 2017-01-04. #522, Open States end more than a year after the
+      last vote is capped at that vote: Will Kraus (SD8, 2018-12-31 -> 2017-07-25) and Ryan Silvey (SD17,
+      2018-12-31 -> 2017-09-13). Silvey's end is today's behaviour (option 1 of #551, a needs-user decision): payroll
+      shows him paid into January 2018, so this expectation changes if #551 decides otherwise. #522, a term ending
+      2018-12-31 with no journal vote, started before the journals, ends the day before them (2017-01-03): Joseph
+      Keaveny (SD4), Eric Schmitt (SD15), Kurt Schaefer (SD19), David Pearce (SD21); Pearce's SD31 term, which ended
+      in 2012, keeps its dates. Not capped: Holsman resigned 2020-01-16 with his last vote 2020-01-13 (under a year),
+      Lauren Arthur (SD17 from a dated 2018-09-12 start, last vote 2024-05-13, end 2024-07-21) and Cierpiot (dated
+      2018-01-01 start, open end; first vote 2018-01-08, #525) keep their Open States dates.
+    given:
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {openstates_id: 'ocd-person/b742d6cb-a63d-40c9-afd0-033f26190063', person_id: 'ocd-person/b742d6cb-a63d-40c9-afd0-033f26190063', full_name: Paul Wieland, chamber: upper, district_number: 22, start_date: '1900-01-01', end_date: '2023-01-04'}
+          - {openstates_id: 'ocd-person/3382ca1d-1920-48a9-9d49-6406b5d157c8', person_id: 'ocd-person/3382ca1d-1920-48a9-9d49-6406b5d157c8', full_name: Jeanie Riddle, chamber: upper, district_number: 10, start_date: '1900-01-01', end_date: '2023-01-04'}
+          - {openstates_id: 'ocd-person/0e3310b6-dfa2-4c00-83d8-fe423c975fdb', person_id: 'ocd-person/0e3310b6-dfa2-4c00-83d8-fe423c975fdb', full_name: Jason Holsman, chamber: upper, district_number: 7, start_date: '1900-01-01', end_date: '2020-01-16'}
+          - {openstates_id: 'ocd-person/e2a4325d-a856-4581-80d5-d323f65391fc', person_id: 'ocd-person/e2a4325d-a856-4581-80d5-d323f65391fc', full_name: Will Kraus, chamber: upper, district_number: 8, start_date: '2011-01-01', end_date: '2018-12-31'}
+          - {openstates_id: 'ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8', person_id: 'ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8', full_name: Mike Cierpiot, chamber: upper, district_number: 8, start_date: '2018-01-01', end_date: '9999-12-31'}
+          - {openstates_id: 'ocd-person/fd8438aa-3dfd-48ef-b2a5-076c42799b9b', person_id: 'ocd-person/fd8438aa-3dfd-48ef-b2a5-076c42799b9b', full_name: Ryan Silvey, chamber: upper, district_number: 17, start_date: '2013-01-01', end_date: '2018-12-31'}
+          - {openstates_id: 'ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff', person_id: 'ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff', full_name: Lauren Arthur, chamber: upper, district_number: 17, start_date: '2018-09-12', end_date: '2024-07-21'}
+          - {openstates_id: 'ocd-person/8be61611-8f4a-4318-8cd7-047b4fb282e3', person_id: 'ocd-person/8be61611-8f4a-4318-8cd7-047b4fb282e3', full_name: Joseph Keaveny, chamber: upper, district_number: 4, start_date: '2011-01-01', end_date: '2018-12-31'}
+          - {openstates_id: 'ocd-person/fc4fd7ed-bb0d-4d09-ac76-879751adbfc0', person_id: 'ocd-person/fc4fd7ed-bb0d-4d09-ac76-879751adbfc0', full_name: Eric Schmitt, chamber: upper, district_number: 15, start_date: '2011-01-01', end_date: '2018-12-31'}
+          - {openstates_id: 'ocd-person/ff5be056-ccc0-408e-a4dd-b0a2fed76639', person_id: 'ocd-person/ff5be056-ccc0-408e-a4dd-b0a2fed76639', full_name: Kurt Schaefer, chamber: upper, district_number: 19, start_date: '2011-01-01', end_date: '2018-12-31'}
+          - {openstates_id: 'ocd-person/d2959bf2-939f-46a0-bc69-76a6d91c1ce7', person_id: 'ocd-person/d2959bf2-939f-46a0-bc69-76a6d91c1ce7', full_name: David Pearce, chamber: upper, district_number: 31, start_date: '2011-01-01', end_date: '2012-12-31'}
+          - {openstates_id: 'ocd-person/d2959bf2-939f-46a0-bc69-76a6d91c1ce7', person_id: 'ocd-person/d2959bf2-939f-46a0-bc69-76a6d91c1ce7', full_name: David Pearce, chamber: upper, district_number: 21, start_date: '2013-01-01', end_date: '2018-12-31'}
+      - input: ref('int_mo_senate__votes')
+        rows:
+          # Wieland and Riddle: first and last votes of their terms
+          - {person_key: 'ocd-person/b742d6cb-a63d-40c9-afd0-033f26190063', vote_date: '2017-01-04'}
+          - {person_key: 'ocd-person/b742d6cb-a63d-40c9-afd0-033f26190063', vote_date: '2022-10-04'}
+          - {person_key: 'ocd-person/3382ca1d-1920-48a9-9d49-6406b5d157c8', vote_date: '2017-01-04'}
+          - {person_key: 'ocd-person/3382ca1d-1920-48a9-9d49-6406b5d157c8', vote_date: '2022-10-04'}
+          # Holsman: first vote, last vote three days before his 2020-01-16 resignation
+          - {person_key: 'ocd-person/0e3310b6-dfa2-4c00-83d8-fe423c975fdb', vote_date: '2017-01-04'}
+          - {person_key: 'ocd-person/0e3310b6-dfa2-4c00-83d8-fe423c975fdb', vote_date: '2020-01-13'}
+          # Kraus and Silvey: last votes in 2017, Open States ends both 2018-12-31
+          - {person_key: 'ocd-person/e2a4325d-a856-4581-80d5-d323f65391fc', vote_date: '2017-01-04'}
+          - {person_key: 'ocd-person/e2a4325d-a856-4581-80d5-d323f65391fc', vote_date: '2017-07-25'}
+          - {person_key: 'ocd-person/fd8438aa-3dfd-48ef-b2a5-076c42799b9b', vote_date: '2017-01-04'}
+          - {person_key: 'ocd-person/fd8438aa-3dfd-48ef-b2a5-076c42799b9b', vote_date: '2017-09-13'}
+          # Arthur: first and last Senate votes
+          - {person_key: 'ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff', vote_date: '2018-09-14'}
+          - {person_key: 'ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff', vote_date: '2024-05-13'}
+          # Cierpiot: first vote of each year 2018-2024
+          - {person_key: 'ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8', vote_date: '2018-01-08'}
+          - {person_key: 'ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8', vote_date: '2019-01-09'}
+          - {person_key: 'ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8', vote_date: '2020-01-13'}
+          - {person_key: 'ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8', vote_date: '2021-01-06'}
+          - {person_key: 'ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8', vote_date: '2022-01-10'}
+          - {person_key: 'ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8', vote_date: '2023-01-04'}
+          - {person_key: 'ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8', vote_date: '2024-01-10'}
+          # Keaveny, Schmitt, Schaefer and Pearce never voted in the journals
+    expect:
+      rows:
+        - {full_name: Paul Wieland, district_number: 22, start_date: '2017-01-04', end_date: '2023-01-04'}
+        - {full_name: Jeanie Riddle, district_number: 10, start_date: '2017-01-04', end_date: '2023-01-04'}
+        - {full_name: Jason Holsman, district_number: 7, start_date: '2017-01-04', end_date: '2020-01-16'}
+        - {full_name: Will Kraus, district_number: 8, start_date: '2011-01-01', end_date: '2017-07-25'}
+        - {full_name: Mike Cierpiot, district_number: 8, start_date: '2018-01-01', end_date: '9999-12-31'}
+        - {full_name: Ryan Silvey, district_number: 17, start_date: '2013-01-01', end_date: '2017-09-13'}
+        - {full_name: Lauren Arthur, district_number: 17, start_date: '2018-09-12', end_date: '2024-07-21'}
+        - {full_name: Joseph Keaveny, district_number: 4, start_date: '2011-01-01', end_date: '2017-01-03'}
+        - {full_name: Eric Schmitt, district_number: 15, start_date: '2011-01-01', end_date: '2017-01-03'}
+        - {full_name: Kurt Schaefer, district_number: 19, start_date: '2011-01-01', end_date: '2017-01-03'}
+        - {full_name: David Pearce, district_number: 31, start_date: '2011-01-01', end_date: '2012-12-31'}
+        - {full_name: David Pearce, district_number: 21, start_date: '2013-01-01', end_date: '2017-01-03'}
+
+  - name: officeholders_named_senate_holders_in_2017_and_2018
+    model: int_officeholders__years
+    description: >
+      Senate years 2017 and 2018 from the dated seat table (#516): a year is kept only when all 34 districts have a
+      dated holder, so these years exist only because the starts of Wieland, Riddle and Holsman were dated from the
+      journal. Real terms for the named districts (as int_mo_legislators__seats outputs them), one dated filler term
+      for each other district. SD8 2017 lists Kraus only (#525): Cierpiot's Senate term starts 2018-01-01 and his
+      first Senate vote is 2018-01-08, so he is SD8's holder from 2018, Kraus (ended 2017-07-25) is not. SD17:
+      Silvey in 2017 (ended 2017-09-13, today's #551 behaviour), Arthur in 2018. Keaveny, Schmitt, Schaefer and Pearce
+      (ended 2017-01-03, before the January 15 handover) are not 2017 holders: their successors are (Jacob Hummel SD4,
+      Andrew Koenig SD15, Caleb Rowden SD19, Denny Hoskins SD21). Jolie Justus (SD10, ended 2016-12-31) is not listed.
+    given:
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '171', session_year: 2017, person_key: 'ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff', full_name: Lauren Arthur, district_number: 18}
+          - {session_code: '181', session_year: 2018, person_key: 'ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff', full_name: Lauren Arthur, district_number: 18}
+      - input: ref('stg_openstates__people')
+        rows: []
+        format: dict
+      - input: ref('int_mo_house__votes')
+        rows: []
+        format: dict
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: 'ocd-person/8be61611-8f4a-4318-8cd7-047b4fb282e3', openstates_id: 'ocd-person/8be61611-8f4a-4318-8cd7-047b4fb282e3', full_name: Joseph Keaveny, chamber: upper, district_number: 4, start_date: '2011-01-01', end_date: '2017-01-03'}
+          - {person_id: 'ocd-person/b29dddf1-268f-4419-a5f7-7d6089b9518c', openstates_id: 'ocd-person/b29dddf1-268f-4419-a5f7-7d6089b9518c', full_name: Jacob Hummel, chamber: upper, district_number: 4, start_date: '2017-01-10', end_date: '2018-12-31'}
+          - {person_id: 'ocd-person/0e3310b6-dfa2-4c00-83d8-fe423c975fdb', openstates_id: 'ocd-person/0e3310b6-dfa2-4c00-83d8-fe423c975fdb', full_name: Jason Holsman, chamber: upper, district_number: 7, start_date: '2017-01-04', end_date: '2020-01-16'}
+          - {person_id: 'ocd-person/e2a4325d-a856-4581-80d5-d323f65391fc', openstates_id: 'ocd-person/e2a4325d-a856-4581-80d5-d323f65391fc', full_name: Will Kraus, chamber: upper, district_number: 8, start_date: '2011-01-01', end_date: '2017-07-25'}
+          - {person_id: 'ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8', openstates_id: 'ocd-person/70c04c22-b1a9-4c3c-96f9-36761e63f3f8', full_name: Mike Cierpiot, chamber: upper, district_number: 8, start_date: '2018-01-01', end_date: '9999-12-31'}
+          - {person_id: 'ocd-person/35bfc652-fb53-489b-887c-9df17ba19959', openstates_id: 'ocd-person/35bfc652-fb53-489b-887c-9df17ba19959', full_name: Jolie Justus, chamber: upper, district_number: 10, start_date: '2011-01-01', end_date: '2016-12-31'}
+          - {person_id: 'ocd-person/3382ca1d-1920-48a9-9d49-6406b5d157c8', openstates_id: 'ocd-person/3382ca1d-1920-48a9-9d49-6406b5d157c8', full_name: Jeanie Riddle, chamber: upper, district_number: 10, start_date: '2017-01-04', end_date: '2023-01-04'}
+          - {person_id: 'ocd-person/fc4fd7ed-bb0d-4d09-ac76-879751adbfc0', openstates_id: 'ocd-person/fc4fd7ed-bb0d-4d09-ac76-879751adbfc0', full_name: Eric Schmitt, chamber: upper, district_number: 15, start_date: '2011-01-01', end_date: '2017-01-03'}
+          - {person_id: 'ocd-person/2effb0e6-3648-4cc7-8738-8f2cb8373b30', openstates_id: 'ocd-person/2effb0e6-3648-4cc7-8738-8f2cb8373b30', full_name: Andrew Koenig, chamber: upper, district_number: 15, start_date: '2017-01-01', end_date: '2025-01-07'}
+          - {person_id: 'ocd-person/fd8438aa-3dfd-48ef-b2a5-076c42799b9b', openstates_id: 'ocd-person/fd8438aa-3dfd-48ef-b2a5-076c42799b9b', full_name: Ryan Silvey, chamber: upper, district_number: 17, start_date: '2013-01-01', end_date: '2017-09-13'}
+          - {person_id: 'ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff', openstates_id: 'ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff', full_name: Lauren Arthur, chamber: upper, district_number: 17, start_date: '2018-09-12', end_date: '2024-07-21'}
+          - {person_id: 'ocd-person/ff5be056-ccc0-408e-a4dd-b0a2fed76639', openstates_id: 'ocd-person/ff5be056-ccc0-408e-a4dd-b0a2fed76639', full_name: Kurt Schaefer, chamber: upper, district_number: 19, start_date: '2011-01-01', end_date: '2017-01-03'}
+          - {person_id: 'ocd-person/b65e8aa2-23c4-4ad4-8550-510d8ba82cfc', openstates_id: 'ocd-person/b65e8aa2-23c4-4ad4-8550-510d8ba82cfc', full_name: Caleb Rowden, chamber: upper, district_number: 19, start_date: '2017-01-01', end_date: '2025-01-07'}
+          - {person_id: 'ocd-person/d2959bf2-939f-46a0-bc69-76a6d91c1ce7', openstates_id: 'ocd-person/d2959bf2-939f-46a0-bc69-76a6d91c1ce7', full_name: David Pearce, chamber: upper, district_number: 21, start_date: '2013-01-01', end_date: '2017-01-03'}
+          - {person_id: 'ocd-person/9f04b7ea-bd98-4f8e-ad76-8a5bf7b5917a', openstates_id: 'ocd-person/9f04b7ea-bd98-4f8e-ad76-8a5bf7b5917a', full_name: Denny Hoskins, chamber: upper, district_number: 21, start_date: '2017-01-01', end_date: '2025-01-07'}
+          - {person_id: 'ocd-person/b742d6cb-a63d-40c9-afd0-033f26190063', openstates_id: 'ocd-person/b742d6cb-a63d-40c9-afd0-033f26190063', full_name: Paul Wieland, chamber: upper, district_number: 22, start_date: '2017-01-04', end_date: '2023-01-04'}
+          # the House seat of a senator is not a Senate holder
+          - {person_id: 'ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff', openstates_id: 'ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff', full_name: Lauren Arthur, chamber: lower, district_number: 18, start_date: '2015-01-01', end_date: '2016-12-31'}
+          # one dated holder for each other district
+          - {person_id: 'q01', openstates_id: 'q01', full_name: Filler 1, chamber: upper, district_number: 1, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q02', openstates_id: 'q02', full_name: Filler 2, chamber: upper, district_number: 2, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q03', openstates_id: 'q03', full_name: Filler 3, chamber: upper, district_number: 3, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q05', openstates_id: 'q05', full_name: Filler 5, chamber: upper, district_number: 5, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q06', openstates_id: 'q06', full_name: Filler 6, chamber: upper, district_number: 6, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q09', openstates_id: 'q09', full_name: Filler 9, chamber: upper, district_number: 9, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q11', openstates_id: 'q11', full_name: Filler 11, chamber: upper, district_number: 11, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q12', openstates_id: 'q12', full_name: Filler 12, chamber: upper, district_number: 12, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q13', openstates_id: 'q13', full_name: Filler 13, chamber: upper, district_number: 13, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q14', openstates_id: 'q14', full_name: Filler 14, chamber: upper, district_number: 14, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q16', openstates_id: 'q16', full_name: Filler 16, chamber: upper, district_number: 16, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q18', openstates_id: 'q18', full_name: Filler 18, chamber: upper, district_number: 18, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q20', openstates_id: 'q20', full_name: Filler 20, chamber: upper, district_number: 20, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q23', openstates_id: 'q23', full_name: Filler 23, chamber: upper, district_number: 23, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q24', openstates_id: 'q24', full_name: Filler 24, chamber: upper, district_number: 24, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q25', openstates_id: 'q25', full_name: Filler 25, chamber: upper, district_number: 25, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q26', openstates_id: 'q26', full_name: Filler 26, chamber: upper, district_number: 26, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q27', openstates_id: 'q27', full_name: Filler 27, chamber: upper, district_number: 27, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q28', openstates_id: 'q28', full_name: Filler 28, chamber: upper, district_number: 28, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q29', openstates_id: 'q29', full_name: Filler 29, chamber: upper, district_number: 29, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q30', openstates_id: 'q30', full_name: Filler 30, chamber: upper, district_number: 30, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q31', openstates_id: 'q31', full_name: Filler 31, chamber: upper, district_number: 31, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q32', openstates_id: 'q32', full_name: Filler 32, chamber: upper, district_number: 32, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q33', openstates_id: 'q33', full_name: Filler 33, chamber: upper, district_number: 33, start_date: '2017-01-04', end_date: '9999-12-31'}
+          - {person_id: 'q34', openstates_id: 'q34', full_name: Filler 34, chamber: upper, district_number: 34, start_date: '2017-01-04', end_date: '9999-12-31'}
+      - input: ref('stg_congress__terms')
+        rows: []
+        format: dict
+      - input: ref('stg_fjc__appointments')
+        rows: []
+        format: dict
+    expect:
+      rows:
+        - {year: 2017, office: state_house, district: '18', full_name: Lauren Arthur}
+        - {year: 2018, office: state_house, district: '18', full_name: Lauren Arthur}
+        - {year: 2017, office: state_senate, district: '4', full_name: Jacob Hummel}
+        - {year: 2017, office: state_senate, district: '7', full_name: Jason Holsman}
+        - {year: 2017, office: state_senate, district: '8', full_name: Will Kraus}
+        - {year: 2017, office: state_senate, district: '10', full_name: Jeanie Riddle}
+        - {year: 2017, office: state_senate, district: '15', full_name: Andrew Koenig}
+        - {year: 2017, office: state_senate, district: '17', full_name: Ryan Silvey}
+        - {year: 2017, office: state_senate, district: '19', full_name: Caleb Rowden}
+        - {year: 2017, office: state_senate, district: '21', full_name: Denny Hoskins}
+        - {year: 2017, office: state_senate, district: '22', full_name: Paul Wieland}
+        - {year: 2018, office: state_senate, district: '4', full_name: Jacob Hummel}
+        - {year: 2018, office: state_senate, district: '7', full_name: Jason Holsman}
+        - {year: 2018, office: state_senate, district: '8', full_name: Mike Cierpiot}
+        - {year: 2018, office: state_senate, district: '10', full_name: Jeanie Riddle}
+        - {year: 2018, office: state_senate, district: '15', full_name: Andrew Koenig}
+        - {year: 2018, office: state_senate, district: '17', full_name: Lauren Arthur}
+        - {year: 2018, office: state_senate, district: '19', full_name: Caleb Rowden}
+        - {year: 2018, office: state_senate, district: '21', full_name: Denny Hoskins}
+        - {year: 2018, office: state_senate, district: '22', full_name: Paul Wieland}
+        - {year: 2017, office: state_senate, district: '1', full_name: Filler 1}
+        - {year: 2017, office: state_senate, district: '2', full_name: Filler 2}
+        - {year: 2017, office: state_senate, district: '3', full_name: Filler 3}
+        - {year: 2017, office: state_senate, district: '5', full_name: Filler 5}
+        - {year: 2017, office: state_senate, district: '6', full_name: Filler 6}
+        - {year: 2017, office: state_senate, district: '9', full_name: Filler 9}
+        - {year: 2017, office: state_senate, district: '11', full_name: Filler 11}
+        - {year: 2017, office: state_senate, district: '12', full_name: Filler 12}
+        - {year: 2017, office: state_senate, district: '13', full_name: Filler 13}
+        - {year: 2017, office: state_senate, district: '14', full_name: Filler 14}
+        - {year: 2017, office: state_senate, district: '16', full_name: Filler 16}
+        - {year: 2017, office: state_senate, district: '18', full_name: Filler 18}
+        - {year: 2017, office: state_senate, district: '20', full_name: Filler 20}
+        - {year: 2017, office: state_senate, district: '23', full_name: Filler 23}
+        - {year: 2017, office: state_senate, district: '24', full_name: Filler 24}
+        - {year: 2017, office: state_senate, district: '25', full_name: Filler 25}
+        - {year: 2017, office: state_senate, district: '26', full_name: Filler 26}
+        - {year: 2017, office: state_senate, district: '27', full_name: Filler 27}
+        - {year: 2017, office: state_senate, district: '28', full_name: Filler 28}
+        - {year: 2017, office: state_senate, district: '29', full_name: Filler 29}
+        - {year: 2017, office: state_senate, district: '30', full_name: Filler 30}
+        - {year: 2017, office: state_senate, district: '31', full_name: Filler 31}
+        - {year: 2017, office: state_senate, district: '32', full_name: Filler 32}
+        - {year: 2017, office: state_senate, district: '33', full_name: Filler 33}
+        - {year: 2017, office: state_senate, district: '34', full_name: Filler 34}
+        - {year: 2018, office: state_senate, district: '1', full_name: Filler 1}
+        - {year: 2018, office: state_senate, district: '2', full_name: Filler 2}
+        - {year: 2018, office: state_senate, district: '3', full_name: Filler 3}
+        - {year: 2018, office: state_senate, district: '5', full_name: Filler 5}
+        - {year: 2018, office: state_senate, district: '6', full_name: Filler 6}
+        - {year: 2018, office: state_senate, district: '9', full_name: Filler 9}
+        - {year: 2018, office: state_senate, district: '11', full_name: Filler 11}
+        - {year: 2018, office: state_senate, district: '12', full_name: Filler 12}
+        - {year: 2018, office: state_senate, district: '13', full_name: Filler 13}
+        - {year: 2018, office: state_senate, district: '14', full_name: Filler 14}
+        - {year: 2018, office: state_senate, district: '16', full_name: Filler 16}
+        - {year: 2018, office: state_senate, district: '18', full_name: Filler 18}
+        - {year: 2018, office: state_senate, district: '20', full_name: Filler 20}
+        - {year: 2018, office: state_senate, district: '23', full_name: Filler 23}
+        - {year: 2018, office: state_senate, district: '24', full_name: Filler 24}
+        - {year: 2018, office: state_senate, district: '25', full_name: Filler 25}
+        - {year: 2018, office: state_senate, district: '26', full_name: Filler 26}
+        - {year: 2018, office: state_senate, district: '27', full_name: Filler 27}
+        - {year: 2018, office: state_senate, district: '28', full_name: Filler 28}
+        - {year: 2018, office: state_senate, district: '29', full_name: Filler 29}
+        - {year: 2018, office: state_senate, district: '30', full_name: Filler 30}
+        - {year: 2018, office: state_senate, district: '31', full_name: Filler 31}
+        - {year: 2018, office: state_senate, district: '32', full_name: Filler 32}
+        - {year: 2018, office: state_senate, district: '33', full_name: Filler 33}
+        - {year: 2018, office: state_senate, district: '34', full_name: Filler 34}
+
+  - name: officeholders_named_house_rows_dropped_or_kept
+    model: int_officeholders__years
+    description: >
+      Real House roster rows, Open States House terms and first/last roll-call votes. #491: Scott Fitzpatrick (HD158)
+      cast his last vote on 2019-01-09 and became State Treasurer; his 2019 roster rows carry no Open States id, so
+      only the last-vote test can drop them, and it does (2019 has roll calls after the handover: Rebecca Roeber's
+      2019-05-17 vote). HD158 then has no 2019 holder; Scott Cupps holds it from 2020. Lauren Arthur (HD18) is kept
+      in 2017 and 2018 although her Open States House term ends 2016-12-31: her rows carry no Open States id, so the
+      last-term test skips them, and she voted through 2018-05-18. #152: Rebecca Roeber (HD34) died 2019-07-30 and
+      the 2020 roster still lists her with her Open States id; her last House term ended before the 2020 handover,
+      so her 2020 row is dropped, and Rick Roeber, whose term began in 2021, is not listed for 2020. The fixture
+      leaves out the 2020 roll calls after the handover, so only the last-term test can drop that row (with them
+      loaded, her 2019-05-17 last vote would drop it too).
+    given:
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '181', session_year: 2018, person_key: 'ocd-person/b97b03ba-eee1-4f52-8815-3d7e61dbbc22', openstates_id: 'ocd-person/b97b03ba-eee1-4f52-8815-3d7e61dbbc22', full_name: Scott Fitzpatrick, district_number: 158}
+          - {session_code: '191', session_year: 2019, person_key: 'ocd-person/b97b03ba-eee1-4f52-8815-3d7e61dbbc22', openstates_id: null, full_name: Scott Fitzpatrick, district_number: 158}
+          - {session_code: '201', session_year: 2020, person_key: 'ocd-person/515b97f2-7c88-40e5-b127-04146435e50e', openstates_id: 'ocd-person/515b97f2-7c88-40e5-b127-04146435e50e', full_name: Scott Cupps, district_number: 158}
+          - {session_code: '171', session_year: 2017, person_key: 'ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff', openstates_id: null, full_name: Lauren Arthur, district_number: 18}
+          - {session_code: '181', session_year: 2018, person_key: 'ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff', openstates_id: null, full_name: Lauren Arthur, district_number: 18}
+          - {session_code: '191', session_year: 2019, person_key: 'ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07', openstates_id: 'ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07', full_name: Rebecca Roeber, district_number: 34}
+          - {session_code: '201', session_year: 2020, person_key: 'ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07', openstates_id: 'ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07', full_name: Rebecca Roeber, district_number: 34}
+          - {session_code: '211', session_year: 2021, person_key: 'ocd-person/cd0a84e5-3f3d-4c02-a8b8-fa1bf8cc8c50', openstates_id: 'ocd-person/cd0a84e5-3f3d-4c02-a8b8-fa1bf8cc8c50', full_name: Rick Roeber, district_number: 34}
+      - input: ref('stg_openstates__people')
+        rows: []
+        format: dict
+      - input: ref('int_mo_house__votes')
+        rows:
+          - {person_key: 'ocd-person/b97b03ba-eee1-4f52-8815-3d7e61dbbc22', vote_date: '2017-01-04'}
+          - {person_key: 'ocd-person/b97b03ba-eee1-4f52-8815-3d7e61dbbc22', vote_date: '2019-01-09'}
+          - {person_key: 'ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff', vote_date: '2017-01-04'}
+          - {person_key: 'ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff', vote_date: '2018-05-18'}
+          - {person_key: 'ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07', vote_date: '2017-01-04'}
+          - {person_key: 'ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07', vote_date: '2019-05-17'}
+          - {person_key: 'ocd-person/515b97f2-7c88-40e5-b127-04146435e50e', vote_date: '2020-01-08'}
+          - {person_key: 'ocd-person/515b97f2-7c88-40e5-b127-04146435e50e', vote_date: '2026-09-16'}
+          - {person_key: 'ocd-person/cd0a84e5-3f3d-4c02-a8b8-fa1bf8cc8c50', vote_date: '2021-01-06'}
+          - {person_key: 'ocd-person/cd0a84e5-3f3d-4c02-a8b8-fa1bf8cc8c50', vote_date: '2021-04-21'}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: 'ocd-person/b97b03ba-eee1-4f52-8815-3d7e61dbbc22', chamber: lower, district_number: 158, start_date: '1900-01-01', end_date: '2019-01-14'}
+          - {person_id: 'ocd-person/515b97f2-7c88-40e5-b127-04146435e50e', chamber: lower, district_number: 158, start_date: '2020-01-01', end_date: '9999-12-31'}
+          - {person_id: 'ocd-person/d7beefb2-2b4f-490a-b1f3-b83840c663ff', chamber: lower, district_number: 18, start_date: '2015-01-01', end_date: '2016-12-31'}
+          - {person_id: 'ocd-person/ad28c002-7bb4-4ba0-a715-e49a945c5e07', chamber: lower, district_number: 34, start_date: '1900-01-01', end_date: '2019-07-30'}
+          - {person_id: 'ocd-person/cd0a84e5-3f3d-4c02-a8b8-fa1bf8cc8c50', chamber: lower, district_number: 34, start_date: '1900-01-01', end_date: '2021-04-21'}
+      - input: ref('stg_congress__terms')
+        rows: []
+        format: dict
+      - input: ref('stg_fjc__appointments')
+        rows: []
+        format: dict
+    expect:
+      rows:
+        - {year: 2018, office: state_house, district: '158', full_name: Scott Fitzpatrick}
+        - {year: 2020, office: state_house, district: '158', full_name: Scott Cupps}
+        - {year: 2017, office: state_house, district: '18', full_name: Lauren Arthur}
+        - {year: 2018, office: state_house, district: '18', full_name: Lauren Arthur}
+        - {year: 2019, office: state_house, district: '34', full_name: Rebecca Roeber}
+        - {year: 2021, office: state_house, district: '34', full_name: Rick Roeber}
+
+  - name: house_vote_tokens_of_named_members
+    model: int_mo_house__votes
+    description: >
+      Real PDF tokens, sessions, dates and roll-call URLs (#539, #581). A compound surname printed by its last word:
+      REHDER is Holly Thompson Rehder (HD148), REISCH is Cheri Toalson Reisch (HD44), COURTWAY is Cyndi
+      Buchheit-Courtway (HD115). Shared surname: before Jean Evans left on 2019-02-05 the PDF prints EVANS 99 (Jean)
+      and EVANS 154 (David); on 2019-05-16 a bare EVANS is David Evans, since Jean, still on the 191 end-of-session
+      list, no longer held her seat (Open States ends it 2019-02-05). Cross-session fallback: Rory Rowland (HD29) is
+      missing from the 2022 (221) list, so ROWLAND on 2022-01-18 is found on the 211 list; Lyle Rowland (HD155, 2017-18
+      lists, seat ended 2018-12-31) is not a candidate. A generational suffix: PRICE is Wiley Price IV (HD84) in 2019
+      and 2022, and Tiffany Price (HD26) in 2025, whose own session list has her and not him; outside their sessions
+      each one's dated seat misses the other's dates.
+    given:
+      - input: ref('stg_mo_house__rollcall_votes')
+        rows:
+          - {rollcall_url: 'https://documents.house.mo.gov/billtracking/bills191/rollcalls/013.002.pdf', session_code: '191', member_token: EVANS 99, token_name: EVANS, token_district: 99, vote_cast: absent}
+          - {rollcall_url: 'https://documents.house.mo.gov/billtracking/bills191/rollcalls/013.002.pdf', session_code: '191', member_token: EVANS 154, token_name: EVANS, token_district: 154, vote_cast: yea}
+          - {rollcall_url: 'https://documents.house.mo.gov/billtracking/bills191/rollcalls/013.002.pdf', session_code: '191', member_token: REHDER, token_name: REHDER, token_district: null, vote_cast: yea}
+          - {rollcall_url: 'https://documents.house.mo.gov/billtracking/bills191/rollcalls/013.002.pdf', session_code: '191', member_token: REISCH, token_name: REISCH, token_district: null, vote_cast: yea}
+          - {rollcall_url: 'https://documents.house.mo.gov/billtracking/bills191/rollcalls/013.002.pdf', session_code: '191', member_token: PRICE, token_name: PRICE, token_district: null, vote_cast: yea}
+          - {rollcall_url: 'https://documents.house.mo.gov/billtracking/bills191/rollcalls/071.007.pdf', session_code: '191', member_token: EVANS, token_name: EVANS, token_district: null, vote_cast: yea}
+          - {rollcall_url: 'https://documents.house.mo.gov/billtracking/bills211/rollcalls/001.001.pdf', session_code: '211', member_token: COURTWAY, token_name: COURTWAY, token_district: null, vote_cast: yea}
+          - {rollcall_url: 'https://documents.house.mo.gov/billtracking/bills211/rollcalls/001.001.pdf', session_code: '211', member_token: REISCH, token_name: REISCH, token_district: null, vote_cast: yea}
+          - {rollcall_url: 'https://documents.house.mo.gov/billtracking/bills221/rollcalls/008.003.pdf', session_code: '221', member_token: ROWLAND, token_name: ROWLAND, token_district: null, vote_cast: absent}
+          - {rollcall_url: 'https://documents.house.mo.gov/billtracking/bills221/rollcalls/008.003.pdf', session_code: '221', member_token: PRICE, token_name: PRICE, token_district: null, vote_cast: present}
+          - {rollcall_url: 'https://documents.house.mo.gov/billtracking/bills251/rollcalls/005.002.pdf', session_code: '251', member_token: PRICE, token_name: PRICE, token_district: null, vote_cast: yea}
+      - input: ref('stg_mo_house__rollcalls')
+        rows:
+          - {rollcall_url: 'https://documents.house.mo.gov/billtracking/bills191/rollcalls/013.002.pdf', session_code: '191', vote_date: '2019-01-31', measure: HCS HB 397}
+          - {rollcall_url: 'https://documents.house.mo.gov/billtracking/bills191/rollcalls/071.007.pdf', session_code: '191', vote_date: '2019-05-16', measure: 'SS SB 414, E.C.'}
+          - {rollcall_url: 'https://documents.house.mo.gov/billtracking/bills211/rollcalls/001.001.pdf', session_code: '211', vote_date: '2021-01-06', measure: QUORUM}
+          - {rollcall_url: 'https://documents.house.mo.gov/billtracking/bills221/rollcalls/008.003.pdf', session_code: '221', vote_date: '2022-01-18', measure: QUORUM}
+          - {rollcall_url: 'https://documents.house.mo.gov/billtracking/bills251/rollcalls/005.002.pdf', session_code: '251', vote_date: '2025-01-14', measure: HCS HR 7}
+      - input: ref('house_speakers')
+        rows:
+          - {session_year: 2019, district_number: 134, name: Elijah Haahr}
+          - {session_year: 2021, district_number: 112, name: Rob Vescovo}
+          - {session_year: 2022, district_number: 112, name: Rob Vescovo}
+          - {session_year: 2025, district_number: 30, name: Jon Patterson}
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '191', district_number: 148, surname_key: thompson rehder, person_key: 'ocd-person/a5a31674-2ef7-48e1-a1e0-133e1ae84278', party: Republican}
+          - {session_code: '191', district_number: 44, surname_key: toalson reisch, person_key: 'ocd-person/11b71e58-eaff-4889-a77b-2d5c9e53b3e9', party: Republican}
+          - {session_code: '211', district_number: 44, surname_key: toalson reisch, person_key: 'ocd-person/11b71e58-eaff-4889-a77b-2d5c9e53b3e9', party: Republican}
+          - {session_code: '221', district_number: 44, surname_key: toalson reisch, person_key: 'ocd-person/11b71e58-eaff-4889-a77b-2d5c9e53b3e9', party: Republican}
+          - {session_code: '211', district_number: 115, surname_key: buchheit courtway, person_key: 'ocd-person/1803795a-4847-429f-afd8-c478f9f751d2', party: Republican}
+          - {session_code: '221', district_number: 115, surname_key: buchheit courtway, person_key: 'ocd-person/1803795a-4847-429f-afd8-c478f9f751d2', party: Republican}
+          - {session_code: '191', district_number: 99, surname_key: evans, person_key: 'ocd-person/af12fdba-1167-4346-8b57-8d79e7a73b89', party: Republican}
+          - {session_code: '191', district_number: 154, surname_key: evans, person_key: 'ocd-person/970bb139-3a35-4e82-bdab-8f5353ddb416', party: Republican}
+          - {session_code: '211', district_number: 154, surname_key: evans, person_key: 'ocd-person/970bb139-3a35-4e82-bdab-8f5353ddb416', party: Republican}
+          - {session_code: '221', district_number: 154, surname_key: evans, person_key: 'ocd-person/970bb139-3a35-4e82-bdab-8f5353ddb416', party: Republican}
+          - {session_code: '181', district_number: 155, surname_key: rowland, person_key: 'ocd-person/51616d17-953c-4cf5-8f5f-ca4d4df08a7d', party: Republican}
+          - {session_code: '191', district_number: 29, surname_key: rowland, person_key: 'ocd-person/51d417ae-146f-4a87-b748-82adf1e57173', party: Democratic}
+          - {session_code: '211', district_number: 29, surname_key: rowland, person_key: 'ocd-person/51d417ae-146f-4a87-b748-82adf1e57173', party: Democratic}
+          - {session_code: '191', district_number: 84, surname_key: price iv, person_key: 'ocd-person/a04c0b37-6f77-483f-8d2b-4b1406ab289a', party: Democratic}
+          - {session_code: '211', district_number: 84, surname_key: price iv, person_key: 'ocd-person/a04c0b37-6f77-483f-8d2b-4b1406ab289a', party: Democratic}
+          - {session_code: '221', district_number: 84, surname_key: price iv, person_key: 'ocd-person/a04c0b37-6f77-483f-8d2b-4b1406ab289a', party: Democratic}
+          - {session_code: '251', district_number: 26, surname_key: price, person_key: 'ocd-person/53e00142-c4a0-41e7-bef7-fedb8de2bcdc', party: Democratic}
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {person_id: 'ocd-person/a5a31674-2ef7-48e1-a1e0-133e1ae84278', chamber: lower, district_number: 148, start_date: '2013-01-01', end_date: '2021-01-06'}
+          - {person_id: 'ocd-person/11b71e58-eaff-4889-a77b-2d5c9e53b3e9', chamber: lower, district_number: 44, start_date: '2017-01-01', end_date: '2025-01-07'}
+          - {person_id: 'ocd-person/1803795a-4847-429f-afd8-c478f9f751d2', chamber: lower, district_number: 115, start_date: '2021-01-01', end_date: '2025-01-07'}
+          - {person_id: 'ocd-person/af12fdba-1167-4346-8b57-8d79e7a73b89', chamber: lower, district_number: 99, start_date: '1900-01-01', end_date: '2019-02-05'}
+          - {person_id: 'ocd-person/970bb139-3a35-4e82-bdab-8f5353ddb416', chamber: lower, district_number: 154, start_date: '2019-01-01', end_date: '2025-01-07'}
+          - {person_id: 'ocd-person/51616d17-953c-4cf5-8f5f-ca4d4df08a7d', chamber: lower, district_number: 155, start_date: '1900-01-01', end_date: '2018-12-31'}
+          - {person_id: 'ocd-person/51d417ae-146f-4a87-b748-82adf1e57173', chamber: lower, district_number: 29, start_date: '1900-01-01', end_date: '2023-01-03'}
+          - {person_id: 'ocd-person/a04c0b37-6f77-483f-8d2b-4b1406ab289a', chamber: lower, district_number: 84, start_date: '1900-01-01', end_date: '2023-01-03'}
+          - {person_id: 'ocd-person/53e00142-c4a0-41e7-bef7-fedb8de2bcdc', chamber: lower, district_number: 26, start_date: '2025-01-01', end_date: '9999-12-31'}
+    expect:
+      rows:
+        - {vote_id: 'https://documents.house.mo.gov/billtracking/bills191/rollcalls/013.002.pdf', member_token: EVANS 99, person_key: 'ocd-person/af12fdba-1167-4346-8b57-8d79e7a73b89'}
+        - {vote_id: 'https://documents.house.mo.gov/billtracking/bills191/rollcalls/013.002.pdf', member_token: EVANS 154, person_key: 'ocd-person/970bb139-3a35-4e82-bdab-8f5353ddb416'}
+        - {vote_id: 'https://documents.house.mo.gov/billtracking/bills191/rollcalls/013.002.pdf', member_token: REHDER, person_key: 'ocd-person/a5a31674-2ef7-48e1-a1e0-133e1ae84278'}
+        - {vote_id: 'https://documents.house.mo.gov/billtracking/bills191/rollcalls/013.002.pdf', member_token: REISCH, person_key: 'ocd-person/11b71e58-eaff-4889-a77b-2d5c9e53b3e9'}
+        - {vote_id: 'https://documents.house.mo.gov/billtracking/bills191/rollcalls/013.002.pdf', member_token: PRICE, person_key: 'ocd-person/a04c0b37-6f77-483f-8d2b-4b1406ab289a'}
+        - {vote_id: 'https://documents.house.mo.gov/billtracking/bills191/rollcalls/071.007.pdf', member_token: EVANS, person_key: 'ocd-person/970bb139-3a35-4e82-bdab-8f5353ddb416'}
+        - {vote_id: 'https://documents.house.mo.gov/billtracking/bills211/rollcalls/001.001.pdf', member_token: COURTWAY, person_key: 'ocd-person/1803795a-4847-429f-afd8-c478f9f751d2'}
+        - {vote_id: 'https://documents.house.mo.gov/billtracking/bills211/rollcalls/001.001.pdf', member_token: REISCH, person_key: 'ocd-person/11b71e58-eaff-4889-a77b-2d5c9e53b3e9'}
+        - {vote_id: 'https://documents.house.mo.gov/billtracking/bills221/rollcalls/008.003.pdf', member_token: ROWLAND, person_key: 'ocd-person/51d417ae-146f-4a87-b748-82adf1e57173'}
+        - {vote_id: 'https://documents.house.mo.gov/billtracking/bills221/rollcalls/008.003.pdf', member_token: PRICE, person_key: 'ocd-person/a04c0b37-6f77-483f-8d2b-4b1406ab289a'}
+        - {vote_id: 'https://documents.house.mo.gov/billtracking/bills251/rollcalls/005.002.pdf', member_token: PRICE, person_key: 'ocd-person/53e00142-c4a0-41e7-bef7-fedb8de2bcdc'}
+
+  - name: house_vote_token_price_exact_surname_beats_suffix_stripped_for_named_members
+    model: int_mo_house__votes
+    description: >
+      The guard behind PRICE (#581), with the real Prices: if one session's list had both Tiffany Price (HD26) and
+      Wiley Price IV (HD84) and Open States dated neither seat (a roster loaded before Open States), PRICE is Tiffany
+      Price, the exact surname, not the suffix-stripped one. This combination is constructed: the real lists never
+      hold both, and in the real data (house_vote_tokens_of_named_members) the session lists and seat dates decide
+      PRICE before the name fit does.
+    given:
+      - input: ref('stg_mo_house__rollcall_votes')
+        rows:
+          - {rollcall_url: 'https://documents.house.mo.gov/billtracking/bills251/rollcalls/005.002.pdf', session_code: '251', member_token: PRICE, token_name: PRICE, token_district: null, vote_cast: yea}
+      - input: ref('stg_mo_house__rollcalls')
+        rows:
+          - {rollcall_url: 'https://documents.house.mo.gov/billtracking/bills251/rollcalls/005.002.pdf', session_code: '251', vote_date: '2025-01-14', measure: HCS HR 7}
+      - input: ref('house_speakers')
+        rows:
+          - {session_year: 2025, district_number: 30, name: Jon Patterson}
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '251', district_number: 26, surname_key: price, person_key: 'ocd-person/53e00142-c4a0-41e7-bef7-fedb8de2bcdc', party: Democratic}
+          - {session_code: '251', district_number: 84, surname_key: price iv, person_key: 'ocd-person/a04c0b37-6f77-483f-8d2b-4b1406ab289a', party: Democratic}
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows: []
+        format: dict
+    expect:
+      rows:
+        - {vote_id: 'https://documents.house.mo.gov/billtracking/bills251/rollcalls/005.002.pdf', member_token: PRICE, person_key: 'ocd-person/53e00142-c4a0-41e7-bef7-fedb8de2bcdc'}
