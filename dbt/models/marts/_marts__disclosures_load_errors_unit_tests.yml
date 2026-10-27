@@ -1,0 +1,47 @@
+# Unit test for fct_disclosures.house_unparsed: a House filing whose PDF the loader could not download or extract
+# (an error row in house_fd_pdf_lines, e.g. an extraction timeout) is labelled as such, not as a scanned filing (#714).
+version: 2
+
+unit_tests:
+  - name: disclosures_house_unparsed_label_says_what_happened
+    model: fct_disclosures
+    description: >
+      A filing with a loader error row (download failed or text extraction timed out) gets the section
+      "document (download or text extraction failed; see PDF)"; a scanned filing (has_text false, no error) keeps
+      "document (not text-extractable; see PDF)"; a filing with schedule lines gets its lines and no placeholder.
+      A filing with both an error row and schedule lines is parsed, so it gets no placeholder.
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: h1, office: us_house, district: 1, family_name: Jones}
+      - input: ref('stg_senate_efd__items')
+        rows: []
+      - input: ref('stg_house_fd__filings')
+        rows:
+          - {doc_id: ok, filing_year: 2023, filing_kind: annual report, filing_date: '2024-05-01', state_district: MO01, last_name: Jones, document_url: u_ok}
+          - {doc_id: scan, filing_year: 2022, filing_kind: annual report, filing_date: '2023-05-01', state_district: MO01, last_name: Jones, document_url: u_scan}
+          - {doc_id: err, filing_year: 2021, filing_kind: annual report, filing_date: '2022-05-01', state_district: MO01, last_name: Jones, document_url: u_err}
+          - {doc_id: both, filing_year: 2020, filing_kind: annual report, filing_date: '2021-05-01', state_district: MO01, last_name: Jones, document_url: u_both}
+      - input: ref('stg_house_fd__pdf_lines')
+        rows:
+          - {doc_id: scan, has_text: false, load_error: null}
+          - {doc_id: err, has_text: null, load_error: 'extract timed out after 120s'}
+          - {doc_id: both, has_text: null, load_error: 'extract timed out after 120s'}
+      - input: ref('int_house_fd__period_covered')
+        rows: []
+      - input: ref('int_house_fd__schedule_lines')
+        rows:
+          - {doc_id: ok, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: both, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+      - input: ref('int_judges__federal')
+        rows: []
+      - input: ref('stg_fjc__appointments')
+        rows: []
+      - input: ref('int_courtlistener__judge_disclosure_items')
+        rows: []
+    expect:
+      rows:
+        - {disclosure_item_id: 'house:ok:1:1', section: 'A: assets'}
+        - {disclosure_item_id: 'house:scan', section: 'document (not text-extractable; see PDF)'}
+        - {disclosure_item_id: 'house:err', section: 'document (download or text extraction failed; see PDF)'}
+        - {disclosure_item_id: 'house:both:1:1', section: 'A: assets'}

@@ -103,15 +103,26 @@ house as (
     left join house_amends as am on h.official_id = am.official_id and h.doc_id = am.doc_id
 ),
 
+house_load_errors as (
+    select distinct doc_id
+    from {{ ref('stg_house_fd__pdf_lines') }}
+    where load_error is not null
+),
+
 house_unparsed as (
-    -- filings with no extractable text (scanned paper) or not downloaded: still list them
+    -- filings with no extractable text (scanned paper) or whose PDF the loader failed to download/extract: still
+    -- list them, with a section that says which (#714)
     select
         h.official_id,
         'U.S. House financial disclosure' as disclosure_type,
         h.filing_kind,
         h.filing_year as report_year,
         h.filing_date,
-        'document (not text-extractable; see PDF)' as section,
+        case
+            when h.doc_id in (select e.doc_id from house_load_errors as e)
+                then 'document (download or text extraction failed; see PDF)'
+            else 'document (not text-extractable; see PDF)'
+        end as section,
         cast(null as {{ dbt.type_string() }}) as owner,
         cast(null as {{ dbt.type_string() }}) as amount,
         cast(null as {{ dbt.type_string() }}) as description,
@@ -231,7 +242,7 @@ document_reports as (
         report_group,
         max(report_version) as report_version,
         max(filing_date) as filing_date,
-        min(case when section like 'document (not text-extractable%' then 0 else 1 end) as has_text
+        min(case when section like 'document (%' then 0 else 1 end) as has_text
     from keyed
     group by official_id, disclosure_type, report_year, document_url, report_group
 ),
