@@ -1,7 +1,7 @@
 // Chart specs for the profile sections. Each spec turns a bundle into table rows; the server renders the
 // table (works without JS) and the client renders the same rows as an Observable Plot chart, re-running
 // the spec when "hide possible matches" changes. Pure TS, safe to bundle for the browser.
-import { missedShares } from "./attendance";
+import { excusalCellFor, missedShares } from "./attendance";
 import type { OfficialBundle } from "./exports/types";
 import { count, money, pct, sessionLabel } from "./format";
 import { DONOR_GROUPS, GIFT_GROUPS, giftGroup, sumBy, withoutMedium } from "./rollups";
@@ -16,6 +16,8 @@ export interface Column {
   money?: boolean;
   num?: boolean;
   pct?: boolean;
+  /** leave/recusal column: show an em dash where the row's chamber (`chamberId`) does not record it; the chart keeps the number (#604) */
+  excusal?: boolean;
   /** value is a URL rendered as a "source" link */
   link?: boolean;
 }
@@ -63,6 +65,11 @@ export const MEDIUM_SUFFIX = " (possible match)";
 
 /** Table cell text; the label's "(possible match)" suffix (needed to keep chart bars distinct) becomes a badge. */
 export function cellText(c: Column, r: Row): string {
+  const text = cellValue(c, r);
+  return excusalCellFor(c, r, text);
+}
+
+function cellValue(c: Column, r: Row): string {
   const v = r[c.key];
   if (c.money) return money(Number(v));
   if (c.num) return count(Number(v));
@@ -386,15 +393,15 @@ export const VIZ: Record<string, VizSpec> = {
     views: ["attendance", "attendance-missed"],
     viewLabel: "Attended",
     usesConfidence: false,
-    note: "● this official · ○ chamber average. Attended = voted yea, nay or present on a recorded vote.",
+    note: "● this official · ○ chamber average. Attended = voted yea, nay or present on a recorded vote. In the table, Absent with leave and Recused show a dash (—) where the source records none: only the MO Senate records leave and recusals.",
     columns: [
       { key: "session", label: "Session" },
       { key: "official", label: "Attended", pct: true },
       { key: "chamber", label: "Chamber", pct: true },
       { key: "recorded", label: "Votes", num: true },
       { key: "absent", label: "Absent or not voting", num: true },
-      { key: "excused", label: "Absent with leave", num: true },
-      { key: "recused", label: "Recused", num: true },
+      { key: "excused", label: "Absent with leave", num: true, excusal: true },
+      { key: "recused", label: "Recused", num: true, excusal: true },
     ],
     rows: (b) =>
       (b.voting.attendance ?? []).map((r) => ({
@@ -405,6 +412,7 @@ export const VIZ: Record<string, VizSpec> = {
         absent: r.absent + r.not_voting,
         excused: r.absent_with_leave,
         recused: r.recused_from_voting,
+        chamberId: r.chamber,
       })),
   },
   "attendance-missed": {
@@ -416,12 +424,12 @@ export const VIZ: Record<string, VizSpec> = {
     views: ["attendance", "attendance-missed"],
     viewLabel: "Not attended",
     usesConfidence: false,
-    note: "Bars: absent or not voting, then absent with leave, then recused (a Senate Rule 91 recusal by a member on the floor), as a share of recorded votes. Only the MO Senate records leave and recusals: the House and Congress sources do not, so 0 there does not mean never excused. Recusals are not counted as attended (open question). | chamber average, all absences together: the export does not split out the chamber's excused absences.",
+    note: "Bars: absent or not voting, then absent with leave, then recused (a Senate Rule 91 recusal by a member on the floor), as a share of recorded votes. Only the MO Senate records leave and recusals: the House and Congress sources do not, so a dash (—) there means not recorded, not never excused. Recusals are not counted as attended (open question). | chamber average, all absences together: the export does not split out the chamber's excused absences.",
     columns: [
       { key: "session", label: "Session" },
       { key: "unexcused", label: "Absent or not voting", pct: true },
-      { key: "excused", label: "Absent with leave", pct: true },
-      { key: "recused", label: "Recused", pct: true },
+      { key: "excused", label: "Absent with leave", pct: true, excusal: true },
+      { key: "recused", label: "Recused", pct: true, excusal: true },
       { key: "chamber", label: "Chamber (all absences)", pct: true },
       { key: "recorded", label: "Votes", num: true },
     ],
@@ -430,6 +438,7 @@ export const VIZ: Record<string, VizSpec> = {
         session: sessionLabel(r.chamber, r.session_code, r.session_name),
         ...missedShares(r),
         recorded: r.votes_recorded,
+        chamberId: r.chamber,
       })),
   },
 };

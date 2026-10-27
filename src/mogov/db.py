@@ -457,6 +457,13 @@ OPTIONAL_JSON_TABLES = {
     "mo_revisor_sections": "mo_revisor",
     "mo_revisor_repeals": "mo_revisor",
     "epa_frs_alt_names": "epa_frs",  # added for U+FFFD name repair (#260); older raw dirs lack it
+    "govinfo_billstatus_files": "govinfo_billstatus",  # new source (#283): older raw dirs lack it
+    "govinfo_billstatus_bills": "govinfo_billstatus",
+    "govinfo_billstatus_sponsors": "govinfo_billstatus",
+    "govinfo_billstatus_cosponsors": "govinfo_billstatus",
+    "govinfo_billstatus_actions": "govinfo_billstatus",
+    "govinfo_billstatus_recorded_votes": "govinfo_billstatus",
+    "govinfo_billstatus_laws": "govinfo_billstatus",
 }
 
 

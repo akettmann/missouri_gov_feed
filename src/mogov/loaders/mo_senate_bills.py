@@ -7,19 +7,26 @@
 - BillTracking/Bills/BillList?billId=N&year=YYYY&billPrefix=SB&billSuffix=1&handler=Actions is an HTML fragment
   with the bill's whole action history (Senate and House side, enrollment, governor), newest first, one table
   row per action: date, action text, journal reference and a link to the journal PDF page. One row per action.
+- The same URL with handler=BillText, FiscalNotes, Amendments or Summaries is the bill page's other tabs: the
+  list of text-version PDFs (LR number and version name), fiscal-note PDFs, amendments (each PDF is
+  handler=AmendmentPdf&year=YYYY&amendmentId=N) and the summaries (the text is in the fragment). One row per
+  link or summary, the link's fields as served; the PDFs themselves are not fetched here. CommitteeMinutes
+  answers HTTP 500 and is left out (committee data is #280). MOGOV_SENATE_BILL_DOCS=0 skips these four.
 
 `billId` is the site's own key, not the bill number (2025 SB 1 is 233; 2017 SB 1 is 57095344).
 
 Every shard reads every session list (one request per session, then the shared cache), and takes the bills
 whose key `year/session/billId` hashes to it, so the split doesn't depend on who else is running. A bill's
-list row and action rows land in the same shard. Requests to the host are paced by the lock shared by every
-process on the machine (http.fetch min_interval): shards add no speed.
+list row, action rows and document rows land in the same shard.
+Requests to the host are paced by the lock shared by every process on the machine
+(http.fetch min_interval): shards add no speed.
 """
 
 import json
 import os
 import re
 from datetime import date
+from urllib.parse import parse_qs, urlparse
 
 import lxml.html
 
@@ -35,6 +42,20 @@ BASE = f"https://{HOST}"
 LIST_URL = f"{BASE}/BillTracking/Bills/BillList"
 BILLS_TABLE = "mo_senate_bill_list"
 ACTIONS_TABLE = "mo_senate_bill_actions"
+TEXTS_TABLE = "mo_senate_bill_texts"
+FISCAL_NOTES_TABLE = "mo_senate_bill_fiscal_notes"
+AMENDMENTS_TABLE = "mo_senate_bill_amendments"
+SUMMARIES_TABLE = "mo_senate_bill_summaries"
+# handler -> (table, the fragment's container, which marks a real answer). A bill with none of a kind gets
+# "No <things> available" instead, also a real answer with zero rows.
+DOC_HANDLERS = {
+    "BillText": (TEXTS_TABLE, b"bill-text-container"),
+    "FiscalNotes": (FISCAL_NOTES_TABLE, b"fiscal-notes-container"),
+    "Amendments": (AMENDMENTS_TABLE, b"amendments-container"),
+    "Summaries": (SUMMARIES_TABLE, b"summaries-container"),
+}
+DOC_TABLES = [t for t, _ in DOC_HANDLERS.values()]
+NONE_AVAILABLE = re.compile(rb"\bNo [A-Za-z ]{3,40} available\b", re.IGNORECASE)
 # senate.mo.gov accepted at ~1 request/second (#584). On Cloud Run each task has its own filesystem, so the
 # per-machine pacing lock doesn't see the other tasks: each task slows down by the task count to keep the total.
 POLITE_DELAY = 1.0
@@ -46,6 +67,10 @@ CLOSED_MAX_AGE = 30 * 86400
 LIST_MARKER = b"const bills"
 
 BILLS_ASSIGNMENT = re.compile(r"const\s+bills\s*=\s*")  # finds where the JSON starts in script text; json parses it
+
+
+class NotABillFragment(RuntimeError):
+    """A bill-page tab fragment that is neither a document list nor the site's "none available" notice."""
 
 
 class NotABillList(RuntimeError):
@@ -69,6 +94,18 @@ def parse_bill_list(page: str) -> list[dict]:
         bills, _ = json.JSONDecoder().raw_decode(text, m.end())
         return [b for b in bills if isinstance(b, dict)]
     return []
+
+
+def _is_doc_fragment(handler: str):
+    """check= for a document tab: reject (so never cache) a body that is neither the tab's container nor the
+    "No ... available" notice, e.g. an error or block page served with 200."""
+    marker = DOC_HANDLERS[handler][1]
+
+    def check(resp) -> None:
+        if marker not in resp.content and not NONE_AVAILABLE.search(resp.content):
+            raise NotABillFragment(f"not a {handler} fragment: {resp.url}")
+
+    return check
 
 
 def _cell(td) -> str:
@@ -97,6 +134,100 @@ def parse_actions(fragment: str) -> list[dict]:
             }
         )
     return rows
+
+
+def _text(el) -> str:
+    return " ".join(el.text_content().split())
+
+
+def _link_cards(fragment: str) -> list:
+    if not fragment.strip():
+        return []
+    return lxml.html.fromstring(fragment).xpath('//*[contains(@class, "link-card-stack")]//a[@href]')
+
+
+def parse_texts(fragment: str) -> list[dict]:
+    """A BillText fragment -> [{doc_index, url, title, label, lr_number, version}] in served order. `label` is
+    the link text as printed ("0453S.04T - Truly Agreed to and Finally Passed"); lr_number and version are its
+    two halves (version is the whole label when there is no " - ")."""
+    rows = []
+    for a in _link_cards(fragment):
+        label = _text(a)
+        lr, sep, version = label.partition(" - ")
+        rows.append(
+            {
+                "doc_index": len(rows),
+                "url": a.get("href"),
+                "title": a.get("title"),
+                "label": label,
+                "lr_number": lr if sep else None,
+                "version": version if sep else label,
+            }
+        )
+    return rows
+
+
+def parse_fiscal_notes(fragment: str) -> list[dict]:
+    """A FiscalNotes fragment -> [{doc_index, url, title, label}] in served order; label is the link text as
+    printed ("Perfected (0453S.04P.ORG)")."""
+    return [
+        {"doc_index": i, "url": a.get("href"), "title": a.get("title"), "label": _text(a)}
+        for i, a in enumerate(_link_cards(fragment))
+    ]
+
+
+def parse_amendments(fragment: str) -> list[dict]:
+    """An Amendments fragment -> [{doc_index, amendment_id, url, title, label, status}] in served order. label
+    is the link text ("2/4/2025 - SS S offered & adopted (Crawford)--(0453S.04F)"), status the chip beside it
+    ("2/4/2025 - Adopted", None when absent), amendment_id the `amendmentId` of the PDF url."""
+    rows = []
+    for a in _link_cards(fragment):
+        chip = a.xpath('.//*[contains(@class, "square-status-chip")]')
+        label_el = a.find("span")
+        ids = parse_qs(urlparse(a.get("href")).query).get("amendmentId")
+        rows.append(
+            {
+                "doc_index": len(rows),
+                "amendment_id": int(ids[0]) if ids and ids[0].isdigit() else None,
+                "url": a.get("href"),
+                "title": a.get("title"),
+                "label": _text(label_el if label_el is not None else a),
+                "status": _text(chip[0]) if chip else None,
+            }
+        )
+    return rows
+
+
+def parse_summaries(fragment: str) -> list[dict]:
+    """A Summaries fragment -> [{doc_index, summary_id, label, text}] in served order. label is the version
+    heading ("Introduced"); text is the summary exactly as printed (line breaks and tabs kept)."""
+    if not fragment.strip():
+        return []
+    rows = []
+    for card in lxml.html.fromstring(fragment).xpath("//*[@data-summary-id]"):
+        body = card.xpath('.//*[contains(@class, "text-content--preformatted")]')
+        heading = card.xpath('.//*[contains(@class, "heading--label")]')
+        rows.append(
+            {
+                "doc_index": len(rows),
+                "summary_id": int(card.get("data-summary-id")),
+                "label": _text(heading[0]) if heading else None,
+                "text": body[0].text_content() if body else "",
+            }
+        )
+    return rows
+
+
+DOC_PARSERS = {
+    "BillText": parse_texts,
+    "FiscalNotes": parse_fiscal_notes,
+    "Amendments": parse_amendments,
+    "Summaries": parse_summaries,
+}
+
+
+def docs_enabled() -> bool:
+    return os.environ.get("MOGOV_SENATE_BILL_DOCS", "1").strip().lower() not in {"0", "false", "no", "off"}
 
 
 def _interval() -> float:
@@ -144,6 +275,13 @@ def _actions_params(year: int, bill: dict) -> dict:
     }
 
 
+def _doc_params(year: int, session: str, bill: dict, handler: str) -> dict:
+    params = {**_actions_params(year, bill), "handler": handler}
+    if handler == "FiscalNotes":
+        params["sessionType"] = session  # the site's tab sends it; the fragment came back without it too
+    return params
+
+
 def owned_bills(shard: db.Shard, lists: list[tuple[int, str, list[dict]]]) -> list[tuple[int, str, dict]]:
     """The (year, session, bill) units this shard owns; each bill once, whichever shards are running."""
     seen: set[str] = set()
@@ -168,7 +306,9 @@ def load(shard: db.Shard) -> dict[str, int]:
             log.info("mo_senate_bills.session", year=year, session=session, bills=len(bills))
             lists.append((year, session, bills))
     units = owned_bills(shard, lists)
-    with db.JsonSink(shard, source_url=LIST_URL, tables=[BILLS_TABLE, ACTIONS_TABLE]) as sink:
+    docs = docs_enabled()
+    tables = [BILLS_TABLE, ACTIONS_TABLE, *(DOC_TABLES if docs else [])]
+    with db.JsonSink(shard, source_url=LIST_URL, tables=tables) as sink:
         progress = obs.Progress("bills", len(units), log)
         for year, session, bill in units:
             key = bill_key(year, session, bill["billId"])
@@ -192,6 +332,20 @@ def load(shard: db.Shard) -> dict[str, int]:
                     **a,
                 }
                 sink.add(ACTIONS_TABLE, f"{key}/{a['action_index']}", row, source_url=url)
+            for handler in DOC_HANDLERS if docs else ():
+                table = DOC_HANDLERS[handler][0]
+                dparams = _doc_params(year, session, bill, handler)
+                fragment = _get(dparams, year, check=_is_doc_fragment(handler))
+                durl = f"{LIST_URL}?" + "&".join(f"{k}={v}" for k, v in dparams.items())
+                for d in DOC_PARSERS[handler](fragment):
+                    row = {
+                        "year": year,
+                        "session_type": session,
+                        "bill_id": bill["billId"],
+                        "bill": bill_label(bill),
+                        **d,
+                    }
+                    sink.add(table, f"{key}/{d['doc_index']}", row, source_url=durl)
             progress.tick()
         progress.finish()
     return sink.counts

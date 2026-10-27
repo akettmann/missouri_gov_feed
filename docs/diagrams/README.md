@@ -162,7 +162,7 @@ Missouri Senate topical index of bills. Source: [sources/mo_senate_topics.puml](
 
 ### mo_senate_bills
 
-Missouri Senate bill list and action history. Source: [sources/mo_senate_bills.puml](sources/mo_senate_bills.puml)
+Missouri Senate bill list, action history and document lists. Source: [sources/mo_senate_bills.puml](sources/mo_senate_bills.puml)
 
 ![mo_senate_bills](sources/mo_senate_bills.svg)
 
@@ -189,6 +189,12 @@ Shor-McCarty state legislator ideology scores. Source: [sources/shor_mccarty.pum
 MEC campaign finance via The Accountability Project mirror. Source: [sources/tap_mec.puml](sources/tap_mec.puml)
 
 ![tap_mec](sources/tap_mec.svg)
+
+### govinfo_billstatus
+
+GovInfo BILLSTATUS federal bills, sponsors and Public Laws. Source: [sources/govinfo_billstatus.puml](sources/govinfo_billstatus.puml)
+
+![govinfo_billstatus](sources/govinfo_billstatus.svg)
 
 ### voteview
 
