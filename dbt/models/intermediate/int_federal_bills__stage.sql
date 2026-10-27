@@ -1,6 +1,5 @@
--- How far each federal bill got, read from the GovInfo BILLSTATUS action codes (never the action text, except for the
--- pocket veto, which has no code of its own and does not occur in the Congresses loaded so far). Each event is read
--- from the Library of Congress's coded copy of the action (source_system 'Library of Congress'; the chamber's own
+-- How far each federal bill got, read from the GovInfo BILLSTATUS action codes (never the action text). Each event is
+-- read from the Library of Congress's coded copy of the action (source_system 'Library of Congress'; the chamber's own
 -- copy is ignored so nothing counts twice) and the first date of each code is kept, so repeated actions change
 -- nothing. Codes: 8000/9000 passed/failed in House, 17000/18000 passed/failed in Senate, 28000 presented to the
 -- President, 31000 vetoed, 32000/34000 passed House/Senate over the veto, 33000/35000 failed of passage in
@@ -8,20 +7,25 @@
 -- 1010, 5000, 14000, 14900 reported; 5500, 14500 discharged.
 -- `stage` is the furthest point reached: introduced, committee_reported_or_discharged, passed_one_chamber,
 -- passed_both_chambers (each chamber passed a version of it; the texts may still differ, presented_to_president is
--- when they agreed), agreed_to (a simple resolution, hres or sres, agreed to in its own chamber: it never leaves
--- it), presented_to_president, vetoed (vetoed, not overridden, not law), pocket_vetoed, veto_overridden (both
--- chambers passed it over the veto but no law number is listed yet), became_law. A concurrent resolution that passed
--- both chambers is passed_both_chambers (final; it is not presented). stage_rank orders the stages in that order,
--- with the endings sharing 6 (agreed_to is 4); a failed vote does not lower the stage, see the failed dates.
--- `president_outcome` for bills presented to the President: signed, became_law_without_signature (became law, no
--- "Signed by President" action), vetoed, pocket_vetoed, veto_overridden, or presented_no_action_recorded (presented,
+-- when they agreed), agreed_to (a simple resolution, hres or sres, agreed to in its own chamber, or a concurrent
+-- resolution, hconres or sconres, adopted by both: none of these is presented to the President, so this is their
+-- final stage), presented_to_president, vetoed (vetoed, not overridden, not law), veto_overridden (both chambers
+-- passed it over the veto but no law is recorded yet), became_law. stage_rank orders the stages in that order, with
+-- the endings sharing 6 (agreed_to is 4); a failed vote does not lower the stage, see the failed dates.
+-- `goes_to_president` is true for every bill and joint resolution (hr, s, hjres, sjres), including a joint resolution
+-- proposing a constitutional amendment, which goes to the states instead of the President (none in the 118th or
+-- 119th). `president_outcome` for bills presented to the President: signed, became_law_without_signature (became
+-- law, no "Signed by President" action), vetoed, veto_overridden, or presented_no_action_recorded (presented,
 -- nothing after it: still pending, or the Congress ended). `veto_result` for vetoed bills: overridden,
 -- override_failed_house, override_failed_senate (a vote under the 2/3 required; the veto stands),
 -- override_passed_one_chamber, or no_override_vote_recorded. Whether a bill "succeeded" is the reader's choice
 -- (#622): this model only says what happened.
--- A bill is also became_law when the BILLSTATUS laws list gives it a law number (has_law_number), as the staging
--- model for bills says it must; a few files list a law number without any matching action (119-hr-766 lists
--- Public Law 119-120 and its actions stop at referral), so it is became_law with no dates and no president_outcome.
+-- Pocket vetoes: BILLSTATUS has no code or wording of its own for them; a claimed pocket veto is recorded as a plain
+-- 31000 "Vetoed by President." (110 H.R. 1585, 111 H.J.Res. 64, 111 H.R. 3808), so it shows here as `vetoed`.
+-- `became_law` comes from the actions only (36000/41000). `has_law_number` is a separate flag: the BILLSTATUS laws
+-- list names a law for the bill. They can disagree: 119-hr-766 (the SEWER Act; actions stop at referral) lists
+-- Public Law 119-120, which is really 119 S. 766 (a GovInfo data error, #729). Trusting the list would make two
+-- bills share one law, so the list only sets the flag.
 with events as (
     select
         bill_id,
@@ -33,11 +37,6 @@ with events as (
         min(case when action_code in ('5500', '14500') then action_date end) as discharged_date,
         min(case when action_code = '28000' then action_date end) as presented_date,
         min(case when action_code = '31000' then action_date end) as vetoed_date,
-        min(
-            case
-                when action_type in ('President', 'Veto') and lower(action_text) like '%pocket veto%' then action_date
-            end
-        ) as pocket_vetoed_date,
         min(case when action_code = '32000' then action_date end) as house_override_passed_date,
         min(case when action_code = '34000' then action_date end) as senate_override_passed_date,
         min(case when action_code = '33000' then action_date end) as house_override_failed_date,
@@ -69,7 +68,6 @@ flagged as (
         e.presented_date,
         e.signed_date,
         e.vetoed_date,
-        e.pocket_vetoed_date,
         e.house_override_passed_date,
         e.senate_override_passed_date,
         e.house_override_failed_date,
@@ -77,6 +75,7 @@ flagged as (
         e.became_law_date,
         l.bill_id is not null as has_law_number,
         coalesce(b.bill_type in ('hr', 's', 'hjres', 'sjres'), false) as goes_to_president,
+        coalesce(e.house_passed_date is not null and e.senate_passed_date is not null, false) as is_passed_both,
         coalesce(
             e.house_override_passed_date is not null and e.senate_override_passed_date is not null, false
         ) as is_override_complete
@@ -89,21 +88,20 @@ staged as (
     select
         *,
         case
-            when became_law_date is not null or has_law_number then 'became_law'
-            when pocket_vetoed_date is not null then 'pocket_vetoed'
+            when became_law_date is not null then 'became_law'
             when is_override_complete then 'veto_overridden'
             when vetoed_date is not null then 'vetoed'
             when presented_date is not null then 'presented_to_president'
             when bill_type in ('hres', 'sres') and coalesce(house_passed_date, senate_passed_date) is not null
                 then 'agreed_to'
-            when house_passed_date is not null and senate_passed_date is not null then 'passed_both_chambers'
+            when bill_type in ('hconres', 'sconres') and is_passed_both then 'agreed_to'
+            when is_passed_both then 'passed_both_chambers'
             when coalesce(house_passed_date, senate_passed_date) is not null then 'passed_one_chamber'
             when coalesce(reported_date, discharged_date) is not null then 'committee_reported_or_discharged'
             else 'introduced'
         end as stage,
         case
             when presented_date is null and became_law_date is null then null
-            when pocket_vetoed_date is not null then 'pocket_vetoed'
             when is_override_complete then 'veto_overridden'
             when vetoed_date is not null then 'vetoed'
             when became_law_date is not null and signed_date is not null then 'signed'
@@ -111,7 +109,7 @@ staged as (
             else 'presented_no_action_recorded'
         end as president_outcome,
         case
-            when vetoed_date is null and pocket_vetoed_date is null then null
+            when vetoed_date is null then null
             when is_override_complete then 'overridden'
             when house_override_failed_date is not null then 'override_failed_house'
             when senate_override_failed_date is not null then 'override_failed_senate'
@@ -149,7 +147,6 @@ select
     senate_failed_date,
     presented_date,
     vetoed_date,
-    pocket_vetoed_date,
     house_override_passed_date,
     house_override_failed_date,
     senate_override_passed_date,
