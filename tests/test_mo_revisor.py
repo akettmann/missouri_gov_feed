@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import ClassVar
 
 import httpx
+import lxml.html
 import pytest
 
 from mogov import http
@@ -421,6 +422,7 @@ def test_repeal_rows_in_any_attribute_layout():
         "https://example.com/main/OneChapter.aspx?chapter=7",
         "http://revisor.mo.gov/main/OneChapter.aspx?chapter=7",
         "//example.com/main/OneChapter.aspx?chapter=7",
+        "https:/main/OneChapter.aspx?chapter=7",  # a scheme with no host is still not a site-relative link
     ],
 )
 def test_links_to_other_hosts_are_not_followed(href):
@@ -439,3 +441,27 @@ def test_parser_never_touches_the_network():
         '<a href="/main/PageSelect.aspx?section=1.5&amp;bid=3">s</a>'
     )
     assert parse_chapter(page) == [("1.5", 3)]
+
+
+def test_every_parse_uses_the_hardened_parser(monkeypatch):
+    seen = []
+
+    def spy(real):
+        def wrapper(*args, **kwargs):
+            seen.append(kwargs.get("parser"))
+            return real(*args, **kwargs)
+
+        return wrapper
+
+    monkeypatch.setattr(lxml.html, "fromstring", spy(lxml.html.fromstring))
+    monkeypatch.setattr(lxml.html, "fragment_fromstring", spy(lxml.html.fragment_fromstring))
+    for func, name in [
+        (parse_toc, "home_excerpt.html"),
+        (parse_chapter, "chapter_1.html"),
+        (parse_section, "section_1.010.html"),
+        (parse_repeals, "rx_excerpt.html"),
+    ]:
+        seen.clear()
+        func(read(name))
+        assert seen, f"{func.__name__} no longer parses through lxml.html"
+        assert all(parser is mo_revisor.PARSER for parser in seen), func.__name__
