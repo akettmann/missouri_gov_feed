@@ -1,7 +1,7 @@
 import gzip
 import io
 import zipfile
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import duckdb
@@ -145,13 +145,36 @@ def test_load_uses_the_date_derived_default_when_nothing_is_configured(site, mon
 
 
 @pytest.mark.parametrize(
-    ("configured", "expected"),
+    ("day", "congress", "expected"),
     [
-        ([118, 119], {"sjres119": 86400, "sjres118": 30 * 86400}),
-        ([117, 118], {"sjres118": 30 * 86400, "sjres117": 30 * 86400}),  # the 119th is not loaded: none is live
+        (date(2026, 10, 27), 119, 86400),
+        (date(2026, 10, 27), 118, 30 * 86400),
+        (date(2027, 1, 2), 119, 86400),
+        (date(2027, 1, 3), 120, 86400),
+        (date(2027, 1, 5), 119, 86400),  # outgoing Congress: late signings
+        (date(2027, 2, 28), 119, 86400),
+        (date(2027, 3, 1), 119, 30 * 86400),  # grace is over
+        (date(2027, 1, 5), 118, 30 * 86400),
+        (date(2027, 1, 5), 121, 30 * 86400),
+        (date(2026, 1, 15), 118, 30 * 86400),  # Jan-Feb of the Congress's second year: no grace
+        (date(2027, 1, 2), 118, 30 * 86400),  # before the 120th starts, 118th is two back
+        (date(2028, 1, 10), 119, 30 * 86400),  # second year of the 120th: no grace
     ],
 )
-def test_only_the_congress_in_session_is_refetched_daily(site, monkeypatch, configured, expected):
+def test_max_age_keeps_the_outgoing_congress_daily_until_march(day, congress, expected):
+    assert loader.max_age(congress, day) == expected
+
+
+@pytest.mark.parametrize(
+    ("today", "configured", "expected"),
+    [
+        (date(2026, 10, 27), [118, 119], {"sjres119": 86400, "sjres118": 30 * 86400}),
+        (date(2026, 10, 27), [117, 118], {"sjres118": 30 * 86400, "sjres117": 30 * 86400}),  # 119th not loaded
+        (date(2027, 1, 5), [119, 120], {"sjres120": 86400, "sjres119": 86400}),
+        (date(2027, 3, 2), [119, 120], {"sjres120": 86400, "sjres119": 30 * 86400}),
+    ],
+)
+def test_load_picks_each_zips_age_from_the_date(site, monkeypatch, today, configured, expected):
     ages = {}
     fake = loader.fetch_to_file
 
@@ -159,12 +182,34 @@ def test_only_the_congress_in_session_is_refetched_daily(site, monkeypatch, conf
         ages[url.split("/")[-2] + url.split("/")[-3]] = max_age
         return fake(url, dest, max_age=max_age)
 
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(today.year, today.month, today.day, 12, tzinfo=tz)
+
+    monkeypatch.setattr(loader, "datetime", Clock)
     monkeypatch.setattr(loader, "fetch_to_file", spy)
     monkeypatch.setattr(loader, "CONGRESSES", configured)
     monkeypatch.setattr(loader, "BILL_TYPES", ["sjres"])
-    monkeypatch.setattr(loader, "current_congress", lambda: 119)
     loader.load(db.UNSHARDED)
     assert ages == expected
+
+
+def test_load_reads_the_clock_once(site, monkeypatch):
+    reads = []
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            reads.append(1)
+            return datetime(2027, 1, 2, 23, 59, tzinfo=tz)
+
+    monkeypatch.setattr(loader, "datetime", Clock)
+    monkeypatch.setattr(loader, "CONGRESSES", None)
+    monkeypatch.setattr(loader, "BILL_TYPES", ["sjres"])
+    loader.load(db.UNSHARDED)
+    # land_file stamps landed_at per file (one fetched zip member here); the date itself is read once
+    assert len(reads) - len(_rows("govinfo_billstatus_files")) == 1
 
 
 # ---- loader --------------------------------------------------------------------------------------------------

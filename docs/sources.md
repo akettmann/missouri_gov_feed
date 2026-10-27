@@ -887,7 +887,9 @@ rule against `/bulkdata`, US government work (the page states no licence). Congr
   private laws. `became_law` is true for either type, so read `law_type` before calling a law broad policy. A
   bill with two laws shows the earliest by number (compared as integers).
 - Cache: the zips of the Congress in session today (derived from the date, not from the configured list) are
-  re-read daily (bills move all the time), others monthly. The cache is `<MOGOV_DATA_DIR>/cache`, which on Cloud Run
+  re-read daily (bills move all the time), and so are the previous Congress's until March 1 of the new Congress's
+  first year (signings and Public Law numbers land after Jan 3); others monthly. The date is read once per run.
+  The cache is `<MOGOV_DATA_DIR>/cache`, which on Cloud Run
   Jobs is the mounted bucket (see environment.md), so the schedule holds across runs. A 404 for a zip
   (a bill type with no zip for a Congress) is logged and skipped.
 
