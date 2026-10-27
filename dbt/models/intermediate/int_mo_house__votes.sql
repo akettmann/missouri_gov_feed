@@ -71,7 +71,9 @@ candidates as (
         (case when v.session_code = m.session_code then 1 else 2 end) * 10
         + case when v.token_key = m.surname_last_word and v.token_key <> m.surname_squashed then 2 else 1 end as tier,
         -- 1 unless Open States dates this person's seat and it did not cover the vote date
-        max(case when tp.person_id is null or t.person_id is not null then 1 else 0 end) as seat_dated_ok
+        max(case when tp.person_id is null or t.person_id is not null then 1 else 0 end) as seat_dated_ok,
+        -- 1 when Open States gives this person a seat that covers the vote date
+        max(case when t.person_id is not null then 1 else 0 end) as seat_covered
     from votes as v
     left join speaker as sp on v.rollcall_url = sp.rollcall_url and v.member_token = 'MR SPEAKER'
     inner join members as m
@@ -109,13 +111,14 @@ best_tier as (
 best_candidates as (
     select
         c.*,
-        max(c.seat_dated_ok) over (partition by c.rollcall_url, c.member_token) as any_dated_ok
+        max(c.seat_covered) over (partition by c.rollcall_url, c.member_token) as any_covered
     from candidates as c
     inner join best_tier as b
         on c.rollcall_url = b.rollcall_url and c.member_token = b.member_token and c.tier = b.tier
 ),
 
--- among the candidates, drop those whose dated seat missed the vote date, but only when someone else's covered it
+-- among the candidates, drop those whose dated seat missed the vote date, but only when another candidate's seat
+-- covered it; a candidate with no dated seat is never dropped
 unique_match as (
     select
         rollcall_url,
@@ -123,7 +126,7 @@ unique_match as (
         max(person_key) as person_key,
         max(party) as party
     from best_candidates
-    where seat_dated_ok = 1 or any_dated_ok = 0
+    where seat_dated_ok = 1 or any_covered = 0
     group by 1, 2
     having count(distinct person_key) = 1
 )

@@ -54,8 +54,9 @@ unit_tests:
       held the seat on the vote date. EVANS on 2019-03-25 is David (Jean's seat ended 2019-02-05); EVANS on
       2019-01-15 is ambiguous (both seated) while EVANS 99 on that day still names Jean. A member missing from the
       vote's own session list is found in an earlier session's list and dated the same way (ROWLAND in 2022 is
-      Rory, whose seat was open; Lyle's ended in 2018). A candidate with no dated seat is never dropped, and a lone
-      candidate is kept even if the dates miss.
+      Rory, whose seat was open; Lyle's ended in 2018). A candidate with no dated seat is never dropped, so it is not
+      picked over a dated candidate whose seat missed the date (UNDATED stays unattributed); a lone candidate is
+      kept even if the dates miss.
     given:
       - input: ref('stg_mo_house__rollcall_votes')
         rows:
@@ -97,4 +98,4 @@ unit_tests:
         - {vote_id: r2, member_token: EVANS 99, person_key: p_jean}
         - {vote_id: r3, member_token: ROWLAND, person_key: p_rory}
         - {vote_id: r3, member_token: LONE, person_key: p_lone}
-        - {vote_id: r3, member_token: UNDATED, person_key: p_undated_b}
+        - {vote_id: r3, member_token: UNDATED, person_key: null}
