@@ -28,13 +28,7 @@ candidates as (
     from {{ ref('fct_disclosures') }}
     where
         disclosure_type = 'U.S. House financial disclosure'
-        and (
-            filing_kind = 'candidate report'
-            or document_url in (
-                select h.document_url from {{ ref('stg_house_fd__filings') }} as h
-                where h.filing_type = 'H'
-            )
-        )
+        and filing_kind in ('candidate report', 'new filer report')
         and not is_latest_version
         and report_year is not null
     group by official_id, report_year

@@ -1,5 +1,8 @@
 -- U.S. House Clerk financial disclosure index (all members/candidates nationally).
--- FilingType: O annual, A amendment, P periodic transaction report, C candidate, T termination, X extension.
+-- FilingType: O annual, A amendment, P periodic transaction report, C candidate, T termination, X extension,
+-- D candidate threshold notice, H new filer report (the PDF header reads "Filing Type: New Filer Report"; it covers
+-- the preceding year plus the current year to the filing date, so it is a separate report from the annual O).
+-- W, B, E and G stay 'other': we have not identified their meaning and the loader does not read them.
 select
     {{ mogov.json_str('payload', '$.DocID') }} as doc_id,
     {{ mogov.json_str('payload', '$.Prefix') }} as prefix,
@@ -14,6 +17,7 @@ select
         when 'P' then 'periodic transaction report'
         when 'C' then 'candidate report'
         when 'T' then 'termination report'
+        when 'H' then 'new filer report'
         when 'X' then 'extension request'
         when 'D' then 'candidate threshold notice'
         else 'other'
