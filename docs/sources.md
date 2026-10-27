@@ -1036,7 +1036,8 @@ Quirks:
   The Clerk index does not say which report a House amendment amends, so it is taken to amend the latest annual,
   candidate or termination report the filer filed that year on or before it (an amendment of a candidate or
   termination report supersedes that report only) (#142, #463). Index type H is a New Filer Report (the PDF header says
-  "Filing Type: New Filer Report"; e.g. Carey OH15 #10050139, Alford MO04 #10051960), a separate report from the
+  "Filing Type: New Filer Report"; e.g. Carey OH15 #10050139, Alford MO04 #10051960; staging labels it
+  `filing_kind = 'new filer report'`, #573), a separate report from the
   Annual Report (O) of the same year, so it is a base like a candidate report: an amendment filed after an H amends
   it and supersedes it, while an H and an O of one year are both kept latest (Carey OH15 2022, Wied WI08 2025; for
   O, A, H, A as in Miller WV03 2018 the first A supersedes the O and the second the H). Whether both should be
