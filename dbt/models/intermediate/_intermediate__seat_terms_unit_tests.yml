@@ -46,7 +46,8 @@ unit_tests:
       of it. Neither of the next two is a conflict, as the roster spells the surname differently: Bruce Franks
       ("Franks Jr." on the roster, HD78, to 2019-07-31, past the 2019 session) and Dean VanSchoiack ("Van Schoiack",
       HD9, open). Rochelle Walton Gray's HD75 term ends 2016-12-31 and the 2017 roster lists Alan Gray, a different
-      person whose own term covers 2017: dated, not a match on the last word of her surname. Alan Gray's first term
+      person whose own term covers 2017: dated (that covering term alone keeps her dated here; the surname rule is
+      pinned by seat_terms_compound_surname_tail_is_not_a_match). Alan Gray's first term
       ends 2018-12-31 and the 2019 roster lists him, but his next term covers 2019: dated. Scott Fitzpatrick left
       HD158 on 2019-01-14 (sworn in as State Treasurer), but the 2019 roster still lists him: a conflict, though here
       the roster outlived the member. A member who left during the 2018 session (leaver, HD30, to 2018-03-01) is not
@@ -116,6 +117,33 @@ unit_tests:
         - {openstates_id: fitzpatrick, start_date: '1900-01-01', end_quality: conflicts_with_roster, evidence_first_date: '2019-01-01', evidence_last_date: '2019-12-31'}
         - {openstates_id: leaver, start_date: '2017-01-01', end_quality: dated, evidence_first_date: null, evidence_last_date: null}
         - {openstates_id: manlove, start_date: '2019-01-01', end_quality: open, evidence_first_date: null, evidence_last_date: null}
+
+  - name: seat_terms_compound_surname_tail_is_not_a_match
+    model: int_mo_legislators__seat_terms
+    description: >
+      The roster's surname never matches the last word of an Open States compound surname (#675). Rochelle Walton
+      Gray's HD75 term ends 2016-12-31 and the 2017-2018 rosters list "Gray" in HD75 (Alan Gray, a different person).
+      Here no Open States term covers 2017 (Alan Gray's is left out), so nothing but the surname rule keeps her term
+      dated: matching "Gray" to the tail of "Walton Gray" would flag it conflicts_with_roster. The rule only runs the
+      other way: the last word of a compound roster surname ("Bland Manlove") matches.
+    given:
+      - input: ref('stg_openstates__roles')
+        rows:
+          - {openstates_id: walton_gray, role_type: lower, district: '75', start_date: '2013-01-01', end_date: '2016-12-31'}
+      - input: ref('legislator_seat_corrections')
+        rows: []
+      - input: ref('stg_openstates__people')
+        rows:
+          - {openstates_id: walton_gray, full_name: Rochelle Walton Gray, family_name: Walton Gray}
+      - input: ref('stg_mo_senate__votes')
+        rows: []
+      - input: ref('stg_mo_house__members')
+        rows:
+          - {session_year: 2017, district_number: 75, last_name: Gray}
+          - {session_year: 2018, district_number: 75, last_name: Gray}
+    expect:
+      rows:
+        - {openstates_id: walton_gray, start_date: '2013-01-01', end_quality: dated, evidence_first_date: null, evidence_last_date: null}
 
   - name: seat_terms_end_quality_against_the_senate_journal
     model: int_mo_legislators__seat_terms
