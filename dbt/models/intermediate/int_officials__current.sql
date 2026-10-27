@@ -1,5 +1,5 @@
 -- Everyone currently holding a Missouri public office that we track, one row per (person, office).
--- official_id: Open States ocd-person id when one exists, else bioguide:<id>, statewide:<office>,
+-- official_id: Open States ocd-person id when one exists, else bioguide:<id>, statewide:<office>:<name>,
 -- or judge:<key> (see int_judges__current). A legislator Open States or the House roster knows under
 -- several ids gets one stable id (int_officials__person_ids); a current official keeps the id they had.
 with os_roles as (
@@ -81,7 +81,12 @@ legislators as (
 
 statewide as (
     select
-        coalesce(x.person_id, p.openstates_id, 'statewide:' || s.office) as official_id,
+        coalesce(
+            x.person_id,
+            p.openstates_id,
+            -- no person id exists for this officer: the name keeps the id with the person when the office changes hands
+            'statewide:' || s.office || ':' || {{ mogov.name_key('s.name') }}
+        ) as official_id,
         p.openstates_id,
         cast(null as {{ dbt.type_string() }}) as bioguide_id,
         s.name as full_name,

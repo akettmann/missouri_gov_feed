@@ -9,14 +9,25 @@ unit_tests:
       stretch is listed ending 2025-01-13, as State Treasurer. Fitzpatrick's closed 2019-2023 Treasurer term is listed
       under the Treasurer title although he is now Auditor, and his auditor term (same start as the seed) is not
       repeated. Hanaway's term starts the day the seed says (no duplicate). Schmitt's Attorney General term is
-      already in Wikidata with its own title and the same start, so it is not listed twice. Someone with no
-      official_id (a former officer) gets no row, nor does an 1871 governor whose name matches a current legislator
-      (terms before 2000 are ignored).
+      already in Wikidata with its own title and the same start, so it is listed once (the Manual copy ranks above
+      Wikidata). Someone with no official_id (a former officer, or a namesake int_statewide__terms did not corroborate,
+      like the 1871 governor) gets no row.
+      One term from several sources is listed once even when the titles differ and the dates are a day apart (#760):
+      Kehoe is "Governor" in the seed and "Governor of Missouri" in Wikidata on the same day; Wasinger is "Lieutenant
+      Governor" in the seed, "Lt Governor" in Open States and "Lieutenant Governor of Missouri" in Wikidata; Hanaway's
+      Wikidata term starts a day after the seed's. A different office (Fitzpatrick's Treasurer term against his
+      Auditor term) or a term that starts the day the previous one ends (Malek 2023 and 2025) is not merged.
     given:
       - input: ref('int_officials__current')
-        rows: []
+        rows:
+          - {official_id: kehoe, office: governor}
+          - {official_id: wasinger, office: lt_governor}
+          - {official_id: hanaway, office: attorney_general}
+          - {official_id: malek_id, office: state_treasurer}
+          - {official_id: fitz, office: state_auditor}
       - input: ref('stg_openstates__roles')
-        rows: []
+        rows:
+          - {openstates_id: wasinger, role_type: lt_governor, start_date: '2025-01-13', end_date: '2029-01-08'}
       - input: ref('int_officials__person_ids')
         rows: []
       - input: ref('stg_congress__terms')
@@ -27,29 +38,41 @@ unit_tests:
           - {office: state_auditor, office_title: State Auditor, term_start: '2023-01-09', term_end: '2027-01-11'}
           - {office: governor, office_title: Governor, term_start: '2025-01-13', term_end: '2029-01-08'}
           - {office: attorney_general, office_title: Attorney General, term_start: '2025-09-08', term_end: '2029-01-08'}
+          - {office: lt_governor, office_title: Lieutenant Governor, term_start: '2025-01-13', term_end: '2029-01-08'}
       - input: ref('int_statewide__terms')
         rows:
-          - {office: state_treasurer, full_name: Vivek Malek, term_start_year: 2023, term_end_year: null, term_start: '2023-01-17', term_end: '9999-12-31', official_id: malek}
+          - {office: state_treasurer, full_name: Vivek Malek, term_start_year: 2023, term_end_year: null, term_start: '2023-01-17', term_end: '9999-12-31', official_id: malek_id}
           - {office: state_treasurer, full_name: Scott Fitzpatrick, term_start_year: 2019, term_end_year: 2023, term_start: '2019-01-14', term_end: '2023-01-09', official_id: fitz}
           - {office: state_auditor, full_name: Scott Fitzpatrick, term_start_year: 2023, term_end_year: null, term_start: '2023-01-09', term_end: '9999-12-31', official_id: fitz}
           - {office: attorney_general, full_name: Catherine L. Hanaway, term_start_year: 2025, term_end_year: null, term_start: '2025-09-08', term_end: '9999-12-31', official_id: hanaway}
           - {office: attorney_general, full_name: Eric Schmitt, term_start_year: 2019, term_end_year: 2023, term_start: '2019-01-03', term_end: '2023-01-03', official_id: schmitt}
           - {office: attorney_general, full_name: Josh Hawley, term_start_year: 2017, term_end_year: 2019, term_start: '2017-01-09', term_end: '2019-01-03', official_id: null}
-          - {office: governor, full_name: Benjamin Gratz Brown, term_start_year: 1871, term_end_year: 1873, term_start: '1871-01-09', term_end: '1873-01-13', official_id: legislator_brown}
+          - {office: governor, full_name: Benjamin Gratz Brown, term_start_year: 1871, term_end_year: 1873, term_start: '1871-01-09', term_end: '1873-01-13', official_id: null}
       - input: ref('stg_fjc__appointments')
         rows: []
       - input: ref('int_officials__wikidata')
         rows:
           - {official_id: schmitt, qid: Q1}
+          - {official_id: kehoe, qid: Q2}
+          - {official_id: wasinger, qid: Q3}
+          - {official_id: hanaway, qid: Q4}
       - input: ref('stg_wikidata__facts')
         rows:
           - {qid: Q1, fact_kind: position held, value: Missouri Attorney General, qualifier: null, start_date: '2019-01-03', end_date: '2023-01-03'}
+          - {qid: Q2, fact_kind: position held, value: Governor of Missouri, qualifier: null, start_date: '2025-01-13', end_date: null}
+          - {qid: Q3, fact_kind: position held, value: Lieutenant Governor of Missouri, qualifier: null, start_date: '2025-01-13', end_date: null}
+          - {qid: Q4, fact_kind: position held, value: Missouri Attorney General, qualifier: null, start_date: '2025-09-09', end_date: null}
       - input: ref('int_officials__bios')
         rows: []
       - input: ref('int_courtlistener__official_positions')
         rows: []
     expect:
       rows:
-        - {official_id: malek, office_title: State Treasurer, start_date: '2023-01-17', end_date: '2025-01-13', source: official manual statewide listing}
+        - {official_id: malek_id, office_title: State Treasurer, start_date: '2023-01-17', end_date: '2025-01-13', source: official manual statewide listing}
+        - {official_id: malek_id, office_title: State Treasurer, start_date: '2025-01-13', end_date: '2029-01-08', source: statewide_officials seed}
         - {official_id: fitz, office_title: State Treasurer, start_date: '2019-01-14', end_date: '2023-01-09', source: official manual statewide listing}
-        - {official_id: schmitt, office_title: Missouri Attorney General, start_date: '2019-01-03', end_date: '2023-01-03', source: wikidata}
+        - {official_id: fitz, office_title: State Auditor, start_date: '2023-01-09', end_date: '2027-01-11', source: statewide_officials seed}
+        - {official_id: schmitt, office_title: Attorney General, start_date: '2019-01-03', end_date: '2023-01-03', source: official manual statewide listing}
+        - {official_id: kehoe, office_title: Governor, start_date: '2025-01-13', end_date: '2029-01-08', source: statewide_officials seed}
+        - {official_id: wasinger, office_title: Lieutenant Governor, start_date: '2025-01-13', end_date: '2029-01-08', source: statewide_officials seed}
+        - {official_id: hanaway, office_title: Attorney General, start_date: '2025-09-08', end_date: '2029-01-08', source: statewide_officials seed}
