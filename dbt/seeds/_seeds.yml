@@ -50,7 +50,7 @@ seeds:
       the person holds now began (a second Monday of January, 2025-01-13 for the 2024 election; Malek's appointment
       on 2023-01-17 is not this column but statewide_office_handovers) or, for someone appointed to the vacancy who
       has not yet faced an election, the day they took office (Hanaway, 2025-09-08). term_end is the next second
-      Monday of January after the term's election (RSMo 27.010), so it is 2029-01-08 for the 2024 cohort and
+      Monday of January after the term's election (RSMo 27.010 sets this for the Attorney General; the other offices follow the same practice), so it is 2029-01-08 for the 2024 cohort and
       2027-01-11 for the auditor.
     config:
       column_types: {term_start: date, term_end: date}
@@ -72,12 +72,21 @@ seeds:
       for that side. Unlike statewide_officials, whose dates are the CURRENT term only, a row here is the whole
       continuous stretch the Manual lists as one term: Malek took office 2023-01-17 by appointment and is still
       Treasurer. This cannot be derived from statewide_officials or wikidata: those hold only today's six officers,
-      and most rows here are people who no longer hold office (Greitens, Hawley as Attorney General, Bailey). Dates
-      are from each row's source_url (checked_on): the Secretary of State's historical listings, the Treasurer's
-      Past Treasurers page, the Lieutenant Governor's Past Lieutenant Governors page and the Attorney General's
-      swearing-in release. Watson's interim auditor term (2015) is left out because no source dated his
-      swearing-in. Add a row when a new mid-term change appears in int_bluebook__statewide_officeholders (the test
-      assert_statewide_handovers_cover_mid_term_changes lists the ones missing).
+      and most rows here are people who no longer hold office (Greitens, Hawley as Attorney General, Bailey). Past
+      terms of current officials (Malek's 2023 appointment, Fitzpatrick's Treasurer term) are not listed again in a
+      separate list: int_statewide__terms joins these dates to the Manual's terms and fct_office_history reads them
+      from there. Dates are from each row's source_url (checked_on), the official page where one gives the day:
+      the Secretary of State's historical listings (Hawley, Schmitt, Bailey, Schweich's death 2015-02-26), the
+      Treasurer's Past Treasurers page (Malek appointed 2023-01-17; Fitzpatrick appointed 2019-01-14, ends
+      2023-01-09 when the Auditor's biography says he was sworn in as Auditor), the Lieutenant Governor's Past
+      Lieutenant Governors page (Carnahan "Died: 10/16/2000"; Parson succeeded 2018-06-01; Kehoe appointed
+      2018-06-18), the Attorney General's swearing-in release (Hanaway) and nga.org (Wilson sworn in as Governor
+      2000-10-18). Only news gives the day for two rows: Maxwell's 2000-11-15 appointment (mdn.org, Wikipedia; the
+      Secretary of State's page only says he was appointed to the vacancy) and Watson's 2015-02-27 interim
+      appointment by Governor Nixon (politicmo.com, St. Louis Public Radio; no official page dates his swearing-in).
+      Galloway took the oath 2015-04-27 (auditor.mo.gov). Add a row when a new mid-term change appears in
+      int_bluebook__statewide_officeholders (the test assert_statewide_handovers_cover_mid_term_changes lists the
+      ones missing, including a mid-year change inside an inauguration year when it adds a third term to that year).
     config:
       column_types: {office: varchar, family_name: varchar, term_start_year: integer, term_start: date, term_end: date, source_url: varchar, checked_on: date}
     data_tests:

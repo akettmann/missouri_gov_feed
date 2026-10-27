@@ -184,7 +184,9 @@ models:
   - name: fct_office_history
     description: >
       Past and present offices held by each official, from every source that records careers: Open States
-      roles, congress-legislators terms, the statewide seed, FJC appointments, Wikidata "position held",
+      roles, congress-legislators terms, the statewide seed, earlier statewide terms of current officials (Official
+      Manual listings with exact dates from the statewide_office_handovers seed, terms from 2000 on: Malek's 2023
+      appointment as Treasurer, Fitzpatrick's 2019-2023 Treasurer term), FJC appointments, Wikidata "position held",
       CourtListener's judge database, and appointment/election sentences in Official Manual judge bios.
       Grain: one row per (official, office_title, start_date); when several sources report the same term,
       the most authoritative is kept (seed and FJC > congress-legislators > Open States > Wikidata >
