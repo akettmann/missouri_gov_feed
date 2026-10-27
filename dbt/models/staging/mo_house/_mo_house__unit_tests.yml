@@ -251,7 +251,7 @@ unit_tests:
       midnight with the free-text alt_time given becomes null; midnight with no alt_time stays 00:00. An email
       address or phone number in a comment or location is replaced by a marker and the rest of the text is kept
       (a sentence-ending dot after an address stays); phones may be 3-3-4 digits with or without separators and
-      parentheses, a leading +1, a trailing extension, or the 7-digit Capitol form 751-6662; year ranges, dates, RSMo
+      parentheses, a leading +1 or 1-, a trailing extension, or the 7-digit Capitol form 751-6662 (dash only, #711); year ranges, dates, RSMo
       section numbers, amounts and times are not phones; text with neither is unchanged. Reading only one table,
       taking midnight as a time, dropping the whole comment, or keeping a contact string fails this test.
     given:
