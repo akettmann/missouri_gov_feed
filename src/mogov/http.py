@@ -91,16 +91,19 @@ _swept_dirs: set[Path] = set()
 
 def sweep_dir_once(directory: Path, *, now: float | None = None) -> None:
     """Delete every crashed writer's temp file in `directory` older than PART_STALE_S, once per process per
-    directory (write_atomic calls it before its first write, so each loader process sweeps CACHE_DIR at start
-    and never scans it per write).
+    directory (the directory is compared resolved, so a relative and an absolute spelling count as one).
+    write_atomic calls it before writing, so each process sweeps every directory it writes to, whichever that is
+    (the cache directory, raw dirs such as the mo_house XML dirs or govinfo `<congress>/<bill_type>/`), the
+    first time it writes there, and never scans one per write.
 
     Never removes a live writer's file: the age gate is a full day on the file's mtime, a small file is written
     in milliseconds and a streamed download rewrites its temp file continuously, so a live writer's temp file is
     always fresh. On Cloud Run with a gcsfuse mount a file still open for writing is not yet an object, so
     another container's listing cannot see it, and this container sees its own local mtime."""
-    if directory in _swept_dirs:
+    key = directory.resolve()
+    if key in _swept_dirs:
         return
-    _swept_dirs.add(directory)
+    _swept_dirs.add(key)
     _sweep(directory, ".+", now)
 
 

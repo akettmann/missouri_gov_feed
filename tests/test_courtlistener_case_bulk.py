@@ -1,6 +1,8 @@
 import bz2
 import csv
 
+import pytest
+
 from mogov.loaders.courtlistener_case_bulk import CSV_DIALECT, _parse, _records
 
 # Postgres COPY ... CSV ESCAPE '\': quotes inside fields are backslash-escaped, so a field can hold an odd
@@ -48,10 +50,9 @@ def test_filter_uses_unique_tmp_names_and_cleans_up_on_failure(tmp_path, monkeyp
         raise RuntimeError("download died")
 
     m = _setup_filter(tmp_path, monkeypatch, boom)
-    import pytest
-
     with pytest.raises(RuntimeError):
         m._filter("dockets", "2025", "court_id", {"mo"})
+    assert len(seen) == 1 and seen[0].startswith(".")  # a temp file existed mid-run, under a hidden unique name
     assert list(tmp_path.glob("*.part")) == []  # failed run removed its own temp file
 
 
