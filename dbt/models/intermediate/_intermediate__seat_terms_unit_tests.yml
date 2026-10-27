@@ -6,7 +6,8 @@ unit_tests:
       (undated); her HD7 term starts 2023-01-04 (dated). Jason Smith and Shawn Sisco both hold HD120 from the
       as-given 2013-01-01, a stand-in Open States uses for "in office by then" (placeholder): real swearing-in falls
       on January 4-12. A seed correction with a start (Mike Kehoe, SD6 from 2017-01-01) is always dated, even on
-      January 1; a seed row with a blank start is undated. The start_date column keeps its old values (1900-01-01 for undated, January 1 for any January start).
+      January 1; a seed row with a blank start is undated. The start_date column keeps its old values (1900-01-01
+      for undated, January 1 for any January start).
     given:
       - input: ref('stg_openstates__roles')
         rows:

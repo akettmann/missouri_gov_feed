@@ -279,7 +279,16 @@ seeds:
               (case when checked_by is null then 0 else 1 end) = (case when checked_on is null then 0 else 1 end)
     columns:
       - name: alias_id
-        data_tests: [not_null]
+        data_tests:
+          - not_null
+          # typo guard (#688): a signed same_person row whose alias_id int_officials__person_ids never saw is
+          # dropped silently by the model and by assert_signed_same_person_links_end_in_one_person, so fail on it
+          - relationships:
+              arguments:
+                to: ref('int_officials__person_ids')
+                field: alias_id
+              config:
+                where: "relation = 'same_person' and checked_by is not null and checked_on is not null"
       - name: person_id
         data_tests:
           - not_null
