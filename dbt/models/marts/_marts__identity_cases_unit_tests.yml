@@ -1,0 +1,64 @@
+# Named-person cases for marts that match listed names to person ids (#649, #658). Each fixture copies the real rows
+# of the people named from the production tables. The synthetic tests of the same rules stay in
+# _marts__sponsorship_unit_tests.yml.
+version: 2
+
+unit_tests:
+  - name: bill_sponsors_of_named_redistricted_members_match_through_the_held_district
+    model: fct_bill_sponsors
+    description: >
+      The House XML lists a sponsor's latest district for every session (#636). Adam Schnelting held HD104 in
+      2019-2022 and HD69 from 2023; the XML lists him as district 69 for 2019 (HB1017) and 2021 (HB1111), where the
+      session's own HD69 member is Gretchen Bangert, so the district match finds nobody, and the rows match through
+      his own roster row and the fact that he held HD69 (2023). His 2023 row (HB1081) matches directly. Jeff Knight
+      held HD129 in 2018-2022 and HD142 from 2023; the XML lists him as 142 for 2018 (HB2607, HD142 then Robert Ross)
+      and 2021 (HB1038, HD142 then Bennie Cook), and both match him the same way; his 2023 row (HB590) matches
+      directly.
+    given:
+      - input: ref('int_bills__status')
+        format: sql
+        rows: |
+            select '211' as session_code, 'HB1111' as bill, 'relisted for governor message' as status where false
+      - input: ref('stg_mo_house__bill_sponsors')
+        format: sql
+        rows: |
+            select '191' as session_code, 2019 as session_year, 'HB1017' as bill, 'Sponsor' as sponsor_type, 'Adam Schnelting' as sponsor_name, 69 as sponsor_district union all
+            select '211', 2021, 'HB1111', 'Sponsor', 'Adam Schnelting', 69 union all
+            select '231', 2023, 'HB1081', 'Sponsor', 'Adam Schnelting', 69 union all
+            select '181', 2018, 'HB2607', 'Sponsor', 'Jeff Knight', 142 union all
+            select '211', 2021, 'HB1038', 'Sponsor', 'Jeff Knight', 142 union all
+            select '231', 2023, 'HB590', 'Sponsor', 'Jeff Knight', 142
+      - input: ref('int_mo_house__member_identity')
+        format: sql
+        rows: |
+            select '191' as session_code, 104 as district_number, 'Adam' as first_name, 'Adam Schnelting' as full_name, 'schnelting' as surname_key, 'ocd-person/f436aa10-c006-4128-9748-050bf50c4e21' as person_key union all
+            select '211', 104, 'Adam', 'Adam Schnelting', 'schnelting', 'ocd-person/f436aa10-c006-4128-9748-050bf50c4e21' union all
+            select '231', 69, 'Adam', 'Adam Schnelting', 'schnelting', 'ocd-person/f436aa10-c006-4128-9748-050bf50c4e21' union all
+            select '191', 69, 'Gretchen', 'Gretchen Bangert', 'bangert', 'ocd-person/26d2c9d5-8aa2-43ab-9aed-e6b3f42e3cbf' union all
+            select '211', 69, 'Gretchen', 'Gretchen Bangert', 'bangert', 'ocd-person/26d2c9d5-8aa2-43ab-9aed-e6b3f42e3cbf' union all
+            select '181', 129, 'Jeff', 'Jeff Knight', 'knight', 'ocd-person/fa6c1b05-02e8-4c6f-9a84-d1f58885ea04' union all
+            select '211', 129, 'Jeff', 'Jeff Knight', 'knight', 'ocd-person/fa6c1b05-02e8-4c6f-9a84-d1f58885ea04' union all
+            select '231', 142, 'Jeff', 'Jeff Knight', 'knight', 'ocd-person/fa6c1b05-02e8-4c6f-9a84-d1f58885ea04' union all
+            select '181', 142, 'Robert', 'Robert Ross', 'ross', 'ocd-person/261ad509-4d95-4154-887c-38c59f04f921' union all
+            select '211', 142, 'Bennie', 'Bennie Cook', 'cook', 'ocd-person/9c485ac1-4ad5-4466-9392-a9014827ef56'
+      - input: ref('int_mo_legislators__seats')
+        format: sql
+        rows: |
+            select 'upper' as chamber, 1 as district_number, cast('2019-01-01' as date) as start_date, cast('2022-12-31' as date) as end_date, 'nobody' as surname_key, 'p_unused' as person_id where false
+      - input: ref('dim_official')
+        format: sql
+        rows: |
+            select 'ocd-person/f436aa10-c006-4128-9748-050bf50c4e21' as official_id union all
+            select 'ocd-person/fa6c1b05-02e8-4c6f-9a84-d1f58885ea04' union all
+            select 'ocd-person/26d2c9d5-8aa2-43ab-9aed-e6b3f42e3cbf' union all
+            select 'ocd-person/261ad509-4d95-4154-887c-38c59f04f921' union all
+            select 'ocd-person/9c485ac1-4ad5-4466-9392-a9014827ef56'
+    expect:
+      format: sql
+      rows: |
+          select '191' as session_code, 'HB1017' as bill, 'Sponsor' as sponsor_type, 'Adam Schnelting' as sponsor_name, 'state_house' as sponsor_chamber, 69 as sponsor_district, 'ocd-person/f436aa10-c006-4128-9748-050bf50c4e21' as official_id union all
+          select '211', 'HB1111', 'Sponsor', 'Adam Schnelting', 'state_house', 69, 'ocd-person/f436aa10-c006-4128-9748-050bf50c4e21' union all
+          select '231', 'HB1081', 'Sponsor', 'Adam Schnelting', 'state_house', 69, 'ocd-person/f436aa10-c006-4128-9748-050bf50c4e21' union all
+          select '181', 'HB2607', 'Sponsor', 'Jeff Knight', 'state_house', 142, 'ocd-person/fa6c1b05-02e8-4c6f-9a84-d1f58885ea04' union all
+          select '211', 'HB1038', 'Sponsor', 'Jeff Knight', 'state_house', 142, 'ocd-person/fa6c1b05-02e8-4c6f-9a84-d1f58885ea04' union all
+          select '231', 'HB590', 'Sponsor', 'Jeff Knight', 'state_house', 142, 'ocd-person/fa6c1b05-02e8-4c6f-9a84-d1f58885ea04'

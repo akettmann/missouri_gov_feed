@@ -1,0 +1,114 @@
+# Unit tests for int_mo_legislators__final_checks on the named people of the person-id issues (#649, #659): real
+# payroll rows (with the real top pay of each title and year, which sets "small"), real Open States person ids and
+# seat dates (prod DB copy, 2026-10). The invented-name tests of the same rules are in
+# _intermediate__final_checks_unit_tests.yml.
+version: 2
+
+unit_tests:
+  - name: final_checks_case_2017_checks_of_house_seats_ended_2016
+    model: int_mo_legislators__final_checks
+    description: >
+      #250, #504, #227. Lincoln Hough (HD135), Denny Hoskins (HD54), Stephen Webber (HD46) and Linda Black (HD117)
+      left House seats on 2016-12-31 and each was paid a small 2017 House check: all four are final checks, Webber's
+      under his merged Senate id. Hoskins' is the leadership title, where Elijah Haahr's $35,544.06 is the 2017 top
+      pay. Rusty Black's full 2017 pay ("BLACK, JAMES R", sharing Linda's middle initial) is not one.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'HOUGH, LINCOLN P', last_name: HOUGH, first_names: LINCOLN P, gross_pay: 1496.45}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE-LEADERSHP, employee_name: 'HOSKINS, DENNY', last_name: HOSKINS, first_names: DENNY, gross_pay: 1558.95}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'WEBBER, STEPHEN D', last_name: WEBBER, first_names: STEPHEN D, gross_pay: 1496.45}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, LINDA R.', last_name: BLACK, first_names: LINDA R., gross_pay: 1496.45}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, JAMES R', last_name: BLACK, first_names: JAMES R, gross_pay: 34418.35}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE-LEADERSHP, employee_name: 'HAAHR, ELIJAH', last_name: HAAHR, first_names: ELIJAH, gross_pay: 35544.06}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'HOSKINS, DENNY', last_name: HOSKINS, first_names: DENNY, gross_pay: 34418.35}
+      - input: ref('mo_payroll_office_titles')
+        rows: &legislature_titles
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE-LEADERSHP, office_group: legislature}
+          - {agency_name: LEGISLATURE, position_title: SENATOR, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: 'ocd-person/934fdfca-5cdf-4c67-a3b0-b23e433f87f6', full_name: Lincoln Hough, surname_key: hough, chamber: lower, end_date: '2016-12-31'}
+          - {person_id: 'ocd-person/934fdfca-5cdf-4c67-a3b0-b23e433f87f6', full_name: Lincoln Hough, surname_key: hough, chamber: upper, end_date: '9999-12-31'}
+          - {person_id: 'ocd-person/9f04b7ea-bd98-4f8e-ad76-8a5bf7b5917a', full_name: Denny Hoskins, surname_key: hoskins, chamber: lower, end_date: '2016-12-31'}
+          - {person_id: 'ocd-person/9f04b7ea-bd98-4f8e-ad76-8a5bf7b5917a', full_name: Denny Hoskins, surname_key: hoskins, chamber: upper, end_date: '2025-01-07'}
+          - {person_id: 'ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9', full_name: Stephen Webber, surname_key: webber, chamber: lower, end_date: '2016-12-31'}
+          - {person_id: 'ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9', full_name: Stephen Webber, surname_key: webber, chamber: upper, end_date: '9999-12-31'}
+          - {person_id: 'ocd-person/a421125b-3625-4309-b4a7-73ec15541bf5', full_name: Linda Black, surname_key: black, chamber: lower, end_date: '2016-12-31'}
+          - {person_id: 'ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0', full_name: Rusty Black, surname_key: black, chamber: lower, end_date: '2023-01-03'}
+    expect:
+      rows:
+        - {calendar_year: 2017, seat_chamber: lower, employee_name: 'HOUGH, LINCOLN P', person_id: 'ocd-person/934fdfca-5cdf-4c67-a3b0-b23e433f87f6'}
+        - {calendar_year: 2017, seat_chamber: lower, employee_name: 'HOSKINS, DENNY', person_id: 'ocd-person/9f04b7ea-bd98-4f8e-ad76-8a5bf7b5917a'}
+        - {calendar_year: 2017, seat_chamber: lower, employee_name: 'WEBBER, STEPHEN D', person_id: 'ocd-person/63dea1c8-8916-4ca8-8821-223a7fef95a9'}
+        - {calendar_year: 2017, seat_chamber: lower, employee_name: 'BLACK, LINDA R.', person_id: 'ocd-person/a421125b-3625-4309-b4a7-73ec15541bf5'}
+
+  - name: final_checks_case_551_silvey_2018_payment_is_not_one_while_his_seat_ends_at_his_last_vote
+    model: int_mo_legislators__final_checks
+    description: >
+      #551, pinning today's behaviour (option 1, last-vote cap) pending the maintainer's decision. Ryan Silvey's
+      SD17 seat ends 2017-09-13, so his 2018 SENATOR payment ($1,836.67, small against Danny Brown's $35,914.80) is
+      not a final check: the seat ended neither in December 2017 nor in January 2018. Will Kraus (SD8, ended
+      2017-07-25) has no 2018 payment, and his partial 2017 pay is his own year's, not a check. If #551 moves
+      Silvey's end into January 2018, this test is expected to change.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'SILVEY, RYAN A', last_name: SILVEY, first_names: RYAN A, gross_pay: 35914.80}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'KRAUS, WILLIAM G', last_name: KRAUS, first_names: WILLIAM G, gross_pay: 22395.50}
+          - {calendar_year: 2018, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'SILVEY, RYAN A', last_name: SILVEY, first_names: RYAN A, gross_pay: 1836.67}
+          - {calendar_year: 2018, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'BROWN, DANNY W.', last_name: BROWN, first_names: DANNY W., gross_pay: 35914.80}
+      - input: ref('mo_payroll_office_titles')
+        rows: *legislature_titles
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: 'ocd-person/fd8438aa-3dfd-48ef-b2a5-076c42799b9b', full_name: Ryan Silvey, surname_key: silvey, chamber: upper, end_date: '2017-09-13'}
+          - {person_id: 'ocd-person/e2a4325d-a856-4581-80d5-d323f65391fc', full_name: Will Kraus, surname_key: kraus, chamber: upper, end_date: '2017-07-25'}
+    expect:
+      rows: []
+
+  - name: final_checks_case_last_house_checks_left_out_by_legal_first_name_or_a_return
+    model: int_mo_legislators__final_checks
+    description: >
+      Pins today's behaviour for the last House payments #660 found missing here (fct_salaries pairs each of them
+      by seat or by name instead). Left out because the legal first name does not fit the name the member goes by:
+      "MOON, CHRIS M" 2021 (Mike Moon), "BLACK, JAMES R" 2023 (Rusty Black), "HENDERSON, JAMES M" 2025 leadership
+      (Mike Henderson), "NURRENBERN, MARGARET" 2025 (Maggie Nurrenbern) and "SMITH, DAVID C" 2025 (Cody Smith,
+      #227). Left out because the member later held a House seat again: Mark Matthiesen 2019 (back in 2023) and
+      John Simmons 2023 (back in 2025). "SMITH, TRAVIS M" 2025 (Travis Smith, seat ended 2025-01-07) is one. Top
+      pay rows are the real highest of each title and year.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2021, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'MOON, CHRIS M', last_name: MOON, first_names: CHRIS M, gross_pay: 1496.45}
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'BLACK, JAMES R', last_name: BLACK, first_names: JAMES R, gross_pay: 1533.86}
+          - {calendar_year: 2025, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE-LEADERSHP, employee_name: 'HENDERSON, JAMES M', last_name: HENDERSON, first_names: JAMES M, gross_pay: 1704.32}
+          - {calendar_year: 2025, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'NURRENBERN, MARGARET', last_name: NURRENBERN, first_names: MARGARET, gross_pay: 1636.00}
+          - {calendar_year: 2025, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, DAVID C', last_name: SMITH, first_names: DAVID C, gross_pay: 1636.00}
+          - {calendar_year: 2025, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, TRAVIS M', last_name: SMITH, first_names: TRAVIS M, gross_pay: 1636.00}
+          - {calendar_year: 2019, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'MATTHIESEN, MARK', last_name: MATTHIESEN, first_names: MARK, gross_pay: 1496.45}
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SIMMONS, JOHN', last_name: SIMMONS, first_names: JOHN, gross_pay: 1533.86}
+          - {calendar_year: 2019, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'QUADE-WATERLAND, CRYSTAL M', last_name: QUADE-WATERLAND, first_names: CRYSTAL M, gross_pay: 37352.53}
+          - {calendar_year: 2021, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'QUADE-WATERLAND, CRYSTAL M', last_name: QUADE-WATERLAND, first_names: CRYSTAL M, gross_pay: 37415.04}
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'ADAMS, JOSEPH L.', last_name: ADAMS, first_names: JOSEPH L., gross_pay: 38385.46}
+          - {calendar_year: 2025, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'PERKINS, CHAD A.', last_name: PERKINS, first_names: CHAD A., gross_pay: 42972.52}
+          - {calendar_year: 2025, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE-LEADERSHP, employee_name: 'AUNE, ASHLEY', last_name: AUNE, first_names: ASHLEY, gross_pay: 41336.52}
+      - input: ref('mo_payroll_office_titles')
+        rows: *legislature_titles
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: 'ocd-person/43563b48-1d26-4a85-bad2-615971201d41', full_name: Mike Moon, surname_key: moon, chamber: lower, end_date: '2021-01-06'}
+          - {person_id: 'ocd-person/bb98b6a0-ba5f-45f8-ad14-b798515fa8a0', full_name: Rusty Black, surname_key: black, chamber: lower, end_date: '2023-01-03'}
+          - {person_id: 'ocd-person/bfad4ef7-fad2-46e6-8f12-f8ea9feaa0cb', full_name: Mike Henderson, surname_key: henderson, chamber: lower, end_date: '2025-01-08'}
+          - {person_id: 'ocd-person/d8594030-4826-48c5-af43-674470f1dd44', full_name: Maggie Nurrenbern, surname_key: nurrenbern, chamber: lower, end_date: '2025-01-08'}
+          - {person_id: 'ocd-person/7529d2d2-0cc1-4d30-9e8f-12d3773dff8d', full_name: Cody Smith, surname_key: smith, chamber: lower, end_date: '2025-01-07'}
+          - {person_id: 'ocd-person/74efb08b-f153-4d63-b6d6-c685d6a04790', full_name: Travis Smith, surname_key: smith, chamber: lower, end_date: '2025-01-07'}
+          - {person_id: 'ocd-person/c509449e-070c-462c-810e-f14315c9df42', full_name: David Smith, surname_key: smith, chamber: lower, end_date: '9999-12-31'}
+          - {person_id: 'ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df', full_name: Mark Matthiesen, surname_key: matthiesen, chamber: lower, end_date: '2018-12-31'}
+          - {person_id: 'ocd-person/661f49f4-e075-491e-aad8-4dde65ecb6df', full_name: Mark Matthiesen, surname_key: matthiesen, chamber: lower, end_date: '9999-12-31'}
+          - {person_id: 'ocd-person/3de9f0e2-7062-4363-91d0-c3f17084ced4', full_name: John Simmons, surname_key: simmons, chamber: lower, end_date: '2023-01-03'}
+          - {person_id: 'ocd-person/3de9f0e2-7062-4363-91d0-c3f17084ced4', full_name: John Simmons, surname_key: simmons, chamber: lower, end_date: '9999-12-31'}
+    expect:
+      rows:
+        - {calendar_year: 2025, seat_chamber: lower, employee_name: 'SMITH, TRAVIS M', person_id: 'ocd-person/74efb08b-f153-4d63-b6d6-c685d6a04790'}

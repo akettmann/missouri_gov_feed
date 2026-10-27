@@ -3,17 +3,20 @@
 version: 2
 models:
 - name: int_bills__list
-  description: 'Every Missouri bill and resolution per session, from the three places that list them; fct_bills
-    and fct_vote_bills both read this one list so a bill cannot be in one and not the other. Re-listed appropriation
-    bills are kept here (they are House bills; int_bills__status marks them). House bills  the House XML export:
-    titles, current version, last action Senate bills the Senate topical index (regular sessions): its one-line
-    description as the short title; Senate bills filed under no keyword aren''t listed there and are missing Senate
-    bills the House XML''s SenateActList lists as having reached the House (2024 on), when the topical index does
-    not list them: the special-session Senate bills (the index covers regular sessions only), with the titles, version,
-    last action and effective date the XML gives. Senate bills of older special sessions are missing (#237). source_url
-    is the Senate index''s bill link, else the bill''s page on house.mo.gov from the House XML (House bills and
-    the House-listed Senate bills). A column a source does not give is null. Grain: one row per (session, bill),
-    House and Senate bills.'
+  description: 'Every Missouri bill and resolution per session, from the places that list them; fct_bills and fct_vote_bills
+    both read this one list so a bill cannot be in one and not the other. Re-listed appropriation bills are kept
+    here (they are House bills; int_bills__status marks them). House bills  the House XML export: titles, current
+    version, last action Senate bills the Senate''s own bill list (senate.mo.gov, regular and special sessions;
+    mo_senate_bills loader, #586): complete, including bills filed under no topical-index keyword (2018 SB 975 and
+    1024) and bills that never left the Senate. Its one-line description is the short title. It covers the sessions
+    the loader''s window reached; for a session it has not landed, the next two sources stand in Senate bills the
+    Senate topical index (regular sessions) of a session the Senate list has no rows for: its one-line description
+    as the short title; bills filed under no keyword are missing Senate bills the House XML''s SenateActList lists
+    as having reached the House (2024 on), when neither of the above lists them, with the titles, version, last
+    action and effective date the XML gives. Senate bills of older special sessions are missing without the Senate
+    list (#237). source_url is the Senate''s bill link, else the bill''s page on house.mo.gov from the House XML
+    (House bills and the House-listed Senate bills). A column a source does not give is null. Grain: one row per
+    (session, bill), House and Senate bills.'
   data_tests:
   - dbt_utils.unique_combination_of_columns:
       arguments:
@@ -222,8 +225,10 @@ models:
 - name: int_house_fd__schedule_lines
   description: 'House disclosure PDF text, each line tagged with the schedule it falls under (the nearest preceding
     "Schedule X:" header in the same document). Column-header rows, "None disclosed." and boilerplate drop out.
-    PDFs from 2021 on extract their small-caps text with NUL characters; the words are restored first (#576). Grain:
-    one text line per House disclosure PDF, tagged with its schedule.'
+    Entries the PDF wraps over several lines are joined back into one row on the schedules that feed commercial
+    ties (C, E, F, J: see "continuation" below), so a wrapped tail never becomes a tie of its own (#599). PDFs from
+    2021 on extract their small-caps text with NUL characters; the words are restored first (#576). Grain: one text
+    line per House disclosure PDF, tagged with its schedule.'
 - name: int_interests__industry_money
   description: 'Money each official received from an industry or interest, per year: campaign contributions from
     organizations, PACs and committees (individuals are left out: their employer is not their money) and lobbyist
@@ -420,8 +425,96 @@ models:
     1. Open States starts the 2017 class on January 11, but the session (and their votes) began January 4. * seed
     legislator_seat_corrections adds terms Open States lacks or cuts short (senators who left mid-term for statewide
     office), each with its source. source_start_date/source_end_date carry the dates exactly as Open States (or
-    the seed) gives them, without those adjustments (null start when undated; end 9999-12-31 while open). Grain:
-    one row per Open States legislative seat-term, under the id Open States gave.'
+    the seed) gives them, without those adjustments (null start when undated; end 9999-12-31 while open). Quality
+    flags (#656) say how far each date can be trusted; they change no other column, so consumers can move to them
+    one by one. start_quality is dated, undated (no start) or placeholder (an Open States start on January 1, never
+    a real start); seed rows with a start are always dated and taken at face value, January 1 included, and a seed
+    row with a blank start is undated. known_start_date is the as-given start only when dated. end_quality is open,
+    dated, conflicts_with_journal (a Senate end the journal roll calls contradict: the terms int_mo_legislators__seats
+    re-dates) or conflicts_with_roster (a House end the House''s session rosters contradict), with the evidence
+    dates behind it. The column docs give each rule. The evidence is read from staging (stg_mo_senate__votes, stg_mo_house__members),
+    never from a model carrying person_id: this model is upstream of int_officials__person_ids. Grain: one row per
+    Open States legislative seat-term, under the id Open States gave.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - openstates_id
+        - chamber
+        - district_number
+        - start_date
+        - end_date
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: (known_start_date is null) = (start_quality <> 'dated')
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: start_quality <> 'dated' or known_start_date = source_start_date
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: (end_quality = 'open') = (source_end_date = cast('9999-12-31' as date)) or end_quality like
+          'conflicts%'
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: (end_quality <> 'conflicts_with_journal' or chamber = 'upper') and (end_quality <> 'conflicts_with_roster'
+          or chamber = 'lower')
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: end_quality <> 'conflicts_with_roster' or (evidence_first_date is not null and evidence_last_date
+          >= evidence_first_date)
+  columns:
+  - name: start_quality
+    description: 'How far the start date can be trusted. dated: Open States (or the seed) gives a real start. undated:
+      Open States gives none (start_date is 1900-01-01). placeholder: any Open States start on January 1 (as given),
+      which is never a real start, as the General Assembly convenes in the first half of January. Open States uses
+      January 1 of 2011, 2013 and 2015 as a stand-in for "in office by then" (111 + 79 + 4 House terms and 24 +
+      3 Senate terms); every other dated January start is January 3 to 11. 2017 has one January 1 start, Nick Schroer''s
+      HD107 term, a near-true case (his first term began with the session on 2017-01-04): flagged all the same,
+      as the rule does not look at the year. Seed rows (legislator_seat_corrections) with a start are always dated
+      and taken at face value, January 1 included; a seed row with a blank start is undated. A seed start is where
+      the correction begins, not necessarily the first start in the seat (Mike Kehoe''s SD6 and Mike Parson''s SD28
+      rows start 2017-01-01, continuing terms Open States starts in 2011).'
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - dated
+          - undated
+          - placeholder
+  - name: known_start_date
+    description: source_start_date when start_quality is dated, else null. Never invented.
+  - name: end_quality
+    description: 'How far the end date can be trusted. conflicts_with_journal (Senate): a closed term whose end
+      is more than a year after its last journal token, or that runs into the journal years with no token, where
+      the journals cover every year of the term from their first date; the terms int_mo_legislators__seats re-dates.
+      A smaller gap stays dated (Jason Holsman resigned 2020-01-16 and voted last 2020-01-13). conflicts_with_roster
+      (House): the term ended before the January 15 handover of a roster year whose list has a member with its surname
+      in its district while no Open States House term matching that member runs into the year (Lauren Arthur, HD18,
+      ends 2016-12-31; the 2017-2018 rosters list her), or the list names someone else in its district every roster
+      year from some point to the term''s end, counting only years the term runs from before January 15 to past
+      May 31 (a member who left during a session is missing from its end-of-session list) and the district is listed
+      at all. Surnames match ignoring spacing and generational suffixes (Van Schoiack, Franks Jr.), or by the last
+      word of a compound roster surname. Otherwise open (no end date) or dated. A flag is evidence that the sources
+      disagree, not a correction: a roster can also outlive a member (#152).'
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - open
+          - dated
+          - conflicts_with_roster
+          - conflicts_with_journal
+  - name: evidence_first_date
+    description: 'Senate terms: the first journal vote whose token matches the term (its surname key, and district
+      when the journal gives one, on a date inside start_date..end_date, naming only one (surname key, district)
+      among the Senate terms that day; so a person Open States holds under two ids in one seat is one candidate,
+      not an ambiguous pair), for every term with one, flagged or not; null when the term has none. House terms:
+      January 1 of the first roster year behind a conflicts_with_roster flag; null otherwise.'
+  - name: evidence_last_date
+    description: 'Senate terms: the last matching journal vote, as evidence_first_date. House terms: December 31
+      of the last roster year behind a conflicts_with_roster flag; null otherwise.'
 - name: int_mo_legislators__seats
   description: 'Every Missouri legislative seat-term in Open States (current and retired people), keyed for matching:
     chamber, district number, surname key, and date range (open-ended where Open States has no date), plus person_id,
@@ -432,21 +525,38 @@ models:
     to a term are the ones cast by its person within the term''s Open States dates. Open States has no start date
     for 25 senators in office from 2017, and a few terms end long after the person left (Joseph Keaveny, 2011-2018,
     never voted in the journals, which begin 2017-01-04; Ryan Silvey''s last vote was 2017-09-13, not 2018-12-31):
-    * an undated start (1900-01-01) becomes the term''s first roll-call vote. That is the latest the start can be
-    (a senator seated on the journal''s first day, 2017-01-04, started on or before it), so it decides which years
-    the senator held the seat in without inventing a start. It agrees with every dated start (the first vote falls
-    on or just after it). A term that ended before the journals begin keeps Open States'' dates. * a closed term
-    that Open States ends more than a year after the term''s last roll-call vote ends at that vote. A smaller gap
-    stays: a senator who resigned on January 16 voted last on January 13 (Jason Holsman, 2020), and the Open States
-    date, not the last vote, says whether they held the seat past the January 15 handover. An open term (no end
-    date) is never cut. * a closed term that runs into the journal years with no vote at all was not held in them.
-    Where it started before the journals began, it ends the day before the first journal date (the latest it can
-    have ended); otherwise (an undated start, or a start inside the journal years) the term is dropped. The last
-    two rules need the journals to cover the term: with no journal loaded, or a calendar year inside the term (from
-    the journals'' first date to the term''s end; to the journals'' last date for an open term) with no journal
-    vote at all, which includes years after the journals stop, a term is left as Open States gives it, never dropped
-    or capped for lacking votes (#534). Only the first rule (an undated start) needs a vote of the term itself.
-    Grain: one row per Open States legislative seat-term.'
+    * an undated start (start_quality undated) becomes the term''s first roll-call vote. That is the latest the
+    start can be (a senator seated on the journal''s first day, 2017-01-04, started on or before it), so it decides
+    which years the senator held the seat in without inventing a start. It agrees with every dated start (the first
+    vote falls on or just after it). A term that ended before the journals begin keeps Open States'' dates. * a
+    closed term that Open States ends more than a year after the term''s last roll-call vote ends at that vote.
+    A smaller gap stays: a senator who resigned on January 16 voted last on January 13 (Jason Holsman, 2020), and
+    the Open States date, not the last vote, says whether they held the seat past the January 15 handover. An open
+    term (no end date) is never cut. * a closed term that runs into the journal years with no vote at all was not
+    held in them. Where it started before the journals began, it ends the day before the first journal date (the
+    latest it can have ended); otherwise (an undated start, or a start inside the journal years) the term is dropped.
+    The last two rules need the journals to cover the term: with no journal loaded, or a calendar year inside the
+    term (from the journals'' first date to the term''s end; to the journals'' last date for an open term) with
+    no journal vote at all, which includes years after the journals stop, a term is left as Open States gives it,
+    never dropped or capped for lacking votes (#534). Only the first rule (an undated start) needs a vote of the
+    term itself. start_quality is int_mo_legislators__seat_terms'' flag (dated, undated or placeholder), except
+    that a start re-dated from the first roll-call vote is first_vote: a known start, though the latest it can be.
+    Consumers that need a known start test start_quality <> ''undated'', never the date (a placeholder start counts
+    as known, as it always has). Grain: one row per Open States legislative seat-term.'
+  columns:
+  - name: start_quality
+    description: int_mo_legislators__seat_terms.start_quality (dated, undated, placeholder), except first_vote for
+      an undated Senate start re-dated from the term's first roll-call vote. Test a known start with start_quality
+      <> 'undated' (placeholder starts count as known).
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - dated
+          - undated
+          - placeholder
+          - first_vote
 - name: int_mo_legislators__seats_as_given
   description: 'Every Missouri legislative seat-term in Open States (current and retired people), keyed for matching:
     chamber, district number, surname key, and date range (open-ended where Open States has no date), plus person_id,
@@ -454,7 +564,8 @@ models:
     gave the term; use person_id wherever a seat holder becomes an official. Rows and corrections are those of int_mo_legislators__seat_terms.
     The dates are still Open States'' own: the Senate terms are re-dated from the journal roll calls in int_mo_legislators__seats,
     which is what to use. This model exists so int_mo_senate__votes can attribute votes to senators without depending
-    on the dates those votes later correct.'
+    on the dates those votes later correct. start_quality is int_mo_legislators__seat_terms'' flag (dated, undated
+    or placeholder), carried so the re-dating in int_mo_legislators__seats reads it instead of the 1900-01-01 start.'
 - name: int_mo_revisor__session_law_bills
   description: 'The bills named in the Revisor''s session-law citations: each RSMo section version''s history note
     and each repeal note, split into one row per (section version, act, bill). A history note lists the acts that
@@ -530,27 +641,27 @@ models:
     int_officials__person_ids works from. One row per (id as the source gave it, year, office, district, House member
     id) for the years with a House roster, from the House''s own roster (its raw seat-matched key: an Open States
     id or mohouse:<House member id>) and from Open States seat-terms (both chambers). A term counts for a year when
-    it runs past January 15 of it, and terms with an undated start are left out, as in int_officeholders__years.
-    house_member_id is the MO House member id the roster gave the row (null for Open States seat-terms): the House
-    keeps one member id per person across sessions and name changes, so the person-id rule can follow it. name_key
-    is the id''s own full name. term_start/term_end are the Open States term''s dates exactly as Open States gives
-    them (DATE; end 9999-12-31 while open; null for House roster rows, which carry only a year), so a rule can tell
-    overlap from succession. They are not the January-1 adjusted dates used for the year membership above: those
-    would make a January successor (from Jan 1) overlap a predecessor Open States ends on Jan 6-9. The two years
-    before the first roster year are included too (Open States seat-terms only), so a member whose seat ended the
-    December before the roster begins (Stephen Webber, #504) or resigned in 2015 (Tom Dempsey, Paul LeVota, #512)
-    still has evidence to be joined by. Earlier years are not: their Open States terms are mostly the 2011 and 2013
-    placeholder starts (#332), and nobody who left before 2015 is a roster member. A term with an undated start
-    (22 senators of 2017-2023 and some House members, #512) counts for one year only, the last year it ran past
-    the January 15 handover: Open States gives its end, so the person held the seat that year, and no first year
-    is invented. That is enough to give the id a person_ids row and to let the name rules see its name and seat.
-    An undated id has only that one year of evidence, which weakens rule 2 (a seat conflict needs more than one
-    shared year) and rule 2b (the chamber-move check compares the first and last year) of int_officials__person_ids
-    (#519). The data test assert_undated_open_states_ids_share_no_name fails if such an id ever shares a name (rule
-    2) or a rule 2b variant name (Dan / Daniel Brown) with another id, so the weakness cannot join or split wrongly
-    unnoticed. Known edge: the min(start)/max(end) collapse per (alias_id, year, office, district) spans any gap
-    if one id holds the same seat in two separate terms in a year. Grain: one row per (id as sourced, year, office,
-    district, House member id).'
+    it runs past January 15 of it. A term with an undated start (start_quality undated in int_mo_legislators__seat_terms)
+    counts only for its last year (below); a placeholder start (January 1, #656) counts like a dated one. house_member_id
+    is the MO House member id the roster gave the row (null for Open States seat-terms): the House keeps one member
+    id per person across sessions and name changes, so the person-id rule can follow it. name_key is the id''s own
+    full name. term_start/term_end are the Open States term''s dates exactly as Open States gives them (DATE; end
+    9999-12-31 while open; null for House roster rows, which carry only a year), so a rule can tell overlap from
+    succession. They are not the January-1 adjusted dates used for the year membership above: those would make a
+    January successor (from Jan 1) overlap a predecessor Open States ends on Jan 6-9. The two years before the first
+    roster year are included too (Open States seat-terms only), so a member whose seat ended the December before
+    the roster begins (Stephen Webber, #504) or resigned in 2015 (Tom Dempsey, Paul LeVota, #512) still has evidence
+    to be joined by. Earlier years are not: their Open States terms are mostly the 2011 and 2013 placeholder starts
+    (#332), and nobody who left before 2015 is a roster member. A term with an undated start (22 senators of 2017-2023
+    and some House members, #512) counts for one year only, the last year it ran past the January 15 handover: Open
+    States gives its end, so the person held the seat that year, and no first year is invented. That is enough to
+    give the id a person_ids row and to let the name rules see its name and seat. An undated id has only that one
+    year of evidence, which weakens rule 2 (a seat conflict needs more than one shared year) and rule 2b (the chamber-move
+    check compares the first and last year) of int_officials__person_ids (#519). The data test assert_undated_open_states_ids_share_no_name
+    fails if such an id ever shares a name (rule 2) or a rule 2b variant name (Dan / Daniel Brown) with another
+    id, so the weakness cannot join or split wrongly unnoticed. Known edge: the min(start)/max(end) collapse per
+    (alias_id, year, office, district) spans any gap if one id holds the same seat in two separate terms in a year.
+    Grain: one row per (id as sourced, year, office, district, House member id).'
 - name: int_officials__name_keys
   description: 'Normalized name variants per current official, for matching sources that only carry names (MEC committees,
     lobbyist reports, Wikidata labels, ratings). One row per (official, variant). Grain: one row per (official,
@@ -561,11 +672,13 @@ models:
     roster falls back to mohouse:<member id> when its seat can''t be tied to an Open States record. Every id seen
     in int_officials__identity_terms gets one row: alias_id (as the source gave it) -> person_id (what the pipeline
     calls the person). Rules, in order: 1. seed official_id_links, same_person: a curated id for a person the name
-    rule can''t join (statewide officers, judges). basis = curated. 2. ids with the same exact full name (case,
-    punctuation and spacing ignored: "Van Schoiack" and "VanSchoiack" are one name, #228) are one person, basis
-    = name_continuity, unless two of them hold different seats in more than one shared year. The same seat in the
-    same year is how a split shows (Jean Evans, Joe Adams); different seats across several shared years mean two
-    people, while a single shared year is a hand-over between seats. A pair listed as different_people in official_id_links
+    rule can''t join (statewide officers, judges). basis = curated. A row moves the whole person its alias_id was
+    merged into by the rules below to the person its person_id was merged into, so naming a merged id the rules
+    did not choose, on either side, does not split the person (#174, #682). 2. ids with the same exact full name
+    (case, punctuation and spacing ignored: "Van Schoiack" and "VanSchoiack" are one name, #228) are one person,
+    basis = name_continuity, unless two of them hold different seats in more than one shared year. The same seat
+    in the same year is how a split shows (Jean Evans, Joe Adams); different seats across several shared years mean
+    two people, while a single shared year is a hand-over between seats. A pair listed as different_people in official_id_links
     also keeps that whole name apart. 2b. two names that differ only in the given name, one being the start of the
     other ("Steve"/"Steven" Roberts, "Ken"/"Kenneth" Jamison; #263), are one person when each name belongs to exactly
     one such pair and the names never hold different seats in the same year (across all ids of both names), and
@@ -580,19 +693,29 @@ models:
     Smith (2019 only, or 2026 only after a special election) inside a Dan Smith successor''s span looks the same
     by year. Dates tell them apart: Kenneth''s term is a 26-day stub that overlaps Ken''s, while a successor''s
     term starts on or after the predecessor''s ends (or is no stub). Undated House-roster rows prove no overlap.
-    A name left with more than one partner (a chain or a fork) is ambiguous and joins nothing. 2c. MO House member
-    id continuity (#151): the House keeps one member id per person across sessions and name changes (Mazzie Boyd,
-    2023, and Mazzie Christensen, 2024-26, are member 2381), so ids that share a House member id are one person
-    whatever their names, basis = member_id_continuity. This is applied after rules 2 and 2b and joins the persons
-    they made, so it also reaches ids the name rules keep apart. It skips an id that carries more than one member
-    id (Open States'' Rick Roeber holds member 2215 and, through a seat-match error, Rebecca Roeber''s 1790, #152:
-    the shared 1790 would join two people) and any id listed as different_people in official_id_links. Only ids
-    with a roster row (a House member id) take part; Senate-only ids rely on names. 3. otherwise the id is its own
-    person, basis = self. Among merged ids the person_id is an Open States id over mohouse:, then the one whose
-    service ends latest, then the smaller id. The choice never looks at the latest roster year, so an official''s
-    id does not change when they leave office. Curated rows (official_id_links) take effect only once a maintainer
-    has signed them off (checked_by filled). Grain: one row per id a legislator has been given, with the stable
-    person_id.'
+    A name left with more than one partner (a chain or a fork) is ambiguous and joins nothing. 2d. duplicate stubs
+    (#294, #292): Open States holds some members twice, once as a stub. An Open States id whose only seat-term is
+    a dated stub under 90 days joins another name when that name''s dated term (90 days or more) in the same office
+    and district contains the stub and starts at most 7 days before it, the surnames match (one side may drop a
+    one-letter middle initial: "David A." / "David" Dolan) and the given names fit (mogov.first_name_fit: "Martin"
+    / "Marty" Jacobs; not "Daniel" / "Robert"), basis = duplicate_stub. Every id of the stub''s name must be such
+    a stub, the stub must have exactly one such partner name, neither name may be kept apart, and a stub name already
+    in a rule 2b pair (Kenneth / Ken Jamison) is left to rule 2b. A special-election successor never qualifies:
+    its term starts on or after the predecessor''s ends, or (when Open States leaves a departed member''s normal
+    term end) months after the predecessor''s term starts. The stub''s name joins the other name''s group, so rule
+    2c still applies to the joined person. 2c. MO House member id continuity (#151): the House keeps one member
+    id per person across sessions and name changes (Mazzie Boyd, 2023, and Mazzie Christensen, 2024-26, are member
+    2381), so ids that share a House member id are one person whatever their names, basis = member_id_continuity.
+    This is applied after rules 2 and 2b and joins the persons they made, so it also reaches ids the name rules
+    keep apart. It skips an id that carries more than one member id (Open States'' Rick Roeber holds member 2215
+    and, through a seat-match error, Rebecca Roeber''s 1790, #152: the shared 1790 would join two people) and any
+    id listed as different_people in official_id_links. Only ids with a roster row (a House member id) take part;
+    Senate-only ids rely on names. 3. otherwise the id is its own person, basis = self. Among merged ids the person_id
+    is an Open States id over mohouse:, then the one whose service ends latest, then the one that is not a duplicate
+    stub, then the smaller id. The choice never looks at the latest roster year, so an official''s id does not change
+    when they leave office. Curated rows (official_id_links) take effect only once a maintainer has signed them
+    off (checked_by and checked_on both filled, #174). Grain: one row per id a legislator has been given, with the
+    stable person_id.'
 - name: int_officials__wikidata
   description: 'Wikidata QID per official: from roster cross-references when present, else a unique exact name match
     against living Missouri officeholders on Wikidata. Grain: one row per official with a Wikidata QID.'

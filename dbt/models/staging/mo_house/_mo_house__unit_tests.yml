@@ -393,3 +393,36 @@ unit_tests:
         - {rollcall_url: keep_all, members_listed: 4, members_voting: 4}
         - {rollcall_url: keep_exact_quarter, members_listed: 4, members_voting: 1}
         - {rollcall_url: keep_no_votes_rows, members_listed: null, members_voting: null}
+
+  - name: house_document_texts_drop_control_characters_and_flag_blank_or_failed_documents
+    model: stg_mo_house__document_texts
+    description: >
+      A small-caps heading extracts with NUL characters ("B" NUL "ILL"): the NULs and other control characters are
+      removed while tabs and line feeds stay, and text_length counts the cleaned text. A PDF of scanned images has
+      pages but only whitespace: has_text false. A failed fetch keeps its row with the error, no text and a zero
+      length. The URL is trimmed to join the links, the bill comes from the House XML row of the first link (null
+      when that is a Senate act list file), and the state row adds the HTTP status. Leaving the NULs in, treating
+      whitespace as text, or dropping failed rows fails this test.
+    given:
+      - input: source('mo_house', 'pdf_texts')
+        format: sql
+        rows: |
+            select cast(' https://documents.house.mo.gov/t/1.pdf ' as varchar) as url, cast('bill_text' as varchar) as kind, cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast('1234H.01I' as varchar) as lr_number, cast('I' as varchar) as version_code, cast(1 as bigint) as n_links, cast(2 as bigint) as page_count, cast('B' || chr(0) || 'ILL' || chr(1) || chr(10) || 'AN ACT' || chr(9) || 'to repeal' as varchar) as text, cast(null as varchar) as error union all
+            select 'https://documents.house.mo.gov/s/scan.pdf', 'summary', '251', '251-HB1.XML', null, null, 2, 3, ' ' || chr(10) || ' ' || chr(10), null union all
+            select 'https://documents.house.mo.gov/a/bad.pdf', 'amendment', '251', '251-SENATEACTLIST.XML', null, null, 1, null, null, 'not a PDF'
+      - input: source('mo_house', 'pdf_files')
+        format: sql
+        rows: |
+            select cast('https://documents.house.mo.gov/t/1.pdf' as varchar) as url, cast(200 as bigint) as http_status, cast(5000 as bigint) as size_bytes union all
+            select 'https://documents.house.mo.gov/s/scan.pdf', 200, 800 union all
+            select 'https://documents.house.mo.gov/a/bad.pdf', 200, null
+      - input: source('mo_house', 'xml_bills')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast('HB1' as varchar) as bill
+    expect:
+      format: sql
+      rows: |
+          select cast('https://documents.house.mo.gov/t/1.pdf' as varchar) as document_url, cast('bill_text' as varchar) as document_kind, cast('251' as varchar) as session_code, cast('HB1' as varchar) as bill, cast('1234H.01I' as varchar) as lr_number, cast('I' as varchar) as version_code, cast(1 as bigint) as n_links, cast(2 as bigint) as page_count, cast('BILL' || chr(10) || 'AN ACT' || chr(9) || 'to repeal' as varchar) as document_text, cast(21 as bigint) as text_length, cast(true as boolean) as has_text, cast(null as varchar) as fetch_error, cast(200 as bigint) as http_status, cast(5000 as bigint) as size_bytes union all
+          select 'https://documents.house.mo.gov/s/scan.pdf', 'summary', '251', 'HB1', null, null, 2, 3, ' ' || chr(10) || ' ' || chr(10), 4, false, null, 200, 800 union all
+          select 'https://documents.house.mo.gov/a/bad.pdf', 'amendment', '251', null, null, null, 1, null, null, 0, false, 'not a PDF', 200, null

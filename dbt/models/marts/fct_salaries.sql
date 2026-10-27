@@ -57,9 +57,10 @@ with pay as (
 ),
 
 -- legislature: by seat ----------------------------------------------------------------------------------
--- The first year each member really sat in a chamber (a roster year). Open States gives some seats no start date,
--- which int_mo_legislators__seats turns into 1900-01-01; such a seat starts here instead, so pay from the years
--- before the member took office never pairs with them (#227). Members with no roster year keep the placeholder.
+-- The first year each member really sat in a chamber (a roster year). Open States gives some seats no start date
+-- (start_quality undated in int_mo_legislators__seats, where the date is 1900-01-01); such a seat starts here
+-- instead, so pay from the years before the member took office never pairs with them (#227). Members with no roster
+-- year keep the 1900 start.
 first_roster_years as (
     select
         official_id as person_id,
@@ -85,8 +86,8 @@ seat_years as (
         on
             y.calendar_year between
             case
-                when s.start_date > {{ dbt.safe_cast("'1900-01-01'", 'date') }} then extract(year from s.start_date)
-                else coalesce(f.first_year, extract(year from s.start_date))
+                when s.start_quality = 'undated' then coalesce(f.first_year, extract(year from s.start_date))
+                else extract(year from s.start_date)
             end
             and extract(year from s.end_date)
 ),

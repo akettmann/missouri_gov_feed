@@ -157,15 +157,22 @@ Quirks:
   dropped ("PRICE" is Wiley Price IV in 2019-2022, Tiffany Price from 2025), and a district is added only while two
   members share a surname ("EVANS 99" / "EVANS 154" until Jean Evans left on 2019-02-05, then a bare "EVANS" is
   David Evans). The roster is an end-of-session list, so a member who left mid-session is missing from their last
-  session (Rory Rowland in 2022). `int_mo_house__votes` handles all of these (#539): a whole-surname match beats a
-  last-word one, and the Open States seat dates break a tie between same-surname members only when exactly one
-  seat covers the vote date.
+  session (Rory Rowland in 2022). `int_mo_house__votes` handles all of these (#539, #581). Members of the vote's
+  own session come first, and among them the better name fit wins: the whole surname, then the surname without
+  its suffix (so "PRICE" is Price, not Price IV), then the last word of a compound surname. Only when no member of
+  the session fits does it look at other sessions' lists. There a person whose dated Open States seat missed the
+  vote date is ruled out, even when alone, and one whose seat covered the date outranks one with no dated seat.
+  Last, the seat dates break a tie between the remaining candidates only when one of their seats covers the vote
+  date. The full rules, their tests and the open cases (#565, #629) are in [person_ids.md](person_ids.md).
 - A member's seat is matched to an Open States person (district, date and surname; when several same-surname terms overlap, the one whose name starts with the member's given name); when that fails the key is `mohouse:<member id>`.
-  Open States also holds some people twice (after a redistricting or a move to the Senate). Both are
+  Open States also holds some people twice (after a redistricting or a move to the Senate, or as a short duplicate
+  stub: three 2025-01-08 to 2025-02-03 stubs, Kenneth Jamison, Martin Jacobs and David A. Dolan, each beside the
+  member's full record in the same seat). All are
   reconciled to one stable `official_id` per person by `int_officials__person_ids` (the same MO House member id, which follows a name change such as Mazzie Boyd/Christensen, member 2381, #151; otherwise the same exact name, or names that differ only in the given
   name like Steve/Steven or Ken/Kenneth (#228, #263), no conflicting seats, and
   either overlapping dated terms in one seat or a chamber move (years alone cannot tell a duplicate record, Kenneth
-  Jamison's 2025 stub inside Ken's term, from a successor like Danielle after Dan Smith; dates can, using the dates exactly as Open States gives them: the January-1 adjustment used for year membership would make a January successor overlap a predecessor ending Jan 6-9. Known edge: `int_officials__identity_terms` collapses each (id, year, seat, House member id) to min(start)/max(end), spanning any gap if one id held the seat in two terms in a year); seed `official_id_links` for statewide officers and judges), #97.
+  Jamison's 2025 stub inside Ken's term, from a successor like Danielle after Dan Smith; dates can, using the dates exactly as Open States gives them: the January-1 adjustment used for year membership would make a January successor overlap a predecessor ending Jan 6-9. Known edge: `int_officials__identity_terms` collapses each (id, year, seat, House member id) to min(start)/max(end), spanning any gap if one id held the seat in two terms in a year); a duplicate stub (rule 2d: an id whose only term is under 90 days, inside another name's term in the same seat and starting within 7 days of it, with the same surname and a fitting given name, so Jacobs and Dolan, which rule 2b's given-name prefix misses; Jamison is joined by rule 2b); seed `official_id_links` for statewide officers and judges), #97. The rules in precedence order, with the
+  known bad inputs and a registry of the people each case covers, are in [person_ids.md](person_ids.md).
 - The site asks clients not to poll its XML more than every 30 minutes. Cached copies keep it well
   under that.
 - Every shard reads every session zip to list the roll calls. In the October 2026 full run, two shards
@@ -182,6 +189,14 @@ Quirks:
   (`matched_by = 'measure text'`). In October 2026 5,274 of 6,449 roll calls were linked; most of the rest
   are procedural (approve journal, quorum calls, rules, previous question).
 - Bill sponsors list senators (conferees, handlers) with district 200 + their senate district.
+  The XML lists a member's *latest* district in every session, so a representative who later moved to the Senate
+  has his House-era sponsor, co-sponsor, handler and House-conferee rows listed as 200 + a senate district
+  (Mike Moon on 191-HB161: 229). `fct_bill_sponsors` reads those rows as House rows when the bill is a House bill
+  (or the row is a handler or House conferee) and matches them to the session's House roster on surname and given
+  name, provided that person later held the listed senate seat (#646, 1,559 rows; 1,266 of them now reach an
+  official, 776 as primary sponsor, the other 293 are former members). The district shown is then the roster's.
+  Senate conferees, and sponsors of Senate bills, keep the listed-district reading. The redistricting match
+  (members whose House district number changed) also requires the given name (#647).
 - The bill XML only links roll calls nested under a House bill. It misses House votes on Senate bills
   (third reading, conference reports) and procedural votes ("APPROVE JOURNAL", "QUORUM", "PQ"). Until
   October 2026 the loader found PDFs only through the XML: 3,873 roll calls, 108 of them on Senate
@@ -233,8 +248,8 @@ Quirks:
   with `no governor action recorded` is decided but not counted as law) and the two shares over `bills_decided`
   (null when it is 0). Resolutions (HR, HCR) and Senate sponsors are left out. Appropriation bills are kept
   (the Budget chair sponsors them and almost all pass). Only current officials (`dim_official`) have an
-  `official_id`, so former members are absent: for 2017 only 27 of 1,224 House primary-sponsor rows match, for
-  2026 2,044 of 2,086. A member with House and Senate careers has rows for House sessions only.
+  `official_id`, so former members are absent: for 2017 only 136 of 1,263 House primary-sponsor rows match (October 2026), for
+  2026 1,982 of 2,022. A member with House and Senate careers has rows for House sessions only.
   Survivorship: the earliest sessions (2017-2018) hold only members still in office today, mostly long-serving
   leaders, so their shares are not comparable with recent sessions. The profile page ("Bills sponsored in the
   House") shows the counts with their n, a percent only when `bills_decided >= 5`, and this caveat.
@@ -251,8 +266,9 @@ Quirks:
   therefore leave out Senate bills, almost all of them before 2024; House bills are complete.
   The same list names the special-session Senate bills (`stg_mo_house__senate_act_bills`, with titles, version, last
   action and effective date), which the Senate topical index never covers: `int_bills__list` adds those the index lacks
-  (2025's 253 SB 1, 3 and 4), for `fct_bills` and `fct_vote_bills` alike. Senate bills of older special sessions are still
-  missing (#237).
+  (2025's 253 SB 1, 3 and 4), for `fct_bills` and `fct_vote_bills` alike. Once `mo_senate_bills` has landed a session,
+  the Senate's own bill list is the source of that session's Senate bills instead (see mo_senate_bills below); Senate
+  bills of older special sessions are missing until it has (#237).
   Quirk: 143 bills (15 to 17 per regular session, 2017 to 2026, none in 2021; e.g. 2024 HB 1 and HB 2) list
   only "Message Received from the Governor, pursuant to Article IV, Section 27" as their action. They are
   re-listings, not new bills: the House repeats the previous regular session's appropriation bills (same bill
@@ -288,7 +304,10 @@ fiscal_notes,amendments}`), so run `mo_house` first; no crawl is needed.
 - Text: `mo_house_pdf_texts`, one row per URL: kind, session, bill file name, LR number and version code from the
   first link row naming the URL (`n_links` counts the rest), `page_count`, joined `text`, `pages_json` (per-page
   text as a JSON array) and `error`. Text is pdfplumber's `extract_text()` via `mogov.pdftext` (cached by PDF
-  hash), stored as-is; clean-up belongs in dbt (#593). Statute links (#594) are not parsed here.
+  hash), stored as-is; clean-up is in dbt: `stg_mo_house__document_texts` strips control characters (#593) and
+  `fct_bill_document_texts` is the mart (one row per URL; `fct_bill_documents` carries `page_count`, `text_length`,
+  `has_text`, `fetch_error`). The tables are optional for dbt: a build without the loader gets empty placeholders
+  (`db.OPTIONAL_TYPED_TABLES`). Statute links (#594) are not parsed here.
 - Not fetched: witness forms (`mo_house_xml_bill_witnesses`; they print citizens' contact details, #244) and
   change-map PDFs (`map_link`). `fetch_document` and the `KINDS` table are the reusable seam for adding a kind.
 - Rate: every request waits at the host-wide throttle (`REQUEST_INTERVAL` = 1 s, shared by every shard and by
@@ -316,7 +335,22 @@ Quirks:
 - A summary PDF is linked by every version of a bill that shares it (23,648 link rows, 23,291 distinct URLs), so
   `mo_house_pdf_texts` has one row per URL, not per link.
 - Small-caps and some display glyphs can extract as NUL characters (seen in `house_fd` text); that is stored as-is.
-  None appeared in the 206 extracted slice documents.
+  None appeared in the 206 extracted slice documents or in a 524-document slice of the 2018 and 2022-2025 special
+  sessions; `clean_pdf_text` strips them (and other control characters) in dbt anyway, proven on a fixed row.
+- Word spacing (#639): the House's Word output sets inter-word spaces at exactly 3.0pt (12pt Times), which is
+  pdfplumber's default `x_tolerance`, so the default glued words (`AMENDHouse Committee Substitute for House Bill
+  No.12,Page 3`), mostly in amendments, also on some bill-text lines. The loader extracts with `x_tolerance=2`
+  (`X_TOLERANCE`). On 14 amendments, tokens over 25 characters fell from 0.77% to 0.16% (the rest are underscore
+  rules) and the token count rose 26,666 to 31,170; 5 bill texts, 5 fiscal notes and 4 summaries did not get worse
+  (bill texts gained 20 tokens, the others were identical). That sample understates appropriation bills: dot
+  leaders are spaced glyphs (gaps 1.7-2.7pt) that now split, so 211 HB2 (0002H.03C, 27 pages) went from 7,139 to
+  14,719 tokens and 52,391 to 59,971 chars (+14%), `Fund.....$25,927,525` becoming `Fund.. . . . . $25,927,525`;
+  171 HB1 grew 9% in chars and its 8 long tokens fell to 0; 231 0619H.01I's 5 glued whole lines fell to 0. Fiscal
+  notes, summaries and 4 of 7 amendments were byte-identical and no mid-word splits were found. For future amount
+  parsing: leaders extract as `. . . .` and an amount can stay glued to the last dot (`.7,771,056`). Re-extraction
+  of the ~68.7k PDFs costs up to ~10 CPU-hours (about 1.3 h wall with 8 shards). `x_tolerance` is part of the `pdftext` cache key,
+  so changing it makes the next `mo_house_pdf` run re-extract every document from the PDF already on disk (no
+  re-download for closed sessions) and rewrite `mo_house_pdf_texts`; old `pdftext` cache entries remain as orphans.
 
 ## mo_senate: Missouri Senate journals
 
@@ -444,6 +478,13 @@ Quirks:
   and links to the journal PDF page (`.../25info/pdf-jrnl/DAY68.pdf#page=32`).
 - A bill whose fragment has no action table logs `mo_senate_bills.no_actions` and lands no action rows.
 - Resolutions have no handler: those keys are absent from the bill's JSON.
+- Revision bills are `SRB` (2018 `SRB975` and `SRB1024`, the "SB 975 & 1024 Revision" act), which the Revisor cites as
+  `S.B.`; the list carries them under no topical-index keyword (#627 for the Revisor link).
+- The Senate site returns an empty list for 2017 `E1` (the House has 173 and 174), so the 2017 special-session
+  Senate bills are not landed and stay missing from `int_bills__list`; the seed has no 2017 `E` row.
+- The Senate's `E1` is not always the House's first special session: 2018's only Senate extraordinary session (the
+  September STEM one, 5 bills) is House `184`; the House's `183` (May impeachment) has no Senate session.
+
 - A bill with no fiscal notes or amendments is answered with `No Fiscal Notes available for this bill.` /
   `No amendments available for this bill.` (HTTP 200, zero rows). Most bills have no fiscal note; bills that
   died in committee have only the introduced text. A bill with no summaries is answered `No summaries
@@ -466,6 +507,22 @@ Quirks:
   `data-modal-url` omits it); in a probe (2026-10-26) the fragment was the same without it. `CommitteeMinutes` answers HTTP 500 and is not requested (see #280).
 - Amendment links go to `BillInformation?handler=AmendmentPdf&year=YYYY&amendmentId=N`; text and fiscal-note
   links go to static PDFs (`/25info/pdf-bill/tat/SB1.pdf`, `/FiscalNotes/2025-1/0453S.04T.ORG.pdf`).
+In dbt (#586): `stg_mo_senate__bills` (one row per bill, parsed from the JSON) and `stg_mo_senate__bill_actions` (one
+row per action, date parsed) read the two raw tables; `mogov build` creates empty placeholders until the loader has
+run (`db.OPTIONAL_JSON_TABLES`), so a build without it still works. `stg_mo_senate__bills` also carries `bill_type`
+(the prefix: SB, SJR, SCR, SR, SRM, SRB) and `legislator_id` (the list's `legislatorId`, the sponsor's id on the
+Senate site); `stg_mo_senate__bill_actions` adds `action_seq` (1 = the oldest action; the site serves newest first)
+and `chamber` (`G` when the action names the Governor, `H` or `S` when the wording has the standalone token, null
+otherwise). The session year is read from the payload's `list_year` when the loader wrote one, else from the served
+`year` key (#613 may rename the key the loader adds). The seed `mo_senate_session_codes` maps
+(year, `R`/`E1`/`E2`) to the House's session code, with its evidence per row: `R` is the two-digit year + 1 (251),
+but the House has no 252, and 2025's June special session (`E1`) is 253, its September one (`E2`) 254. A session
+with no seed row fails `assert_senate_sessions_have_house_codes` and its bills stay out of `int_bills__list` until
+a row is added. `int_bills__list` takes Senate bills from this list for every session it has landed; for other
+sessions it keeps the topical index and the House `SenateActList`. To add a special session: find the House code
+whose bills share the Senate's titles and whose dates overlap, append `year,E<n>,<code>,"<evidence>"` to
+`dbt/seeds/mo_senate_session_codes.csv` (titles and dates in the evidence, as the 2019 to 2022 rows have), and
+`dbt seed`; the failing test's header repeats this. Status from the Senate's actions is #588.
 
 ## mo_senate_topics: Missouri Senate topical index
 
@@ -786,8 +843,14 @@ rule against `/bulkdata`, US government work (the page states no licence). Congr
   download). The House `hr` zip is by far the largest, so more shards than zips (8 per Congress) gain nothing.
 - Everything is landed (all states): cosponsor lists need the whole file anyway, and the Missouri filter
   (sponsor `state` = MO) is applied in dbt, in `fct_federal_sponsorship` (one row per Missouri member, bill and
-  role, with `became_law` and the Public Law number).
-- Cache: the newest Congress's zips daily (bills move all the time), older Congresses monthly. A 404 for a zip
+  role, with `became_law`, `law_type` and `law_number`).
+- Laws: `law_type` is Public Law or Private Law; the two are numbered separately (118-5 can be either). A private
+  law relieves a named person or entity; the 118th Congress's hr/s/sjres/hconres bills have 269 public and no
+  private laws. `became_law` is true for either type, so read `law_type` before calling a law broad policy. A
+  bill with two laws shows the earliest by number (compared as integers).
+- Cache: the zips of the Congress in session today (derived from the date, not from the configured list) are
+  re-read daily (bills move all the time), others monthly. The cache is `<MOGOV_DATA_DIR>/cache`, which on Cloud Run
+  Jobs is the mounted bucket (see environment.md), so the schedule holds across runs. A 404 for a zip
   (a bill type with no zip for a Congress) is logged and skipped.
 
 Quirks:
@@ -829,6 +892,11 @@ Quirks:
   and signature) follow Schedule J but belong to no schedule, and "Schedule A ... Investment Vehicle Details"
   blocks follow it too, so the parser stops emitting lines at the exclusions page and opens schedule A at those
   detail headers; otherwise that boilerplate and the vehicle names surfaced as J compensation sources.
+  Column headers wrap onto lines of their own ("Type(s) Current Year to Filing / Preceding Year", the schedule B, D,
+  H and I headers, the asset-type-code footnote, the PTR "IPO / IVD" labels); they are dropped by exact line match.
+  An entry wrapped over several lines is joined into one row on the tie schedules (C: a line with no amount; F: a
+  line not starting with the agreement date; C, E, F, J: an unbalanced parenthesis), so a tail like "Government"
+  or "KY, US)" is not a tie of its own (#599). Wrapped entries on the other schedules stay split lines.
 - Index type `H` is the New Filer Report (PDF header `Filing Type: New Filer Report`), filed by new members; a
   separate report from that year's Annual Report (O). The loader reads it like O/A/P/C/T. Other index types
   (D, X, G, E, B, W) are not downloaded.
@@ -1018,6 +1086,9 @@ Flow: [diagrams/sources/openstates_people.svg](diagrams/sources/openstates_peopl
 
 Quirks:
 - The flat CSV carries Wikidata QIDs that the YAML often lacks.
+- Seat-term dates are often missing or wrong: undated starts, placeholder January-1 starts, ends that are
+  really mid-term departures, and duplicate records for one person. How the pipeline joins Open States records
+  to one person despite this is in [person_ids.md](person_ids.md).
 
 ## congress_legislators: unitedstates/congress-legislators
 

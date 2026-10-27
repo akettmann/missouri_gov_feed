@@ -1,0 +1,19 @@
+session_year,session_type,house_session_code,evidence
+2017,R,171,regular session: House code is the two-digit year + 1; 171 is in the House XML export
+2018,R,181,regular session: House code is the two-digit year + 1; 181 is in the House XML export
+2019,R,191,regular session: House code is the two-digit year + 1; 191 is in the House XML export
+2020,R,201,regular session: House code is the two-digit year + 1; 201 is in the House XML export
+2021,R,211,regular session: House code is the two-digit year + 1; 211 is in the House XML export
+2022,R,221,regular session: House code is the two-digit year + 1; 221 is in the House XML export
+2023,R,231,regular session: House code is the two-digit year + 1; 231 is in the House XML export
+2024,R,241,regular session: House code is the two-digit year + 1; 241's SenateActList titles equal the Senate list's descriptions
+2025,R,251,regular session: House code is the two-digit year + 1; 251's SenateActList titles equal the Senate list's descriptions
+2025,E1,253,"June 2025 special session: House 253's SenateActList SB1/SB3/SB4 carry the same titles as the Senate E1 list (SB1 appropriates to the Missouri Housing Development Commission); 252 does not exist in the House export"
+2025,E2,254,"September 2025 special session (redistricting): Senate E2 has SR2 and SRM1 (remonstrance against the Governor for calling a session); House 254 is the redistricting session (HB1 composition of congressional districts)"
+2026,R,261,regular session: House code is the two-digit year + 1; 261's SenateActList titles equal the Senate list's descriptions
+2018,E1,184,"September 2018 special session (Parson; STEM): Senate E1 SB1 'computer science education' matches House 184 HB3 (STEM career awareness / computer science); House 183 is the May 2018 impeachment session, which the Senate list has no session for"
+2019,E1,193,"September 2019 special session (Parson; sales tax): Senate E1 SB1 (sales-tax allowance credit) matches House 193 HB1 'SALES AND USE TAX ALLOWANCES'; Senate actions 9/9-9/11/2019, House 9/9-9/25/2019"
+2020,E1,203,"July-September 2020 special session (violent crime / public safety): Senate E1 and House 203 both sit 7/27/2020 and take up the same public-safety bills; Senate 7/27-9/1/2020, House 7/27-9/21/2020"
+2020,E2,204,"November-December 2020 special session (COVID): Senate E2 SB1 (civil actions during COVID) matches House 204 HB3 'CIVIL ACTIONS'; Senate 11/13-12/2/2020, House 11/5-12/16/2020"
+2021,E1,213,"June 2021 special session (Federal Reimbursement Allowance sunset / health care): Senate E1 and House 213 take up the FRA bill; Senate 6/23-6/30/2021, House 6/28-6/30/2021"
+2022,E1,223,"September 2022 special session (income tax / agricultural tax relief): Senate E1 and House 223 take up the same bills; Senate 9/14-10/5/2022, House 9/14-10/5/2022"

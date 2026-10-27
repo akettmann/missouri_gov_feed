@@ -29,6 +29,14 @@ How the parquet exports become the static site. Source: [frontend_data_flow.puml
 
 ![Frontend data flow](frontend_data_flow.svg)
 
+### Person ids
+
+Which models feed which when the pipeline joins a legislator's ids into one person, and what each stage may
+not read without a dbt cycle. The rules are in [person_ids.md](../person_ids.md). Source:
+[person_ids.puml](person_ids.puml)
+
+![Person ids](person_ids.svg)
+
 ### Missouri bill flow
 
 How a bill becomes law in the Missouri General Assembly, which the `mo_house` and `mo_senate` records follow.

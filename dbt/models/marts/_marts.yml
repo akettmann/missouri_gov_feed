@@ -499,7 +499,8 @@ models:
     description: >
       Federal bills sponsored or cosponsored by Missouri's members of Congress, from the GovInfo BILLSTATUS bulk
       XML (loaded congresses, MOGOV_BILLSTATUS_CONGRESSES), with the outcome as a fact: became_law is true when
-      the bill carries a Public Law number. Withdrawn cosponsorships are dropped. Whether that counts as a
+      the bill carries a law number, public or private (law_type says which; a private law relieves one named person
+      or entity and is rare, none among the 118th Congress's bills). Withdrawn cosponsorships are dropped. Whether that counts as a
       "successful" bill is a policy call this model does not make. Grain: (bioguide_id, bill_id, role).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
@@ -557,12 +558,20 @@ models:
       - name: latest_action_text
         data_type: varchar
         description: Text of the most recent action, as published.
-      - name: public_law_number
+      - name: law_type
         data_type: varchar
-        description: Public Law number, e.g. 119-21, when the bill became law.
+        description: Public Law or Private Law, when the bill became law; null otherwise.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [Public Law, Private Law]
+      - name: law_number
+        data_type: varchar
+        description: Law number, e.g. 119-21, when the bill became law. Public and private laws are numbered
+          separately, so read it with law_type. When a bill carries two laws, the earliest by number.
       - name: became_law
         data_type: boolean
-        description: True when the bill carries a Public Law number.
+        description: True when the bill carries a law number, public or private.
         data_tests: [not_null]
       - name: source_url
         data_type: varchar
@@ -1442,10 +1451,12 @@ models:
   - name: fct_bills
     description: >
       Missouri bills and resolutions per session. House bills from the House XML export (titles, current version,
-      last action); Senate bills from the Senate topical index (its one-line description as short_title; the other
-      House-only columns are null), plus the Senate bills the House XML's SenateActList lists as reaching the House
-      that the index does not (the special-session Senate bills, 2024 on, with the titles, version, last action and
-      effective date the XML gives; older special sessions' Senate bills are missing, #237). `subjects` holds the
+      last action); Senate bills from the Senate's own bill list on senate.mo.gov (regular and special sessions, every
+      bill including those under no topical-index keyword; its one-line description as short_title; the other
+      House-only columns are null). A session whose Senate list is not loaded (the mo_senate_bills loader covers a
+      window) falls back to the Senate topical index, plus the Senate bills the House XML's SenateActList lists
+      as reaching the House that neither has (2024 on, with the titles, version, last action and effective date the
+      XML gives). `subjects` holds the
       subject index terms, "; "-separated (fct_bill_subjects).
       Each regular session also has 15 to 17 relistings of the previous session's appropriation bills (status
       "relisted for governor message"): not new bills, so leave them out of per-session bill counts.
@@ -1726,6 +1737,72 @@ models:
       - name: label
         data_type: varchar
         description: The House's name for the document (summary or text version name, amendment description, witness-form description); null for fiscal notes.
+      - name: page_count
+        data_type: bigint
+        description: Pages in the fetched PDF; null when the mo_house_pdf loader has not fetched the link (not run yet, witness forms, change maps) or the fetch failed.
+      - name: text_length
+        data_type: bigint
+        description: Characters of extracted text (see fct_bill_document_texts); null when not fetched, 0 when fetched with no text.
+      - name: has_text
+        data_type: boolean
+        description: True when the PDF has a text layer; null when not fetched.
+      - name: fetch_error
+        data_type: varchar
+        description: Why the loader could not get the text ("not a PDF", HTTP error); null when fetched or not tried.
+
+  - name: fct_bill_document_texts
+    description: >
+      The text of the House's bill documents, one row per document URL: bill text versions, summaries, fiscal notes
+      and amendments the mo_house_pdf loader fetched (empty until it has run). A sibling of fct_bill_documents rather
+      than columns on it, because the text is wide (a few GB for 2017-2026) and the link mart is small and is read
+      for every bill page; join on document_url for the bill, label and index. A summary shared by several
+      versions is one row here and one row per bill in fct_bill_documents. Control characters (NUL from small-caps
+      glyphs) are removed. A scanned page adds to page_count but has no text. Grain: one row per document_url.
+    columns:
+      - name: document_url
+        data_type: varchar
+        description: Link to the PDF; joins to fct_bill_documents.document_url.
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_bill_documents')
+                field: document_url
+      - name: document_kind
+        data_type: varchar
+        description: bill_text, summary, fiscal_note or amendment.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['bill_text', 'summary', 'fiscal_note', 'amendment']
+      - name: session_code
+        data_type: varchar
+        description: House session code of the first link that names the URL.
+      - name: lr_number
+        data_type: varchar
+        description: Legislative Research number (null for fiscal notes).
+      - name: version_code
+        data_type: varchar
+        description: Bill text version code (I introduced, H committee substitute, P perfected, T truly agreed, ...); null for fiscal notes and amendments.
+      - name: n_links
+        data_type: bigint
+        description: How many links in the House XML name this URL.
+      - name: page_count
+        data_type: bigint
+        description: Pages in the PDF; null when the fetch failed. Between 1 and 1,500.
+      - name: text_length
+        data_type: bigint
+        description: Characters in document_text; 0 when there is none.
+      - name: has_text
+        data_type: boolean
+        description: True when document_text has a non-blank character.
+      - name: fetch_error
+        data_type: varchar
+        description: Why there is no text (HTTP error, "not a PDF"); null when fetched.
+      - name: document_text
+        data_type: varchar
+        description: The PDF's text as extracted, control characters removed; null when the fetch failed.
 
   - name: fct_bill_hearings
     description: >
@@ -1819,7 +1896,7 @@ models:
   - name: fct_bill_sponsors
     description: >
       Sponsors, co-sponsors, handlers and House/Senate conferees of each House bill, as the House lists them,
-      matched to officials where the district and surname agree. Re-listed appropriation bills (fct_bills status
+      matched to officials where the district and surname agree. The House lists a member's latest district for every session, so for a member whose district number changed (2022 redistricting) the match goes through the session's roster by surname and the listed district being one the member held; two candidates leave the row unmatched. Re-listed appropriation bills (fct_bills status
       "relisted for governor message") are excluded: they repeat the original's sponsors only to record the
       governor's message. Grain: one row per (session, bill, sponsor type, sponsor name).
     data_tests:
@@ -1861,7 +1938,7 @@ models:
       bills are not counted twice (fct_bill_sponsors drops them). Appropriation bills are kept: they are real
       sponsorships, and the Budget chair sponsors them and almost all pass, so the chair's shares are high for
       that reason (a member who has left office, such as a former Budget chair, has no row). Only current officials (dim_official) have an official_id, so former members are not here
-      (2026: 2,044 of 2,086 House sponsor rows match; 2017: 27 of 1,224). Survivorship: the earliest sessions (2017-2018) hold only
+      (2026: 2,044 of 2,086 House sponsor rows match; 2017: 32 of 1,205). Survivorship: the earliest sessions (2017-2018) hold only
       members still in office today, mostly long-serving leaders, so their shares are not comparable with recent sessions. A bill is "decided" unless its outcome
       is pending (session still open) or awaiting governor (truly agreed this year); decided bills are the
       denominator of both shares, and the passed and became-law counts only include decided bills, so a share

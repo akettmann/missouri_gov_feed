@@ -271,9 +271,24 @@ seeds:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [alias_id, person_id, relation]
+      # a maintainer signs a row off by filling checked_by and checked_on together (#174); a half-signed row is
+      # ignored by int_officials__person_ids, so flag it
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: >-
+              (case when checked_by is null then 0 else 1 end) = (case when checked_on is null then 0 else 1 end)
     columns:
       - name: alias_id
-        data_tests: [not_null]
+        data_tests:
+          - not_null
+          # typo guard (#688): a signed same_person row whose alias_id int_officials__person_ids never saw is
+          # dropped silently by the model and by assert_signed_same_person_links_end_in_one_person, so fail on it
+          - relationships:
+              arguments:
+                to: ref('int_officials__person_ids')
+                field: alias_id
+              config:
+                where: "relation = 'same_person' and checked_by is not null and checked_on is not null"
       - name: person_id
         data_tests:
           - not_null
@@ -345,3 +360,34 @@ seeds:
               arguments:
                 to: ref('statewide_officials')
                 field: office
+  - name: mo_senate_session_codes
+    description: >
+      The House's session code for each Senate bill-list session (#586): senate.mo.gov names a session by year and
+      type (R = regular; E1, E2 = the first and second extraordinary sessions), the House by a three-digit code. The
+      regular session is the two-digit year + 1 (251), but the extraordinary sessions are not year + 2: the House
+      has no 252, 2025's June special session is 253 and its September one 254. A row is added only with evidence
+      (the evidence column), such as the same bills and titles in the House XML for that code; a Senate session
+      with no row has a null session_code in the staging models and fails assert_senate_sessions_have_house_codes
+      (its header says how to add the row). 2017 E1 has no row: the Senate site returns an empty list for it (the House
+      has 173 and 174), so those special-session Senate bills are not landed.
+    config:
+      column_types: {session_year: integer, session_type: varchar, house_session_code: varchar, evidence: varchar}
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [session_year, session_type]
+    columns:
+      - name: session_year
+        data_tests: [not_null]
+      - name: session_type
+        data_tests: [not_null]
+      - name: house_session_code
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              arguments:
+                to: ref('stg_mo_house__bills')
+                field: session_code
+      - name: evidence
+        data_tests: [not_null]

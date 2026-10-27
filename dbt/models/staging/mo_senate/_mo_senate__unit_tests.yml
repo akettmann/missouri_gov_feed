@@ -44,3 +44,102 @@ unit_tests:
         - {vote_id: "j1#vote1", senator_token: Eigel, vacancies: 2}
         - {vote_id: "j1#vote2", senator_token: Brown, vacancies: 0}
         - {vote_id: "j1#vote3", senator_token: Brown, vacancies: null}
+
+  - name: senate_bill_list_parses_json_and_maps_the_session
+    model: stg_mo_senate__bills
+    description: >
+      One row per bill from the list's JSON as printed (#586). The bill number is prefix + suffix and billId is only
+      the site's key (2025 SB 1 is id 233, not 1); the sponsor and handler names are "Last, First" like the House's
+      sponsor_name; a resolution has no handler keys, so its handler is null. session_code comes
+      from the seed by (year, session type), never by arithmetic: 2025 E1 is the House's 253 (not 252) and E2 is 254; a
+      session with no seed row gets a null code. Mapping on year alone, or building the number from billId fails
+      this test. legislator_id is the list's `legislatorId` (null when absent). The session year comes from `list_year`
+      when the loader wrote one, else from the served `year` (the E1 row serves a stale 2024 beside list_year 2025).
+    given:
+      - input: source('mo_senate', 'bill_list')
+        format: sql
+        rows: |
+            select cast('{"billId": 233, "billPrefix": "SB", "billSuffix": 1, "sponsorLastName": "Crawford", "sponsorFirstName": "Sandy", "legislatorId": 947, "districtNumber": 28, "briefDescription": "Modifies provisions relating to county officials", "handlerLastName": "Reedy", "handlerFirstName": "Rodger", "handlerDistrict": 57, "mainBillUrl": "http://s/233", "year": 2025, "session_type": "R"}' as varchar) as payload union all
+            select cast('{"billId": 18267452, "billPrefix": "SB", "billSuffix": 1, "sponsorLastName": "Hough", "sponsorFirstName": "Lincoln", "legislatorId": 1234, "districtNumber": 30, "briefDescription": "To appropriate money", "mainBillUrl": "http://s/18267452", "year": 2024, "list_year": 2025, "session_type": "E1"}' as varchar) as payload union all
+            select cast('{"billId": 18282066, "billPrefix": "SR", "billSuffix": 2, "sponsorLastName": "Rizzo", "sponsorFirstName": "Lauren", "districtNumber": 11, "briefDescription": "Establishes rules", "mainBillUrl": "http://s/18282066", "year": 2025, "session_type": "E2"}' as varchar) as payload union all
+            select cast('{"billId": 5, "billPrefix": "SB", "billSuffix": 9, "sponsorLastName": "Doe", "sponsorFirstName": "J", "districtNumber": 1, "briefDescription": "Unseeded", "mainBillUrl": "http://s/5", "year": 2025, "session_type": "E9"}' as varchar) as payload
+      - input: ref('mo_senate_session_codes')
+        format: sql
+        rows: |
+            select 2025 as session_year, 'R' as session_type, '251' as house_session_code union all
+            select 2025, 'E1', '253' union all
+            select 2025, 'E2', '254'
+    expect:
+      rows:
+        - {session_year: 2025, session_type: R, session_code: '251', bill_id: 233, bill: SB1, bill_type: SB, bill_number: 1, short_title: Modifies provisions relating to county officials, sponsor_name: 'Crawford, Sandy', legislator_id: 947, sponsor_district: 28, handler_name: 'Reedy, Rodger', handler_district: 57, bill_url: 'http://s/233'}
+        - {session_year: 2025, session_type: E1, session_code: '253', bill_id: 18267452, bill: SB1, bill_type: SB, bill_number: 1, short_title: To appropriate money, sponsor_name: 'Hough, Lincoln', legislator_id: 1234, sponsor_district: 30, handler_name: null, handler_district: null, bill_url: 'http://s/18267452'}
+        - {session_year: 2025, session_type: E2, session_code: '254', bill_id: 18282066, bill: SR2, bill_type: SR, bill_number: 2, short_title: Establishes rules, sponsor_name: 'Rizzo, Lauren', legislator_id: null, sponsor_district: 11, handler_name: null, handler_district: null, bill_url: 'http://s/18282066'}
+        - {session_year: 2025, session_type: E9, session_code: null, bill_id: 5, bill: SB9, bill_type: SB, bill_number: 9, short_title: Unseeded, sponsor_name: 'Doe, J', legislator_id: null, sponsor_district: 1, handler_name: null, handler_district: null, bill_url: 'http://s/5'}
+
+  - name: senate_bill_actions_parse_dates_and_map_the_session
+    model: stg_mo_senate__bill_actions
+    description: >
+      One row per action, keeping the Senate's wording and the order served (index 0 is the newest). The printed
+      MM/DD/YYYY date becomes a date (04/03/2025 is April 3, not March 4), an unparseable date is null while the text
+      is kept, a missing journal link stays null, and the session code comes from the seed by (year, session type)
+      (2025 E1 -> 253) (#586). Parsing the date day-first, or mapping the session by year alone, fails this test.
+    given:
+      - input: source('mo_senate', 'bill_actions')
+        format: sql
+        rows: |
+            select cast('{"year": 2025, "session_type": "E1", "bill_id": 18267452, "bill": "SB1", "action_index": 0, "action_date": "06/14/2025", "action": "Approved by Governor", "journal_ref": "S1216 / H2291", "journal_url": "http://j/DAY68.pdf#page=32"}' as varchar) as payload union all
+            select cast('{"year": 2025, "session_type": "E1", "bill_id": 18267452, "bill": "SB1", "action_index": 1, "action_date": "04/03/2025", "action": "S First Read", "journal_ref": "", "journal_url": null}' as varchar) as payload union all
+            select cast('{"year": 2025, "session_type": "R", "bill_id": 233, "bill": "SB1", "action_index": 0, "action_date": "soon", "action": "Odd", "journal_ref": "", "journal_url": null}' as varchar) as payload
+      - input: ref('mo_senate_session_codes')
+        format: sql
+        rows: |
+            select 2025 as session_year, 'R' as session_type, '251' as house_session_code union all
+            select 2025, 'E1', '253'
+    expect:
+      rows:
+        - {session_year: 2025, session_type: E1, session_code: '253', bill_id: 18267452, bill: SB1, action_index: 0, action_date: 2025-06-14, action_date_text: 06/14/2025, action: Approved by Governor, journal_ref: S1216 / H2291, journal_url: 'http://j/DAY68.pdf#page=32'}
+        - {session_year: 2025, session_type: E1, session_code: '253', bill_id: 18267452, bill: SB1, action_index: 1, action_date: 2025-04-03, action_date_text: 04/03/2025, action: S First Read, journal_ref: '', journal_url: null}
+        - {session_year: 2025, session_type: R, session_code: '251', bill_id: 233, bill: SB1, action_index: 0, action_date: null, action_date_text: soon, action: Odd, journal_ref: '', journal_url: null}
+
+  - name: senate_bill_actions_are_numbered_chronologically_and_tagged_by_chamber
+    model: stg_mo_senate__bill_actions
+    description: >
+      The site serves a bill's history newest first (action_index 0 = latest), so action_seq counts from the oldest:
+      the last served row is 1, numbered per bill (a second bill starts again at 1) (#586). chamber is G when the
+      action names the Governor, H or S when exactly one of the standalone tokens H / S appears ("H Third Read and
+      Passed", "Referred H Fiscal Review Committee", "SS S offered", "Second Read and Referred S ..."), null for
+      wording that names neither ("Perfected", "Signed by House Speaker", "Reported to the House"). Numbering in
+      served order, over the whole table instead of per bill, or matching "S" inside words (Senate, SS, Speaker)
+      fails this test.
+    given:
+      - input: source('mo_senate', 'bill_actions')
+        format: sql
+        rows: |
+            select cast('{"year": 2025, "session_type": "R", "bill_id": 233, "bill": "SB1", "action_index": 0, "action_date": "06/14/2025", "action": "Signed by Governor"}' as varchar) as payload union all
+            select cast('{"year": 2025, "session_type": "R", "bill_id": 233, "bill": "SB1", "action_index": 1, "action_date": "06/14/2025", "action": "H Third Read and Passed - EC adopted"}' as varchar) as payload union all
+            select cast('{"year": 2025, "session_type": "R", "bill_id": 233, "bill": "SB1", "action_index": 2, "action_date": "06/14/2025", "action": "Referred H Fiscal Review Committee"}' as varchar) as payload union all
+            select cast('{"year": 2025, "session_type": "R", "bill_id": 233, "bill": "SB1", "action_index": 3, "action_date": "06/14/2025", "action": "S Third Read and Passed"}' as varchar) as payload union all
+            select cast('{"year": 2025, "session_type": "R", "bill_id": 233, "bill": "SB1", "action_index": 4, "action_date": "06/14/2025", "action": "SS S offered & adopted (Hough)--(3298S.03F)"}' as varchar) as payload union all
+            select cast('{"year": 2025, "session_type": "R", "bill_id": 233, "bill": "SB1", "action_index": 5, "action_date": "06/14/2025", "action": "Second Read and Referred S Appropriations Committee"}' as varchar) as payload union all
+            select cast('{"year": 2025, "session_type": "R", "bill_id": 233, "bill": "SB1", "action_index": 6, "action_date": "06/14/2025", "action": "Signed by House Speaker"}' as varchar) as payload union all
+            select cast('{"year": 2025, "session_type": "R", "bill_id": 233, "bill": "SB1", "action_index": 7, "action_date": "06/14/2025", "action": "Perfected"}' as varchar) as payload union all
+            select cast('{"year": 2025, "session_type": "R", "bill_id": 233, "bill": "SB1", "action_index": 8, "action_date": "06/14/2025", "action": "S First Read"}' as varchar) as payload union all
+            select cast('{"year": 2025, "session_type": "R", "bill_id": 234, "bill": "SB2", "action_index": 0, "action_date": "03/01/2025", "action": "Reported to the House"}' as varchar) as payload union all
+            select cast('{"year": 2025, "session_type": "R", "bill_id": 234, "bill": "SB2", "action_index": 1, "action_date": "02/01/2025", "action": "S First Read"}' as varchar) as payload
+      - input: ref('mo_senate_session_codes')
+        format: sql
+        rows: |
+            select 2025 as session_year, 'R' as session_type, '251' as house_session_code
+    expect:
+      rows:
+        - {bill_id: 233, action_index: 0, action_seq: 9, chamber: G}
+        - {bill_id: 233, action_index: 1, action_seq: 8, chamber: H}
+        - {bill_id: 233, action_index: 2, action_seq: 7, chamber: H}
+        - {bill_id: 233, action_index: 3, action_seq: 6, chamber: S}
+        - {bill_id: 233, action_index: 4, action_seq: 5, chamber: S}
+        - {bill_id: 233, action_index: 5, action_seq: 4, chamber: S}
+        - {bill_id: 233, action_index: 6, action_seq: 3, chamber: null}
+        - {bill_id: 233, action_index: 7, action_seq: 2, chamber: null}
+        - {bill_id: 233, action_index: 8, action_seq: 1, chamber: S}
+        - {bill_id: 234, action_index: 0, action_seq: 2, chamber: null}
+        - {bill_id: 234, action_index: 1, action_seq: 1, chamber: S}

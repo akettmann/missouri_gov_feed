@@ -117,7 +117,7 @@ unit_tests:
           - {alias_id: ocd-person/lee-b, year: 2024, office: state_house, district: '77', name_key: sam lee}
       - input: ref('official_id_links')
         rows:
-          - {alias_id: ocd-person/lee-a, person_id: ocd-person/lee-b, relation: different_people, checked_by: maintainer}
+          - {alias_id: ocd-person/lee-a, person_id: ocd-person/lee-b, relation: different_people, checked_by: maintainer, checked_on: '2026-01-01'}
     expect:
       rows:
         - {alias_id: ocd-person/lee-a, person_id: ocd-person/lee-a, basis: self}
@@ -137,7 +137,7 @@ unit_tests:
           - {alias_id: ocd-person/someone-else, year: 2026, office: state_house, district: '1', name_key: some one}
       - input: ref('official_id_links')
         rows:
-          - {alias_id: ocd-person/mcgaugh, person_id: 'mojudge:joe don mcgaugh', relation: same_person, checked_by: maintainer}
+          - {alias_id: ocd-person/mcgaugh, person_id: 'mojudge:joe don mcgaugh', relation: same_person, checked_by: maintainer, checked_on: '2026-01-01'}
     expect:
       rows:
         - {alias_id: ocd-person/mcgaugh, person_id: 'mojudge:joe don mcgaugh', basis: curated}
@@ -445,7 +445,7 @@ unit_tests:
           - {alias_id: ocd-person/steve, year: 2020, office: state_senate, district: '5', name_key: steve roberts}
       - input: ref('official_id_links')
         rows:
-          - {alias_id: ocd-person/steven, person_id: ocd-person/steve, relation: different_people, checked_by: maintainer}
+          - {alias_id: ocd-person/steven, person_id: ocd-person/steve, relation: different_people, checked_by: maintainer, checked_on: '2026-01-01'}
     expect:
       rows:
         - {alias_id: ocd-person/steven, person_id: ocd-person/steven, basis: self}
@@ -511,8 +511,8 @@ unit_tests:
         rows: []
       - input: ref('int_mo_legislators__seat_terms')
         rows:
-          - {openstates_id: ocd-person/dan, chamber: lower, district_number: 10, full_name: Dan Smith, start_date: '2017-01-01', end_date: '2019-01-09', source_start_date: '2017-01-04', source_end_date: '2019-01-09'}
-          - {openstates_id: ocd-person/danielle, chamber: lower, district_number: 10, full_name: Danielle Smith, start_date: '2019-01-01', end_date: '2021-01-06', source_start_date: '2019-01-09', source_end_date: '2021-01-06'}
+          - {openstates_id: ocd-person/dan, chamber: lower, district_number: 10, full_name: Dan Smith, start_date: '2017-01-01', start_quality: dated, end_date: '2019-01-09', source_start_date: '2017-01-04', source_end_date: '2019-01-09'}
+          - {openstates_id: ocd-person/danielle, chamber: lower, district_number: 10, full_name: Danielle Smith, start_date: '2019-01-01', start_quality: dated, end_date: '2021-01-06', source_start_date: '2019-01-09', source_end_date: '2021-01-06'}
     expect:
       rows:
         - {alias_id: 'mohouse:9', year: 2018, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
@@ -557,8 +557,8 @@ unit_tests:
         rows: []
       - input: ref('int_mo_legislators__seat_terms')
         rows:
-          - {openstates_id: ocd-person/gap, chamber: lower, district_number: 10, full_name: Gap Person, start_date: '2019-01-01', end_date: '2019-03-01', source_start_date: '2019-01-09', source_end_date: '2019-03-01'}
-          - {openstates_id: ocd-person/gap, chamber: lower, district_number: 10, full_name: Gap Person, start_date: '2019-09-01', end_date: '2019-12-31', source_start_date: '2019-09-01', source_end_date: '2019-12-31'}
+          - {openstates_id: ocd-person/gap, chamber: lower, district_number: 10, full_name: Gap Person, start_date: '2019-01-01', start_quality: dated, end_date: '2019-03-01', source_start_date: '2019-01-09', source_end_date: '2019-03-01'}
+          - {openstates_id: ocd-person/gap, chamber: lower, district_number: 10, full_name: Gap Person, start_date: '2019-09-01', start_quality: dated, end_date: '2019-12-31', source_start_date: '2019-09-01', source_end_date: '2019-12-31'}
     expect:
       rows:
         - {alias_id: 'mohouse:9', year: 2019, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
@@ -654,7 +654,7 @@ unit_tests:
           - {alias_id: ocd-person/new, year: 2021, office: state_house, district: '4', name_key: kim new, house_member_id: '5'}
       - input: ref('official_id_links')
         rows:
-          - {alias_id: 'mohouse:5', person_id: ocd-person/new, relation: different_people, checked_by: maintainer}
+          - {alias_id: 'mohouse:5', person_id: ocd-person/new, relation: different_people, checked_by: maintainer, checked_on: '2026-01-01'}
     expect:
       rows:
         - {alias_id: 'mohouse:5', person_id: 'mohouse:5', basis: self}
@@ -785,9 +785,9 @@ unit_tests:
         rows: []
       - input: ref('int_mo_legislators__seat_terms')
         rows:
-          - {openstates_id: ocd-person/webber-house, chamber: lower, district_number: 46, full_name: Stephen Webber, start_date: '2013-01-01', end_date: '2016-12-31', source_start_date: '2013-01-01', source_end_date: '2016-12-31'}
-          - {openstates_id: ocd-person/old-house, chamber: lower, district_number: 12, full_name: Olive Old, start_date: '2011-01-01', end_date: '2014-12-31', source_start_date: '2011-01-01', source_end_date: '2014-12-31'}
-          - {openstates_id: ocd-person/dempsey, chamber: upper, district_number: 23, full_name: Tom Dempsey, start_date: '2007-09-18', end_date: '2015-08-07', source_start_date: '2007-09-18', source_end_date: '2015-08-07'}
+          - {openstates_id: ocd-person/webber-house, chamber: lower, district_number: 46, full_name: Stephen Webber, start_date: '2013-01-01', start_quality: placeholder, end_date: '2016-12-31', source_start_date: '2013-01-01', source_end_date: '2016-12-31'}
+          - {openstates_id: ocd-person/old-house, chamber: lower, district_number: 12, full_name: Olive Old, start_date: '2011-01-01', start_quality: placeholder, end_date: '2014-12-31', source_start_date: '2011-01-01', source_end_date: '2014-12-31'}
+          - {openstates_id: ocd-person/dempsey, chamber: upper, district_number: 23, full_name: Tom Dempsey, start_date: '2007-09-18', start_quality: dated, end_date: '2015-08-07', source_start_date: '2007-09-18', source_end_date: '2015-08-07'}
     expect:
       rows:
         - {alias_id: 'mohouse:9', year: 2017, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
@@ -816,9 +816,9 @@ unit_tests:
         rows: []
       - input: ref('int_mo_legislators__seat_terms')
         rows:
-          - {openstates_id: ocd-person/undated-a, chamber: upper, district_number: 22, full_name: Paul Wieland, start_date: '1900-01-01', end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
-          - {openstates_id: ocd-person/undated-b, chamber: upper, district_number: 9, full_name: Kiki Curls, start_date: '1900-01-01', end_date: '2020-01-16', source_start_date: null, source_end_date: '2020-01-16'}
-          - {openstates_id: ocd-person/dated, chamber: upper, district_number: 5, full_name: Dee Dated, start_date: '2019-01-01', end_date: '2020-12-31', source_start_date: '2019-01-01', source_end_date: '2020-12-31'}
+          - {openstates_id: ocd-person/undated-a, chamber: upper, district_number: 22, full_name: Paul Wieland, start_date: '1900-01-01', start_quality: undated, end_date: '2023-01-04', source_start_date: null, source_end_date: '2023-01-04'}
+          - {openstates_id: ocd-person/undated-b, chamber: upper, district_number: 9, full_name: Kiki Curls, start_date: '1900-01-01', start_quality: undated, end_date: '2020-01-16', source_start_date: null, source_end_date: '2020-01-16'}
+          - {openstates_id: ocd-person/dated, chamber: upper, district_number: 5, full_name: Dee Dated, start_date: '2019-01-01', start_quality: placeholder, end_date: '2020-12-31', source_start_date: '2019-01-01', source_end_date: '2020-12-31'}
     expect:
       rows:
         - {alias_id: 'mohouse:9', year: 2017, office: state_house, district: '99', name_key: zed zed, term_start: null, term_end: null}
@@ -855,3 +855,338 @@ unit_tests:
       rows:
         - {alias_id: 'mohouse:1790', person_id: ocd-person/roeber, basis: name_continuity}
         - {alias_id: ocd-person/roeber, person_id: ocd-person/roeber, basis: self}
+
+  - name: person_ids_join_a_duplicate_stub_with_a_middle_initial
+    model: int_officials__person_ids
+    description: >
+      Open States holds David Dolan (HD148) twice: "David A. Dolan", a 26-day stub (2025-01-08 to 2025-02-03, his
+      only seat-term, no House roster row), and "David Dolan" from 2025-01-08, whose term contains the stub. The
+      names differ only by a dropped middle initial, so rule 2b (one given name the start of the other) cannot join
+      them and the stub has no member id for rule 2c. The duplicate-stub rule 2d joins the stub (#294).
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/dolan, year: 2025, office: state_house, district: '148', name_key: david dolan, term_start: '2025-01-08', term_end: '9999-12-31', house_member_id: '2526'}
+          - {alias_id: ocd-person/dolan, year: 2026, office: state_house, district: '148', name_key: david dolan, term_start: '2025-01-08', term_end: '9999-12-31', house_member_id: '2526'}
+          - {alias_id: ocd-person/dolan-stub, year: 2025, office: state_house, district: '148', name_key: david a dolan, term_start: '2025-01-08', term_end: '2025-02-03'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/dolan, person_id: ocd-person/dolan, basis: self}
+        - {alias_id: ocd-person/dolan-stub, person_id: ocd-person/dolan, basis: duplicate_stub}
+
+  - name: person_ids_join_a_duplicate_stub_with_a_nickname
+    model: int_officials__person_ids
+    description: >
+      Open States holds Marty Jacobs (HD38) twice: "Martin Jacobs", a 26-day stub from 2025-01-08, and "Marty Jacobs"
+      from the same day. Neither given name starts with the other, so rule 2b cannot join them; the given names fit
+      (mogov.first_name_fit: the same first three letters), so the duplicate-stub rule 2d does (#292).
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/marty, year: 2025, office: state_house, district: '38', name_key: marty jacobs, term_start: '2025-01-08', term_end: '9999-12-31', house_member_id: '2489'}
+          - {alias_id: ocd-person/marty, year: 2026, office: state_house, district: '38', name_key: marty jacobs, term_start: '2025-01-08', term_end: '9999-12-31', house_member_id: '2489'}
+          - {alias_id: ocd-person/martin, year: 2025, office: state_house, district: '38', name_key: martin jacobs, term_start: '2025-01-08', term_end: '2025-02-03'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/marty, person_id: ocd-person/marty, basis: self}
+        - {alias_id: ocd-person/martin, person_id: ocd-person/marty, basis: duplicate_stub}
+
+  - name: person_ids_keep_a_same_day_stub_with_another_given_name_apart
+    model: int_officials__person_ids
+    description: >
+      A stub that otherwise has the duplicate shape (26 days, same seat, same start day, inside the other term, same
+      surname) is kept apart when the given names do not fit: Daniel and Robert Hale are two people.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/robert, year: 2025, office: state_house, district: '20', name_key: robert hale, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/robert, year: 2026, office: state_house, district: '20', name_key: robert hale, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/daniel, year: 2025, office: state_house, district: '20', name_key: daniel hale, term_start: '2025-01-08', term_end: '2025-02-03'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/robert, person_id: ocd-person/robert, basis: self}
+        - {alias_id: ocd-person/daniel, person_id: ocd-person/daniel, basis: self}
+
+  - name: person_ids_keep_a_stub_that_starts_after_the_other_term_ends_apart
+    model: int_officials__person_ids
+    description: >
+      A special-election successor's short term starts when (or after) the predecessor's ends, so it is not inside
+      it: "David A. Dolan" for 26 days from 2025-03-01, after "David Dolan" left on 2025-02-28, is a successor, not a
+      duplicate, although the names fit.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/dolan, year: 2023, office: state_house, district: '148', name_key: david dolan, term_start: '2023-01-04', term_end: '2025-02-28'}
+          - {alias_id: ocd-person/dolan, year: 2025, office: state_house, district: '148', name_key: david dolan, term_start: '2023-01-04', term_end: '2025-02-28'}
+          - {alias_id: ocd-person/dolan-next, year: 2025, office: state_house, district: '148', name_key: david a dolan, term_start: '2025-03-01', term_end: '2025-03-27'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/dolan, person_id: ocd-person/dolan, basis: self}
+        - {alias_id: ocd-person/dolan-next, person_id: ocd-person/dolan-next, basis: self}
+
+  - name: person_ids_keep_a_stub_late_in_a_departed_members_term_apart
+    model: int_officials__person_ids
+    description: >
+      Open States often leaves a member who left mid-term with the normal term end, so a successor's short term can
+      sit inside the predecessor's on paper. A duplicate stub must start within a few days of the other term: a
+      "Martin Jacobs" stub from 2025-06-02 inside "Marty Jacobs" from 2025-01-08 is kept apart.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/marty, year: 2025, office: state_house, district: '38', name_key: marty jacobs, term_start: '2025-01-08', term_end: '2027-01-06'}
+          - {alias_id: ocd-person/martin, year: 2025, office: state_house, district: '38', name_key: martin jacobs, term_start: '2025-06-02', term_end: '2025-06-28'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/marty, person_id: ocd-person/marty, basis: self}
+        - {alias_id: ocd-person/martin, person_id: ocd-person/martin, basis: self}
+
+  - name: person_ids_join_no_duplicate_stub_with_two_candidates
+    model: int_officials__person_ids
+    description: >
+      A stub whose shape fits two other records ("Martin Jacobs" inside both "Marty" and "Marta Jacobs" in one seat)
+      is ambiguous and joins neither; and a stub with a different middle initial ("david b dolan" against "david a
+      dolan") does not fit.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/marty, year: 2025, office: state_house, district: '38', name_key: marty jacobs, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/marta, year: 2025, office: state_house, district: '38', name_key: marta jacobs, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/martin, year: 2025, office: state_house, district: '38', name_key: martin jacobs, term_start: '2025-01-08', term_end: '2025-02-03'}
+          - {alias_id: ocd-person/dolan-a, year: 2025, office: state_house, district: '148', name_key: david a dolan, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/dolan-b, year: 2025, office: state_house, district: '148', name_key: david b dolan, term_start: '2025-01-08', term_end: '2025-02-03'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/marty, person_id: ocd-person/marty, basis: self}
+        - {alias_id: ocd-person/marta, person_id: ocd-person/marta, basis: self}
+        - {alias_id: ocd-person/martin, person_id: ocd-person/martin, basis: self}
+        - {alias_id: ocd-person/dolan-a, person_id: ocd-person/dolan-a, basis: self}
+        - {alias_id: ocd-person/dolan-b, person_id: ocd-person/dolan-b, basis: self}
+
+  - name: person_ids_keep_a_stub_apart_when_its_name_has_another_id
+    model: int_officials__person_ids
+    description: >
+      Rule 2d joins a stub name only when every id of that name is a duplicate stub. Here "Martin Jacobs" has a
+      26-day stub inside "Marty Jacobs" (HD38, 2025) and also a second id with a full term in another seat (HD40,
+      2019-2020). That second id is no stub, so the name is a person of its own, not a duplicate record of Marty:
+      the two Martin ids join each other by rule 2 and Marty stays apart.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/marty, year: 2025, office: state_house, district: '38', name_key: marty jacobs, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/martin-stub, year: 2025, office: state_house, district: '38', name_key: martin jacobs, term_start: '2025-01-08', term_end: '2025-02-03'}
+          - {alias_id: ocd-person/martin-full, year: 2019, office: state_house, district: '40', name_key: martin jacobs, term_start: '2019-01-09', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/martin-full, year: 2020, office: state_house, district: '40', name_key: martin jacobs, term_start: '2019-01-09', term_end: '2021-01-06'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/marty, person_id: ocd-person/marty, basis: self}
+        - {alias_id: ocd-person/martin-stub, person_id: ocd-person/martin-stub, basis: self}
+        - {alias_id: ocd-person/martin-full, person_id: ocd-person/martin-stub, basis: name_continuity}
+
+  - name: person_ids_join_no_chain_of_duplicate_stubs
+    model: int_officials__person_ids
+    description: >
+      Rule 2d does not chain: a stub joins another name only when that name is no stub name itself. "Martyn
+      Jacobs" is a stub inside the full HD40 term of "Martin Jacobs", and Martin's other id is a stub inside
+      "Martha Jacobs" (HD38). Martin is a stub name, so Martyn does not join it; Martin does not join Martha either,
+      since Martin's HD40 id is no stub. The two Martin ids join each other by rule 2.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/martha, year: 2025, office: state_house, district: '38', name_key: martha jacobs, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/martin-stub, year: 2025, office: state_house, district: '38', name_key: martin jacobs, term_start: '2025-01-08', term_end: '2025-02-03'}
+          - {alias_id: ocd-person/martin-full, year: 2019, office: state_house, district: '40', name_key: martin jacobs, term_start: '2019-01-09', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/martin-full, year: 2020, office: state_house, district: '40', name_key: martin jacobs, term_start: '2019-01-09', term_end: '2021-01-06'}
+          - {alias_id: ocd-person/martyn, year: 2019, office: state_house, district: '40', name_key: martyn jacobs, term_start: '2019-01-09', term_end: '2019-02-04'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/martha, person_id: ocd-person/martha, basis: self}
+        - {alias_id: ocd-person/martin-stub, person_id: ocd-person/martin-stub, basis: self}
+        - {alias_id: ocd-person/martin-full, person_id: ocd-person/martin-stub, basis: name_continuity}
+        - {alias_id: ocd-person/martyn, person_id: ocd-person/martyn, basis: self}
+
+  - name: person_ids_keep_a_duplicate_stub_apart_when_its_name_is_signed_different_people
+    model: int_officials__person_ids
+    description: >
+      A signed different_people row is the maintainer's way to undo a wrong rule 2d join: listing the stub's id keeps
+      its whole name apart. The Marty / Martin Jacobs stub shape would join, but Martin's id is in a signed
+      different_people row (against another record), so Martin stays his own person.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/marty, year: 2025, office: state_house, district: '38', name_key: marty jacobs, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/martin, year: 2025, office: state_house, district: '38', name_key: martin jacobs, term_start: '2025-01-08', term_end: '2025-02-03'}
+          - {alias_id: ocd-person/other, year: 2025, office: state_senate, district: '9', name_key: some other}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: ocd-person/martin, person_id: ocd-person/other, relation: different_people, checked_by: maintainer, checked_on: '2026-01-01'}
+    expect:
+      rows:
+        - {alias_id: ocd-person/marty, person_id: ocd-person/marty, basis: self}
+        - {alias_id: ocd-person/martin, person_id: ocd-person/martin, basis: self}
+        - {alias_id: ocd-person/other, person_id: ocd-person/other, basis: self}
+
+  - name: person_ids_keep_a_duplicate_stub_apart_when_the_other_name_is_signed_different_people
+    model: int_officials__person_ids
+    description: >
+      The same escape hatch on the other side: the Marty / Martin Jacobs stub shape would join, but Marty's id is in a
+      signed different_people row (against another record), so his name is kept apart and the stub does not join it.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/marty, year: 2025, office: state_house, district: '38', name_key: marty jacobs, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/martin, year: 2025, office: state_house, district: '38', name_key: martin jacobs, term_start: '2025-01-08', term_end: '2025-02-03'}
+          - {alias_id: ocd-person/other, year: 2025, office: state_senate, district: '9', name_key: some other}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: ocd-person/marty, person_id: ocd-person/other, relation: different_people, checked_by: maintainer, checked_on: '2026-01-01'}
+    expect:
+      rows:
+        - {alias_id: ocd-person/marty, person_id: ocd-person/marty, basis: self}
+        - {alias_id: ocd-person/martin, person_id: ocd-person/martin, basis: self}
+        - {alias_id: ocd-person/other, person_id: ocd-person/other, basis: self}
+
+  - name: person_ids_keep_a_same_seat_stub_with_another_surname_apart
+    model: int_officials__person_ids
+    description: >
+      Rule 2d needs the surnames to match. A "Martin Smith" stub with the duplicate shape (26 days from the same day,
+      inside the HD38 term of "Marty Jacobs", given names that fit) is another person.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/marty, year: 2025, office: state_house, district: '38', name_key: marty jacobs, term_start: '2025-01-08', term_end: '9999-12-31'}
+          - {alias_id: ocd-person/martin, year: 2025, office: state_house, district: '38', name_key: martin smith, term_start: '2025-01-08', term_end: '2025-02-03'}
+      - input: ref('official_id_links')
+        rows: []
+    expect:
+      rows:
+        - {alias_id: ocd-person/marty, person_id: ocd-person/marty, basis: self}
+        - {alias_id: ocd-person/martin, person_id: ocd-person/martin, basis: self}
+
+  - name: person_ids_ignore_half_signed_curated_links
+    model: int_officials__person_ids
+    description: >
+      A maintainer signs a curated row off by filling checked_by and checked_on together (#174). A row with only
+      checked_by filled is not signed: the same_person row changes nothing and the different_people row does not keep
+      the name apart.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/mcgaugh, year: 2017, office: state_house, district: '39', name_key: joe don mcgaugh}
+          - {alias_id: ocd-person/lee-a, year: 2017, office: state_house, district: '10', name_key: sam lee}
+          - {alias_id: ocd-person/lee-b, year: 2024, office: state_house, district: '10', name_key: sam lee}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: ocd-person/mcgaugh, person_id: 'mojudge:joe don mcgaugh', relation: same_person, checked_by: maintainer}
+          - {alias_id: ocd-person/lee-a, person_id: ocd-person/lee-b, relation: different_people, checked_by: maintainer}
+    expect:
+      rows:
+        - {alias_id: ocd-person/mcgaugh, person_id: ocd-person/mcgaugh, basis: self}
+        - {alias_id: ocd-person/lee-a, person_id: ocd-person/lee-b, basis: name_continuity}
+        - {alias_id: ocd-person/lee-b, person_id: ocd-person/lee-b, basis: self}
+
+  - name: person_ids_redirect_the_whole_group_from_a_curated_link_to_a_non_chosen_alias
+    model: int_officials__person_ids
+    description: >
+      A signed same_person row whose alias_id is an id the name rule merged but did not choose (the fallback key
+      mohouse:658, merged into the Open States id) moves the whole merged person, not just that one id, so the person
+      is not split (#174).
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/mcgaugh, year: 2017, office: state_house, district: '39', name_key: joe don mcgaugh}
+          - {alias_id: 'mohouse:658', year: 2017, office: state_house, district: '39', name_key: joe don mcgaugh}
+          - {alias_id: ocd-person/someone-else, year: 2026, office: state_house, district: '1', name_key: some one}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: 'mohouse:658', person_id: 'mojudge:joe don mcgaugh', relation: same_person, checked_by: maintainer, checked_on: '2026-01-01'}
+    expect:
+      rows:
+        - {alias_id: ocd-person/mcgaugh, person_id: 'mojudge:joe don mcgaugh', basis: curated}
+        - {alias_id: 'mohouse:658', person_id: 'mojudge:joe don mcgaugh', basis: curated}
+        - {alias_id: ocd-person/someone-else, person_id: ocd-person/someone-else, basis: self}
+
+  - name: person_ids_join_the_whole_target_person_of_a_curated_link_to_a_non_chosen_alias
+    model: int_officials__person_ids
+    description: >
+      A signed same_person row whose person_id (its target) is an id the name rule merged but did not choose (the
+      fallback key mohouse:7, merged into the Open States id ocd-person/lee) sends the row's person to the target's
+      chosen id, so the alias and both ids of the target person end up as one person, not two (#682, the target side
+      of #174 item 3). Only the moved person is basis curated; the target's ids keep the basis the rules gave them.
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/lee, year: 2019, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: 'mohouse:7', year: 2019, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: ocd-person/wu, year: 2025, office: state_senate, district: '3', name_key: ann wu}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: ocd-person/wu, person_id: 'mohouse:7', relation: same_person, checked_by: maintainer, checked_on: '2026-01-01'}
+    expect:
+      rows:
+        - {alias_id: ocd-person/lee, person_id: ocd-person/lee, basis: self}
+        - {alias_id: 'mohouse:7', person_id: ocd-person/lee, basis: name_continuity}
+        - {alias_id: ocd-person/wu, person_id: ocd-person/lee, basis: curated}
+
+  - name: person_ids_take_the_smallest_resolved_target_of_two_curated_links
+    model: int_officials__person_ids
+    description: >
+      Two signed same_person rows send one person (ocd-person/wu) to different ids: one to the fallback key mohouse:7,
+      which the name rule merged into ocd-person/lee, and one to ocd-person/zz. Each target is resolved to its
+      person's chosen id first and the smaller resolved id wins (ocd-person/lee over ocd-person/zz), not the smaller
+      id as written (mohouse:7). The seed error itself is caught by assert_signed_same_person_links_end_in_one_person
+      (#691).
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/lee, year: 2019, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: 'mohouse:7', year: 2019, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: ocd-person/wu, year: 2025, office: state_senate, district: '3', name_key: ann wu}
+          - {alias_id: ocd-person/zz, year: 2025, office: state_senate, district: '4', name_key: ann zz}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: ocd-person/wu, person_id: 'mohouse:7', relation: same_person, checked_by: maintainer, checked_on: '2026-01-01'}
+          - {alias_id: ocd-person/wu, person_id: ocd-person/zz, relation: same_person, checked_by: maintainer, checked_on: '2026-01-01'}
+    expect:
+      rows:
+        - {alias_id: ocd-person/lee, person_id: ocd-person/lee, basis: self}
+        - {alias_id: 'mohouse:7', person_id: ocd-person/lee, basis: name_continuity}
+        - {alias_id: ocd-person/wu, person_id: ocd-person/lee, basis: curated}
+        - {alias_id: ocd-person/zz, person_id: ocd-person/zz, basis: self}
+
+  - name: person_ids_keep_the_chosen_id_when_curated_links_join_ids_already_one_person
+    model: int_officials__person_ids
+    description: >
+      Signed same_person rows in both directions between two ids the name rule already joined (as Stephen Webber's
+      row names two ids of one person): the person keeps the id the rules chose (ocd-person/lee, not the fallback key
+      mohouse:7 either row names), and every id of it becomes basis curated (#691).
+    given:
+      - input: ref('int_officials__identity_terms')
+        rows:
+          - {alias_id: ocd-person/lee, year: 2019, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: 'mohouse:7', year: 2019, office: state_house, district: '9', name_key: ann lee}
+          - {alias_id: ocd-person/wu, year: 2025, office: state_senate, district: '3', name_key: ann wu}
+      - input: ref('official_id_links')
+        rows:
+          - {alias_id: 'mohouse:7', person_id: ocd-person/lee, relation: same_person, checked_by: maintainer, checked_on: '2026-01-01'}
+          - {alias_id: ocd-person/lee, person_id: 'mohouse:7', relation: same_person, checked_by: maintainer, checked_on: '2026-01-01'}
+    expect:
+      rows:
+        - {alias_id: ocd-person/lee, person_id: ocd-person/lee, basis: curated}
+        - {alias_id: 'mohouse:7', person_id: ocd-person/lee, basis: curated}
+        - {alias_id: ocd-person/wu, person_id: ocd-person/wu, basis: self}
