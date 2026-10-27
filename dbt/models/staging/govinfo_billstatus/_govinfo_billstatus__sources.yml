@@ -1,0 +1,41 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. The loader lands each BILLSTATUS XML file unchanged as gzip
+# (listed in govinfo_billstatus_files) and one JSON row per entity parsed from it with lxml; `mogov build`
+# creates empty placeholders while the loader has not run.
+version: 2
+sources:
+- name: govinfo_billstatus
+  description: GovInfo BILLSTATUS bulk XML (federal bills), one row per bill, sponsor, cosponsor, action, recorded
+    vote and law, for every bill of the loaded Congresses (all states; filtered to Missouri in dbt).
+  tables:
+  - name: files
+    identifier: govinfo_billstatus_files
+    description: One row per landed BILLSTATUS XML file with its gzip path under MOGOV_RAW_DIR, size, sha256 and
+      landing time. The XML itself is the gzip file, unchanged.
+  - name: bills
+    identifier: govinfo_billstatus_bills
+    description: One row per bill (payload JSON) as published; the key is "<congress>-<type>-<number>".
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 45
+          period: day
+        error_after:
+          count: 120
+          period: day
+  - name: sponsors
+    identifier: govinfo_billstatus_sponsors
+    description: One row per sponsor of a bill (payload JSON), with the member's bioguideId, state and district.
+  - name: cosponsors
+    identifier: govinfo_billstatus_cosponsors
+    description: One row per cosponsor of a bill (payload JSON), with sponsorship date and original / withdrawn flags.
+  - name: actions
+    identifier: govinfo_billstatus_actions
+    description: One row per action on a bill (payload JSON), in the order the file lists them.
+  - name: recorded_votes
+    identifier: govinfo_billstatus_recorded_votes
+    description: One row per roll call an action cites (payload JSON); the link from a bill to a House or Senate vote.
+  - name: laws
+    identifier: govinfo_billstatus_laws
+    description: One row per Public Law number a bill became (payload JSON).
