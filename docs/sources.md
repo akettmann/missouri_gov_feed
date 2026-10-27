@@ -171,6 +171,21 @@ Quirks:
   links none in). That found 6,449 roll calls, 1,526 on Senate measures. Misses are cached for good once
   the session's year is over and re-checked daily before that. The first probe took about 8 minutes per
   shard with 4 shards.
+- Limits of the roll-call probe (issue #538). The probe is bounded by what the XML links, so a House vote the XML
+  never mentions can be missed in two ways. (1) Days: it stops at the last day the XML links a roll call for plus
+  `DAY_SLACK` (3, `src/mogov/loaders/mo_house.py`). A recorded vote more than 3 session days past the last linked day
+  is never requested. For session 204 this does not bite (see above: days 4-6 are all the site's 404 page), but it is a
+  structural limit; widening it costs 3 or more requests per extra day per session (misses are cached for good once
+  the year is over) and cannot be tested without the network, so it is left as is. (2) Numbers: within a day it
+  stops at the first missing number past the highest the XML links for that day, so a gap in the numbering past
+  that point hides later roll calls. A session whose XML links no roll call is probed for 10 days
+  (`DAYS_IF_UNKNOWN`).
+- The XML also links roll-call PDFs the House never published: the fetch returns the HTML error page, and the loader
+  keeps the miss in `mo_house_rollcalls` as a row with `error = 'not a pdf'` (60 in October 2026: 201 one, 211 eight,
+  221 one, 241 fifty). 55 of them are named under a bill (e.g. `bills241/rollcalls/062.013.pdf`, listed on HB 2634).
+  `stg_mo_house__rollcalls` drops error rows, and `fct_vote_bills` now links only roll calls that are in staging, so
+  those 55 links are gone (32 bills, 13 of which now have no linked vote; they were dangling `vote_id`s that no
+  member vote row carries). A relationships test keeps it that way.
 - Committee posts (`fct_committee_memberships`, `fct_committee_posts`): the member XML page lists each
   member's committees and subcommittees with a position (Chair, Vice-Chair, Co-Chair, Ranking Minority
   Member, Member), in every session from 2017 except 253, whose pages list none. For 253 the
@@ -444,6 +459,8 @@ Quirks:
   was lost, but committees first registered for a pre-2020 election are only linked to an official if
   they also filed for a later one. An offered year with no dates is still logged as
   `mec.crosswalk_no_elections` and not cached.
+- The 24-hour notices repeat here too (#156): 74 direct-export rows ($0.51M, report years 2023-26) are notice lines
+  that a full report itemizes again; `int_mec__contributions_direct` drops them (see tap_mec Quirks for the rule).
 - MEC answers in under a second (the lobbyist search takes about 13 s). The fixed `MOGOV_MEC_PAUSE`
   (3 s) between requests is most of the runtime. A cold run is about 4 requests per export year and
   3 per election date.
@@ -510,6 +527,14 @@ Quirks:
   older rows against one newer row and keep the extra older row. Gifts that differ in amount, date, committee or
   name are not matched, so some re-filed gifts may remain.
   Net effect of the dedupe: staging goes from 1,603,397 to 1,486,204 rows ($1.2487B to $1.0550B).
+- A "24 Hour" notice is also listed again, as a line of its own, in the committee's next full report, within the same
+  layout (#156). The notice (report `24 Hour Expenditure Report-...`, a gift of $5,000+) and the full report's line
+  carry the same committee, date, amount and donor. Staging keeps both; `int_tap_mec__contributions` (what committee
+  receipts, donor summaries and the campaign-finance fact read) drops the notice line when the same committee's full
+  report itemizes the same gift (donor compared by `name_key`: case, punctuation and spaces ignored), matched one-to-one,
+  so a notice with no later full-report line and two equal gifts that both appear in full reports stay. Measured
+  October 2026: 127 TAP rows, $1.30M. Gifts whose name differs more than that ("Missouri Growth PAC" against
+  "MO GROWTH PAC") are not matched.
 - A few MECIDs are lower-case (`c000525`); the intermediate models upper-case them.
 - A committee-to-committee gift names the donor committee only. `cmte_id` / `mecid` is the receiving
   committee's ID, and there is no donor MECID. The same holds for MEC's direct export (see mec below).
@@ -639,15 +664,22 @@ Quirks:
   among the amendments of its report (ties: numeric doc id).
   The Clerk index does not say which report a House amendment amends, so it is taken to amend the latest annual,
   candidate or termination report the filer filed that year on or before it (an amendment of a candidate or
-  termination report supersedes that report only) (#142, #463). Periodic transaction reports and the "other" kinds
-  (W withdrawal, H new-filer notice, B, E, G) are never a base. The "Period Covered: mm/dd/yyyy-mm/dd/yyyy" line in
-  the amendment's PDF text (`int_house_fd__period_covered`; candidate reports and their amendments carry it, annual
-  reports do not) refines this: the base covering through the same last day wins, and an amendment with such a line
-  is never taken for an amendment of an annual report. Measured on the Clerk index (all filers, 2,097 amendments;
-  name-matched, so approximate): counting termination reports as bases re-points 18 amendments, "other" kinds 195
-  (all H, which holds no report; W, B, E and G re-point none). For Missouri officials neither change moves a row: the
-  rebuilt `fct_disclosures` is identical (0 rows differ either way). The Period Covered text is loaded for Missouri
-  filers only, and only 3 of the 10 Missouri amendments carry the line.
+  termination report supersedes that report only) (#142, #463). Index type H is a base of the same tier as an
+  annual report: on the Clerk index it is very likely a new member's first annual report, not a "new-filer notice"
+  (of 346 H filings only 3 have an O for the same filer and year, 233 have an extension request X that year, the H
+  counts follow the freshman classes of election years, and they are filed May to September of the next year;
+  Missouri freshmen Alford and Burlison (2022), Onder and Bell (2024) each have an X then an H in August and no
+  O). Periodic transaction reports and the remaining "other" kinds (W withdrawal, B, E, G) are never a base.
+  The "Period Covered: mm/dd/yyyy-mm/dd/yyyy" line in the amendment's PDF text (`int_house_fd__period_covered`;
+  candidate reports and their amendments carry it, annual and termination reports do not) refines this: the base
+  covering through the same last day wins, and an amendment with such a line is taken for an amendment of an
+  annual report only as a last resort, when no candidate or termination report is on file.
+  Measured on the Clerk index (all filers, 2,095 amendments; name-matched, ignoring the Period Covered line, which
+  is loaded for Missouri filers only, so approximate): counting H as a base re-points 195 amendments (169 off a
+  candidate or termination report, 1 off an annual report, 25 that had no base), W, B, E and G re-point none; before
+  H was added, counting termination reports as bases re-pointed 18. For Missouri officials neither change moves a
+  row: the rebuilt `fct_disclosures` is identical to origin/main (EXCEPT ALL both ways, 0 rows differ). Only 3 of
+  the 10 Missouri amendments carry the line.
 
 ## courtlistener_case_bulk: case history from bulk files
 

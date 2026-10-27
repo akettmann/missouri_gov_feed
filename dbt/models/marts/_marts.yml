@@ -1669,6 +1669,22 @@ models:
       - name: vote_id
         data_type: varchar
         description: Vote identifier (fct_votes.vote_id).
+        data_tests:
+          # a link may only name a roll call that exists (#538): the XML links 55 PDFs the House never published
+          - relationships:
+              name: fct_vote_bills_house_vote_id_in_rollcalls
+              arguments:
+                to: ref('stg_mo_house__rollcalls')
+                field: rollcall_url
+              config:
+                where: "chamber = 'state_house'"
+          - relationships:
+              name: fct_vote_bills_senate_vote_id_in_votes
+              arguments:
+                to: ref('int_mo_senate__votes')
+                field: vote_id
+              config:
+                where: "chamber = 'state_senate'"
       - name: session_code
         data_type: varchar
         description: House session code of the bill.

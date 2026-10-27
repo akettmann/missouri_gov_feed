@@ -20,7 +20,9 @@
 -- see its name and seat.
 -- An undated id has only that one year of evidence, which weakens rule 2 (a seat conflict needs more than one
 -- shared year) and rule 2b (the chamber-move check compares the first and last year) of int_officials__person_ids
--- (#519).
+-- (#519). The data test assert_undated_open_states_ids_share_no_name fails if such an id ever shares a name (rule 2)
+-- or a rule 2b variant name (Dan / Daniel Brown) with another id, so the weakness cannot join or split wrongly
+-- unnoticed.
 -- Known edge: the min(start)/max(end) collapse per (alias_id, year, office, district) spans any gap if one id holds
 -- the same seat in two separate terms in a year.
 with roster_years as (

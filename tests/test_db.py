@@ -1,3 +1,6 @@
+import queue
+import threading
+
 import duckdb
 import pytest
 
@@ -8,6 +11,9 @@ from mogov import db
 def raw_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(db, "RAW_DIR", tmp_path)
     return tmp_path
+
+
+_CHILD_READY_TIMEOUT_S = 30
 
 
 def _rows(table: str) -> list[tuple]:
@@ -263,14 +269,28 @@ def test_second_process_holding_the_shard_makes_this_one_fail_fast(raw_dir):
         stderr=subprocess.PIPE,
         text=True,
     )
+    first_line: queue.Queue[str] = queue.Queue()
+    # a blocking readline() has no timeout, so wait for the child's first line from a daemon thread
+    threading.Thread(target=lambda: first_line.put(child.stdout.readline()), daemon=True).start()
     try:
-        assert child.stdout.readline().strip() == "ready", child.stderr.read()
+        try:
+            ready = first_line.get(timeout=_CHILD_READY_TIMEOUT_S)
+        except queue.Empty:
+            pytest.fail(f"child did not print 'ready' within {_CHILD_READY_TIMEOUT_S}s")
+        if ready.strip() != "ready":
+            child.kill()
+            pytest.fail(f"child did not become ready: {ready!r} {child.communicate()[1]!r}")
         with pytest.raises(db.ShardBusyError, match="another run is already writing t shard 0 of 2"):
             db.JsonSink(db.Shard(0, 2), tables=["t"])
         with db.JsonSink(db.Shard(1, 2), tables=["t"]):  # a different shard is not blocked
             pass
-    finally:
         child.communicate(timeout=30)  # closes the child's stdin, so it exits
+    finally:
+        if child.poll() is None:  # any failure or timeout above: never leave the child holding the lock
+            child.kill()
+        child.wait()
+        for pipe in (child.stdin, child.stdout, child.stderr):
+            pipe.close()
     assert child.returncode == 0
     with db.JsonSink(db.Shard(0, 2), tables=["t"]):  # the child released it on exit
         pass

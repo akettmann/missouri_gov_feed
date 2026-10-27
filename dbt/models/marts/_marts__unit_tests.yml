@@ -111,7 +111,7 @@ unit_tests:
       - input: ref('int_mec__official_committees')
         rows:
           - {official_id: o1, mec_committee_id: C000100, committee_name: Friends of Jane Doe, confidence: high}
-      - input: ref('stg_tap_mec__contributions')
+      - input: ref('int_tap_mec__contributions')
         rows:
           - {mec_committee_id: C000100, contributor_name: Missouri Chamber PAC, contributor_type: Committee, contributor_committee_name: Missouri Chamber PAC, amount: 500, contribution_date: '2020-03-01', contribution_year: 2020}
           - {mec_committee_id: C000100, contributor_name: Missouri Chamber PAC, contributor_type: Committee, contributor_committee_name: Missouri Chamber PAC, amount: 250, contribution_date: '2021-03-01', contribution_year: null}
@@ -158,7 +158,7 @@ unit_tests:
     given:
       - input: ref('int_mec__official_committees')
         rows: []
-      - input: ref('stg_tap_mec__contributions')
+      - input: ref('int_tap_mec__contributions')
         rows: []
       - input: ref('int_mec__donor_committees')
         rows: []
@@ -199,7 +199,7 @@ unit_tests:
       - input: ref('int_mec__official_committees')
         rows:
           - {official_id: o1, mec_committee_id: C000100, committee_name: Friends of Jane Doe, confidence: high}
-      - input: ref('stg_tap_mec__contributions')
+      - input: ref('int_tap_mec__contributions')
         rows:
           - {record_id: '777', mec_committee_id: C000100, contributor_name: Ann Doe, contributor_type: Individual, contributor_committee_name: null, amount: 50, contribution_date: '2020-03-01', contribution_year: 2020}
       - input: ref('int_mec__donor_committees')
@@ -243,8 +243,11 @@ unit_tests:
       where 100 sorts before 20, and a url ending .PDF sorts the same way (#463). A termination report is a base
       too: an amendment filed after an annual and a termination report amends the termination report and leaves
       the annual report latest. The amendment's "Period Covered" line (int_house_fd__period_covered) picks the
-      candidate report covering the same last day over a later candidate report, and an amendment with a period is
-      never taken for an amendment of an annual report, which carries none (#463).
+      candidate report covering the same last day over a later candidate report, and an amendment with a period
+      is taken for an amendment of an annual report only as a last resort, when no candidate or termination report
+      is on file (#463). Index type H (very likely a new member's first annual report, not a new-filer notice)
+      is a base like an annual report: an amendment filed after a candidate report and a later H amends the H, and
+      leaves the candidate report latest.
     given:
       - input: ref('dim_official')
         rows:
@@ -261,6 +264,7 @@ unit_tests:
           - {official_id: h11, office: us_house, district: 11, family_name: Pink}
           - {official_id: h12, office: us_house, district: 12, family_name: Gold}
           - {official_id: h13, office: us_house, district: 13, family_name: Cyan}
+          - {official_id: h14, office: us_house, district: 14, family_name: Violet}
       - input: ref('stg_senate_efd__items')
         rows:
           - {last_name: Smith, filing_title: Annual Report for CY 2022, submitted_date: '2023-05-15', row_key: a0, document_url: u_a0}
@@ -310,6 +314,9 @@ unit_tests:
           - {doc_id: '9002', filing_year: 2023, filing_kind: annual report, filing_date: '2024-05-01', state_district: MO13, last_name: Cyan, document_url: 'https://x/9002.PDF'}
           - {doc_id: '1000', filing_year: 2023, filing_kind: amended report, filing_date: '2024-06-01', state_district: MO13, last_name: Cyan, document_url: 'https://x/1000.PDF'}
           - {doc_id: '300', filing_year: 2023, filing_kind: amended report, filing_date: '2024-06-01', state_district: MO13, last_name: Cyan, document_url: 'https://x/300.PDF'}
+          - {doc_id: v1, filing_year: 2023, filing_kind: candidate report, filing_type: C, filing_date: '2023-03-01', state_district: MO14, last_name: Violet, document_url: u_v1}
+          - {doc_id: v2, filing_year: 2023, filing_kind: other, filing_type: H, filing_date: '2024-05-01', state_district: MO14, last_name: Violet, document_url: u_v2}
+          - {doc_id: v3, filing_year: 2023, filing_kind: amended report, filing_type: A, filing_date: '2024-07-01', state_district: MO14, last_name: Violet, document_url: u_v3}
       - input: ref('int_house_fd__period_covered')
         rows:
           - {doc_id: q1, period_start: '2023-01-01', period_end: '2023-02-28'}
@@ -354,6 +361,8 @@ unit_tests:
           - {doc_id: '9002', page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
           - {doc_id: '1000', page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
           - {doc_id: '300', page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: v1, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: v3, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
       - input: ref('int_judges__federal')
         rows:
           - {official_id: j1, fjc_nid: 7}
@@ -412,6 +421,9 @@ unit_tests:
         - {disclosure_item_id: 'house:9002:1:1', report_version: 0, is_latest_version: false}
         - {disclosure_item_id: 'house:300:1:1', report_version: 1, is_latest_version: false}
         - {disclosure_item_id: 'house:1000:1:1', report_version: 2, is_latest_version: true}
+        - {disclosure_item_id: 'house:v1:1:1', report_version: 0, is_latest_version: true}
+        - {disclosure_item_id: 'house:v2', report_version: 0, is_latest_version: true}
+        - {disclosure_item_id: 'house:v3:1:1', report_version: 1, is_latest_version: true}
         - {disclosure_item_id: 'courtlistener:t1', report_version: 0, is_latest_version: false}
         - {disclosure_item_id: 'courtlistener:t2', report_version: 1, is_latest_version: true}
         - {disclosure_item_id: 'courtlistener:t3', report_version: 0, is_latest_version: true}

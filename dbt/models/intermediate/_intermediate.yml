@@ -144,22 +144,23 @@ models:
     A real NAICS code, even a non-primary one, is more precise than a two-digit SIC-derived sector, and agrees with
     it on the sector for about 90% of facilities. Codes tied on tier and program-system count: the one more program
     systems give across ALL tiers, not counting MO-DNR and RMP (the same count over primary, unknown and secondary
-    rows; the UNKNOWN-tier rows usually back the right code, #432; MO-DNR is a state copy of what other systems
-    report: its code matches another system''s at about 87% of facilities. RMP, the facility''s own Risk Management
-    Plan, matches at only about 53%, so it is not a pure mirror, but it is left out on purpose: counted, it would
-    let one more UNKNOWN row outvote the SIC sector (#513, #520); a judgment call, not a claim that RMP duplicates
-    another system); then the one in the SIC-derived sector (NAICS 31-33 count as one sector); then any other code
-    before the construction stormwater-permit noise code NAICS 238910 (a site holds that permit beside its real
-    industry, #432), which still wins when the SIC sector is construction; then the all-tier count again with MO-DNR
-    and RMP included (they still back a code when nothing else separates them), then a 6-digit code before a shorter
-    one, then the lowest code. The SIC sector counts only as a signal when the SIC code is not itself tied (same
-    tier and program-system count) with a SIC code in a different sector, and is not construction stormwater-permit
-    noise: SIC 1629, or 1541/1542/1611 given only by NPDES (or its MO-DNR copy), #513. A 1541/1542/1611 given only
-    by MO-DNR, with no NPDES row, is read as noise too (21 facility/code pairs), #520. is_government: a federal
-    site, any owner-role organization typed as a government body (municipal, county, state, federal, district, tribal),
-    or a facility or owner named like one ("City of ...", "... County", "... School District"; most organizations
-    are typed UNKNOWN). The *_key columns are company_key names for matching donors. Grain: one row per geocoded
-    EPA FRS facility.'
+    rows; the UNKNOWN-tier rows usually back the right code, #432). MO-DNR is a state copy of what other systems
+    report: at most facilities where another system also reports a NAICS code, its code matches (or extends or truncates)
+    one of theirs. RMP, the facility''s own Risk Management Plan, does so at only about two-thirds of those facilities,
+    and matches exactly at under half (it mostly files 5-digit codes), so it is not a pure mirror. It is left out
+    on purpose: counted, it would let one more UNKNOWN row outvote the SIC sector (#513, #520); a judgment call,
+    not a claim that RMP duplicates another system. Then the one in the SIC-derived sector (NAICS 31-33 count as
+    one sector); then any other code before the construction stormwater-permit noise code NAICS 238910 (a site holds
+    that permit beside its real industry, #432), which still wins when the SIC sector is construction; then the
+    all-tier count again with MO-DNR and RMP included (they still back a code when nothing else separates them),
+    then a 6-digit code before a shorter one, then the lowest code. The SIC sector counts only as a signal when
+    the SIC code is not itself tied (same tier and program-system count) with a SIC code in a different sector,
+    and is not construction stormwater-permit noise: SIC 1629, or 1541/1542/1611 given only by NPDES (or its MO-DNR
+    copy), #513. A 1541/1542/1611 given only by MO-DNR, with no NPDES row, is read as noise too (21 facility/code
+    pairs), #520. is_government: a federal site, any owner-role organization typed as a government body (municipal,
+    county, state, federal, district, tribal), or a facility or owner named like one ("City of ...", "... County",
+    "... School District"; most organizations are typed UNKNOWN). The *_key columns are company_key names for matching
+    donors. Grain: one row per geocoded EPA FRS facility.'
 - name: int_house_fd__period_covered
   description: 'The "Period Covered: 01/01/2016-11/11/2017" line on page 1 of a House disclosure PDF. Candidate
     reports and their amendments carry it; annual reports do not. It is the only thing that says which kind of report
@@ -222,12 +223,18 @@ models:
     the old one closed maps to several IDs, told apart by their active years. Years outside 2000..next year are
     typos in the source dates and are ignored. MECIDs are upper-cased. Grain: one row per (MEC committee, name it
     filed under).'
+- name: int_mec__contributions_direct
+  description: 'MEC direct-export contributions without the 24-hour notices that a full report itemizes again (#156):
+    the same pattern as the TAP mirror (int_tap_mec__contributions). See the drop_reitemized_notices macro for the
+    rule. Grain: one direct-export contribution, minus re-itemized 24-hour notices.'
 - name: int_mec__contributions_received
   description: 'Itemized contributions received by Missouri committees from both MEC feeds: the TAP mirror (contribution
     years 2011-2022) and, when the opt-in loader has run, MEC''s direct export (report years 2023+, so the two don''t
     overlap; see fct_campaign_finance). mec_committee_id is always the receiving committee. A committee donor is
     identified only by contributor_committee_name: MEC records no MECID for it. MECIDs are upper-cased: a few rows
-    carry "c000525" for C000525. Grain: one itemized contribution received by a Missouri committee.'
+    carry "c000525" for C000525. Both feeds are read without their 24-hour notices that a full report itemizes again
+    (int_tap_mec__contributions, int_mec__contributions_direct; #156). Grain: one itemized contribution received
+    by a Missouri committee.'
 - name: int_mec__donor_committees
   description: 'Name -> MECID crosswalk for committee donors. MEC records a committee-to-committee gift with the
     donor''s name only (the row''s MECID is the receiving committee), so the donor''s own MECID is found by matching
@@ -475,8 +482,10 @@ models:
     is invented. That is enough to give the id a person_ids row and to let the name rules see its name and seat.
     An undated id has only that one year of evidence, which weakens rule 2 (a seat conflict needs more than one
     shared year) and rule 2b (the chamber-move check compares the first and last year) of int_officials__person_ids
-    (#519). Known edge: the min(start)/max(end) collapse per (alias_id, year, office, district) spans any gap if
-    one id holds the same seat in two separate terms in a year. Grain: one row per (id as sourced, year, office,
+    (#519). The data test assert_undated_open_states_ids_share_no_name fails if such an id ever shares a name (rule
+    2) or a rule 2b variant name (Dan / Daniel Brown) with another id, so the weakness cannot join or split wrongly
+    unnoticed. Known edge: the min(start)/max(end) collapse per (alias_id, year, office, district) spans any gap
+    if one id holds the same seat in two separate terms in a year. Grain: one row per (id as sourced, year, office,
     district, House member id).'
 - name: int_officials__name_keys
   description: 'Normalized name variants per current official, for matching sources that only carry names (MEC committees,
@@ -523,6 +532,11 @@ models:
 - name: int_officials__wikidata
   description: 'Wikidata QID per official: from roster cross-references when present, else a unique exact name match
     against living Missouri officeholders on Wikidata. Grain: one row per official with a Wikidata QID.'
+- name: int_tap_mec__contributions
+  description: 'TAP MEC contributions without the 24-hour notices that a full report itemizes again (#156): stg_tap_mec__contributions
+    keeps every row of the source; everything that totals gifts (committee receipts, donor summaries, the campaign-finance
+    fact) reads this model. See the drop_reitemized_notices macro for the rule. Grain: one itemized contribution
+    in the TAP mirror, minus re-itemized 24-hour notices.'
 - name: int_votes__member_votes
   description: 'Every recorded vote by every member, tracked official or not: MO House roll calls and MO Senate
     journals (member_key is the attributed person, else the printed token) and Congress from the loaded Voteview

@@ -19,6 +19,7 @@ with house_members as (
         f.doc_id,
         f.filing_year,
         f.filing_kind,
+        f.filing_type,
         f.filing_date,
         f.document_url,
         pc.period_end
@@ -33,10 +34,13 @@ with house_members as (
 
 -- Which report a House "amended report" amends. The Clerk index carries no link, so the amendment is taken to
 -- amend the most recent annual, candidate or termination report the same filer filed that year on or before the
--- amendment's date. Other index kinds are no base: a periodic transaction report is its own filing; "other"
--- (new-filer notices, withdrawals) holds no report to restate. When the amendment's PDF has a "Period Covered:"
--- line (candidate and termination reports do, annual reports do not), a base covering through the same last day
--- wins over a later one, and an annual report is the last resort. amends_url is the url of a candidate or
+-- amendment's date. Index type H counts as an annual report here: on the Clerk index it is very likely a new
+-- member's first annual report (only 3 of 346 H filings have an O the same year, 233 have an extension X, and
+-- the counts follow the freshman classes), so it is a base of the same tier as O. Other index kinds are no base:
+-- a periodic transaction report is its own filing; the rest of "other" (withdrawals, B, E, G) holds no report to
+-- restate. When the amendment's PDF has a "Period Covered:" line (candidate reports and their amendments carry
+-- it; annual and termination reports do not), a base covering through the same last day wins over a later one,
+-- and an annual report is the last resort. amends_url is the url of a candidate or
 -- termination base, or null when the base is an annual report (or none is on file, the long-standing default).
 house_amendment_base as (
     select
@@ -49,7 +53,7 @@ house_amendment_base as (
             order by
                 case
                     when b.period_end = a.period_end then 2
-                    when a.period_end is not null and b.filing_kind = 'annual report' then 0
+                    when a.period_end is not null and (b.filing_kind = 'annual report' or b.filing_type = 'H') then 0
                     else 1
                 end desc,
                 b.filing_date desc,
@@ -60,7 +64,7 @@ house_amendment_base as (
         on
             a.official_id = b.official_id
             and a.filing_year = b.filing_year
-            and b.filing_kind in ('annual report', 'candidate report', 'termination report')
+            and (b.filing_kind in ('annual report', 'candidate report', 'termination report') or b.filing_type = 'H')
             and a.filing_date >= b.filing_date
     where a.filing_kind = 'amended report'
 ),
