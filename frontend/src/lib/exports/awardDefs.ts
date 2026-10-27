@@ -15,7 +15,7 @@ export const AWARDS: Record<
   {
     name: string;
     title: string;
-    /** What exactly is counted, shown under the title on the awards page. */
+    /** What exactly is counted, shown once in the award key at the bottom of the awards page (not on every list). */
     note?: string;
     unit: "pct" | "money";
     outOf?: "votes" | "raised" | "party-line votes" | "decided bills";
@@ -59,7 +59,7 @@ export const AWARDS: Record<
   },
   most_bills_passed_house: {
     name: "The “Gets Bills Passed” Award",
-    title: "Highest share of sponsored bills passed by the House",
+    title: "Highest share of sponsored House bills (HB, HJR) that passed the House",
     // keep "at least 10" in step with the awards_min_bills_decided var in dbt_project.yml
     note:
       "Counts House bills (HB) and House joint resolutions (HJR) the member sponsored as the primary sponsor " +

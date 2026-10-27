@@ -117,7 +117,6 @@ const defaultOffice = offices.includes("state_house") ? "state_house" : offices[
                           <section class="card award">
                             <h2>{AWARDS[list.award].name}</h2>
                             <p class="what">{AWARDS[list.award].title}</p>
-                            {AWARDS[list.award].note && <p class="small muted">{AWARDS[list.award].note}</p>}
                             <p class="small muted">
                               Among {count(list.group_size)} {plural(list.office)}{" "}
                               {periodWhen(period, isCycleList(list))}

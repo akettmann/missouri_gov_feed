@@ -316,7 +316,7 @@ test("most_bills_passed_house is a one-award row that says exactly what it count
   const { note, title, unit, outOf } = AWARDS.most_bills_passed_house;
   assert.equal(unit, "pct");
   assert.equal(outOf, "decided bills");
-  assert.match(title, /sponsored bills passed/);
+  assert.match(title, /sponsored House bills \(HB, HJR\) that passed the House/);
   for (const words of [
     /HB/,
     /HJR/,
