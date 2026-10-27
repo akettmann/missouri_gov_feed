@@ -61,6 +61,8 @@ REPEALS_UNIT = "rx.aspx"
 CHAPTER_PATH = "/main/OneChapter.aspx"
 SECTION_PATH = "/main/PageSelect.aspx"
 CHAPTER_ID = re.compile(r"[0-9A-Za-z]+")  # a chapter id; this matches an attribute value, not markup
+# Pages are parsed without ever fetching what they reference (external DTDs, entities); that is also lxml's default.
+PARSER = lxml.html.HTMLParser(no_network=True)
 
 
 class Blocked(RuntimeError):
@@ -97,9 +99,10 @@ def _get(
 
 
 def _query(href: str, path: str) -> dict[str, str] | None:
-    """The (undecoded) query parameters of an href on `path`, or None for any other link."""
+    """The (undecoded) query parameters of a site-relative href on `path`, or None for any other link (an
+    absolute or scheme-relative href is another site's, even when its path matches)."""
     split = urlsplit(href.strip())
-    if split.path != path:
+    if split.scheme or split.netloc or split.path != path:
         return None
     return dict(part.partition("=")[::2] for part in split.query.split("&"))
 
@@ -127,7 +130,7 @@ def _text(el) -> str:
 def parse_toc(page: str) -> list[dict]:
     """Home.aspx -> [{title, chapter, chapter_name}] in the site's order."""
     rows = []
-    for details in lxml.html.fromstring(page).iter("details"):
+    for details in lxml.html.fromstring(page, parser=PARSER).iter("details"):
         spans = details.find("summary").findall("span") if details.find("summary") is not None else []
         title = _text(spans[-1]) if spans else None
         for a in details.iterfind(".//a[@href]"):
@@ -141,7 +144,7 @@ def parse_toc(page: str) -> list[dict]:
 def parse_chapter(page: str) -> list[tuple[str, int]]:
     """A chapter page -> its (section, bid) versions, in page order, without duplicates."""
     seen: dict[tuple[str, int], None] = {}
-    for a in lxml.html.fromstring(page).iterfind(".//a[@href]"):
+    for a in lxml.html.fromstring(page, parser=PARSER).iterfind(".//a[@href]"):
         if link := section_link(a.get("href")):
             seen[link] = None
     return list(seen)
@@ -169,7 +172,7 @@ def parse_section(page: str) -> dict:
     if start < 0 or end < 0:
         raise ValueError("section page without a content block")
     block = page[start:end]
-    root = lxml.html.fragment_fromstring(block, create_parent="div")
+    root = lxml.html.fragment_fromstring(block, create_parent="div", parser=PARSER)
     header = root[0]
     title_p = header.find("p")
     effdt = root.find('.//span[@id="effdt"]')
@@ -197,7 +200,7 @@ def parse_repeals(page: str) -> list[dict]:
     """rx.aspx -> [{kind: repealed|transferred, section, bid, note, date}], note and date as printed."""
     rows = []
     in_transfers = False  # the transferred sections follow the element with id="xfer", in document order
-    for el in lxml.html.fromstring(page).iter():
+    for el in lxml.html.fromstring(page, parser=PARSER).iter():
         if el.get("id") == "xfer":
             in_transfers = True
         if el.tag != "tr" or el.get("style") != "width:100%;":
