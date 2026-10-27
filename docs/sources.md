@@ -672,9 +672,24 @@ Quirks:
   Periodic transaction reports, candidate reports and extension requests are separate filings, never collapsed.
   The index has no amendment number either, so a House amendment's `report_version` is its position by filing date
   among the amendments of its report (ties: numeric doc id).
-  The Clerk index does not say which report a House amendment amends, so it is taken to amend the latest annual or
-  candidate report the filer filed that year on or before it (a candidate-report amendment supersedes that candidate
-  report only) (#142).
+  The Clerk index does not say which report a House amendment amends, so it is taken to amend the latest annual,
+  candidate or termination report the filer filed that year on or before it (an amendment of a candidate or
+  termination report supersedes that report only) (#142, #463). Index type H is a base of the same tier as an
+  annual report: on the Clerk index it is very likely a new member's first annual report, not a "new-filer notice"
+  (of 346 H filings only 3 have an O for the same filer and year, 233 have an extension request X that year, the H
+  counts follow the freshman classes of election years, and they are filed May to September of the next year;
+  Missouri freshmen Alford and Burlison (2022), Onder and Bell (2024) each have an X then an H in August and no
+  O). Periodic transaction reports and the remaining "other" kinds (W withdrawal, B, E, G) are never a base.
+  The "Period Covered: mm/dd/yyyy-mm/dd/yyyy" line in the amendment's PDF text (`int_house_fd__period_covered`;
+  candidate reports and their amendments carry it, annual and termination reports do not) refines this: the base
+  covering through the same last day wins, and an amendment with such a line is taken for an amendment of an
+  annual report only as a last resort, when no candidate or termination report is on file.
+  Measured on the Clerk index (all filers, 2,095 amendments; name-matched, ignoring the Period Covered line, which
+  is loaded for Missouri filers only, so approximate): counting H as a base re-points 195 amendments (169 off a
+  candidate or termination report, 1 off an annual report, 25 that had no base), W, B, E and G re-point none; before
+  H was added, counting termination reports as bases re-pointed 18. For Missouri officials neither change moves a
+  row: the rebuilt `fct_disclosures` is identical to origin/main (EXCEPT ALL both ways, 0 rows differ). Only 3 of
+  the 10 Missouri amendments carry the line.
 
 ## courtlistener_case_bulk: case history from bulk files
 
