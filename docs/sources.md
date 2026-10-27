@@ -297,10 +297,12 @@ fiscal_notes,amendments}`), so run `mo_house` first; no crawl is needed.
   `summary` 23,291 (`summary_text_link`), `fiscal_note` 13,304 (`fiscal_note_link`), `amendment` 9,686
   (`amendment_text`, which holds the PDF link). 68,720 in all.
 - Raw bytes: each PDF is stored unchanged at `<raw dir>/mo_house_pdf/<session>/<kind>/<file name>`, with one state
-  row per URL in `mo_house_pdf_files` (session, kind, relative path, size, sha256, HTTP status, error, last write).
+  row per URL in `mo_house_pdf_files` (session, kind, relative path, size, sha256, HTTP status, error, last write,
+  `checked_at` = when the site was last asked, and the `etag` / `last_modified` it sent).
   Size: about 3-6 GB for the full set (a 206-PDF slice averaged 68 KB: amendments 69 KB, bill texts 85 KB, fiscal
   notes 96 KB, summaries 32 KB; appropriation bills and omnibus substitutes run to hundreds of pages). The HTTP
-  cache is not used for the PDFs (it is wiped on Cloud Run and would double the disk).
+  cache is not used for the PDFs (it would double the disk). The extracted text is cached in `data/cache/pdftext`
+  (`CACHE_DIR`), which on Cloud Run is on the mounted bucket and survives between jobs.
 - Text: `mo_house_pdf_texts`, one row per URL: kind, session, bill file name, LR number and version code from the
   first link row naming the URL (`n_links` counts the rest), `page_count`, joined `text`, `pages_json` (per-page
   text as a JSON array) and `error`. Text is pdfplumber's `extract_text()` via `mogov.pdftext` (cached by PDF
@@ -318,12 +320,28 @@ fiscal_notes,amendments}`), so run `mo_house` first; no crawl is needed.
   disk outside them still get their rows, so the pieces add up (a piece does not drop the earlier pieces' rows).
   Use the same `--shards` for every piece.
 - Freshness: published versions have versioned file names, so a file already on disk for a closed session is read,
-  never fetched; the open session's files (current year or later) are re-fetched when older than 7 days and replaced
-  only if the bytes changed. A re-run of the 216-URL slice made only the 10 requests for URLs that had failed, in
-  about 30 s, and rewrote no file. The text is re-extracted from the landed bytes each run (a cache hit when `data/cache`
-  survives).
+  never fetched; the open session's files (current year or later) are re-checked when older than 7 days with a
+  conditional GET (`If-None-Match` / `If-Modified-Since` from the previous row; a `304` only touches the file) and
+  replaced only if the bytes changed. Re-checks cost one request per file (about 8.2k, 2.3 h at 1 request/s) but
+  transfer nothing when unchanged. A re-run of the 216-URL slice made only the 10 requests for URLs that had failed,
+  in about 30 s, and rewrote no file.
+- Re-runs read the previous `mo_house_pdf_files` row: when a file's size and mtime still match it, the file is not
+  read or hashed again and its text comes from the `pdftext` cache by the recorded sha256 (a pointer file under
+  `cache/pdftext/by-hash/`, written whenever the text is extracted; without a cache hit the file is read and extracted
+  as before). Over Cloud Storage FUSE this avoids re-reading the 3-6 GB set every run.
+- Negative cache: a closed session's permanent failures (HTTP 4xx except 408/429, or `200` with an HTML page, i.e.
+  `error = 'not a PDF'`) are not asked for again for 30 days (`NEGATIVE_CACHE_S`, judged by the previous row's
+  `checked_at`; about 800 resolution-summary links, ~13 min per run). Timeouts, 429, 5xx and any failure in the open
+  session are retried every run. Delete the row's part (or wait 30 days) to force a retry.
+- Filtered runs (`MOGOV_HOUSE_PDF_KINDS` / `_SESSIONS`) carry the previous error rows of URLs outside the filter, so
+  the error history survives a piecewise load.
+- Text extraction is bounded: pages are released as they are read, and one document may take at most
+  `pdftext.MAX_SECONDS` (600 s, checked between pages); past that the document lands as an error row
+  (`ExtractTimeout`) instead of hanging the shard. A single page that never returns is not interrupted.
 - Shard units: distinct document URLs, split by the URL's hash (`--shards`/`--shard`). Failures (HTTP errors,
-  timeouts, a non-PDF answer) land as rows with `error` set and are retried on the next run.
+  timeouts, a non-PDF answer) land as rows with `error` set; transient ones are retried on the next run, permanent ones
+  after the negative-cache window. A failed weekly re-check of an open-session file already on disk keeps that file,
+  its row and its text, logs `mo_house_pdf.recheck_failed` and retries next run.
 
 Quirks:
 - The site answers some bad links with `200` and an HTML error page ("Missouri House of Representatives - Error"),
