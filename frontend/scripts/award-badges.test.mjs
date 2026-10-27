@@ -10,7 +10,7 @@ import {
   ordinal,
   renderBadges,
 } from "../src/lib/awardBadges.ts";
-import { AWARD_PAIRS, assertCyclePeriods } from "../src/lib/exports/awardDefs.ts";
+import { AWARD_PAIRS, AWARDS, assertCyclePeriods } from "../src/lib/exports/awardDefs.ts";
 
 const e = (slug, rank, metric, streak_years = null, sample_size = 100) => ({
   rank,
@@ -305,4 +305,38 @@ test("a federal money-share list on an odd period (stale export) fails the build
     () => assertCyclePeriods([...ok, { office: "us_house", period: "2025", period_kind: "fec_cycle" }]),
     /stale or inconsistent.*us_house 2025.*re-export/s,
   );
+});
+
+test("most_bills_passed_house is a one-award row that says exactly what it counts", () => {
+  assert.ok(
+    AWARD_PAIRS.some((p) => p.length === 1 && p[0] === "most_bills_passed_house"),
+    "no fewest-passed opposite: that end would be a tie at 0% (#603)",
+  );
+  assert.equal(AWARDS.fewest_bills_passed_house, undefined);
+  const { note, title, unit, outOf } = AWARDS.most_bills_passed_house;
+  assert.equal(unit, "pct");
+  assert.equal(outOf, "decided bills");
+  assert.match(title, /sponsored bills passed/);
+  for (const words of [
+    /HB/,
+    /HJR/,
+    /primary sponsor/,
+    /have ended/,
+    /Appropriation bills are included/,
+    /at least 10/,
+  ]) {
+    assert.match(note, words);
+  }
+  assert.ok(AWARD_ICONS.most_bills_passed_house, "has a badge icon");
+});
+
+test("a most_bills_passed_house badge states the share and what it is out of", () => {
+  const m = currentAwards(
+    [list("most_bills_passed_house", "2026", [e("amy", 1, 50, 2, 10)])],
+    (o) => OFFICE_GROUP_LABELS[o],
+  );
+  const [award, streak, detail] = m.get("amy")[0];
+  assert.equal(award, "most_bills_passed_house");
+  assert.equal(streak, 2);
+  assert.match(detail, /ranked 1st of 62 State Representatives in 2026: 50\.0% of 10 decided bills$/);
 });

@@ -40,6 +40,7 @@ export const AWARD_ICONS: Record<string, string> = {
   least_committee_money_share: "%",
   most_party_breaks: "↯",
   most_party_loyal: "=",
+  most_bills_passed_house: "✓",
 };
 const FALLBACK_ICON = "★";
 
@@ -58,6 +59,7 @@ export function outOfText(award: string, sampleSize: number | null): string {
   if (sampleSize == null || !outOf) return "";
   if (outOf === "votes") return `of ${plural(sampleSize, "vote", "votes")}`;
   if (outOf === "raised") return `of ${money(sampleSize)} raised`;
+  if (outOf === "decided bills") return `of ${plural(sampleSize, "decided bill", "decided bills")}`;
   return `with party, of ${plural(sampleSize, "party-line vote", "party-line votes")}`;
 }
 
