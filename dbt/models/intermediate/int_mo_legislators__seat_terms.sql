@@ -58,7 +58,7 @@ terms as (
         {{ dbt.safe_cast('r.start_date', 'date') }} as source_start_date,
         coalesce(r.end_date, {{ dbt.safe_cast("'9999-12-31'", 'date') }}) as source_end_date,
         case
-            when r.is_seed then 'dated'
+            when r.is_seed and r.start_date is not null then 'dated'
             when r.start_date is null then 'undated'
             when extract(month from r.start_date) = 1 and extract(day from r.start_date) = 1 then 'placeholder'
             else 'dated'
