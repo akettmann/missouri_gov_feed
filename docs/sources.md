@@ -10,7 +10,7 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | Loader | Source | Data it provides | Coverage | Gate |
 |---|---|---|---|---|
 | `mo_house` | Missouri House (documents.house.mo.gov) | members, bills, per-member roll-call votes | `MOGOV_LOOKBACK_YEARS` (default 10; PDFs from 2014) | |
-| `mo_house_docs` | Missouri House bill documents (documents.house.mo.gov) | the PDFs behind the `mo_house` document links (bill text versions, summaries, fiscal notes, amendments), unchanged, with their extracted text | every link `mo_house` landed (about 68.7k PDFs, sessions 171-261) | stage 2; slow: ~1 request/s |
+| `mo_house_pdf` | Missouri House bill documents (documents.house.mo.gov) | the PDFs behind the `mo_house` document links (bill text versions, summaries, fiscal notes, amendments), unchanged, with their extracted text | every link `mo_house` landed (about 68.7k PDFs, sessions 171-261) | stage 2; slow: ~1 request/s |
 | `mo_senate` | Missouri Senate journals (senate.mo.gov) | per-senator roll-call votes | `MOGOV_LOOKBACK_YEARS` | |
 | `mo_senate_topics` | Missouri Senate topical index (senate.mo.gov) | Senate bills, subject terms for Senate bills and House bills that reached the Senate | `MOGOV_LOOKBACK_YEARS` (regular sessions) | |
 | `mo_senate_bills` | Missouri Senate bill tracking (senate.mo.gov) | every Senate bill and resolution of each session (regular and extraordinary) and its full action history, with journal references | `MOGOV_LOOKBACK_YEARS` | slow: ~1 request/s, one request per bill |
@@ -265,9 +265,9 @@ Quirks:
   2017–2026: the first special session of a year is 3. 2018's 183 was a legislature-called session with
   resolutions only.
 
-## mo_house_docs: Missouri House bill documents
+## mo_house_pdf: Missouri House bill documents
 
-Flow: [diagrams/sources/mo_house_docs.svg](diagrams/sources/mo_house_docs.svg)
+Flow: [diagrams/sources/mo_house_pdf.svg](diagrams/sources/mo_house_pdf.svg)
 
 Stage 2 companion of `mo_house` (issue #591, part of #241): fetches the PDFs that the House XML links and
 extracts their text. It reads the link tables `mo_house` landed (`mo_house_xml_{bill,senate_act}_{texts,summaries,
@@ -276,12 +276,12 @@ fiscal_notes,amendments}`), so run `mo_house` first; no crawl is needed.
 - Kinds and counts (distinct URLs, sessions 171-261, measured 2026-10-26): `bill_text` 22,439 (`text_link`),
   `summary` 23,291 (`summary_text_link`), `fiscal_note` 13,304 (`fiscal_note_link`), `amendment` 9,686
   (`amendment_text`, which holds the PDF link). 68,720 in all.
-- Raw bytes: each PDF is stored unchanged at `<raw dir>/mo_house_docs/<session>/<kind>/<file name>`, with one state
-  row per URL in `mo_house_doc_files` (session, kind, relative path, size, sha256, HTTP status, error, last write).
+- Raw bytes: each PDF is stored unchanged at `<raw dir>/mo_house_pdf/<session>/<kind>/<file name>`, with one state
+  row per URL in `mo_house_pdf_files` (session, kind, relative path, size, sha256, HTTP status, error, last write).
   Size: about 3-6 GB for the full set (a 206-PDF slice averaged 68 KB: amendments 69 KB, bill texts 85 KB, fiscal
   notes 96 KB, summaries 32 KB; appropriation bills and omnibus substitutes run to hundreds of pages). The HTTP
   cache is not used for the PDFs (it is wiped on Cloud Run and would double the disk).
-- Text: `mo_house_doc_texts`, one row per URL: kind, session, bill file name, LR number and version code from the
+- Text: `mo_house_pdf_texts`, one row per URL: kind, session, bill file name, LR number and version code from the
   first link row naming the URL (`n_links` counts the rest), `page_count`, joined `text`, `pages_json` (per-page
   text as a JSON array) and `error`. Text is pdfplumber's `extract_text()` via `mogov.pdftext` (cached by PDF
   hash), stored as-is; clean-up belongs in dbt (#593). Statute links (#594) are not parsed here.
@@ -290,8 +290,8 @@ fiscal_notes,amendments}`), so run `mo_house` first; no crawl is needed.
 - Rate: every request waits at the host-wide throttle (`REQUEST_INTERVAL` = 1 s, shared by every shard and by
   `mo_house` on one machine). Measured on a 216-URL slice with 2 shards: 225 s, one request a second; more shards
   do not go faster. The first full run is therefore about 68.7k requests, around 19 hours; use
-  `MOGOV_HOUSE_DOCS_KINDS=bill_text` (comma list of `bill_text,summary,fiscal_note,amendment`) and
-  `MOGOV_HOUSE_DOCS_SESSIONS=261` (session codes) to run it in pieces. The options only limit what is fetched: documents already on
+  `MOGOV_HOUSE_PDF_KINDS=bill_text` (comma list of `bill_text,summary,fiscal_note,amendment`) and
+  `MOGOV_HOUSE_PDF_SESSIONS=261` (session codes) to run it in pieces. The options only limit what is fetched: documents already on
   disk outside them still get their rows, so the pieces add up (a piece does not drop the earlier pieces' rows).
   Use the same `--shards` for every piece.
 - Freshness: published versions have versioned file names, so a file already on disk for a closed session is read,
@@ -310,7 +310,7 @@ Quirks:
   probed); they land as error rows. Two bill-text links use `house.mo.gov` rather than `documents.house.mo.gov`; such
   a file is stored as `<host>__<file name>` so it cannot collide with the same name on the main host.
 - A summary PDF is linked by every version of a bill that shares it (23,648 link rows, 23,291 distinct URLs), so
-  `mo_house_doc_texts` has one row per URL, not per link.
+  `mo_house_pdf_texts` has one row per URL, not per link.
 - Small-caps and some display glyphs can extract as NUL characters (seen in `house_fd` text); that is stored as-is.
   None appeared in the 206 extracted slice documents.
 

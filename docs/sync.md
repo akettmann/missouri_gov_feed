@@ -9,7 +9,7 @@ uv run mogov run --shards 4
 ```
 
 Loaders that land files rather than rows (today `mo_house`, whose XML goes to `data/raw/mo_house_xml/` as
-gzip, and `mo_house_docs`, whose PDFs go to `data/raw/mo_house_docs/` unchanged) keep the file bytes unchanged and parse them in a second step inside the same run. To change only the
+gzip, and `mo_house_pdf`, whose PDFs go to `data/raw/mo_house_pdf/` unchanged) keep the file bytes unchanged and parse them in a second step inside the same run. To change only the
 parsing, re-parse the landed files without fetching: `uv run python -m mogov.parsers.mo_house`.
 
 Existing environments: `mo_house` used to land JSON tables. Run `uv run mogov load mo_house` once before the next
@@ -40,7 +40,7 @@ ignore empty witness rows, so a build before the re-parse is still correct. Dele
 | tap_mec                       | frozen (ends 2022)                           | 30 days                                                                    | monthly                                               |
 | fec                           | weekly bulk refresh                          | bulk zips daily; sponsor lookups 30 days                                   | weekly                                                |
 | voteview                      | after each roll call                         | daily                                                                      | weekly                                                |
-| mo_house_docs (stage 2)       | as bills move (new versions, notes, amendments) | PDFs of closed sessions forever (versioned file names); open session re-checked after 7 days | weekly in session, after `mo_house`; first run ~19 h at 1 request/s, so split it with `MOGOV_HOUSE_DOCS_KINDS` / `MOGOV_HOUSE_DOCS_SESSIONS` |
+| mo_house_pdf (stage 2)       | as bills move (new versions, notes, amendments) | PDFs of closed sessions forever (versioned file names); open session re-checked after 7 days | weekly in session, after `mo_house`; first run ~19 h at 1 request/s, so split it with `MOGOV_HOUSE_PDF_KINDS` / `MOGOV_HOUSE_PDF_SESSIONS` |
 | house_fd                      | as filed                                     | current + previous year index daily; PDFs forever                          | weekly                                                |
 | senate_efd (opt-in)           | as filed                                     | not cached (search + reports fetched each run)                             | weekly                                                |
 | courtlistener_bulk            | quarterly snapshot                           | per snapshot, forever                                                      | monthly (picks up new snapshots)                      |

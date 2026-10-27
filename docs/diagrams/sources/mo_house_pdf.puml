@@ -1,15 +1,15 @@
-@startuml mo_house_docs
-title mo_house_docs: House bill document PDFs + text
+@startuml mo_house_pdf
+title mo_house_pdf: House bill document PDFs + text
 start
 :read the mo_house link tables (texts, summaries, fiscal notes,
 amendments; bills and Senate acts), keep the kinds selected by
-MOGOV_HOUSE_DOCS_KINDS and the sessions in MOGOV_HOUSE_DOCS_SESSIONS;
+MOGOV_HOUSE_PDF_KINDS and the sessions in MOGOV_HOUSE_PDF_SESSIONS;
 note right
   Witness forms and change maps are never linked here.
 end note
 :one unit per distinct URL, owned by hash(URL) % --shards;
 repeat
-  if (file already under RAW_DIR/mo_house_docs/SESSION/KIND/\nand (closed session or younger than 7 days)?) then (yes)
+  if (file already under RAW_DIR/mo_house_pdf/SESSION/KIND/\nand (closed session or younger than 7 days)?) then (yes)
     :read it from disk: no request;
   else (no)
     :GET at the host-wide throttle (1 request/s,
@@ -25,8 +25,8 @@ repeat
     endif
   endif
   :pdfplumber text per page (mogov.pdftext, stored as-is);
-  :row in mo_house_doc_files (path, size, sha256, status, error)
-  and row in mo_house_doc_texts (page_count, text, pages_json, error);
+  :row in mo_house_pdf_files (path, size, sha256, status, error)
+  and row in mo_house_pdf_texts (page_count, text, pages_json, error);
 repeat while (more URLs?) is (yes)
 ->no;
 stop

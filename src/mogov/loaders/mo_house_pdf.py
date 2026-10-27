@@ -2,8 +2,8 @@
 
 `mo_house` parses the House XML into link tables (`mo_house_xml_{bill,senate_act}_{texts,summaries,fiscal_notes,
 amendments}`); this stage-2 loader reads those links, fetches each distinct PDF once, lands it unchanged under
-RAW_DIR/mo_house_docs/<session>/<kind>/<file name> (state row per URL in `mo_house_doc_files`), and extracts its
-text with pdfplumber into `mo_house_doc_texts` (one row per document: joined text, per-page text as JSON, page
+RAW_DIR/mo_house_pdf/<session>/<kind>/<file name> (state row per URL in `mo_house_pdf_files`), and extracts its
+text with pdfplumber into `mo_house_pdf_texts` (one row per document: joined text, per-page text as JSON, page
 count, and the link row's identifying fields). Extraction is stored as-is: small-caps glyphs can come out as NULs
 and are cleaned in dbt.
 
@@ -13,7 +13,7 @@ reusable fetch-and-land helper, so a new kind is one more entry in `KINDS`.
 Requests to documents.house.mo.gov (shared with `mo_house`) start at least REQUEST_INTERVAL apart, across every
 shard on the machine. Published versions have versioned file names, so a file landed for a closed session is
 never fetched again; the open session's files are re-checked weekly and rewritten only when the bytes change.
-Options (environment): MOGOV_HOUSE_DOCS_KINDS (comma list, default all) and MOGOV_HOUSE_DOCS_SESSIONS (comma list
+Options (environment): MOGOV_HOUSE_PDF_KINDS (comma list, default all) and MOGOV_HOUSE_PDF_SESSIONS (comma list
 of session codes, default all).
 """
 
@@ -36,7 +36,7 @@ from mogov.loaders import loader
 log = obs.get_logger(__name__)
 
 MAIN_HOST = "documents.house.mo.gov"
-DOCS_DIR = "mo_house_docs"  # under RAW_DIR: <session>/<kind>/<file name>
+DOCS_DIR = "mo_house_pdf"  # under RAW_DIR: <session>/<kind>/<file name>
 REQUEST_INTERVAL = 1.0  # seconds between request starts to the host, across all shards
 OPEN_SESSION_RECHECK_S = 7 * 86400
 RETRIES = 4
@@ -67,7 +67,7 @@ KINDS: dict[str, list[tuple[str, str, str, str, str]]] = {
 class DocFile:
     """State of one document URL: where its bytes landed (if they did) or why they did not."""
 
-    TABLE: ClassVar[str] = "mo_house_doc_files"
+    TABLE: ClassVar[str] = "mo_house_pdf_files"
     url: str
     kind: str
     session_code: str
@@ -87,7 +87,7 @@ class DocText:
     """One row per document URL. Identifying fields come from the first link row (by session, file, index) that
     names the URL; `n_links` counts the link rows, since versions can share a summary."""
 
-    TABLE: ClassVar[str] = "mo_house_doc_texts"
+    TABLE: ClassVar[str] = "mo_house_pdf_texts"
     url: str
     kind: str
     session_code: str
@@ -211,6 +211,10 @@ def land(link: Link, fetcher=None, *, fetch: bool = True) -> tuple[DocFile | Non
     if got.content is not None and got.content[:5] != b"%PDF-":
         error = "not a PDF"  # the site answers some bad URLs with 200 and an HTML page
     if error is not None or got.content is None:
+        if dest.exists():  # a failed re-check must not lose the good file already landed: keep and describe it
+            log.warning("mo_house_pdf.recheck_failed", url=link.url, error=error)
+            data = dest.read_bytes()
+            return _described(link, rel, dest, data), data
         return DocFile(
             link.url, link.kind, link.session_code, None, None, None, got.status, got.content_type, error, None
         ), None
@@ -269,19 +273,19 @@ def _iter_rows(mine: list[Link], kinds: set[str], sessions: set[str] | None) -> 
     progress.finish()
 
 
-@loader("mo_house_docs", stage=2, service="documents.house.mo.gov", slow=True)
+@loader("mo_house_pdf", stage=2, service="documents.house.mo.gov", slow=True)
 def load(shard: db.Shard) -> dict[str, int]:
     """Units: distinct document URLs. Each shard lands and reads its own; every shard lists the same URLs from the
     `mo_house` link tables, so the split needs no coordination. The kind/session options only limit what is
     fetched: documents already on disk outside them still get their rows, so pieces of a first run add up."""
-    kinds = _csv_env("MOGOV_HOUSE_DOCS_KINDS") or list(KINDS)
+    kinds = _csv_env("MOGOV_HOUSE_PDF_KINDS") or list(KINDS)
     if unknown := set(kinds) - set(KINDS):
-        raise SystemExit(f"unknown MOGOV_HOUSE_DOCS_KINDS {sorted(unknown)}; choose from {sorted(KINDS)}")
-    sessions = set(_csv_env("MOGOV_HOUSE_DOCS_SESSIONS")) or None
+        raise SystemExit(f"unknown MOGOV_HOUSE_PDF_KINDS {sorted(unknown)}; choose from {sorted(KINDS)}")
+    sessions = set(_csv_env("MOGOV_HOUSE_PDF_SESSIONS")) or None
     with db.TableSink(shard, tables=[DocFile, DocText]) as sink:
         for file_row, text_row in _iter_rows(units(shard), set(kinds), sessions):
             if file_row.error:
-                log.warning("mo_house_docs.failed", url=file_row.url, error=file_row.error)
+                log.warning("mo_house_pdf.failed", url=file_row.url, error=file_row.error)
             sink.add(file_row)
             sink.add(text_row)
     return sink.counts

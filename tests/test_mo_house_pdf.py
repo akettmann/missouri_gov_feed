@@ -7,7 +7,7 @@ import duckdb
 import pytest
 
 from mogov import db, pdftext
-from mogov.loaders import mo_house_docs as m
+from mogov.loaders import mo_house_pdf as m
 
 HOST = "https://documents.house.mo.gov/billtracking"
 TEXT_1 = f"{HOST}/bills171/hlrbillspdf/0001H.01I.pdf"
@@ -175,17 +175,17 @@ def test_pdfs_land_unchanged_and_errors_become_rows(links_landed, monkeypatch, e
     site = _site()
     monkeypatch.setattr(m, "fetch_document", site)
     counts = m.load(db.UNSHARDED)
-    assert counts == {"mo_house_doc_files": 7, "mo_house_doc_texts": 7}
+    assert counts == {"mo_house_pdf_files": 7, "mo_house_pdf_texts": 7}
     raw = env / "raw"
-    assert (raw / "mo_house_docs/171/bill_text/0001H.01I.pdf").read_bytes() == PDF_A
-    assert (raw / "mo_house_docs/171/fiscal_note/0563-01N.ORG.pdf").read_bytes() == PDF_B
-    assert not (raw / "mo_house_docs/171/summary").exists()  # an HTML page served with 200 is not landed
-    files = {r["url"]: r for r in _rows("mo_house_doc_files")}
+    assert (raw / "mo_house_pdf/171/bill_text/0001H.01I.pdf").read_bytes() == PDF_A
+    assert (raw / "mo_house_pdf/171/fiscal_note/0563-01N.ORG.pdf").read_bytes() == PDF_B
+    assert not (raw / "mo_house_pdf/171/summary").exists()  # an HTML page served with 200 is not landed
+    files = {r["url"]: r for r in _rows("mo_house_pdf_files")}
     assert files[TEXT_1]["size_bytes"] == len(PDF_A) and files[TEXT_1]["sha256"] == hashlib.sha256(PDF_A).hexdigest()
-    assert files[TEXT_1]["rel_path"] == "mo_house_docs/171/bill_text/0001H.01I.pdf" and files[TEXT_1]["error"] is None
+    assert files[TEXT_1]["rel_path"] == "mo_house_pdf/171/bill_text/0001H.01I.pdf" and files[TEXT_1]["error"] is None
     assert files[SUMMARY]["error"] == "not a PDF" and files[SUMMARY]["rel_path"] is None
     assert files[DEAD]["error"].startswith("ConnectTimeout") and files[DEAD]["http_status"] is None
-    texts = {r["url"]: r for r in _rows("mo_house_doc_texts")}
+    texts = {r["url"]: r for r in _rows("mo_house_pdf_texts")}
     assert texts[TEXT_2]["page_count"] == 2 and texts[TEXT_2]["text"] == "Second page one\nSecond page two"
     assert json.loads(texts[TEXT_2]["pages_json"]) == ["Second page one", "Second page two"]
     assert texts[TEXT_1]["lr_number"] == "0001H.01" and texts[TEXT_1]["version_code"] == "IN"
@@ -196,10 +196,10 @@ def test_pdfs_land_unchanged_and_errors_become_rows(links_landed, monkeypatch, e
 def test_second_run_of_closed_sessions_makes_no_requests_and_rewrites_nothing(links_landed, monkeypatch, env):
     monkeypatch.setattr(m, "fetch_document", _site())
     m.load(db.UNSHARDED)
-    first_files, first_texts = _rows("mo_house_doc_files"), _rows("mo_house_doc_texts")
+    first_files, first_texts = _rows("mo_house_pdf_files"), _rows("mo_house_pdf_texts")
 
     def stamps():
-        return {p: (p.stat().st_mtime_ns, p.stat().st_ino) for p in (env / "raw/mo_house_docs").rglob("*.pdf")}
+        return {p: (p.stat().st_mtime_ns, p.stat().st_ino) for p in (env / "raw/mo_house_pdf").rglob("*.pdf")}
 
     landed = stamps()
     assert landed
@@ -211,8 +211,8 @@ def test_second_run_of_closed_sessions_makes_no_requests_and_rewrites_nothing(li
     # reachable closed-session PDFs are not fetched again; only the failures (no file to reuse) are retried
     assert set(again.requests) == {SUMMARY, DEAD}
     assert stamps() == landed
-    assert _rows("mo_house_doc_files") == first_files
-    assert _rows("mo_house_doc_texts") == first_texts
+    assert _rows("mo_house_pdf_files") == first_files
+    assert _rows("mo_house_pdf_texts") == first_texts
 
 
 def test_open_session_is_rechecked_weekly_and_rewritten_only_on_change(links_landed, monkeypatch, env):
@@ -236,19 +236,58 @@ def test_open_session_is_rechecked_weekly_and_rewritten_only_on_change(links_lan
     assert dest.read_bytes() == PDF_B == data and row.sha256 == hashlib.sha256(PDF_B).hexdigest()
 
 
+def test_failed_recheck_of_an_open_session_file_keeps_the_landed_pdf_and_its_text(links_landed, monkeypatch, env):
+    monkeypatch.setattr(m, "fetch_document", _site())
+    m.load(db.UNSHARDED)
+    link = next(x for x in m.links(["bill_text"]) if x.url == OPEN_TEXT)
+    dest = env / "raw" / m.rel_path(link)
+    old = time.time() - 8 * 86400
+    os.utime(dest, (old, old))
+    stamp = (dest.stat().st_mtime_ns, dest.stat().st_ino)
+
+    def timeout(url):
+        return m.Fetched(None, None, None, "ReadTimeout: timed out")
+
+    monkeypatch.setattr(m, "fetch_document", timeout)
+    m.load(db.UNSHARDED)
+    assert dest.read_bytes() == PDF_A and (dest.stat().st_mtime_ns, dest.stat().st_ino) == stamp
+    file_row = next(r for r in _rows("mo_house_pdf_files") if r["url"] == OPEN_TEXT)
+    assert file_row["error"] is None and file_row["sha256"] == hashlib.sha256(PDF_A).hexdigest()
+    text_row = next(r for r in _rows("mo_house_pdf_texts") if r["url"] == OPEN_TEXT)
+    assert text_row["text"] == "Hello bill one"  # text still there
+    assert text_row["error"] is None
+
+    for bad in (m.Fetched(404, None, "text/html", "HTTP 404"), m.Fetched(200, b"<html>x</html>", "text/html", None)):
+        row, data = m.land(link, lambda url, bad=bad: bad)
+        assert data == PDF_A and row.error is None and row.sha256 == hashlib.sha256(PDF_A).hexdigest()
+
+
+def test_filtered_run_does_not_refetch_a_stale_open_session_file_outside_the_filter(links_landed, monkeypatch, env):
+    link = next(x for x in m.links(["bill_text"]) if x.url == OPEN_TEXT)
+    dest = env / "raw" / m.rel_path(link)
+    site = _site()
+    m.land(link, site)
+    old = time.time() - 8 * 86400
+    os.utime(dest, (old, old))
+    site.requests.clear()
+    row, data = m.land(link, site, fetch=False)
+    assert site.requests == [] and data == PDF_A and row.error is None
+    assert dest.stat().st_mtime == pytest.approx(old, abs=2)  # not even touched
+
+
 def test_kinds_and_sessions_options_only_limit_fetching_and_pieces_add_up(links_landed, monkeypatch):
     site = _site()
     monkeypatch.setattr(m, "fetch_document", site)
-    monkeypatch.setenv("MOGOV_HOUSE_DOCS_KINDS", "bill_text")
-    monkeypatch.setenv("MOGOV_HOUSE_DOCS_SESSIONS", "171")
+    monkeypatch.setenv("MOGOV_HOUSE_PDF_KINDS", "bill_text")
+    monkeypatch.setenv("MOGOV_HOUSE_PDF_SESSIONS", "171")
     m.load(db.UNSHARDED)
     assert sorted(site.requests) == sorted([TEXT_1, TEXT_2])
-    assert {r["url"] for r in _rows("mo_house_doc_files")} == {TEXT_1, TEXT_2}  # nothing else is on disk yet
-    monkeypatch.setenv("MOGOV_HOUSE_DOCS_KINDS", "amendment")  # the next piece keeps the bill texts' rows
+    assert {r["url"] for r in _rows("mo_house_pdf_files")} == {TEXT_1, TEXT_2}  # nothing else is on disk yet
+    monkeypatch.setenv("MOGOV_HOUSE_PDF_KINDS", "amendment")  # the next piece keeps the bill texts' rows
     m.load(db.UNSHARDED)
     assert site.requests[2:] == [AMEND]
-    assert {r["url"] for r in _rows("mo_house_doc_texts")} == {TEXT_1, TEXT_2, AMEND}
-    monkeypatch.setenv("MOGOV_HOUSE_DOCS_KINDS", "witness")
+    assert {r["url"] for r in _rows("mo_house_pdf_texts")} == {TEXT_1, TEXT_2, AMEND}
+    monkeypatch.setenv("MOGOV_HOUSE_PDF_KINDS", "witness")
     with pytest.raises(SystemExit):
         m.load(db.UNSHARDED)
 
@@ -259,7 +298,7 @@ def test_shards_land_disjoint_parts_that_add_up(links_landed, monkeypatch):
     for i in range(2):
         m.load(db.Shard(i, 2))
     assert len(site.requests) == len(set(site.requests)) == 7  # no URL fetched by two shards
-    assert len(_rows("mo_house_doc_files")) == 7
+    assert len(_rows("mo_house_pdf_files")) == 7
 
 
 def test_corrupt_pdf_is_an_error_row_not_a_failed_run():
