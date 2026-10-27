@@ -3,10 +3,21 @@
 -- "Second Read and Referred S Government Efficiency Committee"), not the House's. journal_ref names the journal
 -- page that records the action (it can name both chambers, "H2291 / S1216") and journal_url links the PDF page.
 -- session_code is the House's code for the session (seed mo_senate_session_codes), null for a session with no
--- seed row.
+-- seed row. action_seq is the chronological order within the bill, 1 = the first action (the reverse of the served
+-- order). chamber is who acted, read from the wording: G when it names the Governor ("Signed by Governor"), H or S
+-- when exactly one of the standalone tokens H / S appears ("H Third Read and Passed", "Referred H Budget",
+-- "Second Read and Referred S Appropriations Committee", "SS S offered"), else null ("Perfected", "Signed by House
+-- Speaker", or an action naming both).
+-- session_year is read from `list_year` when the loader wrote one, else from the served `year` key (they agree).
+{%- set year_expr -%}
+coalesce(
+    {{ mogov.json_str('payload', '$.list_year') }},
+    {{ mogov.json_str('payload', '$.year') }}
+)
+{%- endset %}
 with src as (
     select
-        {{ dbt.safe_cast(mogov.json_str('payload', '$.year'), dbt.type_int()) }} as session_year,
+        {{ dbt.safe_cast(year_expr, dbt.type_int()) }} as session_year,
         {{ mogov.json_str('payload', '$.session_type') }} as session_type,
         {{ dbt.safe_cast(mogov.json_str('payload', '$.bill_id'), dbt.type_int()) }} as bill_id,
         {{ mogov.json_str('payload', '$.bill') }} as bill,
@@ -25,9 +36,18 @@ select
     src.bill_id,
     src.bill,
     src.action_index,
+    row_number() over (
+        partition by src.session_year, src.session_type, src.bill_id
+        order by src.action_index desc
+    ) as action_seq,
     {{ mogov.parse_date('src.action_date_text', '%m/%d/%Y') }} as action_date,
     src.action_date_text,
     src.action,
+    case
+        when src.action like '%Governor%' then 'G'
+        when (' ' || src.action || ' ') like '% H %' and (' ' || src.action || ' ') not like '% S %' then 'H'
+        when (' ' || src.action || ' ') like '% S %' and (' ' || src.action || ' ') not like '% H %' then 'S'
+    end as chamber,
     src.journal_ref,
     src.journal_url
 from src

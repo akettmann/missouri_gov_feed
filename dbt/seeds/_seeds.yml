@@ -352,7 +352,9 @@ seeds:
       regular session is the two-digit year + 1 (251), but the extraordinary sessions are not year + 2: the House
       has no 252, 2025's June special session is 253 and its September one 254. A row is added only with evidence
       (the evidence column), such as the same bills and titles in the House XML for that code; a Senate session
-      with no row has a null session_code in the staging models and fails assert_senate_sessions_have_house_codes.
+      with no row has a null session_code in the staging models and fails assert_senate_sessions_have_house_codes
+      (its header says how to add the row). 2017 E1 has no row: the Senate site returns an empty list for it (the House
+      has 173 and 174), so those special-session Senate bills are not landed.
     config:
       column_types: {session_year: integer, session_type: varchar, house_session_code: varchar, evidence: varchar}
     data_tests:

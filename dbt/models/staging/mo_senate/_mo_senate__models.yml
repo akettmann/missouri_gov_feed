@@ -8,7 +8,12 @@ models:
     Read", "Second Read and Referred S Government Efficiency Committee"), not the House''s. journal_ref names the
     journal page that records the action (it can name both chambers, "H2291 / S1216") and journal_url links the
     PDF page. session_code is the House''s code for the session (seed mo_senate_session_codes), null for a session
-    with no seed row.'
+    with no seed row. action_seq is the chronological order within the bill, 1 = the first action (the reverse of
+    the served order). chamber is who acted, read from the wording: G when it names the Governor ("Signed by Governor"),
+    H or S when exactly one of the standalone tokens H / S appears ("H Third Read and Passed", "Referred H Budget",
+    "Second Read and Referred S Appropriations Committee", "SS S offered"), else null ("Perfected", "Signed by House
+    Speaker", or an action naming both). session_year is read from `list_year` when the loader wrote one, else from
+    the served `year` key (they agree).'
   data_tests:
   - dbt_utils.unique_combination_of_columns:
       arguments:
@@ -17,6 +22,13 @@ models:
         - session_type
         - bill_id
         - action_index
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - session_year
+        - session_type
+        - bill_id
+        - action_seq
   columns:
   - name: bill_id
     data_tests:
@@ -24,6 +36,20 @@ models:
   - name: action
     data_tests:
     - not_null
+  - name: action_seq
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 1
+  - name: chamber
+    data_tests:
+    - accepted_values:
+        arguments:
+          values:
+          - S
+          - H
+          - G
   - name: action_date
     data_tests:
     - not_null:
@@ -39,7 +65,11 @@ models:
     sessions the mo_senate_bills loader has landed (regular and extraordinary). The list is complete: it does not
     depend on the bill having a topical-index keyword or reaching the House. session_code is the House''s code for
     the session (seed mo_senate_session_codes), null for a session with no seed row (a test fails on that). bill_id
-    is the site''s own key, not the bill number. Resolutions have no handler.'
+    is the site''s own key, not the bill number. Resolutions have no handler. bill_type is the prefix (SB, SJR,
+    SCR, SR, ...). legislator_id is the sponsor''s id in the list''s `legislatorId` (the site''s own legislator
+    key, not the House''s). session_year is read from `list_year` when the loader wrote one (the year of the list
+    the bill came from), else from the served `year` key: the loader used to overwrite the served `year` with the
+    list''s year, and they agree.'
   data_tests:
   - dbt_utils.unique_combination_of_columns:
       arguments:
@@ -63,7 +93,7 @@ models:
   - name: bill
     data_tests:
     - not_null
-  - name: bill_prefix
+  - name: bill_type
     data_tests:
     - accepted_values:
         arguments:

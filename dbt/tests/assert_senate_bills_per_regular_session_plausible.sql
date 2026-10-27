@@ -5,6 +5,6 @@ select
     session_year,
     count(*) as senate_bills
 from {{ ref('stg_mo_senate__bills') }}
-where session_type = 'R' and bill_prefix = 'SB'
+where session_type = 'R' and bill_type = 'SB'
 group by session_year
 having count(*) < 400 or count(*) > 2000
