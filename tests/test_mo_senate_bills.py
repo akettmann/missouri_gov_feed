@@ -629,23 +629,58 @@ def test_no_actions_notice_is_the_real_81_byte_answer():
     assert m.parse_actions(NO_ACTIONS) == []
 
 
-def test_a_rejected_fragment_skips_that_bill_but_not_the_others(monkeypatch, tmp_path):
-    monkeypatch.setattr(db, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(m, "window_years", lambda: [2025])
-    monkeypatch.setenv("MOGOV_SENATE_BILL_DOCS", "0")
+def _fake_get(reject):
+    """_get stand-in: reject(params) -> True raises NotABillFragment; otherwise the canned page."""
 
     def fake_get(params, year, **kw):
-        if params.get("handler") == "Actions":
-            if params["billId"] == 2724185:
-                raise m.NotABillFragment("blocked")
-            return SB1_ACTIONS
-        return LIST_2025_R if params["session"] == "R" else LIST_2025_EMPTY
+        if "handler" not in params:
+            return LIST_2025_R if params["session"] == "R" else LIST_2025_EMPTY
+        if reject(params):
+            raise m.NotABillFragment("blocked")
+        return SB1_ACTIONS if params["handler"] == "Actions" else _doc_page(params)
 
-    monkeypatch.setattr(m, "_get", fake_get)
+    return fake_get
+
+
+def _keys(table):
+    return sorted(_landed(table))
+
+
+def _setup(monkeypatch, tmp_path, docs):
+    monkeypatch.setattr(db, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(m, "window_years", lambda: [2025])
+    monkeypatch.setenv("MOGOV_SENATE_BILL_DOCS", "1" if docs else "0")
+
+
+def test_an_isolated_rejected_actions_tab_keeps_the_bill_row_and_drops_only_those_rows(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=False)
+    bad = 2724185
+    monkeypatch.setattr(m, "_get", _fake_get(lambda p: p["billId"] == bad))
     counts = m.load(db.Shard())
-    assert counts[m.BILLS_TABLE] == 4  # 5 listed, the rejected one skipped
-    with db.connect() as con:
-        keys = [
-            r[0] for r in con.execute(f"select record_key from read_parquet('{db.raw_glob(m.BILLS_TABLE)}')").fetchall()
-        ]
-    assert m.bill_key(2025, "R", 2724185) not in keys
+    assert counts[m.BILLS_TABLE] == 5  # the rejected bill is still listed
+    assert m.bill_key(2025, "R", bad) in _keys(m.BILLS_TABLE)
+    assert not [k for k in _keys(m.ACTIONS_TABLE) if k.startswith(f"2025/R/{bad}/")]
+    assert any(k.startswith("2025/R/233/") for k in _keys(m.ACTIONS_TABLE))
+
+
+def test_an_isolated_rejected_document_tab_drops_only_that_tab(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=True)
+    monkeypatch.setattr(m, "_get", _fake_get(lambda p: p["billId"] == 233 and p["handler"] == "Amendments"))
+    m.load(db.Shard())
+    assert "2025/R/233" in _keys(m.BILLS_TABLE)
+    assert any(k.startswith("2025/R/233/") for k in _keys(m.ACTIONS_TABLE))
+    assert any(k.startswith("2025/R/233/") for k in _keys(m.TEXTS_TABLE))
+    assert any(k.startswith("2025/R/233/") for k in _keys(m.FISCAL_NOTES_TABLE))
+    assert not [k for k in _keys(m.AMENDMENTS_TABLE) if k.startswith("2025/R/233/")]
+
+
+def test_persistent_rejection_raises_and_keeps_the_previous_landing(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=False)
+    monkeypatch.setattr(m, "_get", _fake_get(lambda p: False))
+    first = m.load(db.Shard())
+    assert first[m.BILLS_TABLE] == 5 and first[m.ACTIONS_TABLE] > 0
+    before = {t: _landed(t) for t in (m.BILLS_TABLE, m.ACTIONS_TABLE)}
+    monkeypatch.setattr(m, "_get", _fake_get(lambda p: p["handler"] == "Actions"))
+    with pytest.raises(m.TooManyRejectedFragments):
+        m.load(db.Shard())
+    assert {t: _landed(t) for t in before} == before

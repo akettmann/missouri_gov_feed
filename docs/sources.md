@@ -452,9 +452,14 @@ Quirks:
 - Fragments are checked before they are cached: a body with neither the tab's container nor that tab's own
   notice (`No Fiscal Notes available`, `No amendments available`, `No summaries available`, a text-versions
   one; Actions: its container or the 81-byte `No actions found for this bill.` a bill with no actions gets) is
-  rejected and not cached. A generic "No ... available" error page does not pass. A rejected fragment does not
-  stop the run: `mo_senate_bills.fragment_rejected` is logged with the bill key, none of that bill's rows land,
-  and the next run retries it.
+  rejected and not cached. A generic "No ... available" error page does not pass. A rejected fragment is
+  skipped, not fatal: `mo_senate_bills.fragment_rejected` is logged with the bill key and the tab, the bill-list row
+  and the bill's other tabs still land, and the rejected tab lands no rows. A missing tab therefore means "not
+  fetched this run" (the next run retries it), never "none": a bill with no actions has the notice and logs
+  `no_actions`; a bill with a rejected Actions tab has neither rows nor that notice, so an absent action history
+  for a listed bill is a gap to check against the warnings, not evidence of no actions. If bills with rejected
+  fragments reach 3 in a row, or 5% of the shard's bills (at least 3), the shard raises
+  `TooManyRejectedFragments` and publishes nothing, so the previous landing stays.
 - In the 2017 R list 561 of 604 bill objects have `session` = `"R "` with a trailing space (the loader's own
   `session_type` is clean).
 - `FiscalNotes` is sent with `sessionType=<session>` as the tab's own script does (the list page's

@@ -25,6 +25,7 @@ Requests to the host are paced by the lock shared by every process on the machin
 """
 
 import json
+import math
 import os
 import re
 from datetime import date
@@ -82,6 +83,16 @@ BILLS_ASSIGNMENT = re.compile(r"const\s+bills\s*=\s*")  # finds where the JSON s
 
 class NotABillFragment(RuntimeError):
     """A bill-page tab fragment that is neither a document list nor the site's "none available" notice."""
+
+
+class TooManyRejectedFragments(RuntimeError):
+    """Rejected fragments past the bound: the site is likely blocking us, so publish nothing from this shard."""
+
+
+# Isolated rejections are skipped; stop at 3 bills in a row, or at 5% of the shard's bills (never fewer than 3).
+MAX_CONSECUTIVE_REJECTED = 3
+MAX_REJECTED_SHARE = 0.05
+MIN_REJECTED_BILLS = 3
 
 
 class NotABillList(RuntimeError):
@@ -332,33 +343,56 @@ def load(shard: db.Shard) -> dict[str, int]:
     tables = [BILLS_TABLE, ACTIONS_TABLE, *(DOC_TABLES if docs else [])]
     with db.JsonSink(shard, source_url=LIST_URL, tables=tables) as sink:
         progress = obs.Progress("bills", len(units), log)
+        rejected_bills = consecutive = 0
         for year, session, bill in units:
             key = bill_key(year, session, bill["billId"])
             params = _actions_params(year, bill)
             url = f"{LIST_URL}?" + "&".join(f"{k}={v}" for k, v in params.items())
-            # Fetch every fragment before landing any row, so a rejected one skips the whole bill for this run
-            # (nothing cached, retried next run) instead of crashing the shard or landing a partial bill.
+            # The list page passed its own check, so the bill row always lands. A tab whose fragment is rejected
+            # lands no rows this run (nothing cached, retried next run); that means "not fetched", never "none".
+            skipped = []
             try:
                 actions = parse_actions(_get(params, year, check=_is_actions_fragment))
-                fetched = []
-                for handler in DOC_HANDLERS if docs else ():
-                    dparams = _doc_params(year, session, bill, handler)
-                    fragment = _get(dparams, year, check=_is_doc_fragment(handler))
-                    durl = f"{LIST_URL}?" + "&".join(f"{k}={v}" for k, v in dparams.items())
-                    fetched.append((handler, DOC_PARSERS[handler](fragment), durl))
             except NotABillFragment as e:
-                log.warning("mo_senate_bills.fragment_rejected", year=year, session=session, bill_key=key, error=str(e))
-                progress.tick()
-                continue
+                actions = None
+                skipped.append(("Actions", e))
+            fetched = []
+            for handler in DOC_HANDLERS if docs else ():
+                dparams = _doc_params(year, session, bill, handler)
+                try:
+                    fragment = _get(dparams, year, check=_is_doc_fragment(handler))
+                except NotABillFragment as e:
+                    skipped.append((handler, e))
+                    continue
+                durl = f"{LIST_URL}?" + "&".join(f"{k}={v}" for k, v in dparams.items())
+                fetched.append((handler, DOC_PARSERS[handler](fragment), durl))
+            for tab, e in skipped:
+                log.warning(
+                    "mo_senate_bills.fragment_rejected", year=year, session=session, bill_key=key, tab=tab, error=str(e)
+                )
+            if skipped:
+                rejected_bills += 1
+                consecutive += 1
+                # A site that starts serving block pages would otherwise skip every remaining bill and end the run
+                # "cleanly", and the sink would then replace the last good landing. Stop before publishing instead.
+                if consecutive >= MAX_CONSECUTIVE_REJECTED or rejected_bills >= max(
+                    MIN_REJECTED_BILLS, math.ceil(MAX_REJECTED_SHARE * len(units))
+                ):
+                    raise TooManyRejectedFragments(
+                        f"{rejected_bills} of {len(units)} bills had rejected fragments "
+                        f"({consecutive} in a row, last {key}); nothing published"
+                    )
+            else:
+                consecutive = 0
             sink.add(
                 BILLS_TABLE,
                 key,
                 {**bill, "list_year": year, "session_type": session},
                 source_url=f"{LIST_URL}?year={year}&session={session}",
             )
-            if not actions:
+            if actions is not None and not actions:
                 log.warning("mo_senate_bills.no_actions", year=year, session=session, bill_id=bill["billId"])
-            for a in actions:
+            for a in actions or ():
                 row = {
                     "year": year,
                     "session_type": session,
