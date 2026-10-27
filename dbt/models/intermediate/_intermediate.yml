@@ -222,7 +222,8 @@ models:
 - name: int_house_fd__schedule_lines
   description: 'House disclosure PDF text, each line tagged with the schedule it falls under (the nearest preceding
     "Schedule X:" header in the same document). Column-header rows, "None disclosed." and boilerplate drop out.
-    Grain: one text line per House disclosure PDF, tagged with its schedule.'
+    PDFs from 2021 on extract their small-caps text with NUL characters; the words are restored first (#576). Grain:
+    one text line per House disclosure PDF, tagged with its schedule.'
 - name: int_interests__industry_money
   description: 'Money each official received from an industry or interest, per year: campaign contributions from
     organizations, PACs and committees (individuals are left out: their employer is not their money) and lobbyist

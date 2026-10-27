@@ -75,7 +75,7 @@ Name-matched records carry a `match_confidence` column. Read medium-confidence m
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `MOGOV_METRICS_CONSOLE=1` | Export OpenTelemetry metrics over OTLP, or print them: `mogov.loader.rows`, `.duration`, `.failures`, `.progress` (by loader and shard), `mogov.http.requests`, `.bytes`, `.duration` (by host). |
 | `MOGOV_FEC_INDIV=1` | Also land FEC individual contributions (~2.3 GB per cycle). |
 | `MOGOV_LOOKBACK_YEARS` | Years of state roll calls, House and Senate (default 10, ending this year; House PDFs go back to 2014). |
-| `MOGOV_MEC_*_YEARS`, `MOGOV_FEC_CYCLES`, `MOGOV_VOTEVIEW_CONGRESSES`, ... | Other coverage windows (see each loader's header). |
+| `MOGOV_MEC_*_YEARS`, `MOGOV_FEC_CYCLES`, `MOGOV_VOTEVIEW_CONGRESSES`, `MOGOV_BILLSTATUS_CONGRESSES`, ... | Other coverage windows (see each loader's header). |
 | `MOGOV_PROGRESS_SECONDS` | How often loaders log `loader.progress` (default 15). |
 | `MOGOV_DUCKDB_MEMORY`, `MOGOV_DUCKDB_THREADS` | DuckDB limits per landing process (default 3GB, 4); lower them when running many shards. |
 

@@ -1,0 +1,49 @@
+# Unit tests for the GovInfo BILLSTATUS staging models: fixed source rows -> exact expected rows.
+version: 2
+
+unit_tests:
+  - name: billstatus_bills_cast_types_and_lowercase_type
+    model: stg_govinfo_billstatus__bills
+    description: >
+      The loader lands every value as text. The bill type (SJRES in the XML) is lower-cased, numbers and dates
+      are cast, and the update timestamp is cut to its date. A file without its congress.gov link (two thirds of them)
+      gets it built from type, congress and number (112th: the ordinal's teens rule), a published link is kept.
+    given:
+      - input: source('govinfo_billstatus', 'bills')
+        format: sql
+        rows: |
+            select cast('{"bill_id": "118-sjres-32", "congress": "118", "bill_type": "SJRES", "number": "32", "origin_chamber": "Senate", "introduced_date": "2023-06-13", "update_date": "2025-12-05T08:05:59Z", "title": "A joint resolution", "policy_area": null, "legislation_url": "https://c/32", "latest_action_date": "2023-04-03", "latest_action_text": "Referred."}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "112-hconres-3", "congress": "112", "bill_type": "HCONRES", "number": "3", "origin_chamber": "House", "introduced_date": "2011-01-05", "update_date": "2012-01-01T00:00:00Z", "title": "T", "policy_area": "Law", "legislation_url": null, "latest_action_date": null, "latest_action_text": null}' as varchar) as payload, 'u' as source_url
+    expect:
+      rows:
+        - {bill_id: 118-sjres-32, congress: 118, bill_type: sjres, bill_number: 32, origin_chamber: Senate, introduced_date: '2023-06-13', update_date: '2025-12-05', title: A joint resolution, policy_area: null, legislation_url: 'https://c/32', latest_action_date: '2023-04-03'}
+        - {bill_id: 112-hconres-3, congress: 112, bill_type: hconres, bill_number: 3, origin_chamber: House, introduced_date: '2011-01-05', update_date: '2012-01-01', title: T, policy_area: Law, legislation_url: 'https://www.congress.gov/bill/112th-congress/house-concurrent-resolution/3', latest_action_date: null}
+
+  - name: billstatus_cosponsors_parse_flags_and_dates
+    model: stg_govinfo_billstatus__cosponsors
+    description: >
+      isOriginalCosponsor arrives as the text True/False and becomes a boolean. A withdrawal date is cast, and a
+      senator has no district.
+    given:
+      - input: source('govinfo_billstatus', 'cosponsors')
+        format: sql
+        rows: |
+            select cast('{"bill_id": "118-sjres-32", "position": 0, "bioguide_id": "L000571", "state": "WY", "district": null, "sponsorship_date": "2023-06-13", "is_original_cosponsor": "True", "sponsorship_withdrawn_date": null}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-hr-9", "position": 1, "bioguide_id": "H000001", "state": "MO", "district": "6", "sponsorship_date": "2023-07-01", "is_original_cosponsor": "False", "sponsorship_withdrawn_date": "2023-08-01"}' as varchar) as payload, 'u' as source_url
+    expect:
+      rows:
+        - {bill_id: 118-sjres-32, position: 0, bioguide_id: L000571, state: WY, district: null, sponsorship_date: '2023-06-13', is_original_cosponsor: true, sponsorship_withdrawn_date: null}
+        - {bill_id: 118-hr-9, position: 1, bioguide_id: H000001, state: MO, district: 6, sponsorship_date: '2023-07-01', is_original_cosponsor: false, sponsorship_withdrawn_date: '2023-08-01'}
+
+  - name: billstatus_recorded_votes_cast_roll_numbers_and_dates
+    model: stg_govinfo_billstatus__recorded_votes
+    description: >
+      Roll number and session arrive as text and become integers; the vote timestamp is cut to its date.
+    given:
+      - input: source('govinfo_billstatus', 'recorded_votes')
+        format: sql
+        rows: |
+            select cast('{"bill_id": "118-sjres-32", "action_position": 0, "chamber": "Senate", "congress": "118", "session_number": "2", "roll_number": "5", "vote_date": "2024-01-10T21:14:54Z", "url": "https://s/5"}' as varchar) as payload, 'u' as source_url
+    expect:
+      rows:
+        - {bill_id: 118-sjres-32, action_position: 0, chamber: Senate, congress: 118, session_number: 2, roll_number: 5, vote_date: '2024-01-10', vote_url: 'https://s/5'}

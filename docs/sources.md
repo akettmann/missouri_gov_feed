@@ -19,6 +19,7 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `tap_mec` | MEC via The Accountability Project | state campaign finance and lobbyist gifts | 2011–2022 (gifts from 2004) | |
 | `fec` | Federal Election Commission | federal candidates, committees, PAC contributions, donor aggregates | `MOGOV_FEC_CYCLES` | API key for aggregates |
 | `voteview` | Voteview | Congress roll calls, votes, DW-NOMINATE ideology | `MOGOV_VOTEVIEW_CONGRESSES` | |
+| `govinfo_billstatus` | GovInfo BILLSTATUS bulk XML (govinfo.gov) | federal bills: sponsor, cosponsors, actions, roll calls cited, Public Law number | `MOGOV_BILLSTATUS_CONGRESSES` (default 117-119) | |
 | `house_fd` | U.S. House Clerk | House members' financial disclosures and trades | 2015+ | |
 | `senate_efd` | U.S. Senate eFD | senators' financial disclosures | as filed | opt-in |
 | `courtlistener_bulk` | CourtListener bulk files | judges, positions, education, federal judges' disclosures | quarterly snapshot | |
@@ -234,6 +235,9 @@ Quirks:
   (the Budget chair sponsors them and almost all pass). Only current officials (`dim_official`) have an
   `official_id`, so former members are absent: for 2017 only 27 of 1,224 House primary-sponsor rows match, for
   2026 2,044 of 2,086. A member with House and Senate careers has rows for House sessions only.
+  Survivorship: the earliest sessions (2017-2018) hold only members still in office today, mostly long-serving
+  leaders, so their shares are not comparable with recent sessions. The profile page ("Bills sponsored in the
+  House") shows the counts with their n, a percent only when `bills_decided >= 5`, and this caveat.
 - PDF text extraction is cached by PDF content (`data/cache/pdftext/`). Before that, a re-run spent
   3–10 minutes per shard re-parsing PDFs that were already downloaded.
 - Bill status (`fct_bills.status`, `outcome`; `int_bills__status`) comes from each bill's `Action` list. The
@@ -755,6 +759,43 @@ Quirks:
 - The rollcalls file has only House and Senate rows, and the source `accepted_values` tests on all three files
   flag any new chamber value; staging drops unknown chambers either way.
 
+## govinfo_billstatus: federal bills, sponsors and outcomes
+
+Flow: [diagrams/sources/govinfo_billstatus.svg](diagrams/sources/govinfo_billstatus.svg)
+
+GovInfo's Bill Status bulk data (https://www.govinfo.gov/bulkdata/BILLSTATUS): one zip per Congress and bill type
+(`/119/hr/BILLSTATUS-119-hr.zip`, 33 MB; `/118/s/...`, 14 MB), each member one bill's XML. No key, no robots.txt
+rule against `/bulkdata`, US government work (the page states no licence). Congresses 108 (2003) to 119 exist;
+`MOGOV_BILLSTATUS_CONGRESSES` picks the loaded ones (default 117,118,119, as for Voteview) and
+`MOGOV_BILLSTATUS_TYPES` the bill types (default all eight).
+
+- Lands: every XML file unchanged as gzip under `data/raw/govinfo_billstatus_xml/<congress>/<type>/` plus
+  `govinfo_billstatus_files` (path, URL, size, sha256, landing time); parsed with lxml into one JSON row per entity:
+  `govinfo_billstatus_bills`, `_sponsors`, `_cosponsors`, `_actions`, `_recorded_votes`, `_laws`.
+  Committees, subjects, summaries, titles and text versions stay in the raw XML only.
+- Shard units: (congress, bill type) zips, each downloaded by exactly one shard (so no shard repeats another's
+  download). The House `hr` zip is by far the largest, so more shards than zips (8 per Congress) gain nothing.
+- Everything is landed (all states): cosponsor lists need the whole file anyway, and the Missouri filter
+  (sponsor `state` = MO) is applied in dbt, in `fct_federal_sponsorship` (one row per Missouri member, bill and
+  role, with `became_law` and the Public Law number).
+- Cache: the newest Congress's zips daily (bills move all the time), older Congresses monthly. A 404 for a zip
+  (a bill type with no zip for a Congress) is logged and skipped.
+
+Quirks:
+- Outcome is only the `<laws>` list. The latest-action text is a free-text field and a bill can fail, be vetoed,
+  or be folded into another bill with the same words; `became_law` therefore means "carries a Public Law number".
+  Vetoes, veto overrides and pocket vetoes appear only as actions (type `Veto`, `President`, `BecameLaw`) and are
+  not modelled yet.
+- `<legislationUrl>` is present on only about a third of the files (S.J.Res. 118th: 47 of 122; H.Res.: 335 of
+  1,627), so `stg_govinfo_billstatus__bills` builds the congress.gov link from the type, Congress and number
+  when it is missing.
+- Each action is often listed twice: the chamber's own and the Library of Congress's coded copy (`sourceSystem`
+  names which). Roll calls cited by both appear twice in `_recorded_votes`. Count distinct roll calls, not rows.
+- `isOriginalCosponsor` is the text `True`/`False`; a cosponsor who later withdrew keeps their row with
+  `sponsorshipWithdrawnDate` set (the mart drops them). `district` is present for House members only.
+- Sponsors carry the member's state at the time of the bill; a member who changed states has rows under both.
+- Rate: the loader makes one request per zip (24 for the default window), not per bill.
+
 ## house_fd: U.S. House financial disclosures
 
 Flow: [diagrams/sources/house_fd.svg](diagrams/sources/house_fd.svg)
@@ -768,6 +809,17 @@ Quirks:
 - Scanned paper filings (DocID 8xxxxxxx/9xxxxxxx) have no text layer. They land as one
   `has_text = false` row, so the gap is visible.
 - Periodic transaction reports live under `ptr-pdfs/`; everything else is under `financial-pdfs/`.
+- From 2021 on, the PDFs set their small-caps text (schedule headers, the Location/Description/Comments labels,
+  the page section titles) in a font that text extraction turns into NUL characters: the capital stays and each
+  smaller letter becomes one NUL, so `Schedule A:` lands as `S` + 7 NULs + ` A:`. Values (asset names, amounts)
+  extract normally. The raw lines are stored unchanged; `int_house_fd__schedule_lines` restores the words from
+  the exact NUL counts (macro `mogov.house_fd_restore_text`) and strips any NUL left, so no NUL reaches the
+  marts. Before this fix no 2022+ report (and 8 of 25 in 2021) produced a schedule line (#576); a sanity test now
+  fails if under 90% of a year's text PDFs do.
+  The form's closing pages (the "Exclusions of spouse, dependent, or trust information" questions, certification
+  and signature) follow Schedule J but belong to no schedule, and "Schedule A ... Investment Vehicle Details"
+  blocks follow it too, so the parser stops emitting lines at the exclusions page and opens schedule A at those
+  detail headers; otherwise that boilerplate and the vehicle names surfaced as J compensation sources.
 - Index type `H` is the New Filer Report (PDF header `Filing Type: New Filer Report`), filed by new members; a
   separate report from that year's Annual Report (O). The loader reads it like O/A/P/C/T. Other index types
   (D, X, G, E, B, W) are not downloaded.

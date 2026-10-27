@@ -190,6 +190,12 @@ MEC campaign finance via The Accountability Project mirror. Source: [sources/tap
 
 ![tap_mec](sources/tap_mec.svg)
 
+### govinfo_billstatus
+
+GovInfo BILLSTATUS federal bills, sponsors and Public Laws. Source: [sources/govinfo_billstatus.puml](sources/govinfo_billstatus.puml)
+
+![govinfo_billstatus](sources/govinfo_billstatus.svg)
+
 ### voteview
 
 Voteview congressional roll calls and DW-NOMINATE scores. Source: [sources/voteview.puml](sources/voteview.puml)

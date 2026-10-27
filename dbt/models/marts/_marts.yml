@@ -495,6 +495,80 @@ models:
         description: "{{ doc('source_url') }}"
         data_tests: [not_null]
 
+  - name: fct_federal_sponsorship
+    description: >
+      Federal bills sponsored or cosponsored by Missouri's members of Congress, from the GovInfo BILLSTATUS bulk
+      XML (loaded congresses, MOGOV_BILLSTATUS_CONGRESSES), with the outcome as a fact: became_law is true when
+      the bill carries a Public Law number. Withdrawn cosponsorships are dropped. Whether that counts as a
+      "successful" bill is a policy call this model does not make. Grain: (bioguide_id, bill_id, role).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [bioguide_id, bill_id, role]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }} Null for members who are no longer in office."
+      - name: bioguide_id
+        data_type: varchar
+        description: Bioguide id of the member (joins congress_legislators).
+        data_tests: [not_null]
+      - name: full_name
+        data_type: varchar
+        description: Name as printed in the bill file, with party and state, e.g. "Rep. Graves, Sam [R-MO-6]".
+      - name: party
+        data_type: varchar
+        description: Party letter as printed in the bill file (R, D, I).
+      - name: role
+        data_type: varchar
+        description: "`sponsor` or `cosponsor`."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['sponsor', 'cosponsor']
+      - name: is_original_cosponsor
+        data_type: boolean
+        description: True for a cosponsor who signed on when the bill was introduced; false for sponsors.
+      - name: bill_id
+        data_type: varchar
+        description: "`<congress>-<type>-<number>`, e.g. 119-hr-1."
+        data_tests: [not_null]
+      - name: congress
+        data_type: integer
+        description: Congress number (119 = 2025-2027).
+      - name: bill_type
+        data_type: varchar
+        description: hr, s, hjres, sjres, hconres, sconres, hres or sres.
+      - name: bill_number
+        data_type: integer
+        description: Bill number within its type and congress.
+      - name: introduced_date
+        data_type: date
+        description: Date the bill was introduced.
+      - name: title
+        data_type: varchar
+        description: The bill's title as published.
+      - name: policy_area
+        data_type: varchar
+        description: Congress.gov policy area (one per bill); null before one is assigned.
+      - name: latest_action_date
+        data_type: date
+        description: Date of the bill's most recent action.
+      - name: latest_action_text
+        data_type: varchar
+        description: Text of the most recent action, as published.
+      - name: public_law_number
+        data_type: varchar
+        description: Public Law number, e.g. 119-21, when the bill became law.
+      - name: became_law
+        data_type: boolean
+        description: True when the bill carries a Public Law number.
+        data_tests: [not_null]
+      - name: source_url
+        data_type: varchar
+        description: The bill's page on congress.gov.
+        data_tests: [not_null]
+
   - name: fct_campaign_finance
     description: >
       Money into and out of each official's campaign committees. Federal: FEC committee contributions (pas2)
@@ -1786,8 +1860,9 @@ models:
       share. Senate sponsors are left out (the House XML lists them for 2017-2022 only). Re-listed appropriation
       bills are not counted twice (fct_bill_sponsors drops them). Appropriation bills are kept: they are real
       sponsorships, and the Budget chair sponsors them and almost all pass, so the chair's shares are high for
-      that reason (the 2026 chair, Dirk Deaton, is not in dim_official, so does not appear). Only current officials (dim_official) have an official_id, so former members are not here
-      (2026: 2,044 of 2,086 House sponsor rows match; 2017: 27 of 1,224). A bill is "decided" unless its outcome
+      that reason (a member who has left office, such as a former Budget chair, has no row). Only current officials (dim_official) have an official_id, so former members are not here
+      (2026: 2,044 of 2,086 House sponsor rows match; 2017: 27 of 1,224). Survivorship: the earliest sessions (2017-2018) hold only
+      members still in office today, mostly long-serving leaders, so their shares are not comparable with recent sessions. A bill is "decided" unless its outcome
       is pending (session still open) or awaiting governor (truly agreed this year); decided bills are the
       denominator of both shares, and the passed and became-law counts only include decided bills, so a share
       is always between 0 and 1. A member who moved between chambers has rows only for the House sessions in

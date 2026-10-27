@@ -8,6 +8,7 @@ import { siteDonors } from "./businessDonors";
 import { overlapExamplesSql, recusedSql, senateRollCallsSql } from "./overlapQuery";
 import { trailRowsSql } from "./trailQuery";
 import { exportedAt, hasExport, query } from "./db";
+import { buildSponsorshipSessions, type SponsorshipRow } from "../sponsorshipOutcomes";
 import { buildCommitteeSessions, type PostCounts, type TitledMembership } from "../committeePosts";
 import { payYearsGate, type PayVoteRow } from "../attendancePay";
 import { loadLegislatorExpenses } from "./legislatorExpenses";
@@ -472,6 +473,19 @@ async function loadAll(): Promise<OfficialBundle[]> {
         )
       : null;
 
+  // Bill sponsorship outcomes: the mart only has current officials (dim_official), so no further filter
+  const sponsorshipSessions = hasExport("fct_sponsorship_outcomes")
+    ? buildSponsorshipSessions(
+        await query<SponsorshipRow>(`
+          select official_id, session_code, cast(session_year as integer) as session_year, is_session_over,
+                 cast(bills_sponsored as integer) as bills_sponsored, cast(bills_decided as integer) as bills_decided,
+                 cast(bills_passed_house as integer) as bills_passed_house,
+                 cast(bills_became_law as integer) as bills_became_law, source_url
+          from {fct_sponsorship_outcomes}`),
+        houseSessionNames,
+      )
+    : null;
+
   // a federal appellate judge has ~6k cases: ship yearly counts plus the most recent ones
   const RECENT_CASES = 50;
   const hasCases = hasExport("fct_case_history");
@@ -576,6 +590,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
         },
         overlap: hasOverlap ? ((overlap.get(id) ?? []) as InterestOverlap[]) : null,
         committees: committeeSessions ? (committeeSessions.get(id) ?? []) : null,
+        sponsorship: sponsorshipSessions ? (sponsorshipSessions.get(id) ?? []) : null,
         courts: {
           status: status("cases"),
           time_to_disposition: dispositions.get(id) ?? null,
@@ -698,6 +713,7 @@ export function freshness(): { table: string; exported_at: string | null; sample
     "rpt_party_breaks",
     "fct_committee_posts",
     "fct_committee_memberships",
+    "fct_sponsorship_outcomes",
     "rpt_attendance",
     "rpt_attendance_pay",
     "dim_house_session",

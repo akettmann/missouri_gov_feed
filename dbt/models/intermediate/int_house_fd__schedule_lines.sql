@@ -1,7 +1,15 @@
 -- House disclosure PDF text, each line tagged with the schedule it falls under (the nearest preceding
 -- "Schedule X:" header in the same document). Column-header rows, "None disclosed." and boilerplate drop out.
+-- PDFs from 2021 on extract their small-caps text with NUL characters; the words are restored first (#576).
 with lines as (
-    select * from {{ ref('stg_house_fd__pdf_lines') }}
+    select
+        doc_id,
+        document_url,
+        has_text,
+        page,
+        line_no,
+        {{ mogov.house_fd_restore_text('line_text') }} as line_text
+    from {{ ref('stg_house_fd__pdf_lines') }}
 ),
 
 sequenced as (
@@ -11,6 +19,8 @@ sequenced as (
         case
             when
                 lower(line_text) like 'schedule a:%' or lower(line_text) like 'schedule a and b%'
+                -- 2021+ layout: "Schedule A Asset Class Details" / "Schedule A Investment Vehicle Details"
+                or lower(line_text) like 'schedule a %details'
                 then 'A: assets & unearned income'
             when lower(line_text) like 'schedule b:%' then 'B: transactions'
             when lower(line_text) like 'schedule c:%' then 'C: earned income'
@@ -21,6 +31,11 @@ sequenced as (
             when lower(line_text) like 'schedule h:%' then 'H: travel'
             when lower(line_text) like 'schedule i:%' then 'I: charity in lieu of honoraria'
             when lower(line_text) like 'schedule j:%' then 'J: compensation over $5,000 from one source'
+            -- the form's closing pages (exclusion questions, certification, signature) follow the last schedule;
+            -- their lines belong to no schedule (the sentinel is dropped below)
+            when
+                lower(line_text) like 'exclusions of spouse%' or lower(line_text) like 'certification and signature%'
+                then 'end of form'
             when
                 lower(line_text) like '%transaction date%' or lower(line_text) like 'id owner asset%'
                 then 'PTR: transactions'
@@ -52,10 +67,15 @@ from tagged as t
 inner join tagged as h on t.doc_id = h.doc_id and t.header_seq = h.seq
 where
     t.header_schedule is null
+    and h.header_schedule != 'end of form'
     and lower(t.line_text) not in ('none disclosed.', 'none disclosed')
     and lower(t.line_text) not like 'asset owner value%'
     and lower(t.line_text) not like 'type(s) $1,000?%'
     and lower(t.line_text) not like 'source type amount%'
     and lower(t.line_text) not like 'position name of organization%'
+    and lower(t.line_text) not like 'source (name and address)%'
     and lower(t.line_text) not like '%for the complete list of asset type%'
     and lower(t.line_text) not like 'filing id #%'
+    -- column-header spill of the 2021+ layouts (schedule F and others): would otherwise become ties
+    and lower(t.line_text) not like 'date parties to terms%'
+    and lower(t.line_text) not in ('filing', 'current year to preceding year')
