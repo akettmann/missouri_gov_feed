@@ -4,9 +4,11 @@
 -- sessions: every Senate bill, including those under no topical-index keyword; #586), then for a session whose Senate
 -- list is not loaded the Senate topical index (regular sessions; bills under no keyword are missing) and the Senate
 -- bills the House XML's SenateActList lists that neither has (2024 on).
--- status and outcome come from the House XML's actions (int_bills__status): null for Senate bills that never
--- reached the House, whose actions aren't loaded: every Senate bill before 2024, since the House's list of Senate
--- bills exists only for 2024 and later.
+-- status and outcome come from the actions of both chambers (int_bills__status): the House XML's for House bills and
+-- the Senate bills that reached the House, and the Senate's own history (senate.mo.gov; #588) for every Senate bill
+-- of a session the mo_senate_bills loader has landed. Null for a Senate bill of an unlanded session that never
+-- reached the House (the House's list of Senate bills exists only for 2024 and later), and for a listed Senate bill
+-- whose Actions tab was not landed (unknown, not a stage).
 -- Each regular session also lists 15 to 17 relistings of the previous session's appropriation bills (status
 -- 'relisted for governor message', relisted_from_session_code naming the original's session): the House adds
 -- them only to record the governor's Art. IV, s. 27 message. They are rows here but not new bills, so count
