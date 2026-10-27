@@ -49,6 +49,11 @@ checked < 30 days ago?) then (yes)
   endif
   :pdfplumber text per page (mogov.pdftext, stored as-is,
   time budget per document);
+  if (bill text version with text?) then (yes)
+    :read the enacting title and Section A for the RSMo sections
+    repealed, amended and enacted (mogov.parsers.mo_house_statute_refs);
+    :rows in mo_house_pdf_statute_refs (ranges kept as written);
+  endif
   :row in mo_house_pdf_files (path, size, sha256, status, error,
   checked_at, etag, last_modified)
   and row in mo_house_pdf_texts (page_count, text, pages_json, error);
