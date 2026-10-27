@@ -21,6 +21,7 @@ Options (environment): MOGOV_HOUSE_PDF_KINDS (comma list, default all) and MOGOV
 of session codes, default all).
 """
 
+import contextlib
 import hashlib
 import json
 import os
@@ -162,9 +163,10 @@ def _read_previous_files() -> dict[str, DocFile]:
             ).fetchall()
         }
         cols = ", ".join(n if n in have else f"null as {n}" for n in names)
+        # the newest row for a URL sorts last; the part file name makes ties (error rows have no landed_at) stable
         rows = con.execute(
-            f"select {cols} from read_parquet('{db.raw_glob(DocFile.TABLE)}', union_by_name = true) "
-            "order by url, landed_at nulls first"
+            f"select {cols} from read_parquet('{db.raw_glob(DocFile.TABLE)}', union_by_name = true, filename = true) "
+            "order by url, coalesce(checked_at, landed_at) nulls first, filename"
         ).fetchall()
     return {r[0]: DocFile(*r) for r in rows}
 
@@ -383,8 +385,11 @@ def _text_row(link: Link, pages: list[str]) -> DocText:
     return DocText(*base, len(pages), "\n".join(pages), json.dumps(pages), None)
 
 
+CACHED = "(cached) "  # prefix on an error row reported from a timeout marker
+
+
 def _timeout_marker(sha256_hex: str) -> Path:
-    return pdftext.CACHE_DIR / "mo_house_pdf_timeouts" / f"{sha256_hex}-x{X_TOLERANCE}.json"
+    return pdftext.CACHE_DIR / "mo_house_pdf_timeouts" / f"{sha256_hex}-x{X_TOLERANCE}-{pdftext._EXTRACTOR}.json"
 
 
 def _cached_timeout(sha256_hex: str | None) -> str | None:
@@ -413,13 +418,15 @@ def extract(link: Link, data: bytes | None, error: str | None) -> DocText:
         return DocText(*base, None, None, None, error or "not fetched")
     sha = hashlib.sha256(data).hexdigest()
     if (cached := _cached_timeout(sha)) is not None:
-        return DocText(*base, None, None, None, cached)
+        return DocText(*base, None, None, None, CACHED + cached)
     try:
         pages = pdftext.page_texts(data, layout=False, x_tolerance=X_TOLERANCE)
     except pdftext.ExtractTimeout as exc:
         message = f"{type(exc).__name__}: {exc}"
         log.warning("mo_house_pdf.extract_timeout", url=link.url, error=message)
-        _remember_timeout(sha, message)
+        # best effort: a marker that cannot be written only costs the next run another try
+        with contextlib.suppress(OSError):
+            _remember_timeout(sha, message)
         return DocText(*base, None, None, None, message)
     except Exception as exc:  # a corrupt or runaway PDF is a row, not a failed run
         return DocText(*base, None, None, None, f"{type(exc).__name__}: {exc}")
@@ -435,7 +442,7 @@ def extract_landed(link: Link, row: DocFile) -> DocText:
     if (cached := _cached_timeout(row.sha256)) is not None:  # known to time out: do not even read the file
         return DocText(
             link.url, link.kind, link.session_code, link.file_name, link.lr_number, link.version_code, link.n_links,
-            None, None, None, cached,
+            None, None, None, CACHED + cached,
         )  # fmt: skip
     return extract(link, (db.RAW_DIR / row.rel_path).read_bytes(), None)
 

@@ -339,8 +339,10 @@ fiscal_notes,amendments}`), so run `mo_house` first; no crawl is needed.
 - Text extraction is bounded: pages are released as they are read, and one document may take at most
   `pdftext.MAX_SECONDS` (600 s, checked between pages); past that the document lands as an error row
   (`ExtractTimeout`) instead of hanging the shard. A single page that never returns is not interrupted. A timeout is remembered by the
-  PDF's hash (`<cache>/mo_house_pdf_timeouts/`) for the same 30 days, so later runs report the error row without
-  extracting again; delete that marker file to retry sooner.
+  PDF's hash and the pdfplumber version (`<cache>/mo_house_pdf_timeouts/`) for the same 30 days, so later runs
+  report the error row (prefixed `(cached) `) without extracting again; an extractor upgrade retries on its own, or
+  delete the marker file to retry sooner. The marker is written best-effort: if it cannot be written the row still
+  lands and the next run tries again.
 - Changing the shard count: `db` drops the old-count parts when the first new-count shard publishes, so a shard that
   starts later (Cloud Run waves) no longer sees the earlier rows for its URLs: one round of re-hashing, and error
   history is lost for them. Run a full unfiltered load after changing `--shards`. `previous_files()` retries its read
