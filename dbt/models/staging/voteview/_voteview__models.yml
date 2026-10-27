@@ -5,7 +5,9 @@ models:
 - name: stg_voteview__members
   description: 'Voteview member-congress rows, with DW-NOMINATE ideal points (dim1: economic left(-)/right(+)).'
 - name: stg_voteview__rollcalls
-  description: 'Voteview roll calls (both chambers, loaded congresses): date, bill, question, result and vote totals.'
+  description: 'Voteview roll calls (both chambers, loaded congresses): date, bill, question, result and vote totals.
+    rollnumber runs across the whole Congress; clerk_rollnumber is the chamber clerk''s number, which restarts each
+    session and is the number BILLSTATUS cites (with the session).'
 - name: stg_voteview__votes
   description: 'cast_code per Voteview: 1-3 yea, 4-6 nay, 7-8 present, 9 not voting, 0 not a member.'
   columns:

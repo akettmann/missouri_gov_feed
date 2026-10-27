@@ -1,0 +1,40 @@
+# Unit tests for fct_federal_vote_bills: BILLSTATUS cites (session, clerk roll number); Voteview's rollnumber runs on.
+version: 2
+
+unit_tests:
+  - name: federal_vote_bills_join_on_session_and_clerk_roll_number
+    model: fct_federal_vote_bills
+    description: >
+      Voteview's House roll calls 5 (session 1, clerk number 5) and 720 (session 2, clerk number 5) share a clerk
+      number; BILLSTATUS cites "118, House, session 2, roll 5" for bill 118-hr-2, so only Voteview roll call 720
+      matches (joining on rollnumber would link 118-hr-2 to roll call 5, a different vote). The chamber action and
+      its Library of Congress copy both cite the same roll call for 118-hr-2, giving one row. Senate session 1
+      roll 5 cited by 118-s-9 links to Voteview Senate roll call 5. 118-hr-3 cites a roll call Voteview does not
+      have (House session 2, roll 999) and links to nothing; a House citation does not match the Senate roll call
+      with the same numbers. 118-hr-4 and 118-hr-2 both cite House session 2 roll 5, so that roll call has two
+      bills.
+    given:
+      - input: ref('stg_govinfo_billstatus__recorded_votes')
+        rows:
+          - {bill_id: 118-hr-2, action_position: 3, chamber: House, congress: 118, session_number: 2, roll_number: 5}
+          - {bill_id: 118-hr-2, action_position: 4, chamber: House, congress: 118, session_number: 2, roll_number: 5}
+          - {bill_id: 118-hr-4, action_position: 1, chamber: House, congress: 118, session_number: 2, roll_number: 5}
+          - {bill_id: 118-hr-3, action_position: 1, chamber: House, congress: 118, session_number: 2, roll_number: 999}
+          - {bill_id: 118-s-9, action_position: 1, chamber: Senate, congress: 118, session_number: 1, roll_number: 5}
+      - input: ref('stg_govinfo_billstatus__bills')
+        rows:
+          - {bill_id: 118-hr-2, bill_type: hr, bill_number: 2, title: Two, legislation_url: u2}
+          - {bill_id: 118-hr-3, bill_type: hr, bill_number: 3, title: Three, legislation_url: u3}
+          - {bill_id: 118-hr-4, bill_type: hr, bill_number: 4, title: Four, legislation_url: u4}
+          - {bill_id: 118-s-9, bill_type: s, bill_number: 9, title: Nine, legislation_url: u9}
+      - input: ref('stg_voteview__rollcalls')
+        rows:
+          - {congress: 118, chamber: House, rollnumber: 5, session: 1, clerk_rollnumber: 5, bill_number: HR1}
+          - {congress: 118, chamber: House, rollnumber: 720, session: 2, clerk_rollnumber: 5, bill_number: HR2}
+          - {congress: 118, chamber: Senate, rollnumber: 5, session: 1, clerk_rollnumber: 5, bill_number: S9}
+          - {congress: 118, chamber: Senate, rollnumber: 999, session: 2, clerk_rollnumber: 999, bill_number: S1}
+    expect:
+      rows:
+        - {congress: 118, chamber: House, rollnumber: 720, bill_id: 118-hr-2, voteview_bill_number: HR2, source_url: https://voteview.com/rollcall/RH1180720}
+        - {congress: 118, chamber: House, rollnumber: 720, bill_id: 118-hr-4, voteview_bill_number: HR2, source_url: https://voteview.com/rollcall/RH1180720}
+        - {congress: 118, chamber: Senate, rollnumber: 5, bill_id: 118-s-9, voteview_bill_number: S9, source_url: https://voteview.com/rollcall/RS1180005}
