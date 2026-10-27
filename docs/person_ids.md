@@ -419,20 +419,22 @@ Owner: #658.
 
 | person | issues | model | rule | test |
 |---|---|---|---|---|
-| The 25 undated senators of 2017-2023 | #516 | `int_mo_legislators__seats` | start from first journal vote | `senate_seat_terms_dated_from_the_journal_roll_calls_per_term` (synthetic rows); named: TODO (#658) |
-| Joseph Keaveny, Eric Schmitt, Kurt Schaefer, David Pearce (end 2017-01-03) | #522 | `int_mo_legislators__seats` | unvoted term ends before the journals | same test (synthetic rows); named: TODO (#658) |
-| Will Kraus (SD8), Ryan Silvey (SD17) (capped at last vote) | #522 #551 | `int_mo_legislators__seats` | last-vote cap, today's behaviour | same test (synthetic rows); named: TODO (#658) |
-| Jason Holsman (resigned 2020-01-16, last vote 2020-01-13) | #522 | `int_mo_legislators__seats` | gap under a year is not capped | TODO (#658) |
-| Mike Cierpiot (SD8 seating, late 2017 unknown) | #525 | `int_officeholders__years` | Open States start 2018-01-03 kept (counted from 2018-01-01) | TODO (#658) |
-| Rebecca Roeber (HD34 2020) | #152 | `int_officeholders__years` | drop rule 1 | `officeholders_house_row_dropped_when_the_roster_outlives_the_members_last_term` |
-| Scott Fitzpatrick (HD158 2019) | #491 | `int_officeholders__years` | drop rule 2 | `officeholders_house_row_dropped_when_the_members_last_roll_call_is_before_the_handover` |
-| Lauren Arthur (HD18 2017-18, kept) | #491 | `int_officeholders__years` | drop rule 1 skips rows without an Open States id | TODO (#658) |
-| Holly Thompson Rehder (REHDER), Wiley Price IV (PRICE) | #539 #581 | `int_mo_house__votes` | name rank 3 and 2 | `house_vote_tokens_match_compound_and_suffixed_surnames`, `house_vote_tokens_exact_surname_beats_suffix_stripped` |
-| Cheri Toalson Reisch (REISCH), Cyndi Buchheit-Courtway (COURTWAY) | #539 | `int_mo_house__votes` | name rank 3 | TODO (#658); the Rehder shape |
-| Jean Evans / David Evans (EVANS 2019) | #539 | `int_mo_house__votes` | seat-date tie-break | `house_vote_tokens_shared_surname_resolved_by_seat_dates` |
-| Rory Rowland (missing from the 2022 list) | #539 #581 | `int_mo_house__votes` | cross-session fallback | `house_vote_tokens_cross_session_fallback_uses_seat_dates` (Lowe shape); named: TODO (#658) |
+| Paul Wieland (SD22), Jeanie Riddle (SD10), Jason Holsman (SD7): 3 of the 25 undated senators of 2017-2023 | #516 | `int_mo_legislators__seats` | start from first journal vote (2017-01-04) | `senate_seat_terms_dated_from_the_journal_roll_calls_per_term` (synthetic rows); named: `senate_seat_terms_of_named_senators_dated_from_the_journal` |
+| Joseph Keaveny, Eric Schmitt, Kurt Schaefer, David Pearce (end 2017-01-03; Pearce's SD31 term to 2012 kept) | #522 | `int_mo_legislators__seats` | unvoted term ends before the journals | same test (synthetic rows); named: `senate_seat_terms_of_named_senators_dated_from_the_journal` |
+| Will Kraus (SD8, to 2017-07-25), Ryan Silvey (SD17, to 2017-09-13) (capped at last vote) | #522 #551 | `int_mo_legislators__seats` | last-vote cap, today's behaviour (Silvey's end changes if #551 is decided otherwise) | same test (synthetic rows); named: `senate_seat_terms_of_named_senators_dated_from_the_journal` |
+| Jason Holsman (resigned 2020-01-16, last vote 2020-01-13); Lauren Arthur (SD17 to 2024-07-21, last vote 2024-05-13) | #522 | `int_mo_legislators__seats` | gap under a year is not capped | `senate_seat_terms_of_named_senators_dated_from_the_journal` |
+| Senate years 2017-2018 present (all 34 districts dated); 2019 dropped when SD4 lacks a holder | #516 | `int_officeholders__years` | 34-district rule | `officeholders_senate_seats_as_dated_by_the_seat_table` (synthetic); named: `officeholders_named_senate_holders_in_2017_and_2018` |
+| Mike Cierpiot (SD8 from 2018; Kraus alone in 2017) | #525 | `int_officeholders__years` | Open States start kept (2018-01-01 in the seat table; first vote 2018-01-08); January 15 handover | `senate_seat_terms_of_named_senators_dated_from_the_journal`, `officeholders_named_senate_holders_in_2017_and_2018` |
+| Ryan Silvey (SD17 2017) / Lauren Arthur (SD17 2018) | #522 #551 | `int_officeholders__years` | capped end, today's behaviour | `officeholders_named_senate_holders_in_2017_and_2018` |
+| Rebecca Roeber (HD34 2020 dropped; Rick Roeber listed 2021 only) | #152 | `int_officeholders__years` | drop rule 1 | `officeholders_house_row_dropped_when_the_roster_outlives_the_members_last_term`; named: `officeholders_named_house_rows_dropped_or_kept` |
+| Scott Fitzpatrick (HD158 2019) | #491 | `int_officeholders__years` | drop rule 2 | `officeholders_house_row_dropped_when_the_members_last_roll_call_is_before_the_handover`; named: `officeholders_named_house_rows_dropped_or_kept` |
+| Lauren Arthur (HD18 2017-18, kept) | #491 | `int_officeholders__years` | drop rule 1 skips rows without an Open States id | `officeholders_named_house_rows_dropped_or_kept` |
+| Holly Thompson Rehder (REHDER), Wiley Price IV (PRICE 2019, 2022), Tiffany Price (PRICE 2025) | #539 #581 | `int_mo_house__votes` | name rank 3 and 2; exact over suffix-stripped | `house_vote_tokens_match_compound_and_suffixed_surnames`, `house_vote_tokens_exact_surname_beats_suffix_stripped`; named: `house_vote_tokens_of_named_members` (real PRICE rows are decided by session lists and seat dates), `house_vote_token_price_exact_surname_beats_suffix_stripped_for_named_members` (constructed: both Prices on one list, no seat dates) |
+| Cheri Toalson Reisch (REISCH), Cyndi Buchheit-Courtway (COURTWAY) | #539 | `int_mo_house__votes` | name rank 3 | `house_vote_tokens_of_named_members` |
+| Jean Evans / David Evans (EVANS 99 / EVANS 154 to 2019-02-05, then bare EVANS) | #539 | `int_mo_house__votes` | seat-date tie-break | `house_vote_tokens_shared_surname_resolved_by_seat_dates`; named: `house_vote_tokens_of_named_members` |
+| Rory Rowland (missing from the 2022 list; Lyle Rowland ruled out) | #539 #581 | `int_mo_house__votes` | cross-session fallback | `house_vote_tokens_cross_session_fallback_uses_seat_dates` (Lowe shape); named: `house_vote_tokens_of_named_members` |
 | Fountain Henderson (FOUNTAIN HENDERS) | #629 | `int_mo_house__votes` | truncation; fallback rank (open, #629 item 1) | `house_vote_tokens_attribute_to_one_member_or_none` (truncation); fallback: open in #629 |
-| Adam Schnelting (HD104 to HD69) | #636 | `fct_bill_sponsors` | held-district match | `bill_sponsors_match_redistricted_members_by_surname_and_held_district` |
+| Adam Schnelting (HD104 to HD69), Jeff Knight (HD129 to HD142) | #636 | `fct_bill_sponsors` | held-district match | `bill_sponsors_match_redistricted_members_by_surname_and_held_district`; named: `bill_sponsors_of_named_redistricted_members_match_through_the_held_district` |
 | Mike Moon (HD157, later SD29) | #646 | `fct_bill_sponsors` | House-era senate-listed rows | `bill_sponsors_classify_house_era_rows_of_members_who_moved_to_the_senate` |
 
 <!-- #658 edits only this subsection -->

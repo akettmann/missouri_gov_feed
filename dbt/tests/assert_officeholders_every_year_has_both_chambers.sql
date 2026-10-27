@@ -3,15 +3,23 @@
 -- the Senate 34. Fails for a year with fewer than 140 House or 30 Senate officials.
 -- Guards: the whole Senate missing for 2017-2022 (#516, Open States gave those terms no dates), and the House
 -- last-vote rule emptying the newest year in January before its roll calls load (#491).
--- Floors, measured on a full build (2026-10): the House minimum is 153 (2022)
+-- Floors, measured on a full build (2026-10): the House minimum is 154 (2022)
 -- and the Senate has 34 every year 2017-2026.
 -- 140 leaves room for a year with many vacancies (#547: the old floor of 150 was only 4 under the real minimum)
 -- and still catches any wholesale drop; 30 leaves 4 Senate vacancies.
--- Years come from a series, not from the rows themselves, so a year with no rows for a chamber counts as 0.
-with bounds as (
+-- Years come from a series, not from the rows themselves, so a year with no rows for a chamber counts as 0. The
+-- series ends at the later of the newest House roster year and the newest officeholder year (#668): ending it at the
+-- newest officeholder year alone would stop it a year early, and pass, if every office lost its newest year.
+with last_years as (
+    select max(session_year) as last_year from {{ ref('int_mo_house__member_identity') }}
+    union all
+    select max(year) as last_year from {{ ref('int_officeholders__years') }}
+),
+
+bounds as (
     select
         (select min(session_year) from {{ ref('int_mo_house__member_identity') }}) as first_year,
-        (select max(year) from {{ ref('int_officeholders__years') }}) as last_year
+        (select max(last_year) from last_years) as last_year
 ),
 
 years as (

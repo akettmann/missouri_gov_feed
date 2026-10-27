@@ -12,12 +12,36 @@
 -- keeps a stray misprinted token in a small special session (session 204 has 480 named votes, so 0.5% is 2 votes)
 -- from failing the build; assert_house_vote_tokens_attributed still warns per token.
 -- Load order: a House session whose roll calls are loaded before its roster (no rows yet in
--- int_mo_house__member_identity) leaves every token unmatched until the next sync; it is skipped, not failed.
+-- int_mo_house__member_identity) leaves its tokens unmatched until the next sync; it is skipped, not failed, but
+-- only while it is the newest House session (the latest first roll-call date). A session whose roster never loads
+-- (#668, e.g. a special session) stops being skipped once a later session's roll calls arrive.
 {{ config(severity='error') }}
 
 with house_rosters as (
     select distinct session_code
     from {{ ref('int_mo_house__member_identity') }}
+),
+
+house_sessions as (
+    select
+        session_code,
+        min(vote_date) as first_vote_date
+    from {{ ref('int_mo_house__votes') }}
+    group by session_code
+),
+
+newest_session as (
+    select max(first_vote_date) as first_vote_date
+    from house_sessions
+),
+
+-- the newest House session with roll calls but no roster rows yet: the only one skipped
+skipped_sessions as (
+    select s.session_code
+    from house_sessions as s
+    inner join newest_session as n on s.first_vote_date = n.first_vote_date
+    left join house_rosters as r on s.session_code = r.session_code
+    where r.session_code is null
 ),
 
 votes as (
@@ -26,8 +50,8 @@ votes as (
         v.session_code,
         v.person_key
     from {{ ref('int_mo_house__votes') }} as v
-    inner join house_rosters as r on v.session_code = r.session_code
-    where v.member_token != 'MR SPEAKER'
+    left join skipped_sessions as k on v.session_code = k.session_code
+    where v.member_token != 'MR SPEAKER' and k.session_code is null
     union all
     select
         chamber,
