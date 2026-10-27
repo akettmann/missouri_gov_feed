@@ -125,6 +125,26 @@ def test_congress_comes_from_the_date(day, congress):
 
 
 @pytest.mark.parametrize(
+    ("day", "expected"),
+    [
+        (date(2026, 10, 27), [117, 118, 119]),
+        (date(2027, 1, 2), [117, 118, 119]),  # the 120th has not begun
+        (date(2027, 1, 3), [117, 118, 119, 120]),
+        (date(2029, 6, 1), [117, 118, 119, 120, 121]),
+    ],
+)
+def test_default_congresses_end_at_the_congress_in_session(day, expected):
+    assert loader.default_congresses(day) == expected
+
+
+def test_load_uses_the_date_derived_default_when_nothing_is_configured(site, monkeypatch):
+    monkeypatch.setattr(loader, "CONGRESSES", None)
+    monkeypatch.setattr(loader, "default_congresses", lambda day: [118])
+    loader.load(db.UNSHARDED)
+    assert sorted(site) == sorted(loader.zip_url(118, t) for t in ("hjres", "sjres", "sres"))
+
+
+@pytest.mark.parametrize(
     ("configured", "expected"),
     [
         ([118, 119], {"sjres119": 86400, "sjres118": 30 * 86400}),
