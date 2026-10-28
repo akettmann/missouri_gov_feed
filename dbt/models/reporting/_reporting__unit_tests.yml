@@ -1033,3 +1033,38 @@ unit_tests:
       rows:
         - {official_id: o1, donor_name: Acme PAC, total_amount: 150, contribution_count: 2}
         - {official_id: o1, donor_name: Acme PAC, total_amount: 25, contribution_count: 1}
+
+  - name: votes_by_subject_counts_each_roll_call_once_per_subject
+    model: rpt_votes_by_subject
+    description: >
+      Roll call r1 is on two bills (HB1, HB2) that share TAX, so it counts once for TAX but both bills count;
+      HB2's EDUCATION gets r1 alone. HB3 has TAX in both indexes, which stay separate rows (subject_source).
+      A Senate roll call with the same vote_id (r1) picks up only its own bill's subjects, not the House r1's.
+    given:
+      - input: ref('fct_votes')
+        rows:
+          - {official_id: o1, chamber: state_house, vote_id: r1, vote_cast: yea}
+          - {official_id: o1, chamber: state_house, vote_id: r2, vote_cast: nay}
+          - {official_id: o1, chamber: state_house, vote_id: r3, vote_cast: absent}
+          - {official_id: o2, chamber: state_senate, vote_id: r1, vote_cast: yea}
+      - input: ref('fct_vote_bills')
+        rows:
+          - {chamber: state_house, vote_id: r1, session_code: '241', bill: HB1}
+          - {chamber: state_house, vote_id: r1, session_code: '241', bill: HB2}
+          - {chamber: state_house, vote_id: r2, session_code: '241', bill: HB1}
+          - {chamber: state_house, vote_id: r3, session_code: '251', bill: HB3}
+          - {chamber: state_senate, vote_id: r1, session_code: '241', bill: SB1}
+      - input: ref('fct_bill_subjects')
+        rows:
+          - {session_code: '241', bill: HB1, subject_name: TAX, subject_source: house}
+          - {session_code: '241', bill: HB2, subject_name: TAX, subject_source: house}
+          - {session_code: '241', bill: HB2, subject_name: EDUCATION, subject_source: house}
+          - {session_code: '251', bill: HB3, subject_name: TAX, subject_source: house}
+          - {session_code: '251', bill: HB3, subject_name: TAX, subject_source: senate}
+          - {session_code: '241', bill: SB1, subject_name: TAX, subject_source: senate}
+    expect:
+      rows:
+        - {official_id: o1, chamber: state_house, subject_name: TAX, subject_source: house, roll_calls: 3, yea: 1, nay: 1, other: 1, bills: 3, first_session: '241', last_session: '251'}
+        - {official_id: o1, chamber: state_house, subject_name: EDUCATION, subject_source: house, roll_calls: 1, yea: 1, nay: 0, other: 0, bills: 1, first_session: '241', last_session: '241'}
+        - {official_id: o1, chamber: state_house, subject_name: TAX, subject_source: senate, roll_calls: 1, yea: 0, nay: 0, other: 1, bills: 1, first_session: '251', last_session: '251'}
+        - {official_id: o2, chamber: state_senate, subject_name: TAX, subject_source: senate, roll_calls: 1, yea: 1, nay: 0, other: 0, bills: 1, first_session: '241', last_session: '241'}
