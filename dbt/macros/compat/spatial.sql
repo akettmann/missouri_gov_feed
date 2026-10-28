@@ -59,6 +59,27 @@
 {%- endmacro %}
 
 
+{#
+  Axis-aligned rectangle polygon (st_makeenvelope exists in DuckDB spatial and PostGIS). PostGIS needs the
+  SRID to match the other geometry, so the postgres variant stamps 4269 like geom_point.
+#}
+{% macro geom_envelope(xmin, ymin, xmax, ymax) -%}
+    {{ return(adapter.dispatch('geom_envelope', 'mogov')(xmin, ymin, xmax, ymax)) }}
+{%- endmacro %}
+
+{% macro default__geom_envelope(xmin, ymin, xmax, ymax) -%}
+    {{ exceptions.raise_compiler_error("geom_envelope: no implementation for " ~ target.type) }}
+{%- endmacro %}
+
+{% macro duckdb__geom_envelope(xmin, ymin, xmax, ymax) -%}
+    st_makeenvelope({{ xmin }}, {{ ymin }}, {{ xmax }}, {{ ymax }})
+{%- endmacro %}
+
+{% macro postgres__geom_envelope(xmin, ymin, xmax, ymax) -%}
+    st_setsrid(st_makeenvelope({{ xmin }}, {{ ymin }}, {{ xmax }}, {{ ymax }}), 4269)
+{%- endmacro %}
+
+
 {% macro geom_intersection(a, b) -%}
     st_intersection({{ a }}, {{ b }})
 {%- endmacro %}

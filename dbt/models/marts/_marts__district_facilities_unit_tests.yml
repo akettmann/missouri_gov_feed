@@ -1,0 +1,37 @@
+# Unit tests for fct_district_facilities: the grid clip (0.125-degree cells) must give the same pairs as testing each
+# facility against the whole area.
+version: 2
+
+unit_tests:
+  - name: district_facilities_grid_clip_matches_whole_polygon_test
+    model: fct_district_facilities
+    description: >
+      Facilities exactly on a grid-cell edge (lon -94.75 and lat 39.0 are multiples of 0.125) and on a cell
+      corner are still found inside their area; a facility on the area's own boundary, one outside, one with
+      no coordinates, and one inside a non-current area get no row. An area spanning several cells gets each
+      facility once; an area with no facility in its cells produces no rows.
+    given:
+      - input: ref('dim_district')
+        rows:
+          - {district_id: 'county:1', district_type: county, is_current: true, geometry_geojson: '{"type":"Polygon","coordinates":[[[-94.9,38.9],[-94.6,38.9],[-94.6,39.2],[-94.9,39.2],[-94.9,38.9]]]}'}
+          - {district_id: 'place:1', district_type: place, is_current: true, geometry_geojson: '{"type":"Polygon","coordinates":[[[-94.76,38.95],[-94.6,38.95],[-94.6,39.1],[-94.76,39.1],[-94.76,38.95]]]}'}
+          - {district_id: 'county:far', district_type: county, is_current: true, geometry_geojson: '{"type":"Polygon","coordinates":[[[-91,37],[-90,37],[-90,38],[-91,38],[-91,37]]]}'}
+          - {district_id: 'county:old', district_type: county, is_current: false, geometry_geojson: '{"type":"Polygon","coordinates":[[[-95.5,38],[-95.4,38],[-95.4,38.1],[-95.5,38.1],[-95.5,38]]]}'}
+      - input: ref('int_epa_frs__facilities')
+        rows:
+          - {registry_id: edge_x, longitude: -94.75, latitude: 39.05, is_government: false}
+          - {registry_id: edge_y, longitude: -94.8, latitude: 39.0, is_government: false}
+          - {registry_id: corner, longitude: -94.75, latitude: 39.0, is_government: false}
+          - {registry_id: inside, longitude: -94.65, latitude: 39.15, is_government: false}
+          - {registry_id: on_boundary, longitude: -94.9, latitude: 39.05, is_government: false}
+          - {registry_id: outside, longitude: -94.5, latitude: 39.05, is_government: false}
+          - {registry_id: no_coords, is_government: false}
+          - {registry_id: in_old_area, longitude: -95.45, latitude: 38.05, is_government: false}
+    expect:
+      rows:
+        - {district_id: 'county:1', registry_id: edge_x}
+        - {district_id: 'county:1', registry_id: edge_y}
+        - {district_id: 'county:1', registry_id: corner}
+        - {district_id: 'county:1', registry_id: inside}
+        - {district_id: 'place:1', registry_id: edge_x}
+        - {district_id: 'place:1', registry_id: corner}
