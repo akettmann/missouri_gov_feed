@@ -21,14 +21,17 @@ repeat
       bill, sponsors, cosponsors, actions,
       recorded votes, laws (Public Law number),
       committees (+ subcommittees and their activities),
-      subjects, related bills (+ relationships);
+      subjects, related bills (+ relationships),
+      amendments (+ sponsors, actions, cited roll calls);
     repeat while (more members?)
   endif
 repeat while (more zips?)
 :govinfo_billstatus_files, _bills, _sponsors, _cosponsors,
 _actions, _recorded_votes, _laws, _committees,
 _committee_activities, _subjects, _related_bills,
-_related_bill_relationships (all states; no Missouri filter);
-note right: dbt keeps sponsors with state MO\n(fct_federal_sponsorship)
+_related_bill_relationships, _amendments, _amendment_sponsors,
+_amendment_actions, _amendment_recorded_votes
+(all states; no Missouri filter);
+note right: dbt keeps sponsors with state MO\n(fct_federal_sponsorship, _committees, _subjects)\nfct_federal_vote_amendments links amendment\nroll calls to Voteview
 stop
 @enduml
