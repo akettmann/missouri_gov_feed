@@ -44,7 +44,7 @@ sized_counties as (
     from counties
 ),
 
-areas as (
+parsed_areas as (
     select
         district_id,
         district_type,
@@ -53,6 +53,13 @@ areas as (
     where
         is_current
         and district_type in ('state_house', 'state_senate', 'us_house', 'place')
+),
+
+areas as (
+    select
+        *,
+        {{ mogov.geom_area('geom') }} as sq_degrees
+    from parsed_areas
 ),
 
 touching as (
@@ -66,20 +73,20 @@ touching as (
         a.geom as area_geom
     from sized_counties as c
     inner join areas as a on {{ mogov.geom_intersects('c.geom', 'a.geom') }}
+    -- a place smaller than the city-share cutoff (with slack for rounding) can never cover the county, so skip
+    -- its costly intersection
+    where a.district_type != 'place' or a.sq_degrees >= c.sq_degrees * {{ min_city_share - 0.01 }}
 ),
 
-pair_areas as (
+pair_overlaps as (
+    -- each pair's intersection is computed once; the area and the inward buffer both read it
     select
         county_id,
         district_id,
         district_type,
         interior_lat,
         county_sq_degrees,
-        {{ mogov.geom_intersection_area('county_geom', 'area_geom') }} as overlap_sq_degrees,
-        {{ mogov.geom_area(mogov.geom_buffer(
-            mogov.geom_intersection('county_geom', 'area_geom'),
-            '-' ~ mogov.geom_metres_to_degrees(core_buffer_m, 'interior_lat')
-        )) }} as core_sq_degrees
+        {{ mogov.geom_intersection('county_geom', 'area_geom') }} as overlap_geom
     from touching
 ),
 
@@ -88,10 +95,35 @@ sized as (
         county_id,
         district_id,
         district_type,
-        overlap_sq_degrees * cos(radians(interior_lat)) * {{ km2_per_sq_degree_at_equator }} as overlap_km2,
-        overlap_sq_degrees / county_sq_degrees as share_of_county,
-        core_sq_degrees
-    from pair_areas
+        interior_lat,
+        overlap_geom,
+        {{ mogov.geom_area('overlap_geom') }} * cos(radians(interior_lat)) * {{ km2_per_sq_degree_at_equator }}
+            as overlap_km2,
+        {{ mogov.geom_area('overlap_geom') }} / county_sq_degrees as share_of_county
+    from pair_overlaps
+),
+
+-- only pairs that pass the cheap area and city-share tests pay for the buffer
+candidates as (
+    select *
+    from sized
+    where
+        overlap_km2 > {{ min_overlap_km2 }}
+        and (district_type != 'place' or share_of_county >= {{ min_city_share }})
+),
+
+cores as (
+    select
+        county_id,
+        district_id,
+        district_type,
+        overlap_km2,
+        share_of_county,
+        {{ mogov.geom_area(mogov.geom_buffer(
+            'overlap_geom',
+            '-' ~ mogov.geom_metres_to_degrees(core_buffer_m, 'interior_lat')
+        )) }} as core_sq_degrees
+    from candidates
 )
 
 select
@@ -100,8 +132,5 @@ select
     district_type,
     round(overlap_km2, 3) as overlap_km2,
     round(share_of_county, 4) as share_of_county
-from sized
-where
-    overlap_km2 > {{ min_overlap_km2 }}
-    and core_sq_degrees > 0
-    and (district_type != 'place' or share_of_county >= {{ min_city_share }})
+from cores
+where core_sq_degrees > 0
