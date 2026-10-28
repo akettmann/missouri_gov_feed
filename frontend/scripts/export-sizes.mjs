@@ -3,7 +3,15 @@ import { readdirSync, statSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { formatBudgetError, measure, overBudget, skipRequested } from "./size-budget.mjs";
+import {
+  activeBudgets,
+  BUDGETS,
+  dirBytes,
+  formatBudgetError,
+  measure,
+  overBudget,
+  skipRequested,
+} from "./size-budget.mjs";
 
 // Escape hatch for builds where the budget should not gate (e.g. a throwaway local build): MOGOV_SKIP_SIZE_BUDGET=1
 if (skipRequested()) {
@@ -41,8 +49,12 @@ for (const r of rows.toSorted((a, b) => b.json - a.json).slice(0, 5)) {
 const over = rows.filter((r) => r.jsonGz > BUDGET_GZ_KB * 1024);
 console.log(`\n${over.length} of ${rows.length} over the ${BUDGET_GZ_KB} KB gzipped budget`);
 
-const sizes = measure("dist");
+const budgets = activeBudgets("dist", BUDGETS);
+const sizes = measure("dist", budgets);
 for (const [file, s] of Object.entries(sizes)) console.log(`${file}: ${kb(s.raw)} (${kb(s.gz)} gz)`);
-const errors = overBudget(sizes);
+const statutes = dirBytes(path.join("dist", "statutes"));
+if (statutes > 0)
+  console.log(`statutes/ (all RSMo section pages): ${(statutes / 1024 / 1024).toFixed(1)} MB raw`);
+const errors = overBudget(sizes, budgets);
 for (const e of errors) console.error(formatBudgetError(e));
 process.exitCode = over.length || errors.length ? 1 : 0;

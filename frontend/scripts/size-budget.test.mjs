@@ -1,9 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { budgetGate, formatBudgetError, measure, overBudget, skipRequested } from "./size-budget.mjs";
+import {
+  activeBudgets,
+  budgetGate,
+  dirBytes,
+  formatBudgetError,
+  measure,
+  overBudget,
+  skipRequested,
+} from "./size-budget.mjs";
 
 const budgets = [{ file: "a.json", maxRawKB: 10, maxGzKB: 2 }];
 
@@ -74,4 +82,30 @@ test("budgetGate runs the check before publishing, blocks on failure, and skips 
     calls.splice(0).map((c) => c[0]),
     ["log"],
   );
+});
+
+test("a budget with skipIfPresent is dropped only when its marker file was built", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "budget-"));
+  try {
+    const bs = [...budgets, { file: "s/x.html", maxRawKB: 1, maxGzKB: 1, skipIfPresent: "s/marker.html" }];
+    assert.equal(activeBudgets(dir, bs).length, 2);
+    mkdirSync(path.join(dir, "s"));
+    writeFileSync(path.join(dir, "s", "marker.html"), "x");
+    assert.equal(activeBudgets(dir, bs).length, 1);
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test("dirBytes totals nested files and is 0 for a missing directory", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "budget-"));
+  try {
+    mkdirSync(path.join(dir, "a"));
+    writeFileSync(path.join(dir, "a", "f"), "12345");
+    writeFileSync(path.join(dir, "g"), "123");
+    assert.equal(dirBytes(dir), 8);
+    assert.equal(dirBytes(path.join(dir, "nope")), 0);
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
 });

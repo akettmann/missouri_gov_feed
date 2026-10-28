@@ -2,14 +2,37 @@
 // Sizes measured 2026-10 with the badge fix: lookup/districts.json ~1147 KB raw / ~309 KB gzipped;
 // awards/index.html 339 KB raw / 19 KB gzipped (753 KB / 28 KB before the repeated badges were dropped). Budgets leave ~30% headroom so normal data growth
 // passes but a payload that doubles (say, a repeated field added to every row) fails the build check.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
 
 export const BUDGETS = [
   { file: "lookup/districts.json", maxRawKB: 1500, maxGzKB: 410 },
   { file: "awards/index.html", maxRawKB: 450, maxGzKB: 25 },
+  // The largest RSMo section page (260.700, 69.6k characters of law text), measured 2026-10 (#840): ~74 KB raw /
+  // ~18.5 KB gzipped. Only built when the statute exports are there; the "not loaded yet" build has no such page.
+  {
+    file: "statutes/260.700/index.html",
+    maxRawKB: 100,
+    maxGzKB: 25,
+    skipIfPresent: "statutes/not-loaded/index.html",
+  },
 ];
+
+/** Budgets that apply to this build: one with `skipIfPresent` is dropped when that marker file was built. */
+export function activeBudgets(distDir, budgets = BUDGETS, exists = existsSync) {
+  return budgets.filter((b) => !(b.skipIfPresent && exists(path.join(distDir, b.skipIfPresent))));
+}
+
+/** Total bytes of every file under `dir` (0 when it does not exist). */
+export function dirBytes(dir) {
+  if (!existsSync(dir)) return 0;
+  return readdirSync(dir, { withFileTypes: true }).reduce(
+    (n, e) =>
+      n + (e.isDirectory() ? dirBytes(path.join(dir, e.name)) : statSync(path.join(dir, e.name)).size),
+    0,
+  );
+}
 
 const kb = (n) => `${(n / 1024).toFixed(1)} KB`;
 

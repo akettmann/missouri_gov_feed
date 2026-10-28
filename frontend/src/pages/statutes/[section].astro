@@ -1,0 +1,160 @@
+---
+// One page per RSMo section (#840): every version of the law's text exactly as the Revisor of Statutes
+// publishes it, with status, dates, footnotes, a link to the Revisor's page and an "as of" line.
+import Layout from "../../layouts/Layout.astro";
+import SourceLink from "../../components/SourceLink.astro";
+import {
+  hasStatuteExports,
+  statuteSectionChapters,
+  statuteSectionRefs,
+  statuteVersions,
+} from "../../lib/exports/statutes";
+import {
+  asOfText,
+  footnotesInOrder,
+  introText,
+  NOT_LOADED,
+  orderVersions,
+  statusLabel,
+  statuteBodyHtml,
+  statutePath,
+  statutePaths,
+  UNCONSTITUTIONAL_MARK,
+  versionNames,
+} from "../../lib/statuteText";
+import { href } from "../../lib/site";
+
+export async function getStaticPaths() {
+  const has = hasStatuteExports();
+  return statutePaths(has, has ? await statuteSectionRefs() : []);
+}
+
+const { section } = Astro.params;
+const loaded = hasStatuteExports() && section !== NOT_LOADED;
+const versions = loaded ? orderVersions(await statuteVersions(section as string)) : [];
+const known = loaded ? await statuteSectionChapters() : new Map<string, string>();
+const first = versions[0];
+const names = versionNames(versions);
+const sectionLabel = `Section ${section}`;
+---
+
+<Layout
+  title={loaded ? `RSMo ${section}` : "Missouri statutes"}
+  description={
+    loaded
+      ? `The text of Missouri Revised Statutes section ${section}, as the Revisor of Statutes publishes it.`
+      : "Missouri statute text is not loaded yet."
+  }
+>
+  {!loaded || !first ? (
+    <>
+      <h1>Missouri statutes</h1>
+      <p class="notice">
+        Statute text is not loaded yet. Build the data (<code>uv run mogov build</code>), export it (
+        <code>uv run mogov export --format parquet</code>) and rebuild the site.
+      </p>
+    </>
+  ) : (
+    <>
+      <p class="muted small">
+        Revised Statutes of Missouri
+        {first.chapter && first.chapter_name ? ` · Chapter ${first.chapter}, ${first.chapter_name}` : ""}
+        {first.title_numeral && first.title_name
+          ? ` · Title ${first.title_numeral}, ${first.title_name}`
+          : ""}
+      </p>
+      <h1>{sectionLabel}</h1>
+      <p class="small">{introText(versions)}</p>
+      {versions.map((v, i) => {
+        const st = statusLabel(v);
+        const name = names[i]!;
+        const body = statuteBodyHtml(v.section_text);
+        const notes = footnotesInOrder(v.footnotes);
+        const hasHistoryNote = notes.some((n) => n.is_history_note);
+        return (
+          <section class="statute-version" aria-labelledby={`v${v.bid}`}>
+            <h2 id={`v${v.bid}`}>
+              {name.heading}
+              {v.is_current && <span class="muted small"> · current version</span>}
+            </h2>
+            <p class="small">
+              {st.detail}
+              {st.transferredTo && known.has(st.transferredTo) && (
+                <>
+                  {" "}
+                  <a href={href(statutePath(st.transferredTo))}>Go to section {st.transferredTo}</a>.
+                </>
+              )}
+            </p>
+            {v.held_unconstitutional && (
+              <p class="small">
+                The Revisor marks this version <q>{UNCONSTITUTIONAL_MARK}</q>.
+              </p>
+            )}
+            {v.repeal_pending && (
+              <p class="small">
+                The Revisor's repeals page also lists a repeal of this version that has not taken effect.
+              </p>
+            )}
+            {body ? (
+              <div class="statute-text" set:html={body} />
+            ) : (
+              <p class="muted">The Revisor prints no text for this version.</p>
+            )}
+            {(notes.length > 0 || (v.history_note && !hasHistoryNote)) && (
+              <>
+                <h3>Revisor's notes</h3>
+                <ol class="statute-notes">
+                  {v.history_note && !hasHistoryNote && <li>{v.history_note}</li>}
+                  {notes.map((n) => (
+                    <li>{n.footnote_text}</li>
+                  ))}
+                </ol>
+              </>
+            )}
+            <p class="small">
+              Source:{" "}
+              <SourceLink url={v.source_url} label="this version on revisor.mo.gov" context={name.context} />
+              {v.status === "repealed" || v.status === "transferred"
+                ? " (the Revisor's list of repealed and transferred sections)"
+                : ""}
+              <br />
+              As of: {asOfText(v.loaded_at)}
+            </p>
+          </section>
+        );
+      })}
+    </>
+  )}
+</Layout>
+
+<style is:global>
+  .statute-version {
+    margin: 2rem 0;
+    padding-top: 1rem;
+    border-top: 1px solid var(--hairline);
+  }
+  .statute-text {
+    max-width: 70ch;
+    overflow-wrap: anywhere;
+  }
+  .statute-text p {
+    margin: 0 0 0.9rem;
+  }
+  .statute-table-wrap {
+    margin: 0 0 0.9rem;
+    overflow-x: auto;
+  }
+  .statute-table {
+    border-collapse: collapse;
+  }
+  .statute-table td {
+    border: 1px solid var(--hairline);
+    padding: 0.2rem 0.5rem;
+    vertical-align: top;
+  }
+  .statute-notes li {
+    margin-bottom: 0.4rem;
+    overflow-wrap: anywhere;
+  }
+</style>
