@@ -532,6 +532,12 @@ lists actions for House bills and for Senate bills only once they reach the Hous
     it, LR number), `status` (the chip, e.g. `2/4/2025 - Adopted`).
   - `mo_senate_bill_summaries`: `summary_id`, `label` (the version, e.g. `Introduced`) and `text` exactly as
     printed (tabs and CR LF kept).
+- In the marts (#589): the text, fiscal-note and amendment links reach `marts.fct_bill_documents` with
+  `source_site = 'senate'`. The summaries have no URL, so they stay in `stg_mo_senate__bill_summaries` and are not
+  `summary` rows. A 2024+ Senate bill that the House also acted on carries links from both sites (different URLs,
+  so both rows are kept; only an identical URL is deduped). The Senate serves one PDF URL for several text versions
+  (e.g. two House Committee Substitutes), and that link collapses to one row. The Senate PDFs are not fetched yet
+  (#590), so `page_count` and the text columns are null on Senate rows.
 - Window: `MOGOV_LOOKBACK_YEARS`: the regular session (`R`) of each year plus every extraordinary session
   (`E1`, `E2`, ... until one comes back empty). Shard units: bills, split by a stable hash of
   `year/session/billId`. Every shard reads every session list once (cached) and takes its bills, so the split

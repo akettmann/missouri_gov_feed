@@ -55,6 +55,153 @@ models:
     - not_null:
         config:
           severity: warn
+- name: stg_mo_senate__bill_amendments
+  description: One row per amendment PDF link on a Senate bill's page at senate.mo.gov, in the order the page lists
+    them (doc_index 0 first). label is the link text as printed ("2/4/2025 - SS S offered & adopted (Crawford)--(0453S.04F)"),
+    status the chip beside it ("2/4/2025 - Adopted"; null when the page shows none), amendment_id the site's own
+    key from the PDF url. The PDFs are not fetched (#590). session_code is the House's code for the session (seed
+    mo_senate_session_codes), null for a session with no seed row. Text is cleaned with the shared macros; the url
+    is trimmed only.
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - session_year
+        - session_type
+        - bill_id
+        - doc_index
+  columns:
+  - name: session_code
+    data_tests:
+    - not_null
+  - name: bill
+    data_tests:
+    - not_null
+  - name: doc_index
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 0
+  - name: document_url
+    data_tests:
+    - not_null
+    - dbt_utils.expression_is_true:
+        arguments:
+          expression: like 'https://www.senate.mo.gov/%'
+  - name: label
+    data_tests:
+    - not_null
+  - name: amendment_id
+    data_tests:
+    - not_null
+- name: stg_mo_senate__bill_fiscal_notes
+  description: One row per fiscal-note PDF link on a Senate bill's page at senate.mo.gov, in the order the page
+    lists them (doc_index 0 first). label is the link text as printed ("Perfected (0453S.04P.ORG)"); the PDFs are
+    not fetched (#590). session_code is the House's code for the session (seed mo_senate_session_codes), null for
+    a session with no seed row. Text is cleaned with the shared macros; the url is trimmed only.
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - session_year
+        - session_type
+        - bill_id
+        - doc_index
+  columns:
+  - name: session_code
+    data_tests:
+    - not_null
+  - name: bill
+    data_tests:
+    - not_null
+  - name: doc_index
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 0
+  - name: document_url
+    data_tests:
+    - not_null
+    - dbt_utils.expression_is_true:
+        arguments:
+          expression: like 'https://www.senate.mo.gov/%'
+  - name: label
+    data_tests:
+    - not_null
+- name: stg_mo_senate__bill_summaries
+  description: 'One row per bill summary on a Senate bill''s page at senate.mo.gov, in the order the page lists
+    them (doc_index 0 first). A summary has no PDF: the page prints its text, which lands as served (summary_text
+    keeps its line breaks and tabs). label is the version heading ("Introduced"). summary_id is the site''s own
+    key. With no link, a summary is not a row of fct_bill_documents (document_url is part of its grain). session_code
+    is the House''s code for the session (seed mo_senate_session_codes), null for a session with no seed row. label
+    is cleaned with the shared macros; summary_text is left as printed apart from U+FFFD (it is prose, and whitespace
+    is its layout).'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - session_year
+        - session_type
+        - bill_id
+        - doc_index
+  columns:
+  - name: session_code
+    data_tests:
+    - not_null
+  - name: bill
+    data_tests:
+    - not_null
+  - name: doc_index
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 0
+  - name: summary_id
+    data_tests:
+    - not_null
+  - name: summary_text
+    data_tests:
+    - not_null
+- name: stg_mo_senate__bill_texts
+  description: One row per bill text version (PDF link) on a Senate bill's page at senate.mo.gov, in the order the
+    page lists them (doc_index 0 first). The PDFs themselves are not fetched (#590). label is the link text as printed
+    ("0453S.04T - Truly Agreed to and Finally Passed"), lr_number and version its two halves (version is the whole
+    label when the text has no " - "). session_code is the House's code for the session (seed mo_senate_session_codes),
+    null for a session with no seed row. Text is cleaned with the shared macros (whitespace, entities, U+FFFD);
+    the url is trimmed only.
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - session_year
+        - session_type
+        - bill_id
+        - doc_index
+  columns:
+  - name: session_code
+    data_tests:
+    - not_null
+  - name: bill
+    data_tests:
+    - not_null
+  - name: doc_index
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 0
+  - name: document_url
+    data_tests:
+    - not_null
+    - dbt_utils.expression_is_true:
+        arguments:
+          expression: like 'https://www.senate.mo.gov/%'
+  - name: label
+    data_tests:
+    - not_null
 - name: stg_mo_senate__bill_topics
   description: 'Subject keywords per bill from the MO Senate topical index (regular sessions): Senate bills and
     the House bills that reached the Senate. subject_name is the keyword upper-cased into the House index''s spelling;
