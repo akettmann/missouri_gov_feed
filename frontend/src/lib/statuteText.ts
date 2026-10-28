@@ -63,7 +63,12 @@ export function statuteBodyHtml(text: string | null | undefined): string {
       prose = [];
     };
     const flushRows = () => {
-      if (rows.length) out.push(`<table class="statute-table"><tbody>\n${rows.join("\n")}\n</tbody></table>`);
+      if (rows.length) {
+        out.push(
+          `<div class="statute-table-wrap" tabindex="0" role="region" aria-label="Table in the statute text">` +
+            `<table class="statute-table"><tbody>\n${rows.join("\n")}\n</tbody></table></div>`,
+        );
+      }
       rows = [];
     };
     for (const line of chunk.split("\n")) {
@@ -216,3 +221,50 @@ export function asOfText(loadedAt: string | null | undefined): string {
 
 /** Path (no base) of a section's page; ids use only letters, digits, dots and hyphens, so no encoding is needed. */
 export const statutePath = (sectionId: string): string => `/statutes/${sectionId}/`;
+
+/** Slug of the one placeholder page built when the statute exports are missing. */
+export const NOT_LOADED = "not-loaded";
+
+/**
+ * The pages to build: one per section, or the single "not loaded yet" page without the exports. Lives here, not in
+ * the page's frontmatter, because Astro hoists getStaticPaths to module scope where frontmatter constants do not exist.
+ */
+export function statutePaths(
+  hasExports: boolean,
+  refs: readonly { section_id: string }[],
+): { params: { section: string } }[] {
+  if (!hasExports) return [{ params: { section: NOT_LOADED } }];
+  return refs.map((r) => ({ params: { section: r.section_id } }));
+}
+
+/** A repeal or transfer notice is not a text of the law, so it is not counted as a version. */
+export const isNotice = (v: Pick<StatuteVersion, "status">): boolean =>
+  v.status === "repealed" || v.status === "transferred";
+
+/**
+ * Per-version heading text and screen-reader context for the repeated "this version on revisor.mo.gov" link.
+ * Versions whose labels collide (two current versions with one date) get "(version i of n)" so no two headings or
+ * link names are alike.
+ */
+export function versionNames(versions: readonly StatusInput[]): { heading: string; context: string }[] {
+  const labels = versions.map((v) => statusLabel(v).label);
+  return versions.map((v, i) => {
+    const same = labels.flatMap((l, j) => (l === labels[i] ? [j] : []));
+    const heading =
+      same.length > 1 ? `${labels[i]} (version ${same.indexOf(i) + 1} of ${same.length})` : labels[i]!;
+    const when = v.effective_date ? `, ${longDate(v.effective_date)}` : "";
+    return { heading, context: `(${heading}${when})` };
+  });
+}
+
+/** The page's lead sentences: the word-for-word promise only where there is text, and a count of real versions. */
+export function introText(versions: readonly Pick<StatuteVersion, "status">[]): string {
+  const texts = versions.filter((v) => !isNotice(v)).length;
+  if (texts === 0) {
+    return "The Revisor lists this section only as repealed or transferred. We add nothing to what it publishes.";
+  }
+  return (
+    "The text below is word for word what the Revisor of Statutes publishes. We add nothing to it and leave nothing out." +
+    (texts > 1 ? ` The Revisor lists ${texts} versions of this section.` : "")
+  );
+}

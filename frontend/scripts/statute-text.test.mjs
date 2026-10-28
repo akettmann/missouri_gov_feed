@@ -9,6 +9,10 @@ import {
   statusLabel,
   statuteBodyHtml,
   statutePath,
+  statutePaths,
+  NOT_LOADED,
+  introText,
+  versionNames,
 } from "../src/lib/statuteText.ts";
 
 test("blank lines make paragraphs and a single newline is a line break", () => {
@@ -30,9 +34,9 @@ test("tab-separated lines become a table, prose around it stays prose (143.011 s
   );
   assert.equal(
     html,
-    '<p>Rates:</p>\n<table class="statute-table"><tbody>\n' +
+    '<p>Rates:</p>\n<div class="statute-table-wrap" tabindex="0" role="region" aria-label="Table in the statute text"><table class="statute-table"><tbody>\n' +
       "<tr><td>If the income is:</td><td>The tax is:</td></tr>\n" +
-      "<tr><td>Not over $1,000</td><td>1 1/2%</td></tr>\n</tbody></table>\n<p>The end.</p>",
+      "<tr><td>Not over $1,000</td><td>1 1/2%</td></tr>\n</tbody></table></div>\n<p>The end.</p>",
   );
 });
 
@@ -40,7 +44,7 @@ test("prose lines and tab rows in one block do not merge", () => {
   const html = statuteBodyHtml("lead-in\na\tb\ntrailer");
   assert.equal(
     html,
-    '<p>lead-in</p>\n<table class="statute-table"><tbody>\n<tr><td>a</td><td>b</td></tr>\n</tbody></table>\n<p>trailer</p>',
+    '<p>lead-in</p>\n<div class="statute-table-wrap" tabindex="0" role="region" aria-label="Table in the statute text"><table class="statute-table"><tbody>\n<tr><td>a</td><td>b</td></tr>\n</tbody></table></div>\n<p>trailer</p>',
   );
 });
 
@@ -128,4 +132,41 @@ test("dates and as-of wording: pipeline publish time, never 'copied on'", () => 
 
 test("section page path keeps the id as is", () => {
   assert.equal(statutePath("400.3-505"), "/statutes/400.3-505/");
+});
+
+test("statutePaths: one page per section, or the single not-loaded page without exports", () => {
+  assert.deepEqual(statutePaths(true, [{ section_id: "1.010" }, { section_id: "1.020" }]), [
+    { params: { section: "1.010" } },
+    { params: { section: "1.020" } },
+  ]);
+  assert.deepEqual(statutePaths(false, []), [{ params: { section: NOT_LOADED } }]);
+});
+
+test("versions get distinct headings and distinct link context", () => {
+  const v = (status, is_current, effective_date) => ({
+    status,
+    is_current,
+    effective_date,
+    ended_date: null,
+    transferred_to: null,
+  });
+  const n = versionNames([
+    v("in force", true, "2020-08-28"),
+    v("in force", true, "2020-08-28"),
+    v("historical", false, "2010-08-28"),
+  ]);
+  assert.equal(new Set(n.map((x) => x.heading)).size, 3);
+  assert.equal(new Set(n.map((x) => x.context)).size, 3);
+  assert.equal(n[0].heading, "In force (version 1 of 2)");
+  assert.equal(n[2].context, "(Historical, August 28, 2010)");
+});
+
+test("repeal-only pages make no word-for-word claim and count no versions", () => {
+  assert.doesNotMatch(introText([{ status: "repealed" }]), /word for word|versions/);
+  assert.match(introText([{ status: "in force" }, { status: "repealed" }]), /word for word/);
+  assert.doesNotMatch(introText([{ status: "in force" }, { status: "repealed" }]), /versions of/);
+  assert.match(
+    introText([{ status: "in force" }, { status: "historical" }, { status: "repealed" }]),
+    /2 versions/,
+  );
 });

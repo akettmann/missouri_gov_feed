@@ -12,19 +12,21 @@ import {
 import {
   asOfText,
   footnotesInOrder,
+  introText,
+  NOT_LOADED,
   orderVersions,
   statusLabel,
   statuteBodyHtml,
   statutePath,
+  statutePaths,
   UNCONSTITUTIONAL_MARK,
+  versionNames,
 } from "../../lib/statuteText";
 import { href } from "../../lib/site";
 
-const NOT_LOADED = "not-loaded";
-
 export async function getStaticPaths() {
-  if (!hasStatuteExports()) return [{ params: { section: NOT_LOADED } }];
-  return (await statuteSectionRefs()).map((r) => ({ params: { section: r.section_id } }));
+  const has = hasStatuteExports();
+  return statutePaths(has, has ? await statuteSectionRefs() : []);
 }
 
 const { section } = Astro.params;
@@ -32,6 +34,7 @@ const loaded = hasStatuteExports() && section !== NOT_LOADED;
 const versions = loaded ? orderVersions(await statuteVersions(section as string)) : [];
 const known = loaded ? await statuteSectionChapters() : new Map<string, string>();
 const first = versions[0];
+const names = versionNames(versions);
 const sectionLabel = `Section ${section}`;
 ---
 
@@ -61,20 +64,17 @@ const sectionLabel = `Section ${section}`;
           : ""}
       </p>
       <h1>{sectionLabel}</h1>
-      <p class="small">
-        The text below is word for word what the Revisor of Statutes publishes. We add nothing to it and leave
-        nothing out.{" "}
-        {versions.length > 1 ? `The Revisor lists ${versions.length} versions of this section.` : ""}
-      </p>
-      {versions.map((v) => {
+      <p class="small">{introText(versions)}</p>
+      {versions.map((v, i) => {
         const st = statusLabel(v);
+        const name = names[i]!;
         const body = statuteBodyHtml(v.section_text);
         const notes = footnotesInOrder(v.footnotes);
         const hasHistoryNote = notes.some((n) => n.is_history_note);
         return (
           <section class="statute-version" aria-labelledby={`v${v.bid}`}>
             <h2 id={`v${v.bid}`}>
-              {st.label}
+              {name.heading}
               {v.is_current && <span class="muted small"> · current version</span>}
             </h2>
             <p class="small">
@@ -113,7 +113,8 @@ const sectionLabel = `Section ${section}`;
               </>
             )}
             <p class="small">
-              Source: <SourceLink url={v.source_url} label="this version on revisor.mo.gov" />
+              Source:{" "}
+              <SourceLink url={v.source_url} label="this version on revisor.mo.gov" context={name.context} />
               {v.status === "repealed" || v.status === "transferred"
                 ? " (the Revisor's list of repealed and transferred sections)"
                 : ""}
@@ -140,11 +141,12 @@ const sectionLabel = `Section ${section}`;
   .statute-text p {
     margin: 0 0 0.9rem;
   }
+  .statute-table-wrap {
+    margin: 0 0 0.9rem;
+    overflow-x: auto;
+  }
   .statute-table {
     border-collapse: collapse;
-    margin: 0 0 0.9rem;
-    display: block;
-    overflow-x: auto;
   }
   .statute-table td {
     border: 1px solid var(--hairline);
