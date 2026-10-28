@@ -1,0 +1,62 @@
+# Unit tests for the Senate's side of fct_bill_documents (#589): fixed staged rows -> exact expected rows.
+version: 2
+
+unit_tests:
+  - name: bill_documents_union_senate_links
+    model: fct_bill_documents
+    description: >
+      The Senate's bill text, fiscal note and amendment links are rows of their own kind, tagged source_site
+      'senate'; the House's keep 'house'. The index is 1-based like the House's (the staged doc_index starts at 0).
+      A Senate bill both sites list keeps both links (different URLs). The Senate serves one URL for several text
+      versions (two House Committee Substitutes behind the same PDF): that is one row, with the lowest index and the
+      label at that index. A row with no URL, and a row of a session with no code, are dropped. Dropping the
+      source_site tag, not shifting the index, keeping the repeated link, or letting a null-session row through fails
+      this test.
+    given:
+      - input: ref('stg_mo_house__bill_summaries')
+        format: sql
+        rows: |
+            select cast('241' as varchar) as session_code, cast('SB7' as varchar) as bill, cast(1 as bigint) as summary_index, cast('Introduced' as varchar) as document_name, cast('https://documents.house.mo.gov/s/7.pdf' as varchar) as summary_url
+      - input: ref('stg_mo_house__bill_fiscal_notes')
+        format: sql
+        rows: |
+            select cast(null as varchar) as session_code, cast(null as varchar) as bill, cast(null as bigint) as fiscal_note_index, cast(null as varchar) as fiscal_note_url where false
+      - input: ref('stg_mo_house__bill_witness_forms')
+        format: sql
+        rows: |
+            select cast(null as varchar) as session_code, cast(null as varchar) as bill, cast(null as bigint) as witness_index, cast(null as varchar) as witness_forms_url, cast(null as varchar) as description where false
+      - input: ref('stg_mo_house__bill_texts')
+        format: sql
+        rows: |
+            select cast(null as varchar) as session_code, cast(null as varchar) as bill, cast(null as bigint) as text_index, cast(null as varchar) as document_name, cast(null as varchar) as web_name, cast(null as varchar) as text_url, cast(null as varchar) as map_url where false
+      - input: ref('stg_mo_house__bill_amendments')
+        format: sql
+        rows: |
+            select cast(null as varchar) as session_code, cast(null as varchar) as bill, cast(null as bigint) as amendment_index, cast(null as varchar) as description, cast(null as varchar) as amendment_url, cast(null as varchar) as map_url where false
+      - input: ref('stg_mo_house__document_texts')
+        format: sql
+        rows: |
+            select cast(null as varchar) as document_url, cast(null as varchar) as document_kind, cast(null as bigint) as page_count, cast(null as bigint) as text_length, cast(null as boolean) as has_text, cast(null as varchar) as fetch_error where false
+      - input: ref('stg_mo_senate__bill_texts')
+        format: sql
+        rows: |
+            select cast('241' as varchar) as session_code, cast('SB7' as varchar) as bill, cast(0 as integer) as doc_index, cast('https://www.senate.mo.gov/24info/pdf-bill/House/HCS-SB/SB7.pdf' as varchar) as document_url, cast('0007H.09C - House Committee Substitute' as varchar) as label union all
+            select '241', 'SB7', 1, 'https://www.senate.mo.gov/24info/pdf-bill/House/HCS-SB/SB7.pdf', '0007H.07C - House Committee Substitute' union all
+            select '241', 'SB7', 2, 'https://www.senate.mo.gov/24info/pdf-bill/intro/SB7.pdf', '0007S.01I - Introduced' union all
+            select '241', 'SB7', 3, null, 'No link' union all
+            select null, 'SB8', 0, 'https://www.senate.mo.gov/24info/pdf-bill/intro/SB8.pdf', '0008S.01I - Introduced'
+      - input: ref('stg_mo_senate__bill_fiscal_notes')
+        format: sql
+        rows: |
+            select cast('241' as varchar) as session_code, cast('SB7' as varchar) as bill, cast(0 as integer) as doc_index, cast('https://www.senate.mo.gov/FiscalNotes/2024-1/0007-01N.ORG.pdf' as varchar) as document_url, cast('Introduced (0007-01N.ORG)' as varchar) as label
+      - input: ref('stg_mo_senate__bill_amendments')
+        format: sql
+        rows: |
+            select cast('241' as varchar) as session_code, cast('SB7' as varchar) as bill, cast(0 as integer) as doc_index, cast('https://www.senate.mo.gov/BillTracking/Bills/BillInformation?handler=AmendmentPdf&year=2024&amendmentId=9' as varchar) as document_url, cast('3/4/2024 - SA 1 offered (Smith)' as varchar) as label
+    expect:
+      rows:
+        - {session_code: '241', bill: SB7, document_kind: summary, document_url: 'https://documents.house.mo.gov/s/7.pdf', document_index: 1, label: Introduced, source_site: house}
+        - {session_code: '241', bill: SB7, document_kind: bill_text, document_url: 'https://www.senate.mo.gov/24info/pdf-bill/House/HCS-SB/SB7.pdf', document_index: 1, label: 0007H.09C - House Committee Substitute, source_site: senate}
+        - {session_code: '241', bill: SB7, document_kind: bill_text, document_url: 'https://www.senate.mo.gov/24info/pdf-bill/intro/SB7.pdf', document_index: 3, label: 0007S.01I - Introduced, source_site: senate}
+        - {session_code: '241', bill: SB7, document_kind: fiscal_note, document_url: 'https://www.senate.mo.gov/FiscalNotes/2024-1/0007-01N.ORG.pdf', document_index: 1, label: Introduced (0007-01N.ORG), source_site: senate}
+        - {session_code: '241', bill: SB7, document_kind: amendment, document_url: 'https://www.senate.mo.gov/BillTracking/Bills/BillInformation?handler=AmendmentPdf&year=2024&amendmentId=9', document_index: 1, label: 3/4/2024 - SA 1 offered (Smith), source_site: senate}

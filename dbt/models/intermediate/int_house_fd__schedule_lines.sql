@@ -11,6 +11,8 @@
 {% set last_low_only = '\\$[0-9,]+ -( [^$0-9]*)?$' %}
 {# a PTR transaction line: the transaction's date and its notification date side by side ("P 12/05/2025 12/08/2025") #}
 {% set ptr_dates = '[0-9]{1,2}/[0-9]{1,2}/[0-9]{4} [0-9]{1,2}/[0-9]{1,2}/[0-9]{4}' %}
+{# the labelled attribute lines under a PTR transaction (lower case) #}
+{% set ptr_labels = '^(location|description|comments|filing status|subholding of):' %}
 with lines as (
     select
         doc_id,
@@ -143,6 +145,9 @@ kept as (
 --     part of the asset name that wrapped ("[GS] $250,000"). The dates of the head are the head marker: a line with
 --     its own dates starts the next transaction.
 --   * H: it carries no date (mm/dd/yyyy): the sponsor, itinerary and city names wrap around the line with the dates.
+--     The tail's own lines are the head's asset name: the lines that follow it, up to the next transaction line or
+--     label line, and carry no dates, join as well ("TAX BLDG AND SITE BDS SER." / "2020 I [GS]"); a tail that
+--     opens with an owner code (SP/DC/JT) is a new entry, not a tail (#782).
 -- "Location:" / "Description:" / "Comments:" lines of B stay lines of their own (labelled attributes), and so do
 -- those of A unless the rules above apply: a parenthesis the entry above left open ("(50% Inter") pulls the next
 -- line in, "DESCRIPTION:" included (3 lines).
@@ -153,7 +158,39 @@ flagged as (
         k.*,
         lag(k.schedule) over (partition by k.doc_id order by k.seq) as prev_schedule,
         lag(k.line_text) over (partition by k.doc_id order by k.seq) as prev_text,
-        lag(k.line_text, 2) over (partition by k.doc_id order by k.seq) as prev2_text
+        lag(k.line_text, 2) over (partition by k.doc_id order by k.seq) as prev2_text,
+        lead(k.line_text) over (partition by k.doc_id order by k.seq) as next_text,
+        -- PTR: the nearest transaction line / label line above (or this line), the nearest wrapped-range head, and
+        -- the nearest "Description:" line. The lines after a head and before the next marker belong to that head;
+        -- the lines after a "Description:" line belong to the description (#782).
+        max(
+            case
+                when
+                    substr(k.schedule, 1, 1) = 'P' and (
+                        {{ mogov.regex_matches('k.line_text', ptr_dates) }}
+                        or {{ mogov.regex_matches('lower(k.line_text)', ptr_labels) }}
+                    )
+                    then k.seq
+            end
+        )
+            over (partition by k.doc_id order by k.seq rows between unbounded preceding and current row)
+            as ptr_marker_seq,
+        max(
+            case
+                when
+                    substr(k.schedule, 1, 1) = 'P'
+                    and {{ mogov.regex_matches('k.line_text', first_low_only) }}
+                    and {{ mogov.regex_matches('k.line_text', ptr_dates ~ ' \\$[0-9,]+ -( |$)') }}
+                    then k.seq
+            end
+        )
+            over (partition by k.doc_id order by k.seq rows between unbounded preceding and current row)
+            as ptr_wrapped_head_seq,
+        max(
+            case when substr(k.schedule, 1, 1) = 'P' and lower(k.line_text) like 'description:%' then k.seq end
+        )
+            over (partition by k.doc_id order by k.seq rows between unbounded preceding and current row)
+            as ptr_description_seq
     from kept as k
 ),
 
@@ -245,9 +282,18 @@ continued as (
                 and {{ mogov.regex_matches('f.line_text', '\\$[0-9]') }}
                 and not {{ mogov.regex_matches('f.line_text', '\\$[0-9,]+ -( |$)') }}
                 and not {{ mogov.regex_matches('f.line_text', ptr_dates) }}
-                and not {{ mogov.regex_matches(
-                    'lower(f.line_text)', '^(location|description|comments|filing status|subholding of):'
-                ) }}
+                and not {{ mogov.regex_matches('lower(f.line_text)', ptr_labels) }}
+                and not {{ mogov.regex_matches('f.line_text', '^(SP|DC|JT)( |$)') }}
+            )
+            -- PTR: the lines after a wrapped head (and its tail) that carry no dates, label or owner code are the
+            -- rest of its asset name
+            or (
+                substr(f.schedule, 1, 1) = 'P'
+                and coalesce(f.ptr_wrapped_head_seq = f.ptr_marker_seq, false)
+                and not {{ mogov.regex_matches('f.line_text', ptr_dates) }}
+                and not {{ mogov.regex_matches('lower(f.line_text)', ptr_labels) }}
+                and not {{ mogov.regex_matches('f.line_text', '^(SP|DC|JT)( |$)') }}
+                and not {{ mogov.regex_matches('f.line_text', '\\$[0-9,]+ -( |$)') }}
             )
             or (
                 substr(f.schedule, 1, 1) = 'H'
@@ -260,6 +306,7 @@ continued as (
 entries as (
     select
         c.*,
+        lead(c.is_continuation) over (partition by c.doc_id order by c.seq) as next_is_continuation,
         max(case when not c.is_continuation then c.seq end)
             over (partition by c.doc_id order by c.seq rows between unbounded preceding and current row) as entry_seq
     from continued as c
@@ -294,6 +341,18 @@ select
             then {{ mogov.regex_extract('e.line_text', '^(SP|DC|JT)( |$)') }}
     end as owner_code,
     case
+        -- PTR: the "Description:" line (a share price like "sold @ $27.645/share") and the lines it wraps onto are
+        -- free text, not an amount (#782)
+        when substr(e.schedule, 1, 1) = 'P' and e.ptr_description_seq = e.ptr_marker_seq then null
+        -- PTR: the high end is the last "$" of the first tail line, not of the whole joined name
+        when
+            substr(e.schedule, 1, 1) = 'P'
+            and {{ mogov.regex_matches('e.line_text', first_low_only) }}
+            and e.line_text != j.line_text
+            and coalesce(e.next_is_continuation, false)
+            then
+                {{ mogov.regex_extract('e.line_text', '(\\$[0-9,]+)') }}
+                || coalesce(' - ' || {{ mogov.regex_extract('e.next_text', '.*(\\$[0-9,]+)') }}, '')
         when
             {{ mogov.regex_matches('e.line_text', first_low_only) }}
             -- "None" / "Undetermined" before the first "$": that is the asset's value and the "$" starts the income

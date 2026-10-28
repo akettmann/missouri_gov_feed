@@ -11,6 +11,7 @@
         'least_committee_money_share',
         'most_party_breaks',
         'most_party_loyal',
+        'most_bills_passed_house',
     ] %}
     {% set cutoffs = var('awards_threshold') %}
     {% if 'default' not in cutoffs %}

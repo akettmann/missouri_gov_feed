@@ -1,16 +1,25 @@
 // Award keys, their names and display order. Dependency-free so browser code and tests can import it.
 
-/** Display order only: each pair is [the award, its positive opposite]. Whether a pair shares a field is decided in dbt. */
-export const AWARD_PAIRS: [string, string][] = [
+/** Display order only: each row is [the award, its positive opposite], or the award alone. Whether a pair shares a field is decided in dbt. */
+export const AWARD_PAIRS: string[][] = [
   ["lowest_attendance", "highest_attendance"],
   ["most_committee_money", "least_committee_money_share"],
   ["most_party_breaks", "most_party_loyal"],
+  // no opposite: most members pass none of their bills, so "fewest passed" would be a long tie at 0% (#603)
+  ["most_bills_passed_house"],
 ];
 
 /** `name` is the award's nickname (the heading); `title` says plainly what is measured, shown under it. */
 export const AWARDS: Record<
   string,
-  { name: string; title: string; unit: "pct" | "money"; outOf?: "votes" | "raised" | "party-line votes" }
+  {
+    name: string;
+    title: string;
+    /** What exactly is counted, shown once in the award key at the bottom of the awards page (not on every list). */
+    note?: string;
+    unit: "pct" | "money";
+    outOf?: "votes" | "raised" | "party-line votes" | "decided bills";
+  }
 > = {
   lowest_attendance: {
     name: "The “Where Do I Work Again?” Award",
@@ -47,6 +56,21 @@ export const AWARDS: Record<
     title: "Votes with their party most often",
     unit: "pct",
     outOf: "party-line votes",
+  },
+  most_bills_passed_house: {
+    name: "The “Gets Bills Passed” Award",
+    title: "Highest share of sponsored House bills (HB, HJR) that passed the House",
+    // keep "at least 10" in step with the awards_min_bills_decided var in dbt_project.yml
+    note:
+      "Counts House bills (HB) and House joint resolutions (HJR) the member sponsored as the primary sponsor " +
+      "in sessions that have ended, out of those whose outcome is known (bills still pending are not " +
+      "counted), and shows the share the House passed. Appropriation bills are included; co-sponsored bills " +
+      "and resolutions (HR, HCR) are not. A year adds its regular and special sessions; at least 10 decided " +
+      "bills are needed, and at least one must have passed. Only current officials are in the data, so early years are not comparable with " +
+      "recent ones. Bills from the majority party pass far more often, and most members pass none, so there " +
+      "is no “fewest passed” list.",
+    unit: "pct",
+    outOf: "decided bills",
   },
 };
 

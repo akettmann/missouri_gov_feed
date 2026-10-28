@@ -49,3 +49,17 @@ sources:
   - name: bill_actions
     identifier: mo_senate_bill_actions
     description: One row per action in a Senate bill's history on senate.mo.gov (newest first), with the journal page that records it.
+  # The bill page's other tabs, landed by the same loader (MOGOV_SENATE_BILL_DOCS=0 skips them): the links to the
+  # bill text, fiscal note and amendment PDFs, and the summaries' text. Optional like bill_list.
+  - name: bill_texts
+    identifier: mo_senate_bill_texts
+    description: One row per bill text version (PDF link) on a Senate bill's page, with the LR number and version name as printed.
+  - name: bill_fiscal_notes
+    identifier: mo_senate_bill_fiscal_notes
+    description: One row per fiscal-note PDF link on a Senate bill's page.
+  - name: bill_amendments
+    identifier: mo_senate_bill_amendments
+    description: One row per amendment PDF link on a Senate bill's page, with the status chip beside it.
+  - name: bill_summaries
+    identifier: mo_senate_bill_summaries
+    description: One row per bill summary on a Senate bill's page; the summary's text is on the page, not in a PDF.

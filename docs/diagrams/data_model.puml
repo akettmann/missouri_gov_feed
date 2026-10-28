@@ -50,6 +50,16 @@ entity fct_federal_vote_bills {
   vote_result, source_url
 }
 
+entity fct_federal_vote_amendments {
+  congress, chamber, rollnumber, amendment_id
+  --
+  session, clerk_rollnumber, vote_date
+  amendment_type, amendment_number
+  amendment_purpose, amendment_description
+  bill_id, bill_type, bill_no, bill_title
+  vote_question, vote_result, source_url
+}
+
 entity fct_federal_sponsorship {
   bioguide_id, bill_id, role
   --
@@ -153,6 +163,7 @@ fct_federal_votes }o--|| dim_official
 fct_federal_votes ..> fct_votes : federal rows\nunioned in
 fct_federal_sponsorship }o--o| dim_official
 fct_federal_vote_bills }o..o{ fct_federal_votes : same roll call
+fct_federal_vote_amendments }o..o{ fct_federal_votes : same roll call
 dim_official ||--o{ fct_campaign_finance
 dim_official ||--o{ fct_federal_donor_summary
 dim_official ||--o{ fct_lobbyist_gifts

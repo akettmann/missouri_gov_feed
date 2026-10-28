@@ -80,6 +80,8 @@ test("award badge sample sizes", () => {
   assert.equal(metricText("highest_attendance", 99.5, 1203), "99.5% of 1,203 votes");
   assert.equal(metricText("most_party_loyal", 90, 1), "90.0% with party, of 1 party-line vote");
   assert.equal(metricText("most_party_loyal", 90, 20), "90.0% with party, of 20 party-line votes");
+  assert.equal(metricText("most_bills_passed_house", 50, 1), "50.0% of 1 decided bill");
+  assert.equal(metricText("most_bills_passed_house", 30.4, 23), "30.4% of 23 decided bills");
 });
 
 test("voting breaks sentence", () => {

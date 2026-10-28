@@ -40,6 +40,11 @@ def test_valid_var_is_returned():
     assert _thresholds(value) == value
 
 
+def test_house_passage_award_is_known():
+    value = {"default": 5, "most_bills_passed_house": 3}
+    assert _thresholds(value) == value
+
+
 def test_default_alone_is_valid():
     assert _thresholds({"default": 5}) == {"default": 5}
 

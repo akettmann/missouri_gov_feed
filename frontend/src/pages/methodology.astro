@@ -259,20 +259,20 @@ const tables = freshness();
   <section class="card" id="awards">
     <h2>Awards</h2>
     <p>
-      Each award ranks one measured number, among officials holding the same office, and comes with its
-      opposite (lowest and highest attendance, and so on). Ranks use the unrounded figure, so two officials
-      shown at the same rounded percentage can hold different ranks; only exact ties share a rank (this holds
-      for every award, including the lowest share of money from PACs, committees and parties). The top five
-      qualify unless an award sets its own cutoff (the awards_threshold setting). For the attendance and
-      party-unity pairs, which rank one number over one field, each end's cutoff is at most half the field
-      (ties at the cutoff can add more), and an official tied into both lists is left out of both, so nobody
-      holds both ends of a pair in one period. An office needs at least five qualifying officials in a period,
-      so single-seat offices like governor have no awards. An official who qualified for the same award in
-      consecutive years gets a marker such as X3 (3 qualifying years in a row; for the federal money share, 3
-      qualifying cycles in a row). Years the official wasn't ranked for that award (in another office, not
-      eligible for the measure, or too few officials to rank) are skipped: they neither add to nor break the
-      run, so the years in a run can span more calendar years than the number shown. A year ranked outside the
-      cutoff breaks it. Lifetime rankings have no marker.
+      Each award ranks one measured number, among officials holding the same office, and, except for bills
+      passed, comes with its opposite (lowest and highest attendance, and so on). Ranks use the unrounded
+      figure, so two officials shown at the same rounded percentage can hold different ranks; only exact ties
+      share a rank (this holds for every award, including the lowest share of money from PACs, committees and
+      parties). The top five qualify unless an award sets its own cutoff (the awards_threshold setting). For
+      the attendance and party-unity pairs, which rank one number over one field, each end's cutoff is at most
+      half the field (ties at the cutoff can add more), and an official tied into both lists is left out of
+      both, so nobody holds both ends of a pair in one period. An office needs at least five qualifying
+      officials in a period, so single-seat offices like governor have no awards. An official who qualified
+      for the same award in consecutive years gets a marker such as X3 (3 qualifying years in a row; for the
+      federal money share, 3 qualifying cycles in a row). Years the official wasn't ranked for that award (in
+      another office, not eligible for the measure, or too few officials to rank) are skipped: they neither
+      add to nor break the run, so the years in a run can span more calendar years than the number shown. A
+      year ranked outside the cutoff breaks it. Lifetime rankings have no marker.
     </p>
     <ul>
       <li>
@@ -296,6 +296,14 @@ const tables = freshness();
         period (the awards_min_party_line_votes setting, default 20). Maverick needs at least one vote against
         the party. The lifetime figure is the same number the profile page shows; yearly figures appear with
         the award only.
+      </li>
+      <li>
+        <strong>Bills passed</strong>: the share of House bills (HB) and House joint resolutions (HJR) the
+        member sponsored as primary sponsor, in sessions that have ended, that the House passed, out of those
+        whose outcome is known (pending bills are not counted). A year adds its regular and special sessions;
+        lifetime adds the counts. Needs at least 10 decided bills (the awards_min_bills_decided setting;
+        provisional, see issue 773) and at least one bill passed. There is no lowest-share list, because most
+        members pass none.
       </li>
     </ul>
   </section>
