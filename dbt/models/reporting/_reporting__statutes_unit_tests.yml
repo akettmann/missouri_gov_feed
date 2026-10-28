@@ -1,0 +1,60 @@
+# Unit tests for the statute reporting tables: fixed rows -> exact expected rows.
+version: 2
+
+unit_tests:
+  - name: statute_section_bills_keep_non_lead_flag_and_do_not_duplicate_links
+    model: rpt_statute_section_bills
+    description: >
+      Section 143.011's links: SB153 leads the 2021 act and SB97 is combined into it (is_lead_bill false, combined_into
+      SB153, both keep their own row). SB153 lists a primary Sponsor plus a Co-Sponsor and a second Sponsor row
+      (data that should not occur): the link still comes out once, with the sponsor with the smallest official_id,
+      and co-sponsors are never used. A 2018 link whose bill is not in fct_bills keeps its citation and has no title,
+      outcome or sponsor. Joining sponsors without the type filter and the single pick fails this test.
+    given:
+      - input: ref('fct_bill_statute_links')
+        format: sql
+        rows: |
+            select '211' as session_code, 2021 as session_year, 'SB153' as bill, '143.011' as section_id, 'amended' as change, 'A.L. 2021 S.B. 153 & 97' as citation, true as is_lead_bill, cast(null as varchar) as combined_into, true as in_fct_bills union all
+            select '211', 2021, 'SB97', '143.011', 'amended', 'A.L. 2021 S.B. 153 & 97', false, 'SB153', true union all
+            select '181', 2018, 'HB2540', '143.011', 'amended', 'A.L. 2018 H.B. 2540', true, null, false
+      - input: ref('fct_bills')
+        format: sql
+        rows: |
+            select '211' as session_code, 'SB153' as bill, 'Tax bill' as short_title, 'became law' as outcome, 'https://x/sb153' as source_url union all
+            select '211', 'SB97', 'Other tax bill', 'failed', 'https://x/sb97'
+      - input: ref('fct_bill_sponsors')
+        format: sql
+        rows: |
+            select '211' as session_code, 'SB153' as bill, 'Sponsor' as sponsor_type, 'Zed' as sponsor_name, 'Senate' as sponsor_chamber, 5 as sponsor_district, 'o2' as official_id union all
+            select '211', 'SB153', 'Sponsor', 'Abe', 'Senate', 6, 'o1' union all
+            select '211', 'SB153', 'Co-Sponsor', 'Cam', 'Senate', 7, 'o0' union all
+            select '211', 'SB97', 'Sponsor', 'Dee', 'Senate', 8, null
+    expect:
+      rows:
+        - {section_id: '143.011', session_code: '211', bill: SB153, is_lead_bill: true, combined_into: , in_fct_bills: true, short_title: Tax bill, outcome: became law, source_url: 'https://x/sb153', official_id: o1, sponsor_name: Abe}
+        - {section_id: '143.011', session_code: '211', bill: SB97, is_lead_bill: false, combined_into: SB153, in_fct_bills: true, short_title: Other tax bill, outcome: failed, source_url: 'https://x/sb97', official_id: , sponsor_name: Dee}
+        - {section_id: '143.011', session_code: '181', bill: HB2540, is_lead_bill: true, combined_into: , in_fct_bills: false, short_title: , outcome: , source_url: , official_id: , sponsor_name: }
+
+  - name: statute_chapters_count_versions_by_status
+    model: rpt_statute_chapters
+    description: >
+      Chapter 1 has two versions of 1.010 (one in force, one not yet effective), two in-force versions of 1.020 (conflicting enactments), a repealed 1.030
+      and a transferred 1.040; chapter 2 has one contingent and one historical version. Each count is of versions in
+      exactly that status, sections counts distinct section numbers, sections_in_force distinct numbers with an in-force
+      version, and loaded_at is the oldest landing. Counting sections where versions are meant fails this test.
+    given:
+      - input: ref('fct_statute_sections')
+        format: sql
+        rows: |
+            select '1' as chapter, 'Laws' as chapter_name, 'I' as title_numeral, 'T1' as title_name, '1.010' as section_id, 'in force' as status, cast('2026-10-26 04:00:00' as timestamp) as loaded_at union all
+            select '1', 'Laws', 'I', 'T1', '1.010', 'not yet effective', cast('2026-10-25 04:00:00' as timestamp) union all
+            select '1', 'Laws', 'I', 'T1', '1.020', 'in force', cast('2026-10-26 04:00:00' as timestamp) union all
+            select '1', 'Laws', 'I', 'T1', '1.020', 'in force', cast('2026-10-26 04:00:00' as timestamp) union all
+            select '1', 'Laws', 'I', 'T1', '1.030', 'repealed', cast('2026-10-26 04:00:00' as timestamp) union all
+            select '1', 'Laws', 'I', 'T1', '1.040', 'transferred', cast('2026-10-26 04:00:00' as timestamp) union all
+            select '2', null, null, null, '2.010', 'contingent', cast('2026-10-26 04:00:00' as timestamp) union all
+            select '2', null, null, null, '2.020', 'historical', cast('2026-10-26 04:00:00' as timestamp)
+    expect:
+      rows:
+        - {chapter: '1', chapter_name: Laws, title_numeral: I, title_name: T1, section_versions: 6, sections: 4, sections_in_force: 2, in_force_versions: 3, not_yet_effective_versions: 1, contingent_versions: 0, historical_versions: 0, repealed_versions: 1, transferred_versions: 1, loaded_at: '2026-10-25 04:00:00'}
+        - {chapter: '2', chapter_name: , title_numeral: , title_name: , section_versions: 2, sections: 2, sections_in_force: 0, in_force_versions: 0, not_yet_effective_versions: 0, contingent_versions: 1, historical_versions: 1, repealed_versions: 0, transferred_versions: 0, loaded_at: '2026-10-26 04:00:00'}

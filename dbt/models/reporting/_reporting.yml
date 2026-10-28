@@ -926,6 +926,146 @@ models:
         data_type: varchar
         description: The committee's MEC page, where its reports and itemized contributions are.
 
+  - name: rpt_statute_section_bills
+    description: >
+      The bills that enacted, amended or repealed each RSMo section, shaped for a statute section page: one row per
+      link in fct_bill_statute_links, with the bill's short title, outcome and official page when fct_bills has it
+      (2017 on) and its primary sponsor. Older links show the Revisor's citation only. A combined act's non-lead
+      bill keeps is_lead_bill false and names the lead bill in combined_into. Grain: one row per (session_code,
+      bill, section_id, change).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [session_code, bill, section_id, change]
+    columns:
+      - name: section_id
+        data_type: varchar
+        description: The RSMo section (fct_statute_sections.section_id).
+        data_tests:
+          - not_null
+      - name: session_year
+        data_type: integer
+        description: Year of the act (the Revisor's citation year).
+        data_tests:
+          - not_null
+      - name: session_code
+        data_type: varchar
+        description: Session code as in fct_bills (e.g. 231 for the 2023 regular session).
+        data_tests:
+          - not_null
+      - name: bill
+        data_type: varchar
+        description: Bill id without spaces ("HB115", "SB153").
+        data_tests:
+          - not_null
+      - name: change
+        data_type: varchar
+        description: enacted (L.), amended (A.L.) or repealed (Repealed L.), as in fct_bill_statute_links.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [enacted, amended, repealed]
+      - name: citation
+        data_type: varchar
+        description: The act as the Revisor cites it, e.g. "A.L. 2021 S.B. 153 & 97".
+      - name: is_lead_bill
+        data_type: boolean
+        description: >
+          False for a bill that was combined into another in one act (fct_bill_statute_links.is_lead_bill); only the
+          lead bill reached the governor.
+        data_tests:
+          - not_null
+      - name: combined_into
+        data_type: varchar
+        description: The lead bill a non-lead bill was combined into (SB153 for 2021 SB97); null for lead bills.
+        data_tests:
+          - not_null:
+              config:
+                where: not is_lead_bill
+      - name: in_fct_bills
+        data_type: boolean
+        description: Whether fct_bills has the bill; when false, short_title, outcome, source_url and the sponsor are null.
+        data_tests:
+          - not_null
+      - name: short_title
+        data_type: varchar
+        description: The bill's short title (fct_bills).
+      - name: outcome
+        data_type: varchar
+        description: The bill's outcome (fct_bills.outcome).
+      - name: source_url
+        data_type: varchar
+        description: The bill's official House or Senate page (fct_bills.source_url); null when fct_bills lacks the bill.
+      - name: official_id
+        data_type: varchar
+        description: >
+          The bill's primary sponsor (fct_bill_sponsors, sponsor_type 'Sponsor') as an official; null when the sponsor
+          is not matched to one or none is loaded (Senate bills, #839).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: sponsor_name
+        data_type: varchar
+        description: The primary sponsor's name as the bill lists it; null when no primary sponsor is loaded.
+
+  - name: rpt_statute_chapters
+    description: >
+      One row per RSMo chapter with the number of section versions in each status, for the statutes index pages.
+      Every count is of fct_statute_sections rows (versions), so the status counts add up to section_versions; sections
+      counts distinct section numbers. Chapter and title names are null for chapters the Revisor's table of contents no
+      longer lists. Grain: one row per chapter.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [chapter]
+    columns:
+      - name: chapter
+        data_type: varchar
+        description: RSMo chapter number, as text because a few carry a letter.
+        data_tests:
+          - not_null
+      - name: chapter_name
+        data_type: varchar
+        description: Chapter name from the Revisor's table of contents; null for a chapter no longer listed there.
+      - name: title_numeral
+        data_type: varchar
+        description: The chapter's title, as a roman numeral; null with chapter_name.
+      - name: title_name
+        data_type: varchar
+        description: The title's name, e.g. "LAWS AND STATUTES".
+      - name: section_versions
+        data_type: bigint
+        description: All fct_statute_sections rows of the chapter; equals the sum of the six status counts.
+      - name: sections
+        data_type: bigint
+        description: Distinct section numbers in the chapter, whatever their status.
+      - name: sections_in_force
+        data_type: bigint
+        description: Distinct section numbers with at least one version whose status is in force.
+      - name: in_force_versions
+        data_type: bigint
+        description: Versions with status in force.
+      - name: not_yet_effective_versions
+        data_type: bigint
+        description: Versions with status not yet effective (a later version printed beside the one in force).
+      - name: contingent_versions
+        data_type: bigint
+        description: Versions with status contingent (take effect on an event, not a date).
+      - name: historical_versions
+        data_type: bigint
+        description: Versions with status historical (expired versions still printed).
+      - name: repealed_versions
+        data_type: bigint
+        description: Rows for repealed sections.
+      - name: transferred_versions
+        data_type: bigint
+        description: Rows for transferred sections.
+      - name: loaded_at
+        data_type: timestamp with time zone
+        description: The oldest landing among the chapter's pages, which is the chapter's as-of date.
+
 exposures:
   - name: voter_frontend
     label: Missouri officials frontend

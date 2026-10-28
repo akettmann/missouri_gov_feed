@@ -5,7 +5,8 @@
 -- version's effective date; the Revisor dates a version that waits on a contingency 1 Jan 2099, which becomes
 -- is_contingent with no date. held_unconstitutional: the effective line says "(all or part is unconstitutional)".
 -- history_note is the session-law history footnote ("(RSMo 1939 § 645, A.L. 1957 p. 587, A.L. 2015 S.B. 239)"),
--- when the first footnote is one.
+-- when the first footnote is one. footnotes is the page's whole footnote array (stg_mo_revisor__section_footnotes
+-- explodes it). loaded_at is when we landed the page: the "as of" date of everything shown from it.
 with src as (
     select
         {{ mogov.json_str('payload', '$.section') }} as section_id,
@@ -18,7 +19,8 @@ with src as (
         {{ mogov.json_str('payload', '$.text') }} as section_text,
         {{ mogov.json_str('payload', '$.footnotes[0]') }} as first_footnote,
         {{ mogov.json_fragment('payload', '$.footnotes') }} as footnotes,
-        source_url
+        source_url,
+        loaded_at
     from {{ source('mo_revisor', 'sections') }}
 ),
 
@@ -49,5 +51,6 @@ select
     section_text,
     case when first_footnote like '(%' then first_footnote end as history_note,
     footnotes,
-    source_url
+    source_url,
+    loaded_at
 from dated

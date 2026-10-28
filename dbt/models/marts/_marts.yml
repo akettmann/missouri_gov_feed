@@ -1754,6 +1754,67 @@ models:
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"
+      - name: loaded_at
+        data_type: timestamp with time zone
+        description: >
+          When our copy of the version's page was landed (for repealed and transferred sections, the repeals list):
+          the "as of" date to show beside the text, since the Revisor's site may have changed since.
+        data_tests:
+          - not_null
+
+  - name: fct_statute_section_footnotes
+    description: >
+      The footnotes the Revisor prints under each RSMo section version (fct_statute_sections), one row per footnote
+      in page order: the session-law history, "Prior revisions" lines, the Revisor's court-case annotations (a section
+      can carry dozens) and notes such as "Effective 1-01-17". footnote_text is verbatim, never rewritten. Repealed
+      and transferred sections have no footnotes. Grain: one row per footnote (section_version_id, footnote_number).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [section_version_id, footnote_number]
+    columns:
+      - name: section_version_id
+        data_type: varchar
+        description: The section version the footnote is printed under (fct_statute_sections.section_version_id).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_statute_sections')
+                field: section_version_id
+      - name: footnote_number
+        data_type: integer
+        description: Position of the footnote on the version's page, 1-based; sort by it to print them in order.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 100
+                inclusive: true
+      - name: section_id
+        data_type: varchar
+        description: The RSMo section (fct_statute_sections.section_id), repeated so a section's footnotes can be read without the version table.
+        data_tests:
+          - not_null
+      - name: footnote_text
+        data_type: varchar
+        description: >
+          The footnote as the Revisor prints it. Checked for HTML entities, U+FFFD, filler values and doubled
+          punctuation by tests/assert_statute_footnotes_are_clean_text.sql.
+        data_tests:
+          - not_null
+      - name: is_history_note
+        data_type: boolean
+        description: True for the first footnote when it is the session-law history that fct_statute_sections carries as history_note.
+        data_tests:
+          - not_null
+      - name: source_url
+        data_type: varchar
+        description: "{{ doc('source_url') }}"
+      - name: loaded_at
+        data_type: timestamp with time zone
+        description: When our copy of the version's page was landed (fct_statute_sections.loaded_at).
 
   - name: fct_bill_statute_links
     description: >
