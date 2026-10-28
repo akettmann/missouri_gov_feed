@@ -10,6 +10,12 @@
 -- entry's fetch time, so a page reused from the cache keeps its original time); null on rows loaded before the
 -- loader recorded it (#852). loaded_at is when our pipeline last published the raw table, up to 180 days after
 -- the fetch.
+{{ config(materialized='table') }}
+{#- A table, unlike the other staging views: the model parses the payload column of the raw sections table
+    (~53 MB of JSON, one document per section version), and fct_statute_sections,
+    int_mo_revisor__session_law_bills, stg_mo_revisor__section_footnotes and several tests each re-read it, so as
+    a view that parse ran once per consumer (#886). -#}
+
 with src as (
     select
         {{ mogov.json_str('payload', '$.section') }} as section_id,
