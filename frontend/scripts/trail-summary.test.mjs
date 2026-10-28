@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { sumByTrailStatus } from "../src/lib/trailSummary.ts";
+import { sumByTrailStatus, sumGaveOfficial } from "../src/lib/trailSummary.ts";
 
 const d = (trail_status, total_amount) => ({ trail_status, total_amount });
 
@@ -29,4 +29,14 @@ test("no trails or no donors gives no kinds; an unknown status throws", () => {
   assert.deepEqual(sumByTrailStatus([]), []);
   assert.deepEqual(sumByTrailStatus([{ donors: [] }]), []);
   assert.throws(() => sumByTrailStatus([{ donors: [d("mystery", 1)] }]), /unknown trail_status/);
+});
+
+test("gave-official sums what the listed committees gave the official, not donor dollars", () => {
+  const trails = [
+    { gave_official: 0.1, donors: [d("end of trail", 1000000)] },
+    { gave_official: 0.2, donors: [d("individuals", 5000000)] },
+    { gave_official: 108199.7, donors: [] },
+  ];
+  assert.equal(sumGaveOfficial(trails), 108200);
+  assert.equal(sumGaveOfficial([]), 0);
 });

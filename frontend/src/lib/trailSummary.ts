@@ -9,6 +9,8 @@ export interface TrailDonorLike {
 }
 export interface TrailLike {
   donors: TrailDonorLike[];
+  /** what this official's committee got from the listed committee */
+  gave_official?: number;
 }
 
 /** Order the kinds are shown in; the same for every official. */
@@ -51,4 +53,9 @@ export function sumByTrailStatus(trails: readonly TrailLike[]): TrailSum[] {
     const e = cents.get(kind);
     return e ? [{ kind, amount: e.cents / 100, rows: e.rows }] : [];
   });
+}
+
+/** What the listed committees gave this official, in exact dollars (whole cents, no float drift). */
+export function sumGaveOfficial(trails: readonly TrailLike[]): number {
+  return trails.reduce((n, t) => n + Math.round((t.gave_official ?? 0) * 100), 0) / 100;
 }

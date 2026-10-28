@@ -5,7 +5,7 @@
 import type { CommitteeDonorRow, CommitteeTrail } from "../lib/exports/types";
 import { count, money } from "../lib/format";
 import { href } from "../lib/site";
-import { sumByTrailStatus, type TrailKind } from "../lib/trailSummary";
+import { sumByTrailStatus, sumGaveOfficial, type TrailKind } from "../lib/trailSummary";
 import SourceLink from "./SourceLink.astro";
 
 interface Props {
@@ -31,7 +31,8 @@ const TRAIL_LABEL: Record<string, string> = {
 };
 // What each kind counts in the summary, in the same words the methodology page uses.
 const SUMMARY_LABEL: Record<TrailKind, string> = {
-  "end of trail": "Businesses and other organizations: MEC does not receive their own donors",
+  "end of trail":
+    "Businesses and other organizations: the Missouri Ethics Commission (MEC) does not receive their own donors",
   "not an mec filer": "Not found among Missouri filers (federal or out-of-state PACs)",
   "ambiguous mec name": "Name shared by several Missouri committees",
   individuals: "Individuals (itemized gifts, added together)",
@@ -40,7 +41,7 @@ const SUMMARY_LABEL: Record<TrailKind, string> = {
 const MEC_PAGE = "https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=";
 const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : `${a}–${b}`);
 const summary = sumByTrailStatus(trails ?? []);
-const summaryTotal = summary.reduce((n, r) => n + Math.round(r.amount * 100), 0) / 100;
+const gaveOfficial = sumGaveOfficial(trails ?? []);
 const committeeCount = trails?.length ?? 0;
 const donorName = (d: CommitteeDonorRow) =>
   d.trail_status === "individuals" ? "Individuals (itemized)" : d.donor_name;
@@ -61,8 +62,8 @@ const donorName = (d: CommitteeDonorRow) =>
     </p>
     <div class="trail-summary" data-confidence="medium">
       <h4>
-        Where the money behind these {count(committeeCount)}{" "}
-        {committeeCount === 1 ? "committee" : "committees"} goes out of view{" "}
+        Who gave to the {count(committeeCount)} {committeeCount === 1 ? "committee" : "committees"} listed
+        below, and where that money goes out of view{" "}
         <span
           class="badge medium"
           title="Every committee here was found by matching a name: MEC records no ID for a donor committee"
@@ -71,10 +72,12 @@ const donorName = (d: CommitteeDonorRow) =>
         </span>
       </h4>
       <p class="small muted">
-        Adds up only the {count(committeeCount)} {committeeCount === 1 ? "committee" : "committees"} listed
-        below: each one's 10 largest donors that are not individuals, plus its individual donors added
-        together. It is not all of this official's money, and these totals are not a measure of influence. The
-        total counted is {money(summaryTotal)}.
+        Adds up who gave to the {count(committeeCount)} {committeeCount === 1 ? "committee" : "committees"}{" "}
+        listed below, across every year on file: each one's 10 largest donors that are not individuals, plus
+        its individual donors added together. This is money those committees took in, not money given to this
+        official; {committeeCount === 1 ? "that committee" : "those committees"} gave this official{" "}
+        {money(gaveOfficial)}. The listed committees sometimes give to each other, so some dollars appear
+        twice. These figures are not a measure of influence.
       </p>
       <div class="table-scroll">
         <table>
