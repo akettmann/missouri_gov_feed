@@ -9,6 +9,11 @@
 --   ambiguous mec name     several Missouri committees active that year share the name
 --   not an mec filer       a committee not found among Missouri filers (federal and out-of-state PACs report
 --                          elsewhere, or a name too different to match)
+--   own name               the donor name is one the receiving committee files under (a committee does not fund
+--                          itself, so the trail is not followed, #833); a high-confidence match to itself
+--   similar name           the donor name matched the receiving committee only on the core name (PAC, Fund etc.
+--                          dropped; medium confidence), so it may be a parent body or another state's affiliate;
+--                          not followed either
 --   end of trail           a business or organization: MEC does not receive the donors of non-committees,
 --                          so a nonprofit's funders are not disclosed here
 --   individuals            itemized gifts from people
@@ -59,12 +64,18 @@ donors as (
         count(*) as contribution_count,
         min(contribution_year) as first_year,
         max(contribution_year) as last_year,
-        max(case when match_status = 'ambiguous' then 1 else 0 end) as any_ambiguous
+        max(case when match_status = 'ambiguous' then 1 else 0 end) as any_ambiguous,
+        max(case when donor_mec_committee_id = mec_committee_id then 1 else 0 end) as any_self,
+        max(case when donor_mec_committee_id = mec_committee_id and donor_link_confidence = 'high' then 1 else 0 end)
+            as any_self_high
     from gifts
     group by mec_committee_id, donor_class, donor_name
 ),
 
--- a name can match in some years and not others (or two IDs over time): keep the ID with the most money
+-- a name can match in some years and not others (or two IDs over time): keep the ID with the most money.
+-- A match to the committee itself is no link (#833): a committee does not fund itself, so the name is another
+-- body's (for C000621 the parent union, "Missouri State Council of Fire Fighters", matched to its PAC once the
+-- core-name tier dropped "PAC"). The money stays, as a donor we can't place; the trail doesn't loop back.
 donor_links as (
     select
         mec_committee_id,
@@ -77,7 +88,7 @@ donor_links as (
             order by sum(amount) desc, donor_mec_committee_id
         ) as link_rank
     from gifts
-    where donor_mec_committee_id is not null
+    where donor_mec_committee_id is not null and donor_mec_committee_id <> mec_committee_id
     group by mec_committee_id, donor_class, donor_name, donor_mec_committee_id, donor_link_confidence
 ),
 
@@ -95,6 +106,8 @@ ranked as (
         case
             when d.donor_class = 'individual' then 'individuals'
             when l.donor_mec_committee_id is not null then 'mec committee'
+            when d.any_self_high = 1 then 'own name'
+            when d.any_self = 1 then 'similar name'
             when d.donor_class in ('business or organization', 'other') then 'end of trail'
             when d.any_ambiguous = 1 then 'ambiguous mec name'
             else 'not an mec filer'

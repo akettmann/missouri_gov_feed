@@ -76,7 +76,7 @@ export interface CommitteeDonorRow {
   contribution_count: number;
   first_year: number | null;
   last_year: number | null;
-  /** mec committee | ambiguous mec name | not an mec filer | end of trail | individuals */
+  /** mec committee | ambiguous mec name | not an mec filer | own name (high-confidence self match) | similar name (core-name self match) | end of trail | individuals */
   trail_status: string;
   donor_mec_committee_id: string | null;
 }
@@ -88,8 +88,8 @@ export interface CommitteeDonorRow {
 export interface CommitteeTrail {
   mec_committee_id: string;
   committee_name: string | null;
-  /** the donor's name(s) as the official's committee reported them */
-  donor_names: string;
+  /** the donor's name(s) as the official's committee reported them, one entry per distinct name */
+  donor_names: string[];
   gave_official: number;
   first_year: number;
   last_year: number;

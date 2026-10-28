@@ -17,6 +17,8 @@ export interface TrailLike {
 export const TRAIL_KINDS = [
   "end of trail",
   "not an mec filer",
+  "own name",
+  "similar name",
   "ambiguous mec name",
   "individuals",
   "mec committee",

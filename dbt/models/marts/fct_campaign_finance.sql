@@ -103,6 +103,8 @@ mec_received as (
             and coalesce(c.contribution_year, cast(extract(year from c.contribution_date) as {{ dbt.type_int() }}))
             = x.contribution_year
             and x.match_status = 'matched'
+            -- a committee is not its own donor: a name match back to the receiving committee is no link (#833)
+            and m.mec_committee_id <> x.mec_committee_id
 ),
 
 mec_given as (
@@ -156,6 +158,8 @@ mec_given as (
                 c.contributor_committee_name = x.donor_committee_name
                 and c.contribution_year = x.contribution_year
                 and x.match_status = 'matched'
+                -- a committee is not its own donor: a name match back to the receiving committee is no link (#833)
+                and m.mec_committee_id <> x.mec_committee_id
     ),
 
     mec_direct_given as (
