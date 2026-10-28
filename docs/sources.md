@@ -945,9 +945,9 @@ rule against `/bulkdata`, US government work (the page states no licence). Congr
   `govinfo_billstatus_files` (path, URL, size, sha256, landing time); parsed with lxml into one JSON row per entity:
   `govinfo_billstatus_bills`, `_sponsors`, `_cosponsors`, `_actions`, `_recorded_votes`, `_laws`, and (#625)
   `_committees` (committees and subcommittees a bill was referred to), `_committee_activities` (their dated steps),
-  `_subjects` (CRS legislative subject terms), `_related_bills` and `_related_bill_relationships`. Summaries,
+  `_subjects` (CRS legislative subject terms), `_related_bills` and `_related_bill_relationships`.
   `_amendments`, `_amendment_sponsors`, `_amendment_actions` and `_amendment_recorded_votes` (#738). Summaries,
-  titles and text versions stay in the raw XML only.
+  titles, text versions, amendment cosponsors and amendment text versions and links stay in the raw XML only.
 - Shard units: (congress, bill type) zips, each downloaded by exactly one shard (so no shard repeats another's
   download). The House `hr` zip is by far the largest, so more shards than zips (8 per Congress) gain nothing.
 - Everything is landed (all states): cosponsor lists need the whole file anyway, and the Missouri filter
@@ -956,7 +956,7 @@ rule against `/bulkdata`, US government work (the page states no licence). Congr
 - Votes to bills: `fct_federal_vote_bills` links each cited roll call to its Voteview roll call (one row per roll
   call and bill). The bill is the one the roll call was "taken on", not always the one it decided: of the 1,708
   linked rows in the 117th and 118th, 136 are motions to recommit and 130 order the previous question on a rule,
-  and cloture, motion-to-proceed, tabling and discharge votes are in there too. Read `vote_question`. BILLSTATUS cites the chamber clerk's roll number within the session; Voteview's `rollnumber`
+  and cloture, motion-to-proceed, tabling and discharge votes are in there too. Read `vote_question`. Roll calls cited by an amendment's actions are in `fct_federal_vote_amendments` (below), not here. BILLSTATUS cites the chamber clerk's roll number within the session; Voteview's `rollnumber`
   runs across the whole Congress (House session 2 starts at 720 in the 118th), so the join uses Voteview's
   `clerk_rollnumber` and `session`, not `rollnumber`. On the 117th and 118th (checked 2026-10-27) all 914 and 794 distinct cited roll calls were found in Voteview
   (117th: House 764, Senate 150 rows; 118th: House 661, Senate 133). On the 118th and 119th, all 1,646 cited roll
@@ -1058,10 +1058,19 @@ Quirks:
   - The mart holds more than votes on the amendment itself: 9 Senate cloture votes on substitute amendments, 3 House
     "Ordering the Previous Question" votes cited under a minority amendment to the H.Res, and 43 Senate "On the
     Motion" rows. Read `vote_question` to tell them apart.
-  - Most amendments are never proposed: 9,216 of 9,977 SAMDTs have a null `proposed_date` (only proposed ones have
+  - Most Senate amendments are never proposed: 9,216 of 9,977 SAMDTs have a null `proposed_date` (only proposed ones have
     one; House ones carry `submitted_date`). `purpose` and `description` are free text and null for 9,211 of 11,545.
-  - `vote_date` is the date part of a UTC timestamp, so it is off by a day from Voteview's date for 213 of 1,060 rows
-    (#790). Use Voteview's date for the day of the vote.
+  - `stg_govinfo_billstatus__amendment_recorded_votes.vote_date` (and `stg_govinfo_billstatus__recorded_votes.vote_date`)
+    is the date part of a UTC timestamp, so it is off by a day from Voteview's date for 213 of 1,060 linked (amendment,
+    roll call) rows (1,060 rows over the 1,059 distinct roll calls; #790). `fct_federal_vote_amendments.vote_date` is
+    Voteview's date (`r.vote_date` from `stg_voteview__rollcalls`), so use the mart for the day of the vote.
+  - Amendment actions nest one level deeper than a bill's: `<actions><count/><actions><item/>`.
+  - Some House amendments are sponsored by a committee (e.g. "Rules Committee"): the file gives a name and no
+    `bioguideId`, so `bioguide_id` is null and `is_committee` is true in `stg_govinfo_billstatus__amendment_sponsors`.
+  - The same sponsor is sometimes listed twice under two spellings of the name, so a member can appear twice for an
+    amendment; `position` keeps the file's order.
+  - Amendments can amend other amendments: `amended_amendment_id` and `amendments_to_amendment_count` in
+    `stg_govinfo_billstatus__amendments` (4,499 amendments on the 117th and 118th have an `amended_amendment_id`, #792).
   - A roll call missing here means no amendment was found for it, not that none was voted on.
 - Committees and subjects of Missouri members' bills (#737): `fct_federal_sponsorship_committees` (one row per
   member, bill, role and committee or subcommittee, with the earliest referred, hearing, markup, reported and
