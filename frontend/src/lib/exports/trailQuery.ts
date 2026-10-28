@@ -7,7 +7,7 @@
  * The names the official's committee filed the donor under are a second query (one row per name, #833),
  * not a delimited string column: a name can hold any punctuation, so no separator is safe.
  */
-function rankedCte(trails: number, rollup: string, donors: string): string {
+function rankedCte(rollup: string, donors: string): string {
   return `with ranked as (
           select dr.official_id, dr.donor_mec_committee_id as mec_committee_id,
                  cast(sum(dr.total_amount) as double) as gave_official,
@@ -20,7 +20,7 @@ function rankedCte(trails: number, rollup: string, donors: string): string {
                  ) as rank
           from ${rollup} as dr
           where dr.donor_mec_committee_id is not null
-            -- rank only committees that have a donor list to show, so the top ${trails} are all displayable
+            -- rank only committees that have a donor list to show, so the top N are all displayable
             and exists (
               select 1 from ${donors} as cd where cd.mec_committee_id = dr.donor_mec_committee_id
             )
@@ -30,7 +30,7 @@ function rankedCte(trails: number, rollup: string, donors: string): string {
 
 export function trailRowsSql(trails: number, rollup: string, donors: string): string {
   return `
-        ${rankedCte(trails, rollup, donors)}
+        ${rankedCte(rollup, donors)}
         select official_id, mec_committee_id, gave_official, first_year, last_year, link_confidence
         from ranked
         where rank <= ${trails} order by official_id, rank`;
@@ -39,7 +39,7 @@ export function trailRowsSql(trails: number, rollup: string, donors: string): st
 /** One row per (official, shown committee, name filed), in name order with a unique tie-break. */
 export function trailDonorNamesSql(trails: number, rollup: string, donors: string): string {
   return `
-        ${rankedCte(trails, rollup, donors)}
+        ${rankedCte(rollup, donors)}
         select distinct rk.official_id, rk.mec_committee_id, dr.donor_name
         from ranked as rk
         inner join ${rollup} as dr

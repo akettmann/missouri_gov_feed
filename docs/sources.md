@@ -1093,6 +1093,11 @@ Quirks:
   - Amendments can amend other amendments: `amended_amendment_id` and `amendments_to_amendment_count` in
     `stg_govinfo_billstatus__amendments` (4,499 amendments on the 117th and 118th have an `amended_amendment_id`, #792).
   - A roll call missing here means no amendment was found for it, not that none was voted on.
+- Per-member summaries (#772): `fct_federal_member_committees` (one row per member, Congress, role and committee:
+  distinct bills referred, with hearing, markup, reported and discharged counts) and `fct_federal_member_subjects`
+  (one row per member, Congress, role and CRS subject: distinct bills, marked up, reported by a full committee, became
+  law). A bill referred to several committees counts once in each; a bill CRS has not tagged has no subject row. The
+  member's own committee assignments are separate (#284).
 - Committees and subjects of Missouri members' bills (#737): `fct_federal_sponsorship_committees` (one row per
   member, bill, role and committee or subcommittee, with the earliest referred, hearing, markup, reported and
   discharged dates in that committee) and `fct_federal_sponsorship_subjects` (one row per member, bill, role and CRS

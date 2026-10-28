@@ -27,6 +27,7 @@ const TRAIL_LABEL: Record<string, string> = {
   "mec committee": "Missouri committee: its own donors are on MEC",
   "ambiguous mec name": "Several Missouri committees use this name",
   "not an mec filer": "Not a Missouri filer (federal and out-of-state PACs report elsewhere)",
+  "own name": "Same name as this committee itself; not followed",
   "end of trail": "End of the trail: an organization's own funders aren't reported to MEC",
   individuals: "People, each giving itemized amounts",
 };
@@ -35,6 +36,7 @@ const SUMMARY_LABEL: Record<TrailKind, string> = {
   "end of trail":
     "Businesses and other organizations: the Missouri Ethics Commission (MEC) does not receive their own donors",
   "not an mec filer": "Not found among Missouri filers (federal or out-of-state PACs)",
+  "own name": "Name matches the committee itself, which does not fund itself; not followed",
   "ambiguous mec name": "Name shared by several Missouri committees",
   individuals: "Individuals (itemized gifts, added together)",
   "mec committee": "Missouri committees: their own donors are on MEC",
@@ -126,9 +128,11 @@ const donorName = (d: CommitteeDonorRow) =>
           </span>
         </h4>
         <p class="small muted">
-          Filed by this official's committee as {quotedNames(t.donor_names)}: {money(t.gave_official)},{" "}
-          {years(t.first_year, t.last_year)}. The committee took in {money(t.committee_total_amount)} in
-          itemized contributions in total.{" "}
+          {t.donor_names.length > 0
+            ? `Filed by this official's committee as ${quotedNames(t.donor_names)}: `
+            : ""}
+          {money(t.gave_official)}, {years(t.first_year, t.last_year)}. The committee took in{" "}
+          {money(t.committee_total_amount)} in itemized contributions in total.{" "}
           <SourceLink url={t.source_url} label={`MEC committee ${t.mec_committee_id}`} />
         </p>
         <div class="table-scroll">

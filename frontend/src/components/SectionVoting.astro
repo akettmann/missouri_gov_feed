@@ -12,6 +12,7 @@ import {
 import { count, sessionLabel, statusKind } from "../lib/format";
 import { breaksText, voteYearsText } from "../lib/indicators";
 import { href } from "../lib/site";
+import { stageLabel } from "../lib/voteStage";
 import ConfidenceBadge from "./ConfidenceBadge.astro";
 import SourceLink from "./SourceLink.astro";
 import Viz from "./Viz.astro";
@@ -72,6 +73,7 @@ const tally = (yea: number | null, nay: number | null) => (yea == null ? "—" :
                     <tr>
                       <th>Date</th>
                       <th>Measure</th>
+                      <th>Stage</th>
                       <th>Their vote</th>
                       <th>Party voted</th>
                       <th class="num">Republicans</th>
@@ -91,6 +93,11 @@ const tally = (yea: number | null, nay: number | null) => (yea == null ? "—" :
                             {" "}
                             ({sessionLabel(v.chamber, v.session_code, v.session_name)})
                           </span>
+                        </td>
+                        <td>
+                          {stageLabel(v.chamber, v.vote_stage, v.vote_informal) ?? (
+                            <span class="muted">—</span>
+                          )}
                         </td>
                         <td>{v.vote_cast}</td>
                         <td>{v.party_position}</td>

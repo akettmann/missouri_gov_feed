@@ -1,17 +1,18 @@
 # Core responsibilities of each office
 
-Legal text checked 2026-10-27 (issue #336). Each bullet is one responsibility, written in plain words, with a link to
-the law that creates it. Reading level: Flesch-Kincaid grade 8.7 with the quoted legal wording included (7.4
-without it). This describes the job, not how any officeholder does it. The layout is the same for every
-office.
+Legal text checked 2026-10-27. Each bullet is one responsibility, written in plain words, with a link to the law
+that creates it. This describes the job, not how any officeholder does it. The layout is the same for every office.
+
+<!-- Maintainer note, not shown on the site: issue #336. Reading level: Flesch-Kincaid grade 8.7 with the quoted
+legal wording included (7.4 without it). -->
 
 How to read it:
 
 - **Duty** means the law says the office must do it. **Power** means the law allows it. Where the law does not make
   that split clear, the bullet says "Job".
-- "Data" names the project source that covers the responsibility, or says "no data yet". Source names are the
-  loaders in `docs/sources.md`. "Candidate" means a source we have researched but not loaded.
-- Notes marked `[n]` are at the end of each office. They hold exceptions and conditions.
+- "Data" names the project source that covers the responsibility, or says "no data yet".
+  "Candidate" means a source we have researched but not loaded.
+- Numbered notes are at the end of each office. They hold exceptions and conditions.
 - The Missouri Constitution and the Revised Statutes of Missouri (RSMo) are quoted from revisor.mo.gov. The U.S.
   Constitution is quoted from the National Archives transcript. Quotes are short so the exact words can be checked.
   The law changes. Check the linked page for the current text.
@@ -344,7 +345,7 @@ Notes:
 
 ## Offices not covered yet
 
-Sheriffs, prosecutors and other local officers (#178), county and city officials, and the State Auditor's local
+Sheriffs, prosecutors and other local officers, county and city officials, and the State Auditor's local
 audits beyond the Constitution's wording are not in this first version. Statewide boards and commissions an office sits
 on by law (for example, the Governor and Auditor approving state bank deposits, noted above) are listed only where the
 Constitution says so. Statutes that add duties are listed only for the Attorney General.

@@ -65,7 +65,7 @@ unit_tests:
     description: >
       A donor name whose match is the receiving committee itself (the parent union filing as "Fire Fighters
       Council", matched to its own "Fire Fighters Council PAC" on the core name, #833) gets no donor_mec_committee_id
-      and is "not an mec filer", with its money kept. The same name matched to a different committee keeps the
+      and is "own name" (not followed), with its money kept. The same name matched to a different committee keeps the
       link, as does another donor of the self-matched committee, so only the self-link is dropped.
     given:
       - input: ref('fct_campaign_finance')
@@ -84,7 +84,7 @@ unit_tests:
           - {donor_committee_name: Other Union PAC, contribution_year: 2020, mec_committee_id: C000999, match_status: matched, match_confidence: high}
     expect:
       rows:
-        - {mec_committee_id: C000100, donor_rank: 1, donor_name: Fire Fighters Council, total_amount: 900, trail_status: not an mec filer, donor_mec_committee_id: null}
+        - {mec_committee_id: C000100, donor_rank: 1, donor_name: Fire Fighters Council, total_amount: 900, trail_status: own name, donor_mec_committee_id: null}
         - {mec_committee_id: C000100, donor_rank: 2, donor_name: Other Union PAC, total_amount: 100, trail_status: mec committee, donor_mec_committee_id: C000999}
 
   - name: committee_donors_rank_ties_break_on_donor_class

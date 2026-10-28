@@ -9,6 +9,8 @@
 --   ambiguous mec name     several Missouri committees active that year share the name
 --   not an mec filer       a committee not found among Missouri filers (federal and out-of-state PACs report
 --                          elsewhere, or a name too different to match)
+--   own name               the donor name matches the receiving committee itself (a committee does not fund itself,
+--                          so the trail is not followed, #833)
 --   end of trail           a business or organization: MEC does not receive the donors of non-committees,
 --                          so a nonprofit's funders are not disclosed here
 --   individuals            itemized gifts from people
@@ -59,7 +61,8 @@ donors as (
         count(*) as contribution_count,
         min(contribution_year) as first_year,
         max(contribution_year) as last_year,
-        max(case when match_status = 'ambiguous' then 1 else 0 end) as any_ambiguous
+        max(case when match_status = 'ambiguous' then 1 else 0 end) as any_ambiguous,
+        max(case when donor_mec_committee_id = mec_committee_id then 1 else 0 end) as any_self
     from gifts
     group by mec_committee_id, donor_class, donor_name
 ),
@@ -98,6 +101,7 @@ ranked as (
         case
             when d.donor_class = 'individual' then 'individuals'
             when l.donor_mec_committee_id is not null then 'mec committee'
+            when d.any_self = 1 then 'own name'
             when d.donor_class in ('business or organization', 'other') then 'end of trail'
             when d.any_ambiguous = 1 then 'ambiguous mec name'
             else 'not an mec filer'

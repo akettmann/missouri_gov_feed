@@ -1,0 +1,57 @@
+version: 2
+
+unit_tests:
+  - name: federal_member_committees_counts_distinct_bills
+    model: fct_federal_member_committees
+    description: >
+      M1 sponsored 118-hr-1 and 118-hr-2, both referred to hsba00 (118-hr-1 also to its subcommittee hsba15, so that
+      bill is in two rows but once in each). hsba00 sees two bills, one marked up and reported, one marked up then
+      discharged without a report; 118-hr-2 is also in a second hsba00 row (re-referred to the same committee), so it must still count once. M1 cosponsoring 118-hr-3 is a separate row from the sponsor rows, as is M1's 117th Congress bill.
+    given:
+      - input: ref('fct_federal_sponsorship_committees')
+        rows:
+          - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-1, congress: 118, committee_system_code: hsba00, committee_name: Financial Services, committee_chamber: House, is_subcommittee: false, parent_system_code: null, referred_date: '2023-02-01', hearing_date: '2023-02-20', markup_date: '2023-04-01', reported_date: '2023-06-01', discharged_date: null, source_url: 'https://g/1'}
+          - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-1, congress: 118, committee_system_code: hsba15, committee_name: Housing Subcommittee, committee_chamber: House, is_subcommittee: true, parent_system_code: hsba00, referred_date: '2023-02-02', hearing_date: null, markup_date: null, reported_date: null, discharged_date: null, source_url: 'https://g/1'}
+          - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-2, congress: 118, committee_system_code: hsba00, committee_name: Financial Services, committee_chamber: House, is_subcommittee: false, parent_system_code: null, referred_date: '2023-03-01', hearing_date: null, markup_date: '2023-04-15', reported_date: null, discharged_date: '2023-09-01', source_url: 'https://g/2'}
+          - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-2, congress: 118, committee_system_code: hsba00, committee_name: Financial Services, committee_chamber: House, is_subcommittee: false, parent_system_code: null, referred_date: '2023-03-05', hearing_date: null, markup_date: '2023-04-15', reported_date: null, discharged_date: '2023-09-02', source_url: 'https://g/2'}
+          - {official_id: o_m1, bioguide_id: M1, role: cosponsor, bill_id: 118-hr-3, congress: 118, committee_system_code: hsba00, committee_name: Financial Services, committee_chamber: House, is_subcommittee: false, parent_system_code: null, referred_date: null, hearing_date: null, markup_date: null, reported_date: null, discharged_date: null, source_url: 'https://g/3'}
+          - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 117-hr-9, congress: 117, committee_system_code: hsba00, committee_name: Financial Services, committee_chamber: House, is_subcommittee: false, parent_system_code: null, referred_date: '2021-02-01', hearing_date: null, markup_date: null, reported_date: null, discharged_date: null, source_url: 'https://g/9'}
+    expect:
+      rows:
+        - {official_id: o_m1, bioguide_id: M1, congress: 118, role: sponsor, committee_system_code: hsba00, committee_name: Financial Services, committee_chamber: House, is_subcommittee: false, parent_system_code: null, bills: 2, bills_with_hearing: 1, bills_marked_up: 2, bills_reported: 1, bills_discharged: 1, first_referred_date: '2023-02-01', last_referred_date: '2023-03-05'}
+        - {official_id: o_m1, bioguide_id: M1, congress: 118, role: sponsor, committee_system_code: hsba15, committee_name: Housing Subcommittee, committee_chamber: House, is_subcommittee: true, parent_system_code: hsba00, bills: 1, bills_with_hearing: 0, bills_marked_up: 0, bills_reported: 0, bills_discharged: 0, first_referred_date: '2023-02-02', last_referred_date: '2023-02-02'}
+        - {official_id: o_m1, bioguide_id: M1, congress: 118, role: cosponsor, committee_system_code: hsba00, committee_name: Financial Services, committee_chamber: House, is_subcommittee: false, parent_system_code: null, bills: 1, bills_with_hearing: 0, bills_marked_up: 0, bills_reported: 0, bills_discharged: 0, first_referred_date: null, last_referred_date: null}
+        - {official_id: o_m1, bioguide_id: M1, congress: 117, role: sponsor, committee_system_code: hsba00, committee_name: Financial Services, committee_chamber: House, is_subcommittee: false, parent_system_code: null, bills: 1, bills_with_hearing: 0, bills_marked_up: 0, bills_reported: 0, bills_discharged: 0, first_referred_date: '2021-02-01', last_referred_date: '2021-02-01'}
+
+  - name: federal_member_subjects_bill_level_steps
+    model: fct_federal_member_subjects
+    description: >
+      Subject steps are bill-level. 118-hr-1 (Taxation, Health care) is referred to a full committee and a
+      subcommittee, both marked up or reported: it counts as marked up and reported once per subject, not twice.
+      118-hr-2 (Taxation) was only forwarded by a subcommittee (marked up, not reported to the chamber) and became
+      law. 118-hr-4 (Taxation) has no committee row at all and counts in bills only. A bill with no subject is in no
+      row. The cosponsor M2 on 118-hr-1 is a separate row with no steps (no committee rows for M2).
+    given:
+      - input: ref('fct_federal_sponsorship_subjects')
+        rows:
+          - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-1, congress: 118, subject: Taxation, source_url: 'https://g/1'}
+          - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-1, congress: 118, subject: Health care, source_url: 'https://g/1'}
+          - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-2, congress: 118, subject: Taxation, source_url: 'https://g/2'}
+          - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-4, congress: 118, subject: Taxation, source_url: 'https://g/4'}
+          - {official_id: null, bioguide_id: M2, role: cosponsor, bill_id: 118-hr-1, congress: 118, subject: Taxation, source_url: 'https://g/1'}
+      - input: ref('fct_federal_sponsorship_committees')
+        rows:
+          - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-1, congress: 118, committee_system_code: hsba00, committee_name: Financial Services, committee_chamber: House, is_subcommittee: false, parent_system_code: null, referred_date: '2023-02-01', hearing_date: null, markup_date: null, reported_date: '2023-06-01', discharged_date: null, source_url: 'https://g/1'}
+          - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-1, congress: 118, committee_system_code: hsba15, committee_name: Housing Subcommittee, committee_chamber: House, is_subcommittee: true, parent_system_code: hsba00, referred_date: '2023-02-02', hearing_date: null, markup_date: '2023-04-01', reported_date: '2023-05-01', discharged_date: null, source_url: 'https://g/1'}
+          - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-2, congress: 118, committee_system_code: hsba15, committee_name: Housing Subcommittee, committee_chamber: House, is_subcommittee: true, parent_system_code: hsba00, referred_date: '2023-02-02', hearing_date: null, markup_date: '2023-04-01', reported_date: '2023-05-01', discharged_date: null, source_url: 'https://g/2'}
+      - input: ref('fct_federal_sponsorship')
+        rows:
+          - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-1, congress: 118, became_law: false}
+          - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-2, congress: 118, became_law: true}
+          - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 118-hr-4, congress: 118, became_law: false}
+          - {official_id: null, bioguide_id: M2, role: cosponsor, bill_id: 118-hr-1, congress: 118, became_law: false}
+    expect:
+      rows:
+        - {official_id: o_m1, bioguide_id: M1, congress: 118, role: sponsor, subject: Taxation, bills: 3, bills_marked_up: 2, bills_reported: 1, bills_became_law: 1}
+        - {official_id: o_m1, bioguide_id: M1, congress: 118, role: sponsor, subject: Health care, bills: 1, bills_marked_up: 1, bills_reported: 1, bills_became_law: 0}
+        - {official_id: null, bioguide_id: M2, congress: 118, role: cosponsor, subject: Taxation, bills: 1, bills_marked_up: 0, bills_reported: 0, bills_became_law: 0}

@@ -903,12 +903,12 @@ models:
         description: Latest contribution year.
       - name: trail_status
         data_type: varchar
-        description: mec committee, ambiguous mec name, not an mec filer, end of trail, or individuals (see above).
+        description: mec committee, ambiguous mec name, not an mec filer, own name, end of trail, or individuals (see above).
         data_tests:
           - not_null
           - accepted_values:
               arguments:
-                values: ['mec committee', 'ambiguous mec name', 'not an mec filer', 'end of trail', 'individuals']
+                values: ['mec committee', 'ambiguous mec name', 'not an mec filer', 'own name', 'end of trail', 'individuals']
       - name: donor_mec_committee_id
         data_type: varchar
         description: >
