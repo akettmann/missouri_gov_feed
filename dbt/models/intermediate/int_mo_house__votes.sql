@@ -23,7 +23,8 @@ with votes as (
 ),
 
 -- Matching depends only on the session, the vote date and the token, so it runs once per distinct token and day
--- (about a ninth of the vote rows) and the result is joined back to every vote.
+-- (about a ninth of the vote rows) and the result is joined back to every vote. A roll call whose date did not parse
+-- keeps a null vote_date (stg_mo_house__rollcalls), so the joins on the date are null-safe.
 tokens as (
     select distinct
         session_code,
@@ -162,7 +163,7 @@ best_candidates as (
     inner join best_tier as b
         on
             c.session_code = b.session_code
-            and c.vote_date = b.vote_date
+            and c.vote_date is not distinct from b.vote_date
             and c.member_token = b.member_token
             and c.tier = b.tier
 ),
@@ -197,4 +198,7 @@ select
     v.rollcall_url as source_url
 from votes as v
 left join unique_match as m
-    on v.session_code = m.session_code and v.vote_date = m.vote_date and v.member_token = m.member_token
+    on
+        v.session_code = m.session_code
+        and v.vote_date is not distinct from m.vote_date
+        and v.member_token = m.member_token

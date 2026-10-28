@@ -55,7 +55,7 @@
 -- rows, 1 newer; the extra older row is kept).
 
 -- A table, not a view like the other staging models: about a dozen models and tests read it, and as a view each
--- re-read the 1.5M Parquet rows and re-ran the name-cleaning regexes (about 10s per full read, 0.8s as a table).
+-- re-read the 1.5M Parquet rows and re-ran the name-cleaning regexes (about 10s per full read, under 1s as a table).
 with
 
 identified as (
