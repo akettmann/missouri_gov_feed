@@ -55,3 +55,17 @@ sources:
   - name: related_bill_relationships
     identifier: govinfo_billstatus_related_bill_relationships
     description: One row per relationship type a related bill carries (payload JSON).
+  - name: amendments
+    identifier: govinfo_billstatus_amendments
+    description: One row per amendment filed to a bill (payload JSON); the key is "<congress>-<type>-<number>" of the
+      amendment ("118-hamdt-180").
+  - name: amendment_sponsors
+    identifier: govinfo_billstatus_amendment_sponsors
+    description: One row per sponsor of an amendment, and per senator it was proposed on behalf of (payload JSON).
+  - name: amendment_actions
+    identifier: govinfo_billstatus_amendment_actions
+    description: One row per action on an amendment (payload JSON), in the order the file lists them.
+  - name: amendment_recorded_votes
+    identifier: govinfo_billstatus_amendment_recorded_votes
+    description: One row per roll call an amendment action cites (payload JSON); the link from an amendment to a House
+      or Senate vote.
