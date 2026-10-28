@@ -245,14 +245,14 @@ Notes:
   in all cases except those within the exclusive jurisdiction of the supreme court."
   ([Mo. Const. art. V, §3][mc-v-3]) Data: `courtlistener_case_bulk`.
 - **Duty (circuit courts).** Hear cases first. "The circuit courts shall have original jurisdiction over all cases and
-  matters, civil and criminal." ([Mo. Const. art. V, §14][mc-v-14]) Data: `courtlistener_case_bulk` covers only
-  part of this.
+  matters, civil and criminal." ([Mo. Const. art. V, §14][mc-v-14]) Data: `courtlistener_case_bulk`, which covers
+  only part of this.
 - **Duty (associate circuit judges).** Hear and decide the cases the law gives them, including civil and criminal
   cases, and probate matters. ([Mo. Const. art. V, §17][mc-v-17]) Data: no data yet.
 - **Power (Supreme Court).** Write the rules for how courts work. The court "may establish rules relating to
   practice, procedure and pleading for all courts and administrative tribunals". The legislature can annul or amend a
-  rule by a law limited to that purpose. ([Mo. Const. art. V, §5][mc-v-5]) Data: Court Operating Rule 2 is on file in
-  `docs/reference/court_operating_rule_2.md`; no rule-change data yet.
+  rule by a law limited to that purpose. ([Mo. Const. art. V, §5][mc-v-5]) Data: no rule-change data yet. The current
+  [Court Operating Rule 2][cor-2] is on the Missouri Courts website. <!-- Text on file: docs/reference/court_operating_rule_2.md (#858) -->
 
 Notes:
 
@@ -397,3 +397,4 @@ Constitution says so. Statutes that add duties are listed only for the Attorney 
 [rsmo-27-050]: https://revisor.mo.gov/main/OneSection.aspx?section=27.050
 [rsmo-27-060]: https://revisor.mo.gov/main/OneSection.aspx?section=27.060
 [us-const]: https://www.archives.gov/founding-docs/constitution-transcript
+[cor-2]: https://www.courts.mo.gov/courts/ClerkHandbooksP2RulesOnly.nsf/E2AA3309EF5C449186256BE20060C329/DC2E80286AFA4AD286256CA60051DEE2

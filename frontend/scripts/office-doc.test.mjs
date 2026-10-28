@@ -309,3 +309,48 @@ test("the preface list is checked and cleaned like any other block", () => {
   assert.match(named.prefaceHtml, /Voteview \(Congress roll calls\) here/);
   assert.doesNotMatch(named.prefaceHtml, /<code>voteview/);
 });
+
+test("a table in the preface is checked and cleaned like any other block", () => {
+  const withTable = (cell) =>
+    wrap([GOOD]).replace(
+      "(issue #1).",
+      `(issue #1).\n\n| Term | Meaning |\n| --- | --- |\n| Duty | ${cell} |\n`,
+    );
+  assert.throws(() => parseOfficeDoc(withTable("See [lost]."), OPT), /unresolved link reference/);
+  const d = parseOfficeDoc(withTable("means it <!-- secret --> now"), OPT);
+  assert.doesNotMatch(d.prefaceHtml, /secret|<!--/);
+  assert.match(d.prefaceHtml, /<table>/);
+  const named = parseOfficeDoc(withTable("from `voteview`"), {
+    ...OPT,
+    names: new Map([["voteview", "Voteview"]]),
+  });
+  assert.match(named.prefaceHtml, /from Voteview/);
+  assert.doesNotMatch(named.prefaceHtml, /<code>voteview/);
+});
+
+test("the 'is not loaded yet' marker may wrap across lines or spaces", () => {
+  const cand =
+    "- **Duty.** Do it. ([Art. 1][c1]) Data: no data yet (`mo_sos_rules` is\n  not  loaded\n  yet).";
+  const b = parseOfficeDoc(wrap([cand]), OPT).offices[0].bullets[0];
+  assert.deepEqual(b.candidates, ["mo_sos_rules"]);
+});
+
+test("no plain name sits inside another pair of parentheses in a Data line on the real page", () => {
+  const d = loadResponsibilities();
+  const nested = /\([^()]*\([^()]*\)[^()]*\)/;
+  for (const s of [...d.offices, ...d.otherSections])
+    for (const b of s.bullets) assert.doesNotMatch(b.dataHtml?.replace(/<[^>]+>/g, "") ?? "", nested);
+});
+
+test("the real page shows no repo file path to readers", () => {
+  const d = loadResponsibilities();
+  const html = [
+    d.prefaceHtml,
+    ...[...d.offices, ...d.otherSections].flatMap((s) => [
+      s.introHtml,
+      ...s.bullets.flatMap((b) => [b.html, b.dataHtml ?? ""]),
+      ...s.notes.map((n) => n.html),
+    ]),
+  ].join("\n");
+  assert.doesNotMatch(html.replace(/<[^>]+>/g, ""), /docs\/|\.md\b/);
+});

@@ -19,7 +19,7 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `tap_mec` | MEC via The Accountability Project | state campaign finance and lobbyist gifts | 2011–2022 (gifts from 2004) | |
 | `fec` | Federal Election Commission | federal candidates, committees, PAC contributions, donor aggregates | `MOGOV_FEC_CYCLES` | API key for aggregates |
 | `voteview` | Voteview | Congress roll calls, votes, DW-NOMINATE ideology | `MOGOV_VOTEVIEW_CONGRESSES` | |
-| `govinfo_billstatus` | GovInfo bill status (Congress) | federal bills: sponsor, cosponsors, actions, roll calls cited, Public Law number, committee referrals, subjects, related bills | `MOGOV_BILLSTATUS_CONGRESSES` (default 117 to today's Congress) | |
+| `govinfo_billstatus` | GovInfo congressional bill status | federal bills: sponsor, cosponsors, actions, roll calls cited, Public Law number, committee referrals, subjects, related bills | `MOGOV_BILLSTATUS_CONGRESSES` (default 117 to today's Congress) | |
 | `house_fd` | U.S. House Clerk | House members' financial disclosures and trades | 2015+ | |
 | `senate_efd` | U.S. Senate eFD | senators' financial disclosures | as filed | opt-in |
 | `courtlistener_bulk` | CourtListener judge records | judges, positions, education, federal judges' disclosures | quarterly snapshot | |
