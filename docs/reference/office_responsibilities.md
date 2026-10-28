@@ -11,7 +11,7 @@ How to read it:
 - **Duty** means the law says the office must do it. **Power** means the law allows it. Where the law does not make
   that split clear, the bullet says "Job".
 - "Data" names the project source that covers the responsibility, or says "no data yet".
-  "Candidate" means a source we have researched but not loaded.
+  "Not loaded yet" marks a source we have researched but not loaded.
 - Numbered notes are at the end of each office. They hold exceptions and conditions.
 - The Missouri Constitution and the Revised Statutes of Missouri (RSMo) are quoted from revisor.mo.gov. The U.S.
   Constitution is quoted from the National Archives transcript. Quotes are short so the exact words can be checked.
@@ -150,12 +150,12 @@ Notes:
 - **Duty.** Keep state records and handle the work the law gives the office for elections and corporations. The
   Secretary of State "shall be custodian of such records, and documents ... in relation to elections and
   corporations, as provided by law". ([Mo. Const. art. IV, §14][mc-iv-14]) Data: certified election returns (`mo_sos_elections`);
-  business filings (`mo_sos_business` is a candidate).
+  business filings (`mo_sos_business` is not loaded yet).
 - **Duty.** Collect the election returns for the six statewide executive offices and appoint two judges who join the Secretary to form the board that
   canvasses (officially counts) them. ([Mo. Const. art. IV, §18][mc-iv-18]) Data: certified canvass returns (`mo_sos_elections`).
 - **Duty.** Receive the rules of state agencies for filing. Most rules "shall take effect not less than ten days after
   the filing thereof in the office of the secretary of state". ([Mo. Const. art. IV, §16][mc-iv-16]) Data: no data
-  yet (`mo_sos_rules` is a candidate).
+  yet (`mo_sos_rules` is not loaded yet).
 - **Duty.** Receive bills the Governor returns after the legislature adjourns. When the legislature has adjourned,
   the Governor returns a bill "to the office of the secretary of state". ([Mo. Const. art. III, §31][mc-iii-31]) Data:
   no data yet.
