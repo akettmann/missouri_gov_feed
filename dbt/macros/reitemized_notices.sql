@@ -45,6 +45,8 @@
     Rows missing a committee, date, amount or donor are never matched in tier 1, and a row without a city and state
     never in tier 2. rel is a relation with record_id, mec_committee_id, contributor_name, contributor_city,
     contributor_state, amount, contribution_date and report.
+    Only a committee/date/amount group that holds a 24-hour notice can lose a row (every tier pairs a notice with a
+    full-report line of its own group), so the pairing runs on those groups alone and every other row passes through.
     Applies to both MEC feeds: the TAP mirror and the direct export. -#}
 
 {#- A donor name as a looser match key than name_key: "MO"/"Missouri" alike, stop words ("and", "of", "the"), legal-form
@@ -206,18 +208,33 @@
 {% macro drop_reitemized_notices(rel) -%}
 with
 
-keyed as (
-    select
-        record_id,
+notice_groups as (
+    select distinct
         upper(trim(mec_committee_id)) as match_committee_id,
         contribution_date as match_date,
-        amount as match_amount,
-        nullif({{ mogov.name_key('contributor_name') }}, '') as match_donor,
-        nullif(upper(trim(contributor_city)), '') as match_city,
-        nullif(upper(trim(contributor_state)), '') as match_state,
-        coalesce(lower(report) like '%24 hour%', false) as is_notice
+        amount as match_amount
     from {{ rel }}
-    where mec_committee_id is not null and contribution_date is not null and amount is not null
+    where
+        mec_committee_id is not null and contribution_date is not null and amount is not null
+        and coalesce(lower(report) like '%24 hour%', false)
+),
+
+keyed as (
+    select
+        s.record_id,
+        upper(trim(s.mec_committee_id)) as match_committee_id,
+        s.contribution_date as match_date,
+        s.amount as match_amount,
+        nullif({{ mogov.name_key('s.contributor_name') }}, '') as match_donor,
+        nullif(upper(trim(s.contributor_city)), '') as match_city,
+        nullif(upper(trim(s.contributor_state)), '') as match_state,
+        coalesce(lower(s.report) like '%24 hour%', false) as is_notice
+    from {{ rel }} as s
+    inner join notice_groups as g
+        on
+            upper(trim(s.mec_committee_id)) = g.match_committee_id
+            and s.contribution_date = g.match_date
+            and s.amount = g.match_amount
 ),
 
 ranked as (
