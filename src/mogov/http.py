@@ -328,9 +328,30 @@ def fetch_stamped(
         return content, path.stat().st_mtime
 
 
-def fetch(*args, **kwargs) -> bytes:
-    """GET url, returning bytes; see fetch_stamped (same arguments) for the cache and its arguments."""
-    return fetch_stamped(*args, **kwargs)[0]
+def fetch(
+    url: str,
+    params: dict | None = None,
+    *,
+    max_age: float | None = 86400,
+    retries: int = 4,
+    headers: dict | None = None,
+    delay: float = 0.0,
+    cache_only: bool = False,
+    check: Callable[[httpx.Response], None] | None = None,
+    min_interval: float = 0.0,
+) -> bytes:
+    """GET url, returning bytes; see fetch_stamped for the cache and the arguments."""
+    return fetch_stamped(
+        url,
+        params,
+        max_age=max_age,
+        retries=retries,
+        headers=headers,
+        delay=delay,
+        cache_only=cache_only,
+        check=check,
+        min_interval=min_interval,
+    )[0]
 
 
 def _get(

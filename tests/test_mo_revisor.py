@@ -3,8 +3,9 @@ import os
 import subprocess
 import sys
 import threading
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import ClassVar
 
 import httpx
@@ -520,12 +521,15 @@ def test_cache_hit_keeps_the_original_fetch_time_not_the_reuse_time(tmp_path, mo
     url, params = "https://revisor.mo.gov/main/OneSection.aspx", {"section": "1.010"}
     mo_revisor._get_stamped(url, params, max_age=mo_revisor.SECTION_MAX_AGE)
     (entry,) = tmp_path.glob("*")
-    long_ago = datetime(2026, 9, 1, 8, 15, 0, tzinfo=UTC)
-    os.utime(entry, (long_ago.timestamp(), long_ago.timestamp()))  # the page was fetched months ago
+    now = datetime(2026, 10, 28, 12, 0, 0, tzinfo=UTC)
+    long_ago = now - timedelta(days=30)
+    # one fixed clock for the expiry check and the backdated mtime, so the test does not age out with the calendar
+    monkeypatch.setattr(http, "time", SimpleNamespace(time=lambda: now.timestamp(), sleep=lambda s: None))
+    os.utime(entry, (long_ago.timestamp(), long_ago.timestamp()))  # the page was fetched a month ago
     page, fetched_at = mo_revisor._get_stamped(url, params, max_age=mo_revisor.SECTION_MAX_AGE)
     assert len(hits) == 1  # served from the cache
     assert page == "<html>page</html>"
-    assert fetched_at == "2026-09-01T08:15:00+00:00"
+    assert fetched_at == long_ago.isoformat()
 
 
 def test_expired_cache_entry_is_refetched_and_restamped(tmp_path, monkeypatch):
