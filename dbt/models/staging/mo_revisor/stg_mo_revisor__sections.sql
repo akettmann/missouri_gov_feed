@@ -6,7 +6,8 @@
 -- is_contingent with no date. held_unconstitutional: the effective line says "(all or part is unconstitutional)".
 -- history_note is the session-law history footnote ("(RSMo 1939 § 645, A.L. 1957 p. 587, A.L. 2015 S.B. 239)"),
 -- when the first footnote is one. footnotes is the page's whole footnote array (stg_mo_revisor__section_footnotes
--- explodes it). loaded_at is when we landed the page: the "as of" date of everything shown from it.
+-- explodes it). loaded_at is when our pipeline last published the raw
+-- table; the page was fetched from revisor.mo.gov up to 180 days earlier.
 with src as (
     select
         {{ mogov.json_str('payload', '$.section') }} as section_id,

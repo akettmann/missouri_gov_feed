@@ -7,8 +7,8 @@
 -- A version can be on both pages: listed in force (or contingent) on its chapter page and printed on the repeals page
 -- with a future repeal ("Repealed L. 2026 S.B. 1233", contingent date 2099: 324.406/60569). It stays one row, the
 -- listed one, flagged repeal_pending; the repeals page's copy is dropped.
--- loaded_at is when we landed the version's page (or the repeals list, for repealed and transferred rows): the "as of"
--- date to show beside the text, since the Revisor's site may have changed since.
+-- loaded_at is when our pipeline last published the raw table (not the fetch time: section pages are
+-- served from the HTTP cache up to 180 days old, the repeals list up to 7).
 {% set as_of = "cast('" ~ var('as_of_date') ~ "' as date)" if var('as_of_date', none) else 'current_date' %}
 
 with repealed_ids as (

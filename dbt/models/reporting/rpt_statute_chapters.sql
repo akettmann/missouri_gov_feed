@@ -3,7 +3,8 @@
 -- chapter's counts add up to the table's row count across chapters; sections counts distinct section numbers, and
 -- sections_in_force the distinct numbers with an in-force version. Chapter and title names come from the Revisor's
 -- table of contents and are null for a chapter it no longer lists (repealed chapters still have repealed sections
--- here). loaded_at is the oldest landing of any of the chapter's pages: the chapter's "as of" date.
+-- here). loaded_at is the earliest publish time among the chapter's rows (the run's publish
+-- time, not a fetch time: pages were fetched up to 180 days earlier).
 select
     chapter,
     max(chapter_name) as chapter_name,

@@ -41,7 +41,7 @@ unit_tests:
       Chapter 1 has two versions of 1.010 (one in force, one not yet effective), two in-force versions of 1.020 (conflicting enactments), a repealed 1.030
       and a transferred 1.040; chapter 2 has one contingent and one historical version. Each count is of versions in
       exactly that status, sections counts distinct section numbers, sections_in_force distinct numbers with an in-force
-      version, and loaded_at is the oldest landing. Counting sections where versions are meant fails this test.
+      version, and loaded_at is the earliest publish time. Counting sections where versions are meant fails this test.
     given:
       - input: ref('fct_statute_sections')
         format: sql

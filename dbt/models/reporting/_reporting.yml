@@ -1064,7 +1064,9 @@ models:
         description: Rows for transferred sections.
       - name: loaded_at
         data_type: timestamp with time zone
-        description: The oldest landing among the chapter's pages, which is the chapter's as-of date.
+        description: >
+          The earliest publish time among the chapter's rows (when our pipeline last published the raw tables),
+          not when the pages were fetched, which was up to 180 days earlier.
 
 exposures:
   - name: voter_frontend
