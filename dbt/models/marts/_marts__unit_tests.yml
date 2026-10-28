@@ -585,6 +585,44 @@ unit_tests:
         - {official_id: o1, registry_id: F1, donor_key: ameren, donor_name: AMEREN CORPORATION, by_name: 1, amount: 150, n_contributions: 2, first_year: 2020, last_year: 2021, is_medium: 1}
         - {official_id: o1, registry_id: F1, donor_key: acme holdings, donor_name: ACME HOLDINGS INC, by_name: 1, amount: 70, n_contributions: 1, first_year: 2022, last_year: 2022, is_medium: 0}
 
+  - name: jurisdiction_business_donor_matches_match_brand_keywords_in_normalized_names
+    model: int_jurisdiction_business_donor_matches
+    description: >
+      A donor and a facility tie by brand when a company_brands keyword appears as whole words in the normalized
+      (name_key) donor name and in the facility, owner or parent name: at the start of a name, at the end of one,
+      or after punctuation is normalised away ("AT&T" is "at t"). A keyword inside a longer word ("Rebayer",
+      "Bayerische") is a near miss and ties nothing. These ties are marked by_name 0 (#883).
+    given:
+      - input: ref('fct_official_districts')
+        rows:
+          - {official_id: o1, district_id: 'state_house:1', relation: elected from}
+      - input: ref('fct_district_facilities')
+        rows:
+          - {district_id: 'state_house:1', registry_id: F1, is_government: false}
+          - {district_id: 'state_house:1', registry_id: F2, is_government: false}
+          - {district_id: 'state_house:1', registry_id: F3, is_government: false}
+          - {district_id: 'state_house:1', registry_id: F4, is_government: false}
+      - input: ref('int_epa_frs__facilities')
+        rows:
+          - {registry_id: F1, facility_key: k1, owner_key: k1o, parent_company_key: null, facility_name: Bayer Crop Science, owner_name: null, parent_company_name: null}
+          - {registry_id: F2, facility_key: k2, owner_key: k2o, parent_company_key: null, facility_name: Plant Two, owner_name: Holdings of Bayer, parent_company_name: null}
+          - {registry_id: F3, facility_key: k3, owner_key: k3o, parent_company_key: k3p, facility_name: Plant Three, owner_name: null, parent_company_name: Rebayer Corp}
+          - {registry_id: F4, facility_key: k4, owner_key: k4o, parent_company_key: null, facility_name: Plant Four, owner_name: null, parent_company_name: 'AT&T Wireless'}
+      - input: ref('company_brands')
+        rows:
+          - {keyword: bayer, brand: bayer}
+          - {keyword: at t, brand: at_t}
+      - input: ref('fct_campaign_finance')
+        rows:
+          - {official_id: o1, direction: received, counterparty: x, counterparty_organization: 'Bayer, Inc.', counterparty_type: committee, amount: 100, transaction_date: '2020-03-01', match_confidence: high}
+          - {official_id: o1, direction: received, counterparty: x, counterparty_organization: 'AT&T Services', counterparty_type: committee, amount: 40, transaction_date: '2021-03-01', match_confidence: high}
+          - {official_id: o1, direction: received, counterparty: x, counterparty_organization: 'Bayerische Motor Works', counterparty_type: committee, amount: 7, transaction_date: '2021-03-01', match_confidence: high}
+    expect:
+      rows:
+        - {official_id: o1, registry_id: F1, donor_key: bayer, by_name: 0, amount: 100}
+        - {official_id: o1, registry_id: F2, donor_key: bayer, by_name: 0, amount: 100}
+        - {official_id: o1, registry_id: F4, donor_key: at t services, by_name: 0, amount: 40}
+
   - name: jurisdiction_business_donor_matches_hold_no_line_breaks
     model: int_jurisdiction_business_donor_matches
     description: >

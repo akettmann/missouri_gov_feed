@@ -50,26 +50,52 @@ donors as (
         {{ mogov.company_key("coalesce(nullif(trim(counterparty_organization), ''), counterparty)") }}
 ),
 
+-- The padded name key is computed once per name, then joined to the brand keywords with a plain `like`. Computing
+-- name_key inside the ON clause re-ran its regexes for every (name x keyword) pair (#883)
+donor_name_keys as (
+    select
+        official_id,
+        donor_key,
+        ' ' || {{ mogov.name_key('donor_name') }} || ' ' as padded_name
+    from donors
+),
+
 donor_brands as (
     select distinct
         d.official_id,
         d.donor_key,
         b.brand
-    from donors as d
+    from donor_name_keys as d
     inner join {{ ref('company_brands') }} as b
-        on ' ' || {{ mogov.name_key('d.donor_name') }} || ' ' like '% ' || b.keyword || ' %'
+        on d.padded_name like '% ' || b.keyword || ' %'
+),
+
+-- A facility matches a brand when any of its facility, owner or parent names does: the union of the three
+-- padded keys followed by `distinct` is the same set as the OR of the three conditions
+facility_name_keys as (
+    select
+        registry_id,
+        ' ' || {{ mogov.name_key("coalesce(facility_name, '')") }} || ' ' as padded_name
+    from {{ ref('int_epa_frs__facilities') }}
+    union
+    select
+        registry_id,
+        ' ' || {{ mogov.name_key("coalesce(owner_name, '')") }} || ' ' as padded_name
+    from {{ ref('int_epa_frs__facilities') }}
+    union
+    select
+        registry_id,
+        ' ' || {{ mogov.name_key("coalesce(parent_company_name, '')") }} || ' ' as padded_name
+    from {{ ref('int_epa_frs__facilities') }}
 ),
 
 facility_brands as (
     select distinct
-        i.registry_id,
+        n.registry_id,
         b.brand
-    from {{ ref('int_epa_frs__facilities') }} as i
+    from facility_name_keys as n
     inner join {{ ref('company_brands') }} as b
-        on
-            ' ' || {{ mogov.name_key("coalesce(i.facility_name, '')") }} || ' ' like '% ' || b.keyword || ' %'
-            or ' ' || {{ mogov.name_key("coalesce(i.owner_name, '')") }} || ' ' like '% ' || b.keyword || ' %'
-            or ' ' || {{ mogov.name_key("coalesce(i.parent_company_name, '')") }} || ' ' like '% ' || b.keyword || ' %'
+        on n.padded_name like '% ' || b.keyword || ' %'
 ),
 
 -- One row per (facility, company key) over the facility, owner and parent names, so the by-name match below is an
