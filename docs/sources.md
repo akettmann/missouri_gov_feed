@@ -662,9 +662,22 @@ of their own.
   is a new version with its own `bid` and URL, so the weekly chapter lists find it. A version's own page only
   changes with annotations, so it is re-read every 180 days.
 - dbt: `stg_mo_revisor__*`, then `int_mo_revisor__session_law_bills` (history and repeal notes split into one
-  row per bill), then `fct_statute_sections` and `fct_bill_statute_links`.
+  row per bill), then `fct_statute_sections`, `fct_statute_section_footnotes` (one row per footnote, in page order,
+  verbatim; the first is usually the session-law history) and `fct_bill_statute_links`. For the site's statute pages
+  (#355): `rpt_statute_section_bills` (each section's bill links with the bill's title, outcome, page and primary
+  sponsor from `fct_bills` / `fct_bill_sponsors`; a link to a bill before 2017 or outside `fct_bills` has the citation
+  only) and `rpt_statute_chapters` (section versions per chapter by status). `loaded_at` on `fct_statute_sections` is
+  when our pipeline last published the raw table, not when the page was fetched: section pages come from the HTTP cache
+  up to 180 days old and the repeals list up to 7, so the page can be that much older than `loaded_at` (#852).
 
 Quirks:
+- **Footnotes are the whole annotation, not just the history.** A page's footnotes (1 to 39 on a version; 13,600+
+  versions have more than one) are the session-law history, "Prior revisions" lines, the Revisor's court-case
+  annotations ("(1960) An alley in a city is a highway ... Timmons v. Kilpatrick (Mo.), 332 S.W.2d 918.") and notes
+  such as "Effective 1-01-17". They keep the Revisor's own typography: ellipses ("*...*Words ... appear here in
+  original rolls"), elided party names ("G....v.Souder") and the odd typo ("paraphernalia.. State"). Four versions
+  (82.136, 324.023, and the two contingent 324.406 / 324.424 versions) print a first footnote that is not the history
+  note, so they have no `history_note` and no `is_history_note` row.
 - **Cross-chamber combined acts.** Five acts join a Senate and a House bill with "&" or "and" ("A.L. 1977 S.B. 111
   & H.B. 130"; 1998 and 2005 use "and"), all before 2017: 1977 SB 111 and HB 130 (6 sections), 1981 HB 519 and SB 16 (1), 1982 SB 649 and HB 1096 (1),
   1998 SB 820 and HB 1587 (1), 2005 HB 353 and SB 254 (2). The section text never names the bill, so the

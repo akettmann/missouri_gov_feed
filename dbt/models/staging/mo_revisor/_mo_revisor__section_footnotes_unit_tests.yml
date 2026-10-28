@@ -1,0 +1,23 @@
+# Unit tests for stg_mo_revisor__section_footnotes: a version's footnote array -> one row per footnote, in order.
+version: 2
+
+unit_tests:
+  - name: section_footnotes_explode_in_page_order
+    model: stg_mo_revisor__section_footnotes
+    description: >
+      A version with three footnotes yields three rows numbered 1 to 3 in the array's order (not alphabetical, not
+      by length), text verbatim, including a footnote with a quote and a section sign. A version with an empty
+      array yields no rows. Sorting, deduplicating or renumbering the footnotes fails this test.
+    given:
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 'a/1' as section_version_id, '["(RSMo 1939 § 645, A.L. 2015 S.B. 239)","Prior revisions: 1929 § 645","(1953) Held \"common law\" rule applies. Zed v. Abe, 363 Mo. 1224."]' as footnotes union all
+            select 'b/2', '[]' union all
+            select 'c/3', '["Effective 1-01-17"]'
+    expect:
+      rows:
+        - {section_version_id: 'a/1', footnote_number: 1, footnote_text: '(RSMo 1939 § 645, A.L. 2015 S.B. 239)'}
+        - {section_version_id: 'a/1', footnote_number: 2, footnote_text: 'Prior revisions: 1929 § 645'}
+        - {section_version_id: 'a/1', footnote_number: 3, footnote_text: '(1953) Held "common law" rule applies. Zed v. Abe, 363 Mo. 1224.'}
+        - {section_version_id: 'c/3', footnote_number: 1, footnote_text: 'Effective 1-01-17'}
