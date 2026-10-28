@@ -112,12 +112,15 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
                               )}
                               {s.naics_description && <span class="muted"> · {s.naics_description}</span>}
                               {s.matched_by === "same company" && (
-                                <span
-                                  class="badge"
-                                  title="Tied by a shared brand (company_brands list), not an identical name"
-                                >
-                                  same brand
-                                </span>
+                                <>
+                                  {" "}
+                                  <span
+                                    class="badge"
+                                    title="Tied by a shared brand (company_brands list), not an identical name"
+                                  >
+                                    same brand
+                                  </span>
+                                </>
                               )}{" "}
                               · <SourceLink url={s.frs_url} label="EPA record" context={siteContext.get(s)} />
                             </li>

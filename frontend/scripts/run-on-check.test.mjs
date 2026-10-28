@@ -34,8 +34,29 @@ test("a tag whose content starts with a space already separates the words", () =
   assert.deepEqual(findRunOns("<p>word<em> spaced</em></p>"), []);
 });
 
-test("spans are styling hooks and may touch text", () => {
+test("a span whose text starts with a letter or digit glued to a word fails", () => {
+  const r = findRunOns('<td>Mercy<span class="badge">possible match</span></td>');
+  assert.equal(r.length, 1);
+  assert.equal(r[0].kind, "word<span>word");
+  assert.match(r[0].hint, /\{" "\}/);
+  assert.equal(
+    findRunOns(`<li>HIGH PRAIRIE<span
+ class="badge"
+>same brand</span></li>`).length,
+    1,
+  );
+});
+
+test("spans that are sr-only, arrows, punctuation-led or spaced pass", () => {
   assert.deepEqual(findRunOns('<a>roll call<span aria-hidden="true">↗</span></a>'), []);
+  assert.deepEqual(findRunOns('<a>EPA record<span class="sr-only"> for X</span></a>'), []);
+  assert.deepEqual(findRunOns('<li>Site<span class="muted">, Main St</span></li>'), []);
+  assert.deepEqual(findRunOns('<li>Site<span class="muted"> · NAICS</span></li>'), []);
+  assert.deepEqual(findRunOns('<td>Mercy <span class="badge">possible match</span></td>'), []);
+});
+
+test("HTML comments are skipped", () => {
+  assert.deepEqual(findRunOns("<!-- a<strong>b</strong>c --><p>ok</p>"), []);
 });
 
 test("script, style, svg and pre contents are ignored", () => {
@@ -43,10 +64,11 @@ test("script, style, svg and pre contents are ignored", () => {
   assert.deepEqual(findRunOns("<svg><text>a<a>b</a>c</text></svg>"), []);
 });
 
-test("an allowlisted context passes, others still fail", () => {
-  const html = `<p>H<abbr>2</abbr>O</p><p>${"filler text ".repeat(8)}</p><p>that is<strong>x</strong></p>`;
+test("an allowlisted match or data-glue passes, others still fail", () => {
+  const html = `<p>H<abbr>2</abbr>O</p><p>that is<strong>x</strong></p>`;
   assert.equal(findRunOns(html, []).length, 3);
-  const r = findRunOns(html, ["H<abbr>"]);
+  const r = findRunOns(html, ["H<abbr>", "</abbr>O"]);
   assert.equal(r.length, 1);
   assert.match(r[0].context, /that is<strong>/);
+  assert.deepEqual(findRunOns("<p>H<abbr data-glue>2</abbr> O</p>", []), []);
 });
