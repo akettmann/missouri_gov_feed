@@ -25,7 +25,7 @@ folder "frontend/dist (static)" as dist {
   [officials/<slug>/index.html\nprofile + tables] as page
   [officials/<slug>/index.html\nsmall past-officeholder page] as pastpage
   [officials/<slug>.json\nper-official bundle] as json
-  [districts/<district>/sites/index.html\n+ sites.csv] as sites
+  [districts/<district>/sites/index.html\n+ sites.csv\n+ sites-donors.csv] as sites
   [methodology/index.html] as meth
 }
 

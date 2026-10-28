@@ -45,6 +45,7 @@ const rows = spec.rows(bundle, false);
                 {spec.columns.map((c, i) => (
                   <td class:list={{ num: c.money || c.num || c.pct }}>
                     {c.link ? <SourceLink url={String(r[c.key])} /> : cellText(c, r)}
+                    {i === 0 && r.confidence === "medium" && " "}
                     {i === 0 && r.confidence === "medium" && <span class="badge medium">possible match</span>}
                   </td>
                 ))}
@@ -65,9 +66,6 @@ const rows = spec.rows(bundle, false);
     font-weight: 600;
     font-size: 0.9375rem;
     margin-bottom: 6px;
-  }
-  .badge {
-    margin-left: 6px;
   }
   .views {
     display: inline-flex;

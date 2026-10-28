@@ -19,11 +19,11 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | `tap_mec` | MEC via The Accountability Project | state campaign finance and lobbyist gifts | 2011–2022 (gifts from 2004) | |
 | `fec` | Federal Election Commission | federal candidates, committees, PAC contributions, donor aggregates | `MOGOV_FEC_CYCLES` | API key for aggregates |
 | `voteview` | Voteview | Congress roll calls, votes, DW-NOMINATE ideology | `MOGOV_VOTEVIEW_CONGRESSES` | |
-| `govinfo_billstatus` | GovInfo BILLSTATUS bulk XML (govinfo.gov) | federal bills: sponsor, cosponsors, actions, roll calls cited, Public Law number, committee referrals, subjects, related bills | `MOGOV_BILLSTATUS_CONGRESSES` (default 117 to today's Congress) | |
+| `govinfo_billstatus` | GovInfo congressional bill status | federal bills: sponsor, cosponsors, actions, roll calls cited, Public Law number, committee referrals, subjects, related bills | `MOGOV_BILLSTATUS_CONGRESSES` (default 117 to today's Congress) | |
 | `house_fd` | U.S. House Clerk | House members' financial disclosures and trades | 2015+ | |
 | `senate_efd` | U.S. Senate eFD | senators' financial disclosures | as filed | opt-in |
-| `courtlistener_bulk` | CourtListener bulk files | judges, positions, education, federal judges' disclosures | quarterly snapshot | |
-| `courtlistener_case_bulk` | CourtListener bulk files | Missouri state and federal court dockets and opinions | quarterly snapshot | |
+| `courtlistener_bulk` | CourtListener judge records | judges, positions, education, federal judges' disclosures | quarterly snapshot | |
+| `courtlistener_case_bulk` | CourtListener court records | Missouri state and federal court dockets and opinions | quarterly snapshot | |
 | `courtlistener_cases` | CourtListener API | recent cases and outcomes for judges and lawyers | ~125 requests/day | token for outcomes |
 | `bluebook` | Missouri Official Manual | biographies, judges, county→judicial circuit table | `MOGOV_BLUEBOOK_EDITIONS` | |
 | `openstates_people` | Open States | state legislators, executives, mayors: roles, party, ids | current + retired | |
@@ -1347,7 +1347,7 @@ Quirks:
   starts and nothing is cached yet, `cl_cases` lands 0 rows (seen in the October 2026 runs:
   `cases.quota_exhausted` with `retry_after_s` about 16 hours). Run it again the next day.
 - Without a token it can only search (5 requests per minute) and gets no dispositions.
-- CourtListener has no trial-court (circuit) cases, and Case.net forbids automated access.
+- CourtListener has no Missouri circuit-court (state trial court) cases, and Case.net forbids automated access.
 - It's now a top-up for `courtlistener_case_bulk`. Where both have a case, an API row with outcome data
   wins.
 
@@ -1723,8 +1723,8 @@ offices, shops and most service businesses are missing.
   (one row per official, site, donor and filing page; #370), the donors and their links. A page is the MEC committee
   matched to the official, which is not filtered to the donor, or the FEC disbursements of the donor's committee
   filtered to the receiving committee; a donor filed on both keeps both. Line breaks in a donor name become spaces so a
-  line never splits; the frontend writes them as `<url> <donor name>` lines, which in the published sites.csv sit in one
-  cell. A donor with no page has one row with a null `source_url`.
+  line never splits; the frontend writes them as `<url> <donor name>` lines for the page, and the published
+  sites-donors.csv has one line per site, donor and filing page (sites.csv has no donor columns). A donor with no page has one row with a null `source_url`.
 - Industry: the NAICS code the most program systems (RCRAINFO, NPDES, AIR, ...) give, one count per system however many records it has, taking primary codes first (`naics_source` `naics`,
   31% of the geocoded sites in October 2026), then codes FRS leaves UNKNOWN (`naics_unknown`, 2%), then SECONDARY
   ones (`naics_secondary`, 0.1%). A real NAICS code is more precise than a SIC-derived sector, so only a site with

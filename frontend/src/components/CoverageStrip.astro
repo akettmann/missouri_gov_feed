@@ -1,7 +1,7 @@
 ---
 // official_profile.*_status as a strip, so gaps are explicit: "not public" is not the same as "none found".
 import type { CoverageItem } from "../lib/exports/types";
-import { count, coverageGaps, statusKind } from "../lib/format";
+import { count, coverageGaps, STATUS_ICON, STATUS_SHORT, statusKind } from "../lib/format";
 import { href } from "../lib/site";
 
 interface Props {
@@ -10,9 +10,7 @@ interface Props {
   all?: CoverageItem[];
 }
 const { items, all = items } = Astro.props;
-const ICON = { available: "●", none: "○", "not-public": "⊘", na: "–" } as const;
 const gaps = coverageGaps(all);
-const SHORT = { available: "available", none: "none found", "not-public": "not public", na: "n/a" } as const;
 ---
 
 <ul class="strip" aria-label="What data we have for this official">
@@ -22,15 +20,14 @@ const SHORT = { available: "available", none: "none found", "not-public": "not p
       <li class={`cell ${kind}`} title={it.status}>
         <span class="label">{it.label}</span>
         <span class="state">
-          <span aria-hidden="true">{ICON[kind]}</span> {SHORT[kind]}
+          <span aria-hidden="true">{STATUS_ICON[kind]}</span> {STATUS_SHORT[kind]}
           {kind === "available" && it.count > 0 && <span class="muted"> · {count(it.count)}</span>}
         </span>
-        {kind !== "available" && kind !== "na" && <span class="why small muted">{it.status}</span>}
       </li>
     );
   })}
 </ul>
-{(gaps.cant.length > 0 || gaps.none.length > 0) && (
+{(gaps.cant.length > 0 || gaps.none.length > 0 || gaps.unrecorded.length > 0) && (
   <p class="gaps small muted">
     {gaps.cant.length > 0 && (
       <>
@@ -40,6 +37,11 @@ const SHORT = { available: "available", none: "none found", "not-public": "not p
     {gaps.none.length > 0 && (
       <>
         <strong>None found:</strong> {gaps.none.join("; ")}.{" "}
+      </>
+    )}
+    {gaps.unrecorded.length > 0 && (
+      <>
+        <strong>None recorded:</strong> {gaps.unrecorded.join("; ")}.{" "}
       </>
     )}
     A gap is not evidence about the official either way.{" "}
@@ -77,6 +79,7 @@ const SHORT = { available: "available", none: "none found", "not-public": "not p
     color: var(--ink);
   }
   .none .state,
+  .unrecorded .state,
   .not-public .state {
     color: var(--ink-2);
   }
@@ -85,9 +88,5 @@ const SHORT = { available: "available", none: "none found", "not-public": "not p
   }
   .na {
     opacity: 0.6;
-  }
-  .why {
-    font-size: 0.75rem;
-    line-height: 1.3;
   }
 </style>

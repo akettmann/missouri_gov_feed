@@ -112,12 +112,15 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
                               )}
                               {s.naics_description && <span class="muted"> · {s.naics_description}</span>}
                               {s.matched_by === "same company" && (
-                                <span
-                                  class="badge"
-                                  title="Tied by a shared brand (company_brands list), not an identical name"
-                                >
-                                  same brand
-                                </span>
+                                <>
+                                  {" "}
+                                  <span
+                                    class="badge"
+                                    title="Tied by a shared brand (company_brands list), not an identical name"
+                                  >
+                                    same brand
+                                  </span>
+                                </>
                               )}{" "}
                               · <SourceLink url={s.frs_url} label="EPA record" context={siteContext.get(s)} />
                             </li>
@@ -144,7 +147,8 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
       {siteList && (
         <p class="small">
           <a href={href(`/districts/${siteList.slug}/sites/`)}>See all {sitesText(siteList.n_sites)}</a> (one
-          page) or <a href={href(`/districts/${siteList.slug}/sites.csv`)}>download them as CSV</a>.
+          page) or <a href={href(`/districts/${siteList.slug}/sites.csv`)}>download them as CSV</a> (the
+          matching donors are a second CSV on that page).
         </p>
       )}
       <p class="small muted">

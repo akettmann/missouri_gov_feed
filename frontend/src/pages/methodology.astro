@@ -43,7 +43,7 @@ const tables = freshness();
     <h2>How records are matched to officials</h2>
     <p>
       Many sources (campaign finance, lobbyist reports) identify people by name only. Each matched record
-      keeps a<code>match_confidence</code>:
+      keeps a <code>match_confidence</code>:
     </p>
     <ul>
       <li>
@@ -58,7 +58,7 @@ const tables = freshness();
       </li>
       <li>
         <strong>medium</strong>: surname matches but the first-name signal is weaker (only the first three
-        letters, or a surname-first committee name with no other official sharing the surname). These carry a
+        letters, or a surname-first committee name with no other official sharing the surname). These carry a{" "}
         <span class="badge medium">possible match</span> badge, and "Hide possible matches" on any profile
         removes them from every table and chart.
       </li>
@@ -77,7 +77,10 @@ const tables = freshness();
       ("MO" as Missouri, "Assn" as Association); and the name without words like PAC, Political Action
       Committee or Fund (or a short name the filer put in parentheses). A committee only counts if it was
       active within a year of the gift, and only when exactly one committee fits. When several do, no link is
-      made.
+      made. A name that matches the committee receiving the gift is not followed, because a committee does not
+      fund itself. If the name is one that committee files under (or filed under before), the donor shows as
+      having the committee's own name; if only the name without words like PAC or Fund matched, it shows as a
+      similar name, which may be a parent body or another state's affiliate.
     </p>
     <p>
       About 71% of the committee-to-committee dollars on record match one Missouri committee this way. Most of
@@ -128,8 +131,13 @@ const tables = freshness();
     <p>
       <strong>What you can conclude from "none found":</strong> our sources, as of the last update, held no
       matching record. That is weaker than "there is nothing". A source may not cover this office or this
-      court (CourtListener, for example, indexes most Missouri trial courts only lightly), a name may not have
-      matched, or a filing may be late. Do not read it as a clean record or as a sign of wrongdoing.
+      court (CourtListener, for example, has no Missouri circuit-court cases, the state trial courts), a name
+      may not have matched, or a filing may be late. Do not read it as a clean record or as a sign of
+      wrongdoing.
+    </p>
+    <p>
+      <strong>What you can conclude from "none recorded":</strong> no public list of the item exists, so we
+      hold only what we found and added by hand. It does not mean the official has nothing to report.
     </p>
     <p>
       <strong>What you can conclude from "not public":</strong> nothing about the official. The records may
@@ -142,8 +150,9 @@ const tables = freshness();
     <h2>Court records</h2>
     <p>
       Cases come from CourtListener: published opinions and dockets that name the official as the judge on the
-      panel or as an attorney. CourtListener covers appellate and federal courts well and most Missouri trial
-      courts barely, so a circuit judge with few cases here may simply sit in a court it doesn't index.
+      panel or as an attorney. CourtListener covers appellate and federal courts well but holds no Missouri
+      circuit-court (state trial court) cases, so a circuit judge with few cases here may simply sit in a
+      court it doesn't index.
     </p>
     <p>
       Profiles count cases per year and list the most recent ones with the court's own disposition text. They
@@ -386,7 +395,7 @@ const tables = freshness();
   <section class="card" id="interest-votes">
     <h2>Interests and votes</h2>
     <p>
-      Where the site shows money or gifts from an interest next to votes on related bills, that is
+      Where the site shows money or gifts from an interest next to votes on related bills, that is{" "}
       <strong>co-occurrence, not causation</strong>. A donation alongside a vote doesn't show the vote was
       bought, and officials often get money from groups that already agree with them.
     </p>

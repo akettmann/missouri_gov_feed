@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build && node scripts/export-sizes.mjs",
+    "build": "astro build && node scripts/export-sizes.mjs && node scripts/run-on-check.mjs",
     "preview": "astro preview",
     "check": "astro check",
     "test": "node --test scripts/*.test.mjs",
@@ -16,6 +16,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "sizes": "node scripts/export-sizes.mjs",
+    "run-on-check": "node scripts/run-on-check.mjs",
     "deploy:gcs": "node scripts/deploy-gcs.mjs",
     "deploy:pages": "node scripts/deploy-pages.mjs"
   },

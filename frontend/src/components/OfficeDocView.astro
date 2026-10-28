@@ -34,7 +34,8 @@ const STATE = { loaded: "● loaded", candidate: "○ not loaded yet" } as const
 </nav>
 
 {doc.offices.map((o) => {
-  const cov = officeCoverage(o);
+  const cov = officeCoverage(o, doc.names);
+  const example = Math.min(2, cov.total);
   return (
     <section class="card office" id={o.id}>
       <h2>{o.title}</h2>
@@ -44,7 +45,7 @@ const STATE = { loaded: "● loaded", candidate: "○ not loaded yet" } as const
           <ul class="strip" aria-label={`Project sources that cover ${o.title}`}>
             {cov.cells.map((c) => (
               <li class={`cell ${c.kind}`}>
-                <span class="label">{c.source}</span>
+                <span class="label">{c.name}</span>
                 <span class="state">{STATE[c.kind]}</span>
                 <span class="muted small">
                   {c.bullets} of {cov.total} {cov.total === 1 ? "item" : "items"}
@@ -62,7 +63,12 @@ const STATE = { loaded: "● loaded", candidate: "○ not loaded yet" } as const
             )}
           </ul>
           <p class="gaps small muted">
-            A gap means we have not loaded data on that duty or power. It says nothing about the officeholder.{" "}
+            Each source box counts the items below whose "Data" line names that source, so "{example} of{" "}
+            {cov.total}" means {example} of this office's {cov.total} {cov.total === 1 ? "item" : "items"}.
+            One item can name several sources, so the boxes can add up to more than {cov.total}. The "no data
+            yet" box counts items with no loaded source. A source can cover an item only in part, and the
+            "Data" line says so when it does. A gap means we have not loaded data on that duty or power. It
+            says nothing about the officeholder.{" "}
             <a href={href("/methodology/#coverage")}>How to read these gaps</a>
           </p>
         </>
