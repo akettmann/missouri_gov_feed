@@ -56,26 +56,66 @@
 
 -- A table, not a view like the other staging models: about a dozen models and tests read it, and as a view each
 -- re-read the 1.5M Parquet rows and re-ran the name-cleaning regexes (about 10s per full read, under 1s as a table).
+{# columns this model reads; unused source columns (zip, address_2, rpt_year, na_flag, zip_clean, filename,
+   cd1_a_id after record_id) are not carried through the window sorts (#881) #}
+{% set src_cols = [
+    'txn', 'cmte_id', 'mecid', 'cmte_name', 'committee_name', 'committee', 'company', 'first_name', 'last_name',
+    'address_1', 'address_clean', 'city', 'city_clean', 'state', 'state_clean', 'employer', 'occupation', 'date',
+    'amount', 'cont_type', 'contribution_type', 'rpt_type', 'report', 'ctrb_name', 'ctrb_type', 'year',
+] %}
+{% set key_cols = ['match_committee_id', 'match_date', 'match_amount', 'match_donor'] %}
+
+-- Only the ~7% of record_ids that occur more than once are ranked (#881), and only the ~400 keys present in both
+-- layouts are matched; every other row passes through untouched, so the wide rows are not sorted.
 with
 
 identified as (
     select
-        *,
+        {{ src_cols | join(', ') }},
         cast(coalesce(txn, cd1_a_id) as {{ dbt.type_string() }}) as record_id
     from {{ source('tap_mec', 'contributions') }}
     where coalesce(dupe_flag, 'FALSE') <> 'TRUE'
 ),
 
+repeated_ids as (
+    select record_id
+    from identified
+    group by record_id
+    having count(*) > 1
+),
+
 unique_records as (
     select
-        *,
-        row_number() over (
-            partition by record_id
-            order by
-                case when txn is null then 0 else 1 end,
-                coalesce(length(address_clean), 0), address_clean, address_1, amount
-        ) as record_rank
-    from identified
+        {% for c in src_cols %}i.{{ c }},
+        {% endfor %}i.record_id
+    from identified as i
+    left join repeated_ids as r on i.record_id = r.record_id
+    where r.record_id is null
+
+    union all
+
+    select
+        {{ src_cols | join(', ') }},
+        record_id
+    from (
+        select
+            {% for c in src_cols %}i.{{ c }},
+            {% endfor %}i.record_id,
+            row_number() over (
+                partition by i.record_id
+                order by
+                    case when i.txn is null then 0 else 1 end,
+                    coalesce(length(i.address_clean), 0), i.address_clean, i.address_1, i.amount,
+                    i.employer, i.occupation, i.city_clean, i.state_clean, i.committee, i.company, i.first_name,
+                    i.last_name, i.ctrb_name, i.ctrb_type, i.date, i.cmte_id, i.mecid,
+                    -- every remaining output column, so two rows that differ at all rank deterministically (#226)
+                    i.cmte_name, i.committee_name, i.city, i.state, i.cont_type, i.contribution_type, i.rpt_type,
+                    i.report, i.year
+            ) as record_rank
+        from identified as i
+        inner join repeated_ids as r on i.record_id = r.record_id
+    ) as ranked
+    where record_rank = 1
 ),
 
 layout_keyed as (
@@ -91,21 +131,53 @@ layout_keyed as (
         end as match_donor,
         txn is null as is_newer_layout
     from unique_records
-    where record_rank = 1
+),
+
+cross_keys as (
+    select {{ key_cols | join(', ') }}
+    from layout_keyed
+    group by {{ key_cols | join(', ') }}
+    having count(distinct is_newer_layout) = 2
 ),
 
 layout_ranked as (
     select
-        *,
+        k.*,
         row_number() over (
-            partition by match_committee_id, match_date, match_amount, match_donor, is_newer_layout
-            order by record_id
+            partition by
+                k.match_committee_id, k.match_date, k.match_amount, k.match_donor, k.is_newer_layout
+            order by k.record_id
         ) as layout_match_rank
-    from layout_keyed
+    from layout_keyed as k
+    inner join cross_keys as x
+        on
+            k.match_committee_id = x.match_committee_id
+            and k.match_date = x.match_date
+            and k.match_amount = x.match_amount
+            and k.match_donor = x.match_donor
 ),
 
 cross_layout_unique as (
-    select older.*
+    select
+        {% for c in src_cols %}k.{{ c }},
+        {% endfor %}k.record_id
+    from layout_keyed as k
+    where
+        not exists (
+            select 1
+            from cross_keys as x
+            where
+                k.match_committee_id = x.match_committee_id
+                and k.match_date = x.match_date
+                and k.match_amount = x.match_amount
+                and k.match_donor = x.match_donor
+        )
+
+    union all
+
+    select
+        {% for c in src_cols %}older.{{ c }},
+        {% endfor %}older.record_id
     from layout_ranked as older
     where
         older.is_newer_layout
