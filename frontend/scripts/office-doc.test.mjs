@@ -80,7 +80,7 @@ test("footnotes must be numbered in order and carry a citation", () => {
 test("a Data clause may only name loaders, known models, or a source marked as a candidate", () => {
   const bad = "- **Duty.** Do it. ([Art. 1][c1]) Data: roll calls (`made_up`).";
   assert.throws(() => parseOfficeDoc(wrap([bad]), OPT), /"made_up" in Data/);
-  const cand = "- **Duty.** Do it. ([Art. 1][c1]) Data: no data yet (`mo_sos_rules` is a candidate).";
+  const cand = "- **Duty.** Do it. ([Art. 1][c1]) Data: no data yet (`mo_sos_rules` is not loaded yet).";
   const b = parseOfficeDoc(wrap([cand]), OPT).offices[0].bullets[0];
   assert.deepEqual(b.candidates, ["mo_sos_rules"]);
   assert.equal(b.noData, true);
@@ -104,7 +104,7 @@ test("coverage counts bullets per source, loaded before candidates, ordered by n
   const md = wrap([
     "- **Duty.** A. ([x][c1]) Data: `voteview`, `mo_house`.",
     "- **Duty.** B. ([x][c1]) Data: `voteview`.",
-    "- **Duty.** C. ([x][c1]) Data: no data yet (`zz` is a candidate).",
+    "- **Duty.** C. ([x][c1]) Data: no data yet (`zz` is not loaded yet).",
   ]);
   const cov = officeCoverage(parseOfficeDoc(md, OPT).offices[0]);
   assert.deepEqual(
@@ -233,24 +233,18 @@ test("code names show by their plain name in Data lines and notes; the strip use
   assert.equal(officeCoverage(s).cells[0].name, "voteview");
 });
 
-test("sourceNames reads docs/sources.md and tells loaders with one source name apart", () => {
+test("sourceNames reads the Summary table of docs/sources.md and drops a trailing web address", () => {
   const md = [
     "| Loader | Source | Data it provides | Coverage | Gate |",
     "|---|---|---|---|---|",
     "| `a` | Alpha Agency (alpha.mo.gov) | things, more | all | |",
     "| `b` | Beta | judges, more | all | |",
-    "| `c` | Beta | dockets | all | |",
-    "",
-    "## b: judges and more",
-    "",
-    "## c: Beta dockets",
   ].join("\n");
   assert.deepEqual(
     [...sourceNames(md)],
     [
       ["a", "Alpha Agency"],
-      ["b", "Beta: judges and more"],
-      ["c", "Beta: Beta dockets"],
+      ["b", "Beta"],
     ],
   );
   assert.throws(() => sourceNames("no table here"), /no Summary table/);
@@ -264,7 +258,7 @@ test("every loader has a plain name, every candidate and model in the doc too, a
     "a loader without a row in docs/sources.md (Summary table) has no plain name",
   );
   const md = readDoc("office_responsibilities.md");
-  const candidates = [...md.matchAll(/`([a-z_0-9]+)` is a candidate/g)].map((m) => m[1]);
+  const candidates = [...md.matchAll(/`([a-z_0-9]+)` is not loaded yet/g)].map((m) => m[1]);
   assert.ok(candidates.length > 0);
   assert.deepEqual(
     candidates.filter((c) => !CANDIDATE_NAMES.has(c)),
@@ -282,13 +276,36 @@ test("every loader has a plain name, every candidate and model in the doc too, a
   );
 });
 
-test("the real page shows no raw loader name in Data lines, notes or strip", () => {
+test("the real page shows no raw loader name anywhere: preface, intros, Data lines, notes, strip", () => {
   const d = loadResponsibilities();
   const loaders = [...loaderNames()];
-  const text = [...d.offices, ...d.otherSections].flatMap((s) => [
-    ...s.bullets.flatMap((b) => [b.dataHtml ?? ""]),
-    ...s.notes.map((n) => n.html),
-    ...officeCoverage(s, d.names).cells.map((c) => c.name),
-  ]);
-  for (const t of text) for (const l of loaders) assert.ok(!t.includes(l), `${l} shown raw in: ${t}`);
+  const sections = [...d.offices, ...d.otherSections];
+  const text = [
+    d.prefaceHtml,
+    ...sections.flatMap((s) => [
+      s.introHtml,
+      ...s.bullets.flatMap((b) => [b.html, b.dataHtml ?? ""]),
+      ...s.notes.map((n) => n.html),
+      ...officeCoverage(s, d.names).cells.map((c) => c.name),
+    ]),
+  ];
+  for (const t of text)
+    for (const l of loaders) assert.ok(!new RegExp(`\\b${l}\\b`).test(t), `${l} shown raw in: ${t}`);
+});
+
+test("the preface list is checked and cleaned like any other block", () => {
+  const withPreface = (item) => wrap([GOOD]).replace("(issue #1).", "(issue #1).\n\n" + item + "\n");
+  assert.throws(
+    () => parseOfficeDoc(withPreface("- See [lost]. **Duty** means it."), OPT),
+    /unresolved link reference/,
+  );
+  const d = parseOfficeDoc(withPreface("- **Duty** <!-- secret --> means it."), OPT);
+  assert.doesNotMatch(d.prefaceHtml, /secret|<!--/);
+  assert.match(d.prefaceHtml, /Duty/);
+  const named = parseOfficeDoc(withPreface("- Source `voteview` here."), {
+    ...OPT,
+    names: new Map([["voteview", "Voteview (Congress roll calls)"]]),
+  });
+  assert.match(named.prefaceHtml, /Voteview \(Congress roll calls\) here/);
+  assert.doesNotMatch(named.prefaceHtml, /<code>voteview/);
 });

@@ -81,6 +81,25 @@ const render = (tokens: Token[], links: LinkMap | undefined) =>
   Parser.parse(Object.assign([...tokens], { links: links ?? {} }) as never).trim();
 const renderInline = (tokens: Token[]) => Parser.parseInline(tokens).trim();
 
+/** Child tokens of a block: a list keeps them in `items` (each with its own `tokens`), everything else in `tokens`. */
+const hasKids = (t: Token) =>
+  ("tokens" in t && Array.isArray(t.tokens)) || ("items" in t && Array.isArray(t.items));
+
+/** Rebuilds a token with `f` applied to each child token list. */
+function mapKids(t: Token, f: (kids: Token[]) => Token[]): Token {
+  const o = t as unknown as { tokens?: Token[]; items?: Token[] };
+  return {
+    ...t,
+    ...(Array.isArray(o.tokens) ? { tokens: f(o.tokens) } : {}),
+    ...(Array.isArray(o.items) ? { items: f(o.items) } : {}),
+  } as Token;
+}
+
+const kidsOf = (t: Token): Token[] => {
+  const o = t as unknown as { tokens?: Token[]; items?: Token[] };
+  return [...(o.tokens ?? []), ...(o.items ?? [])];
+};
+
 /** Every link token, however deeply nested in emphasis. */
 function collectLinks(tokens: Token[], where: string): DocLink[] {
   const out: DocLink[] = [];
@@ -89,20 +108,21 @@ function collectLinks(tokens: Token[], where: string): DocLink[] {
       const l = t as Tokens.Link;
       if (!/^https:\/\//.test(l.href)) fail(where, `link "${l.text}" is not an https URL (${l.href})`);
       out.push({ text: l.text, href: l.href });
-    } else if ("tokens" in t && Array.isArray(t.tokens)) out.push(...collectLinks(t.tokens, where));
+    } else if (hasKids(t)) out.push(...collectLinks(kidsOf(t), where));
   }
   return out;
 }
 
 /**
  * A "[x][y]" or a bare "[x]" the lexer could not resolve stays as literal text: a citation lost to a typo.
- * No text in these docs contains literal square brackets, so any "[...]" left in a text token is a bug.
+ * docs/reference/office_responsibilities.md has no literal square brackets in its text (write a footnote
+ * marker as `\[5\]` if one is ever needed), so any "[...]" left in a text token is a bug.
  */
 function assertResolved(tokens: Token[], where: string) {
   for (const t of tokens) {
     if (t.type === "text" && /\[[^\]]*\]/.test((t as Tokens.Text).raw))
       fail(where, `unresolved link reference in "${(t as Tokens.Text).raw.trim()}"`);
-    if ("tokens" in t && Array.isArray(t.tokens)) assertResolved(t.tokens, where);
+    if (hasKids(t)) assertResolved(kidsOf(t), where);
   }
 }
 
@@ -110,11 +130,7 @@ const isInlineComment = (t: Token) => t.type === "html" && /^\s*<!--[\s\S]*-->\s
 
 /** Drops inline HTML comments (maintainer notes in the middle of a paragraph), however deeply nested. */
 function stripInlineComments(tokens: Token[]): Token[] {
-  return tokens
-    .filter((t) => !isInlineComment(t))
-    .map((t) =>
-      "tokens" in t && Array.isArray(t.tokens) ? { ...t, tokens: stripInlineComments(t.tokens) } : t,
-    ) as Token[];
+  return tokens.filter((t) => !isInlineComment(t)).map((t) => mapKids(t, stripInlineComments));
 }
 
 /** Shows a code name that has a reader-facing name by that name; other code stays as code. */
@@ -123,7 +139,7 @@ function plainNames(tokens: Token[], names: ReadonlyMap<string, string> | undefi
   return tokens.map((t) => {
     if (t.type === "codespan" && names.has((t as Tokens.Codespan).text))
       return textToken(names.get((t as Tokens.Codespan).text)!);
-    return "tokens" in t && Array.isArray(t.tokens) ? { ...t, tokens: plainNames(t.tokens, names) } : t;
+    return mapKids(t, (kids) => plainNames(kids, names));
   }) as Token[];
 }
 
@@ -170,13 +186,13 @@ function parseBullet(item: Tokens.ListItem, where: string, opt: ParseOptions): D
     const name = (t as Tokens.Codespan).text;
     if (name.includes("/")) return; // a file path, not a source name
     const next = all[i + 1];
-    const isCandidate = next?.type === "text" && /^\s+is a candidate/.test((next as Tokens.Text).raw);
+    const isCandidate = next?.type === "text" && /^\s+is not loaded yet/.test((next as Tokens.Text).raw);
     if (isCandidate) {
       if (!candidates.includes(name)) candidates.push(name);
     } else if (opt.loaders.has(name)) {
       if (!sources.includes(name)) sources.push(name);
     } else if (!opt.models?.has(name)) {
-      fail(where, `"${name}" in Data is not a loader, a known model or marked "is a candidate"`);
+      fail(where, `"${name}" in Data is not a loader, a known model or marked "is not loaded yet"`);
     }
   });
   if (
@@ -225,11 +241,7 @@ export function parseOfficeDoc(markdown: string, opt: ParseOptions): OfficeDoc {
   const isComment = (t: Token) => t.type === "html" && /^\s*<!--[\s\S]*-->\s*$/.test(t.raw);
   const blocks = tokens
     .filter((t) => t.type !== "space" && !isComment(t))
-    .map((t) =>
-      t.type === "paragraph"
-        ? ({ ...t, tokens: stripInlineComments((t as Tokens.Paragraph).tokens) } as Token)
-        : t,
-    );
+    .map((t) => mapKids(t, stripInlineComments));
 
   const h1 = blocks[0];
   if (h1?.type !== "heading" || (h1 as Tokens.Heading).depth !== 1)

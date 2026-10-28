@@ -30,31 +30,20 @@ export const MODEL_NAMES: ReadonlyMap<string, string> = new Map([
 
 /**
  * Reader-facing source names, read from the Summary table of docs/sources.md (its "Source" column), so the
- * doc stays the one place the names live. Two loaders with the same source name are told apart by the title of
- * their own section ("## loader: title"), or by the first item of their "Data it provides" cell. A trailing "(domain.tld)" is dropped: it is a web address, not a name.
+ * doc stays the one place the names live. Each loader needs its own name there (a test fails when two share
+ * one). A trailing "(domain.tld)" is dropped: it is a web address, not a name.
  */
 export function sourceNames(markdown: string): Map<string, string> {
-  const tokens = new Lexer().lex(markdown);
-  const titles = new Map<string, string>();
-  for (const t of tokens) {
-    const m =
-      t.type === "heading" && (t as Tokens.Heading).depth === 2
-        ? /^(\w+): (.+)$/.exec((t as Tokens.Heading).text)
-        : null;
-    if (m) titles.set(m[1], m[2]);
-  }
-  const table = tokens.find(
-    (t): t is Tokens.Table => t.type === "table" && (t as Tokens.Table).header[0]?.text === "Loader",
-  );
+  const table = new Lexer()
+    .lex(markdown)
+    .find((t): t is Tokens.Table => t.type === "table" && (t as Tokens.Table).header[0]?.text === "Loader");
   if (!table) throw new Error("docs/sources.md: no Summary table starting with a Loader column");
-  const rows = table.rows.map((r) => ({
-    loader: r[0].text.replace(/`/g, ""),
-    name: r[1].text.replace(/\s*\([a-z0-9.-]+\.(?:gov|com|org)\)$/i, ""),
-    data: titles.get(r[0].text.replace(/`/g, "")) ?? r[2].text.split(",")[0].trim(),
-  }));
-  const counts = new Map<string, number>();
-  rows.forEach((r) => counts.set(r.name, (counts.get(r.name) ?? 0) + 1));
-  return new Map(rows.map((r) => [r.loader, counts.get(r.name)! > 1 ? `${r.name}: ${r.data}` : r.name]));
+  return new Map(
+    table.rows.map((r) => [
+      r[0].text.replace(/`/g, ""),
+      r[1].text.replace(/\s*\([a-z0-9.-]+\.(?:gov|com|org)\)$/i, ""),
+    ]),
+  );
 }
 
 export const readSourcesDoc = () => readFileSync(path.join(repo, "docs/sources.md"), "utf8");
