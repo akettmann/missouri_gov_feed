@@ -31,8 +31,7 @@ test("nothing missing: both lists empty", () => {
 
 test("'none recorded' counts as none found", () => {
   assert.deepEqual(
-    coverageGaps([item("Voluntary disclosures", "none recorded (no feed exists; add finds to seeds/x.csv)")])
-      .none,
-    ["voluntary disclosures (no feed exists)"],
+    coverageGaps([item("Voluntary disclosures", "none recorded (no public list exists)")]).none,
+    ["voluntary disclosures (no public list exists)"],
   );
 });

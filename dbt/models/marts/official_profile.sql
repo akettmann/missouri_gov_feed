@@ -81,7 +81,7 @@ select
     end as disclosures_status,
     case
         when voluntary_disclosures_n.n > 0 then 'available'
-        else 'none recorded (no feed exists; add finds to seeds/voluntary_disclosures.csv)'
+        else 'none recorded (no public list exists)'
     end as voluntary_disclosures_status,
     case
         when bias_indicators_n.n > 0 then 'available'
