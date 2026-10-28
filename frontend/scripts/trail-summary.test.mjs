@@ -38,5 +38,13 @@ test("gave-official sums what the listed committees gave the official, not donor
     { gave_official: 108199.7, donors: [] },
   ];
   assert.equal(sumGaveOfficial(trails), 108200);
+  // 0.07 * 100 is 7.000000000000001: only rounding each amount to whole cents makes the sum exactly 0.21
+  assert.equal(
+    sumGaveOfficial([
+      { gave_official: 0.07, donors: [] },
+      { gave_official: 0.14, donors: [] },
+    ]),
+    0.21,
+  );
   assert.equal(sumGaveOfficial([]), 0);
 });

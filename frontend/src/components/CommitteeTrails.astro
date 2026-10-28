@@ -5,6 +5,7 @@
 import type { CommitteeDonorRow, CommitteeTrail } from "../lib/exports/types";
 import { count, money } from "../lib/format";
 import { href } from "../lib/site";
+import { quotedNames, trailsGiveToEachOther } from "../lib/trailNames";
 import { sumByTrailStatus, sumGaveOfficial, type TrailKind } from "../lib/trailSummary";
 import SourceLink from "./SourceLink.astro";
 
@@ -42,6 +43,7 @@ const MEC_PAGE = "https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx
 const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : `${a}–${b}`);
 const summary = sumByTrailStatus(trails ?? []);
 const gaveOfficial = sumGaveOfficial(trails ?? []);
+const giveToEachOther = trailsGiveToEachOther(trails ?? []);
 const committeeCount = trails?.length ?? 0;
 const donorName = (d: CommitteeDonorRow) =>
   d.trail_status === "individuals" ? "Individuals (itemized)" : d.donor_name;
@@ -76,8 +78,10 @@ const donorName = (d: CommitteeDonorRow) =>
         listed below, across every year on file: each one's 10 largest donors that are not individuals, plus
         its individual donors added together. This is money those committees took in, not money given to this
         official; {committeeCount === 1 ? "that committee" : "those committees"} gave this official{" "}
-        {money(gaveOfficial)}. The listed committees sometimes give to each other, so some dollars appear
-        twice. These figures are not a measure of influence.
+        {money(gaveOfficial)}.{" "}
+        {giveToEachOther &&
+          "A listed committee also gave to another listed one, so some dollars appear twice. "}
+        These figures are not a measure of influence.
       </p>
       <div class="table-scroll">
         <table>
@@ -122,7 +126,7 @@ const donorName = (d: CommitteeDonorRow) =>
           </span>
         </h4>
         <p class="small muted">
-          Filed by this official's committee as "{t.donor_names}": {money(t.gave_official)},{" "}
+          Filed by this official's committee as {quotedNames(t.donor_names)}: {money(t.gave_official)},{" "}
           {years(t.first_year, t.last_year)}. The committee took in {money(t.committee_total_amount)} in
           itemized contributions in total.{" "}
           <SourceLink url={t.source_url} label={`MEC committee ${t.mec_committee_id}`} />

@@ -88,8 +88,8 @@ export interface CommitteeDonorRow {
 export interface CommitteeTrail {
   mec_committee_id: string;
   committee_name: string | null;
-  /** the donor's name(s) as the official's committee reported them */
-  donor_names: string;
+  /** the donor's name(s) as the official's committee reported them, one entry per distinct name */
+  donor_names: string[];
   gave_official: number;
   first_year: number;
   last_year: number;

@@ -6,7 +6,7 @@ import { DONOR_GROUP_SQL } from "../rollups";
 import { groupBySiteDonors, siteKey } from "../siteDonors";
 import { siteDonors } from "./businessDonors";
 import { overlapExamplesSql, recusedSql, senateRollCallsSql } from "./overlapQuery";
-import { trailRowsSql } from "./trailQuery";
+import { trailDonorNamesSql, trailRowsSql } from "./trailQuery";
 import { exportedAt, hasExport, query } from "./db";
 import { buildSponsorshipSessions, type SponsorshipRow } from "../sponsorshipOutcomes";
 import { buildCommitteeSessions, type PostCounts, type TitledMembership } from "../committeePosts";
@@ -176,13 +176,25 @@ async function loadAll(): Promise<OfficialBundle[]> {
   const hasTrails = hasDonors && hasExport("rpt_committee_donors");
   type TrailRow = Omit<
     CommitteeTrail,
-    "donors" | "committee_name" | "committee_total_amount" | "source_url"
+    "donors" | "donor_names" | "committee_name" | "committee_total_amount" | "source_url"
   > & {
     official_id: string;
   };
   const trailRows = hasTrails
     ? await query<TrailRow>(trailRowsSql(TRAILS, "{rpt_donor_rollup}", "{rpt_committee_donors}"))
     : [];
+  // The names each official's committee filed the donor under: one row per name, grouped here (#833).
+  const trailNames = new Map<string, string[]>();
+  if (hasTrails) {
+    for (const r of await query<{ official_id: string; mec_committee_id: string; donor_name: string }>(
+      trailDonorNamesSql(TRAILS, "{rpt_donor_rollup}", "{rpt_committee_donors}"),
+    )) {
+      const key = `${r.official_id} ${r.mec_committee_id}`;
+      const names = trailNames.get(key);
+      if (names) names.push(r.donor_name);
+      else trailNames.set(key, [r.donor_name]);
+    }
+  }
   const committeeDonors = new Map<
     string,
     Pick<CommitteeTrail, "committee_name" | "committee_total_amount" | "source_url" | "donors">
@@ -222,7 +234,8 @@ async function loadAll(): Promise<OfficialBundle[]> {
     ? groupBy(
         trailRows.flatMap((t) => {
           const hop = committeeDonors.get(t.mec_committee_id);
-          return hop ? [{ ...t, ...hop }] : [];
+          const donor_names = trailNames.get(`${t.official_id} ${t.mec_committee_id}`) ?? [];
+          return hop ? [{ ...t, ...hop, donor_names }] : [];
         }),
       )
     : null;

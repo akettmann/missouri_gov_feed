@@ -64,7 +64,10 @@ donors as (
     group by mec_committee_id, donor_class, donor_name
 ),
 
--- a name can match in some years and not others (or two IDs over time): keep the ID with the most money
+-- a name can match in some years and not others (or two IDs over time): keep the ID with the most money.
+-- A match to the committee itself is no link (#833): a committee does not fund itself, so the name is another
+-- body's (for C000621 the parent union, "Missouri State Council of Fire Fighters", matched to its PAC once the
+-- core-name tier dropped "PAC"). The money stays, as a donor we can't place; the trail doesn't loop back.
 donor_links as (
     select
         mec_committee_id,
@@ -77,7 +80,7 @@ donor_links as (
             order by sum(amount) desc, donor_mec_committee_id
         ) as link_rank
     from gifts
-    where donor_mec_committee_id is not null
+    where donor_mec_committee_id is not null and donor_mec_committee_id <> mec_committee_id
     group by mec_committee_id, donor_class, donor_name, donor_mec_committee_id, donor_link_confidence
 ),
 
