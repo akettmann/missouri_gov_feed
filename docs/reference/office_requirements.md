@@ -56,7 +56,7 @@ Notes:
 - [2] The tax rule has a repair path. If the Department of Revenue finds a false tax statement, the candidate gets
   "thirty days to remit" the tax owed that is not in dispute. If the candidate does not pay, the candidate is
   disqualified "and barred from refiling for an entire election cycle". ([RSMo 115.306][rsmo-115-306])
-- [3] A candidate may file by certified mail only if unable to appear because of physical disability (with a doctor's
+- [3] A candidate may file by certified mail if unable to appear because of physical disability (with a doctor's
   sworn statement) or on active duty in the U.S. Armed Forces (with a commanding officer's sworn statement). A judge
   seeking retention may also file by certified mail. ([RSMo 115.355][rsmo-115-355])
 - [4] A candidate who cannot pay the fee may file a "declaration of inability to pay" with a petition of signatures: at
@@ -149,7 +149,7 @@ Notes:
 - **Terms.** Four years. The Governor is "elected at the presidential elections for terms of four years".
   ([Mo. Const. art. IV, §17][mc-iv-17])
 - **Term limit.** "No person shall be elected governor or treasurer more than twice". ([Mo. Const. art. IV, §17][mc-iv-17])
-- **How filled.** Elected at the presidential elections. If the office is vacant, the Lieutenant Governor takes over.
+- **How filled.** Elected at the presidential elections. The Lieutenant Governor becomes Governor on the Governor's death, conviction, impeachment or resignation.
   ([Mo. Const. art. IV, §17][mc-iv-17], [art. IV, §11(a)][mc-iv-11a])
 - **Filing.** Declaration of candidacy and a $500 fee. See "Rules for every Missouri candidate".
   ([RSMo 115.349][rsmo-115-349], [RSMo 115.357][rsmo-115-357])
@@ -172,7 +172,7 @@ Notes:
 - **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid state or local taxes.
   ([RSMo 115.306][rsmo-115-306])
 - **Terms.** Four years. ([Mo. Const. art. IV, §17][mc-iv-17])
-- **Term limit.** No rule found. Section 17 limits only the Governor and Treasurer.
+- **Term limit.** No rule found. Section 17 sets limits for the Governor and Treasurer and names none for this office.
   ([Mo. Const. art. IV, §17][mc-iv-17])
 - **How filled.** Elected at the presidential elections. ([Mo. Const. art. IV, §17][mc-iv-17])
 - **Filing.** Declaration of candidacy and a $500 fee. See "Rules for every Missouri candidate".
@@ -193,7 +193,7 @@ Notes:
 - **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid state or local taxes.
   ([RSMo 115.306][rsmo-115-306])
 - **Terms.** Four years. ([Mo. Const. art. IV, §17][mc-iv-17])
-- **Term limit.** No rule found. Section 17 limits only the Governor and Treasurer.
+- **Term limit.** No rule found. Section 17 sets limits for the Governor and Treasurer and names none for this office.
   ([Mo. Const. art. IV, §17][mc-iv-17])
 - **How filled.** Elected at the presidential elections. ([Mo. Const. art. IV, §17][mc-iv-17])
 - **Filing.** Declaration of candidacy and a $500 fee. See "Rules for every Missouri candidate".
@@ -216,7 +216,7 @@ Notes:
 - **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid state or local taxes.
   ([RSMo 115.306][rsmo-115-306])
 - **Terms.** Four years. ([Mo. Const. art. IV, §17][mc-iv-17])
-- **Term limit.** No rule found. Section 17 limits only the Governor and Treasurer.
+- **Term limit.** No rule found. Section 17 sets limits for the Governor and Treasurer and names none for this office.
   ([Mo. Const. art. IV, §17][mc-iv-17])
 - **How filled.** Elected at the presidential elections. ([Mo. Const. art. IV, §17][mc-iv-17])
 - **Filing.** Declaration of candidacy and a $500 fee. See "Rules for every Missouri candidate".
@@ -260,7 +260,7 @@ Notes:
   and "shall not engage in the practice of law" except in official duties. ([RSMo 27.010][rsmo-27-010])
 - **Terms.** "Four years, or until his or her successor is elected and qualified." The term begins "at 12:00 noon on the
   second Monday in January". ([RSMo 27.010][rsmo-27-010])
-- **Term limit.** No rule found. Section 17 limits only the Governor and Treasurer.
+- **Term limit.** No rule found. Section 17 sets limits for the Governor and Treasurer and names none for this office.
   ([Mo. Const. art. IV, §17][mc-iv-17])
 - **How filled.** Elected at the general election when a governor is elected.
   ([RSMo 27.010][rsmo-27-010], [Mo. Const. art. IV, §17][mc-iv-17])
@@ -291,8 +291,9 @@ Notes:
 - **Terms.** "Twelve years" for the Supreme Court and Court of Appeals, "six years" for circuit judges and "four years"
   for associate circuit judges. ([Mo. Const. art. V, §19][mc-v-19])
 - **Term limit.** No rule found.
-- **How filled.** By the nonpartisan court plan in some courts and by election in others. See notes [1] and [2].
-  ([Mo. Const. art. V, §25(a)][mc-v-25a], [art. V, §16][mc-v-16])
+- **How filled.** By the nonpartisan court plan in some courts and by election in others, depending on the court and, for
+  some circuits, a local vote. See notes [1] and [2]. ([Mo. Const. art. V, §25(a)][mc-v-25a],
+  [art. V, §25(b)][mc-v-25b])
 - **Filing.** Judges chosen by election file like other candidates: see "Rules for every Missouri candidate", with the
   fee for circuit judge ($300). Judges under the court plan file a declaration to run for retention. See note [3].
   ([RSMo 115.357][rsmo-115-357], [Mo. Const. art. V, §25(c)(1)][mc-v-25c1])
@@ -304,7 +305,8 @@ Notes:
   persons ... nominated ... by a nonpartisan judicial commission". If the Governor does not choose within 60 days, the
   commission picks one of its nominees. ([Mo. Const. art. V, §25(a)][mc-v-25a])
 - [2] Other circuits. Voters in a circuit outside St. Louis and Jackson County can vote to adopt the court plan or drop
-  it. ([Mo. Const. art. V, §25(b)][mc-v-25b]) Associate circuit judges are picked the same way as the circuit judge in
+  it.
+  ([Mo. Const. art. V, §25(b)][mc-v-25b]) Associate circuit judges are picked the same way as the circuit judge in
   their circuit; where the plan does not apply, they "shall be elected in the county in which they are to serve".
   ([Mo. Const. art. V, §16][mc-v-16])
 - [3] Retention. A judge on the court plan can file with the Secretary of State a declaration to run to succeed
