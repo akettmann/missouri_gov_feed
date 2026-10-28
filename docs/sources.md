@@ -866,12 +866,20 @@ Quirks:
   least 3 letters (2 for "Ed" / "Education"): "Assoc" / "Associates", "Ins" / "Insurance", "Technical Ed" /
   "Technical Education". Person surnames are not on the list, so "John Hill" / "John Hillhouse", "Smith Alex" /
   "Smith Alexandra", "John Smith" / "John Smithson" and "Committee to Elect John Smith" / "... Smithson" stay unpaired,
-  and Roman numerals and 1-2 letter words must be equal ("Holding III" / "Holdings II"). An organisation abbreviated
-  in a way the list does not cover (a misspelling, "Mfg") is not paired by this rule. The typo rule (#735) only pairs names whose differing words are 5+ letters in both names, so a change to a short
+  and Roman numerals and 1-2 letter words must be equal ("Holding III" / "Holdings II"). Two different abbreviations of one word also pair (#740), through a map in the macro
+  `org_word_abbreviation` ("Ass" / "Assoc" / "Assn" / "Association", "Ed" / "Edu" / "Educ", "Int" / "Intl", "Com" / "Comm",
+  "Telecom" / "Telecomm", "Dist" / "District", "Govt" / "Government"; "Assoc" can also mean "Associates", a firm, but maps to
+  "association": no wrong match seen in the data; the map applies from word 2 on, so "John Ed Smith" / "John Edu Smith" pair by design). An organisation abbreviated in a way the list and the map do not cover
+  (a misspelling, "Mfg") is not paired by this rule. The typo rule (#735) only pairs names whose differing words are 5+ letters in both names, so a change to a short
   word ("Citizens for Ann Smith" / "Citizens for Anne Smith", "Joan" / "John", "Sara" / "Sarah") is two people and both
   lines stay; "Fran Froelich" / "Fran Froehlich" and "Lathrop GPM" / "Lanthrop GPM" still pair. Spacing
-  variants that change the word count or a short word ("Century Link" / "CenturyLink", "Fire Fighters" / "Firefighters",
-  "Kansas City Life" / "KansasCity Life") no longer pair either. A name whose loose key is empty
+  variants that change the word count ("Century Link" / "CenturyLink", "Fire Fighters" / "Firefighters", "Kansas City Life" /
+  "KansasCity Life", "Van Dyke" / "Vandyke") pair again (#753): with the spaces removed the two names are identical (6+ characters, different
+  word counts, so "Marc Anthony" / "Marca Nthony" does not pair). That is no looser than an exact match. October 2026: no notice/full-report
+  pair of the two feeds is a spacing variant, so no row changes. The typo rule cannot tell a person from an organisation, so 5+-letter first
+  name and surname variants (Frances / Francis, Peterson / Petersen) still pair when one lone notice and one lone full-report line share committee,
+  date, amount, city and state; no such pair exists in the data, and skipping word 1 would break real organisation typos ("Lathrop GPM" /
+  "Lanthrop GPM"). A name whose loose key is empty
   (only stop words, legal forms and initials) is never paired. On the October 2026 data the tightening changes no
   row (the same records: still 138 TAP notices and 78 direct-export notices dropped). With several lines in the
   group a notice is dropped only when it has exactly one name-compatible full-report line, that line has exactly one
@@ -945,14 +953,17 @@ rule against `/bulkdata`, US government work (the page states no licence). Congr
   (sponsor `state` = MO) is applied in dbt, in `fct_federal_sponsorship` (one row per Missouri member, bill and
   role, with `became_law`, `law_type` and `law_number`).
 - Votes to bills: `fct_federal_vote_bills` links each cited roll call to its Voteview roll call (one row per roll
-  call and bill). BILLSTATUS cites the chamber clerk's roll number within the session; Voteview's `rollnumber`
+  call and bill). The bill is the one the roll call was "taken on", not always the one it decided: of the 1,708
+  linked rows in the 117th and 118th, 136 are motions to recommit and 130 order the previous question on a rule,
+  and cloture, motion-to-proceed, tabling and discharge votes are in there too. Read `vote_question`. BILLSTATUS cites the chamber clerk's roll number within the session; Voteview's `rollnumber`
   runs across the whole Congress (House session 2 starts at 720 in the 118th), so the join uses Voteview's
-  `clerk_rollnumber` and `session`, not `rollnumber`. On the 118th and 119th, all 1,646 cited roll calls were
-  found in Voteview and every one names the same bill as Voteview's own `bill_number` text. Only roll calls a bill
+  `clerk_rollnumber` and `session`, not `rollnumber`. On the 117th and 118th (checked 2026-10-27) all 914 and 794 distinct cited roll calls were found in Voteview
+  (117th: House 764, Senate 150 rows; 118th: House 661, Senate 133). On the 118th and 119th, all 1,646 cited roll
+  calls were found in Voteview and every one names the same bill as Voteview's own `bill_number` text. Only roll calls a bill
   action cites are linked (118th: 794 of 1,926 roll calls; 119th so far: 852 of 1,589), so votes on nominations,
   quorum calls and amendments to a bill the file does not cite for them have no bill here.
 - Laws: `law_type` is Public Law or Private Law; the two are numbered separately (118-5 can be either). A private
-  law relieves a named person or entity; the 118th Congress's hr/s/sjres/hconres bills have 274 public (including 5 H.J.Res.) and
+  law relieves a named person or entity; the 118th Congress's hr/s/hjres bills have 274 public laws (hr 178, s 91, hjres 5) and
   no private laws. `became_law` is true for either type, so read `law_type` before calling a law broad policy. A
   bill with two laws shows the earliest by number (compared as integers).
 - Stage and veto outcomes: `int_federal_bills__stage` (one row per bill) reads how far each bill got from the
@@ -967,6 +978,9 @@ rule against `/bulkdata`, US government work (the page states no licence). Congr
   Senate. 118th and 119th (loaded 2026-10-27): 412 laws (118th: 274; 119th: 138 = 136 public + 2 private), 15 vetoes
   (118th: 13; 119th: 2), every veto sustained or never put to an override vote, no override in these two Congresses.
   `became_law` comes from the actions only; `has_law_number` flags the laws list separately (see the quirk below).
+  The test `assert_federal_bills_stage_plausible` fails the build on impossible counts, but a bill whose actions say
+  it became law while the laws list lacks it is only a warning (`assert_federal_bills_became_law_on_laws_list`):
+  GovInfo can add the 36000 action a day or so before it updates `<laws>` for a just-signed bill.
   A concurrent resolution (hconres, sconres) adopted by both chambers is `agreed_to`, like a simple resolution; it
   is never presented. `goes_to_president` is true for every hr, s, hjres and sjres, including a joint resolution
   proposing a constitutional amendment (that goes to the states; none in the 118th or 119th). BILLSTATUS has no
@@ -991,14 +1005,16 @@ Quirks:
 - GovInfo data error: 119-hr-766 (the SEWER Act; actions end at referral) lists Public Law 119-120, which is
   really 119 S. 766 (that bill's own actions show it signed). `int_federal_bills__stage` therefore takes
   `became_law` from the actions only and keeps the laws list as the separate `has_law_number` flag; a test checks
-  each law maps to one `became_law` bill. The staging and sponsorship models still credit the law to 119-hr-766
-  (#729).
+  each law maps to one `became_law` bill. `fct_federal_sponsorship` reads `became_law` from that stage and only
+  shows a law number for such bills, so 119-hr-766's sponsors are not credited with the law; a second test checks
+  each law in the fact maps to one bill (#729).
 - Each action is often listed twice: the chamber's own and the Library of Congress's coded copy (`sourceSystem`
   names which). Roll calls cited by both appear twice in `_recorded_votes`. Count distinct roll calls, not rows.
 - `isOriginalCosponsor` is the text `True`/`False`; a cosponsor who later withdrew keeps their row with
   `sponsorshipWithdrawnDate` set (the mart drops them). `district` is present for House members only.
 - Sponsors carry the member's state at the time of the bill; a member who changed states has rows under both.
-- Eleven reserved 117th House bills (hr2, hr9-17, hr20; "Reserved for the Speaker." / "...Minority Leader.") use `<billType>` and `<billNumber>` where every other file uses `<type>` and `<number>`. The parser reads either, so they keep their real id (`117-hr-2`); they are real bills with no sponsors, cosponsors or votes, and are recognizable by that title.
+- Eleven reserved 117th House bills (hr2, hr9-17, hr20; "Reserved for the Speaker." / "...Minority Leader.") use `<billType>` and `<billNumber>` where every other file uses `<type>` and `<number>`. The parser reads either, so they keep their real id (`117-hr-2`); they are real bills with no sponsors, cosponsors or votes, and are recognizable by that title. The 118th has nine such
+  reserved bills too (hr3, hr4, hr6, hr8, hr9, hr10, hr13, hr18, hr19); every one's only action is "Introduced in House". They stay in `stg_govinfo_billstatus__bills` as ordinary empty bills, so a count of bills introduced per Congress includes them; there is no `is_reserved` flag, filter on the two titles.
 - Committees, subjects and related bills (staging only so far; checked on the 118th hr and s, 16,213 bills, and the
   117th hr and s, 15,066 bills): a subcommittee is its own row with `subposition` set and `parent_system_code`; the
   file gives it no chamber, so staging takes the parent's.
@@ -1029,7 +1045,7 @@ Quirks:
   the parser looks through the wrapper if one ever has entries.
 - Amendments: BILLSTATUS keeps each amendment, with its own actions and recorded roll calls, under `<amendments>`.
   That element is not parsed, so no amendment roll call is linked to a bill and `fct_federal_vote_bills` has no
-  amendment votes (#706).
+  amendment votes (parsing them is #738).
 - Rate: the loader makes one request per zip (24 for the default window), not per bill.
 
 ## house_fd: U.S. House financial disclosures
@@ -1079,10 +1095,19 @@ Quirks:
   low end ("... $250,001 -" / "Road $500,000", or in the 2021+ layout "$500,001 - Dividends $2,501 -" / the asset
   name with "$1,000,000 $5,000"), and "Over" / "$1,000,000" reads "Over $1,000,000". When the asset's value is
   "None" ("... JT None Interest $1,001 - ..."), the first `$` on the line is the income range, not the asset's value,
-  and `amount_range` is `None`. Residual cases that still split:
-  an A asset name wrapped with no structural signal ("Fidelity Managed Income II III [HE]" / "Unit Cl I [HE]"), PTR
-  (`P`) rows, which are not joined at all, and a few A `DESCRIPTION:` lines that join through the open-parenthesis
-  rule.
+  and `amount_range` is `None`; the same for "Undetermined" (pensions, annuities, royalties: 47 A rows), which
+  `amount_range` reads as `Undetermined`. On A an income range wrapped after a complete value range joins too
+  ("Fidelity Trust => JT $15,001 - $50,000 Interest $201 -" / "Clark Cnty WA Sch Dist $1,000": the tail holds the
+  income high end and the asset name; the glyph line may sit between; 245 rows in all), and so does a value of
+  "Over" (or "Over None") with the amount on the next line ("Equity Trust CO => Over None" / "Berkshire Hathaway Inc.
+  New (BRK.B) $50,000,000" reads `Over $50,000,000`; `Location:` / `Description:` / `Comments:` lines ending on
+  "Over" are not heads). Residual cases that still split:
+  an A asset name wrapped with no structural signal ("Fidelity Managed Income II III [HE]" / "Unit Cl I [HE]"),
+  and a few A `DESCRIPTION:` lines that join through the open-parenthesis
+  rule. On the PTR, a transaction line (owner code, two dates) that holds only the low end of its range joins the next
+  line when that has an amount, no transaction dates of its own and no `Description:` / `Location:` / `Comments:` /
+  `Filing Status:` / `Subholding Of:` label ("JT ... P 12/05/2025 12/08/2025 $100,001 -" / "[GS] $250,000", #749); the
+  rest of a wrapped PTR asset name ("NITTANYMED [GS]") is not joined.
 - Index type `H` is the New Filer Report (PDF header `Filing Type: New Filer Report`), filed by new members; a
   separate report from that year's Annual Report (O). The loader reads it like O/A/P/C/T. Other index types
   (D, X, G, E, B, W) are not downloaded.
@@ -1254,8 +1279,12 @@ Chapter PDFs (executive, legislative, judicial), one row per text line.
   lieutenant governor, secretary of state, auditor, treasurer and attorney general since 1820, terms in whole years)
   into `int_bluebook__statewide_officeholders`.
   `int_statewide__terms` dates those terms (seed `statewide_office_handovers`, else the second Monday of January) and links
-  each to the current official of the same name; `fct_office_history` lists the earlier statewide terms of current
-  officials from it (terms from 2000 on; Malek's 2023 appointment as Treasurer, Fitzpatrick's 2019-2023 Treasurer term).
+  each to the current official of the same name, but only when the official's known service corroborates the match
+  (the office they hold today, or an overlap with dated Open States / congress-legislators / Wikidata service; the
+  1871 governor Benjamin Gratz Brown is not the legislator Ben Brown, #760); `fct_office_history` lists the earlier
+  statewide terms of current officials from it (Malek's 2023 appointment as Treasurer, Fitzpatrick's 2019-2023
+  Treasurer term) and lists one row per statewide term even when sources title it differently ("Governor", "Governor
+  of Missouri").
 
 Quirks:
 - PDF file names differ between editions. Links are scraped from the edition page, with a fallback to

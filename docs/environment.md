@@ -382,12 +382,15 @@ only helps as far as Cloud Storage FUSE honours exclusive creates; expect some d
 
 Temp files: every writer in the cache (`write_atomic`, large downloads, the CourtListener case filter) writes
 `.<name>.<pid>.<32 hex>.part` and renames it into place (the raw-table writers in `db.py` do the same for their
-`.part` and `.jsonl` scratch files); a failed writer deletes its own. A crash leaves the file
-behind, so the first `write_atomic` into a directory in each process sweeps that directory (every directory it
-writes to, not only the cache: raw dirs such as the `mo_house` XML dirs and govinfo `<congress>/<bill_type>/` too;
-once per directory per process, not per write), and each large download sweeps its own name, deleting only such files untouched for 24 hours. A live writer's
-file is always fresh (a small file takes milliseconds; a download rewrites its file continuously), and on a
-Cloud Storage FUSE mount a file still open for writing is not yet an object, so another task cannot list it.
+`.part` and `.jsonl` scratch files); a failed writer deletes its own. A crash leaves the file behind, so the first
+`write_atomic` into a directory in each process sweeps that directory (every directory it writes to, not only the
+cache: raw dirs such as the `mo_house` XML dirs and govinfo `<congress>/<bill_type>/` too; once per directory per
+process, not per write), and each large download sweeps its own name, deleting only such files untouched for 24
+hours. A live writer's file is always fresh (a small file takes milliseconds; a download rewrites its file
+continuously), and on a Cloud Storage FUSE mount a file still open for writing is not yet an object, so another
+task cannot list it. A raw-table shard clears its own leftover scratch when it starts. Scratch left under an old
+shard count is swept once every shard of the new count has landed, and only if it is 24 hours old and its old
+shard's lock is not held, so a still-running old-count run is never touched.
 
 Be polite with small state sites. Each shard keeps its own request pace, so N shards make N times the
 request rate. That matters most for `mec` (ask MEC before running it in parallel) and less for the

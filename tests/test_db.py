@@ -1,10 +1,13 @@
+import os
 import queue
 import threading
+import time
+from pathlib import Path
 
 import duckdb
 import pytest
 
-from mogov import db
+from mogov import db, http
 
 
 @pytest.fixture(autouse=True)
@@ -389,14 +392,28 @@ def test_replace_csv_releases_the_lock_on_failure(raw_dir):
     assert db.replace_csv("t", csv_path) == 1
 
 
-def test_sink_scratch_and_publish_temp_names_are_unique_per_run(raw_dir):
+def test_sink_scratch_and_publish_temp_names_are_unique_per_run(raw_dir, monkeypatch):
     names = []
+    real_sibling = db.tmp_sibling
+    publish_tmps = []
+
+    def spy(path):
+        tmp = real_sibling(path)
+        if tmp.name.startswith(".part-"):  # _publish's parquet temp, named for the part it will become
+            publish_tmps.append(tmp.name)
+        return tmp
+
+    monkeypatch.setattr(db, "tmp_sibling", spy)
     for _ in range(2):
         with db.JsonSink(tables=["t"]) as sink:
             sink.add("t", "k", {})
             names.extend(p.name for p in (raw_dir / "t").glob(".*.jsonl"))
     assert len(names) == 2 and names[0] != names[1]  # pid alone repeats across runs / containers
     assert all(len(n.split(".")) == 6 for n in names)  # "", part-..-of-.., parquet, pid, uuid, jsonl
+    # each run made a scratch name and a _publish name: all four distinct, the publish ones `.part`-suffixed
+    assert len(publish_tmps) == 4 and len(set(publish_tmps)) == 4
+    publish_only = publish_tmps[1::2]  # sink opens (scratch) then _publish, per run
+    assert all(n.endswith(".part") and len(n.split(".")) == 6 for n in publish_only)
 
 
 def test_own_rows_sql_keeps_a_tables_own_filename_column(raw_dir):
@@ -407,3 +424,72 @@ def test_own_rows_sql_keeps_a_tables_own_filename_column(raw_dir):
     cols = duckdb.sql(db.own_rows_sql("t", ["k"], "0")).columns
     assert cols == ["k", "v", "filename"]
     assert sorted(r[0] for r in rows) == ["a", "b"] and all(r[2].endswith("in.csv") for r in rows)
+
+
+def _old_scratch(folder, count, index=0, ext="jsonl", age_s=0.0, tag="1"):
+    path = folder / f".part-{index:03d}-of-{count:03d}.parquet.{tag}.{'a' * 32}.{ext}"
+    path.write_bytes(b"x")
+    stamp = time.time() - age_s
+    os.utime(path, (stamp, stamp))
+    return path
+
+
+def test_new_count_sweeps_old_count_scratch_that_is_old_enough(raw_dir):
+    folder = db.table_dir("t")
+    old_jsonl = _old_scratch(folder, 3, ext="jsonl", age_s=http.PART_STALE_S + 60, tag="1")
+    old_part = _old_scratch(folder, 3, 1, ext="part", age_s=http.PART_STALE_S + 60, tag="2")
+    db.replace_json("t", [("new", {})])
+    assert not old_jsonl.exists() and not old_part.exists()
+
+
+def test_old_count_scratch_survives_while_new_count_incomplete_fresh_or_locked(raw_dir):
+    folder = db.table_dir("t")
+    stale = http.PART_STALE_S + 60
+    fresh = _old_scratch(folder, 3, 0, age_s=0, tag="1")  # an old-count writer still running
+    locked = _old_scratch(folder, 3, 1, age_s=stale, tag="2")
+    lock = db._ShardLock("t", db.Shard(1, 3))
+    lock.acquire()  # that writer's sink holds its shard lock
+    try:
+        db.replace_json("t", [("new", {})])
+        assert fresh.exists() and locked.exists()
+    finally:
+        lock.release()
+    db.replace_json("t", [("new2", {})])
+    assert fresh.exists() and not locked.exists()  # fresh stays until it ages; released + old goes
+
+
+def test_old_count_scratch_stays_until_new_count_is_complete(raw_dir):
+    folder = db.table_dir("t")
+    old = _old_scratch(folder, 3, age_s=http.PART_STALE_S + 60)
+    db.replace_json("t", [("n0", {})], shard=db.Shard(0, 2))
+    assert old.exists()
+    db.replace_json("t", [("n1", {})], shard=db.Shard(1, 2))
+    assert not old.exists()
+
+
+def test_old_count_scratch_unlink_failure_does_not_fail_the_publish(raw_dir, monkeypatch):
+    folder = db.table_dir("t")
+    stuck = _old_scratch(folder, 3, 0, age_s=http.PART_STALE_S + 60, tag="1")
+    old_lock = folder / ".part-001-of-003.parquet.lock"
+    old_lock.write_bytes(b"")
+    real_unlink = Path.unlink
+
+    def flaky_unlink(self, *args, **kwargs):
+        if self == stuck:
+            raise PermissionError(13, "file held open by another handle")
+        return real_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", flaky_unlink)
+    db.replace_json("t", [("new", {})])  # must not raise
+    assert (folder / "part-000-of-001.parquet").exists()
+    assert stuck.exists()  # left for the next run
+    assert not old_lock.exists()  # the lock sweep after it still ran
+
+
+def test_old_count_scratch_sweep_never_touches_current_count_scratch(raw_dir):
+    folder = db.table_dir("t")
+    stale = http.PART_STALE_S + 60
+    current = _old_scratch(folder, 1, 0, age_s=stale, tag="1")  # same count as the publish below, stale by age
+    other = _old_scratch(folder, 3, 0, age_s=stale, tag="2")
+    db._sweep_old_count_scratch(folder, "-of-001.parquet")
+    assert current.exists() and not other.exists()
