@@ -179,9 +179,9 @@ const tables = freshness();
   <section class="card" id="vote-stage">
     <h2>Stage of a Missouri vote</h2>
     <p>
-      Wherever the profile lists individual Missouri roll calls, a Stage column says what kind of question the
-      vote decided, so a final-passage vote is not mistaken for an amendment, a procedural motion or a
-      consent-calendar bill. It is a label only: attendance, party unity and the awards do not read it.
+      Wherever the profile lists individual Missouri roll calls, each roll call is labeled with the kind of
+      question the vote decided, so a final-passage vote is not mistaken for an amendment, a procedural motion
+      or a consent-calendar bill. It is a label only: attendance, party unity and the awards do not read it.
       Federal votes keep their own description and get no stage.
     </p>
     <ul>
@@ -200,9 +200,14 @@ const tables = freshness();
         has no such marker, so Senate votes are never labeled this way.
       </li>
       <li>
-        <strong>Senate amendments</strong>, <strong>Conference report</strong>, <strong>Veto override</strong>
-        ,<strong>Amendment</strong> and <strong>Emergency clause</strong>: votes on those questions, not on
-        passing the bill.
+        <strong>Senate amendments</strong> and <strong>Conference report</strong>: the vote on the other
+        chamber's changes to a bill, or on the conference version. In the House these stages also include the
+        final-passage vote that follows (the bill truly agreed to and finally passed), so one measure can show
+        two roll calls under the same stage.
+      </li>
+      <li>
+        <strong>Veto override</strong>, <strong>Amendment</strong> and <strong>Emergency clause</strong>:
+        votes on those questions, not the vote to pass the bill in that chamber.
       </li>
       <li>
         <strong>Procedural motion</strong>, <strong>Previous question</strong> and
@@ -211,7 +216,9 @@ const tables = freshness();
       </li>
       <li>
         <strong>Resolution</strong> and <strong>Other question</strong>: a resolution, or a vote we recognise
-        but that fits none of the stages above (for example an officer election).
+        but that fits none of the stages above (for example an officer election). Some Other question votes
+        are still being sorted into proper stages (for example House roll calls on bills carrying request
+        messages, tracked in issue 816).
       </li>
       <li>
         <strong>Stage not identified</strong>: the stage is worked out from the House calendar item or the
