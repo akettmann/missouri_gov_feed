@@ -25,12 +25,11 @@ const SHORT = { available: "available", none: "none found", "not-public": "not p
           <span aria-hidden="true">{ICON[kind]}</span> {SHORT[kind]}
           {kind === "available" && it.count > 0 && <span class="muted"> · {count(it.count)}</span>}
         </span>
-        {kind !== "available" && kind !== "na" && <span class="why small muted">{it.status}</span>}
       </li>
     );
   })}
 </ul>
-{(gaps.cant.length > 0 || gaps.none.length > 0) && (
+{(gaps.cant.length > 0 || gaps.none.length > 0 || gaps.unrecorded.length > 0) && (
   <p class="gaps small muted">
     {gaps.cant.length > 0 && (
       <>
@@ -40,6 +39,11 @@ const SHORT = { available: "available", none: "none found", "not-public": "not p
     {gaps.none.length > 0 && (
       <>
         <strong>None found:</strong> {gaps.none.join("; ")}.{" "}
+      </>
+    )}
+    {gaps.unrecorded.length > 0 && (
+      <>
+        <strong>None recorded:</strong> {gaps.unrecorded.join("; ")}.{" "}
       </>
     )}
     A gap is not evidence about the official either way.{" "}
@@ -85,9 +89,5 @@ const SHORT = { available: "available", none: "none found", "not-public": "not p
   }
   .na {
     opacity: 0.6;
-  }
-  .why {
-    font-size: 0.75rem;
-    line-height: 1.3;
   }
 </style>
