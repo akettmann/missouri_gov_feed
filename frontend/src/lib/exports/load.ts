@@ -6,6 +6,7 @@ import { DONOR_GROUP_SQL } from "../rollups";
 import { groupBySiteDonors, siteKey } from "../siteDonors";
 import { siteDonors } from "./businessDonors";
 import { overlapExamplesSql, recusedSql, senateRollCallsSql } from "./overlapQuery";
+import { voteStagesSql } from "./voteStageQuery";
 import { trailRowsSql } from "./trailQuery";
 import { exportedAt, hasExport, query } from "./db";
 import { buildSponsorshipSessions, type SponsorshipRow } from "../sponsorshipOutcomes";
@@ -292,9 +293,10 @@ async function loadAll(): Promise<OfficialBundle[]> {
                  vote_description, vote_cast, party_position, other_party_position,
                  cast(republican_yea as integer) as republican_yea, cast(republican_nay as integer) as republican_nay,
                  cast(democratic_yea as integer) as democratic_yea, cast(democratic_nay as integer) as democratic_nay,
-                 source_url
-          from {rpt_party_breaks}
-          order by official_id, vote_date desc, chamber, session_code, vote_id, measure, vote_description, source_url`),
+                 b.source_url, s.vote_stage, s.vote_informal
+          from {rpt_party_breaks} as b
+          left join (${voteStagesSql()}) as s using (chamber, session_code, vote_id)
+          order by official_id, vote_date desc, chamber, session_code, vote_id, measure, vote_description, b.source_url`),
       )
     : null;
 
@@ -390,7 +392,11 @@ async function loadAll(): Promise<OfficialBundle[]> {
     for (const r of await query<
       InterestOverlap["examples"][number] & { official_id: string; industry: string }
     >(`
-      ${overlapExamplesSql(5, "{rpt_interest_vote_overlap}")}`)) {
+      ${overlapExamplesSql(
+        5,
+        `(select o.*, s.vote_stage, s.vote_informal from {rpt_interest_vote_overlap} as o
+          left join (${voteStagesSql()}) as s using (chamber, session_code, vote_id))`,
+      )}`)) {
       const { official_id, industry, ...ex } = r;
       const key = `${official_id}|${industry}`;
       examples.set(key, [...(examples.get(key) ?? []), ex]);
