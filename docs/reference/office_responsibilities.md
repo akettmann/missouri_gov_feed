@@ -29,12 +29,12 @@ How to read it:
   pending." One-third of the members can pull a bill out of committee and put it on the calendar.
   ([Mo. Const. art. III, §22][mc-iii-22]) Data: committee membership (`mo_house`); no data on pulled bills yet.
 - **Duty.** Pass bills that cover one subject. "No bill shall contain more than one subject which shall be clearly
-  expressed in its title." ([Mo. Const. art. III, §23][mc-iii-23]) Data: bill text (`mo_house_pdf`).
-- **Duty.** Vote on the record. Each house keeps a journal and records yes and no votes when asked.
+  expressed in its title", except general appropriation bills and one other exception in the section. ([Mo. Const. art. III, §23][mc-iii-23]) Data: bill text (`mo_house_pdf`).
+- **Duty.** Vote on the record. Each house keeps a journal and records yes and no votes "on the motion of any five members".
   ([Mo. Const. art. III, §26][mc-iii-26]) Data: roll calls (`mo_house`).
 - **Power.** Appropriate money. "The general assembly shall have no power ... to permit the withdrawal of money from
-  the treasury, except in pursuance of appropriations made by law." ([Mo. Const. art. III, §36][mc-iii-36]) Data: no
-  data yet on spending (`mo_state_expenditures` is a candidate).
+  the treasury, except in pursuance of appropriations made by law." ([Mo. Const. art. III, §36][mc-iii-36]) Data: what
+  agencies paid, by fiscal year, with partial coverage (`mo_state_expenditures`).
 - **Power.** Override a veto. Two-thirds of the elected members of each house can pass a bill over the Governor's
   objections. ([Mo. Const. art. III, §32][mc-iii-32]) Data: roll calls (`mo_house`).
 - **Power.** Set its own rules and judge its own members. A house "may determine the rules of its own proceedings"
@@ -49,9 +49,10 @@ Notes:
 
 - [1] The Speaker of the House is in the line of succession to be Governor. See the Governor notes.
    ([Mo. Const. art. IV, §11(a)][mc-iv-11a])
-- [2] A bill that the Governor vetoes late in the session goes to a September session. Only bills returned on or
-   after the fifth day before the last day of the session are taken up then.
-   ([Mo. Const. art. III, §32][mc-iii-32])
+- [2] If the Governor returns any bill with objections on or after the fifth day before the last day of the session,
+   the legislature meets again automatically in September, for up to ten days, only to consider vetoed bills.
+   ([Mo. Const. art. III, §32][mc-iii-32]) Bills vetoed after the legislature adjourns go to the Secretary of State.
+   ([Mo. Const. art. III, §31][mc-iii-31])
 
 ## Missouri Senate
 
@@ -98,10 +99,10 @@ Notes:
   ([Mo. Const. art. IV, §26][mc-iv-26]) Data: bill actions; no data yet on item vetoes.
 - **Power.** Slow or cut spending when revenue falls short. The Governor "may control the rate at which any
   appropriation is expended" and may cut spending when "actual revenues are less than the revenue estimates".
-  ([Mo. Const. art. IV, §27][mc-iv-27]) Data: no data yet (`mo_state_expenditures` is a candidate).
+  ([Mo. Const. art. IV, §27][mc-iv-27]) Data: what agencies paid, by fiscal year, with partial coverage (`mo_state_expenditures`).
 - **Power.** Call a special session. "On extraordinary occasions he may convene the general assembly by
   proclamation." ([Mo. Const. art. IV, §9][mc-iv-9]) Data: bill actions in special sessions (`mo_senate_bills`).
-- **Power.** Appoint. The Governor fills vacancies in public offices, and appoints department heads with Senate
+- **Power.** Appoint. The Governor fills vacancies in public offices "unless otherwise provided by law", and appoints department heads with Senate
   approval. ([Mo. Const. art. IV, §4][mc-iv-4], [art. IV, §17][mc-iv-17]) Data: no data yet.
 - **Power.** Appoint judges to open seats on the courts that use the Missouri nonpartisan court plan, from a list of
   three names. ([Mo. Const. art. V, §25(a)][mc-v-25a]) Data: judge careers (`bluebook`, `courtlistener_bulk`).
@@ -113,7 +114,7 @@ Notes:
 
 Notes:
 
-- [1] If the Governor dies, resigns or is removed, the Lieutenant Governor becomes Governor for the rest of the term.
+- [1] If the Governor dies, resigns, or is convicted or impeached, the Lieutenant Governor becomes Governor for the rest of the term.
    If the Governor is absent or cannot serve, the Lieutenant Governor takes over the powers until the problem ends.
    ([Mo. Const. art. IV, §11(a)][mc-iv-11a])
 - [2] A Governor can be impeached by the House and tried by a special commission picked by the Senate.
@@ -147,10 +148,10 @@ Notes:
 - **Duty.** Keep a register of the Governor's official acts. ([Mo. Const. art. IV, §14][mc-iv-14]) Data: no data yet.
 - **Duty.** Keep state records and handle the work the law gives the office for elections and corporations. The
   Secretary of State "shall be custodian of such records, and documents ... in relation to elections and
-  corporations, as provided by law". ([Mo. Const. art. IV, §14][mc-iv-14]) Data: election returns (`mo_sos_elections`
-  is a candidate); business filings (`mo_sos_business` is a candidate).
-- **Duty.** Collect statewide election returns and appoint two judges who join the Secretary to form the board that
-  canvasses (officially counts) them. ([Mo. Const. art. IV, §18][mc-iv-18]) Data: no data yet.
+  corporations, as provided by law". ([Mo. Const. art. IV, §14][mc-iv-14]) Data: certified election returns (`mo_sos_elections`);
+  business filings (`mo_sos_business` is a candidate).
+- **Duty.** Collect the election returns for the six statewide executive offices and appoint two judges who join the Secretary to form the board that
+  canvasses (officially counts) them. ([Mo. Const. art. IV, §18][mc-iv-18]) Data: certified canvass returns (`mo_sos_elections`).
 - **Duty.** Receive the rules of state agencies for filing. Most rules "shall take effect not less than ten days after
   the filing thereof in the office of the secretary of state". ([Mo. Const. art. IV, §16][mc-iv-16]) Data: no data
   yet (`mo_sos_rules` is a candidate).
@@ -184,14 +185,15 @@ Notes:
 - [1] The Constitution limits the office: "No duty shall be imposed on him by law which is not related to the
    supervising and auditing of the receipt and expenditure of public funds." ([Mo. Const. art. IV, §13][mc-iv-13])
 - [2] The Auditor is in the line of succession to be Governor. ([Mo. Const. art. IV, §11(a)][mc-iv-11a])
-- [3] The Missouri Supreme Court has held that the Auditor lacked standing to challenge the Governor's power to
-   withhold funds. (Noted on [Mo. Const. art. IV, §13][mc-iv-13]: Schweich v. Nixon, 408 S.W.3d 769 (Mo. 2013).)
+- [3] The Missouri Supreme Court has held that the Auditor lacked standing to challenge the Governor's authority to
+   withhold funding of other branches of government before the end of the fiscal year, or to set amounts above the
+   estimated ("E") appropriations. (Noted on [Mo. Const. art. IV, §13][mc-iv-13]: Schweich v. Nixon, 408 S.W.3d 769 (Mo. 2013).)
 
 ## State Treasurer
 
 - **Duty.** Hold all state money and money from the federal government. The Treasurer "shall be custodian of all
-  state funds and funds received from the United States government". ([Mo. Const. art. IV, §15][mc-iv-15]) Data: no
-  data yet (`mo_state_expenditures` is a candidate).
+  state funds and funds received from the United States government". ([Mo. Const. art. IV, §15][mc-iv-15]) Data: what
+  agencies paid, by fiscal year, with partial coverage (`mo_state_expenditures`).
 - **Duty.** Deposit state money in banks the Treasurer picks and the Governor and Auditor approve, and pay it out "as
   provided by law". ([Mo. Const. art. IV, §15][mc-iv-15]) Data: no data yet.
 - **Duty.** Invest money not needed right away, in interest-bearing bank deposits or U.S. government obligations.
@@ -234,7 +236,7 @@ Notes:
   court of appeals consisting of districts as prescribed by law, and circuit courts."
   ([Mo. Const. art. V, §1][mc-v-1]) Data: dockets and opinions (`courtlistener_case_bulk`).
 - **Duty (Supreme Court).** Hear certain cases that only it can hear on appeal, such as cases about the validity of a
-  federal treaty or statute or a provision of the state constitution, state revenue laws, title to a state office,
+  federal treaty or statute, or of a state statute or constitutional provision, state revenue laws, title to a state office,
   and death sentences. ([Mo. Const. art. V, §3][mc-v-3]) Data: `courtlistener_case_bulk`.
 - **Duty (Supreme Court).** Be the highest court in the state. "Its decisions shall be controlling in all other
   courts." ([Mo. Const. art. V, §2][mc-v-2]) Data: `courtlistener_case_bulk`.
@@ -254,11 +256,13 @@ Notes:
 Notes:
 
 - [1] Terms: 12 years for Supreme Court and Court of Appeals judges, 6 years for circuit judges, 4 years for
-   associate circuit judges. ([Mo. Const. art. V, §19][mc-v-19]) Data: `bluebook`, `mo_sos_elections` (candidate) for
+   associate circuit judges. ([Mo. Const. art. V, §19][mc-v-19]) Data: `bluebook`, `mo_sos_elections` (`fct_judicial_retention`) for
    retention votes.
 - [2] Seats on the Supreme Court, the Court of Appeals, and the circuit courts of St. Louis city and Jackson County
    are filled by Governor appointment from a three-name list from a nonpartisan commission.
-   ([Mo. Const. art. V, §25(a)][mc-v-25a]) Other circuits elect their judges. ([Mo. Const. art. V, §16][mc-v-16])
+   ([Mo. Const. art. V, §25(a)][mc-v-25a]) Other circuits elect their judges unless their voters have adopted the plan: they "may by a majority of those
+   voting on the question elect to have the circuit and associate circuit judges appointed by the governor in the
+   manner provided for" the courts in §25(a). ([Mo. Const. art. V, §25(b)][mc-v-25b])
 - [3] Each circuit's judges pick a presiding judge, who has "general administrative authority over the court".
    ([Mo. Const. art. V, §15][mc-v-15])
 - [4] Judges can be impeached for "crimes, misconduct, habitual drunkenness, willful neglect of duty, corruption in
@@ -381,10 +385,10 @@ Constitution says so. Statutes that add duties are listed only for the Attorney 
 [mc-v-5]: https://revisor.mo.gov/main/OneSection.aspx?section=V+++++5&constit=y
 [mc-v-14]: https://revisor.mo.gov/main/OneSection.aspx?section=V++++14&constit=y
 [mc-v-15]: https://revisor.mo.gov/main/OneSection.aspx?section=V++++15&constit=y
-[mc-v-16]: https://revisor.mo.gov/main/OneSection.aspx?section=V++++16&constit=y
 [mc-v-17]: https://revisor.mo.gov/main/OneSection.aspx?section=V++++17&constit=y
 [mc-v-19]: https://revisor.mo.gov/main/OneSection.aspx?section=V++++19&constit=y
 [mc-v-25a]: https://revisor.mo.gov/main/OneSection.aspx?section=V+++25(a)&constit=y
+[mc-v-25b]: https://revisor.mo.gov/main/OneSection.aspx?section=V+++25(b)&constit=y
 [mc-vii-1]: https://revisor.mo.gov/main/OneSection.aspx?section=VII+++1&constit=y
 [mc-vii-2]: https://revisor.mo.gov/main/OneSection.aspx?section=VII+++2&constit=y
 [rsmo-27-030]: https://revisor.mo.gov/main/OneSection.aspx?section=27.030
