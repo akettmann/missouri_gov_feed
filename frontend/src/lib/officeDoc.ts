@@ -191,7 +191,9 @@ const isNotesMarker = (t: Token) =>
 export function parseOfficeDoc(markdown: string, opt: ParseOptions): OfficeDoc {
   const tokens = new Lexer().lex(markdown);
   const links = (tokens as unknown as { links?: LinkMap }).links;
-  const blocks = tokens.filter((t) => t.type !== "space");
+  // Block-level HTML comments are maintainer notes (issue numbers, reading level): never rendered.
+  const isComment = (t: Token) => t.type === "html" && /^\s*<!--[\s\S]*-->\s*$/.test(t.raw);
+  const blocks = tokens.filter((t) => t.type !== "space" && !isComment(t));
 
   const h1 = blocks[0];
   if (h1?.type !== "heading" || (h1 as Tokens.Heading).depth !== 1)
@@ -234,6 +236,8 @@ export function parseOfficeDoc(markdown: string, opt: ParseOptions): OfficeDoc {
       ? lists[1].items.map((it, k) => parseNote(it, k + 1, `${where} note ${k + 1}`))
       : [];
     const section: DocSection = { title: h.text, id, introHtml: render(intro, links), bullets, notes };
+    // A section with no bullets and no text (the trailing "## Links" of reference definitions) shows nothing.
+    if (bullets.length === 0 && section.introHtml === "") continue;
     (bullets.length > 0 ? offices : otherSections).push(section);
   }
   if (offices.length === 0) fail("top", "no section has bullets");

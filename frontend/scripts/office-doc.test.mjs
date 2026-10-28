@@ -156,3 +156,28 @@ test("loader names come from src/mogov/loaders and the doc's models are listed",
   assert.ok(names.has("voteview") && names.has("mo_house") && !names.has("__init__"));
   assert.ok(DOC_MODELS.has("fct_judicial_retention"));
 });
+
+test("a section of only link definitions renders no section", () => {
+  const md = wrap([GOOD]) + "\n## Links\n\n[c2]: https://example.gov/2\n";
+  const d = parseOfficeDoc(md, OPT);
+  assert.deepEqual(
+    [...d.offices, ...d.otherSections].map((s) => s.title),
+    ["Office A"],
+  );
+});
+
+test("maintainer comments are not rendered and the real doc shows no issue refs", () => {
+  const md = wrap([GOOD]).replace("# T\n", "# T\n\n<!-- issue #9 -->\n");
+  assert.doesNotMatch(parseOfficeDoc(md, OPT).prefaceHtml, /#9/);
+  const d = loadResponsibilities();
+  const all = [
+    d.prefaceHtml,
+    ...[...d.offices, ...d.otherSections].flatMap((s) => [
+      s.introHtml,
+      ...s.bullets.flatMap((b) => [b.html, b.dataHtml ?? ""]),
+      ...s.notes.map((n) => n.html),
+    ]),
+  ].join("\n");
+  assert.doesNotMatch(all, /\(#\d+\)|issue #\d+|Flesch|docs\/sources\.md/);
+  assert.ok(!d.otherSections.some((s) => s.title === "Links"));
+});
