@@ -5,6 +5,7 @@ shuffle logic with a tiny stand-in "build" that ranks fixed rows.
 """
 
 import importlib.util
+import os
 from pathlib import Path
 
 import duckdb
@@ -74,3 +75,15 @@ def test_relative_exports_resolve_against_callers_cwd_not_frontend(tmp_path, mon
     assert seen["cwd"].name == "frontend"
     assert seen["exports"].is_absolute()
     assert seen["exports"] == (tmp_path / "ex").resolve()
+
+
+def test_shuffled_copy_keeps_source_mtime(tmp_path):
+    """The methodology page prints export mtimes, so a shuffled copy must not look newer than its source (#813)."""
+    exports = _exports(tmp_path)
+    src = exports / "dim_official.parquet"
+    old = 1_600_000_000  # 2020-09-13, far from "now"
+    os.utime(src, (old, old))
+    dst = tmp_path / "shuffled"
+    dst.mkdir()
+    det._shuffled_copy(exports, dst, 0.5)
+    assert (dst / "dim_official.parquet").stat().st_mtime_ns == src.stat().st_mtime_ns

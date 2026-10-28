@@ -37,6 +37,9 @@ def _shuffled_copy(src: Path, dst: Path, seed: float | None = None) -> None:
         con.execute(
             f"copy (select * from read_parquet('{src_file}') order by random()) to '{dst_file}' (format parquet)"
         )
+        # The site prints each export's mtime (methodology page); a fresh copy would differ from the original.
+        st = f.stat()
+        os.utime(dst / f.name, ns=(st.st_atime_ns, st.st_mtime_ns))
     con.close()
 
 
