@@ -57,6 +57,23 @@ export const HIDE_UNLESS_AVAILABLE = ["disclosures", "commercial_ties"];
 export const visibleCoverage = <T extends { key: string; status: string }>(items: T[]) =>
   items.filter((c) => !HIDE_UNLESS_AVAILABLE.includes(c.key) || statusKind(c.status) === "available");
 
+/** One coverage item as a phrase (detail cut at ";" so maintainer to-do notes never reach readers): "financial disclosures (the status's own parenthetical, if any)". */
+const gapPhrase = (c: { label: string; status: string }) => {
+  const detail = /\(([^)]*)\)\s*$/.exec(c.status)?.[1]?.split(";")[0];
+  const label = c.label.charAt(0).toLowerCase() + c.label.slice(1);
+  return detail ? `${label} (${detail})` : label;
+};
+
+/**
+ * The coverage gaps for one official: items whose status is "not public" (we can't see them) and "none found"
+ * (we looked and found nothing). "n/a" and "available" items are never listed. Same template for everyone.
+ */
+export function coverageGaps<T extends { label: string; status: string }>(items: T[]) {
+  const cant = items.filter((c) => statusKind(c.status) === "not-public").map(gapPhrase);
+  const none = items.filter((c) => statusKind(c.status) === "none").map(gapPhrase);
+  return { cant, none };
+}
+
 export const isMedium = (confidence: string | null | undefined) => confidence === "medium";
 
 export const LEVELS: Record<string, string> = { state: "State", federal: "Federal", local: "Local" };
