@@ -342,9 +342,10 @@ Notes:
 - **Voter.** No rule found.
 - **Other qualifications.** No one can hold another U.S. office and be a member: "no Person holding any Office under the
   United States, shall be a Member of either House during his Continuance in Office."
-  ([U.S. Const. art. I, §6][us-const]) No one who previously took an oath, as an officer of the United States or of a State, to support the Constitution and
-  then "engaged in insurrection or rebellion against the same, or given aid or comfort to the enemies thereof" can
-  serve unless two-thirds of each house vote to remove the bar.
+  ([U.S. Const. art. I, §6][us-const]) No one who took an oath to support the Constitution as a member of Congress,
+  a U.S. officer, a state legislator, or a state executive or judicial officer, and then "engaged in insurrection or
+  rebellion against the same, or given aid or comfort to the enemies thereof", can serve unless two-thirds of each
+  house vote to remove the bar.
   ([U.S. Const. amend. XIV, §3][us-amend])
 - **Terms.** "Chosen every second Year by the People of the several States." ([U.S. Const. art. I, §2][us-const])
 - **Term limit.** No rule found in the Constitution's text.
