@@ -1,0 +1,83 @@
+chamber,vote_description,measure,expected_stage,expected_informal
+state_house,HBs FOR THIRD READING,HCS HB 10,third_reading,false
+state_house,SBs 3rd READ - INFORMAL,SCS SB 174,third_reading,true
+state_house,HBs 3rd READ - INFORMAL,HB 5,third_reading,true
+state_house,HBs FOR THIRD READING-INFORMAL,HB 5,third_reading,true
+state_house,HJRs FOR THIRD READING,HJR 1,third_reading,false
+state_house,SCRs FOR THIRD READING - INF,SCR 2,third_reading,true
+state_house,HBs FOR PERFECTION,HB 1,perfection,false
+state_house,HBs PERFECTION - INFORMAL,HB 2,perfection,true
+state_house,HCBs for PERFECTION,HCB 3,perfection,false
+state_house,HBs 3rd READING - CONSENT,HB 4,third_reading_consent,false
+state_house,HBs 3rd READ-CONSENT-INF,HB 4,third_reading_consent,true
+state_house,SBs 3rd READING - CONSENT,SB 4,third_reading_consent,false
+state_house,HBs 3rd READ - FED MAN,HB 6,third_reading_consent,false
+state_house,BILLS IN CONFERENCE,CCR SCS HCS HB 12,conference,false
+state_house,HBs WITH SENATE AMENDMENTS,HB 7,senate_amendments,false
+state_house,HBs w/SENATE AMENDMENTS - INF,HB 7,senate_amendments,true
+state_house,VETOED HOUSE BILLS,CCS SCS HCS HB 3,veto_override,false
+state_house,QUORUM,HB 1,quorum,false
+state_house,QUORUM CALL,QUORUM,quorum,false
+state_house,General,QUORUM,quorum,false
+state_house,General,APPROVE JOURNAL,procedural_motion,false
+state_house,,APPROVE JOURNAL,procedural_motion,false
+state_house,General,RULE SUSPENSION,procedural_motion,false
+state_house,SUSPEND,SUSPEND RULE,procedural_motion,false
+state_house,General,PQ,previous_question,false
+state_house,HOUSE RESOLUTIONS,HR 4596,resolution,false
+state_house,BILLS CARRYING REQUEST MESSAGE,SCS SB 174,other,false
+state_house,,HCS HB 320,unknown,false
+state_house,General,HCS SB 182 A.A.,unknown,false
+state_senate,Was read the 3rd time and passed by the following vote:,SB 1,third_reading,false
+state_senate,"On motion of Senator Hough, SCS for HCS for HB 18 was read the 3rd time and passed by the following vote:",HB 18,third_reading,false
+state_senate,The emergency clause was adopted by the following vote:,HB 1,emergency_clause,false
+state_senate,The emergency clause failed of adoption by the following vote:,HB 1,emergency_clause,false
+state_senate,SA 1 failed of adoption by the following vote:,SB 5,amendment,false
+state_senate,SA 1 to SA 4 was adopted by the following vote:,SB 5,amendment,false
+state_senate,"Senator White moved that the above amendment be adopted, which motion prevailed by the following vote:",SB 5,amendment,false
+state_senate,"Senator Hegeman moved that the above conference committee report be adopted, which motion prevailed by the following vote:",HB 2,conference,false
+state_senate,/s/ Mike Henderson /s/ Mary Elizabeth Coleman /s/ Sandy Crawford /s/ Curtis Trent The motion to move the previous question was adopted by the following vote:,SB 1,previous_question,false
+state_senate,/s/ Jamie Burger /s/ Brad Hudson /s/ Curtis Trent Journal of the Senate 72 The motion to move the previous question was adopted by the following vote:,HB 2,previous_question,false
+state_senate,/s/ Eric Burlison /s/ Denny Hoskins Senator Sifton moved that the bill be laid on the table which motion was defeated by the following vote:,SB 3,procedural_motion,false
+state_senate,The motion to move the previous question was adopted by the following vote:,SB 7,previous_question,false
+state_senate,"HCS for SB 8, as amended, was declared perfected and ordered printed by the following vote:",SB 8,perfection,false
+state_senate,"On motion of Senator Kehoe, HCR 1 was adopted by the following vote:",HCR 1,resolution,false
+state_senate,The motion to adjourn was defeated by the following vote:,,procedural_motion,false
+state_senate,"PRIVILEGED MOTIONS Having voted on the prevailing side, Senator Schatz, moved that the vote by which the HCS for SB 782, as amended, passed be reconsidered",SB 782,procedural_motion,false
+state_senate,"No further nominations being made, Mrs. Martin was elected by the following vote:",,other,false
+state_senate,On roll call the following Senators were present:,,quorum,false
+state_senate,Journal of the Senate 1234,,unknown,false
+state_senate,"On motion of Senator Hegeman, SCR 7 was read for the third time and passed by the following vote:",SCR 7,third_reading,false
+state_senate,The motion to appeal failed of adoption by the following vote:,,procedural_motion,false
+state_senate,"Senator Dixon moved that SS for SCS for SB 553 be read the 3rd time and finally passed, which motion failed to receive a constitutional majority by the following vote:",SB 553,third_reading,false
+state_senate,"Senator X moved that HCS for HJR 73 be read the 3rd time and finally passed, which motion prevailed by the following vote:",HJR 73,third_reading,false
+state_senate,"On motion of Senator Luetkemeyer, SS for SCS for SB 1351 was read the 3rd time and was defeated by the following vote:",SB 1351,third_reading,false
+state_senate,"moved that Section 12.265 of CCS for SCS for HCS for HB 12, for a program that focuses on crimes against children, be passed, the objections of the Governor thereto notwithstanding, which motion failed to receive the necessary two-thirds majority by the following vote:",HB 12,veto_override,false
+state_senate,"On motion of Senator Eigel, SR 552 failed of adoption by the following vote:",SR 552,resolution,false
+state_senate,SA 5 failed by the following vote:,SB 5,amendment,false
+state_senate,"Senator Schatz moved that the report submitted to the Committee on Gubernatorial Appointments, to which was referred the appointment of Todd P. Graves, be adopted and the Senate do give its advice and consent to said appointment, which motion prevailed by the following vote:",,other,false
+state_senate,"Senator Schatz moved that SR 4, as amended, be adopted, which motion prevailed by the following vote:",SR 4,resolution,false
+state_senate,"Senator May moved that SR 7 be adopted, which failed by the following vote:",SR 7,resolution,false
+state_senate,"Senator Wieland moved that SCR 17, as amended, be adopted, which motion prevailed by the following vote:",SCR 17,resolution,false
+state_senate,"Senator Schatz moved that SS for SR 436 be adopted, which motion prevailed by the following vote:",SR 436,resolution,false
+state_senate,"Senator Fitzwater moved that HCS for SS for SCS for SB 70, as amended, be adopted, which motion prevailed by the following vote:",SB 70,amendment,false
+state_senate,"On motion of Senator Eigel, HCS for HCR 47 was adopted by the following vote:",HCR 47,resolution,false
+state_senate,"SS for SB 333, as amended, was adopted by the following vote:",SB 333,amendment,false
+state_senate,SCS for SB 623 was adopted by the following vote:,SB 623,amendment,false
+state_senate,"HCS for SCS for SB 103, as amended, was adopted by the following vote:",SB 103,amendment,false
+state_senate,"SS No. 2 for SCS for SB 727, as amended, was adopted by the following vote:",SB 727,amendment,false
+state_senate,SS for SCS for HCS for HJRs 173 and 174 was adopted by the following vote:,HJR 173,amendment,false
+state_senate,The above substitute motion was adopted by the following vote:,,procedural_motion,false
+state_senate,The amendment to the substitute motion was adopted by the following vote:,,procedural_motion,false
+state_senate,The substitute motion was defeated by the following vote:,,procedural_motion,false
+state_senate,The above privileged motion prevailed by the following vote:,,procedural_motion,false
+state_senate,"Senator Hoskins requested a roll call vote be taken. He was joined in his request by Senators Brattin, Carter, Eigel, and Moon, which motion failed by the following vote:",,procedural_motion,false
+state_senate,The following Senators were present during the day�s proceedings:,,quorum,false
+state_senate,"Senator Schatz moved that the vote by which the HCS for SB 782, as amended, passed be reconsidered",SB 782,procedural_motion,false
+state_senate,"Senator Sater moved that the Senate reconsider the vote by which SB 12 passed, which motion prevailed by the following vote:",SB 12,procedural_motion,false
+state_senate,"Senator Munzlinger moved that the Senate recede from its position on SS for HB 1428, as amended, which motion prevailed by the following vote:",HB 1428,unknown,false
+state_senate,SB 745 was taken up by the following vote:,SB 745,unknown,false
+state_senate,"The motion to lay SA 1 to SA 1 on the table indefinitely failed by the following vote:",SB 1,procedural_motion,false
+state_senate,"On motion of Senator Hough, SB 5 was read the 3rd time and finally passed by the following vote:",SB 5,third_reading,false
+state_senate,"Senator Roberts moved that the vote that which SA 1 was adopted, be reconsidered",SB 1,procedural_motion,false
+state_senate,"The motion for the previous question to lay on the table was adopted by the following vote:",SB 1,previous_question,false

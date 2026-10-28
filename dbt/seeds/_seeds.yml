@@ -496,3 +496,54 @@ seeds:
         data_tests: [not_null]
       - name: expected_flag
         data_tests: [not_null]
+  - name: mo_vote_stage_rules
+    description: >
+      Rules that classify a Missouri roll call by stage (#804), read by the classify_vote_stage macro for
+      int_votes__stage / fct_votes.vote_stage. chamber is state_house (the calendar item, e.g. "HBs FOR THIRD
+      READING") or state_senate (the journal sentence introducing the vote). description_pattern and measure_pattern
+      are SQL LIKE patterns matched ignoring case against the description and the measure (`%` = anything). The rule
+      with the lowest priority within a chamber that matches both wins, so specific rules come before general ones
+      (a conference-report vote is an "adopted by the following vote" sentence too). A roll call no rule matches is
+      `unknown`: a new phrasing is a new row, never a guess. mo_vote_stage_examples pins real wordings to stages.
+    config:
+      column_types: {chamber: varchar, priority: integer, description_pattern: varchar, measure_pattern: varchar, stage: varchar, evidence: varchar}
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [chamber, priority]
+    columns:
+      - name: chamber
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [state_house, state_senate]
+      - name: priority
+        data_tests: [not_null]
+      - name: description_pattern
+        data_tests: [not_null]
+      - name: measure_pattern
+        data_tests: [not_null]
+      - name: stage
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [perfection, third_reading, third_reading_consent, senate_amendments, conference, veto_override,
+                         amendment, emergency_clause, previous_question, procedural_motion, quorum, resolution, other]
+      - name: evidence
+        data_tests: [not_null]
+  - name: mo_vote_stage_examples
+    description: >
+      Golden examples for mo_vote_stage_rules (#804): real House calendar items and Senate journal sentences with
+      the stage and informal flag each must get, checked by assert_vote_stage_rules_map_known_wordings against the
+      real rules (the unit tests mock the seed). Removing or breaking a rule fails the example it served.
+    config:
+      column_types: {chamber: varchar, vote_description: varchar, measure: varchar, expected_stage: varchar, expected_informal: boolean}
+    columns:
+      - name: chamber
+        data_tests: [not_null]
+      - name: expected_stage
+        data_tests: [not_null]
+      - name: expected_informal
+        data_tests: [not_null]
