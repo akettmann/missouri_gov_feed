@@ -1312,6 +1312,13 @@ Quirks:
   and sons on the Court of Appeals. Judges-text matches therefore count only from the judge's first
   known judicial start date; with no start date, only panel matches count. Attorney matches start at
   dbt var `case_history_min_year` (default 1975).
+- State appellate and Supreme Court judges with no CourtListener person have no start date there (#847). Their
+  start is the first state payroll year (2017 on) under their own court's title (`APPELLATE JUDGE`, or `SUPREME
+  COURT JUDGE`; earlier circuit pay doesn't count), found in `fct_salaries` or, when the payroll prints a legal first
+  name ("GABBERT, ANTHONY REX" for A. Rex Gabbert), by a surname held by one judge of that court and the same first
+  initial; else the year of their retention in the Official Manual biography. Both are upper bounds on the real
+  start, so early cases are lost (a judge seated since 1979 starts in 2017), never a predecessor's credited. Known
+  false positive: James M. Dowd is credited with 19 cases of Robert G. Dowd, Jr. (sitting by assignment).
 - In the 2026-09 snapshot, 8th Circuit (ca8) opinions stop in August 2019. The API loader covers later
   ones.
 - Time to disposition (`fct_judge_time_to_disposition`): only the federal districts (`moed`, `mowd`) have a

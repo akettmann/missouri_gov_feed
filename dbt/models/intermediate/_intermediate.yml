@@ -131,8 +131,12 @@ models:
     as name_key()s padded with spaces, so "Hall" doesn''t match "Marshall". Surnames repeat across generations on
     the same court (a 1910 Judge Smith on the 8th Circuit, fathers and sons on the Court of Appeals), so judges-text
     matches only count from the judge''s first known judicial start date (fct_office_history, else dim_official.current_term_start);
-    without one, panel matches only. Attorney matches start at var case_history_min_year (default 1975): earlier
-    namesakes aren''t them. Grain: one row per (official, role, cluster); matched_by says how.'
+    without one, panel matches only. State appellate and Supreme Court judges with no CourtListener person (#847)
+    have neither, so they fall back to the Missouri sources, both upper bounds on the real start (we can lose early
+    cases, never credit a predecessor): 1. the first calendar year they were paid under their court''s payroll title
+    (state employee pay, from 2017) 2. else the year of their retention or election in their Official Manual biography
+    Attorney matches start at var case_history_min_year (default 1975): earlier namesakes aren''t them. Grain: one
+    row per (official, role, cluster); matched_by says how.'
 - name: int_courtlistener__district_dockets
   description: 'Federal district-court dockets (E.D. and W.D. Missouri) that have an assigned judge: filed and terminated
     dates (null when the docket has none) and the days between. A docket whose termination date is before its filing

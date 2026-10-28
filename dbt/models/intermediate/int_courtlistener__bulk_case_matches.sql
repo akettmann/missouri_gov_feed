@@ -9,6 +9,10 @@
 -- Surnames repeat across generations on the same court (a 1910 Judge Smith on the 8th Circuit, fathers and
 -- sons on the Court of Appeals), so judges-text matches only count from the judge's first known judicial
 -- start date (fct_office_history, else dim_official.current_term_start); without one, panel matches only.
+-- State appellate and Supreme Court judges with no CourtListener person (#847) have neither, so they fall back to
+-- the Missouri sources, both upper bounds on the real start (we can lose early cases, never credit a predecessor):
+--   1. the first calendar year they were paid under their court's payroll title (state employee pay, from 2017)
+--   2. else the year of their retention or election in their Official Manual biography
 -- Attorney matches start at var case_history_min_year (default 1975): earlier namesakes aren't them.
 with searched as (
     select
@@ -23,10 +27,87 @@ with searched as (
     group by 1, 2, 3, 4
 ),
 
+-- First payroll year under the title of the judge's own court (an appellate judge's earlier circuit pay doesn't count).
+-- fct_salaries matches payees to officials by first-name fit, which misses "GABBERT, ANTHONY REX" for A. Rex Gabbert
+-- and "POWELL, WESLEY BRENT" for W. Brent Powell, so a payee is also taken when the surname is held by exactly one
+-- judge of that court and the first initials agree.
+court_titles as (
+    select
+        'mo_court_of_appeals' as office,
+        'APPELLATE JUDGE' as position_title
+    union all
+    select
+        'mo_supreme_court' as office,
+        'SUPREME COURT JUDGE' as position_title
+    union all
+    select
+        'mo_supreme_court' as office,
+        'SUPREME COURT JUDGE (CH)' as position_title
+),
+
+court_judges as (
+    select
+        o.official_id,
+        o.office,
+        {{ mogov.surname_key('o.family_name') }} as last_key,
+        substr({{ mogov.name_key('o.given_name') }}, 1, 1) as first_initial,
+        count(*) over (partition by o.office, {{ mogov.surname_key('o.family_name') }}) as same_surname
+    from {{ ref('dim_official') }} as o
+    where o.office in (select t.office from court_titles as t)
+),
+
+payroll_years as (
+    select
+        sal.official_id,
+        sal.calendar_year
+    from {{ ref('fct_salaries') }} as sal
+    inner join {{ ref('dim_official') }} as o on sal.official_id = o.official_id
+    inner join court_titles as t on o.office = t.office and sal.position_title = t.position_title
+    union all
+    select
+        j.official_id,
+        p.calendar_year
+    from {{ ref('stg_mo_employee_pay__pay') }} as p
+    inner join court_titles as t on p.position_title = t.position_title
+    inner join court_judges as j
+        on
+            t.office = j.office
+            and {{ mogov.surname_key('p.last_name') }} = j.last_key
+            and substr({{ mogov.name_key('p.first_names') }}, 1, 1) = j.first_initial
+    where p.agency_name = 'JUDICIARY' and j.same_surname = 1
+),
+
+payroll_start as (
+    select
+        official_id,
+        {{ dbt.safe_cast(dbt.concat(['cast(min(calendar_year) as ' ~ dbt.type_string() ~ ')', "'-01-01'"]), 'date') }}
+            as start_date
+    from payroll_years
+    group by 1
+),
+
+-- Retention / election dates from the Official Manual biography (fct_office_history, jurisdiction 'mo judiciary')
+manual_start as (
+    select
+        h.official_id,
+        min(h.start_date) as start_date
+    from {{ ref('fct_office_history') }} as h
+    where
+        h.jurisdiction = 'mo judiciary'
+        and h.start_date is not null
+        and (lower(h.office_title) like 'retained%' or lower(h.office_title) like '%elected%')
+    group by 1
+),
+
 judicial_start as (
     select
         s.official_id,
-        coalesce(min(h.start_date), max(o.current_term_start)) as start_date
+        coalesce(
+            min(h.start_date),
+            max(o.current_term_start),
+            max(ps.start_date),
+            max(ms.start_date)
+        ) as start_date
     from searched as s
     inner join {{ ref('dim_official') }} as o on s.official_id = o.official_id
     left join {{ ref('fct_office_history') }} as h
@@ -37,6 +118,8 @@ judicial_start as (
                 or lower(h.office_title) like '%justice%'
                 or lower(h.office_title) like '%court%'
             )
+    left join payroll_start as ps on s.official_id = ps.official_id
+    left join manual_start as ms on s.official_id = ms.official_id
     group by 1
 ),
 

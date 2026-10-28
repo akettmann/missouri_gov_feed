@@ -195,6 +195,10 @@ unit_tests:
       - input: ref('fct_office_history')
         rows:
           - {official_id: j_hall, office_title: 'Judge, Missouri Court of Appeals', start_date: '2010-01-01'}
+      - input: ref('fct_salaries')
+        rows: []
+      - input: ref('stg_mo_employee_pay__pay')
+        rows: []
       - input: ref('mo_courts')
         rows:
           - {court_id: mo, office: mo_supreme_court}
@@ -219,6 +223,98 @@ unit_tests:
         - {official_id: j_hall, role: judge, cluster_id: c1, matched_by: judges text}
         - {official_id: j_smith, role: judge, cluster_id: c4, matched_by: panel}
         - {official_id: l_doe, role: attorney, cluster_id: c5, matched_by: attorneys text}
+
+  - name: bulk_case_matches_date_state_appellate_judges_without_a_courtlistener_person
+    model: int_courtlistener__bulk_case_matches
+    description: >
+      A state appellate or Supreme Court judge with no CourtListener person and no dated position (#847) starts on
+      the first payroll year under the title of their own court (the Court of Appeals judge's earlier CIRCUIT JUDGE
+      pay, and the Supreme Court judge's APPELLATE JUDGE pay, don't count), else on their Official Manual retention
+      year. Cases before that date (a predecessor of the same surname) and in another court don't match.
+      j_dowd: paid APPELLATE JUDGE from 2017 and CIRCUIT JUDGE in 2010, so c1 (2018) matches, c2 (2012), c3
+      (2016) and c4 (a Supreme Court case) don't. j_gooch: APPELLATE JUDGE pay in 2022, SUPREME COURT JUDGE
+      pay in 2024, so c5 (2023) doesn't and c6 (2024) does. j_powell: payroll prints WESLEY BRENT, which fct_salaries
+      doesn't pair, but he is the only Powell on his court and the initial W agrees, so 2017 (the 2015 ZACHARY row has
+      another initial, so c15 from 2016 doesn't match), so both c7 (2019) and c8 (2017-06) match. j_gabbert: the same for ANTHONY REX from 2018 (his
+      2016 CIRCUIT JUDGE pay doesn't count), so c10 (2019) matches, c11 (2017) doesn't. j_wright_a and j_wright_b share
+      a surname on one court, so neither is dated from the payroll and c12 doesn't match either. j_retained: no payroll,
+      retained in 2018, so c13 (2019) does and c14 (2017) doesn't. j_none: no date of any kind, so c9 doesn't match.
+    overrides:
+      vars:
+        cl_case_bulk: true
+        case_history_min_year: 1975
+    given:
+      - input: ref('fct_legal_careers')
+        rows:
+          - {official_id: j_dowd, legal_role: judge}
+          - {official_id: j_gooch, legal_role: judge}
+          - {official_id: j_powell, legal_role: judge}
+          - {official_id: j_none, legal_role: judge}
+          - {official_id: j_gabbert, legal_role: judge}
+          - {official_id: j_wright_a, legal_role: judge}
+          - {official_id: j_wright_b, legal_role: judge}
+          - {official_id: j_retained, legal_role: judge}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: j_dowd, given_name: James, family_name: Dowd, office: mo_court_of_appeals, current_term_start: null}
+          - {official_id: j_gooch, given_name: Ginger, family_name: Gooch, office: mo_supreme_court, current_term_start: null}
+          - {official_id: j_powell, given_name: W. Brent, family_name: Powell, office: mo_supreme_court, current_term_start: null}
+          - {official_id: j_none, given_name: Zed, family_name: Nodate, office: mo_court_of_appeals, current_term_start: null}
+          - {official_id: j_gabbert, given_name: A. Rex, family_name: Gabbert, office: mo_court_of_appeals, current_term_start: null}
+          - {official_id: j_wright_a, given_name: Michael S., family_name: Wright, office: mo_court_of_appeals, current_term_start: null}
+          - {official_id: j_wright_b, given_name: David, family_name: Wright, office: mo_court_of_appeals, current_term_start: null}
+          - {official_id: j_retained, given_name: Rita, family_name: Retained, office: mo_supreme_court, current_term_start: null}
+      - input: ref('fct_office_history')
+        rows:
+          - {official_id: j_retained, office_title: retained by voters in November 2018, jurisdiction: mo judiciary, start_date: '2018-01-01'}
+          - {official_id: j_retained, office_title: served as chief of the General Crimes Unit, jurisdiction: mo judiciary, start_date: null}
+      - input: ref('fct_salaries')
+        rows:
+          - {official_id: j_dowd, calendar_year: 2017, position_title: APPELLATE JUDGE}
+          - {official_id: j_dowd, calendar_year: 2010, position_title: CIRCUIT JUDGE}
+          - {official_id: j_gooch, calendar_year: 2022, position_title: APPELLATE JUDGE}
+          - {official_id: j_gooch, calendar_year: 2024, position_title: SUPREME COURT JUDGE}
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {agency_name: JUDICIARY, position_title: SUPREME COURT JUDGE, calendar_year: 2017, last_name: POWELL, first_names: WESLEY BRENT}
+          - {agency_name: JUDICIARY, position_title: SUPREME COURT JUDGE, calendar_year: 2015, last_name: POWELL, first_names: ZACHARY}
+          - {agency_name: JUDICIARY, position_title: APPELLATE JUDGE, calendar_year: 2018, last_name: GABBERT, first_names: ANTHONY REX}
+          - {agency_name: JUDICIARY, position_title: APPELLATE JUDGE, calendar_year: 2018, last_name: WRIGHT, first_names: MICHAEL}
+          - {agency_name: JUDICIARY, position_title: APPELLATE JUDGE, calendar_year: 2018, last_name: WRIGHT, first_names: DAVID}
+          - {agency_name: JUDICIARY, position_title: CIRCUIT JUDGE, calendar_year: 2016, last_name: GABBERT, first_names: ANTHONY REX}
+      - input: ref('mo_courts')
+        rows:
+          - {court_id: mo, office: mo_supreme_court}
+          - {court_id: moctapp, office: mo_court_of_appeals}
+      - input: ref('int_courtlistener__mo_cases')
+        rows:
+          - {cluster_id: c1, court_id: moctapp, date_filed: '2018-03-01', judges_text: 'Dowd, J.', attorneys_text: null}
+          - {cluster_id: c2, court_id: moctapp, date_filed: '2012-03-01', judges_text: 'Dowd, J.', attorneys_text: null}
+          - {cluster_id: c3, court_id: moctapp, date_filed: '2016-12-31', judges_text: 'Dowd, J.', attorneys_text: null}
+          - {cluster_id: c4, court_id: mo, date_filed: '2020-03-01', judges_text: 'Dowd', attorneys_text: null}
+          - {cluster_id: c5, court_id: mo, date_filed: '2023-03-01', judges_text: 'Judge Ginger Gooch', attorneys_text: null}
+          - {cluster_id: c6, court_id: mo, date_filed: '2024-03-01', judges_text: 'Judge Ginger Gooch', attorneys_text: null}
+          - {cluster_id: c7, court_id: mo, date_filed: '2019-03-01', judges_text: 'Judge W. Brent Powell', attorneys_text: null}
+          - {cluster_id: c8, court_id: mo, date_filed: '2017-06-01', judges_text: 'Judge W. Brent Powell', attorneys_text: null}
+          - {cluster_id: c9, court_id: moctapp, date_filed: '2020-03-01', judges_text: 'Nodate, J.', attorneys_text: null}
+          - {cluster_id: c10, court_id: moctapp, date_filed: '2019-03-01', judges_text: 'Gabbert, C.J.', attorneys_text: null}
+          - {cluster_id: c11, court_id: moctapp, date_filed: '2017-03-01', judges_text: 'Gabbert, C.J.', attorneys_text: null}
+          - {cluster_id: c12, court_id: moctapp, date_filed: '2019-03-01', judges_text: 'Wright, J.', attorneys_text: null}
+          - {cluster_id: c15, court_id: mo, date_filed: '2016-03-01', judges_text: 'Judge W. Brent Powell', attorneys_text: null}
+          - {cluster_id: c13, court_id: mo, date_filed: '2019-03-01', judges_text: 'Judge Rita Retained', attorneys_text: null}
+          - {cluster_id: c14, court_id: mo, date_filed: '2017-03-01', judges_text: 'Judge Rita Retained', attorneys_text: null}
+      - input: ref('stg_courtlistener__mo_cluster_panel')
+        rows: []
+      - input: ref('int_courtlistener__official_people')
+        rows: []
+    expect:
+      rows:
+        - {official_id: j_dowd, role: judge, cluster_id: c1, matched_by: judges text}
+        - {official_id: j_gooch, role: judge, cluster_id: c6, matched_by: judges text}
+        - {official_id: j_powell, role: judge, cluster_id: c7, matched_by: judges text}
+        - {official_id: j_powell, role: judge, cluster_id: c8, matched_by: judges text}
+        - {official_id: j_gabbert, role: judge, cluster_id: c10, matched_by: judges text}
+        - {official_id: j_retained, role: judge, cluster_id: c13, matched_by: judges text}
 
   - name: epa_frs_facility_industry_prefers_naics_over_sic_sector
     model: int_epa_frs__facilities
