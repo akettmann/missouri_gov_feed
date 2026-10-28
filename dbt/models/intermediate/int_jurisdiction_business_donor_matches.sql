@@ -72,6 +72,26 @@ facility_brands as (
             or ' ' || {{ mogov.name_key("coalesce(i.parent_company_name, '')") }} || ' ' like '% ' || b.keyword || ' %'
 ),
 
+-- One row per (facility, company key) over the facility, owner and parent names, so the by-name match below is an
+-- equality join. Joining on `donor_key in (facility_key, owner_key, parent_company_key)` can't use a hash key: it
+-- paired every donor of an official with every facility in their area (55M rows, ~5GB) before filtering (#818)
+facility_keys as (
+    select
+        registry_id,
+        facility_key as company_key
+    from {{ ref('int_epa_frs__facilities') }}
+    union
+    select
+        registry_id,
+        owner_key as company_key
+    from {{ ref('int_epa_frs__facilities') }}
+    union
+    select
+        registry_id,
+        parent_company_key as company_key
+    from {{ ref('int_epa_frs__facilities') }}
+),
+
 matched_donors as (
     select
         a.official_id,
@@ -79,11 +99,11 @@ matched_donors as (
         d.donor_key,
         1 as by_name
     from areas as a
-    inner join {{ ref('int_epa_frs__facilities') }} as i on a.registry_id = i.registry_id
+    inner join facility_keys as k on a.registry_id = k.registry_id
     inner join donors as d
         on
             a.official_id = d.official_id
-            and d.donor_key in (i.facility_key, i.owner_key, i.parent_company_key)
+            and k.company_key = d.donor_key
     where {{ dbt.length('d.donor_key') }} >= 4
 
     union all
