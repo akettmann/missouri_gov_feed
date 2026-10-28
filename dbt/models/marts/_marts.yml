@@ -433,6 +433,34 @@ models:
       - name: vote_description
         data_type: varchar
         description: What was voted on - the House calendar item, the Senate journal sentence introducing the vote, or Voteview's description.
+      - name: vote_stage
+        data_type: varchar
+        description: >
+          Stage of the Missouri roll call, from vote_description and measure by the rules in the seed
+          mo_vote_stage_rules (#804): perfection, third_reading, third_reading_consent (consent and federal-mandate
+          calendars), senate_amendments (House vote on Senate amendments), conference (conference committee
+          report), veto_override, amendment (an amendment or substitute), emergency_clause, previous_question,
+          procedural_motion (approve the journal, suspend rules, reconsider, adjourn, lay on the table), quorum,
+          resolution, other (recognised, none of the above, e.g. officer elections) or unknown (no rule matches;
+          the Senate journal's text sometimes runs into the sentence that introduces a vote). Null for Congress
+          rows, which carry Voteview's own vote_description. Informational: attendance and party unity do not read
+          it (#192, #351 decide how procedural votes count).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [perfection, third_reading, third_reading_consent, senate_amendments, conference, veto_override,
+                         amendment, emergency_clause, previous_question, procedural_motion, quorum, resolution, other,
+                         unknown]
+                config:
+                  where: "chamber in ('state_house', 'state_senate')"
+          - not_null:
+              config:
+                where: "chamber in ('state_house', 'state_senate')"
+      - name: vote_informal
+        data_type: boolean
+        description: >
+          True when a Missouri House calendar item ends in the informal-calendar marker (INFORMAL or INF, e.g.
+          "SBs 3rd READ - INFORMAL"). False for every Senate vote (the journal has no such marker); null for Congress.
       - name: vote_cast
         data_type: varchar
         description: "{{ doc('vote_cast') }}"

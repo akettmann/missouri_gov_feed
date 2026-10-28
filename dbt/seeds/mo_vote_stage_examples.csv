@@ -1,0 +1,49 @@
+chamber,vote_description,measure,expected_stage,expected_informal
+state_house,HBs FOR THIRD READING,HCS HB 10,third_reading,false
+state_house,SBs 3rd READ - INFORMAL,SCS SB 174,third_reading,true
+state_house,HBs 3rd READ - INFORMAL,HB 5,third_reading,true
+state_house,HBs FOR THIRD READING-INFORMAL,HB 5,third_reading,true
+state_house,HJRs FOR THIRD READING,HJR 1,third_reading,false
+state_house,SCRs FOR THIRD READING - INF,SCR 2,third_reading,true
+state_house,HBs FOR PERFECTION,HB 1,perfection,false
+state_house,HBs PERFECTION - INFORMAL,HB 2,perfection,true
+state_house,HCBs for PERFECTION,HCB 3,perfection,false
+state_house,HBs 3rd READING - CONSENT,HB 4,third_reading_consent,false
+state_house,HBs 3rd READ-CONSENT-INF,HB 4,third_reading_consent,true
+state_house,SBs 3rd READING - CONSENT,SB 4,third_reading_consent,false
+state_house,HBs 3rd READ - FED MAN,HB 6,third_reading_consent,false
+state_house,BILLS IN CONFERENCE,CCR SCS HCS HB 12,conference,false
+state_house,HBs WITH SENATE AMENDMENTS,HB 7,senate_amendments,false
+state_house,HBs w/SENATE AMENDMENTS - INF,HB 7,senate_amendments,true
+state_house,VETOED HOUSE BILLS,CCS SCS HCS HB 3,veto_override,false
+state_house,QUORUM,HB 1,quorum,false
+state_house,QUORUM CALL,QUORUM,quorum,false
+state_house,General,QUORUM,quorum,false
+state_house,General,APPROVE JOURNAL,procedural_motion,false
+state_house,,APPROVE JOURNAL,procedural_motion,false
+state_house,General,RULE SUSPENSION,procedural_motion,false
+state_house,SUSPEND,SUSPEND RULE,procedural_motion,false
+state_house,General,PQ,previous_question,false
+state_house,HOUSE RESOLUTIONS,HR 4596,resolution,false
+state_house,BILLS CARRYING REQUEST MESSAGE,SCS SB 174,other,false
+state_house,,HCS HB 320,unknown,false
+state_house,General,HCS SB 182 A.A.,unknown,false
+state_senate,Was read the 3rd time and passed by the following vote:,SB 1,third_reading,false
+state_senate,"On motion of Senator Hough, SCS for HCS for HB 18 was read the 3rd time and passed by the following vote:",HB 18,third_reading,false
+state_senate,The emergency clause was adopted by the following vote:,HB 1,emergency_clause,false
+state_senate,The emergency clause failed of adoption by the following vote:,HB 1,emergency_clause,false
+state_senate,SA 1 failed of adoption by the following vote:,SB 5,amendment,false
+state_senate,SA 1 to SA 4 was adopted by the following vote:,SB 5,amendment,false
+state_senate,"Senator White moved that the above amendment be adopted, which motion prevailed by the following vote:",SB 5,amendment,false
+state_senate,"Senator Hegeman moved that the above conference committee report be adopted, which motion prevailed by the following vote:",HB 2,conference,false
+state_senate,/s/ Cody Smith /s/ Daniel J. Hegeman /s/ Dirk Deaton /s/ Lincoln Hough,HB 2,conference,false
+state_senate,The motion to move the previous question was adopted by the following vote:,SB 7,previous_question,false
+state_senate,"HCS for SB 8, as amended, was declared perfected and ordered printed by the following vote:",SB 8,perfection,false
+state_senate,"On motion of Senator Kehoe, HCR 1 was adopted by the following vote:",HCR 1,resolution,false
+state_senate,The motion to adjourn was defeated by the following vote:,,procedural_motion,false
+state_senate,"PRIVILEGED MOTIONS Having voted on the prevailing side, Senator Schatz, moved that the vote by which the HCS for SB 782, as amended, passed be reconsidered",SB 782,procedural_motion,false
+state_senate,"No further nominations being made, Mrs. Martin was elected by the following vote:",,other,false
+state_senate,On roll call the following Senators were present:,,quorum,false
+state_senate,Journal of the Senate 1234,,unknown,false
+state_senate,"On motion of Senator Hegeman, SCR 7 was read for the third time and passed by the following vote:",SCR 7,third_reading,false
+state_senate,The motion to appeal failed of adoption by the following vote:,,procedural_motion,false

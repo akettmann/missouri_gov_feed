@@ -31,6 +31,7 @@ entity fct_votes {
   --
   chamber, session_code, vote_date
   measure, vote_description
+  vote_stage, vote_informal
   vote_cast, party_at_vote, source_url
 }
 

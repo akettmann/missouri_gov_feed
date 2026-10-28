@@ -927,3 +927,18 @@ models:
     not only the officials tracked today. A party''s position is the side most of its yea/nay voters took; a tie
     has no position. A party-line vote is one where the Republican and Democratic majorities took opposite sides.
     vote_id and chamber match fct_votes. Grain: one row per (chamber, vote) with any Republican or Democratic yea/nay.'
+- name: int_votes__stage
+  description: 'The stage of every Missouri roll call (#804): perfection, third reading, consent calendar, conference,
+    veto override, ... derived from the House calendar item / Senate journal sentence by the rules in the seed mo_vote_stage_rules
+    (macro classify_vote_stage). Grain: one row per (chamber, vote_id). Federal roll calls are not here (Voteview
+    carries its own vote_question).'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - chamber
+        - vote_id
+  columns:
+  - name: vote_stage
+    data_tests:
+    - not_null

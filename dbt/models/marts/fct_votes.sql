@@ -37,11 +37,14 @@ select
     v.vote_date,
     v.measure,
     v.vote_description,
+    s.vote_stage,
+    s.vote_informal,
     v.vote_cast,
     v.party as party_at_vote,
     v.source_url
 from state_votes as v
 inner join {{ ref('dim_official') }} as o on v.person_key = o.official_id
+left join {{ ref('int_votes__stage') }} as s on v.chamber = s.chamber and v.vote_id = s.vote_id
 
 union all
 
@@ -55,6 +58,8 @@ select
     f.vote_date,
     f.bill_number as measure,
     coalesce(f.vote_desc, f.vote_question) as vote_description,
+    cast(null as {{ dbt.type_string() }}) as vote_stage,
+    cast(null as {{ dbt.type_boolean() }}) as vote_informal,
     f.vote_cast,
     o.party as party_at_vote,
     f.source_url
