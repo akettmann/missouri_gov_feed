@@ -53,3 +53,54 @@ unit_tests:
         - {registry_id: m1, naics_code: '111998', naics_source: naics}
         - {registry_id: m2, naics_code: '237310', naics_source: naics}
         - {registry_id: m3, naics_code: '111998', naics_source: naics}
+  - name: epa_frs_facility_naics_join_edge_cases
+    model: int_epa_frs__facilities
+    description: >
+      Pins the join edge cases of the NAICS and SIC fallback (#880). s1 has no NAICS code, so it takes the SIC sector
+      (naics_source sic). p1: the 5-digit code 81232 (two systems) is a prefix of two 6-digit codes at the same facility and gives a
+      full vote to each, so they outvote the short code; p4: a 4-digit code extends the one 6-digit code; the tie goes to the lowest code, 812320. p2: the 4-digit code 8123 has no 6-digit code to
+      extend, so it stays as it is, and its facility's SIC code is not used. p3: a 5-digit code at p3 does not extend
+      the 6-digit code another facility (p1) has. d1: a real NAICS code with no description keeps the null description
+      and does not borrow the SIC sector description. Every facility appears exactly once.
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: s1, facility_name: No NAICS code, latitude: 38.5, longitude: -92.1}
+          - {registry_id: p1, facility_name: Short code extends two codes, latitude: 38.5, longitude: -92.1}
+          - {registry_id: p2, facility_name: Short code extends nothing, latitude: 38.5, longitude: -92.1}
+          - {registry_id: p3, facility_name: Prefix of another facility only, latitude: 38.5, longitude: -92.1}
+          - {registry_id: p4, facility_name: Four-digit code extends one code, latitude: 38.5, longitude: -92.1}
+          - {registry_id: d1, facility_name: NAICS without description, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows: []
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: p1, program_system: RCRAINFO, naics_code: '81232', naics_description: Short, is_primary: true, is_secondary: false}
+          - {registry_id: p1, program_system: AIR, naics_code: '81232', naics_description: Short, is_primary: true, is_secondary: false}
+          - {registry_id: p1, program_system: EIS, naics_code: '812320', naics_description: Drycleaning, is_primary: true, is_secondary: false}
+          - {registry_id: p1, program_system: NPDES, naics_code: '812321', naics_description: Laundry, is_primary: true, is_secondary: false}
+          - {registry_id: p2, program_system: RCRAINFO, naics_code: '8123', naics_description: Four digits, is_primary: true, is_secondary: false}
+          - {registry_id: p3, program_system: RCRAINFO, naics_code: '81232', naics_description: Short, is_primary: true, is_secondary: false}
+          - {registry_id: p4, program_system: RCRAINFO, naics_code: '8123', naics_description: Four digits, is_primary: true, is_secondary: false}
+          - {registry_id: p4, program_system: AIR, naics_code: '8123', naics_description: Four digits, is_primary: true, is_secondary: false}
+          - {registry_id: p4, program_system: EIS, naics_code: '812320', naics_description: Drycleaning, is_primary: true, is_secondary: false}
+          - {registry_id: d1, program_system: EIS, naics_code: '111998', naics_description: null, is_primary: true, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows:
+          - {registry_id: s1, program_system: RCRAINFO, sic_code: '0111', sic_description: WHEAT, is_primary: true, is_secondary: false}
+          - {registry_id: p2, program_system: RCRAINFO, sic_code: '0111', sic_description: WHEAT, is_primary: true, is_secondary: false}
+          - {registry_id: d1, program_system: RCRAINFO, sic_code: '0111', sic_description: WHEAT, is_primary: true, is_secondary: false}
+      - input: ref('sic_naics_sectors')
+        rows:
+          - {sic_prefix: '01', naics_prefix: '11'}
+      - input: ref('naics_sectors')
+        rows:
+          - {naics_prefix: '11', sector_code: '11', sector_name: Agriculture}
+    expect:
+      rows:
+        - {registry_id: s1, naics_code: '11', naics_description: 'Agriculture sector, from SIC 0111 WHEAT', naics_source: sic}
+        - {registry_id: p1, naics_code: '812320', naics_description: Drycleaning, naics_source: naics}
+        - {registry_id: p2, naics_code: '8123', naics_description: Four digits, naics_source: naics}
+        - {registry_id: p3, naics_code: '81232', naics_description: Short, naics_source: naics}
+        - {registry_id: p4, naics_code: '812320', naics_description: Drycleaning, naics_source: naics}
+        - {registry_id: d1, naics_code: '111998', naics_description: null, naics_source: naics}
