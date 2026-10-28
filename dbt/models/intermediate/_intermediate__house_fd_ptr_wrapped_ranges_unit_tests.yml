@@ -28,7 +28,7 @@ unit_tests:
           select 'p', 'u_p', true, 1, 10, 'JT Head Two S 06/10/2026 06/11/2026 $15,001 -' union all
           select 'p', 'u_p', true, 1, 11, 'EQUITY MASTER FD LLC UNIT CL I $50,000' union all
           select 'p', 'u_p', true, 1, 12, 'JT Head Three P 06/12/2026 06/13/2026 $15,001 -' union all
-          select 'p', 'u_p', true, 1, 13, 'Description: sold @ $27.645/share' union all
+          select 'p', 'u_p', true, 1, 13, 'Filing Status: New' union all
           select 'p', 'u_p', true, 1, 14, 'Bond Name 5% 07/01/2031 $1,001 -' union all
           select 'p', 'u_p', true, 1, 15, 'Tail Without Head $5,000' union all
           select 'p', 'u_p', true, 1, 16, 'JT Head Four P 06/14/2026 06/15/2026 $15,001 -' union all
@@ -40,16 +40,66 @@ unit_tests:
         - {doc_id: p, page: 1, line_no: 5, schedule: 'PTR: transactions', owner_code: null, amount_range: null, line_text: 'Subholding Of: Fidelity Trust'}
         - {doc_id: p, page: 1, line_no: 6, schedule: 'PTR: transactions', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Amazon.com, Inc. - Common Stock S (partial) 03/16/2026 03/16/2026 $1,001 - $15,000'}
         - {doc_id: p, page: 1, line_no: 7, schedule: 'PTR: transactions', owner_code: null, amount_range: null, line_text: '(AMZN) [ST]'}
-        - {doc_id: p, page: 1, line_no: 8, schedule: 'PTR: transactions', owner_code: null, amount_range: '$27', line_text: 'Description: sold @ $27.645/share'}
+        - {doc_id: p, page: 1, line_no: 8, schedule: 'PTR: transactions', owner_code: null, amount_range: null, line_text: 'Description: sold @ $27.645/share'}
         - {doc_id: p, page: 1, line_no: 9, schedule: 'PTR: transactions', owner_code: JT, amount_range: '$250,001', line_text: 'JT Head One P 06/22/2026 06/23/2026 $250,001 -'}
         - {doc_id: p, page: 1, line_no: 10, schedule: 'PTR: transactions', owner_code: JT, amount_range: '$15,001 - $50,000', line_text: 'JT Head Two S 06/10/2026 06/11/2026 $15,001 - EQUITY MASTER FD LLC UNIT CL I $50,000'}
         - {doc_id: p, page: 1, line_no: 12, schedule: 'PTR: transactions', owner_code: JT, amount_range: '$15,001', line_text: 'JT Head Three P 06/12/2026 06/13/2026 $15,001 -'}
-        - {doc_id: p, page: 1, line_no: 13, schedule: 'PTR: transactions', owner_code: null, amount_range: '$27', line_text: 'Description: sold @ $27.645/share'}
+        - {doc_id: p, page: 1, line_no: 13, schedule: 'PTR: transactions', owner_code: null, amount_range: null, line_text: 'Filing Status: New'}
         - {doc_id: p, page: 1, line_no: 14, schedule: 'PTR: transactions', owner_code: null, amount_range: '$1,001', line_text: 'Bond Name 5% 07/01/2031 $1,001 -'}
         - {doc_id: p, page: 1, line_no: 15, schedule: 'PTR: transactions', owner_code: null, amount_range: '$5,000', line_text: 'Tail Without Head $5,000'}
         - {doc_id: p, page: 1, line_no: 16, schedule: 'PTR: transactions', owner_code: JT, amount_range: '$15,001', line_text: 'JT Head Four P 06/14/2026 06/15/2026 $15,001 -'}
         - {doc_id: p, page: 1, line_no: 17, schedule: 'PTR: transactions', owner_code: null, amount_range: 'Over $1,000,000', line_text: 'Whale Corp S 06/16/2026 06/17/2026 Over $1,000,000'}
 
+  - name: house_fd_ptr_description_and_name_lines
+    model: int_house_fd__schedule_lines
+    description: >
+      PTR (#782). (1) A "Description:" line and the lines it wraps onto (up to the next label or transaction line) hold
+      free text, e.g. share prices ("sold @ $27.645/share"): no amount_range. (2) The lines after a wrapped head and
+      its tail that carry no dates, label or owner code are the rest of the head's asset name and join it
+      ("NITTANYMED [GS]", "TAX BLDG AND SITE BDS SER." / "2020 I [GS]"); after a head whose range is complete they
+      stay lines of their own. (3) The high end is the last "$" of the tail line ("Fund $5 par [GS] $250,000" gives
+      $250,000), and a tail that opens with an owner code is a new entry, not a tail.
+    given:
+      - input: ref('stg_house_fd__pdf_lines')
+        format: sql
+        rows: |
+          select 'q' as doc_id, 'u_q' as document_url, true as has_text, 1 as page, 1 as line_no, 'ID Owner Asset Transaction Date Notification Date Amount' as line_text union all
+          select 'q', 'u_q', true, 1, 2, 'JT CENTRE CNTY PA HOSP AUTH REV S 10/21/2025 10/21/2025 $250,001 -' union all
+          select 'q', 'u_q', true, 1, 3, 'HOSP REV 5% 11/15/2046 BDS MT $500,000' union all
+          select 'q', 'u_q', true, 1, 4, 'NITTANYMED [GS]' union all
+          select 'q', 'u_q', true, 1, 5, 'Filing Status: New' union all
+          select 'q', 'u_q', true, 1, 6, 'JT ATHERTON MICH CMNTY SCH S 04/10/2026 04/10/2026 $100,001 -' union all
+          select 'q', 'u_q', true, 1, 7, 'Fund $5 par [GS] $250,000' union all
+          select 'q', 'u_q', true, 1, 8, 'TAX BLDG AND SITE BDS SER.' union all
+          select 'q', 'u_q', true, 1, 9, '2020 I [GS]' union all
+          select 'q', 'u_q', true, 1, 10, 'Filing Status: New' union all
+          select 'q', 'u_q', true, 1, 11, 'Description: sold @ $27.645/share BRK/B' union all
+          select 'q', 'u_q', true, 1, 12, 'sold @ $493.42/share SPY' union all
+          select 'q', 'u_q', true, 1, 13, 'Putnam Investments' union all
+          select 'q', 'u_q', true, 1, 14, 'Amazon.com, Inc. - Common Stock S 03/16/2026 03/16/2026 $1,001 - $15,000' union all
+          select 'q', 'u_q', true, 1, 15, '(AMZN) [ST]' union all
+          select 'q', 'u_q', true, 1, 16, 'JT Head X P 06/22/2026 06/23/2026 $250,001 -' union all
+          select 'q', 'u_q', true, 1, 17, 'SP Fragment $5,000' union all
+          select 'r' as doc_id, 'u_r' as document_url, true as has_text, 1 as page, 1 as line_no, 'ID Owner Asset Transaction Date Notification Date Amount' as line_text union all
+          select 'r', 'u_r', true, 1, 2, 'Apple Inc. - Common Stock S 03/16/2026 03/16/2026 $1,001 - $15,000' union all
+          select 'r', 'u_r', true, 1, 3, '(AAPL) [ST]' union all
+          select 'r', 'u_r', true, 1, 4, 'Description: sold @ $27.645/share'
+    expect:
+      rows:
+        - {doc_id: q, page: 1, line_no: 2, schedule: 'PTR: transactions', owner_code: JT, amount_range: '$250,001 - $500,000', line_text: 'JT CENTRE CNTY PA HOSP AUTH REV S 10/21/2025 10/21/2025 $250,001 - HOSP REV 5% 11/15/2046 BDS MT $500,000 NITTANYMED [GS]'}
+        - {doc_id: q, page: 1, line_no: 5, schedule: 'PTR: transactions', owner_code: null, amount_range: null, line_text: 'Filing Status: New'}
+        - {doc_id: q, page: 1, line_no: 6, schedule: 'PTR: transactions', owner_code: JT, amount_range: '$100,001 - $250,000', line_text: 'JT ATHERTON MICH CMNTY SCH S 04/10/2026 04/10/2026 $100,001 - Fund $5 par [GS] $250,000 TAX BLDG AND SITE BDS SER. 2020 I [GS]'}
+        - {doc_id: q, page: 1, line_no: 10, schedule: 'PTR: transactions', owner_code: null, amount_range: null, line_text: 'Filing Status: New'}
+        - {doc_id: q, page: 1, line_no: 11, schedule: 'PTR: transactions', owner_code: null, amount_range: null, line_text: 'Description: sold @ $27.645/share BRK/B'}
+        - {doc_id: q, page: 1, line_no: 12, schedule: 'PTR: transactions', owner_code: null, amount_range: null, line_text: 'sold @ $493.42/share SPY'}
+        - {doc_id: q, page: 1, line_no: 13, schedule: 'PTR: transactions', owner_code: null, amount_range: null, line_text: 'Putnam Investments'}
+        - {doc_id: q, page: 1, line_no: 14, schedule: 'PTR: transactions', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Amazon.com, Inc. - Common Stock S 03/16/2026 03/16/2026 $1,001 - $15,000'}
+        - {doc_id: q, page: 1, line_no: 15, schedule: 'PTR: transactions', owner_code: null, amount_range: null, line_text: '(AMZN) [ST]'}
+        - {doc_id: q, page: 1, line_no: 16, schedule: 'PTR: transactions', owner_code: JT, amount_range: '$250,001', line_text: 'JT Head X P 06/22/2026 06/23/2026 $250,001 -'}
+        - {doc_id: q, page: 1, line_no: 17, schedule: 'PTR: transactions', owner_code: SP, amount_range: '$5,000', line_text: 'SP Fragment $5,000'}
+        - {doc_id: r, page: 1, line_no: 2, schedule: 'PTR: transactions', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Apple Inc. - Common Stock S 03/16/2026 03/16/2026 $1,001 - $15,000'}
+        - {doc_id: r, page: 1, line_no: 3, schedule: 'PTR: transactions', owner_code: null, amount_range: null, line_text: '(AAPL) [ST]'}
+        - {doc_id: r, page: 1, line_no: 4, schedule: 'PTR: transactions', owner_code: null, amount_range: null, line_text: 'Description: sold @ $27.645/share'}
   - name: house_fd_wrapped_range_tail_rules_pinned
     model: int_house_fd__schedule_lines
     description: >
