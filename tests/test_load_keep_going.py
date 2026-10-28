@@ -177,6 +177,11 @@ def test_run_runs_the_second_build_when_the_stage_2_failure_is_allowed(stage2_fa
     assert dbt_calls == [["build"], ["build"]]
 
 
+def test_run_skip_unit_tests_excludes_them_from_both_builds(stage2_failing, dbt_calls, monkeypatch):
+    _main(monkeypatch, "run", "--workers", "1", "--allow-failed-loader", "late", "--skip-unit-tests")
+    assert dbt_calls == [["build", "--exclude-resource-type", "unit_test"]] * 2
+
+
 def test_explanatory_text_survives_cloud_logging_message_rewrite(monkeypatch, capsys):
     """On Cloud Run `event` becomes `message`; an extra `message=` kwarg would be overwritten, so use `hint`."""
     monkeypatch.setenv("CLOUD_RUN_JOB", "mogov")

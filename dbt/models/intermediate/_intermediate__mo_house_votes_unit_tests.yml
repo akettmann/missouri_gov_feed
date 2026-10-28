@@ -168,3 +168,89 @@ unit_tests:
       rows:
         - {member_token: PRICE, person_key: p_price}
         - {member_token: JONES, person_key: p_jones_iv}
+
+  - name: house_vote_tokens_match_when_the_roll_call_date_did_not_parse
+    model: int_mo_house__votes
+    description: >
+      stg_mo_house__rollcalls keeps a roll call whose date did not parse (vote_date null). Its tokens still match a
+      same-session member by name; the null date must not break the joins on the vote date.
+    given:
+      - input: ref('stg_mo_house__rollcall_votes')
+        rows:
+          - {rollcall_url: r1, session_code: '221', member_token: PRICE, token_name: PRICE, token_district: null, vote_cast: yea}
+      - input: ref('stg_mo_house__rollcalls')
+        rows:
+          - {rollcall_url: r1, session_code: '221', vote_date: null, measure: HB 10}
+      - input: ref('house_speakers')
+        rows:
+          - {session_year: 2022, district_number: 89, name: Somebody}
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '221', district_number: 1, surname_key: price, person_key: p_price, party: Republican}
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {person_id: p_senator, chamber: upper, district_number: 1, start_date: '2019-01-01', end_date: '9999-12-31'}
+    expect:
+      rows:
+        - {member_token: PRICE, person_key: p_price}
+
+  - name: house_vote_mr_speaker_follows_the_speaker_of_the_vote_year
+    model: int_mo_house__votes
+    description: >
+      MR SPEAKER is the house_speakers seat of the year the roll call was held (one speaker per session_year), so the
+      same token on dates in two years is two different people.
+    given:
+      - input: ref('stg_mo_house__rollcall_votes')
+        rows:
+          - {rollcall_url: r1, session_code: '221', member_token: MR SPEAKER, token_name: MR SPEAKER, token_district: null, vote_cast: yea}
+          - {rollcall_url: r2, session_code: '221', member_token: MR SPEAKER, token_name: MR SPEAKER, token_district: null, vote_cast: yea}
+      - input: ref('stg_mo_house__rollcalls')
+        rows:
+          - {rollcall_url: r1, session_code: '221', vote_date: '2022-03-01', measure: HB 10}
+          - {rollcall_url: r2, session_code: '221', vote_date: '2023-03-01', measure: HB 11}
+      - input: ref('house_speakers')
+        rows:
+          - {session_year: 2022, district_number: 112, name: First Speaker}
+          - {session_year: 2023, district_number: 89, name: Second Speaker}
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '221', district_number: 112, surname_key: first, person_key: p_first, party: Republican}
+          - {session_code: '221', district_number: 89, surname_key: second, person_key: p_second, party: Republican}
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {person_id: p_senator, chamber: upper, district_number: 1, start_date: '2019-01-01', end_date: '9999-12-31'}
+    expect:
+      rows:
+        - {vote_id: r1, member_token: MR SPEAKER, person_key: p_first}
+        - {vote_id: r2, member_token: MR SPEAKER, person_key: p_second}
+
+  - name: house_vote_best_tier_is_chosen_per_vote_date
+    model: int_mo_house__votes
+    description: >
+      The same token in the same session can fit differently on two days. FOO is looked up in other sessions' lists;
+      on 2022-01-15 the dated seat of p_dated covers the date and outranks the undated p_undated, on 2022-03-01 that
+      seat is over, so only p_undated is left and is a match in its own right (its tier is worse than the first
+      day's, which must not rule it out).
+    given:
+      - input: ref('stg_mo_house__rollcall_votes')
+        rows:
+          - {rollcall_url: r1, session_code: '221', member_token: FOO, token_name: FOO, token_district: null, vote_cast: yea}
+          - {rollcall_url: r2, session_code: '221', member_token: FOO, token_name: FOO, token_district: null, vote_cast: yea}
+      - input: ref('stg_mo_house__rollcalls')
+        rows:
+          - {rollcall_url: r1, session_code: '221', vote_date: '2022-01-15', measure: HB 10}
+          - {rollcall_url: r2, session_code: '221', vote_date: '2022-03-01', measure: HB 11}
+      - input: ref('house_speakers')
+        rows:
+          - {session_year: 2022, district_number: 89, name: Somebody}
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '213', district_number: 5, surname_key: foo, person_key: p_dated, party: Republican}
+          - {session_code: '191', district_number: 6, surname_key: foo, person_key: p_undated, party: Republican}
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {person_id: p_dated, chamber: lower, district_number: 5, start_date: '2021-01-01', end_date: '2022-01-31'}
+    expect:
+      rows:
+        - {vote_id: r1, member_token: FOO, person_key: p_dated}
+        - {vote_id: r2, member_token: FOO, person_key: p_undated}

@@ -1,3 +1,4 @@
+{{ config(materialized='table') }}
 -- MEC itemized contributions received by Missouri committees (TAP mirror, 2011-2022).
 -- The mirror combines two MEC export layouts; coalesce the overlapping columns. dupe_flag marks rows TAP
 -- identified as duplicates (amended reports) and they're dropped.
@@ -52,6 +53,9 @@
 -- nth row, so a donor who gave the same amount twice in a day in ONE layout keeps both gifts, and a pair with a
 -- different amount, date, committee or donor is never matched. Only 2 of 397 matched keys are not 1:1 (2 older
 -- rows, 1 newer; the extra older row is kept).
+
+-- A table, not a view like the other staging models: about a dozen models and tests read it, and as a view each
+-- re-read the 1.5M Parquet rows and re-ran the name-cleaning regexes (about 10s per full read, under 1s as a table).
 with
 
 identified as (

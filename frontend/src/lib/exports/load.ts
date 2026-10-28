@@ -46,14 +46,14 @@ import type {
 type ProfileRow = Omit<Official, "slug"> & Record<string, string | number | boolean | null>;
 
 export const COVERAGE: { key: string; label: string }[] = [
-  { key: "votes", label: "Votes" },
-  { key: "bias", label: "Ideology indicators" },
   { key: "donations", label: "Donations" },
   { key: "disclosures", label: "Financial disclosures" },
   { key: "commercial_ties", label: "Commercial ties" },
   { key: "family_ties", label: "Family ties" },
-  { key: "cases", label: "Court cases" },
   { key: "voluntary_disclosures", label: "Voluntary disclosures" },
+  { key: "votes", label: "Votes" },
+  { key: "bias", label: "Ideology indicators" },
+  { key: "cases", label: "Court cases" },
 ];
 const COUNT_COLUMN: Record<string, string> = { bias: "n_bias_indicators" }; // the rest are n_<key>
 

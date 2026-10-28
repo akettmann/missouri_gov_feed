@@ -92,6 +92,19 @@ already landed reads them from disk and fetches nothing for closed sessions, so 
   still exits non-zero (a Cloud Run job still shows the failure). A failure in any other loader still
   stops the run. Check `mogov freshness` to see how stale the data is.
 
+## Skipping unit tests on a data refresh
+
+dbt unit tests run on fixed rows, so they check the SQL logic, not the data; a refresh that changes no
+model cannot change their result. They are about a quarter of a full build's work. A scheduled refresh
+can leave them out:
+
+```
+uv run mogov run --skip-unit-tests
+uv run mogov build --exclude-resource-type unit_test
+```
+
+Keep them in any build after changing a model: a failing unit test is what skips a model with broken logic.
+
 ## Moving the windows
 
 - `MOGOV_LOOKBACK_YEARS` (default 10): the years of state roll calls (House and Senate). Widening it
