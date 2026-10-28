@@ -247,14 +247,40 @@ named_judge as (
         )
 ),
 
-attorney as (
+-- The padded LIKE below is the match rule, but a LIKE join is a nested loop (~700 people x 113k attorneys texts, #884).
+-- Any key that LIKE matches has each of its words as a whole word of the text, so the equi-join on one word of the key
+-- (its second word, the first word of the surname; the only word of a one-word key) picks the candidate cases, and the
+-- LIKE then runs on those only: the same pairs for keys of any length.
+attorney_keys as (
     select
         s.official_id,
-        c.cluster_id
+        s.full_key,
+        coalesce(nullif({{ dbt.split_part('s.full_key', "' '", 2) }}, ''), {{ dbt.split_part('s.full_key', "' '", 1) }})
+            as key_word
     from searched as s
-    inner join cases as c on c.attorneys_key like '% ' || s.full_key || ' %'
+    where s.is_lawyer = 1 or s.office not in (select jc.office from judge_courts as jc)
+),
+
+attorney_words as (
+    select distinct
+        c.cluster_id,
+        w.word
+    from cases as c
+    {{ mogov.cross_join_words('c.attorneys_key', 'w') }}
     where
-        (s.is_lawyer = 1 or s.office not in (select jc.office from judge_courts as jc))
+        c.date_filed >= cast('{{ var("case_history_min_year", 1975) }}-01-01' as date)
+        and w.word in (select k.key_word from attorney_keys as k)
+),
+
+attorney as (
+    select
+        k.official_id,
+        c.cluster_id
+    from attorney_keys as k
+    inner join attorney_words as w on k.key_word = w.word
+    inner join cases as c on w.cluster_id = c.cluster_id
+    where
+        c.attorneys_key like '% ' || k.full_key || ' %'
         and c.date_filed >= cast('{{ var("case_history_min_year", 1975) }}-01-01' as date)
 )
 

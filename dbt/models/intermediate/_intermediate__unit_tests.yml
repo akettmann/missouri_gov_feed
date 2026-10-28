@@ -224,6 +224,69 @@ unit_tests:
         - {official_id: j_smith, role: judge, cluster_id: c4, matched_by: panel}
         - {official_id: l_doe, role: attorney, cluster_id: c5, matched_by: attorneys text}
 
+  - name: bulk_case_matches_attorney_keys_match_whole_word_runs_of_any_length
+    model: int_courtlistener__bulk_case_matches
+    description: >
+      The attorneys join picks candidate cases by one word of the "<first> <last>" key and then applies the padded
+      LIKE (#884), so the result is the same whatever the key's length. l_ann ("ann lee"): a match at the start of the
+      text (a1), at the end (a2), in the middle (a3) and twice in one text (a4, one row), but not inside longer words
+      ("joann lee" a5, "ann leeds" a6) nor split by another word ("ann marie lee" a7), nor before 1975 (a8).
+      l_cher has no given name, so her key is the one word "cher" (a9, a10; not "cherie" in a11). l_buren's key has
+      three words, "ann van buren" (a12 matches, a13 "ann van" and a14 "van buren ann" don't).
+    overrides:
+      vars:
+        cl_case_bulk: true
+        case_history_min_year: 1975
+    given:
+      - input: ref('fct_legal_careers')
+        rows:
+          - {official_id: l_ann, legal_role: lawyer}
+          - {official_id: l_cher, legal_role: lawyer}
+          - {official_id: l_buren, legal_role: lawyer}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: l_ann, given_name: Ann, family_name: Lee, office: state_house, current_term_start: null}
+          - {official_id: l_cher, given_name: '', family_name: Cher, office: state_house, current_term_start: null}
+          - {official_id: l_buren, given_name: Ann, family_name: Van Buren, office: state_house, current_term_start: null}
+      - input: ref('fct_office_history')
+        rows: []
+      - input: ref('fct_salaries')
+        rows: []
+      - input: ref('stg_mo_employee_pay__pay')
+        rows: []
+      - input: ref('mo_courts')
+        rows:
+          - {court_id: mo, office: mo_supreme_court}
+      - input: ref('int_courtlistener__mo_cases')
+        rows:
+          - {cluster_id: a1, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Ann Lee, for appellant; Bo Day.'}
+          - {cluster_id: a2, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Bo Day and Ann Lee'}
+          - {cluster_id: a3, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Bo Day, Ann Lee, Cy Fox'}
+          - {cluster_id: a4, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Ann Lee; Cy Fox; Ann Lee'}
+          - {cluster_id: a5, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Joann Lee'}
+          - {cluster_id: a6, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Ann Leeds'}
+          - {cluster_id: a7, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Ann Marie Lee'}
+          - {cluster_id: a8, court_id: mo, date_filed: '1970-01-01', judges_text: null, attorneys_text: 'Ann Lee'}
+          - {cluster_id: a9, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Cher'}
+          - {cluster_id: a10, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Bo Day, Cher, Cy Fox'}
+          - {cluster_id: a11, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Cherie Day'}
+          - {cluster_id: a12, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Bo Day, Ann Van Buren'}
+          - {cluster_id: a13, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Ann Van Dyke'}
+          - {cluster_id: a14, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Van Buren Ann'}
+      - input: ref('stg_courtlistener__mo_cluster_panel')
+        rows: []
+      - input: ref('int_courtlistener__official_people')
+        rows: []
+    expect:
+      rows:
+        - {official_id: l_ann, role: attorney, cluster_id: a1, matched_by: attorneys text}
+        - {official_id: l_ann, role: attorney, cluster_id: a2, matched_by: attorneys text}
+        - {official_id: l_ann, role: attorney, cluster_id: a3, matched_by: attorneys text}
+        - {official_id: l_ann, role: attorney, cluster_id: a4, matched_by: attorneys text}
+        - {official_id: l_cher, role: attorney, cluster_id: a9, matched_by: attorneys text}
+        - {official_id: l_cher, role: attorney, cluster_id: a10, matched_by: attorneys text}
+        - {official_id: l_buren, role: attorney, cluster_id: a12, matched_by: attorneys text}
+
   - name: bulk_case_matches_date_state_appellate_judges_without_a_courtlistener_person
     model: int_courtlistener__bulk_case_matches
     description: >
