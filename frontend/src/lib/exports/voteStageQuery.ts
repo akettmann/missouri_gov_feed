@@ -12,3 +12,12 @@ export function voteStagesSql(): string {
           where chamber in ('state_house', 'state_senate')
           group by chamber, vote_id`;
 }
+
+/**
+ * `table` (any relation with chamber and vote_id) with vote_stage and vote_informal added, as a parenthesised
+ * subquery. Every caller goes through this so the join key stays (chamber, vote_id) in one place.
+ */
+export function withVoteStages(table: string): string {
+  return `(select o.*, s.vote_stage, s.vote_informal from ${table} as o
+          left join (${voteStagesSql()}) as s using (chamber, vote_id))`;
+}

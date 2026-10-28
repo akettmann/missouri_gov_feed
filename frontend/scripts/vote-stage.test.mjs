@@ -31,19 +31,16 @@ test("a federal vote gets no stage label", () => {
 
 test("the stage join matches a Senate overlap row whose session is the bill session, not the year", async () => {
   const { DuckDBInstance } = await import("@duckdb/node-api");
-  const { voteStagesSql } = await import("../src/lib/exports/voteStageQuery.ts");
+  const { withVoteStages } = await import("../src/lib/exports/voteStageQuery.ts");
   const conn = await (await DuckDBInstance.create(":memory:")).connect();
   await conn.run(`create table fv (chamber varchar, session_code varchar, vote_id varchar, vote_stage varchar,
     vote_informal boolean, official_id varchar)`);
   await conn.run(`insert into fv values ('state_senate','2022','v1','third_reading',false,'a'),
-    ('state_senate','2022','v1','third_reading',false,'b')`);
+    ('state_senate','2022','v1','third_reading',false,'b'),
+    ('state_senate','2023','v1','third_reading',false,'c')`);
   await conn.run(`create table ov (chamber varchar, session_code varchar, vote_id varchar)`);
   await conn.run(`insert into ov values ('state_senate','221','v1')`);
-  const stages = voteStagesSql().replace("{fct_votes}", "fv");
-  const rows = (
-    await conn.runAndReadAll(
-      `select o.vote_id, s.vote_stage from ov as o left join (${stages}) as s using (chamber, vote_id)`,
-    )
-  ).getRowObjectsJson();
+  const joined = withVoteStages("ov").replace("{fct_votes}", "fv");
+  const rows = (await conn.runAndReadAll(`select vote_id, vote_stage from ${joined}`)).getRowObjectsJson();
   assert.deepEqual(rows, [{ vote_id: "v1", vote_stage: "third_reading" }]);
 });
