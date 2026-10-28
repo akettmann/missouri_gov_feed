@@ -130,6 +130,14 @@ models:
   - name: label
     data_tests:
     - not_null
+- name: stg_mo_senate__bill_sponsors
+  description: The primary sponsor of each Senate bill or resolution (SB, SJR, SCR, SR) as senate.mo.gov's bill
+    list gives him or her, shaped like stg_mo_house__bill_sponsors (the list has no co-sponsors, handlers or conferees,
+    so sponsor_type is always 'Sponsor'). session_code is the House's code for the session (seed mo_senate_session_codes),
+    null for a session with no seed row. sponsor_name is "First Last". The list prints a surname shared by two senators
+    with the district after it ("Brown (16)"); that suffix is dropped from the name, and the district column keeps
+    it apart. sponsor_district is the senate district itself (the House XML numbers senators 200 + district; this
+    list does not). A bill the list gives no sponsor (2022 SB 2162 has none) is left out.
 - name: stg_mo_senate__bill_summaries
   description: 'One row per bill summary on a Senate bill''s page at senate.mo.gov, in the order the page lists
     them (doc_index 0 first). A summary has no PDF: the page prints its text, which lands as served (summary_text

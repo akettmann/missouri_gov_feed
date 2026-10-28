@@ -76,6 +76,33 @@ unit_tests:
         - {session_year: 2025, session_type: E2, session_code: '254', bill_id: 18282066, bill: SR2, bill_type: SR, bill_number: 2, short_title: Establishes rules, sponsor_name: 'Rizzo, Lauren', legislator_id: null, sponsor_district: 11, handler_name: null, handler_district: null, bill_url: 'http://s/18282066'}
         - {session_year: 2025, session_type: E9, session_code: null, bill_id: 5, bill: SB9, bill_type: SB, bill_number: 9, short_title: Unseeded, sponsor_name: 'Doe, J', legislator_id: null, sponsor_district: 1, handler_name: null, handler_district: null, bill_url: 'http://s/5'}
 
+  - name: senate_bill_sponsors_name_the_sponsor_without_the_district_suffix
+    model: stg_mo_senate__bill_sponsors
+    description: >
+      One sponsor row per bill from the list (#839): sponsor_name is "First Last", the district stays the senate
+      district (no 200 offset), session_code comes from the seed by (year, session type) and sponsor_type is
+      Sponsor. A surname shared by two senators is printed with the district ("Brown (16)"): the suffix is dropped
+      from the name, so it still equals the senator's surname, and the district column keeps the two Browns apart.
+      A bill with no sponsor in the list is left out; a session with no seed row keeps a null code (a data test
+      fails on that for the bill list).
+    given:
+      - input: source('mo_senate', 'bill_list')
+        format: sql
+        rows: |
+            select cast('{"billId": 233, "billPrefix": "SB", "billSuffix": 1, "sponsorLastName": "Crawford", "sponsorFirstName": "Sandy", "legislatorId": 947, "districtNumber": 28, "year": 2025, "session_type": "R"}' as varchar) as payload union all
+            select cast('{"billId": 9, "billPrefix": "SJR", "billSuffix": 3, "sponsorLastName": "Brown (16)", "sponsorFirstName": "Justin", "legislatorId": 1, "districtNumber": 16, "year": 2024, "list_year": 2025, "session_type": "R"}' as varchar) as payload union all
+            select cast('{"billId": 10, "billPrefix": "SB", "billSuffix": 4, "sponsorLastName": "Doe", "sponsorFirstName": "J", "districtNumber": 1, "year": 2025, "session_type": "E9"}' as varchar) as payload union all
+            select cast('{"billId": 11, "billPrefix": "SB", "billSuffix": 5, "briefDescription": "No sponsor", "year": 2025, "session_type": "R"}' as varchar) as payload
+      - input: ref('mo_senate_session_codes')
+        format: sql
+        rows: |
+            select 2025 as session_year, 'R' as session_type, '251' as house_session_code
+    expect:
+      rows:
+        - {session_code: '251', session_year: 2025, session_type: R, bill: SB1, sponsor_type: Sponsor, sponsor_name: Sandy Crawford, legislator_id: 947, sponsor_district: 28}
+        - {session_code: '251', session_year: 2025, session_type: R, bill: SJR3, sponsor_type: Sponsor, sponsor_name: Justin Brown, legislator_id: 1, sponsor_district: 16}
+        - {session_code: null, session_year: 2025, session_type: E9, bill: SB4, sponsor_type: Sponsor, sponsor_name: J Doe, legislator_id: null, sponsor_district: 1}
+
   - name: senate_bill_actions_parse_dates_and_map_the_session
     model: stg_mo_senate__bill_actions
     description: >

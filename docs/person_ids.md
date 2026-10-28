@@ -428,9 +428,18 @@ matches a House roster member of that session (surname and given name) who held 
 before or after; the model does not check that the senate seat came later (`switch_match`, #646). A senator matches
 the senate seat held that year (`senate_match`). Two candidate people leave the row unmatched.
 
+The primary sponsor of each Senate bill (SB, SJR, SCR, SR) comes from senate.mo.gov's bill list
+(`stg_mo_senate__bill_sponsors`, #839) and goes through the same `senate_match`: the district is restored to the
+House's 200 + district, the senator who held that seat in the session's year, surname inside the "First Last" name.
+The list prints a shared surname with the district ("Brown (16)"); staging drops the suffix. Only current officials
+(`dim_official`) get an `official_id`, so a former senator's bills keep it null (about 3,160 of 7,600 rows: every
+unmatched name but Ryan Silvey's 2018 bills is a senator whose seat the match finds but who is not a current official;
+his seat ends at his last 2017 vote).
+
 - Tests: `bill_sponsors_match_redistricted_members_by_surname_and_held_district`,
-  `bill_sponsors_classify_house_era_rows_of_members_who_moved_to_the_senate`, `bill_sponsors_skip_relisted_bills`;
-  data test `assert_bill_sponsors_roster_members_matched`.
+  `bill_sponsors_classify_house_era_rows_of_members_who_moved_to_the_senate`, `bill_sponsors_skip_relisted_bills`,
+  `bill_sponsors_match_senate_bill_sponsors_by_district_and_session_year`, `senate_bill_sponsors_name_the_sponsor_without_the_district_suffix`;
+  data tests `assert_bill_sponsors_roster_members_matched`, `assert_bill_sponsors_senate_plausible`, `assert_senate_bill_sponsors_text_clean`.
 
 ### Profiles and office history
 
