@@ -7,6 +7,7 @@ mogov:
       # point-in-polygon for facilities in districts (macros/compat/spatial.sql)
       extensions: [spatial]
       threads: 4
+      memory_limit: 2GB
     # Used only by sqlfluff (see .sqlfluff): compiling models never needs real data, so linting works in a
     # fresh clone/worktree where the gitignored data/ directory doesn't exist.
     lint:
