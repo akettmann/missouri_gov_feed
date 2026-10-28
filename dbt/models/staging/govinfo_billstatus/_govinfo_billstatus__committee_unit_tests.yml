@@ -22,6 +22,44 @@ unit_tests:
         - {bill_id: 118-hjres-99, position: 1, subposition: null, system_code: hsju00, parent_system_code: null, name: Judiciary Committee, chamber: House, committee_type: Select, is_subcommittee: false}
         - {bill_id: 118-hjres-99, position: 1, subposition: 0, system_code: hsju03, parent_system_code: hsju00, name: Courts Subcommittee, chamber: House, committee_type: Select, is_subcommittee: true}
 
+  - name: billstatus_committee_parent_lookup_edge_cases
+    model: stg_govinfo_billstatus__committees
+    description: >
+      The parent lookup (#876) keeps its old semantics. A full committee is never matched to a parent and keeps its
+      own (possibly null) chamber and type. A subcommittee takes the chamber and type only where its own is null,
+      and only from a parent with the same bill and position. One with no such parent (none at that position, the
+      parent on another bill, or a null bill id) stays null. Two candidate parents give the subcommittee one row
+      each.
+    given:
+      - input: source('govinfo_billstatus', 'committees')
+        format: sql
+        rows: |
+            select cast('{"bill_id": "b1", "position": 0, "subposition": null, "system_code": "p1", "parent_system_code": null, "name": "Parent One", "chamber": "Senate", "committee_type": null}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "b1", "position": 0, "subposition": 0, "system_code": "s1", "parent_system_code": "p1", "name": "Sub inherits", "chamber": null, "committee_type": null}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "b1", "position": 1, "subposition": 0, "system_code": "s2", "parent_system_code": "zz", "name": "Sub no parent", "chamber": null, "committee_type": null}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "b1", "position": 2, "subposition": null, "system_code": "p3", "parent_system_code": null, "name": "Parent Three", "chamber": "House", "committee_type": "Select"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "b1", "position": 2, "subposition": 1, "system_code": "s3", "parent_system_code": "p3", "name": "Sub keeps own", "chamber": "Joint", "committee_type": "Standing"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "b2", "position": 0, "subposition": null, "system_code": "p4a", "parent_system_code": null, "name": "Twin A", "chamber": "House", "committee_type": "Standing"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "b2", "position": 0, "subposition": null, "system_code": "p4b", "parent_system_code": null, "name": "Twin B", "chamber": "Senate", "committee_type": "Special"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "b2", "position": 0, "subposition": 0, "system_code": "s4", "parent_system_code": "p4a", "name": "Sub of twins", "chamber": null, "committee_type": null}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "b3", "position": 0, "subposition": 0, "system_code": "s5", "parent_system_code": "p5", "name": "Sub other bill", "chamber": null, "committee_type": null}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": null, "position": 0, "subposition": null, "system_code": "p6", "parent_system_code": null, "name": "Null bill parent", "chamber": "House", "committee_type": "Standing"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": null, "position": 0, "subposition": 0, "system_code": "s6", "parent_system_code": "p6", "name": "Null bill sub", "chamber": null, "committee_type": null}' as varchar) as payload, 'u' as source_url
+    expect:
+      rows:
+        - {bill_id: b1, position: 0, subposition: null, system_code: p1, parent_system_code: null, name: Parent One, chamber: Senate, committee_type: null, is_subcommittee: false}
+        - {bill_id: b1, position: 0, subposition: 0, system_code: s1, parent_system_code: p1, name: Sub inherits, chamber: Senate, committee_type: null, is_subcommittee: true}
+        - {bill_id: b1, position: 1, subposition: 0, system_code: s2, parent_system_code: zz, name: Sub no parent, chamber: null, committee_type: null, is_subcommittee: true}
+        - {bill_id: b1, position: 2, subposition: null, system_code: p3, parent_system_code: null, name: Parent Three, chamber: House, committee_type: Select, is_subcommittee: false}
+        - {bill_id: b1, position: 2, subposition: 1, system_code: s3, parent_system_code: p3, name: Sub keeps own, chamber: Joint, committee_type: Standing, is_subcommittee: true}
+        - {bill_id: b2, position: 0, subposition: null, system_code: p4a, parent_system_code: null, name: Twin A, chamber: House, committee_type: Standing, is_subcommittee: false}
+        - {bill_id: b2, position: 0, subposition: null, system_code: p4b, parent_system_code: null, name: Twin B, chamber: Senate, committee_type: Special, is_subcommittee: false}
+        - {bill_id: b2, position: 0, subposition: 0, system_code: s4, parent_system_code: p4a, name: Sub of twins, chamber: House, committee_type: Standing, is_subcommittee: true}
+        - {bill_id: b2, position: 0, subposition: 0, system_code: s4, parent_system_code: p4a, name: Sub of twins, chamber: Senate, committee_type: Special, is_subcommittee: true}
+        - {bill_id: b3, position: 0, subposition: 0, system_code: s5, parent_system_code: p5, name: Sub other bill, chamber: null, committee_type: null, is_subcommittee: true}
+        - {bill_id: null, position: 0, subposition: null, system_code: p6, parent_system_code: null, name: Null bill parent, chamber: House, committee_type: Standing, is_subcommittee: false}
+        - {bill_id: null, position: 0, subposition: 0, system_code: s6, parent_system_code: p6, name: Null bill sub, chamber: null, committee_type: null, is_subcommittee: true}
+
   - name: billstatus_committee_activities_cut_the_timestamp_to_a_date
     model: stg_govinfo_billstatus__committee_activities
     description: >
