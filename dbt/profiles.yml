@@ -7,7 +7,14 @@ mogov:
       # point-in-polygon for facilities in districts (macros/compat/spatial.sql)
       extensions: [spatial]
       threads: 4
-      memory_limit: 2GB
+      # DuckDB's default memory_limit is 80% of RAM. When other apps hold memory, it then asks the OS for more than
+      # exists and fails with "Out of Memory Error: Allocation failure" instead of spilling to disk. An explicit
+      # limit makes it spill. 6GB at 4 threads is the measured-good value on the 32 GB dev machine (#818); size
+      # MOGOV_DUCKDB_MEMORY to the container on Cloud Run. This is DuckDB's own setting: a top-level
+      # `memory_limit:` key on the output is ignored by dbt-duckdb. Never put temp_directory here: dbt-duckdb
+      # re-applies settings per connection and DuckDB refuses to move the temp directory once it is in use.
+      settings:
+        memory_limit: "{{ env_var('MOGOV_DUCKDB_MEMORY', '6GB') }}"
     # Used only by sqlfluff (see .sqlfluff): compiling models never needs real data, so linting works in a
     # fresh clone/worktree where the gitignored data/ directory doesn't exist.
     lint:

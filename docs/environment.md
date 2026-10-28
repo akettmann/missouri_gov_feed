@@ -435,9 +435,13 @@ instead run `mogov run` as a job, it is strict by default; set `MOGOV_ALLOW_FAIL
 5. Create the build job. DuckDB does random writes, which Cloud Storage FUSE handles badly, so build in
    the container's in-memory filesystem and copy the finished database back:
    ```
-   gcloud run jobs create mogov-build ... --tasks 1 --memory 8Gi \
+   gcloud run jobs create mogov-build ... --tasks 1 --memory 8Gi --set-env-vars MOGOV_DUCKDB_MEMORY=4GB \
      --command sh --args -c,'cp /data/mogov.duckdb /tmp/ 2>/dev/null; MOGOV_DB=/tmp/mogov.duckdb mogov build && cp /tmp/mogov.duckdb /data/mogov.duckdb'
    ```
+   `MOGOV_DUCKDB_MEMORY` also sets the dbt build's DuckDB `memory_limit` (default 6GB, the measured-good value
+   at 4 dbt threads). Without a limit DuckDB takes 80% of RAM and, when other processes hold memory, fails with
+   `Out of Memory Error: Allocation failure` instead of spilling to disk (#818). Size it below the container
+   memory minus the in-memory `/tmp` database, as above. DuckDB spills to its temp directory next to the database.
 6. Chain them in order: stage-1 load jobs, then `mogov-build`, then
    `mogov load courtlistener_cases wikidata` (stage 2; `mogov list` shows each loader's stage), then
    `mogov-build` again. Use Cloud Workflows, or Cloud Scheduler triggers spaced far
