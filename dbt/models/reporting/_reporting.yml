@@ -1062,11 +1062,17 @@ models:
       - name: transferred_versions
         data_type: bigint
         description: Rows for transferred sections.
+      - name: oldest_fetched_at
+        data_type: timestamp with time zone
+        description: >
+          The earliest fetch time among the chapter's rows: when the chapter's stalest page was fetched from
+          revisor.mo.gov. Null until the loader has run again since #852; rows without a fetch time are ignored, so
+          before a full reload this is the oldest of the pages that have one.
       - name: loaded_at
         data_type: timestamp with time zone
         description: >
           The earliest publish time among the chapter's rows (when our pipeline last published the raw tables),
-          not when the pages were fetched, which was up to 180 days earlier.
+          not when the pages were fetched (see oldest_fetched_at), which was up to 180 days earlier.
 
 exposures:
   - name: voter_frontend

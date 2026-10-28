@@ -3,8 +3,9 @@
 -- chapter's counts add up to the table's row count across chapters; sections counts distinct section numbers, and
 -- sections_in_force the distinct numbers with an in-force version. Chapter and title names come from the Revisor's
 -- table of contents and are null for a chapter it no longer lists (repealed chapters still have repealed sections
--- here). loaded_at is the earliest publish time among the chapter's rows (the run's publish
--- time, not a fetch time: pages were fetched up to 180 days earlier).
+-- here). oldest_fetched_at is the earliest fetch time among the chapter's rows: the age of the stalest page behind the
+-- chapter, null until the loader has run again since #852. loaded_at is the earliest publish time among the
+-- chapter's rows (the run's publish time, not a fetch time: pages were fetched up to 180 days earlier).
 select
     chapter,
     max(chapter_name) as chapter_name,
@@ -19,6 +20,7 @@ select
     count(case when status = 'historical' then 1 end) as historical_versions,
     count(case when status = 'repealed' then 1 end) as repealed_versions,
     count(case when status = 'transferred' then 1 end) as transferred_versions,
+    min(fetched_at) as oldest_fetched_at,
     min(loaded_at) as loaded_at
 from {{ ref('fct_statute_sections') }}
 group by chapter

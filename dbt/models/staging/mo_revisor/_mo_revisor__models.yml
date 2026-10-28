@@ -11,7 +11,9 @@ models:
     565.004; repealed 1983)"; transferred_to is the section it moved to. action_date is the date the repeal or transfer
     took effect; the Revisor dates a repeal that waits on a contingency 1 Jan 2099, which becomes is_contingent
     with no date. The list also carries repealed constitution sections ("V Section 25"); they are left out here.
-    loaded_at is when our pipeline last published the raw table; the list was fetched up to 7 days earlier.'
+    fetched_at is when the list page (one page for every row) was fetched from revisor.mo.gov, null on rows loaded
+    before the loader recorded it (#852). loaded_at is when our pipeline last published the raw table, up to 7 days
+    after the fetch.'
   columns:
   - name: section_version_id
     data_tests:
@@ -53,8 +55,10 @@ models:
     is_contingent with no date. held_unconstitutional: the effective line says "(all or part is unconstitutional)".
     history_note is the session-law history footnote ("(RSMo 1939 § 645, A.L. 1957 p. 587, A.L. 2015 S.B. 239)"),
     when the first footnote is one. footnotes is the page''s whole footnote array (stg_mo_revisor__section_footnotes
-    explodes it). loaded_at is when our pipeline last published the raw table; the page was fetched from revisor.mo.gov
-    up to 180 days earlier.'
+    explodes it). fetched_at is when the page was fetched from revisor.mo.gov (the loader records the HTTP cache
+    entry''s fetch time, so a page reused from the cache keeps its original time); null on rows loaded before the
+    loader recorded it (#852). loaded_at is when our pipeline last published the raw table, up to 180 days after
+    the fetch.'
   columns:
   - name: section_version_id
     description: section_id/bid; a null here would silently break the not-exists anti-join in fct_statute_sections.

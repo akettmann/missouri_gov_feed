@@ -671,9 +671,18 @@ of their own.
   verbatim; the first is usually the session-law history) and `fct_bill_statute_links`. For the site's statute pages
   (#355): `rpt_statute_section_bills` (each section's bill links with the bill's title, outcome, page and primary
   sponsor from `fct_bills` / `fct_bill_sponsors`; a link to a bill before 2017 or outside `fct_bills` has the citation
-  only) and `rpt_statute_chapters` (section versions per chapter by status). `loaded_at` on `fct_statute_sections` is
-  when our pipeline last published the raw table, not when the page was fetched: section pages come from the HTTP cache
-  up to 180 days old and the repeals list up to 7, so the page can be that much older than `loaded_at` (#852).
+  only) and `rpt_statute_chapters` (section versions per chapter by status).
+- `fetched_at` vs `loaded_at` (#852): `fetched_at` (on `fct_statute_sections`, `fct_statute_section_footnotes`, and as
+  `oldest_fetched_at`, the earliest per chapter, on `rpt_statute_chapters`) is when the page's bytes came from
+  revisor.mo.gov. The loader writes it into each `mo_revisor_sections` / `mo_revisor_repeals` payload (all
+  `mo_revisor_repeals` rows share the one `rx.aspx` fetch time) as ISO-8601 UTC, taken from the HTTP cache entry's
+  mtime (`http.fetch_stamped`): the cache file is written the moment the response lands, and the same mtime decides
+  whether the entry is still fresh. A page reused from the cache therefore keeps the time of the fetch that filled it,
+  not the time of reuse (the site sends a `Date` header, but it is not stored, and the cache file is the only record
+  of a cache hit). The cache directory must keep file mtimes (copying it without them makes pages look freshly
+  fetched). `loaded_at` is when our pipeline last published the raw table, so a page can be up to 180 days older than
+  `loaded_at` (the repeals list up to 7). Raw rows loaded before #852 have no `fetched_at` (null in dbt); only a
+  loader re-run fills it, and `oldest_fetched_at` ignores nulls until then.
 
 Quirks:
 - **Footnotes are the whole annotation, not just the history.** A page's footnotes (1 to 39 on a version; 13,600+

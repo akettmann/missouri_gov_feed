@@ -1656,6 +1656,29 @@ models:
       listed in force (heading, text, effective date, session-law history) and the repealed and transferred sections
       (note and date only). A section can have several versions at once, e.g. one not yet effective; is_current
       marks the version(s) in effect on the build date. Grain: one row per section version (section_version_id).
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            name: fct_statute_sections_fetched_at_not_after_loaded_at
+            expression: "fetched_at <= loaded_at"
+            where: "fetched_at is not null"
+          config:
+            severity: warn
+      # section pages are cached up to 180 days, the repeals list up to 7 (+1 day slack for each)
+      - dbt_utils.expression_is_true:
+          arguments:
+            name: fct_statute_sections_fetched_at_within_page_cache_window
+            expression: "fetched_at >= {{ dbt.dateadd('day', -181, 'loaded_at') }}"
+            where: "fetched_at is not null and status not in ('repealed', 'transferred')"
+          config:
+            severity: warn
+      - dbt_utils.expression_is_true:
+          arguments:
+            name: fct_statute_sections_fetched_at_within_repeals_cache_window
+            expression: "fetched_at >= {{ dbt.dateadd('day', -8, 'loaded_at') }}"
+            where: "fetched_at is not null and status in ('repealed', 'transferred')"
+          config:
+            severity: warn
     columns:
       - name: section_id
         data_type: varchar
@@ -1754,12 +1777,18 @@ models:
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"
+      - name: fetched_at
+        data_type: timestamp with time zone
+        description: >
+          When the section's page was fetched from revisor.mo.gov (for repealed and transferred sections, when the
+          repeals list was). A page served from the loader's HTTP cache keeps the time of the fetch that filled the
+          cache. Null for rows loaded before the loader recorded it; the loader must run again to fill it (#852).
       - name: loaded_at
         data_type: timestamp with time zone
         description: >
           When our pipeline last published the raw table (for repealed and transferred sections, the repeals list).
-          Not the fetch time: the page itself was fetched from revisor.mo.gov up to 180 days earlier (section pages)
-          or up to 7 days earlier (repeals list), and every row of a run shares one value (#852).
+          Not the fetch time (see fetched_at): the page itself was fetched from revisor.mo.gov up to 180 days earlier
+          (section pages) or up to 7 days earlier (repeals list), and every row of a run shares one value.
         data_tests:
           - not_null
 
@@ -1813,9 +1842,12 @@ models:
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"
+      - name: fetched_at
+        data_type: timestamp with time zone
+        description: When the section version's page was fetched from revisor.mo.gov (see fct_statute_sections.fetched_at); null until the loader has run again since #852.
       - name: loaded_at
         data_type: timestamp with time zone
-        description: When our pipeline last published the raw table; the page was fetched up to 180 days earlier (see fct_statute_sections.loaded_at).
+        description: When our pipeline last published the raw table; the page was fetched up to 180 days earlier (see fetched_at and fct_statute_sections.loaded_at).
         data_tests:
           - not_null
 

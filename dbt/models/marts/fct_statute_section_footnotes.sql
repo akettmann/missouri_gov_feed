@@ -10,6 +10,7 @@ select
     f.footnote_text,
     coalesce(f.footnote_number = 1 and f.footnote_text = s.history_note, false) as is_history_note,
     s.source_url,
+    s.fetched_at,
     s.loaded_at
 from {{ ref('stg_mo_revisor__section_footnotes') }} as f
 inner join {{ ref('fct_statute_sections') }} as s on f.section_version_id = s.section_version_id

@@ -1,8 +1,11 @@
 import itertools
+import os
 import subprocess
 import sys
 import threading
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import ClassVar
 
 import httpx
@@ -232,10 +235,16 @@ def test_throttle_across_real_processes(tmp_path):
     assert min(b - a for a, b in itertools.pairwise(starts)) >= 0.29
 
 
+class _Added(list):
+    def __init__(self):
+        super().__init__()
+        self.payloads = {}
+
+
 def _loader_pages(monkeypatch, refused: set[str], n: int = 5):
     """Run mo_revisor.load on one chapter with sections 1.010, 1.020, ...; pages in `refused` get the warning."""
     sections = [(f"1.0{i}0", i) for i in range(1, n + 1)]
-    added, fetched = [], []
+    added, fetched = _Added(), []
 
     class Sink:
         counts: ClassVar[dict] = {}
@@ -251,16 +260,18 @@ def _loader_pages(monkeypatch, refused: set[str], n: int = 5):
 
         def add(self, table, key, payload, **k):
             added.append((table, key))
+            added.payloads[(table, key)] = payload
 
     def fake_get(url, params=None, *, max_age=None, backoff=None):
         if params and "section" in params:
             fetched.append(params["section"])
             if params["section"] in refused:
                 raise mo_revisor.Warned("warning page")
-        return "page"
+        return "page", "2026-05-01T12:00:00+00:00"
 
     monkeypatch.setattr(mo_revisor.db, "JsonSink", Sink)
-    monkeypatch.setattr(mo_revisor, "_get", fake_get)
+    monkeypatch.setattr(mo_revisor, "_get_stamped", fake_get)
+    monkeypatch.setattr(mo_revisor, "_get", lambda *a, **k: fake_get(*a, **k)[0])
     monkeypatch.setattr(mo_revisor, "parse_toc", lambda page: [{"title": "I", "chapter": "1", "chapter_name": "x"}])
     monkeypatch.setattr(mo_revisor, "parse_repeals", lambda page: [])
     monkeypatch.setattr(mo_revisor, "parse_chapter", lambda page: sections)
@@ -343,7 +354,7 @@ def test_get_pauses_the_whole_host_on_a_warning(monkeypatch):
     monkeypatch.setattr(mo_revisor, "pause_host", lambda host, s: paused.append((host, s)))
     monkeypatch.setattr(mo_revisor, "WARNING_BACKOFF", (7,))
     monkeypatch.setattr(mo_revisor.time, "sleep", lambda s: None)
-    answers = iter([mo_revisor.Warned("w"), b"ok"])
+    answers = iter([mo_revisor.Warned("w"), (b"ok", 0.0)])
 
     def fake_fetch(*a, **k):
         r = next(answers)
@@ -351,7 +362,7 @@ def test_get_pauses_the_whole_host_on_a_warning(monkeypatch):
             raise r
         return r
 
-    monkeypatch.setattr(mo_revisor, "fetch", fake_fetch)
+    monkeypatch.setattr(mo_revisor, "fetch_stamped", fake_fetch)
     assert mo_revisor._get("https://revisor.mo.gov/main/x") == "ok"
     assert paused == [("revisor.mo.gov", 7)]
 
@@ -465,3 +476,68 @@ def test_every_parse_uses_the_hardened_parser(monkeypatch):
         func(read(name))
         assert seen, f"{func.__name__} no longer parses through lxml.html"
         assert all(parser is mo_revisor.PARSER for parser in seen), func.__name__
+
+
+def test_loader_records_the_pages_fetched_at_in_the_section_payload(monkeypatch):
+    added, _ = _loader_pages(monkeypatch, refused=set(), n=2)
+    mo_revisor.load(mo_revisor.db.UNSHARDED)
+    assert added.payloads[("mo_revisor_sections", "1.010/1")]["fetched_at"] == "2026-05-01T12:00:00+00:00"
+
+
+def test_loader_records_the_repeals_pages_fetched_at_on_every_row(monkeypatch):
+    added, _ = _loader_pages(monkeypatch, refused=set(), n=1)
+    monkeypatch.setattr(
+        mo_revisor, "parse_repeals", lambda page: [{"section": "9.1", "bid": 1}, {"section": "9.2", "bid": 2}]
+    )
+    mo_revisor.load(mo_revisor.db.UNSHARDED)
+    assert [added.payloads[("mo_revisor_repeals", k)]["fetched_at"] for k in ("9.1/1", "9.2/2")] == [
+        "2026-05-01T12:00:00+00:00"
+    ] * 2
+
+
+def _stamped_setup(tmp_path, monkeypatch):
+    monkeypatch.setattr(http, "CACHE_DIR", tmp_path)
+    hits = []
+
+    def handler(request):
+        hits.append(str(request.url))
+        return httpx.Response(200, content=b"<html>page</html>")
+
+    monkeypatch.setattr(http, "_client", httpx.Client(transport=httpx.MockTransport(handler)))
+    monkeypatch.setattr(mo_revisor, "POLITE_DELAY", 0)
+    return hits
+
+
+def test_fresh_fetch_is_stamped_with_the_time_it_was_fetched(tmp_path, monkeypatch):
+    _stamped_setup(tmp_path, monkeypatch)
+    before = datetime.now(UTC).replace(microsecond=0)
+    _, fetched_at = mo_revisor._get_stamped("https://revisor.mo.gov/main/OneSection.aspx", {"section": "1.010"})
+    after = datetime.now(UTC)
+    assert before <= datetime.fromisoformat(fetched_at) <= after
+
+
+def test_cache_hit_keeps_the_original_fetch_time_not_the_reuse_time(tmp_path, monkeypatch):
+    hits = _stamped_setup(tmp_path, monkeypatch)
+    url, params = "https://revisor.mo.gov/main/OneSection.aspx", {"section": "1.010"}
+    mo_revisor._get_stamped(url, params, max_age=mo_revisor.SECTION_MAX_AGE)
+    (entry,) = tmp_path.glob("*")
+    now = datetime(2026, 10, 28, 12, 0, 0, tzinfo=UTC)
+    long_ago = now - timedelta(days=30)
+    # one fixed clock for the expiry check and the backdated mtime, so the test does not age out with the calendar
+    monkeypatch.setattr(http, "time", SimpleNamespace(time=lambda: now.timestamp(), sleep=lambda s: None))
+    os.utime(entry, (long_ago.timestamp(), long_ago.timestamp()))  # the page was fetched a month ago
+    page, fetched_at = mo_revisor._get_stamped(url, params, max_age=mo_revisor.SECTION_MAX_AGE)
+    assert len(hits) == 1  # served from the cache
+    assert page == "<html>page</html>"
+    assert fetched_at == long_ago.isoformat()
+
+
+def test_expired_cache_entry_is_refetched_and_restamped(tmp_path, monkeypatch):
+    hits = _stamped_setup(tmp_path, monkeypatch)
+    url, params = "https://revisor.mo.gov/main/OneSection.aspx", {"section": "1.010"}
+    mo_revisor._get_stamped(url, params, max_age=60)
+    (entry,) = tmp_path.glob("*")
+    os.utime(entry, (1_700_000_000, 1_700_000_000))  # older than max_age
+    _, fetched_at = mo_revisor._get_stamped(url, params, max_age=60)
+    assert len(hits) == 2
+    assert datetime.fromisoformat(fetched_at).year >= 2026
