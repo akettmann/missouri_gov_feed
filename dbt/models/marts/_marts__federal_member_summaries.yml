@@ -63,7 +63,9 @@ models:
         data_tests: [not_null]
       - name: bills_with_hearing
         data_type: bigint
-        description: Of those, bills with a "Hearings by" activity in this committee.
+        description: >
+          Of those, bills with a "Hearings by" activity in this committee. BILLSTATUS records "Hearings By" mostly on
+          subcommittee rows, so full-committee rows undercount and 0 does not mean the bill had no hearing.
       - name: bills_marked_up
         data_type: bigint
         description: Of those, bills with a "Markup by" activity in this committee.
@@ -127,7 +129,7 @@ models:
         data_tests: [not_null]
       - name: bills_marked_up
         data_type: bigint
-        description: Of those, bills a committee marked up.
+        description: Of those, bills any committee or subcommittee marked up.
       - name: bills_reported
         data_type: bigint
         description: Of those, bills a full committee reported.

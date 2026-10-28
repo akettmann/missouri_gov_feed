@@ -11,7 +11,7 @@ select
     committee_system_code,
     min(committee_name) as committee_name,
     min(committee_chamber) as committee_chamber,
-    bool_or(is_subcommittee) as is_subcommittee,
+    {{ dbt.bool_or('is_subcommittee') }} as is_subcommittee,
     min(parent_system_code) as parent_system_code,
     count(distinct bill_id) as bills,
     count(distinct case when hearing_date is not null then bill_id end) as bills_with_hearing,
