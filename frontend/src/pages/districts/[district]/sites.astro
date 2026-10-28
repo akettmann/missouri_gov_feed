@@ -46,13 +46,18 @@ const recordContexts = siteLinkContexts(sites);
       <a href={href(`/districts/${list.slug}/sites.csv`)} download>
         Download as CSV
       </a>{" "}
+      ·{" "}
+      <a href={href(`/districts/${list.slug}/sites-donors.csv`)} download>
+        Download the matching donors as CSV
+      </a>{" "}
       · <a href={href(`/officials/${official.slug}/#businesses`)}>Back to the profile</a>
     </p>
     <p class="small muted">
-      In the CSV, <code>donor_links</code> holds one line per donor and filing page inside one quoted cell,
-      each as <code>&lt;url&gt; &lt;donor name&gt;</code>, separated by line breaks. A donor with no filing
-      page has no line there; <code>donor_names</code> lists every matched donor, separated by a "; " (a name
-      as filed can hold its own ";", so the separator is not unique).
+      Every column of the site CSV holds one value. The donors are in a second file,
+      <code>sites-donors.csv</code>, with one line per site, donor and filing page: <code>registry_id</code>
+      (the EPA site ID, the same as in the site CSV) and <code>facility_name</code>, then
+      <code>donor_name</code> as filed and <code>filing_page_url</code>. A donor with no filing page has one
+      line with an empty <code>filing_page_url</code>; a site with no matched donor has no line.
     </p>
     <p class="small">
       <ConfidenceToggle />

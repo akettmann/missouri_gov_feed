@@ -1705,8 +1705,8 @@ offices, shops and most service businesses are missing.
   (one row per official, site, donor and filing page; #370), the donors and their links. A page is the MEC committee
   matched to the official, which is not filtered to the donor, or the FEC disbursements of the donor's committee
   filtered to the receiving committee; a donor filed on both keeps both. Line breaks in a donor name become spaces so a
-  line never splits; the frontend writes them as `<url> <donor name>` lines, which in the published sites.csv sit in one
-  cell. A donor with no page has one row with a null `source_url`.
+  line never splits; the frontend writes them as `<url> <donor name>` lines for the page, and the published
+  sites-donors.csv has one line per site, donor and filing page (sites.csv has no donor columns). A donor with no page has one row with a null `source_url`.
 - Industry: the NAICS code the most program systems (RCRAINFO, NPDES, AIR, ...) give, one count per system however many records it has, taking primary codes first (`naics_source` `naics`,
   31% of the geocoded sites in October 2026), then codes FRS leaves UNKNOWN (`naics_unknown`, 2%), then SECONDARY
   ones (`naics_secondary`, 0.1%). A real NAICS code is more precise than a SIC-derived sector, so only a site with
