@@ -1046,6 +1046,20 @@ Quirks:
 - Amendments: BILLSTATUS keeps each amendment, with its own actions and recorded roll calls, under `<amendments>`.
   That element is not parsed, so no amendment roll call is linked to a bill and `fct_federal_vote_bills` has no
   amendment votes (parsing them is #738).
+- Committees and subjects of Missouri members' bills (#737): `fct_federal_sponsorship_committees` (one row per
+  member, bill, role and committee or subcommittee, with the earliest referred, hearing, markup, reported and
+  discharged dates in that committee) and `fct_federal_sponsorship_subjects` (one row per member, bill, role and CRS
+  subject). Both are `fct_federal_sponsorship` times the staging rows, so they cover the same members and roles. On
+  the 118th hr and s: 3,991 committee rows over 1,560 of Missouri's sponsored or cosponsored bills (797 are
+  subcommittee rows), 10,342 subject rows over 719 bills; the rest have no subject yet. A cosponsorship is much
+  weaker evidence than a sponsorship, so read `role`. `reported_date` on a subcommittee row means the subcommittee
+  forwarded the bill to the full committee (118-hr-1774 hsvr03 "Reported by"; 35 such rows on the 118th hr and s); on a full committee it
+  means reported to the chamber. A House full committee's `discharged_date` can be the day its subcommittee was
+  discharged, because Congress.gov records it under the parent too (118-hr-6494 hspw00 discharged 2023-12-06, marked
+  up the same day, reported 2024-12-16; 21 of the 115 full-committee rows with a discharged date, all House, also have a
+  later markup or report; counts as of 2026-10-27 on the 118th hr and s), so check `reported_date`; a warn-level test flags growth in that pattern. The "Re-Referred to" label (normalized
+  `re referred to`) was accepted in staging after one review build saw it; it does not occur in the 118th hr and s loaded for #737.
+  Related bills and subcommittee-level summaries are not in a mart yet.
 - Rate: the loader makes one request per zip (24 for the default window), not per bill.
 
 ## house_fd: U.S. House financial disclosures
