@@ -7,7 +7,7 @@
 {# Gap between the digit groups of a 10-digit number (#751): optional space, optional dash or dot, optional space, so
    "573 - 751 - 1167", "573 -751- 1167" and "(573) - 751-1167" read as one number. A character class only (no
    group), so the replacement group numbers below do not move. #}
-{% macro sep_gap() -%}[   ]?[   .‐‑‒–—―−-]?[   ]?{%- endmacro %}
+{% macro sep_gap() -%}[   ]?[   .‐‑‒–—―−-]?[   ]?{%- endmacro %}
 {% macro sep_nodot() -%}[   ‐‑‒–—―−-]{%- endmacro %}
 
 {# Redact contact strings from free text, keeping the rest of the sentence. This project keeps citizens' email
