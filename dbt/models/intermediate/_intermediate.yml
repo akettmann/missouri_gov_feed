@@ -524,6 +524,12 @@ models:
     seat dates break the tie: a person whose seat did not cover the vote date is dropped if another candidate''s
     did ("EVANS" after Jean Evans left on 2019-02-05 is David Evans). Tokens still matching zero or several people
     stay unattributed rather than guessed. Grain: one row per (House roll call, attributed person).'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - vote_id
+        - member_token
 - name: int_mo_legislators__final_checks
   description: 'Legislator payroll rows that are a departed member''s final check: a small payment to a payee whose
     surname and first name fit a member of the same chamber whose seat ended the December before the pay year, or
