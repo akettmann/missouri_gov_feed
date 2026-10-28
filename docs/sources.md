@@ -538,6 +538,11 @@ lists actions for House bills and for Senate bills only once they reach the Hous
   so both rows are kept; only an identical URL is deduped). The Senate serves one PDF URL for several text versions
   (e.g. two House Committee Substitutes), and that link collapses to one row. The Senate PDFs are not fetched yet
   (#590), so `page_count` and the text columns are null on Senate rows.
+- In the marts (#839): each bill's sponsor (`sponsorLastName`, `sponsorFirstName`, `districtNumber`) becomes the
+  `Sponsor` row of the bill in `marts.fct_bill_sponsors` (`stg_mo_senate__bill_sponsors`), matched to the senator
+  holding the district's seat that year. The list names one sponsor and no co-sponsors, so a Senate bill has one row.
+  The list prints a surname shared by two senators with the district, "Brown (16)"; staging drops the suffix.
+  One list row (2022 SB 2162) has no sponsor at all and is left out.
 - Window: `MOGOV_LOOKBACK_YEARS`: the regular session (`R`) of each year plus every extraordinary session
   (`E1`, `E2`, ... until one comes back empty). Shard units: bills, split by a stable hash of
   `year/session/billId`. Every shard reads every session list once (cached) and takes its bills, so the split

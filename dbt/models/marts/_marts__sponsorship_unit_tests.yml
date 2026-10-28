@@ -75,6 +75,10 @@ unit_tests:
         format: sql
         rows: |
             select '211' as session_code, 'HB1' as bill, 'signed' as status
+      - input: ref('stg_mo_senate__bill_sponsors')
+        format: sql
+        rows: |
+            select cast(null as varchar) as session_code, cast(null as integer) as session_year, cast(null as varchar) as bill, cast(null as varchar) as sponsor_type, cast(null as varchar) as sponsor_name, cast(null as integer) as sponsor_district where false
       - input: ref('stg_mo_house__bill_sponsors')
         format: sql
         rows: |
@@ -149,6 +153,10 @@ unit_tests:
         format: sql
         rows: |
             select '191' as session_code, 'HB1' as bill, 'signed' as status
+      - input: ref('stg_mo_senate__bill_sponsors')
+        format: sql
+        rows: |
+            select cast(null as varchar) as session_code, cast(null as integer) as session_year, cast(null as varchar) as bill, cast(null as varchar) as sponsor_type, cast(null as varchar) as sponsor_name, cast(null as integer) as sponsor_district where false
       - input: ref('stg_mo_house__bill_sponsors')
         format: sql
         rows: |
@@ -195,3 +203,69 @@ unit_tests:
           select '191', 'HB16', 'Sponsor', 'Pat Roe', 'state_senate', 31, cast(null as varchar) union all
           select '191', 'HB17', 'Sponsor', 'Terry Vale', 'state_senate', 28, 'p_vale' union all
           select '191', 'HB18', 'Handler', 'Mike Moon', 'state_house', 157, 'p_moon'
+
+  - name: bill_sponsors_match_senate_bill_sponsors_by_district_and_session_year
+    model: fct_bill_sponsors
+    description: >
+      The Senate's bill list names one sponsor per bill (#839), with the senate district itself (the House XML adds
+      200). Each is matched to the senator holding that district's seat in the session's year whose surname is in the
+      listed name. SB1 (2021): Sandy Crawford, district 28, matches p_crawford, who held seat 28 in 2019-2022. A seat
+      change in the same year: district 10 was Pat Old's until 2021-05-31 and Kim Newer's from 2021-06-01, so SB2
+      (Pat Old) and SB3 (Kim Newer), both 2021, each match their own senator, and Pat Old's SB4 in 2023, after the
+      seat ended, does not match (the year decides). SB5 by Zed Nobody, district 12, has no senator of that surname
+      in the seat: official_id stays null (row kept, chamber and district from the list). Two Browns, districts 16
+      and 26: each SB matches the Brown of its district. SB7 is in a session with no House code (session_code null)
+      and is left out. The House bill HB1 (Jo Jones, district 4) is unaffected. Every row has sponsor_type Sponsor
+      and one row per Senate bill.
+    given:
+      - input: ref('int_bills__status')
+        format: sql
+        rows: |
+            select '211' as session_code, 'HB1' as bill, 'signed' as status
+      - input: ref('stg_mo_house__bill_sponsors')
+        format: sql
+        rows: |
+            select '211' as session_code, 2021 as session_year, 'HB1' as bill, 'Sponsor' as sponsor_type, 'Jo Jones' as sponsor_name, 4 as sponsor_district
+      - input: ref('stg_mo_senate__bill_sponsors')
+        format: sql
+        rows: |
+            select '211' as session_code, 2021 as session_year, 'SB1' as bill, 'Sponsor' as sponsor_type, 'Sandy Crawford' as sponsor_name, 28 as sponsor_district union all
+            select '211', 2021, 'SB2', 'Sponsor', 'Pat Old', 10 union all
+            select '211', 2021, 'SB3', 'Sponsor', 'Kim Newer', 10 union all
+            select '231', 2023, 'SB4', 'Sponsor', 'Pat Old', 10 union all
+            select '211', 2021, 'SB5', 'Sponsor', 'Zed Nobody', 12 union all
+            select '211', 2021, 'SB6', 'Sponsor', 'Justin Brown', 16 union all
+            select '211', 2021, 'SB8', 'Sponsor', 'Ben Brown', 26 union all
+            select cast(null as varchar), 2021, 'SB7', 'Sponsor', 'Sandy Crawford', 28
+      - input: ref('int_mo_house__member_identity')
+        format: sql
+        rows: |
+            select '211' as session_code, 4 as district_number, 'Jo' as first_name, 'Jo Jones' as full_name, 'jones' as surname_key, 'p_jones' as person_key
+      - input: ref('int_mo_legislators__seats')
+        format: sql
+        rows: |
+            select 'upper' as chamber, 28 as district_number, cast('2019-01-01' as date) as start_date, cast('2022-12-31' as date) as end_date, 'crawford' as surname_key, 'p_crawford' as person_id union all
+            select 'upper', 10, cast('2019-01-01' as date), cast('2021-05-31' as date), 'old', 'p_old' union all
+            select 'upper', 10, cast('2021-06-01' as date), cast('2024-12-31' as date), 'newer', 'p_newer' union all
+            select 'upper', 16, cast('2019-01-01' as date), cast('2024-12-31' as date), 'brown', 'p_brown16' union all
+            select 'upper', 26, cast('2019-01-01' as date), cast('2024-12-31' as date), 'brown', 'p_brown26'
+      - input: ref('dim_official')
+        format: sql
+        rows: |
+            select 'p_jones' as official_id union all
+            select 'p_crawford' union all
+            select 'p_old' union all
+            select 'p_newer' union all
+            select 'p_brown16' union all
+            select 'p_brown26'
+    expect:
+      format: sql
+      rows: |
+          select '211' as session_code, 'HB1' as bill, 'Sponsor' as sponsor_type, 'Jo Jones' as sponsor_name, 'state_house' as sponsor_chamber, 4 as sponsor_district, 'p_jones' as official_id union all
+          select '211', 'SB1', 'Sponsor', 'Sandy Crawford', 'state_senate', 28, 'p_crawford' union all
+          select '211', 'SB2', 'Sponsor', 'Pat Old', 'state_senate', 10, 'p_old' union all
+          select '211', 'SB3', 'Sponsor', 'Kim Newer', 'state_senate', 10, 'p_newer' union all
+          select '231', 'SB4', 'Sponsor', 'Pat Old', 'state_senate', 10, cast(null as varchar) union all
+          select '211', 'SB5', 'Sponsor', 'Zed Nobody', 'state_senate', 12, cast(null as varchar) union all
+          select '211', 'SB6', 'Sponsor', 'Justin Brown', 'state_senate', 16, 'p_brown16' union all
+          select '211', 'SB8', 'Sponsor', 'Ben Brown', 'state_senate', 26, 'p_brown26'
