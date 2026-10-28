@@ -1,4 +1,10 @@
--- Sponsors, co-sponsors, handlers and conferees of each House bill, matched to officials where possible.
+-- Sponsors, co-sponsors, handlers and conferees of each House bill, matched to officials where possible, and the
+-- primary sponsor of each Senate bill (SB, SJR, SCR, SR) from senate.mo.gov's bill list (#839): sponsor_type
+-- 'Sponsor', sponsor_chamber state_senate, sponsor_district the senate district, matched like any senator below
+-- (district, the senator holding the seat in the session year, and the surname in the listed name). The Senate list
+-- has no co-sponsors, so a Senate bill has one row. The two lists are disjoint (House bills start with H, Senate
+-- bills with S), so no bill is counted twice. Consumers that mean House bills filter on the bill type or on
+-- sponsor_chamber state_house (fct_sponsorship_outcomes does both).
 -- The House numbers senators 200 + senate district. A representative is matched on (session, district)
 -- through the House roster; a senator on the senate seat held that year. Either way the listed name must
 -- contain the member's surname. The House XML lists a representative's latest district for every session, so
@@ -40,6 +46,23 @@ sponsors as (
     from {{ ref('stg_mo_house__bill_sponsors') }} as sp
     left join relisted as rl on sp.session_code = rl.session_code and sp.bill = rl.bill
     where rl.bill is null
+
+    union all
+
+    -- the Senate's own list numbers senators by their district; the House's 200 + district is restored here so the
+    -- one senate_match rule reads both
+    select
+        ss.session_code,
+        ss.session_year,
+        ss.bill,
+        ss.sponsor_type,
+        ss.sponsor_name,
+        200 + ss.sponsor_district as sponsor_district,
+        {{ mogov.name_key('ss.sponsor_name') }} as sponsor_key,
+        'state_senate' as sponsor_chamber,
+        false as is_house_role
+    from {{ ref('stg_mo_senate__bill_sponsors') }} as ss
+    where ss.session_code is not null and ss.sponsor_district is not null
 ),
 
 house_match as (
