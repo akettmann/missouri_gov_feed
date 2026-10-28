@@ -178,9 +178,9 @@ profile's (or another past entry's) shows a neutral "same name" cross-link; name
 The businesses section of a profile carries only the donor-tied sites and counts by industry (a U.S. House
 district holds about 10,000 EPA-regulated sites). The full list per district or city is built from
 `fct_jurisdiction_businesses` into `dist/districts/<district>/sites/index.html` (a plain table, no JavaScript
-needed) and `dist/districts/<district>/sites.csv`, 201 districts in all; `<district>` is the `district_id` with
+needed) `dist/districts/<district>/sites.csv` and `dist/districts/<district>/sites-donors.csv`, 201 districts in all; `<district>` is the `district_id` with
 `:` replaced by `-` (`state_house-135`). Donor-tied rows name the donor, link to where the contributions are filed
-and carry the "possible match" badge, so the "Hide possible matches" toggle applies; the CSV has the same columns.
+and carry the "possible match" badge, so the "Hide possible matches" toggle applies; `sites.csv` has the page's columns plus `registry_id`, one value per cell; `sites-donors.csv` has one line per site, donor and filing page (`registry_id`, `facility_name`, `donor_name`, `filing_page_url`).
 `lib/exports/districtSites.ts` reads `fct_jurisdiction_businesses` and `fct_jurisdiction_business_donors` once each (two queries, grouped in memory) and fails the build if a
 district maps to several officials or an official to several districts. Measured on this machine against main
 (about 218k site rows, 402 extra routes): `dist/` 64 MB to 174 MB; peak node memory about 0.6-0.7 GB to about

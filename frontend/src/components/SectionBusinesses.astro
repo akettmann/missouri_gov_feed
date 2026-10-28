@@ -144,7 +144,8 @@ const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : 
       {siteList && (
         <p class="small">
           <a href={href(`/districts/${siteList.slug}/sites/`)}>See all {sitesText(siteList.n_sites)}</a> (one
-          page) or <a href={href(`/districts/${siteList.slug}/sites.csv`)}>download them as CSV</a>.
+          page) or <a href={href(`/districts/${siteList.slug}/sites.csv`)}>download them as CSV</a> (the
+          matching donors are a second CSV on that page).
         </p>
       )}
       <p class="small muted">
