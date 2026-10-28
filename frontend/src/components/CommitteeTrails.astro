@@ -27,7 +27,9 @@ const TRAIL_LABEL: Record<string, string> = {
   "mec committee": "Missouri committee: its own donors are on MEC",
   "ambiguous mec name": "Several Missouri committees use this name",
   "not an mec filer": "Not a Missouri filer (federal and out-of-state PACs report elsewhere)",
-  "own name": "Same name as this committee itself; not followed",
+  "own name": "Filed under one of this committee's own names; not followed",
+  "similar name":
+    "Name close to this committee's own (may be a parent body or another state's affiliate); not followed",
   "end of trail": "End of the trail: an organization's own funders aren't reported to MEC",
   individuals: "People, each giving itemized amounts",
 };
@@ -36,7 +38,9 @@ const SUMMARY_LABEL: Record<TrailKind, string> = {
   "end of trail":
     "Businesses and other organizations: the Missouri Ethics Commission (MEC) does not receive their own donors",
   "not an mec filer": "Not found among Missouri filers (federal or out-of-state PACs)",
-  "own name": "Name matches the committee itself, which does not fund itself; not followed",
+  "own name": "Filed under one of the committee's own names, which does not fund itself; not followed",
+  "similar name":
+    "Name close to the committee's own (a parent body or another state's affiliate?); not followed",
   "ambiguous mec name": "Name shared by several Missouri committees",
   individuals: "Individuals (itemized gifts, added together)",
   "mec committee": "Missouri committees: their own donors are on MEC",

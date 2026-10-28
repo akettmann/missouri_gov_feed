@@ -76,7 +76,7 @@ export interface CommitteeDonorRow {
   contribution_count: number;
   first_year: number | null;
   last_year: number | null;
-  /** mec committee | ambiguous mec name | not an mec filer | own name | end of trail | individuals */
+  /** mec committee | ambiguous mec name | not an mec filer | own name (high-confidence self match) | similar name (core-name self match) | end of trail | individuals */
   trail_status: string;
   donor_mec_committee_id: string | null;
 }
