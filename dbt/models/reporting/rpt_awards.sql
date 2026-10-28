@@ -21,7 +21,8 @@
 --                      share the House passed, counting only decided bills (not pending, not awaiting the
 --                      governor). Per calendar year of the session (a year's regular and special sessions summed)
 --                      and lifetime (counts summed over all loaded sessions, not an average of shares). Needs
---                      awards_min_bills_decided (default 10) decided bills in the period. Ranked among
+--                      awards_min_bills_decided (default 10) decided bills in the period and at least one bill passed
+--                      (a 0% member is never a winner; group_size is still the whole field). Ranked among
 --                      state_house, whatever office the member holds now. Not a pair: the low end is mostly a
 --                      tie at 0% (most bills die in committee), so there is no "fewest passed" award; read
 --                      early years with care, only members still in office are in the data (see
@@ -272,7 +273,10 @@ house_passage as (
         round(100.0 * bills_passed_house / bills_decided, 1) as metric,
         bills_decided as sample_size,
         -- the unrounded share ranks (rounding made fake ties)
-        100.0 * bills_passed_house / bills_decided as share_exact
+        100.0 * bills_passed_house / bills_decided as share_exact,
+        bills_passed_house,
+        -- the whole ranked field, before members with no passed bill are dropped (like Maverick's field_size)
+        count(*) over (partition by period) as field_size
     from house_passage_totals
     where bills_decided >= {{ var('awards_min_bills_decided') }}
 ),
@@ -363,8 +367,11 @@ measures as (
         metric,
         sample_size,
         -share_exact as sort_key,
-        cast(null as {{ dbt.type_bigint() }}) as field_size
+        field_size
     from house_passage
+    -- a top-share award needs at least one passed bill: in a thin field a tie at the cutoff must not
+    -- let 0% members win. group_size stays the whole ranked field, as for Maverick
+    where bills_passed_house > 0
 ),
 
 ranked as (

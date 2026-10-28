@@ -567,7 +567,8 @@ models:
       HJR primary sponsorships (fct_sponsorship_outcomes: not pending, not awaiting the governor; sessions
       that have ended only; co-sponsored bills and resolutions not counted; appropriation bills counted) that
       the House passed, per session year and lifetime (counts summed), with at least awards_min_bills_decided
-      decided bills (default 10). It has no low end: most bills are never passed, so a "fewest" list would be
+      decided bills (default 10) and at least one passed (a 0% member never wins; group_size stays the whole
+      ranked field, as for Maverick). It has no low end: most bills are never passed, so a "fewest" list would be
       a tie at 0%. Early years are not comparable with recent ones (only current officials are in the data).
       Only attendance and party unity are pairs (the two ends rank one number over one field); each end's
       cutoff is at most half that field (floor(group_size / 2)), ties at the cutoff can add more, so

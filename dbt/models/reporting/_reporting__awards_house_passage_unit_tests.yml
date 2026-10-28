@@ -91,3 +91,40 @@ unit_tests:
       rows:
         - {award: most_bills_passed_house, office: state_house, period: '2023', period_kind: year, official_id: q, award_rank: 1, metric: 85.0, sample_size: 20, group_size: 3, streak_years: 1}
         - {award: most_bills_passed_house, office: state_house, period: lifetime, period_kind: lifetime, official_id: q, award_rank: 1, metric: 85.0, sample_size: 20, group_size: 3, streak_years: null}
+
+  - name: awards_house_passage_needs_at_least_one_passed_bill
+    model: rpt_awards
+    description: >
+      A winner needs at least one passed bill (like Maverick's one break). In a thin field of 4 with a cutoff of
+      2, q (3 of 10) is first and s, t and u (0 of 10 each) tie for second, which would put three 0% members on
+      the list. They get no row, and group_size stays 4 (the whole ranked field, as Maverick reports it).
+    overrides:
+      vars:
+        awards_threshold: {default: 2}
+        awards_min_field_size: 2
+        awards_min_bills_decided: 10
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: q, office: state_house}
+          - {official_id: s, office: state_house}
+          - {official_id: t, office: state_house}
+          - {official_id: u, office: state_house}
+      - input: ref('rpt_attendance')
+        rows: []
+      - input: ref('rpt_donor_rollup')
+        rows: []
+      - input: ref('fct_federal_donor_summary')
+        rows: []
+      - input: ref('fct_party_unity_yearly')
+        rows: []
+      - input: ref('fct_sponsorship_outcomes')
+        rows:
+          - {official_id: q, session_code: '231', session_year: 2023, is_session_over: true, bills_decided: 10, bills_passed_house: 3}
+          - {official_id: s, session_code: '231', session_year: 2023, is_session_over: true, bills_decided: 10, bills_passed_house: 0}
+          - {official_id: t, session_code: '231', session_year: 2023, is_session_over: true, bills_decided: 10, bills_passed_house: 0}
+          - {official_id: u, session_code: '231', session_year: 2023, is_session_over: true, bills_decided: 10, bills_passed_house: 0}
+    expect:
+      rows:
+        - {award: most_bills_passed_house, office: state_house, period: '2023', period_kind: year, official_id: q, award_rank: 1, metric: 30.0, sample_size: 10, group_size: 4, streak_years: 1}
+        - {award: most_bills_passed_house, office: state_house, period: lifetime, period_kind: lifetime, official_id: q, award_rank: 1, metric: 30.0, sample_size: 10, group_size: 4, streak_years: null}

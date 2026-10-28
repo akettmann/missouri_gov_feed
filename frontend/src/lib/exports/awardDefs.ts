@@ -66,7 +66,7 @@ export const AWARDS: Record<
       "in sessions that have ended, out of those whose outcome is known (bills still pending are not " +
       "counted), and shows the share the House passed. Appropriation bills are included; co-sponsored bills " +
       "and resolutions (HR, HCR) are not. A year adds its regular and special sessions; at least 10 decided " +
-      "bills are needed. Only current officials are in the data, so early years are not comparable with " +
+      "bills are needed, and at least one must have passed. Only current officials are in the data, so early years are not comparable with " +
       "recent ones. Bills from the majority party pass far more often, and most members pass none, so there " +
       "is no “fewest passed” list.",
     unit: "pct",
