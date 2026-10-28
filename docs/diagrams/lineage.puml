@@ -91,7 +91,7 @@ package "marts" {
   [dim_district\nfct_official_districts] as D_dist
   [dim_zcta] as D_zcta
   [fct_votes\nfct_federal_votes] as F_votes
-  [fct_federal_sponsorship\nfct_federal_vote_bills] as F_spons
+  [fct_federal_sponsorship\nfct_federal_sponsorship_committees\nfct_federal_sponsorship_subjects\nfct_federal_vote_bills\nfct_federal_vote_amendments] as F_spons
   [fct_campaign_finance\nfct_federal_donor_summary\nfct_campaign_spending\nfct_campaign_reports] as F_money
   [fct_lobbyist_gifts] as F_gifts
   [fct_disclosures\nfct_voluntary_disclosures] as F_disc

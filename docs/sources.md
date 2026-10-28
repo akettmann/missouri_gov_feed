@@ -946,7 +946,8 @@ rule against `/bulkdata`, US government work (the page states no licence). Congr
   `govinfo_billstatus_bills`, `_sponsors`, `_cosponsors`, `_actions`, `_recorded_votes`, `_laws`, and (#625)
   `_committees` (committees and subcommittees a bill was referred to), `_committee_activities` (their dated steps),
   `_subjects` (CRS legislative subject terms), `_related_bills` and `_related_bill_relationships`. Summaries,
-  titles, text versions and amendments (with the roll calls recorded on them) stay in the raw XML only.
+  `_amendments`, `_amendment_sponsors`, `_amendment_actions` and `_amendment_recorded_votes` (#738). Summaries,
+  titles and text versions stay in the raw XML only.
 - Shard units: (congress, bill type) zips, each downloaded by exactly one shard (so no shard repeats another's
   download). The House `hr` zip is by far the largest, so more shards than zips (8 per Congress) gain nothing.
 - Everything is landed (all states): cosponsor lists need the whole file anyway, and the Missouri filter
@@ -1043,9 +1044,25 @@ Quirks:
 - The older export of the eleven reserved 117th bills wraps these lists one level deeper
   (`<committees><billCommittees/>`, `<subjects><billSubjects><legislativeSubjects/>`); all eleven are empty, and
   the parser looks through the wrapper if one ever has entries.
-- Amendments: BILLSTATUS keeps each amendment, with its own actions and recorded roll calls, under `<amendments>`.
-  That element is not parsed, so no amendment roll call is linked to a bill and `fct_federal_vote_bills` has no
-  amendment votes (parsing them is #738).
+- Amendments (#738): BILLSTATUS keeps each amendment, with its own actions and recorded roll calls, under `<amendments>`
+  of the bill it was filed to. The parser lands four tables: `govinfo_billstatus_amendments` (number, type, chamber,
+  purpose, description, dates, the bill amended), `_amendment_sponsors`, `_amendment_actions` and
+  `_amendment_recorded_votes` (the roll calls those actions cite). Staging is `stg_govinfo_billstatus__amendments`,
+  `__amendment_sponsors`, `__amendment_actions` and `__amendment_recorded_votes`; `fct_federal_vote_amendments` joins
+  the cited roll calls to Voteview (same key as `fct_federal_vote_bills`: congress, chamber, session and Voteview's
+  `clerk_rollnumber`) and to the bill. Grain: (congress, chamber, rollnumber, `amendment_id`); an amendment can have
+  several roll calls and a roll call can cite more than one amendment. It is a sibling of `fct_federal_vote_bills`,
+  not part of it, so a bill's vote list is not a pile of floor amendments. Counts as of 2026-10-27, 117th and 118th:
+  11,545 amendments (117th: 333 HAMDT, 6,618 SAMDT; 118th: 1,235 HAMDT, 3,359 SAMDT); their actions cite 1,059
+  distinct roll calls and every one is in Voteview.
+  - The mart holds more than votes on the amendment itself: 9 Senate cloture votes on substitute amendments, 3 House
+    "Ordering the Previous Question" votes cited under a minority amendment to the H.Res, and 43 Senate "On the
+    Motion" rows. Read `vote_question` to tell them apart.
+  - Most amendments are never proposed: 9,216 of 9,977 SAMDTs have a null `proposed_date` (only proposed ones have
+    one; House ones carry `submitted_date`). `purpose` and `description` are free text and null for 9,211 of 11,545.
+  - `vote_date` is the date part of a UTC timestamp, so it is off by a day from Voteview's date for 213 of 1,060 rows
+    (#790). Use Voteview's date for the day of the vote.
+  - A roll call missing here means no amendment was found for it, not that none was voted on.
 - Committees and subjects of Missouri members' bills (#737): `fct_federal_sponsorship_committees` (one row per
   member, bill, role and committee or subcommittee, with the earliest referred, hearing, markup, reported and
   discharged dates in that committee) and `fct_federal_sponsorship_subjects` (one row per member, bill, role and CRS
