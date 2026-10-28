@@ -1,0 +1,42 @@
+# Unit tests for fct_federal_vote_amendments: BILLSTATUS cites (session, clerk roll number); Voteview's rollnumber runs on.
+version: 2
+
+unit_tests:
+  - name: federal_vote_amendments_join_on_session_and_clerk_roll_number
+    model: fct_federal_vote_amendments
+    description: >
+      Voteview's House roll calls 5 (session 1, clerk number 5) and 720 (session 2, clerk number 5) share a clerk
+      number; BILLSTATUS cites "118, House, session 2, roll 5" for amendment 118-hamdt-7, so only Voteview roll call
+      720 matches (joining on rollnumber would link it to roll call 5, a different vote). The chamber action and its
+      Library of Congress copy both cite that roll call, giving one row, and the row carries the amendment's bill
+      (118-hr-2), not the amendment's own number. Senate amendment 118-samdt-9 cites Senate session 1 roll 5 and links
+      to Voteview Senate roll call 5; a House citation does not match the Senate roll call with the same numbers.
+      118-hamdt-8 cites a roll call Voteview does not have and links to nothing. 118-hamdt-9 is filed to a bill
+      absent from the bills model and is dropped.
+    given:
+      - input: ref('stg_govinfo_billstatus__amendment_recorded_votes')
+        rows:
+          - {amendment_id: 118-hamdt-7, action_position: 0, chamber: House, congress: 118, session_number: 2, roll_number: 5}
+          - {amendment_id: 118-hamdt-7, action_position: 2, chamber: House, congress: 118, session_number: 2, roll_number: 5}
+          - {amendment_id: 118-hamdt-8, action_position: 0, chamber: House, congress: 118, session_number: 2, roll_number: 999}
+          - {amendment_id: 118-hamdt-9, action_position: 0, chamber: House, congress: 118, session_number: 2, roll_number: 5}
+          - {amendment_id: 118-samdt-9, action_position: 0, chamber: Senate, congress: 118, session_number: 1, roll_number: 5}
+      - input: ref('stg_govinfo_billstatus__amendments')
+        rows:
+          - {amendment_id: 118-hamdt-7, amendment_type: hamdt, amendment_number: 7, purpose: P7, description: D7, bill_id: 118-hr-2}
+          - {amendment_id: 118-hamdt-8, amendment_type: hamdt, amendment_number: 8, purpose: null, description: null, bill_id: 118-hr-2}
+          - {amendment_id: 118-hamdt-9, amendment_type: hamdt, amendment_number: 9, purpose: null, description: null, bill_id: 118-hr-77}
+          - {amendment_id: 118-samdt-9, amendment_type: samdt, amendment_number: 9, purpose: P9, description: null, bill_id: 118-s-4}
+      - input: ref('stg_govinfo_billstatus__bills')
+        rows:
+          - {bill_id: 118-hr-2, bill_type: hr, bill_number: 2, title: Two, legislation_url: u2}
+          - {bill_id: 118-s-4, bill_type: s, bill_number: 4, title: Four, legislation_url: u4}
+      - input: ref('stg_voteview__rollcalls')
+        rows:
+          - {congress: 118, chamber: House, rollnumber: 5, session: 1, clerk_rollnumber: 5, bill_number: HR1}
+          - {congress: 118, chamber: House, rollnumber: 720, session: 2, clerk_rollnumber: 5, bill_number: HR2}
+          - {congress: 118, chamber: Senate, rollnumber: 5, session: 1, clerk_rollnumber: 5, bill_number: S4}
+    expect:
+      rows:
+        - {congress: 118, chamber: House, rollnumber: 720, amendment_id: 118-hamdt-7, amendment_number: 7, amendment_purpose: P7, amendment_description: D7, bill_id: 118-hr-2, bill_no: 2, voteview_bill_number: HR2, source_url: https://voteview.com/rollcall/RH1180720}
+        - {congress: 118, chamber: Senate, rollnumber: 5, amendment_id: 118-samdt-9, amendment_number: 9, amendment_purpose: P9, amendment_description: null, bill_id: 118-s-4, bill_no: 4, voteview_bill_number: S4, source_url: https://voteview.com/rollcall/RS1180005}

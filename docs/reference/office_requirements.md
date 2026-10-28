@@ -1,8 +1,8 @@
 # Legal requirements to hold or run for each office
 
 Legal text checked 2026-10-27 (issue #296). Each bullet is one requirement, written in plain words, with a link to the
-law that sets it. Reading level: Flesch-Kincaid grade about 4.9 (own estimate, simple syllable count) with the quoted legal wording included
-(3.8 without it). This describes what the law says a
+law that sets it. Reading level: Flesch-Kincaid grade about 7 with the quoted legal wording (7.1) and about 6 without it (5.7), measured
+with the Python `textstat` package on the page text with abbreviations protected. That is under the grade-12 target. This describes what the law says a
 person needs to hold or run for the office. It does not say whether any officeholder or candidate meets the rules. The
 layout is the same for every office, and matches `docs/reference/office_responsibilities.md` (what each office does).
 
@@ -17,8 +17,10 @@ How to read it:
   Constitution and its amendments are quoted from the National Archives transcripts. Quotes are short so the exact
   words can be checked. Laws change by amendment or new statute. Check the linked page for the current text.
 - Words used: a **qualified voter** is a person who meets the voting rules in Missouri Constitution art. VIII, §2:
-  a U.S. citizen over 18 who lives in Missouri and the local area and is registered within the time the law sets
-  ([art. VIII, §2][mc-viii-2]). An
+  a U.S. citizen over 18 who lives in Missouri and the local area and is registered within the time the law sets.
+  The same section excludes anyone with a court-appointed guardian "by reason of mental incapacity", anyone
+  "involuntarily confined in a mental institution" by a court, and says persons convicted of a felony "may be excluded
+  by law" ([art. VIII, §2][mc-viii-2]). An
   **inhabitant** is a person who lives in the place. A **declaration of candidacy** is the sworn form a person files to
   get on the ballot. A **felony** is a crime that the felony law cited in each rule counts as a felony. A **retention
   election** is a yes-or-no vote on whether a judge keeps the job.
@@ -33,7 +35,8 @@ the state of Missouri". Each office section links back here.
   the laws of this state or an offense committed in another state that would be considered a felony in this state."
   ([RSMo 115.306][rsmo-115-306])
 - **Taxes.** A candidate is out of the race if "delinquent in the payment of any state income taxes, personal property
-  taxes, municipal taxes, real property taxes on the place of residence". A candidate must file a sworn tax statement
+  taxes, municipal taxes, real property taxes on the place of residence", or if "a past or present corporate officer of
+  any fee office that owes any taxes to the state". A candidate must file a sworn tax statement
   with the Department of Revenue and attach a copy to the declaration of candidacy.
   ([RSMo 115.306][rsmo-115-306])
 - **Filing window.** File the declaration of candidacy "by 5:00 p.m. on the last Tuesday in March immediately preceding
@@ -51,8 +54,9 @@ Notes:
 
 - [1] The felony rule has a court ruling on pardons: a governor's pardon "extinguishes the fact of a felony
   conviction, but does not erase the fact of a felony guilty plea." (Noted on [RSMo 115.306][rsmo-115-306]: Fletcher v.
-  Young, 689 S.W.3d 161 (Mo. banc 2024).) The section was amended by 2026 H.B. 1871; this page quotes the text shown on
-  revisor.mo.gov on 2026-10-27, so re-check the wording before relying on it.
+  Young, 689 S.W.3d 161 (Mo. banc 2024).) The section's history ends "A.L. 2026 H.B. 1871" with no future-effective marker on revisor.mo.gov, so the text
+  quoted here (as shown on 2026-10-27) is very likely the version in effect since 2026-08-28. Re-check the wording
+  before relying on it.
 - [2] The tax rule has a repair path. If the Department of Revenue finds a false tax statement, the candidate gets
   "thirty days to remit" the tax owed that is not in dispute. If the candidate does not pay, the candidate is
   disqualified "and barred from refiling for an entire election cycle". ([RSMo 115.306][rsmo-115-306])
@@ -77,13 +81,14 @@ Notes:
   ([Mo. Const. art. III, §4][mc-iii-4])
 - **Citizenship.** U.S. citizen. See the general rule in note [5] of "Rules for every Missouri candidate".
   ([Mo. Const. art. VII, §8][mc-vii-8])
-- **Residency.** Live in the district for one year before the election. A representative must "next before the day of his
+- **Residency.** Live in the county or district for one year before the election. A representative must "next before the day of his
   election" have been "a resident of the county or district which he is chosen to represent for one year".
   ([Mo. Const. art. III, §4][mc-iii-4])
 - **Voter.** Be a qualified voter for two years before the election. ([Mo. Const. art. III, §4][mc-iii-4])
-- **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid state or local taxes.
+- **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid taxes of the kinds listed in RSMo 115.306 (see "Rules for every Missouri candidate").
   ([RSMo 115.306][rsmo-115-306])
-- **Terms.** The House has "one hundred sixty-three members elected at each general election".
+- **Terms.** Two years: the House has "one hundred sixty-three members elected at each general election", and general
+  elections are held every two years.
   ([Mo. Const. art. III, §3][mc-iii-3])
 - **Term limit.** "No one shall be elected to serve more than eight years total in any one house of the General Assembly
   nor more than sixteen years total in both houses". ([Mo. Const. art. III, §8][mc-iii-8])
@@ -117,7 +122,7 @@ Notes:
   represent for one year". ([Mo. Const. art. III, §6][mc-iii-6])
 - **Voter.** Be a "qualified voter of the state for three years" before the election.
   ([Mo. Const. art. III, §6][mc-iii-6])
-- **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid state or local taxes.
+- **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid taxes of the kinds listed in RSMo 115.306 (see "Rules for every Missouri candidate").
   ([RSMo 115.306][rsmo-115-306])
 - **Terms.** "The senate shall consist of thirty-four members elected by the qualified voters of the senatorial
   districts for a term of four years." ([Mo. Const. art. III, §5][mc-iii-5])
@@ -144,7 +149,7 @@ Notes:
 - **Residency.** "A resident of this state at least ten years next before election".
   ([Mo. Const. art. IV, §3][mc-iv-3])
 - **Voter.** No separate voter rule found in art. IV, §3.
-- **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid state or local taxes.
+- **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid taxes of the kinds listed in RSMo 115.306 (see "Rules for every Missouri candidate").
   ([RSMo 115.306][rsmo-115-306])
 - **Terms.** Four years. The Governor is "elected at the presidential elections for terms of four years".
   ([Mo. Const. art. IV, §17][mc-iv-17])
@@ -169,7 +174,7 @@ Notes:
 - **Residency.** Same as the Governor: a resident of the state at least ten years before the election.
   ([Mo. Const. art. IV, §3][mc-iv-3])
 - **Voter.** No separate voter rule found in art. IV, §§3 or 10.
-- **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid state or local taxes.
+- **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid taxes of the kinds listed in RSMo 115.306 (see "Rules for every Missouri candidate").
   ([RSMo 115.306][rsmo-115-306])
 - **Terms.** Four years. ([Mo. Const. art. IV, §17][mc-iv-17])
 - **Term limit.** No rule found. Section 17 sets limits for the Governor and Treasurer and names none for this office.
@@ -190,7 +195,7 @@ Notes:
 - **Residency.** One year in Missouri before the election, under the general rule.
   ([Mo. Const. art. VII, §8][mc-vii-8])
 - **Voter.** No rule found in art. IV, §14.
-- **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid state or local taxes.
+- **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid taxes of the kinds listed in RSMo 115.306 (see "Rules for every Missouri candidate").
   ([RSMo 115.306][rsmo-115-306])
 - **Terms.** Four years. ([Mo. Const. art. IV, §17][mc-iv-17])
 - **Term limit.** No rule found. Section 17 sets limits for the Governor and Treasurer and names none for this office.
@@ -201,8 +206,7 @@ Notes:
 
 Notes:
 
-- [1] The Constitution says appointive officers "shall possess the qualifications required by this constitution or by
-  law". For elected officers other than the Governor, Lieutenant Governor and Auditor, this page found no age rule in
+- [1] For elected officers other than the Governor, Lieutenant Governor and Auditor, this page found no age rule in
   the sections that set up the office. ([Mo. Const. art. IV, §17][mc-iv-17], [art. IV, §14][mc-iv-14])
 
 ## State Auditor
@@ -213,12 +217,14 @@ Notes:
 - **Residency.** Same as the Governor: a resident of the state at least ten years before the election.
   ([Mo. Const. art. IV, §3][mc-iv-3])
 - **Voter.** No separate voter rule found in art. IV, §§3 or 13.
-- **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid state or local taxes.
+- **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid taxes of the kinds listed in RSMo 115.306 (see "Rules for every Missouri candidate").
   ([RSMo 115.306][rsmo-115-306])
 - **Terms.** Four years. ([Mo. Const. art. IV, §17][mc-iv-17])
 - **Term limit.** No rule found. Section 17 sets limits for the Governor and Treasurer and names none for this office.
   ([Mo. Const. art. IV, §17][mc-iv-17])
-- **How filled.** Elected at the presidential elections. ([Mo. Const. art. IV, §17][mc-iv-17])
+- **How filled.** Elected at the general election in the years between presidential elections (for example 2022 and
+  2026). "The state auditor shall be elected for a term of two years at the general election in the year 1948, and his
+  successors shall be elected for terms of four years." ([Mo. Const. art. IV, §17][mc-iv-17])
 - **Filing.** Declaration of candidacy and a $500 fee. See "Rules for every Missouri candidate".
   ([RSMo 115.349][rsmo-115-349], [RSMo 115.357][rsmo-115-357])
 
@@ -234,7 +240,7 @@ Notes:
 - **Residency.** One year in Missouri before the election, under the general rule.
   ([Mo. Const. art. VII, §8][mc-vii-8])
 - **Voter.** No rule found in art. IV, §15.
-- **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid state or local taxes.
+- **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid taxes of the kinds listed in RSMo 115.306 (see "Rules for every Missouri candidate").
   ([RSMo 115.306][rsmo-115-306])
 - **Terms.** Four years. ([Mo. Const. art. IV, §17][mc-iv-17])
 - **Term limit.** "No person shall be elected governor or treasurer more than twice". ([Mo. Const. art. IV, §17][mc-iv-17])
@@ -255,7 +261,7 @@ Notes:
 - **Residency.** One year in Missouri before the election, under the general rule.
   ([Mo. Const. art. VII, §8][mc-vii-8])
 - **Voter.** No rule found in the sections read.
-- **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid state or local taxes
+- **Other qualifications.** Not guilty of or pleaded guilty to a felony; no unpaid taxes of the kinds listed in RSMo 115.306 (see "Rules for every Missouri candidate")
   ([RSMo 115.306][rsmo-115-306]). Once in office, the Attorney General must "devote his or her full time to the office"
   and "shall not engage in the practice of law" except in official duties. ([RSMo 27.010][rsmo-27-010])
 - **Terms.** "Four years, or until his or her successor is elected and qualified." The term begins "at 12:00 noon on the
@@ -289,13 +295,14 @@ Notes:
   practice law in this state." ([Mo. Const. art. V, §21][mc-v-21]) Judges "shall retire at the age of seventy years".
   ([Mo. Const. art. V, §26][mc-v-26])
 - **Terms.** "Twelve years" for the Supreme Court and Court of Appeals, "six years" for circuit judges and "four years"
-  for associate circuit judges. ([Mo. Const. art. V, §19][mc-v-19])
+  for associate circuit judges. A judge chosen under the court plan serves a shorter first term: see note [8].
+  ([Mo. Const. art. V, §19][mc-v-19])
 - **Term limit.** No rule found.
 - **How filled.** By the nonpartisan court plan in some courts and by election in others, depending on the court and, for
   some circuits, a local vote. See notes [1] and [2]. ([Mo. Const. art. V, §25(a)][mc-v-25a],
   [art. V, §25(b)][mc-v-25b])
 - **Filing.** Judges chosen by election file like other candidates: see "Rules for every Missouri candidate", with the
-  fee for circuit judge ($300). Judges under the court plan file a declaration to run for retention. See note [3].
+  fee for circuit judge ($300); RSMo 115.357 lists no separate fee for associate circuit judges. Judges under the court plan file a declaration to run for retention. See note [3].
   ([RSMo 115.357][rsmo-115-357], [Mo. Const. art. V, §25(c)(1)][mc-v-25c1])
 
 Notes:
@@ -321,6 +328,10 @@ Notes:
   ([Mo. Const. art. V, §21][mc-v-21])
 - [7] The citizenship and voter years for Supreme Court, Court of Appeals and circuit judges are counted back from
   their "selection" ("next preceding their selection"). ([Mo. Const. art. V, §21][mc-v-21])
+- [8] First term. "Each judge appointed pursuant to the provisions of sections 25(a)-(g) shall hold office for a term
+  ending December thirty-first following the next general election after the expiration of twelve months in the
+  office." So an appointed judge serves until the retention vote, then the full term.
+  ([Mo. Const. art. V, §25(c)(1)][mc-v-25c1])
 
 ## U.S. House of Representatives
 
@@ -331,8 +342,9 @@ Notes:
 - **Voter.** No rule found.
 - **Other qualifications.** No one can hold another U.S. office and be a member: "no Person holding any Office under the
   United States, shall be a Member of either House during his Continuance in Office."
-  ([U.S. Const. art. I, §6][us-const]) No one who broke an oath to support the Constitution by taking part in
-  "insurrection or rebellion" can serve unless two-thirds of each house vote to remove the bar.
+  ([U.S. Const. art. I, §6][us-const]) No one who previously took an oath, as an officer of the United States or of a State, to support the Constitution and
+  then "engaged in insurrection or rebellion against the same, or given aid or comfort to the enemies thereof" can
+  serve unless two-thirds of each house vote to remove the bar.
   ([U.S. Const. amend. XIV, §3][us-amend])
 - **Terms.** "Chosen every second Year by the People of the several States." ([U.S. Const. art. I, §2][us-const])
 - **Term limit.** No rule found in the Constitution's text.

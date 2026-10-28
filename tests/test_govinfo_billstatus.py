@@ -432,3 +432,77 @@ def test_new_entity_row_keys_are_unique_across_every_fixture():
         for key in ("committees", "committee_activities", "subjects", "related_bills", "related_bill_relationships"):
             keys = [k for k, _ in parser.parse_bill(xml, "f.xml")[key]]
             assert len(keys) == len(set(keys)), key
+
+
+# --- amendments (#738): trimmed real files, each keeping only the amendments named here ---
+def _fx(name: str) -> dict:
+    return parser.parse_bill((FIXTURES / f"BILLSTATUS-{name}.xml").read_bytes(), f"{name}.xml")
+
+
+def test_house_amendment_row_and_its_roll_call():
+    rows = _fx("118hr2494")
+    ((key, am),) = rows["amendments"]
+    assert key == "118-hamdt-180"
+    assert (am["bill_id"], am["amended_bill_type"], am["amended_bill_number"]) == ("118-hr-2494", "HR", "2494")
+    assert (am["chamber"], am["submitted_date"]) == ("House of Representatives", "2023-05-17T04:00:00Z")
+    assert am["purpose"].startswith("Amendment sought to require a conviction")
+    # the amendment's own type/number must not pick up the amended bill's (HR / 2494)
+    assert (am["amendment_type"], am["number"]) == ("HAMDT", "180")
+    # the chamber's own action and the Library of Congress copy of it cite the same roll call
+    assert {p["roll_number"] for _, p in rows["amendment_recorded_votes"]} == {"224"}
+    vkey, vote = rows["amendment_recorded_votes"][0]
+    assert vkey == "118-hamdt-180#0#0"
+    assert (vote["chamber"], vote["congress"], vote["session_number"], vote["roll_number"]) == (
+        "House",
+        "118",
+        "1",
+        "224",
+    )
+    # nested <actions><actions><item>: all seven actions, the vote on position 0
+    assert len(rows["amendment_actions"]) == 7
+    assert vote["action_position"] == 0
+    assert rows["amendment_actions"][0][1]["text"].startswith("On agreeing to the Correa amendment")
+    # amendment votes are not mixed into the bill's own tables
+    assert rows["recorded_votes"] == [] and rows["actions"] == []
+
+
+def test_amendment_sponsors_committee_double_listing_and_on_behalf_of():
+    committee = _fx("118hr788")["amendment_sponsors"]
+    assert [(p["name"], p["bioguide_id"], p["role"]) for _, p in committee] == [("Rules Committee", None, "sponsor")]
+    twice = _fx("118hr5894")["amendment_sponsors"]
+    assert [k.rsplit("#", 1)[1] for k, _ in twice] == ["0", "1"]
+    assert {p["bioguide_id"] for _, p in twice} == {"M001210"}
+    sponsors = _fx("118s3857")["amendment_sponsors"]
+    assert [p["role"] for _, p in sponsors] == ["sponsor", "on_behalf_of"]
+    assert sponsors[1][1]["bioguide_id"] == "P000145"
+
+
+def test_senate_amendment_amending_an_amendment_and_its_vote():
+    rows = _fx("118s2226")
+    by_id = {p["amendment_id"]: p for _, p in rows["amendments"]}
+    assert set(by_id) == {"118-samdt-999", "118-samdt-935", "118-samdt-1087"}
+    assert by_id["118-samdt-999"]["amended_bill_number"] == "2226"
+    assert by_id["118-samdt-935"]["amended_amendment_number"] is None
+    voted = {p["amendment_id"] for _, p in rows["amendment_recorded_votes"]}
+    assert "118-samdt-999" in voted and "118-samdt-935" not in voted
+    assert {p["chamber"] for _, p in rows["amendment_recorded_votes"]} == {"Senate"}
+
+
+def test_amendment_of_an_older_congress_is_read_the_same_way():
+    rows = _fx("117hr1319")
+    ((key, am),) = rows["amendments"]
+    assert (key, am["bill_id"]) == ("117-samdt-996", "117-hr-1319")
+    assert [p["action_position"] for _, p in rows["amendment_recorded_votes"]] == [0, 2, 3]
+    vote = rows["amendment_recorded_votes"][0][1]
+    assert (vote["chamber"], vote["congress"], vote["session_number"], vote["roll_number"]) == (
+        "Senate",
+        "117",
+        "1",
+        "93",
+    )
+
+
+def test_files_without_amendments_and_the_older_export_emit_none():
+    assert parser.parse_bill(HJRES, "f.xml")["amendments"] == []
+    older = parser.parse_bill((FIXTURES / "BILLSTATUS-117hr2.xml").read_bytes(), "f.xml")
+    assert older["amendments"] == [] and older["amendment_actions"] == []
