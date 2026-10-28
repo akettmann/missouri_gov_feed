@@ -83,10 +83,17 @@ const renderInline = (tokens: Token[]) => Parser.parseInline(tokens).trim();
 
 /** Child tokens of a block: a list keeps them in `items` (each with its own `tokens`), everything else in `tokens`. */
 const hasKids = (t: Token) =>
-  ("tokens" in t && Array.isArray(t.tokens)) || ("items" in t && Array.isArray(t.items));
+  t.type === "table" ||
+  ("tokens" in t && Array.isArray(t.tokens)) ||
+  ("items" in t && Array.isArray(t.items));
 
 /** Rebuilds a token with `f` applied to each child token list. */
 function mapKids(t: Token, f: (kids: Token[]) => Token[]): Token {
+  if (t.type === "table") {
+    const tb = t as Tokens.Table;
+    const cell = (c: Tokens.TableCell) => ({ ...c, tokens: f(c.tokens) as Tokens.TableCell["tokens"] });
+    return { ...tb, header: tb.header.map(cell), rows: tb.rows.map((r) => r.map(cell)) };
+  }
   const o = t as unknown as { tokens?: Token[]; items?: Token[] };
   return {
     ...t,
@@ -96,6 +103,10 @@ function mapKids(t: Token, f: (kids: Token[]) => Token[]): Token {
 }
 
 const kidsOf = (t: Token): Token[] => {
+  if (t.type === "table") {
+    const tb = t as Tokens.Table;
+    return [...tb.header, ...tb.rows.flat()].flatMap((c) => c.tokens);
+  }
   const o = t as unknown as { tokens?: Token[]; items?: Token[] };
   return [...(o.tokens ?? []), ...(o.items ?? [])];
 };
@@ -186,7 +197,8 @@ function parseBullet(item: Tokens.ListItem, where: string, opt: ParseOptions): D
     const name = (t as Tokens.Codespan).text;
     if (name.includes("/")) return; // a file path, not a source name
     const next = all[i + 1];
-    const isCandidate = next?.type === "text" && /^\s+is not loaded yet/.test((next as Tokens.Text).raw);
+    const isCandidate =
+      next?.type === "text" && /^\s+is\s+not\s+loaded\s+yet/.test((next as Tokens.Text).raw);
     if (isCandidate) {
       if (!candidates.includes(name)) candidates.push(name);
     } else if (opt.loaders.has(name)) {

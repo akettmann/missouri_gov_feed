@@ -35,6 +35,7 @@ const STATE = { loaded: "● loaded", candidate: "○ not loaded yet" } as const
 
 {doc.offices.map((o) => {
   const cov = officeCoverage(o, doc.names);
+  const example = Math.min(2, cov.total);
   return (
     <section class="card office" id={o.id}>
       <h2>{o.title}</h2>
@@ -62,11 +63,12 @@ const STATE = { loaded: "● loaded", candidate: "○ not loaded yet" } as const
             )}
           </ul>
           <p class="gaps small muted">
-            Each source box counts the items below whose "Data" line names that source, so "2 of {cov.total}"
-            means 2 of this office's {cov.total} items. One item can name several sources, so the boxes can
-            add up to more than {cov.total}. The "no data yet" box counts items with no loaded source. A
-            source can cover an item only in part, and the "Data" line says so when it does. A gap means we
-            have not loaded data on that duty or power. It says nothing about the officeholder.{" "}
+            Each source box counts the items below whose "Data" line names that source, so "{example} of{" "}
+            {cov.total}" means {example} of this office's {cov.total} {cov.total === 1 ? "item" : "items"}.
+            One item can name several sources, so the boxes can add up to more than {cov.total}. The "no data
+            yet" box counts items with no loaded source. A source can cover an item only in part, and the
+            "Data" line says so when it does. A gap means we have not loaded data on that duty or power. It
+            says nothing about the officeholder.{" "}
             <a href={href("/methodology/#coverage")}>How to read these gaps</a>
           </p>
         </>
