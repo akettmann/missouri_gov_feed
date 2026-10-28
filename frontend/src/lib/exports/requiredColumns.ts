@@ -7,6 +7,36 @@
 // Tables not listed here still get a clear message: query() turns a binder error naming a column an
 // export lacks into the same stale-export error. Listing a column here only adds the up-front, all-at-once report.
 export const REQUIRED_COLUMNS: Record<string, readonly string[]> = {
+  fct_statute_sections: [
+    "section_id",
+    "bid",
+    "section_version_id",
+    "chapter",
+    "chapter_name",
+    "title_numeral",
+    "title_name",
+    "heading",
+    "status",
+    "is_current",
+    "effective_date",
+    "held_unconstitutional",
+    "ended_date",
+    "transferred_to",
+    "history_note",
+    "section_text",
+    "repeal_pending",
+    "source_url",
+    "loaded_at",
+  ],
+  fct_statute_section_footnotes: [
+    "section_version_id",
+    "footnote_number",
+    "section_id",
+    "footnote_text",
+    "is_history_note",
+    "source_url",
+    "loaded_at",
+  ],
   fct_votes: ["vote_stage", "vote_informal"],
   rpt_attendance: ["recused_from_voting"],
   rpt_interest_vote_overlap: ["vote_description"],
@@ -74,6 +104,8 @@ export const REQUIRED_COLUMNS: Record<string, readonly string[]> = {
  */
 export const REQUIRED_TABLES: Record<string, readonly string[]> = {
   fct_jurisdiction_businesses: ["fct_jurisdiction_business_donors"],
+  fct_statute_sections: ["fct_statute_section_footnotes"],
+  fct_statute_section_footnotes: ["fct_statute_sections"],
   fct_jurisdiction_business_donors: ["fct_jurisdiction_businesses"],
 };
 
