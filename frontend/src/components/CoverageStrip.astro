@@ -1,13 +1,17 @@
 ---
 // official_profile.*_status as a strip, so gaps are explicit: "not public" is not the same as "none found".
 import type { CoverageItem } from "../lib/exports/types";
-import { count, statusKind } from "../lib/format";
+import { count, coverageGaps, statusKind } from "../lib/format";
+import { href } from "../lib/site";
 
 interface Props {
   items: CoverageItem[];
+  /** Every coverage item, including those the strip hides, so the gap sentence can name them. */
+  all?: CoverageItem[];
 }
-const { items } = Astro.props;
+const { items, all = items } = Astro.props;
 const ICON = { available: "●", none: "○", "not-public": "⊘", na: "–" } as const;
+const gaps = coverageGaps(all);
 const SHORT = { available: "available", none: "none found", "not-public": "not public", na: "n/a" } as const;
 ---
 
@@ -26,8 +30,28 @@ const SHORT = { available: "available", none: "none found", "not-public": "not p
     );
   })}
 </ul>
+{(gaps.cant.length > 0 || gaps.none.length > 0) && (
+  <p class="gaps small muted">
+    {gaps.cant.length > 0 && (
+      <>
+        <strong>We can't see:</strong> {gaps.cant.join("; ")}.{" "}
+      </>
+    )}
+    {gaps.none.length > 0 && (
+      <>
+        <strong>None found:</strong> {gaps.none.join("; ")}.{" "}
+      </>
+    )}
+    A gap is not evidence about the official either way.{" "}
+    <a href={href("/methodology/#coverage")}>How to read these gaps</a>
+  </p>
+)}
 
 <style>
+  .gaps {
+    margin: 8px 0 0;
+    line-height: 1.4;
+  }
   .strip {
     list-style: none;
     padding: 0;

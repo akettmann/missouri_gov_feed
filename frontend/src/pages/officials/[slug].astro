@@ -85,7 +85,7 @@ const term = o ? [o.current_term_start, o.current_term_end].filter(Boolean).join
         </div>
       </header>
 
-      <CoverageStrip items={visibleCoverage(bundle.coverage)} />
+      <CoverageStrip items={visibleCoverage(bundle.coverage)} all={bundle.coverage} />
 
       <div class="tools small">
         <ConfidenceToggle />
