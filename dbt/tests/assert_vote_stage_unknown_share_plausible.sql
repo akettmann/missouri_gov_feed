@@ -1,7 +1,8 @@
 -- Sanity check on fct_votes.vote_stage (#804): the rules should recognise nearly every Missouri roll call. On the
--- 2026-10-27 build `unknown` was 0.6% of House roll calls (37 of 6,022) and 5.3% of Senate ones (120 of 2,261), at
--- most 11% in any chamber and year. The Senate is higher because its journal text sometimes runs into the sentence
--- that introduces a vote (page headers, vote lists). Bounds: House 2%, Senate 8% overall; 20% in any chamber and year
+-- 2026-10-27 build `unknown` was 0.6% of House roll calls (37 of 6,022) and 4.6% of Senate ones (104 of 2,261), at
+-- most 11% in any chamber and year. The Senate is higher because 100 of its 104 are journal page headers or vote-list
+-- fragments that run into the sentence that introduces a vote (the other 4 are listed in #816). Bounds: House 2%,
+-- Senate 8% overall; 20% in any chamber and year
 -- with at least 50 roll calls (a year all `unknown` means the House calendar or Senate wording changed). Also every
 -- chamber and year with roll calls needs at least one third-reading vote. Returns the chambers / years out of bounds.
 with votes as (
