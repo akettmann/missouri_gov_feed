@@ -10,20 +10,22 @@ The site has no bulk download; every page is server-rendered HTML.
 - rx.aspx is one ~10 MB page listing every repealed and transferred section with its repealing act and date,
   so those ~15,000 sections need no page of their own.
 
-Each section version lands as the page's content block, verbatim, plus its text split into paragraphs; dbt
-parses dates, status and the history citations. Units: chapters, plus rx.aspx (owned by one shard).
+Each section version lands as the page's content block, verbatim, plus its text split into paragraphs and
+fetched_at (when the page came from the site, from the HTTP cache entry's fetch time); dbt parses dates,
+status and the history citations. Units: chapters, plus rx.aspx (owned by one shard).
 """
 
 import os
 import re
 import time
+from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
 import httpx
 import lxml.html
 
 from mogov import db, obs
-from mogov.http import fetch, pause_host
+from mogov.http import fetch_stamped, pause_host
 from mogov.loaders import loader
 
 log = obs.get_logger(__name__)
@@ -84,10 +86,18 @@ def _not_blocked(resp: httpx.Response) -> None:
 def _get(
     url: str, params: dict | None = None, *, max_age: float = LIST_MAX_AGE, backoff: tuple[float, ...] | None = None
 ) -> str:
+    return _get_stamped(url, params, max_age=max_age, backoff=backoff)[0]
+
+
+def _get_stamped(
+    url: str, params: dict | None = None, *, max_age: float = LIST_MAX_AGE, backoff: tuple[float, ...] | None = None
+) -> tuple[str, str]:
+    """The page text and fetched_at: when its bytes came from revisor.mo.gov, as an ISO-8601 UTC string. A page
+    served from the HTTP cache carries the time of the fetch that filled the cache, not the time it was reused."""
     for wait in (*(WARNING_BACKOFF if backoff is None else backoff), None):
         try:
-            page = fetch(url, params, max_age=max_age, min_interval=POLITE_DELAY, check=_not_blocked)
-            return page.decode("utf-8", "replace")
+            page, fetched = fetch_stamped(url, params, max_age=max_age, min_interval=POLITE_DELAY, check=_not_blocked)
+            return page.decode("utf-8", "replace"), datetime.fromtimestamp(fetched, UTC).isoformat(timespec="seconds")
         except Warned:
             if wait is None:
                 raise
@@ -245,8 +255,14 @@ def load(shard: db.Shard) -> dict[str, int]:
             sink.add("mo_revisor_chapters", c["chapter"], c)
         if shard.owns(REPEALS_UNIT):
             rx_url = f"{BASE}/rx.aspx"
-            for r in parse_repeals(_get(rx_url)):
-                sink.add("mo_revisor_repeals", f"{r['section']}/{r['bid']}", r, source_url=rx_url)
+            rx_page, rx_fetched_at = _get_stamped(rx_url)
+            for r in parse_repeals(rx_page):
+                sink.add(
+                    "mo_revisor_repeals",
+                    f"{r['section']}/{r['bid']}",
+                    {**r, "fetched_at": rx_fetched_at},
+                    source_url=rx_url,
+                )
         versions = []
         for c in chapters:
             listed = parse_chapter(_get(f"{BASE}/OneChapter.aspx", {"chapter": c["chapter"]}))
@@ -259,7 +275,7 @@ def load(shard: db.Shard) -> dict[str, int]:
         skipped_total = 0
         for chapter, section, bid in versions:
             try:
-                page = _get(
+                page, fetched_at = _get_stamped(
                     url, {"section": section, "bid": bid}, max_age=SECTION_MAX_AGE, backoff=SECTION_WARNING_BACKOFF
                 )
             except Warned:
@@ -284,7 +300,7 @@ def load(shard: db.Shard) -> dict[str, int]:
             sink.add(
                 "mo_revisor_sections",
                 f"{section}/{bid}",
-                {"chapter": chapter, "section": section, "bid": bid, **parsed},
+                {"chapter": chapter, "section": section, "bid": bid, **parsed, "fetched_at": fetched_at},
                 source_url=f"{url}?section={section}&bid={bid}",
             )
             progress.tick()

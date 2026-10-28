@@ -1,0 +1,40 @@
+# Unit tests for the Revisor staging models' fetched_at: the loader's ISO-8601 UTC string -> a timestamp, and null
+# for raw rows loaded before the loader recorded it.
+version: 2
+
+unit_tests:
+  - name: sections_fetched_at_is_parsed_and_absent_when_not_recorded
+    model: stg_mo_revisor__sections
+    description: >
+      A raw row whose payload carries fetched_at gets that instant as a timestamp with time zone (the offset is
+      honoured, so +00:00 and -05:00 spellings of one instant agree); a row from before the loader recorded it, whose
+      payload has no fetched_at key, gets null and still builds. Reading loaded_at as the fetch time, or failing on
+      the missing key, fails this test.
+    given:
+      - input: source('mo_revisor', 'sections')
+        format: sql
+        rows: |
+            select '{"section":"1.010","bid":42,"chapter":"1","title_line":"Title I LAWS","effective":"Effective - 28 Aug 2015, 2 histories","historical":false,"heading":"1.010. Common law —","text":"t","footnotes":[],"fetched_at":"2026-05-01T12:00:00+00:00"}' as payload, 'u1' as source_url, cast('2026-10-26 04:00:00' as timestamp) as loaded_at union all
+            select '{"section":"1.020","bid":43,"chapter":"1","title_line":"Title I LAWS","effective":"Effective - 28 Aug 2015, 1 histories","historical":false,"heading":"1.020. Second —","text":"t","footnotes":[],"fetched_at":"2026-05-01T07:00:00-05:00"}', 'u2', cast('2026-10-26 04:00:00' as timestamp) union all
+            select '{"section":"1.030","bid":44,"chapter":"1","title_line":"Title I LAWS","effective":"Effective - 28 Aug 2015, 1 histories","historical":false,"heading":"1.030. Third —","text":"t","footnotes":[]}', 'u3', cast('2026-10-26 04:00:00' as timestamp)
+    expect:
+      rows:
+        - {section_version_id: '1.010/42', fetched_at: '2026-05-01 12:00:00+00:00', loaded_at: '2026-10-26 04:00:00+00:00'}
+        - {section_version_id: '1.020/43', fetched_at: '2026-05-01 12:00:00+00:00', loaded_at: '2026-10-26 04:00:00+00:00'}
+        - {section_version_id: '1.030/44', fetched_at: , loaded_at: '2026-10-26 04:00:00+00:00'}
+
+  - name: repeals_fetched_at_is_parsed_and_absent_when_not_recorded
+    model: stg_mo_revisor__repeals
+    description: >
+      Same contract for the repeals list: the payload's fetched_at becomes a timestamp, a row without the key gets
+      null.
+    given:
+      - input: source('mo_revisor', 'repeals')
+        format: sql
+        rows: |
+            select '{"section":"85.270","bid":1,"kind":"repealed","note":"(Repealed L. 1983 H.B. 68 § 1)","date":"08/13/1983","fetched_at":"2026-10-20T01:02:03+00:00"}' as payload, 'r1' as source_url, cast('2026-10-26 04:00:00' as timestamp) as loaded_at union all
+            select '{"section":"85.280","bid":2,"kind":"repealed","note":"(Repealed L. 1983 H.B. 68 § 1)","date":"08/13/1983"}', 'r1', cast('2026-10-26 04:00:00' as timestamp)
+    expect:
+      rows:
+        - {section_version_id: '85.270/1', fetched_at: '2026-10-20 01:02:03+00:00'}
+        - {section_version_id: '85.280/2', fetched_at: }

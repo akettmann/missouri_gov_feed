@@ -6,8 +6,10 @@
 -- is_contingent with no date. held_unconstitutional: the effective line says "(all or part is unconstitutional)".
 -- history_note is the session-law history footnote ("(RSMo 1939 § 645, A.L. 1957 p. 587, A.L. 2015 S.B. 239)"),
 -- when the first footnote is one. footnotes is the page's whole footnote array (stg_mo_revisor__section_footnotes
--- explodes it). loaded_at is when our pipeline last published the raw
--- table; the page was fetched from revisor.mo.gov up to 180 days earlier.
+-- explodes it). fetched_at is when the page was fetched from revisor.mo.gov (the loader records the HTTP cache
+-- entry's fetch time, so a page reused from the cache keeps its original time); null on rows loaded before the
+-- loader recorded it (#852). loaded_at is when our pipeline last published the raw table, up to 180 days after
+-- the fetch.
 with src as (
     select
         {{ mogov.json_str('payload', '$.section') }} as section_id,
@@ -20,6 +22,7 @@ with src as (
         {{ mogov.json_str('payload', '$.text') }} as section_text,
         {{ mogov.json_str('payload', '$.footnotes[0]') }} as first_footnote,
         {{ mogov.json_fragment('payload', '$.footnotes') }} as footnotes,
+        {{ dbt.safe_cast(mogov.json_str('payload', '$.fetched_at'), 'timestamp with time zone') }} as fetched_at,
         source_url,
         loaded_at
     from {{ source('mo_revisor', 'sections') }}
@@ -53,5 +56,6 @@ select
     case when first_footnote like '(%' then first_footnote end as history_note,
     footnotes,
     source_url,
+    fetched_at,
     loaded_at
 from dated

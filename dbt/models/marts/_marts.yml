@@ -1754,12 +1754,18 @@ models:
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"
+      - name: fetched_at
+        data_type: timestamp with time zone
+        description: >
+          When the section's page was fetched from revisor.mo.gov (for repealed and transferred sections, when the
+          repeals list was). A page served from the loader's HTTP cache keeps the time of the fetch that filled the
+          cache. Null for rows loaded before the loader recorded it; the loader must run again to fill it (#852).
       - name: loaded_at
         data_type: timestamp with time zone
         description: >
           When our pipeline last published the raw table (for repealed and transferred sections, the repeals list).
-          Not the fetch time: the page itself was fetched from revisor.mo.gov up to 180 days earlier (section pages)
-          or up to 7 days earlier (repeals list), and every row of a run shares one value (#852).
+          Not the fetch time (see fetched_at): the page itself was fetched from revisor.mo.gov up to 180 days earlier
+          (section pages) or up to 7 days earlier (repeals list), and every row of a run shares one value.
         data_tests:
           - not_null
 
@@ -1813,9 +1819,12 @@ models:
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"
+      - name: fetched_at
+        data_type: timestamp with time zone
+        description: When the section version's page was fetched from revisor.mo.gov (see fct_statute_sections.fetched_at); null until the loader has run again since #852.
       - name: loaded_at
         data_type: timestamp with time zone
-        description: When our pipeline last published the raw table; the page was fetched up to 180 days earlier (see fct_statute_sections.loaded_at).
+        description: When our pipeline last published the raw table; the page was fetched up to 180 days earlier (see fetched_at and fct_statute_sections.loaded_at).
         data_tests:
           - not_null
 

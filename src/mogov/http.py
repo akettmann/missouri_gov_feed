@@ -274,7 +274,12 @@ def _retry_after(resp: httpx.Response) -> float | None:
         return None
 
 
-def fetch(
+def _read_stamped(path: Path) -> tuple[bytes, float]:
+    content = path.read_bytes()
+    return content, path.stat().st_mtime
+
+
+def fetch_stamped(
     url: str,
     params: dict | None = None,
     *,
@@ -285,13 +290,16 @@ def fetch(
     cache_only: bool = False,
     check: Callable[[httpx.Response], None] | None = None,
     min_interval: float = 0.0,
-) -> bytes:
-    """GET url, returning bytes. Responses younger than max_age seconds come from cache (None = always cache).
+) -> tuple[bytes, float]:
+    """GET url -> (bytes, fetched_at): the epoch second the bytes were fetched from the server. Responses younger
+    than max_age seconds come from cache (None = always cache).
 
     delay: seconds to sleep before a network request (not on cache hits), to stay polite to small state sites.
     cache_only: never touch the network; return any cached copy regardless of age, else raise CacheMiss.
     min_interval: requests to this host from every process sharing CACHE_DIR start at least this many seconds apart
     (host_throttle), unlike `delay`, which each process counts on its own clock.
+    The fetch time is the cache entry's mtime, which write_atomic sets when the response lands and which is also what
+    `max_age` measures: a cache hit returns the ORIGINAL fetch time, never the time of reuse.
     check: called with each successful response before it is cached; raise to reject it (e.g. a block page
     served with 200 after a redirect), so it is never cached.
     """
@@ -299,14 +307,14 @@ def fetch(
     host = httpx.URL(url).host
     if _fresh(path, None if cache_only else max_age):
         obs.http_requests.add(1, {"host": host, "cache_hit": True})
-        return path.read_bytes()
+        return _read_stamped(path)
     if cache_only:
         raise CacheMiss(url)
     with _single_flight(path):
         if _fresh(path, max_age):  # another shard fetched it while we waited
             obs.http_requests.add(1, {"host": host, "cache_hit": True})
-            return path.read_bytes()
-        return _get(
+            return _read_stamped(path)
+        content = _get(
             url,
             params,
             path,
@@ -317,6 +325,12 @@ def fetch(
             check=check,
             min_interval=min_interval,
         )
+        return content, path.stat().st_mtime
+
+
+def fetch(*args, **kwargs) -> bytes:
+    """GET url, returning bytes; see fetch_stamped (same arguments) for the cache and its arguments."""
+    return fetch_stamped(*args, **kwargs)[0]
 
 
 def _get(
