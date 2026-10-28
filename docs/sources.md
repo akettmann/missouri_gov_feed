@@ -1039,8 +1039,23 @@ Quirks:
   - Related bills carry one or more relationship types, and the label is not stable: use
     `relationship_type_normalized`. Seen: "Identical bill", "Related bill", "Procedurally related" and
     "Procedurally-related" (one value once normalized), "Text similarities" (59 in the 118th hr and s), "Related
-    document" (6, 117th). The link is listed on both bills 98% of the time in the 118th hr and s (11,946 of the
-    12,171 relations whose other bill is loaded), not always.
+    document" (6, 117th). The 119th adds five (first seen 2026-10-28, none in the 117th or 118th), counted
+    across all 119th types: "Cross-Congress related bill" (923, CRS), "Contained in public law" (220, CRS) and
+    its reverse "Public law contains the text" (216, CRS), and "PrimaryCompanionBillBecameLaw" /
+    "SecondaryCompanionBillBecameLaw" (15 each, identified by "U.S. Government Publishing Office"; CamelCase, so
+    they normalize to `primarycompanionbillbecamelaw` with no spaces). GovInfo's BILLSTATUS user guide lists no
+    labels (one example, and it still says relationships are same-Congress only). The nearest to a full list is
+    congress.gov's "About Related Bills" (https://www.congress.gov/help/related-bills, checked 2026-10-28; it
+    answers scripted fetches with 403): CRS adds Contained in public law (119th on), Identical bill and Related
+    bill (93rd on) and Cross-Congress related bill (119th on, at most two Congresses apart); the House adds
+    Related bill (101st on), Procedurally related (93rd on) and Text similarities (101st-106th, 108th-118th);
+    the Senate added Companion bill (95th-112th, retired); the Library of Congress adds Reintroduction (114th-118th,
+    automated). Reintroduction and Companion bill are accepted but absent from our 117th-119th files
+    (Reintroduction appears to be congress.gov only). The page does not list Public law contains the text,
+    Related document or the two GPO labels. A new label fails the `accepted_values` test on
+    `relationship_type_normalized`; add it there and here.
+    The link is listed on both bills 98% of the time in the 118th hr and s (11,946 of the 12,171 relations whose
+    other bill is loaded), not always.
   - CRS sometimes lists a bill as related to itself (34 of 12,472 related-bill rows in the 118th hr and s, e.g.
     118-hr-9541, hr-292, hr-8205). Staging drops those rows (and their relationship rows), so `position` and
     `related_position` have gaps; the raw table keeps them.

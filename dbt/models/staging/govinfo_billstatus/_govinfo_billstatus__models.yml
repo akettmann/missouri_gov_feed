@@ -407,6 +407,13 @@ models:
           - related document
           - bill replaced by
           - bill replaces
+          - contained in public law
+          - public law contains the text
+          - cross congress related bill
+          - primarycompanionbillbecamelaw
+          - secondarycompanionbillbecamelaw
+          - reintroduction
+          - companion bill
 - name: stg_govinfo_billstatus__related_bills
   description: 'Bills a federal bill is related to, from the GovInfo BILLSTATUS bulk XML: one row per (bill, related
     bill). related_bill_id has the same form as bill_id ("118-hjres-125"), so it joins stg_govinfo_billstatus__bills
