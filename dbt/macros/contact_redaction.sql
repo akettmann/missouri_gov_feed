@@ -4,6 +4,10 @@
    em dash, horizontal bar), U+2212 minus, and the ASCII hyphen last. Spaces: space, U+00A0, U+202F. #}
 {% macro sep_dash() -%}[‐‑‒–—―−-]{%- endmacro %}
 {% macro sep_any() -%}[   .‐‑‒–—―−-]{%- endmacro %}
+{# Gap between the digit groups of a 10-digit number (#751): optional space, optional dash or dot, optional space, so
+   "573 - 751 - 1167", "573 -751- 1167" and "(573) - 751-1167" read as one number. A character class only (no
+   group), so the replacement group numbers below do not move. #}
+{% macro sep_gap() -%}[   ]?[   .‐‑‒–—―−-]?[   ]?{%- endmacro %}
 {% macro sep_nodot() -%}[   ‐‑‒–—―−-]{%- endmacro %}
 
 {# Redact contact strings from free text, keeping the rest of the sentence. This project keeps citizens' email
@@ -18,10 +22,12 @@
    bill lists such as "SB 123 4567" and "100 1000 dollars"; a spaced or dotted 7-digit number is left to the
    warn-level has_phone_like_digits check). Both sit between non-digits, so ranges (2001-2013), dates and amounts
    are not caught. A bare 1 before the area code needs a separator, so "751-6662 751-1167 751-1168" cannot read
-   "-1167 751-1168" as a 1-prefixed number. #}
+   "-1167 751-1168" as a 1-prefixed number.
+   Spaces around the dashes of a 10-digit number are accepted ("573 - 751 - 1167", #751). The dotted 7-digit form
+   "751.6662" is NOT redacted: "RSMo 135.1150" has the same shape, so it stays a warn-level check (#751). #}
 {# Groups: 1 = the character before, 6 = the character after (both kept on replacement). #}
 {% macro contact_phone_pattern() -%}
-    (^|[^0-9])(([+]1{{ mogov.sep_any() }}?|1{{ mogov.sep_any() }})?[(]?[0-9]{3}[)]?{{ mogov.sep_any() }}?[0-9]{3}{{ mogov.sep_any() }}?[0-9]{4}|1[0-9]{10}|1[(][0-9]{3}[)]{{ mogov.sep_any() }}?[0-9]{3}{{ mogov.sep_any() }}?[0-9]{4}|[0-9]{3}{{ mogov.sep_dash() }}[0-9]{4})([ ]?(ext[.]?|EXT[.]?|Ext[.]?|x|X)[ ]?[0-9]{1,5})?([^0-9]|$)
+    (^|[^0-9])(([+]1{{ mogov.sep_any() }}?|1{{ mogov.sep_any() }})?[(]?[0-9]{3}[)]?{{ mogov.sep_gap() }}[0-9]{3}{{ mogov.sep_gap() }}[0-9]{4}|1[0-9]{10}|1[(][0-9]{3}[)]{{ mogov.sep_gap() }}[0-9]{3}{{ mogov.sep_gap() }}[0-9]{4}|[0-9]{3}{{ mogov.sep_dash() }}[0-9]{4})([ ]?(ext[.]?|EXT[.]?|Ext[.]?|x|X)[ ]?[0-9]{1,5})?([^0-9]|$)
 {%- endmacro %}
 
 {% macro redact_contact(expr) -%}
@@ -41,7 +47,7 @@
    lists, but anything that still looks like a phone after redaction must fail the build. Bill numbers are masked
    first (guard_bill_mask_pattern), so "SB 123 4567" or "HCR 12 3456" pass; "100 1000 dollars" fails loudly. #}
 {% macro guard_phone_pattern() -%}
-    (^|[^0-9])(([+]?1{{ mogov.sep_any() }}?)?[(]?[0-9]{3}[)]?{{ mogov.sep_any() }}?[0-9]{3}{{ mogov.sep_any() }}?[0-9]{4}|[0-9]{3}{{ mogov.sep_nodot() }}[0-9]{4}|[0-9]{3}/[0-9]{4})([^0-9]|$)
+    (^|[^0-9])(([+]?1{{ mogov.sep_any() }}?)?[(]?[0-9]{3}[)]?{{ mogov.sep_gap() }}[0-9]{3}{{ mogov.sep_gap() }}[0-9]{4}|[0-9]{3}{{ mogov.sep_nodot() }}[0-9]{4}|[0-9]{3}/[0-9]{4})([^0-9]|$)
 {%- endmacro %}
 
 {% macro guard_bill_mask_pattern() -%}
