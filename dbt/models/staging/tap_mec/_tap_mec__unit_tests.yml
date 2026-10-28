@@ -311,6 +311,8 @@ unit_tests:
           union all select 'C10', null, null, null, 'Jo Kim', 'Individual', null, null, 'Jo', 'Kim', null, null, null, null, null, null, null, '30', '2020-07-10', null, null, null, null, null, 'FALSE', 'j-old', null, null
           union all select null, 'C10', null, null, null, null, '', '', 'Jo', 'Kim', null, null, null, null, null, null, null, '30', '2020-07-10', null, null, null, null, null, 'FALSE', null, 'j-new1', null
           union all select null, 'C10', null, null, null, null, '', '', 'Jo', 'Kim', null, null, null, null, null, null, null, '30', '2020-07-10', null, null, null, null, null, 'FALSE', null, 'j-new2', null
+          union all select 'C4', null, null, null, 'Zed Young', 'Individual', null, null, 'Zed', 'Young', null, null, null, null, null, null, null, '10', '2020-07-04', null, null, null, null, null, 'FALSE', 'z-old', null, null
+          union all select null, 'C4', null, null, null, null, '', '', 'Yan', 'Zee', null, null, null, null, null, null, null, '10', '2020-07-04', null, null, null, null, null, 'FALSE', null, 'z-new', null
     expect:
       rows:
         - {record_id: a-new, mec_committee_id: C1, amount: 100}
@@ -320,6 +322,8 @@ unit_tests:
         - {record_id: c-new, mec_committee_id: C3, amount: 26}
         - {record_id: d-old2, mec_committee_id: C4, amount: 10}
         - {record_id: d-new, mec_committee_id: C4, amount: 10}
+        - {record_id: z-old, mec_committee_id: C4, amount: 10}
+        - {record_id: z-new, mec_committee_id: C4, amount: 10}
         - {record_id: e-new, mec_committee_id: C5, amount: 900}
         - {record_id: f-old, mec_committee_id: C6, amount: 5}
         - {record_id: f-new, mec_committee_id: C7, amount: 5}

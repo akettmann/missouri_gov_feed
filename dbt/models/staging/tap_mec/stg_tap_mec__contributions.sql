@@ -107,7 +107,10 @@ unique_records as (
                     case when i.txn is null then 0 else 1 end,
                     coalesce(length(i.address_clean), 0), i.address_clean, i.address_1, i.amount,
                     i.employer, i.occupation, i.city_clean, i.state_clean, i.committee, i.company, i.first_name,
-                    i.last_name, i.ctrb_name, i.ctrb_type, i.date, i.cmte_id, i.mecid
+                    i.last_name, i.ctrb_name, i.ctrb_type, i.date, i.cmte_id, i.mecid,
+                    -- every remaining output column, so two rows that differ at all rank deterministically (#226)
+                    i.cmte_name, i.committee_name, i.city, i.state, i.cont_type, i.contribution_type, i.rpt_type,
+                    i.report, i.year
             ) as record_rank
         from identified as i
         inner join repeated_ids as r on i.record_id = r.record_id
