@@ -22,11 +22,23 @@ with votes as (
     inner join {{ ref('stg_mo_house__rollcalls') }} as r on v.rollcall_url = r.rollcall_url
 ),
 
+-- Matching depends only on the session, the vote date and the token, so it runs once per distinct token and day
+-- (about a ninth of the vote rows) and the result is joined back to every vote.
+tokens as (
+    select distinct
+        session_code,
+        vote_date,
+        member_token,
+        token_key,
+        token_district
+    from votes
+),
+
 speaker as (
-    select
-        v.rollcall_url,
+    select distinct
+        v.vote_date,
         s.district_number
-    from votes as v
+    from tokens as v
     inner join {{ ref('house_speakers') }} as s on extract(year from v.vote_date) = s.session_year
     where v.member_token = 'MR SPEAKER'
 ),
@@ -64,7 +76,8 @@ term_people as (
 
 matches as (
     select
-        v.rollcall_url,
+        v.session_code,
+        v.vote_date,
         v.member_token,
         m.person_key,
         m.party,
@@ -86,8 +99,8 @@ matches as (
         max(case when tp.person_id is null or t.person_id is not null then 1 else 0 end) as seat_dated_ok,
         -- 1 when Open States gives this person a seat that covers the vote date
         max(case when t.person_id is not null then 1 else 0 end) as seat_covered
-    from votes as v
-    left join speaker as sp on v.rollcall_url = sp.rollcall_url and v.member_token = 'MR SPEAKER'
+    from tokens as v
+    left join speaker as sp on v.vote_date = sp.vote_date and v.member_token = 'MR SPEAKER'
     inner join members as m
         on
             (
@@ -108,7 +121,7 @@ matches as (
             m.person_key = t.person_id
             and m.district_number = t.district_number
             and v.vote_date between t.start_date and t.end_date
-    group by 1, 2, 3, 4, 5, 6
+    group by 1, 2, 3, 4, 5, 6, 7
 ),
 
 -- Same-session members rank ahead of other sessions' members (members who left mid-session are only in the latter).
@@ -117,7 +130,8 @@ matches as (
 -- covered the date outranks a person with no dated seat, whatever the name fit.
 candidates as (
     select
-        rollcall_url,
+        session_code,
+        vote_date,
         member_token,
         person_key,
         party,
@@ -132,33 +146,39 @@ candidates as (
 
 best_tier as (
     select
-        rollcall_url,
+        session_code,
+        vote_date,
         member_token,
         min(tier) as tier
     from candidates
-    group by 1, 2
+    group by 1, 2, 3
 ),
 
 best_candidates as (
     select
         c.*,
-        max(c.seat_covered) over (partition by c.rollcall_url, c.member_token) as any_covered
+        max(c.seat_covered) over (partition by c.session_code, c.vote_date, c.member_token) as any_covered
     from candidates as c
     inner join best_tier as b
-        on c.rollcall_url = b.rollcall_url and c.member_token = b.member_token and c.tier = b.tier
+        on
+            c.session_code = b.session_code
+            and c.vote_date = b.vote_date
+            and c.member_token = b.member_token
+            and c.tier = b.tier
 ),
 
 -- among the candidates, drop those whose dated seat missed the vote date, but only when another candidate's seat
 -- covered it; a candidate with no dated seat is never dropped
 unique_match as (
     select
-        rollcall_url,
+        session_code,
+        vote_date,
         member_token,
         max(person_key) as person_key,
         max(party) as party
     from best_candidates
     where seat_dated_ok = 1 or any_covered = 0
-    group by 1, 2
+    group by 1, 2, 3
     having count(distinct person_key) = 1
 )
 
@@ -176,4 +196,5 @@ select
     v.vote_cast,
     v.rollcall_url as source_url
 from votes as v
-left join unique_match as m on v.rollcall_url = m.rollcall_url and v.member_token = m.member_token
+left join unique_match as m
+    on v.session_code = m.session_code and v.vote_date = m.vote_date and v.member_token = m.member_token

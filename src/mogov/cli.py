@@ -296,6 +296,12 @@ def main() -> None:
         "By default any failed loader stops the run before dbt. The exit code is non-zero either way. "
         "Also read from $MOGOV_ALLOW_FAILED_LOADERS (comma-separated), for runtimes with fixed args.",
     )
+    p_run.add_argument(
+        "--skip-unit-tests",
+        action="store_true",
+        help="leave dbt unit tests out of the build (they check SQL logic, which a data refresh does not change; "
+        "about a quarter of a full build's work). For `mogov build`, pass --exclude-resource-type unit_test.",
+    )
     args, extra = parser.parse_known_args()
     if extra and args.cmd != "build":
         parser.error(f"unrecognized arguments: {' '.join(extra)}")
@@ -318,13 +324,14 @@ def main() -> None:
         failed = run_loaders(args.sources, stage=1, **shards)
         if not _gate_build(failed, allowed):
             sys.exit(1)
-        rc = run_dbt(["build"])
+        build = ["build", "--exclude-resource-type", "unit_test"] if args.skip_unit_tests else ["build"]
+        rc = run_dbt(build)
         if not args.sources:
             stage2 = run_loaders([], stage=2, **shards)
             failed += stage2
             if not _gate_build(stage2, allowed):
                 sys.exit(1)
-            rc = run_dbt(["build"]) or rc
+            rc = run_dbt(build) or rc
         sys.exit(rc or (1 if failed else 0))
 
 
