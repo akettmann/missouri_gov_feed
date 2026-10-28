@@ -4,7 +4,7 @@
 --   judge     on the opinion's panel (CourtListener person id), or their surname as a whole word in the
 --             judges text of a case in a court they sit on (panels are sparse for state courts)
 --   attorney  "<first> <last>" as whole words in the attorneys text, for lawyers and for judges whose own
---             court CourtListener doesn't cover (trial courts)
+--             court CourtListener doesn't cover (Missouri circuit courts)
 -- Names are compared as name_key()s padded with spaces, so "Hall" doesn't match "Marshall".
 -- Surnames repeat across generations on the same court (a 1910 Judge Smith on the 8th Circuit, fathers and
 -- sons on the Court of Appeals), so judges-text matches only count from the judge's first known judicial

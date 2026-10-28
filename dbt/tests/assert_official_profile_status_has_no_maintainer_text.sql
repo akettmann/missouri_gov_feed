@@ -1,53 +1,36 @@
+-- depends_on: {{ ref('official_profile') }}
 -- Coverage status text is shown to readers (cell and sentence on every profile). It must carry no instructions to the
--- maintainer: no seed or file paths, no "add finds" or to-do notes (#829).
+-- maintainer: no seed or file paths, no "add finds" or to-do notes (#829). Every *_status column is checked, so a
+-- new one is covered without editing this test.
+{% set status_columns = [] %}
+{% if execute %}
+    {% for col in adapter.get_columns_in_relation(ref('official_profile')) %}
+        {% if (col.name | lower).endswith('_status') %}
+            {% do status_columns.append(col.name) %}
+        {% endif %}
+    {% endfor %}
+    {% if status_columns | length == 0 and target.name != 'lint' %}
+        {{ exceptions.raise_compiler_error('official_profile has no *_status columns (model not built or not deferred?); this guard would check nothing') }}
+    {% endif %}
+{% endif %}
+
 with statuses as (
-    select
-        official_id,
-        'votes_status' as status_column,
-        votes_status as status
-    from {{ ref('official_profile') }}
-    union all
-    select
-        official_id,
-        'donations_status' as status_column,
-        donations_status as status
-    from {{ ref('official_profile') }}
-    union all
-    select
-        official_id,
-        'disclosures_status' as status_column,
-        disclosures_status as status
-    from {{ ref('official_profile') }}
-    union all
-    select
-        official_id,
-        'voluntary_disclosures_status' as status_column,
-        voluntary_disclosures_status as status
-    from {{ ref('official_profile') }}
-    union all
-    select
-        official_id,
-        'bias_status' as status_column,
-        bias_status as status
-    from {{ ref('official_profile') }}
-    union all
-    select
-        official_id,
-        'commercial_ties_status' as status_column,
-        commercial_ties_status as status
-    from {{ ref('official_profile') }}
-    union all
-    select
-        official_id,
-        'family_ties_status' as status_column,
-        family_ties_status as status
-    from {{ ref('official_profile') }}
-    union all
-    select
-        official_id,
-        'cases_status' as status_column,
-        cases_status as status
-    from {{ ref('official_profile') }}
+    {% for col in status_columns %}
+        select
+            official_id,
+            '{{ col }}' as status_column,
+            {{ col }} as status
+        from {{ ref('official_profile') }}
+        {% if not loop.last %}
+            union all
+        {% endif %}
+    {% else %}
+        select
+            cast(null as {{ dbt.type_string() }}) as official_id,
+            cast(null as {{ dbt.type_string() }}) as status_column,
+            cast(null as {{ dbt.type_string() }}) as status
+        where 1 = 0
+    {% endfor %}
 )
 
 select

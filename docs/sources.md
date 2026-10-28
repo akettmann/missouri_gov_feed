@@ -1347,7 +1347,7 @@ Quirks:
   starts and nothing is cached yet, `cl_cases` lands 0 rows (seen in the October 2026 runs:
   `cases.quota_exhausted` with `retry_after_s` about 16 hours). Run it again the next day.
 - Without a token it can only search (5 requests per minute) and gets no dispositions.
-- CourtListener has no trial-court (circuit) cases, and Case.net forbids automated access.
+- CourtListener has no Missouri circuit-court (state trial court) cases, and Case.net forbids automated access.
 - It's now a top-up for `courtlistener_case_bulk`. Where both have a case, an API row with outcome data
   wins.
 

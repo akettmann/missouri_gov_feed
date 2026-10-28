@@ -933,3 +933,56 @@ unit_tests:
         - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 119-hr-1, law_type: Public Law, law_number: 119-21, became_law: true, is_original_cosponsor: false}
         - {official_id: null, bioguide_id: M2, role: cosponsor, bill_id: 119-hr-1, law_type: Public Law, law_number: 119-21, became_law: true, is_original_cosponsor: true}
         - {official_id: o_m1, bioguide_id: M1, role: cosponsor, bill_id: 119-hr-2, law_type: null, law_number: null, became_law: false, is_original_cosponsor: false}
+
+  - name: official_profile_status_wording
+    model: official_profile
+    description: >
+      Pins the reader-facing coverage status text (#830): voluntary disclosures read "none recorded" and say
+      entries are added by hand; the MEC gap spells out Missouri Ethics Commission; the court-case gap gives a
+      federal judge or a justice a reason that can apply to them (no case matched in the courts we load), and
+      gives a circuit judge, a legislator or a Congress member who is a lawyer both reasons (the lawyer search covers every court we load, and CourtListener has no circuit courts).
+    overrides:
+      vars:
+        mec_direct: false
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: o_rep, full_name: A Rep, party: R, level: state, office: state_house, office_title: Representative, district: '1'}
+          - {official_id: o_circuit, full_name: A Circuit, party: null, level: state, office: mo_circuit_judge, office_title: Judge, district: '2'}
+          - {official_id: o_fed, full_name: A Fed, party: null, level: federal, office: us_district_court, office_title: Judge, district: 'E'}
+          - {official_id: o_cong, full_name: A Congress Lawyer, party: R, level: federal, office: us_house, office_title: Representative, district: '1'}
+          - {official_id: o_appeals, full_name: An Appeals Judge, party: null, level: state, office: mo_court_of_appeals, office_title: Judge, district: 'W'}
+      - input: ref('fct_legal_careers')
+        rows:
+          - {official_id: o_rep}
+          - {official_id: o_circuit}
+          - {official_id: o_fed}
+          - {official_id: o_cong}
+          - {official_id: o_appeals}
+      - input: ref('fct_votes')
+        rows: [{official_id: nobody}]
+      - input: ref('fct_campaign_finance')
+        rows: [{official_id: nobody}]
+      - input: ref('fct_lobbyist_gifts')
+        rows: [{official_id: nobody}]
+      - input: ref('fct_disclosures')
+        rows: [{official_id: nobody, is_latest_version: true}]
+      - input: ref('fct_bias_indicators')
+        rows: [{official_id: nobody}]
+      - input: ref('fct_office_history')
+        rows: [{official_id: nobody}]
+      - input: ref('fct_commercial_ties')
+        rows: [{official_id: nobody}]
+      - input: ref('fct_family_ties')
+        rows: [{official_id: nobody}]
+      - input: ref('fct_case_history')
+        rows: [{official_id: nobody}]
+      - input: ref('fct_voluntary_disclosures')
+        rows: [{official_id: nobody}]
+    expect:
+      rows:
+        - {official_id: o_rep, donations_status: 'none found (no Missouri Ethics Commission committee linked to this official)', voluntary_disclosures_status: 'none recorded (no public list exists; we add these by hand)', cases_status: 'none found (no case matched in the Missouri appellate and federal courts we load; CourtListener has no Missouri circuit-court cases)'}
+        - {official_id: o_circuit, donations_status: 'none found (no Missouri Ethics Commission committee linked to this official)', voluntary_disclosures_status: 'none recorded (no public list exists; we add these by hand)', cases_status: 'none found (no case matched in the Missouri appellate and federal courts we load; CourtListener has no Missouri circuit-court cases)'}
+        - {official_id: o_fed, donations_status: 'not applicable', voluntary_disclosures_status: 'none recorded (no public list exists; we add these by hand)', cases_status: 'none found (no case matched in the courts we load from CourtListener)'}
+        - {official_id: o_cong, donations_status: 'none found', voluntary_disclosures_status: 'none recorded (no public list exists; we add these by hand)', cases_status: 'none found (no case matched in the Missouri appellate and federal courts we load; CourtListener has no Missouri circuit-court cases)'}
+        - {official_id: o_appeals, donations_status: 'not applicable', voluntary_disclosures_status: 'none recorded (no public list exists; we add these by hand)', cases_status: 'none found (no case matched in the courts we load from CourtListener)'}
