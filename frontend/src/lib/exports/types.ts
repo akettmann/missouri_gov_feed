@@ -186,6 +186,10 @@ export interface PartyBreak {
   democratic_yea: number | null;
   democratic_nay: number | null;
   source_url: string | null;
+  /** fct_votes.vote_stage (#804): null for a federal vote, which carries no stage */
+  vote_stage: string | null;
+  /** fct_votes.vote_informal: a House calendar item on the informal calendar; null for a federal vote */
+  vote_informal: boolean | null;
 }
 
 /** rpt_attendance: one session. */
@@ -254,6 +258,10 @@ export interface InterestOverlap {
   /** the most recent overlapping votes, then any recusals not among them (recent = false) */
   examples: {
     recent: boolean;
+    chamber: string;
+    /** fct_votes.vote_stage (#804) of the example roll call */
+    vote_stage: string | null;
+    vote_informal: boolean | null;
     vote_date: string;
     bill: string;
     short_title: string | null;

@@ -156,6 +156,10 @@ unit_tests:
         rows: |
             select '171' as session_code, 'HB2' as bill, 'signed' as status union all
             select '181', 'HB2', 'relisted for governor message'
+      - input: ref('stg_mo_senate__bill_sponsors')
+        format: sql
+        rows: |
+            select cast(null as varchar) as session_code, cast(null as integer) as session_year, cast(null as varchar) as bill, cast(null as varchar) as sponsor_type, cast(null as varchar) as sponsor_name, cast(null as integer) as sponsor_district where false
       - input: ref('stg_mo_house__bill_sponsors')
         format: sql
         rows: |

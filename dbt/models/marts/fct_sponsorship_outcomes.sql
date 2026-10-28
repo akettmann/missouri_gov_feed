@@ -3,8 +3,9 @@
 -- Counted: the primary sponsor (sponsor_type 'Sponsor', one per bill) of a House bill (HB) or House joint resolution
 -- (HJR: a proposed law or constitutional amendment), sponsor_chamber state_house, matched to an official. Left out:
 -- co-sponsors, handlers and conferees; resolutions (HR, HCR: adopted by voice vote or not at all, they would swamp
--- the share); Senate sponsors (the House XML lists them for 2017-2022 only). fct_bill_sponsors already drops the
--- re-listed appropriation bills. Appropriation bills are kept: they are real sponsorships, and the Budget chair
+-- the share); Senate bills and their senator sponsors (fct_bill_sponsors lists them since #839, as state_senate;
+-- bill_type below keeps only HB and HJR). fct_bill_sponsors already drops the re-listed
+-- appropriation bills. Appropriation bills are kept: they are real sponsorships, and the Budget chair
 -- carries them, almost all passing.
 -- bills_decided is the denominator: bills whose outcome is known, so not 'pending' (session still open) or
 -- 'awaiting governor' (truly agreed this year). 'no governor action recorded' counts as decided but not as law.

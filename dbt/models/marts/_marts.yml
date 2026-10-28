@@ -1754,6 +1754,70 @@ models:
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"
+      - name: loaded_at
+        data_type: timestamp with time zone
+        description: >
+          When our pipeline last published the raw table (for repealed and transferred sections, the repeals list).
+          Not the fetch time: the page itself was fetched from revisor.mo.gov up to 180 days earlier (section pages)
+          or up to 7 days earlier (repeals list), and every row of a run shares one value (#852).
+        data_tests:
+          - not_null
+
+  - name: fct_statute_section_footnotes
+    description: >
+      The footnotes the Revisor prints under each RSMo section version (fct_statute_sections), one row per footnote
+      in page order: the session-law history, "Prior revisions" lines, the Revisor's court-case annotations (a section
+      can carry dozens) and notes such as "Effective 1-01-17". footnote_text is verbatim, never rewritten. Repealed
+      and transferred sections have no footnotes. Grain: one row per footnote (section_version_id, footnote_number).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [section_version_id, footnote_number]
+    columns:
+      - name: section_version_id
+        data_type: varchar
+        description: The section version the footnote is printed under (fct_statute_sections.section_version_id).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_statute_sections')
+                field: section_version_id
+      - name: footnote_number
+        data_type: integer
+        description: Position of the footnote on the version's page, 1-based; sort by it to print them in order.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 100
+                inclusive: true
+      - name: section_id
+        data_type: varchar
+        description: The RSMo section (fct_statute_sections.section_id), repeated so a section's footnotes can be read without the version table.
+        data_tests:
+          - not_null
+      - name: footnote_text
+        data_type: varchar
+        description: >
+          The footnote as the Revisor prints it. Checked for HTML entities, U+FFFD, filler values and doubled
+          punctuation by tests/assert_statute_footnotes_are_clean_text.sql.
+        data_tests:
+          - not_null
+      - name: is_history_note
+        data_type: boolean
+        description: True for the first footnote when it is the session-law history that fct_statute_sections carries as history_note.
+        data_tests:
+          - not_null
+      - name: source_url
+        data_type: varchar
+        description: "{{ doc('source_url') }}"
+      - name: loaded_at
+        data_type: timestamp with time zone
+        description: When our pipeline last published the raw table; the page was fetched up to 180 days earlier (see fct_statute_sections.loaded_at).
+        data_tests:
+          - not_null
 
   - name: fct_bill_statute_links
     description: >
@@ -2095,7 +2159,7 @@ models:
     columns:
       - name: session_code
         data_type: varchar
-        description: House session code.
+        description: House session code (the Senate's sessions are mapped to the House's codes).
       - name: bill
         data_type: varchar
         description: Bill number (fct_bills).
@@ -2116,7 +2180,10 @@ models:
   - name: fct_bill_sponsors
     description: >
       Sponsors, co-sponsors, handlers and House/Senate conferees of each House bill, as the House lists them,
-      matched to officials where the district and surname agree. The House lists a member's latest district for every session, so for a member whose district number changed (2022 redistricting) the match goes through the session's roster by surname and the listed district being one the member held; two candidates leave the row unmatched. Re-listed appropriation bills (fct_bills status
+      and the primary sponsor of each Senate bill (SB, SJR, SCR, SR) from senate.mo.gov's bill list (one Sponsor
+      row per Senate bill; that list has no co-sponsors; a bill it gives no sponsor has no row), matched to officials where the district and surname agree (a Senate bill's sponsor: the senator who held the
+      listed district's seat in the session's year and whose surname is in the listed name). Only current officials
+      (dim_official) get an official_id, so a former senator's bills keep it null. The House lists a member's latest district for every session, so for a member whose district number changed (2022 redistricting) the match goes through the session's roster by surname and the listed district being one the member held; two candidates leave the row unmatched. Re-listed appropriation bills (fct_bills status
       "relisted for governor message") are excluded: they repeat the original's sponsors only to record the
       governor's message. Grain: one row per (session, bill, sponsor type, sponsor name).
     data_tests:
@@ -2135,10 +2202,10 @@ models:
         description: Sponsor, Co-Sponsor, Handler, HouseConferee or SenateConferee.
       - name: sponsor_name
         data_type: varchar
-        description: Name as the House lists it.
+        description: Name as the House lists it ("First Last" from the Senate's list for a Senate bill).
       - name: sponsor_chamber
         data_type: varchar
-        description: state_house or state_senate (the House numbers senators 200 + senate district).
+        description: state_house or state_senate (the House numbers senators 200 + senate district; a Senate bill's sponsor is always state_senate).
       - name: sponsor_district
         data_type: integer
         description: District in the sponsor's own chamber.
@@ -2154,7 +2221,7 @@ models:
       primary sponsor (sponsor_type Sponsor, exactly one per bill), as a House bill (HB) or House joint resolution
       (HJR: a proposed law or constitutional amendment). Co-sponsors, handlers and conferees are not counted.
       Resolutions (HR, HCR) are left out: they are adopted on a voice vote or not at all and would swamp the
-      share. Senate sponsors are left out (the House XML lists them for 2017-2022 only). Re-listed appropriation
+      share. Senate bills and their senator sponsors are left out (fct_bill_sponsors carries them since #839; this model counts House bills only). Re-listed appropriation
       bills are not counted twice (fct_bill_sponsors drops them). Appropriation bills are kept: they are real
       sponsorships, and the Budget chair sponsors them and almost all pass, so the chair's shares are high for
       that reason (a member who has left office, such as a former Budget chair, has no row). Only current officials (dim_official) have an official_id, so former members are not here
