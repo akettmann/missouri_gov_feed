@@ -438,6 +438,11 @@ instead run `mogov run` as a job, it is strict by default; set `MOGOV_ALLOW_FAIL
    gcloud run jobs create mogov-build ... --tasks 1 --memory 8Gi \
      --command sh --args -c,'cp /data/mogov.duckdb /tmp/ 2>/dev/null; MOGOV_DB=/tmp/mogov.duckdb mogov build && cp /tmp/mogov.duckdb /data/mogov.duckdb'
    ```
+   `MOGOV_DUCKDB_MEMORY` (default 4GB here) also caps the dbt build's DuckDB (`dbt/profiles.yml`, under `settings:`;
+   a top-level `memory_limit:` key is ignored by dbt-duckdb). The build does not spill to disk
+   (`temp_directory: ''`), so a model that needs more than the cap fails with an out-of-memory error instead of
+   slowing down. 3GB is too small (`rpt_votes_by_subject` runs out of memory); 4GB builds everything. Keep the
+   cap below the container memory minus the in-memory `/tmp` database (#818).
 6. Chain them in order: stage-1 load jobs, then `mogov-build`, then
    `mogov load courtlistener_cases wikidata` (stage 2; `mogov list` shows each loader's stage), then
    `mogov-build` again. Use Cloud Workflows, or Cloud Scheduler triggers spaced far
