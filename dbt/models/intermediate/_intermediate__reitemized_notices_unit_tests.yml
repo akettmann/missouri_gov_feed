@@ -345,3 +345,39 @@ unit_tests:
         - {record_id: fh1}
         - {record_id: fh2}
         - {record_id: fi}
+
+  - name: tap_contributions_restrict_notice_dedupe_to_groups_with_a_notice
+    model: int_tap_mec__contributions
+    description: >
+      The dedupe only looks at committee/date/amount groups that hold a 24-hour notice (#882). 1: groups without a
+      notice pass through untouched, even two full-report lines of the same donor, a donor-less line and rows missing
+      a committee, date or amount. 2: a notice and a full-report line whose committee id differs only in case and
+      padding ("c1" / " C1 ") are one group after cleaning and still pair, so the notice is dropped. 3: a notice
+      next to a full-report line of another amount is a group of its own and is kept.
+    given:
+      - input: ref('stg_tap_mec__contributions')
+        rows:
+          # 1
+          - {record_id: p1a, mec_committee_id: E1, contributor_name: Same Giver, amount: 100, contribution_date: 2020-02-01, report: April Quarterly Report}
+          - {record_id: p1b, mec_committee_id: E1, contributor_name: Same Giver, amount: 100, contribution_date: 2020-02-01, report: April Quarterly Report}
+          - {record_id: p1c, mec_committee_id: E1, contributor_name: null, amount: 100, contribution_date: 2020-02-01, report: April Quarterly Report}
+          - {record_id: p1d, mec_committee_id: null, contributor_name: No Committee, amount: 100, contribution_date: 2020-02-01, report: April Quarterly Report}
+          - {record_id: p1e, mec_committee_id: E1, contributor_name: No Date, amount: 100, contribution_date: null, report: April Quarterly Report}
+          - {record_id: p1f, mec_committee_id: E1, contributor_name: No Amount, amount: null, contribution_date: 2020-02-01, report: null}
+          # 2
+          - {record_id: n2, mec_committee_id: ' c2 ', contributor_name: Pat Doe, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary'}
+          - {record_id: f2, mec_committee_id: C2, contributor_name: PAT DOE., amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report}
+          # 3
+          - {record_id: n3, mec_committee_id: E3, contributor_name: Pat Doe, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary'}
+          - {record_id: f3, mec_committee_id: E3, contributor_name: Pat Doe, amount: 6000, contribution_date: 2020-07-28, report: April Quarterly Report}
+    expect:
+      rows:
+        - {record_id: p1a}
+        - {record_id: p1b}
+        - {record_id: p1c}
+        - {record_id: p1d}
+        - {record_id: p1e}
+        - {record_id: p1f}
+        - {record_id: f2}
+        - {record_id: n3}
+        - {record_id: f3}
