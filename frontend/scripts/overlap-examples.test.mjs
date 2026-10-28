@@ -9,9 +9,9 @@ async function run(rows, examples = 5) {
   const conn = await (await DuckDBInstance.create(":memory:")).connect();
   await conn.run(`create table ov (official_id varchar, industry varchar, chamber varchar, vote_id varchar,
     session_code varchar, vote_date date, bill varchar, short_title varchar, vote_cast varchar, vote_description varchar,
-    vote_source_url varchar, bill_source_url varchar)`);
+    vote_source_url varchar, bill_source_url varchar, vote_stage varchar, vote_informal boolean)`);
   for (const [vote_id, date, bill, desc, chamber = "state_senate", session = "S1", cast = "yea"] of rows) {
-    await conn.run(`insert into ov values ('A','Gas',?,?,?,?,?,'t',?,?,?,'b')`, [
+    await conn.run(`insert into ov values ('A','Gas',?,?,?,?,?,'t',?,?,?,'b','third_reading',true)`, [
       chamber,
       vote_id,
       session,
@@ -29,6 +29,13 @@ const J = "https://x/RDay1.pdf#vote";
 const PASS = "On motion of Senator B, SB 724 was read the 3rd time and passed by the following vote:";
 const AMEND = "Senator B moved that SA 2 to SB 724 be adopted, which motion prevailed by the following vote:";
 const EMERG = "The emergency clause was adopted by the following vote:";
+
+test("each example carries its roll call's chamber, stage and informal flag", async () => {
+  const [row] = await run([[`${J}1`, "2022-05-10", "SB724", PASS]]);
+  assert.equal(row.chamber, "state_senate");
+  assert.equal(row.vote_stage, "third_reading");
+  assert.equal(row.vote_informal, true);
+});
 
 test("passage beats an earlier amendment and a later emergency-clause vote on the same day", async () => {
   const rows = await run([

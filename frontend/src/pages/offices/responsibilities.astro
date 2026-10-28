@@ -1,0 +1,17 @@
+---
+// What each office does, from docs/reference/office_responsibilities.md (#786). The doc is the single source of
+// the legal text; the parser fails the build if a bullet loses its citation (see lib/officeDoc.ts).
+import Layout from "../../layouts/Layout.astro";
+import OfficeDocView from "../../components/OfficeDocView.astro";
+import { loadResponsibilities } from "../../lib/officeDocLoad";
+
+const doc = loadResponsibilities();
+---
+
+<Layout
+  title="What each office does"
+  description="The core duties and powers of each Missouri and federal office we cover, each with a link to the law."
+>
+  <h1>What each office does</h1>
+  <OfficeDocView doc={doc} sourcePath="docs/reference/office_responsibilities.md" coverage />
+</Layout>

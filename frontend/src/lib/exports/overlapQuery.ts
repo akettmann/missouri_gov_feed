@@ -43,7 +43,7 @@ export function overlapExamplesSql(examples: number, overlap: string): string {
         select * from (${pickPerBill("where vote_cast = 'recused'")}) as per_bill where pick = 1
       )
       select official_id, industry, cast(vote_date as varchar) as vote_date, bill, short_title, vote_cast,
-             vote_source_url, bill_source_url, recent
+             vote_source_url, bill_source_url, recent, chamber, vote_stage, vote_informal
       from (
         select *, true as recent from recent where rank <= ${examples}
         union all
