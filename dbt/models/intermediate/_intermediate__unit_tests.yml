@@ -316,6 +316,75 @@ unit_tests:
         - {official_id: j_gabbert, role: judge, cluster_id: c10, matched_by: judges text}
         - {official_id: j_retained, role: judge, cluster_id: c13, matched_by: judges text}
 
+  - name: bulk_case_matches_skip_namesakes_paid_on_the_same_court
+    model: int_courtlistener__bulk_case_matches
+    description: >
+      A namesake on the payroll who is not an official (Robert G. Dowd, Jr., APPELLATE JUDGE 2017-2021 beside
+      James M. Dowd) makes a bare "Dowd" ambiguous while he was paid, so j_dowd starts in 2022, the year after
+      (d1 in 2018 and d2 in 2021, "Dowd, Hess, Hoff" and "Dowd, J.", don't match; d3 in 2022 does). A text that
+      prints the surname right after another first name or a middle initial that isn't the judge's is the namesake
+      even after that: d4 "Robert G. Dowd, Jr., J." and d6 "Robert Dowd" don't match, d5 "James M. Dowd, J." and d7
+      "J. Dowd" and d8 "Dowd, Hess, Hoff" do. A CIRCUIT JUDGE named Dowd (2030) is not on the judge's court and
+      doesn't push the start. j_hall, with no namesake, keeps his payroll start in 2017 (d9). j_page's own first name
+      before a middle initial she doesn't have in her given name ("Lisa P. Page", d10) is still her, and a trailing letter of the word before a comma ("División, Hall", read as "divisi n") is no first initial (d11).
+    overrides:
+      vars:
+        cl_case_bulk: true
+        case_history_min_year: 1975
+    given:
+      - input: ref('fct_legal_careers')
+        rows:
+          - {official_id: j_dowd, legal_role: judge}
+          - {official_id: j_hall, legal_role: judge}
+          - {official_id: j_page, legal_role: judge}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: j_dowd, given_name: James M., family_name: Dowd, office: mo_court_of_appeals, current_term_start: null}
+          - {official_id: j_hall, given_name: Gary, family_name: Hall, office: mo_court_of_appeals, current_term_start: null}
+          - {official_id: j_page, given_name: Lisa, family_name: Page, office: mo_court_of_appeals, current_term_start: null}
+      - input: ref('fct_office_history')
+        rows: []
+      - input: ref('fct_salaries')
+        rows:
+          - {official_id: j_dowd, calendar_year: 2017, position_title: APPELLATE JUDGE}
+          - {official_id: j_hall, calendar_year: 2017, position_title: APPELLATE JUDGE}
+          - {official_id: j_page, calendar_year: 2017, position_title: APPELLATE JUDGE}
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {agency_name: JUDICIARY, position_title: APPELLATE JUDGE, calendar_year: 2017, last_name: DOWD, first_names: ROBERT G.}
+          - {agency_name: JUDICIARY, position_title: APPELLATE JUDGE, calendar_year: 2021, last_name: DOWD, first_names: ROBERT G.}
+          - {agency_name: JUDICIARY, position_title: APPELLATE JUDGE, calendar_year: 2017, last_name: DOWD, first_names: JAMES M}
+          - {agency_name: JUDICIARY, position_title: CIRCUIT JUDGE, calendar_year: 2030, last_name: DOWD, first_names: LARRY}
+      - input: ref('mo_courts')
+        rows:
+          - {court_id: moctapp, office: mo_court_of_appeals}
+      - input: ref('int_courtlistener__mo_cases')
+        rows:
+          - {cluster_id: d1, court_id: moctapp, date_filed: '2018-03-01', judges_text: 'Dowd, Hess, Hoff', attorneys_text: null}
+          - {cluster_id: d2, court_id: moctapp, date_filed: '2021-12-31', judges_text: 'Dowd, J.', attorneys_text: null}
+          - {cluster_id: d3, court_id: moctapp, date_filed: '2022-03-01', judges_text: 'Dowd, J.', attorneys_text: null}
+          - {cluster_id: d4, court_id: moctapp, date_filed: '2023-03-01', judges_text: 'Robert G. Dowd, Jr., J.', attorneys_text: null}
+          - {cluster_id: d5, court_id: moctapp, date_filed: '2023-03-01', judges_text: 'James M. Dowd, J.', attorneys_text: null}
+          - {cluster_id: d6, court_id: moctapp, date_filed: '2023-03-01', judges_text: 'Robert Dowd, J.', attorneys_text: null}
+          - {cluster_id: d7, court_id: moctapp, date_filed: '2023-03-01', judges_text: 'J. Dowd, J.', attorneys_text: null}
+          - {cluster_id: d8, court_id: moctapp, date_filed: '2023-03-01', judges_text: 'Dowd, Hess, Hoff', attorneys_text: null}
+          - {cluster_id: d9, court_id: moctapp, date_filed: '2017-03-01', judges_text: 'Hall, J.', attorneys_text: null}
+          - {cluster_id: d11, court_id: moctapp, date_filed: '2018-03-01', judges_text: 'División, Hall, Jbdge, Witt', attorneys_text: null}
+          - {cluster_id: d10, court_id: moctapp, date_filed: '2018-03-01', judges_text: 'Lisa P. Page, J.', attorneys_text: null}
+      - input: ref('stg_courtlistener__mo_cluster_panel')
+        rows: []
+      - input: ref('int_courtlistener__official_people')
+        rows: []
+    expect:
+      rows:
+        - {official_id: j_dowd, role: judge, cluster_id: d3, matched_by: judges text}
+        - {official_id: j_dowd, role: judge, cluster_id: d5, matched_by: judges text}
+        - {official_id: j_dowd, role: judge, cluster_id: d7, matched_by: judges text}
+        - {official_id: j_dowd, role: judge, cluster_id: d8, matched_by: judges text}
+        - {official_id: j_hall, role: judge, cluster_id: d9, matched_by: judges text}
+        - {official_id: j_hall, role: judge, cluster_id: d11, matched_by: judges text}
+        - {official_id: j_page, role: judge, cluster_id: d10, matched_by: judges text}
+
   - name: epa_frs_facility_industry_prefers_naics_over_sic_sector
     model: int_epa_frs__facilities
     description: >

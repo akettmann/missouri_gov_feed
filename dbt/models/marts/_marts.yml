@@ -1206,8 +1206,8 @@ models:
     description: >
       Court cases (CourtListener) involving officials who are or were judges or lawyers. Built from the
       quarterly bulk export (Missouri state appellate and federal courts in Missouri plus the 8th Circuit)
-      matched in int_courtlistener__bulk_case_matches, topped up by REST API search hits. Trial-court
-      (circuit) cases are not in CourtListener. Grain: (official, role, case). Caveats: judges-text matches
+      matched in int_courtlistener__bulk_case_matches, topped up by REST API search hits. Missouri circuit-court
+      (state trial court) cases are not in CourtListener. Grain: (official, role, case). Caveats: judges-text matches
       are by surname within the judge's own courts and tenure; attorney text names an Attorney General on
       every brief their office filed (role `attorney` = office of record).
     data_tests:

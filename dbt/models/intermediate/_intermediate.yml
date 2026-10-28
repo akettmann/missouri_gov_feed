@@ -127,16 +127,22 @@ models:
     searches (src/mogov/loaders/courtlistener_cases.py) over the same people (fct_legal_careers): judge     on the
     opinion''s panel (CourtListener person id), or their surname as a whole word in the judges text of a case in
     a court they sit on (panels are sparse for state courts) attorney  "<first> <last>" as whole words in the attorneys
-    text, for lawyers and for judges whose own court CourtListener doesn''t cover (trial courts) Names are compared
-    as name_key()s padded with spaces, so "Hall" doesn''t match "Marshall". Surnames repeat across generations on
-    the same court (a 1910 Judge Smith on the 8th Circuit, fathers and sons on the Court of Appeals), so judges-text
-    matches only count from the judge''s first known judicial start date (fct_office_history, else dim_official.current_term_start);
-    without one, panel matches only. State appellate and Supreme Court judges with no CourtListener person (#847)
-    have neither, so they fall back to the Missouri sources, both upper bounds on the real start (we can lose early
-    cases, never credit a predecessor): 1. the first calendar year they were paid under their court''s payroll title
-    (state employee pay, from 2017) 2. else the year of their retention or election in their Official Manual biography
-    Attorney matches start at var case_history_min_year (default 1975): earlier namesakes aren''t them. Grain: one
-    row per (official, role, cluster); matched_by says how.'
+    text, for lawyers and for judges whose own court CourtListener doesn''t cover (Missouri circuit courts) Names
+    are compared as name_key()s padded with spaces, so "Hall" doesn''t match "Marshall". Surnames repeat across
+    generations on the same court (a 1910 Judge Smith on the 8th Circuit, fathers and sons on the Court of Appeals),
+    so judges-text matches only count from the judge''s first known judicial start date (fct_office_history, else
+    dim_official.current_term_start); without one, panel matches only. State appellate and Supreme Court judges
+    with no CourtListener person (#847) have neither, so they fall back to the Missouri sources, both upper bounds
+    on the real start (we can lose early cases, we do not credit a predecessor; the payroll year is only year-precise,
+    so a start falls on January 1 of it): 1. the first calendar year they were paid under their court''s payroll
+    title (state employee pay, from 2017) 2. else the year of their retention or election in their Official Manual
+    biography A namesake paid under the same court title (any payroll payee with the judge''s surname and another
+    first initial: Robert G. Dowd, Jr. was an APPELLATE JUDGE 2017-2021 beside James M. Dowd) makes a bare surname
+    ambiguous while they were paid, so such a judge starts the year after the namesake''s last paid year (a later
+    start only loses cases, which keeps the upper bound). A judges text that prints the surname right after a first
+    name or initial that is not the judge''s (a middle initial outside their given name, or a namesake''s first
+    name) is not them either. Attorney matches start at var case_history_min_year (default 1975): earlier namesakes
+    aren''t them. Grain: one row per (official, role, cluster); matched_by says how.'
 - name: int_courtlistener__district_dockets
   description: 'Federal district-court dockets (E.D. and W.D. Missouri) that have an assigned judge: filed and terminated
     dates (null when the docket has none) and the days between. A docket whose termination date is before its filing

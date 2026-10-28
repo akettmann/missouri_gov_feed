@@ -4,15 +4,21 @@
 --   judge     on the opinion's panel (CourtListener person id), or their surname as a whole word in the
 --             judges text of a case in a court they sit on (panels are sparse for state courts)
 --   attorney  "<first> <last>" as whole words in the attorneys text, for lawyers and for judges whose own
---             court CourtListener doesn't cover (trial courts)
+--             court CourtListener doesn't cover (Missouri circuit courts)
 -- Names are compared as name_key()s padded with spaces, so "Hall" doesn't match "Marshall".
 -- Surnames repeat across generations on the same court (a 1910 Judge Smith on the 8th Circuit, fathers and
 -- sons on the Court of Appeals), so judges-text matches only count from the judge's first known judicial
 -- start date (fct_office_history, else dim_official.current_term_start); without one, panel matches only.
 -- State appellate and Supreme Court judges with no CourtListener person (#847) have neither, so they fall back to
--- the Missouri sources, both upper bounds on the real start (we can lose early cases, never credit a predecessor):
+-- the Missouri sources, both upper bounds on the real start (we can lose early cases, we do not credit a
+-- predecessor; the payroll year is only year-precise, so a start falls on January 1 of it):
 --   1. the first calendar year they were paid under their court's payroll title (state employee pay, from 2017)
 --   2. else the year of their retention or election in their Official Manual biography
+-- A namesake paid under the same court title (any payroll payee with the judge's surname and another first initial:
+-- Robert G. Dowd, Jr. was an APPELLATE JUDGE 2017-2021 beside James M. Dowd) makes a bare surname ambiguous while
+-- they were paid, so such a judge starts the year after the namesake's last paid year (a later start only loses
+-- cases, which keeps the upper bound). A judges text that prints the surname right after a first name or initial
+-- that is not the judge's (a middle initial outside their given name, or a namesake's first name) is not them either.
 -- Attorney matches start at var case_history_min_year (default 1975): earlier namesakes aren't them.
 with searched as (
     select
@@ -51,6 +57,7 @@ court_judges as (
         o.office,
         {{ mogov.surname_key('o.family_name') }} as last_key,
         substr({{ mogov.name_key('o.given_name') }}, 1, 1) as first_initial,
+        {{ mogov.name_key('o.given_name') }} as given_key,
         count(*) over (partition by o.office, {{ mogov.surname_key('o.family_name') }}) as same_surname
     from {{ ref('dim_official') }} as o
     where o.office in (select t.office from court_titles as t)
@@ -77,6 +84,63 @@ payroll_years as (
     where p.agency_name = 'JUDICIARY' and j.same_surname = 1
 ),
 
+-- Payees under the judge's own court title with the judge's surname and another first initial.
+namesake_pay as (
+    select distinct
+        j.official_id,
+        j.given_key,
+        p.calendar_year,
+        {{ dbt.split_part(mogov.name_key('p.first_names'), "' '", 1) }} as namesake_first
+    from court_judges as j
+    inner join court_titles as t on j.office = t.office
+    inner join {{ ref('stg_mo_employee_pay__pay') }} as p
+        on
+            t.position_title = p.position_title
+            and p.agency_name = 'JUDICIARY'
+            and {{ mogov.surname_key('p.last_name') }} = j.last_key
+            and substr({{ mogov.name_key('p.first_names') }}, 1, 1) <> j.first_initial
+),
+
+namesake_end as (
+    select
+        official_id,
+        {{ dbt.safe_cast(
+            dbt.concat(['cast(max(calendar_year) + 1 as ' ~ dbt.type_string() ~ ')', "'-01-01'"]), 'date'
+        ) }} as start_date
+    from namesake_pay
+    group by 1
+),
+
+-- First names that, printed right before the surname, mark another person: every single letter that is not an initial
+-- of the judge's given name (except J, which also ends "Wilson, J. Broniec" as a title; unless the judge's first name
+-- comes right before it: "Lisa P. Page" is Lisa Page), and the first names of namesakes paid on the court. own_prefix
+-- is the text that makes the token the judge's after all.
+letters as (
+    {% for letter in 'abcdefghiklmnopqrstuvwxyz' -%}
+        select '{{ letter }}' as token
+        {% if not loop.last %}union all{% endif %}
+    {% endfor -%}
+),
+
+foreign_forenames as (
+    select
+        j.official_id,
+        l.token,
+        {{ dbt.split_part('j.given_key', "' '", 1) }} || ' ' || l.token as own_prefix
+    from court_judges as j
+    cross join letters as l
+    where ' ' || j.given_key not like '% ' || l.token || '%'
+    union
+    select
+        n.official_id,
+        n.namesake_first as token,
+        '#' as own_prefix
+    from namesake_pay as n
+    where
+        length(n.namesake_first) > 1
+        and ' ' || n.given_key || ' ' not like '% ' || n.namesake_first || ' %'
+),
+
 payroll_start as (
     select
         official_id,
@@ -99,7 +163,7 @@ manual_start as (
     group by 1
 ),
 
-judicial_start as (
+base_start as (
     select
         s.official_id,
         coalesce(
@@ -123,6 +187,17 @@ judicial_start as (
     group by 1
 ),
 
+judicial_start as (
+    select
+        b.official_id,
+        case
+            when ne.start_date is not null and b.start_date < ne.start_date then ne.start_date
+            else b.start_date
+        end as start_date
+    from base_start as b
+    left join namesake_end as ne on b.official_id = ne.official_id
+),
+
 judge_courts as (
     select
         office,
@@ -135,7 +210,10 @@ cases as (
         cluster_id,
         court_id,
         date_filed,
-        ' ' || {{ mogov.name_key('judges_text') }} || ' ' as judges_key,
+        -- a comma or semicolon stays a word, so the n of "División, Ahuja" isn't a first initial of Ahuja
+        ' '
+        || {{ mogov.name_key("replace(replace(judges_text, ',', ' xcommax '), ';', ' xcommax ')") }}
+        || ' ' as judges_key,
         ' ' || {{ mogov.name_key('attorneys_text') }} || ' ' as attorneys_key
     from {{ ref('int_courtlistener__mo_cases') }}
 ),
@@ -160,6 +238,13 @@ named_judge as (
     where
         c.judges_key like '% ' || s.family_key || ' %'
         and c.date_filed >= js.start_date
+        and not exists (
+            select 1 from foreign_forenames as f
+            where
+                f.official_id = s.official_id
+                and c.judges_key like '% ' || f.token || ' ' || s.family_key || ' %'
+                and c.judges_key not like '% ' || f.own_prefix || ' ' || s.family_key || ' %'
+        )
 ),
 
 attorney as (

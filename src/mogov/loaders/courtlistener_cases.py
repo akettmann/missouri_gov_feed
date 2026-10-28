@@ -16,7 +16,7 @@ read "AFFIRMED"/"REVERSED"... from the decree. Without a token CourtListener all
 and no cluster/opinion detail, so the loader runs search-only, capped by MOGOV_CL_MAX_QUERIES per run
 (results are cached for 30 days, so repeated runs make progress).
 
-Trial-court (circuit) cases are not in CourtListener; Missouri Case.net prohibits automated access.
+Missouri circuit-court (state trial court) cases are not in CourtListener; Missouri Case.net prohibits automated access.
 """
 
 import json
@@ -80,7 +80,7 @@ def _queries(person: dict) -> list[tuple[str, str, str]]:
     if person["office"] in JUDGE_COURTS:
         out.append(("judge", f'judge:"{family}"', JUDGE_COURTS[person["office"]]))
     roles = person["roles"] or ""
-    # lawyers, and judges whose cases CourtListener doesn't index (trial courts): search their law practice
+    # lawyers, and judges whose cases CourtListener doesn't index (Missouri circuit courts): search their law practice
     if "lawyer" in roles or person["office"] not in JUDGE_COURTS:
         out.append(("attorney", f'attorney:"{given} {family}"', f"{MO_STATE_COURTS} {MO_FEDERAL_COURTS}"))
     return out
