@@ -1889,9 +1889,13 @@ models:
 
   - name: fct_bill_documents
     description: >
-      Links to the House's PDFs for each bill, one row per document: summaries, fiscal notes, witness forms, bill
-      text versions, amendments and the change maps of text versions and amendments. The PDFs are not fetched.
-      Covers House bills and the Senate bills the House acted on (2024 sessions on). Witness forms name citizens,
+      Links to the PDFs for each bill, one row per document: the House's summaries, fiscal notes, witness forms, bill
+      text versions, amendments and the change maps of text versions and amendments, and the Senate's bill text, fiscal
+      note and amendment links. The PDFs are not fetched. source_site says whose link it is: the House's links cover
+      House bills and the Senate bills the House acted on (2024 sessions on); the Senate's come from senate.mo.gov's
+      own bill pages for every Senate bill of a session the mo_senate_bills loader has landed (none until it has). A
+      Senate bill both sites list has links from both, with different URLs, so both are kept. The Senate's summaries
+      are text on the page, not a link, and are in stg_mo_senate__bill_summaries only. Witness forms name citizens,
       so only the link is kept. Join to fct_bills on (session_code, bill); a few special-session Senate bills have
       documents here but no fct_bills row (#438). Grain: one row per (session, bill, document_kind, document_url).
     data_tests:
@@ -1911,19 +1915,30 @@ models:
           - not_null
       - name: document_kind
         data_type: varchar
-        description: What the link is (summary, fiscal_note, witness_form, bill_text, text_map, amendment, amendment_map). An amendment is the amendment's own PDF; amendment_map is its change map, which few amendments have.
+        description: What the link is (summary, fiscal_note, witness_form, bill_text, text_map, amendment, amendment_map). An amendment is the amendment's own PDF; amendment_map is its change map, which few amendments have. The Senate's links are bill_text, fiscal_note and amendment only.
         data_tests:
           - accepted_values:
               arguments:
                 values: ['summary', 'fiscal_note', 'witness_form', 'bill_text', 'text_map', 'amendment', 'amendment_map']
       - name: document_url
         data_type: varchar
-        description: Link to the PDF (documents.house.mo.gov; a few 2018 links point at the older house.mo.gov and moga.mo.gov hosts).
+        description: Link to the PDF (documents.house.mo.gov; a few 2018 links point at the older house.mo.gov and moga.mo.gov hosts; www.senate.mo.gov for the Senate's own).
         data_tests:
           - not_null
           - dbt_utils.expression_is_true:
               arguments:
-                expression: "like 'http%://documents.house.mo.gov/%' or document_url like 'http%://house.mo.gov/%' or document_url like 'http%://www.moga.mo.gov/%'"
+                expression: "like 'http%://documents.house.mo.gov/%' or document_url like 'http%://house.mo.gov/%' or document_url like 'http%://www.moga.mo.gov/%' or document_url like 'http%://www.senate.mo.gov/%'"
+      - name: source_site
+        data_type: varchar
+        description: Whose link it is, 'house' (the House XML) or 'senate' (a Senate bill page on senate.mo.gov). The fetched-text columns below are House-only until the Senate PDFs are fetched (#590).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['house', 'senate']
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "= case when document_url like 'http%://www.senate.mo.gov/%' then 'senate' else 'house' end"
       - name: document_index
         data_type: bigint
         description: Position of the link in the bill's XML among documents of its kind (lowest, when listed twice).
