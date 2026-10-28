@@ -100,21 +100,21 @@ const term = o ? [o.current_term_start, o.current_term_end].filter(Boolean).join
         </a>
       </div>
 
+      <SectionMoney bundle={bundle} />
+      <SectionGifts bundle={bundle} />
+      <SectionInterests bundle={bundle} />
+      <SectionBusinesses bundle={bundle} />
+      <SectionOverlap bundle={bundle} />
+      <SectionSponsorship bundle={bundle} />
+      <SectionVoting bundle={bundle} />
+      <SectionCommittees bundle={bundle} />
+      <SectionExpenses bundle={bundle} />
       <SectionIdeology
         indicators={bundle.indicators}
         status={bias.status}
         peers={bundle.peers}
         office={o.office}
       />
-      <SectionVoting bundle={bundle} />
-      <SectionCommittees bundle={bundle} />
-      <SectionSponsorship bundle={bundle} />
-      <SectionMoney bundle={bundle} />
-      <SectionGifts bundle={bundle} />
-      <SectionExpenses bundle={bundle} />
-      <SectionOverlap bundle={bundle} />
-      <SectionBusinesses bundle={bundle} />
-      <SectionInterests bundle={bundle} />
       <SectionCourts bundle={bundle} />
     </article>
     <ProfileScript />
