@@ -4,9 +4,9 @@
 -- so a bill can show two notices for one day; the House XML carries no cancelled flag.
 -- notice_time is the clock time as HH:MM, null when the House gave only the free-text alt_time ("4:30 PM or upon
 -- adjournment"; the XML stores that as midnight). Midnight without an alt_time is kept as 00:00 (not seen so far).
--- Email addresses and phone numbers in comments and locations are replaced by a marker ("[email removed]",
--- "[phone removed]", mogov.redact_contact): committee staff and members put contact details there, and this
--- project keeps contact data out of the models. The rest of the text stays.
+-- Email addresses and phone numbers in comments, locations and hearing_time_note are replaced by a
+-- marker ("[email removed]", "[phone removed]", mogov.redact_contact): committee staff and members put contact
+-- details there, and this project keeps contact data out of the models. The rest of the text stays.
 with hearings as (
     select
         b.session_code,

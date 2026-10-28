@@ -80,6 +80,18 @@ def _redact(text):
         "751‑6662",
         "573 751 1167",
         "573 751 1167",
+        # spaced-dash and NBSP/NNBSP shapes (#751). The redaction pattern also catches most of these, so the 1-prefixed
+        # ones (which only guard_phone_pattern reads) are what pin the guard's own gap class.
+        "573 - 751 - 1167",
+        "(573) 751 - 1167",
+        "(573) 7511167",
+        "573 7511167",
+        "573 751-1167",
+        "1573 - 751 - 1167",
+        "1573 751 1167",
+        "1573 751 1167",
+        "+1573 - 751 - 1167",
+        "1(573) 751 - 1167",
     ],
 )
 def test_guard_fails_on_phone_shapes_left_in_redacted_text(text):
@@ -132,6 +144,11 @@ def test_warn_ignores_ordinary_numbers(text):
         ("751‑6662", "[phone removed]"),
         ("573 751 1167", "[phone removed]"),
         ("573 751 1167", "[phone removed]"),
+        ("573 - 751 - 1167", "[phone removed]"),
+        ("(573) 751 - 1167", "[phone removed]"),
+        ("(573) 7511167", "[phone removed]"),
+        ("573 7511167", "[phone removed]"),
+        ("573 751-1167", "[phone removed]"),
         ("Call 751–6662 or 2001–2013", "Call [phone removed] or 2001–2013"),
         ("HCR 123 4567", "HCR 123 4567"),
         ("751 6662", "751 6662"),  # left for the guard / warn check

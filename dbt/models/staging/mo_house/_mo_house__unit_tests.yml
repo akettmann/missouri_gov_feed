@@ -279,6 +279,39 @@ unit_tests:
         - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 4, committee_name: Ways and Means, hearing_date: '2025-02-13', hearing_time: '10:00', hearing_time_note: null, location: 'Room 5 call [phone removed]', comments: 'Notify my office at [phone removed] or [phone removed] or [phone removed] or [phone removed]. Sessions 2001-2013 and 3001-3013 met 2/13/19 and 1-23-17 per RSMo 135.1150 and 610.021(10) for $1,000 in room 110 at 10:30'}
         - {session_code: '251', session_year: 2025, bill: SB7, hearing_index: 1, committee_name: Rules - Regulatory Oversight, hearing_date: '2025-03-05', hearing_time: '14:00', hearing_time_note: null, location: House Hearing Room 5, comments: null}
 
+  - name: house_bill_hearings_redact_phones_with_spaced_separators_not_bill_lists_or_citations
+    model: stg_mo_house__bill_hearings
+    description: >
+      Guard for shapes not in current data (#751). A 10-digit phone whose dashes have spaces around them is redacted
+      whole: "573 - 751 - 1167", "573 -751- 1167", "(573) 751 - 1167", "(573) - 751-1167" (no area code left behind).
+      Bill lists with spaced dashes ("HB 1 - 3"), amount ranges, dates, times, room numbers and legal citations
+      (RSMo, "Section 105.145", "sections 105.145 and 105.450", "Chapter 610.010", "RSMo 135.1150") are not phones.
+      The dotted 7-digit form "751.6662" is deliberately NOT redacted (same shape as "RSMo 135.1150", left to the
+      warn-level check, see #751). Allowing only a bare single separator again fails this test.
+    given:
+      - input: source('mo_house', 'xml_bills')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast('HB1' as varchar) as bill
+      - input: source('mo_house', 'xml_bill_hearings')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast(1 as bigint) as hearing_index, cast('Judiciary' as varchar) as committee_name, cast('2025-02-04' as date) as notice_date, cast('1900-01-01T08:15:00' as varchar) as notice_time, cast(null as varchar) as alt_time, cast('Room 5' as varchar) as location, cast('Call 573 - 751 - 1167 or 573 -751- 1167 or (573) 751 - 1167 or (573) - 751-1167 today' as varchar) as comments union all
+            select '251', '251-HB1.XML', 2, 'Rules', '2025-02-05', '1900-01-01T08:15:00', null, 'Room 110', 'HB 1 - 3 and HB 5 - 7 heard with 12 - 15 and $100 - $1,000 on 2/5/25 at 9:00 - 10:30 AM' union all
+            select '251', '251-HB1.XML', 3, 'Ways and Means', '2025-02-06', '1900-01-01T08:15:00', null, 'Room 5', 'See RSMo 135.1150, Section 105.145, sections 105.145 and 105.450, Chapter 610.010 and 610.021 - 610.026' union all
+            select '251', '251-HB1.XML', 4, 'Fiscal Review', '2025-02-07', '1900-01-01T08:15:00', null, 'Room 5', 'Dotted seven digits 751.6662 are left to the warn check'
+      - input: source('mo_house', 'xml_senate_act_hearings')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-SENATEACTLIST.XML' as varchar) as file_name, cast(1 as bigint) as hearing_index, cast('Rules' as varchar) as committee_name, cast('2025-03-05' as date) as notice_date, cast('1900-01-01T14:00:00' as varchar) as notice_time, cast(null as varchar) as alt_time, cast('Room 5' as varchar) as location, cast(null as varchar) as comments, cast('SB7' as varchar) as bill
+    expect:
+      rows:
+        - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 1, committee_name: Judiciary, hearing_date: '2025-02-04', hearing_time: '08:15', hearing_time_note: null, location: Room 5, comments: 'Call [phone removed] or [phone removed] or [phone removed] or [phone removed] today'}
+        - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 2, committee_name: Rules, hearing_date: '2025-02-05', hearing_time: '08:15', hearing_time_note: null, location: Room 110, comments: 'HB 1 - 3 and HB 5 - 7 heard with 12 - 15 and $100 - $1,000 on 2/5/25 at 9:00 - 10:30 AM'}
+        - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 3, committee_name: Ways and Means, hearing_date: '2025-02-06', hearing_time: '08:15', hearing_time_note: null, location: Room 5, comments: 'See RSMo 135.1150, Section 105.145, sections 105.145 and 105.450, Chapter 610.010 and 610.021 - 610.026'}
+        - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 4, committee_name: Fiscal Review, hearing_date: '2025-02-07', hearing_time: '08:15', hearing_time_note: null, location: Room 5, comments: Dotted seven digits 751.6662 are left to the warn check}
+        - {session_code: '251', session_year: 2025, bill: SB7, hearing_index: 1, committee_name: Rules, hearing_date: '2025-03-05', hearing_time: '14:00', hearing_time_note: null, location: Room 5, comments: null}
+
   - name: house_rollcalls_whose_header_names_another_session_are_dropped
     model: stg_mo_house__rollcalls
     description: >
