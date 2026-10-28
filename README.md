@@ -77,7 +77,7 @@ Name-matched records carry a `match_confidence` column. Read medium-confidence m
 | `MOGOV_LOOKBACK_YEARS` | Years of state roll calls, House and Senate (default 10, ending this year; House PDFs go back to 2014). |
 | `MOGOV_MEC_*_YEARS`, `MOGOV_FEC_CYCLES`, `MOGOV_VOTEVIEW_CONGRESSES`, `MOGOV_BILLSTATUS_CONGRESSES`, ... | Other coverage windows (see each loader's header). |
 | `MOGOV_PROGRESS_SECONDS` | How often loaders log `loader.progress` (default 15). |
-| `MOGOV_DUCKDB_MEMORY`, `MOGOV_DUCKDB_THREADS` | DuckDB limits per landing process (default 3GB, 4); lower them when running many shards. |
+| `MOGOV_DUCKDB_MEMORY`, `MOGOV_DUCKDB_THREADS` | DuckDB limits per landing process (default 3GB, 4); lower them when running many shards. `MOGOV_DUCKDB_MEMORY` also caps the dbt build's DuckDB (default 4GB, no spilling; a value lowered for shards also lowers the build's cap; see `docs/environment.md`). |
 
 ## Layout
 
