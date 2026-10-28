@@ -77,3 +77,7 @@ state_senate,"Senator Schatz moved that the vote by which the HCS for SB 782, as
 state_senate,"Senator Sater moved that the Senate reconsider the vote by which SB 12 passed, which motion prevailed by the following vote:",SB 12,procedural_motion,false
 state_senate,"Senator Munzlinger moved that the Senate recede from its position on SS for HB 1428, as amended, which motion prevailed by the following vote:",HB 1428,unknown,false
 state_senate,SB 745 was taken up by the following vote:,SB 745,unknown,false
+state_senate,"The motion to lay SA 1 to SA 1 on the table indefinitely failed by the following vote:",SB 1,procedural_motion,false
+state_senate,"On motion of Senator Hough, SB 5 was read the 3rd time and finally passed by the following vote:",SB 5,third_reading,false
+state_senate,"Senator Roberts moved that the vote that which SA 1 was adopted, be reconsidered",SB 1,procedural_motion,false
+state_senate,"The motion for the previous question to lay on the table was adopted by the following vote:",SB 1,previous_question,false
