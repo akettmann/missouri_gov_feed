@@ -80,3 +80,12 @@ repos:
         language: system
         files: ^frontend/scripts/
         pass_filenames: false
+      - id: office-doc-parse
+        name: office reference docs still parse (office-doc.test.mjs)
+        # The office pages are built from docs/reference/office_*.md by a strict parser; a lost citation, an
+        # unresolved [link] or an unnamed source fails the site build. Run just that test file (about a second).
+        # docs/sources.md gives the plain source names and the loaders must each have one, so they trigger it too.
+        entry: pnpm --dir frontend exec node --test scripts/office-doc.test.mjs
+        language: system
+        files: ^(docs/reference/office_.*\.md|docs/sources\.md|src/mogov/loaders/[^/]+\.py|frontend/src/lib/officeDoc.*\.ts)$
+        pass_filenames: false
