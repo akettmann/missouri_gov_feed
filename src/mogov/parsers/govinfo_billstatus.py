@@ -14,10 +14,15 @@ One file is one federal bill (`<billStatus><bill>...`). It is walked with lxml (
 - subjects        -> `govinfo_billstatus_subjects`    (CRS legislative subject terms; the policy area is a bills column)
 - related bills   -> `govinfo_billstatus_related_bills` (identified-by-CRS/House related bills) and
                      `govinfo_billstatus_related_bill_relationships` (one row per relationship type of a related bill)
+- amendments      -> `govinfo_billstatus_amendments` (the amendments filed to the bill: number, type, chamber,
+                     purpose, dates, the bill amended), `govinfo_billstatus_amendment_sponsors` (sponsors, and
+                     the senators an amendment was proposed on behalf of),
+                     `govinfo_billstatus_amendment_actions` and
+                     `govinfo_billstatus_amendment_recorded_votes` (the roll calls those actions cite)
 
 Elements are selected by local name. Empty elements are None, text is only stripped, and nothing is interpreted:
 what became law, and which outcomes count as success, is dbt's call. Summaries, titles, text versions and
-amendments (including their recorded votes) stay in the raw XML (see docs/sources.md).
+amendment cosponsors, text versions and links stay in the raw XML (see docs/sources.md).
 
 The 11 reserved 117th House bills use an older export that wraps the lists one level deeper
 (`committees/billCommittees/item`, `subjects/billSubjects/legislativeSubjects`); both layouts are read.
@@ -39,6 +44,10 @@ TABLES = {
     "subjects": "govinfo_billstatus_subjects",
     "related_bills": "govinfo_billstatus_related_bills",
     "related_bill_relationships": "govinfo_billstatus_related_bill_relationships",
+    "amendments": "govinfo_billstatus_amendments",
+    "amendment_sponsors": "govinfo_billstatus_amendment_sponsors",
+    "amendment_actions": "govinfo_billstatus_amendment_actions",
+    "amendment_recorded_votes": "govinfo_billstatus_amendment_recorded_votes",
 }
 ALL_TABLES = list(TABLES.values())
 
@@ -196,7 +205,106 @@ def parse_bill(xml: bytes, file_name: str, errors: list[str] | None = None) -> d
                     },
                 )
             )
+    _amendments(out, bid, bill)
     return out
+
+
+def _recorded_votes(action: etree._Element) -> list[etree._Element]:
+    votes = child(action, "recordedVotes")
+    return [c for c in (votes if votes is not None else []) if _local(c) == "recordedVote"]
+
+
+def _amendments(out: dict[str, list[Row]], bid: str, bill: etree._Element) -> None:
+    """The amendments filed to the bill (`<amendments><amendment>`), each with its sponsors and its own actions and
+    recorded votes. Keyed by the amendment id ("118-hamdt-180"); `bill_id` is the file's bill, and the amended bill
+    named inside the amendment is kept beside it (`amended_bill_id`) so dbt can check they agree. The files of the
+    reserved older export have no amendments list."""
+    container = _unwrap(child(bill, "amendments"), "billAmendments")
+    for a in (c for c in (container if container is not None else []) if _local(c) in ("amendment", "item")):
+        a_type = text(a, "type")
+        aid = bill_id(text(a, "congress"), a_type, text(a, "number"))
+        ab = child(a, "amendedBill")
+        aa = child(a, "amendedAmendment")
+        latest = child(a, "latestAction")
+        out["amendments"].append(
+            (
+                aid,
+                {
+                    "amendment_id": aid,
+                    "bill_id": bid,
+                    "congress": text(a, "congress"),
+                    "amendment_type": a_type,
+                    "number": text(a, "number"),
+                    "chamber": text(a, "chamber"),
+                    "description": text(a, "description"),
+                    "purpose": text(a, "purpose"),
+                    "submitted_date": text(a, "submittedDate"),
+                    "proposed_date": text(a, "proposedDate"),
+                    "update_date": text(a, "updateDate"),
+                    "latest_action_date": text(latest, "actionDate"),
+                    "latest_action_text": text(latest, "text"),
+                    "amended_bill_congress": text(ab, "congress"),
+                    "amended_bill_type": text(ab, "type"),
+                    "amended_bill_number": text(ab, "number"),
+                    "amended_amendment_congress": text(aa, "congress"),
+                    "amended_amendment_type": text(aa, "type"),
+                    "amended_amendment_number": text(aa, "number"),
+                    "amendments_to_amendment_count": text(child(a, "amendmentsToAmendment"), "count"),
+                },
+            )
+        )
+        sponsors = [("sponsor", s) for s in items(a, "sponsors")]
+        sponsors += [("on_behalf_of", s) for s in items(a, "onBehalfOfSponsor")]
+        for i, (role, s) in enumerate(sponsors):
+            # a committee sponsors some House amendments (`<name>Rules Committee</name>`, no bioguideId)
+            out["amendment_sponsors"].append(
+                (
+                    f"{aid}#{i}",
+                    {
+                        "amendment_id": aid,
+                        "bill_id": bid,
+                        "position": i,
+                        "role": role,
+                        "name": text(s, "name"),
+                        **_person(s),
+                    },
+                )
+            )
+        # amendment actions are nested one level deeper than a bill's: <actions><count/><actions><item/>
+        for i, act in enumerate(items(child(a, "actions"), "actions")):
+            out["amendment_actions"].append(
+                (
+                    f"{aid}#{i}",
+                    {
+                        "amendment_id": aid,
+                        "bill_id": bid,
+                        "position": i,
+                        "action_date": text(act, "actionDate"),
+                        "action_time": text(act, "actionTime"),
+                        "text": text(act, "text"),
+                        "action_type": text(act, "type"),
+                        "action_code": text(act, "actionCode"),
+                        "source_system": text(child(act, "sourceSystem"), "name"),
+                    },
+                )
+            )
+            for j, v in enumerate(_recorded_votes(act)):
+                out["amendment_recorded_votes"].append(
+                    (
+                        f"{aid}#{i}#{j}",
+                        {
+                            "amendment_id": aid,
+                            "bill_id": bid,
+                            "action_position": i,
+                            "chamber": text(v, "chamber"),
+                            "congress": text(v, "congress"),
+                            "session_number": text(v, "sessionNumber"),
+                            "roll_number": text(v, "rollNumber"),
+                            "vote_date": text(v, "date"),
+                            "url": text(v, "url"),
+                        },
+                    )
+                )
 
 
 def _unwrap(el: etree._Element | None, old_wrapper: str) -> etree._Element | None:
