@@ -9,12 +9,12 @@ mogov:
       threads: 4
       # DuckDB's default memory_limit is 80% of RAM. When other apps hold memory, it then asks the OS for more than
       # exists and fails with "Out of Memory Error: Allocation failure" instead of spilling to disk. An explicit
-      # limit makes it spill. 6GB at 4 threads is the measured-good value on the 32 GB dev machine (#818); size
-      # MOGOV_DUCKDB_MEMORY to the container on Cloud Run. This is DuckDB's own setting: a top-level
+      # limit makes it spill. 6GB at 4 threads was measured passing on the 32 GB dev machine; 2GB is the
+      # maintainer's default (#818, relies on spilling). Set MOGOV_DUCKDB_MEMORY to size it, e.g. to the container. This is DuckDB's own setting: a top-level
       # `memory_limit:` key on the output is ignored by dbt-duckdb. Never put temp_directory here: dbt-duckdb
       # re-applies settings per connection and DuckDB refuses to move the temp directory once it is in use.
       settings:
-        memory_limit: "{{ env_var('MOGOV_DUCKDB_MEMORY', '6GB') }}"
+        memory_limit: "{{ env_var('MOGOV_DUCKDB_MEMORY', '2GB') }}"
     # Used only by sqlfluff (see .sqlfluff): compiling models never needs real data, so linting works in a
     # fresh clone/worktree where the gitignored data/ directory doesn't exist.
     lint:

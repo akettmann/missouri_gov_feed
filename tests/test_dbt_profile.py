@@ -13,7 +13,7 @@ def _local() -> dict:
 
 def test_local_output_sets_duckdb_memory_limit_from_env() -> None:
     limit = _local()["settings"]["memory_limit"]
-    assert "env_var('MOGOV_DUCKDB_MEMORY', '6GB')" in limit
+    assert "env_var('MOGOV_DUCKDB_MEMORY', '2GB')" in limit
 
 
 def test_local_output_has_no_ignored_top_level_memory_limit() -> None:
