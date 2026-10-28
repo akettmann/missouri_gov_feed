@@ -204,6 +204,28 @@ naics_full as (
     group by registry_id, naics_code
 ),
 
+-- every shorter prefix (1 to 5 digits) of each 6-digit code, so a short code finds the codes it extends with an
+-- equality join on (registry_id, prefix) instead of a nested loop on left(...)
+naics_full_prefixes as (
+    select
+        f.registry_id,
+        f.naics_code,
+        f.naics_description,
+        left(f.naics_code, k.prefix_length) as prefix
+    from naics_full as f
+    cross join (
+        select 1 as prefix_length
+        union all
+        select 2
+        union all
+        select 3
+        union all
+        select 4
+        union all
+        select 5
+    ) as k
+),
+
 -- a 4- or 5-digit code becomes (one row per) 6-digit code of the same facility it is the prefix of, and takes that
 -- code's description; with no such code it stays as it is
 naics_normalised as (
@@ -214,11 +236,12 @@ naics_normalised as (
         r.program_family,
         r.rank_class
     from naics_rows as r
-    left join naics_full as f
+    left join naics_full_prefixes as f
         on
             r.registry_id = f.registry_id
-            and length(r.naics_code) < 6
-            and left(f.naics_code, length(r.naics_code)) = r.naics_code
+            -- the prefixes are all shorter than 6 digits, so a 6-digit code never matches (an equality-only
+            -- condition keeps this a hash join)
+            and r.naics_code = f.prefix
 ),
 
 naics as (
@@ -300,7 +323,9 @@ select
     coalesce(
         n.naics_description,
         case
-            when ps.naics_prefix is not null
+            -- ps is joined without the n.naics_code is null condition (it would force a nested loop join), so the
+            -- SIC fallback is guarded here instead: a facility with a NAICS code never takes the SIC sector
+            when n.naics_code is null and ps.naics_prefix is not null
                 then
                     {{ dbt.concat(sic_description_parts) }}
         end
@@ -309,7 +334,7 @@ select
         when n.rank_class = 0 then 'naics'
         when n.rank_class = 1 then 'naics_unknown'
         when n.rank_class = 2 then 'naics_secondary'
-        when ps.naics_prefix is not null then 'sic'
+        when n.naics_code is null and ps.naics_prefix is not null then 'sic'
     end as naics_source,
     (
         f.federal_agency_name is not null
@@ -325,7 +350,7 @@ from {{ ref('stg_epa_frs__facilities') }} as f
 left join owners as o on f.registry_id = o.registry_id and o.rn = 1
 left join parents as p on f.registry_id = p.registry_id and p.rn = 1
 left join best_naics as n on f.registry_id = n.registry_id and n.rn = 1
-left join primary_sic as ps on f.registry_id = ps.registry_id and ps.rn = 1 and n.naics_code is null
+left join primary_sic as ps on f.registry_id = ps.registry_id and ps.rn = 1
 left join {{ ref('naics_sectors') }} as sec on ps.naics_prefix = sec.naics_prefix
 left join government as g on f.registry_id = g.registry_id
 where f.latitude is not null and f.longitude is not null
