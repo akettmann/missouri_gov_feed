@@ -18,12 +18,30 @@ export function officeLine(o: { office_title: string | null; office: string; dis
 }
 
 /** Coverage status text -> one of a few visual states (the full text is always shown too). */
-export function statusKind(status: string): "available" | "none" | "not-public" | "na" {
+export type StatusKind = "available" | "none" | "unrecorded" | "not-public" | "na";
+export function statusKind(status: string): StatusKind {
   if (status === "available") return "available";
+  if (status.startsWith("none recorded")) return "unrecorded";
   if (status.startsWith("not public")) return "not-public";
   if (status === "not applicable") return "na";
   return "none";
 }
+
+/** Icon and short cell text per kind; "none recorded" must not read as "none found". */
+export const STATUS_ICON: Record<StatusKind, string> = {
+  available: "●",
+  none: "○",
+  unrecorded: "◌",
+  "not-public": "⊘",
+  na: "–",
+};
+export const STATUS_SHORT: Record<StatusKind, string> = {
+  available: "available",
+  none: "none found",
+  unrecorded: "none recorded",
+  "not-public": "not public",
+  na: "n/a",
+};
 
 /** 1st, 2nd, 3rd, 4th, 11th, 22nd. */
 export function ordinal(n: number): string {
@@ -75,10 +93,8 @@ const gapPhrase = (c: { label: string; status: string }) => {
  */
 export function coverageGaps<T extends { label: string; status: string }>(items: T[]) {
   const cant = items.filter((c) => statusKind(c.status) === "not-public").map(gapPhrase);
-  const unrecorded = items.filter((c) => c.status.startsWith("none recorded")).map(gapPhrase);
-  const none = items
-    .filter((c) => statusKind(c.status) === "none" && !c.status.startsWith("none recorded"))
-    .map(gapPhrase);
+  const unrecorded = items.filter((c) => statusKind(c.status) === "unrecorded").map(gapPhrase);
+  const none = items.filter((c) => statusKind(c.status) === "none").map(gapPhrase);
   return { cant, none, unrecorded };
 }
 

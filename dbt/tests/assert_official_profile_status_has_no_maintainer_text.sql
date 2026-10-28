@@ -5,10 +5,13 @@
 {% set status_columns = [] %}
 {% if execute %}
     {% for col in adapter.get_columns_in_relation(ref('official_profile')) %}
-        {% if col.name.endswith('_status') %}
+        {% if (col.name | lower).endswith('_status') %}
             {% do status_columns.append(col.name) %}
         {% endif %}
     {% endfor %}
+    {% if status_columns | length == 0 %}
+        {{ exceptions.raise_compiler_error('official_profile has no *_status columns (model not built or not deferred?); this guard would check nothing') }}
+    {% endif %}
 {% endif %}
 
 with statuses as (

@@ -100,9 +100,12 @@ select
         when cases_n.n > 0 then 'available'
         when
             b.is_judge_or_lawyer
-            and (b.is_congress or b.is_federal_judge or b.office in ('mo_supreme_court', 'mo_court_of_appeals'))
-            then 'none found (no case matched in the Missouri and federal courts we load from CourtListener)'
-        when b.is_judge_or_lawyer then 'none found (CourtListener holds no Missouri trial-court cases)'
+            and (b.is_federal_judge or b.office in ('mo_supreme_court', 'mo_court_of_appeals'))
+            then 'none found (no case matched in the courts we load from CourtListener)'
+        when b.is_judge_or_lawyer
+            then
+                'none found (no case matched in the Missouri appellate and federal courts we load; '
+                || 'CourtListener has no Missouri circuit-court cases)'
         else 'not applicable'
     end as cases_status
 from base as b

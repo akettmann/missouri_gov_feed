@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { coverageGaps } from "../src/lib/format.ts";
+import { coverageGaps, STATUS_SHORT, statusKind } from "../src/lib/format.ts";
 
 const item = (label, status) => ({ key: label, label, status, count: 0 });
 
@@ -11,7 +11,7 @@ test("lists not-public and none-found items, skips available and n/a", () => {
       "Financial disclosures",
       "not public (MO personal financial disclosure: Sunshine Law request to Missouri Ethics Commission)",
     ),
-    item("Court cases", "none found (CourtListener holds no Missouri trial-court cases)"),
+    item("Court cases", "none found (CourtListener has no Missouri circuit-court cases)"),
     item("Votes", "not applicable"),
     item("Family ties", "none found"),
   ]);
@@ -19,7 +19,7 @@ test("lists not-public and none-found items, skips available and n/a", () => {
     "financial disclosures (MO personal financial disclosure: Sunshine Law request to Missouri Ethics Commission)",
   ]);
   assert.deepEqual(g.none, [
-    "court cases (CourtListener holds no Missouri trial-court cases)",
+    "court cases (CourtListener has no Missouri circuit-court cases)",
     "family ties",
   ]);
 });
@@ -50,4 +50,11 @@ test("a parenthetical with a semicolon is kept whole", () => {
       "business ties (state disclosures not online; Secretary of State business registry not machine-accessible)",
     ],
   );
+});
+
+test("a none-recorded status gets its own kind and cell text, not 'none found'", () => {
+  const status = "none recorded (no public list exists; we add these by hand)";
+  assert.equal(statusKind(status), "unrecorded");
+  assert.equal(STATUS_SHORT[statusKind(status)], "none recorded");
+  assert.equal(STATUS_SHORT[statusKind("none found")], "none found");
 });
