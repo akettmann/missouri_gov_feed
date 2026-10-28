@@ -9,7 +9,7 @@
             {% do status_columns.append(col.name) %}
         {% endif %}
     {% endfor %}
-    {% if status_columns | length == 0 %}
+    {% if status_columns | length == 0 and target.name != 'lint' %}
         {{ exceptions.raise_compiler_error('official_profile has no *_status columns (model not built or not deferred?); this guard would check nothing') }}
     {% endif %}
 {% endif %}
@@ -26,9 +26,9 @@ with statuses as (
         {% endif %}
     {% else %}
         select
-            cast(null as varchar) as official_id,
-            cast(null as varchar) as status_column,
-            cast(null as varchar) as status
+            cast(null as {{ dbt.type_string() }}) as official_id,
+            cast(null as {{ dbt.type_string() }}) as status_column,
+            cast(null as {{ dbt.type_string() }}) as status
         where 1 = 0
     {% endfor %}
 )

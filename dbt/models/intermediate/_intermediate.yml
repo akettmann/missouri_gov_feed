@@ -127,12 +127,13 @@ models:
     searches (src/mogov/loaders/courtlistener_cases.py) over the same people (fct_legal_careers): judge     on the
     opinion''s panel (CourtListener person id), or their surname as a whole word in the judges text of a case in
     a court they sit on (panels are sparse for state courts) attorney  "<first> <last>" as whole words in the attorneys
-    text, for lawyers and for judges whose own court CourtListener doesn''t cover (trial courts) Names are compared
-    as name_key()s padded with spaces, so "Hall" doesn''t match "Marshall". Surnames repeat across generations on
-    the same court (a 1910 Judge Smith on the 8th Circuit, fathers and sons on the Court of Appeals), so judges-text
-    matches only count from the judge''s first known judicial start date (fct_office_history, else dim_official.current_term_start);
-    without one, panel matches only. Attorney matches start at var case_history_min_year (default 1975): earlier
-    namesakes aren''t them. Grain: one row per (official, role, cluster); matched_by says how.'
+    text, for lawyers and for judges whose own court CourtListener doesn''t cover (Missouri circuit courts) Names
+    are compared as name_key()s padded with spaces, so "Hall" doesn''t match "Marshall". Surnames repeat across
+    generations on the same court (a 1910 Judge Smith on the 8th Circuit, fathers and sons on the Court of Appeals),
+    so judges-text matches only count from the judge''s first known judicial start date (fct_office_history, else
+    dim_official.current_term_start); without one, panel matches only. Attorney matches start at var case_history_min_year
+    (default 1975): earlier namesakes aren''t them. Grain: one row per (official, role, cluster); matched_by says
+    how.'
 - name: int_courtlistener__district_dockets
   description: 'Federal district-court dockets (E.D. and W.D. Missouri) that have an assigned judge: filed and terminated
     dates (null when the docket has none) and the days between. A docket whose termination date is before its filing
