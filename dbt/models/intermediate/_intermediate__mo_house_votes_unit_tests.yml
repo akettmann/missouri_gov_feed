@@ -254,3 +254,58 @@ unit_tests:
       rows:
         - {vote_id: r1, member_token: FOO, person_key: p_dated}
         - {vote_id: r2, member_token: FOO, person_key: p_undated}
+
+  - name: house_vote_tokens_match_through_each_join_branch
+    model: int_mo_house__votes
+    description: >
+      The token-to-member match is one equi-join per way a token can fit (Speaker seat, whole surname, suffix-less
+      surname, last word of a compound surname, prefix of a long truncated surname), unioned (#825). Each token here
+      reaches its member through a different branch or a combination: MR SPEAKER by seat only; ADAMS through the whole
+      surname (also its suffix-less form, so two branches hit the same member once); BAKER through the suffix-less
+      surname only; CARTER through the last word only; WASHINGTONIANX through the prefix only; CHRISTOPHERSON through
+      the whole surname and the prefix at once; NOBODY through none (unattributed). DAVIS fits two members and stays
+      unattributed, DAVIS 31 is narrowed to one by its district, and DAVIS 99 names no seat.
+    given:
+      - input: ref('stg_mo_house__rollcall_votes')
+        rows:
+          - {rollcall_url: r1, session_code: '191', member_token: MR SPEAKER, token_name: MR SPEAKER, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: ADAMS, token_name: ADAMS, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: BAKER, token_name: BAKER, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: CARTER, token_name: CARTER, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: WASHINGTONIANX, token_name: WASHINGTONIANX, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: CHRISTOPHERSON, token_name: CHRISTOPHERSON, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: NOBODY, token_name: NOBODY, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: DAVIS, token_name: DAVIS, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: DAVIS 31, token_name: DAVIS, token_district: 31, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: DAVIS 99, token_name: DAVIS, token_district: 99, vote_cast: yea}
+      - input: ref('stg_mo_house__rollcalls')
+        rows:
+          - {rollcall_url: r1, session_code: '191', vote_date: '2019-03-05', measure: HB 10}
+      - input: ref('house_speakers')
+        rows:
+          - {session_year: 2019, district_number: 89, name: Somebody}
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '191', district_number: 89, surname_key: somebody, person_key: p_speaker, party: Republican}
+          - {session_code: '191', district_number: 1, surname_key: adams, person_key: p_adams, party: Republican}
+          - {session_code: '191', district_number: 2, surname_key: baker iv, person_key: p_baker, party: Democratic}
+          - {session_code: '191', district_number: 3, surname_key: lee carter, person_key: p_carter, party: Republican}
+          - {session_code: '191', district_number: 4, surname_key: washingtonianxyz, person_key: p_washington, party: Democratic}
+          - {session_code: '191', district_number: 5, surname_key: christopherson, person_key: p_christopherson, party: Republican}
+          - {session_code: '191', district_number: 30, surname_key: davis, person_key: p_davis_30, party: Republican}
+          - {session_code: '191', district_number: 31, surname_key: davis, person_key: p_davis_31, party: Democratic}
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {person_id: p_senator, chamber: upper, district_number: 1, start_date: '2019-01-01', end_date: '9999-12-31'}
+    expect:
+      rows:
+        - {member_token: MR SPEAKER, person_key: p_speaker}
+        - {member_token: ADAMS, person_key: p_adams}
+        - {member_token: BAKER, person_key: p_baker}
+        - {member_token: CARTER, person_key: p_carter}
+        - {member_token: WASHINGTONIANX, person_key: p_washington}
+        - {member_token: CHRISTOPHERSON, person_key: p_christopherson}
+        - {member_token: NOBODY, person_key: null}
+        - {member_token: DAVIS, person_key: null}
+        - {member_token: DAVIS 31, person_key: p_davis_31}
+        - {member_token: DAVIS 99, person_key: null}

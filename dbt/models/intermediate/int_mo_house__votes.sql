@@ -75,52 +75,155 @@ term_people as (
     from house_terms
 ),
 
-matches as (
+-- Every (token, member) pair that fits. The old single join on "speaker seat OR any name key OR prefix" could not use a
+-- hash key, so each branch is its own equi-join and the union removes a pair that fits through several branches.
+-- The Speaker is matched by seat; any other token by name (and district, when it has one).
+token_speaker as (
     select
         v.session_code,
         v.vote_date,
         v.member_token,
+        v.token_key,
+        v.token_district,
+        sp.district_number as speaker_district
+    from tokens as v
+    left join speaker as sp on v.vote_date = sp.vote_date and v.member_token = 'MR SPEAKER'
+),
+
+pairs as (
+    select distinct
+        v.session_code as token_session_code,
+        v.vote_date,
+        v.member_token,
+        v.token_key,
+        1 as is_speaker,
+        m.session_code as member_session_code,
         m.person_key,
         m.party,
-        case when v.session_code = m.session_code then 1 else 0 end as same_session,
+        m.district_number,
+        m.surname_squashed,
+        m.surname_unsuffixed
+    from token_speaker as v
+    inner join members as m
+        on v.session_code = m.session_code and v.speaker_district = m.district_number
+
+    union
+
+    select
+        v.session_code as token_session_code,
+        v.vote_date,
+        v.member_token,
+        v.token_key,
+        0 as is_speaker,
+        m.session_code as member_session_code,
+        m.person_key,
+        m.party,
+        m.district_number,
+        m.surname_squashed,
+        m.surname_unsuffixed
+    from token_speaker as v
+    inner join members as m
+        on
+            v.token_key = m.surname_squashed
+            and (v.token_district is null or v.token_district = m.district_number)
+    where v.speaker_district is null
+
+    union
+
+    select
+        v.session_code as token_session_code,
+        v.vote_date,
+        v.member_token,
+        v.token_key,
+        0 as is_speaker,
+        m.session_code as member_session_code,
+        m.person_key,
+        m.party,
+        m.district_number,
+        m.surname_squashed,
+        m.surname_unsuffixed
+    from token_speaker as v
+    inner join members as m
+        on
+            v.token_key = m.surname_unsuffixed
+            and (v.token_district is null or v.token_district = m.district_number)
+    where v.speaker_district is null
+
+    union
+
+    select
+        v.session_code as token_session_code,
+        v.vote_date,
+        v.member_token,
+        v.token_key,
+        0 as is_speaker,
+        m.session_code as member_session_code,
+        m.person_key,
+        m.party,
+        m.district_number,
+        m.surname_squashed,
+        m.surname_unsuffixed
+    from token_speaker as v
+    inner join members as m
+        on
+            v.token_key = m.surname_last_word
+            and (v.token_district is null or v.token_district = m.district_number)
+    where v.speaker_district is null
+
+    union
+
+    -- a long token the PDF truncated: a prefix test has no hash key, but only the few long tokens reach it
+    select
+        v.session_code as token_session_code,
+        v.vote_date,
+        v.member_token,
+        v.token_key,
+        0 as is_speaker,
+        m.session_code as member_session_code,
+        m.person_key,
+        m.party,
+        m.district_number,
+        m.surname_squashed,
+        m.surname_unsuffixed
+    from token_speaker as v
+    inner join members as m
+        on
+            m.surname_squashed like v.token_key || '%'
+            and (v.token_district is null or v.token_district = m.district_number)
+    where v.speaker_district is null and length(v.token_key) >= 13
+),
+
+matches as (
+    select
+        v.token_session_code as session_code,
+        v.vote_date,
+        v.member_token,
+        v.person_key,
+        v.party,
+        case when v.token_session_code = v.member_session_code then 1 else 0 end as same_session,
         -- how the token fits the name: 1 the whole surname (or the truncated start of a long one), 2 the surname
         -- without its generational suffix ("PRICE" for Price IV), 3 the last word of a compound surname
         -- ("HENDERSON" is Henderson, not Fountain Henderson, whom the PDF prints as "FOUNTAIN HENDERS"). The Speaker
         -- is matched by seat, not name.
         case
-            when sp.district_number is not null then 1
+            when v.is_speaker = 1 then 1
             when
-                v.token_key = m.surname_squashed
-                or (length(v.token_key) >= 13 and m.surname_squashed like v.token_key || '%')
+                v.token_key = v.surname_squashed
+                or (length(v.token_key) >= 13 and v.surname_squashed like v.token_key || '%')
                 then 1
-            when v.token_key = m.surname_unsuffixed then 2
+            when v.token_key = v.surname_unsuffixed then 2
             else 3
         end as name_rank,
         -- 1 unless Open States dates this person's seat and it did not cover the vote date
         max(case when tp.person_id is null or t.person_id is not null then 1 else 0 end) as seat_dated_ok,
         -- 1 when Open States gives this person a seat that covers the vote date
         max(case when t.person_id is not null then 1 else 0 end) as seat_covered
-    from tokens as v
-    left join speaker as sp on v.vote_date = sp.vote_date and v.member_token = 'MR SPEAKER'
-    inner join members as m
-        on
-            (
-                v.session_code = m.session_code
-                and sp.district_number = m.district_number
-            )
-            or (
-                sp.district_number is null
-                and (
-                    v.token_key in (m.surname_squashed, m.surname_unsuffixed, m.surname_last_word)
-                    or (length(v.token_key) >= 13 and m.surname_squashed like v.token_key || '%')
-                )
-                and (v.token_district is null or v.token_district = m.district_number)
-            )
-    left join term_people as tp on m.person_key = tp.person_id and m.district_number = tp.district_number
+    from pairs as v
+    left join term_people as tp on v.person_key = tp.person_id and v.district_number = tp.district_number
     left join house_terms as t
         on
-            m.person_key = t.person_id
-            and m.district_number = t.district_number
+            v.person_key = t.person_id
+            and v.district_number = t.district_number
             and v.vote_date between t.start_date and t.end_date
     group by 1, 2, 3, 4, 5, 6, 7
 ),
