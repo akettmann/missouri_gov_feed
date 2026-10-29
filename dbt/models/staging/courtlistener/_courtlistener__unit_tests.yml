@@ -1,0 +1,54 @@
+version: 2
+unit_tests:
+  - name: stg_courtlistener__judge_disclosure_items_garbled_flag
+    description: >
+      Investment descriptions are tickers that read as garbled, but are never flagged; garbled text in any other
+      kind is flagged and readable text is not. The investment guard must not change the flag.
+    model: stg_courtlistener__judge_disclosure_items
+    given:
+      - input: source('courtlistener', 'fd_investments')
+        format: sql
+        rows: |
+          select 1 as id, 10 as financial_disclosure_id, '2200 =oK00 =o OL00 Es 0.' as description, 'A' as gross_value_code, 'T' as transaction_during_reporting_period, 'f' as redacted union all
+          select 2 as id, 10 as financial_disclosure_id, 'Apple Inc' as description, 'A' as gross_value_code, 'T' as transaction_during_reporting_period, 'f' as redacted
+      - input: source('courtlistener', 'fd_positions')
+        format: sql
+        rows: |
+          select 3 as id, 10 as financial_disclosure_id, 'S.' as position, 'LE fo NY' as organization_name, 'f' as redacted union all
+          select 4 as id, 10 as financial_disclosure_id, 'Trustee' as position, 'Saint Louis Art Museum' as organization_name, 't' as redacted
+      - input: source('courtlistener', 'fd_agreements')
+        format: sql
+        rows: |
+          select 5 as id, 10 as financial_disclosure_id, 'SIE = RE' as parties_and_terms, '2019' as date_raw, 'f' as redacted
+      - input: source('courtlistener', 'fd_non_investment_income')
+        format: sql
+        rows: |
+          select 6 as id, 10 as financial_disclosure_id, 'Savings Bank' as source_type, '1' as income_amount, 'd' as date_raw, 'f' as redacted
+      - input: source('courtlistener', 'fd_spousal_income')
+        format: sql
+        rows: |
+          select 7 as id, 10 as financial_disclosure_id, 'f' as redacted, 'Savings Bank' as source_type, 'd' as date_raw
+      - input: source('courtlistener', 'fd_gifts')
+        format: sql
+        rows: |
+          select 7 as id, 10 as financial_disclosure_id, 'f' as redacted, 'Savings Bank' as source, 'Annual Gala' as description, '1' as value
+      - input: source('courtlistener', 'fd_debts')
+        format: sql
+        rows: |
+          select 7 as id, 10 as financial_disclosure_id, 'f' as redacted, 'Savings Bank' as creditor_name, 'Annual Gala' as description, 'J' as value_code
+      - input: source('courtlistener', 'fd_reimbursements')
+        format: sql
+        rows: |
+          select 7 as id, 10 as financial_disclosure_id, 'f' as redacted, 'Savings Bank' as source, 'Conference' as purpose, 'Chicago' as location, 'Airfare' as items_paid_or_provided
+    expect:
+      rows:
+        - {item_id: 'investment:1', is_garbled: false}
+        - {item_id: 'investment:2', is_garbled: false}
+        - {item_id: 'outside position:3', is_garbled: true}
+        - {item_id: 'outside position:4', is_garbled: false}
+        - {item_id: 'agreement:5', is_garbled: true}
+        - {item_id: 'non-investment income:6', is_garbled: false}
+        - {item_id: 'spousal income:7', is_garbled: false}
+        - {item_id: 'gift:7', is_garbled: false}
+        - {item_id: 'liability:7', is_garbled: false}
+        - {item_id: 'reimbursement:7', is_garbled: false}
