@@ -257,15 +257,20 @@ The build is plain static files, so any static host works; the repo ships a scri
 GCS (above) stays the end goal; Pages is a free stopgap while traffic is tiny. The site is built **locally** (CI has no data) and pushed to an
 orphan `gh-pages` branch; `main` history is never touched.
 
-Findings (checked against the ~200 MB `dist/`, 1052 pages):
+Findings (first checked against the ~200 MB `dist/`, 1052 pages; with the RSMo section pages it is ~460 MB and ~45k files as of 2026-10-29):
 
 - Limits: a published Pages site must be <= 1 GB, each file < 100 MB (git push limit), and the soft bandwidth cap is
-  100 GB/month. Our `dist/` is about 200 MB, the largest file is a 4.4 MB HTML page, so it fits comfortably.
+  100 GB/month. Our `dist/` is about 460 MB, the largest file is a 4.8 MB HTML page, so it still fits.
   `deploy:pages` refuses to push if either limit would be broken.
-- Method (a), orphan `gh-pages` branch from a temp dir, was chosen over (b) `workflow_dispatch` +
+- Method (a), orphan `gh-pages` branch pushed from this machine, was chosen over (b) `workflow_dispatch` +
   `upload-pages-artifact`: (b) needs the built site inside CI, and CI has no data, so we would have to upload 200 MB
   from a laptop anyway. (a) is one command, needs no workflow, and force-pushing the orphan branch replaces history
   so snapshots do not accumulate.
+- Pushes are incremental: the live `gh-pages` tip is fetched (`--depth 1`) into `frontend/.pages-cache/` (a
+  gitignored bare repo kept between deploys), `dist/` is committed there as a new orphan commit, and the force-push
+  then sends only the objects the live branch does not already have. The first deploy from a machine downloads the
+  live site once; if nothing changed the script says so and pushes nothing. Deleting `.pages-cache/` is always safe
+  (the next deploy fetches again), and is the fix if it is ever left in a bad state.
 - Project sites are served under `/missouri_gov_feed/`, so the build sets Astro `base` from `PUBLIC_BASE_PATH`.
   Every internal link goes through `href()` (`src/lib/site.ts`); the default (GCS) build has no base and is
   unchanged. `scripts/link-check.mjs` verifies a built `dist/` (every root-relative reference resolves under the base).
@@ -290,8 +295,9 @@ the build now rejects that); the script sets it for you.
 The deploy only ever writes the `gh-pages` branch (there is no `--branch` flag), pushing to
 `https://github.com/<owner>/<name>.git` for the repo of the `origin` remote (`--remote NAME` picks another remote
 to read the repo from). It refuses to run with uncommitted changes under `frontend/` (`--allow-dirty` overrides)
-and removes its ~200 MB temp repo on every exit, dry runs and failures included (`--keep` leaves it for
-inspection). It can be started from any directory. It runs the size budget check (as `pnpm build` does) before publishing, including with `--skip-build`; `MOGOV_SKIP_SIZE_BUDGET=1` skips it, as it does for `pnpm deploy:gcs`. If deleting the temp repo fails (for example EBUSY) during an interrupt, the interrupt result stays (exit 130) and the left-over directory is named in an extra warning.
+and removes its temp dir (only a throwaway git index; `dist/` itself is the work tree) on every exit, dry runs and
+failures included (`--keep` leaves it for inspection). A dry run commits into `.pages-cache/` and prints the change
+summary (`git diff --shortstat` against the live branch). It can be started from any directory. It runs the size budget check (as `pnpm build` does) before publishing, including with `--skip-build`; `MOGOV_SKIP_SIZE_BUDGET=1` skips it, as it does for `pnpm deploy:gcs`. If deleting the temp dir fails (for example EBUSY) during an interrupt, the interrupt result stays (exit 130) and the left-over directory is named in an extra warning.
 
 A Ctrl+C before the push starts stops it. What happens depends on the stage:
 
@@ -299,12 +305,12 @@ A Ctrl+C before the push starts stops it. What happens depends on the stage:
 | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm build`                                | Node's default handler (no listener is installed yet) kills the script and the build; no temp dir exists yet; exit code is the signal's (on Windows typically `0xC000013A`).                                                                                                                                                                                                                 |
 | `pnpm build` / link check                   | Same as the build: no listener is installed yet, so Node's default handler kills the script (the link check is a child process); no temp dir exists yet.                                                                                                                                                                                                                                     |
-| Copy of `dist/` and size scan               | The first Ctrl+C deletes the temp repo (unless `--keep`) and exits 130 ("Interrupted; nothing was pushed.").                                                                                                                                                                                                                                                                                 |
-| `git init` / `add` / `commit` / `rev-parse` | These run as asynchronous child processes, so the same listener handles the signal: temp repo deleted, exit 130. If git itself dies from the Ctrl+C first (status 130 or `0xC000013A`), that is reported as "Interrupted; nothing was pushed.", also exit 130. An interrupt flag is also checked (after yielding to the event loop) before every git step and immediately before `git push`. |
+| Size scan                                   | The first Ctrl+C deletes the temp dir (unless `--keep`) and exits 130 ("Interrupted; nothing was pushed.").                                                                                                                                                                                                                                                                                 |
+| `git fetch` / `add` / `commit-tree`         | These run as asynchronous child processes, so the same listener handles the signal: temp dir deleted, exit 130. If git itself dies from the Ctrl+C first (status 130 or `0xC000013A`), that is reported as "Interrupted; nothing was pushed.", also exit 130. An interrupt flag is also checked (after yielding to the event loop) before every git step and immediately before `git push`. |
 | `git push`                                  | If Ctrl+C arrives after the push has started the script exits 130 with "the push may or may not have completed"; check the `gh-pages` branch.                                                                                                                                                                                                                                                |
 
-A second Ctrl+C while the temp repo is being deleted is ignored until the deletion finishes, so no ~200 MB directory is
-left in the temp folder.
+A second Ctrl+C while the temp dir is being deleted is ignored until the deletion finishes. `.pages-cache/` is never
+deleted by the script.
 
 The repo is always taken from a GitHub remote URL (`https://github.com/o/n`, `git@github.com:o/n`, or
 `ssh://git@github.com/o/n`). Explicit ports, `ssh.github.com:443` and SSH host aliases are not recognised; use a
