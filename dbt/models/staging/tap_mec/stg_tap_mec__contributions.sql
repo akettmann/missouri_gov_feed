@@ -262,6 +262,9 @@ select
                 ctrb_type is null
                 then {{ mogov.donor_company('company', 'first_name', 'last_name', 'recipient_name') }}
         end,
+        case
+            when ctrb_type is null then {{ mogov.first_name_beside_address('company', 'first_name', 'last_name') }}
+        end,
         person_name,
         company_clean
     ) as contributor_name,

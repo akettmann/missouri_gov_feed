@@ -46,11 +46,35 @@
     end
 {%- endmacro %}
 
-{#- Whether a filer's first / last name columns hold a person's name: at least one part is not a filler. -#}
+{#- A filer's last name as a person's surname (#485): real_name_part, but null when it holds a digit. A digit means a
+    street address typed into the last-name column ("700 12th Avenue South") of a shifted row, not a surname. -#}
+{% macro real_last_part(expr) -%}
+    case
+        when not coalesce({{ mogov.regex_matches(expr, '[0-9]') }}, false) then {{ mogov.real_name_part(expr) }}
+    end
+{%- endmacro %}
+
+{#- Whether a filer's first / last name columns hold a person's name: at least one part is not a filler (and the last
+    name is not an address). -#}
 {% macro has_person_name(first_expr, last_expr) -%}
     coalesce(
-        {{ mogov.real_name_part(first_expr) }} is not null or {{ mogov.real_name_part(last_expr) }} is not null, false
+        {{ mogov.real_name_part(first_expr) }} is not null or {{ mogov.real_last_part(last_expr) }} is not null, false
     )
+{%- endmacro %}
+
+{#- name_key without middle initials (any single-letter word) and generational suffixes (jr, sr, ii, iii, iv), so
+    "Rex A. Sinquefield" equals "Rex Sinquefield" and "Jones Jr" equals "Jones" (#485). Two passes, because
+    adjacent words share their separating space. -#}
+{% macro person_key(expr) -%}
+    trim({{ mogov.regex_replace_all(
+        mogov.regex_replace_all(
+            mogov.regex_replace_all(
+                "' ' || " ~ mogov.name_key(expr) ~ " || ' '", ' ([a-z]|jr|sr|ii|iii|iv) ', ' '
+            ),
+            ' ([a-z]|jr|sr|ii|iii|iv) ', ' '
+        ),
+        ' +', ' '
+    ) }})
 {%- endmacro %}
 
 {#- The company column as a company name: trimmed, or null for a filler (blank, 'N/A', 'NONE', all digits,
@@ -66,29 +90,58 @@
 {%- endmacro %}
 
 {#- Whether the company is not a business but the person (#485): the person's own name ("Natalie DiNicola",
-    "DiNicola, Natalie"), a bare given name or surname (a shifted row: surname in first_name, given name in company,
-    or the first name repeated), or the recipient committee's own name. Needs a person's name to be true: a filler name
-    leaves nothing to repeat, so the company is the donor. -#}
+    "DiNicola, Natalie", "Rex A. Sinquefield" beside Rex / Sinquefield; middle initials and suffixes ignored), a bare
+    given name or surname (a shifted row: surname in first_name, given name in company, or the first name repeated),
+    or the recipient committee's own name. Needs a person's name to be true: a filler name leaves nothing to repeat, so
+    the company is the donor. A name whose first and last parts are equal (an organization typed into both fields,
+    "ANC Properties" / "ANC Properties") is no person's name, and a multi-word company that equals only the first or
+    only the last part ("Vantage CU" as first_name and company) is that organization, not a person. -#}
 {% macro company_is_person_name(company_expr, first_expr, last_expr, recipient_expr) -%}
     coalesce(
         {{ mogov.has_person_name(first_expr, last_expr) }}
         and {{ mogov.real_company(company_expr) }} is not null
         and (
-            {{ mogov.name_key(company_expr) }} in (
-                {{ mogov.name_key("coalesce(" ~ first_expr ~ ", '') || ' ' || coalesce(" ~ last_expr ~ ", '')") }},
-                {{ mogov.name_key("coalesce(" ~ last_expr ~ ", '') || ' ' || coalesce(" ~ first_expr ~ ", '')") }},
-                {{ mogov.name_key(first_expr) }},
-                {{ mogov.name_key(last_expr) }},
-                {{ mogov.name_key(recipient_expr) }}
+            {{ mogov.name_key(company_expr) }} = {{ mogov.name_key(recipient_expr) }}
+            or (
+                -- both name parts present and different: the company is the whole name, either way round
+                {{ mogov.real_name_part(first_expr) }} is not null
+                and {{ mogov.real_last_part(last_expr) }} is not null
+                and {{ mogov.name_key(first_expr) }} <> {{ mogov.name_key(last_expr) }}
+                and {{ mogov.person_key(company_expr) }} <> ''
+                and {{ mogov.person_key(company_expr) }} in (
+                    {{ mogov.person_key("coalesce(" ~ first_expr ~ ", '') || ' ' || coalesce(" ~ last_expr ~ ", '')") }},
+                    {{ mogov.person_key("coalesce(" ~ last_expr ~ ", '') || ' ' || coalesce(" ~ first_expr ~ ", '')") }}
+                )
             )
             or (
-                -- one half of the name is missing and the company is a single word: the other half
-                ({{ mogov.real_name_part(first_expr) }} is null or {{ mogov.real_name_part(last_expr) }} is null)
-                and {{ mogov.name_key(company_expr) }} not like '% %'
+                -- a single-word company is a bare given name or surname: the half of the name that is missing, or one of
+                -- two different halves repeated
+                {{ mogov.name_key(company_expr) }} not like '% %'
+                and (
+                    {{ mogov.real_name_part(first_expr) }} is null
+                    or {{ mogov.real_last_part(last_expr) }} is null
+                    or (
+                        {{ mogov.name_key(first_expr) }} <> {{ mogov.name_key(last_expr) }}
+                        and {{ mogov.name_key(company_expr) }} in (
+                            {{ mogov.name_key(first_expr) }}, {{ mogov.name_key(last_expr) }}
+                        )
+                    )
+                )
             )
         ),
         false
     )
+{%- endmacro %}
+
+{#- The name of a donor whose last-name column holds a street address (a shifted row, #485): the given or family name
+    that is left, without the address. Null when there is a name in the last column or no company. -#}
+{% macro first_name_beside_address(company_expr, first_expr, last_expr) -%}
+    case
+        when
+            {{ mogov.real_company(company_expr) }} is not null
+            and coalesce({{ mogov.regex_matches(last_expr, '[0-9]') }}, false)
+            then {{ mogov.name_part(first_expr) }}
+    end
 {%- endmacro %}
 
 {#- The company as the donor: the business named in `company`, when there is one. MEC's convention (#485) is that a

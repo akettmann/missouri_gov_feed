@@ -812,9 +812,13 @@ Quirks:
   company, a business and its owner, the first name repeated in `company`). MEC's own convention, kept here (#485):
   a filled company is the donor (Organization, named for the company) and the first / last name is its contact
   person. The company is not the donor, and the row is an Individual with no employer from the company, when it
-  only repeats the person (their own name as "Natalie DiNicola" or "DiNicola, Natalie"), is a bare given name
-  (a shifted row: surname alone in `first_name`, given name in `company`), or is the recipient committee's own
-  name. A filled `committee` still makes a Committee. Filler names (`x`, `PAC`, `#N/A`, `Not applicable`,
+  only repeats the person (their own name as "Natalie DiNicola" or "DiNicola, Natalie"; middle initials and
+  Jr / Sr / II-IV are ignored, so "Rex A. Sinquefield" beside Rex / Sinquefield counts), is a bare given name
+  (a shifted row: surname alone in `first_name`, given name in `company`; a street address in `last_name` counts
+  as a missing surname and is left out of the name), or is the recipient committee's own name. A filer who typed
+  the organization into the name fields too (first = last = company, or the organization alone in `first_name`
+  and `company`, such as "Vantage CU") is still an Organization: a one-part match counts only for a one-word
+  company. A filled `committee` still makes a Committee. Filler names (`x`, `PAC`, `#N/A`, `Not applicable`,
   one-character values) are not a person, and filler companies (`N/A`, `NONE`, digits only) are no company.
 - ASP.NET WebForms: each postback must carry the `__VIEWSTATE` of the page it came from. An export
   answers with a file, not a page. Posting from the export body used to lose the view state, so MEC

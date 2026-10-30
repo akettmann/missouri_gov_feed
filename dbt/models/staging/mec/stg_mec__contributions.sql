@@ -10,6 +10,7 @@ select
             when committee is null or committee = ''
                 then {{ mogov.donor_company('company', 'first_name', 'last_name', 'committee_name') }}
         end,
+        {{ mogov.first_name_beside_address('company', 'first_name', 'last_name') }},
         nullif(trim(coalesce(first_name, '') || ' ' || coalesce(last_name, '')), ''),
         company,
         committee

@@ -52,6 +52,11 @@ unit_tests:
           union all select 'C1', 'Friends of Jo Poe', 'Fisher', null, 'Stephanie ', null, 'Retired', null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r16'
           union all select 'C1', 'Friends of Jo Poe', 'x', null, 'Centene', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r17'
           union all select 'C1', 'Friends of Jo Poe', null, 'PAC', 'Cerner', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r18'
+          union all select 'C1', 'Friends of Jo Poe', 'Vantage CU', null, 'Vantage CU', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r19'
+          union all select 'C1', 'Friends of Jo Poe', 'ANC Properties', 'ANC Properties', 'ANC Properties', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r20'
+          union all select 'C1', 'Friends of Jo Poe', 'Parsons', '700 12th Avenue South', 'Donn', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r21'
+          union all select 'C1', 'Friends of Jo Poe', 'Rex', 'Sinquefield', 'Rex A. Sinquefield', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r22'
+          union all select 'C1', 'Friends of Jo Poe', 'Dennis', 'Jones Jr', 'Dennis M. Jones', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r23'
     expect:
       rows:
         - {record_id: r1, contributor_name: Natalie DiNicola, contributor_type: Individual, contributor_company: null}
@@ -72,3 +77,8 @@ unit_tests:
         - {record_id: r16, contributor_name: Fisher, contributor_type: Individual, contributor_company: null}
         - {record_id: r17, contributor_name: Centene, contributor_type: Organization, contributor_company: Centene}
         - {record_id: r18, contributor_name: Cerner, contributor_type: Organization, contributor_company: Cerner}
+        - {record_id: r19, contributor_name: Vantage CU, contributor_type: Organization, contributor_company: Vantage CU}
+        - {record_id: r20, contributor_name: ANC Properties, contributor_type: Organization, contributor_company: ANC Properties}
+        - {record_id: r21, contributor_name: Parsons, contributor_type: Individual, contributor_company: null}
+        - {record_id: r22, contributor_name: Rex Sinquefield, contributor_type: Individual, contributor_company: null}
+        - {record_id: r23, contributor_name: Dennis Jones Jr, contributor_type: Individual, contributor_company: null}
