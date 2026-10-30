@@ -5,6 +5,9 @@ import Layout from "../../layouts/Layout.astro";
 import SourceLink from "../../components/SourceLink.astro";
 import {
   hasStatuteExports,
+  hasStatuteIndexExports,
+  statuteChapterSectionIds,
+  statuteChapters,
   statuteSectionChapters,
   statuteSectionRefs,
   statuteVersions,
@@ -15,10 +18,13 @@ import {
   introText,
   NOT_LOADED,
   orderVersions,
+  sectionNeighbors,
   statusLabel,
   statuteBodyHtml,
+  statuteChapterPath,
   statutePath,
   statutePaths,
+  titleAnchor,
   UNCONSTITUTIONAL_MARK,
   versionNames,
 } from "../../lib/statuteText";
@@ -36,6 +42,15 @@ const known = loaded ? await statuteSectionChapters() : new Map<string, string>(
 const first = versions[0];
 const names = versionNames(versions);
 const sectionLabel = `Section ${section}`;
+// Breadcrumb and previous/next (within the chapter, Revisor order) only when the index pages are built (#841).
+const chapter = loaded ? known.get(section as string) : undefined;
+const indexed = loaded && hasStatuteIndexExports() && chapter !== undefined;
+const around = indexed
+  ? sectionNeighbors((await statuteChapterSectionIds()).get(chapter!) ?? [], section as string)
+  : { prev: null, next: null };
+const titleNumeral = indexed
+  ? ((await statuteChapters()).find((c) => c.chapter === chapter)?.title_numeral ?? null)
+  : null;
 ---
 
 <Layout
@@ -56,6 +71,19 @@ const sectionLabel = `Section ${section}`;
     </>
   ) : (
     <>
+      {indexed && (
+        <nav aria-label="Breadcrumb" class="small">
+          <a href={href("/statutes/")}>Statutes</a>
+          {" › "}
+          <a href={href(`/statutes/#${titleAnchor(titleNumeral)}`)}>
+            {titleNumeral ? `Title ${titleNumeral}` : "Chapters no longer listed"}
+          </a>
+          {" › "}
+          <a href={href(statuteChapterPath(chapter!))}>Chapter {chapter}</a>
+          {" › "}
+          <span aria-current="page">{sectionLabel}</span>
+        </nav>
+      )}
       <p class="muted small">
         Revised Statutes of Missouri
         {first.chapter && first.chapter_name ? ` · Chapter ${first.chapter}, ${first.chapter_name}` : ""}
@@ -124,6 +152,12 @@ const sectionLabel = `Section ${section}`;
           </section>
         );
       })}
+      {(around.prev || around.next) && (
+        <nav aria-label={`Other sections of chapter ${chapter}`} class="statute-pager small">
+          {around.prev && <a href={href(statutePath(around.prev))}>← Section {around.prev}</a>}
+          {around.next && <a href={href(statutePath(around.next))}>Section {around.next} →</a>}
+        </nav>
+      )}
     </>
   )}
 </Layout>
@@ -156,5 +190,12 @@ const sectionLabel = `Section ${section}`;
   .statute-notes li {
     margin-bottom: 0.4rem;
     overflow-wrap: anywhere;
+  }
+  .statute-pager {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 16px;
+    margin-top: 2rem;
   }
 </style>
