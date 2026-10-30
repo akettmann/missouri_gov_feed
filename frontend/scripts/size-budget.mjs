@@ -18,6 +18,15 @@ export const BUDGETS = [
     maxGzKB: 25,
     skipIfPresent: "statutes/not-loaded/index.html",
   },
+  // The statute index (41 titles, 531 chapters) and the largest chapter page (67: 624 sections with headings), measured
+  // 2026-10 (#841): ~138 KB / ~17 KB gzipped and ~175 KB / ~23.5 KB gzipped. The index is always built.
+  { file: "statutes/index.html", maxRawKB: 180, maxGzKB: 23 },
+  {
+    file: "statutes/chapter/67/index.html",
+    maxRawKB: 230,
+    maxGzKB: 31,
+    skipIfPresent: "statutes/not-loaded/index.html",
+  },
 ];
 
 /** Budgets that apply to this build: one with `skipIfPresent` is dropped when that marker file was built. */

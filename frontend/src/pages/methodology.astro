@@ -440,6 +440,50 @@ const tables = freshness();
     </p>
   </section>
 
+  <section class="card" id="statutes">
+    <h2>Missouri statutes</h2>
+    <p>
+      The <a href={href("/statutes/")}>statute pages</a> show the Revised Statutes of Missouri as the Revisor
+      of Statutes publishes them on revisor.mo.gov, by title, chapter and section. A section's text is the
+      Revisor's word for word: we keep its paragraphs, line breaks and tables and add no summary or rewording.
+      Chapters list their sections in the Revisor's order, and also list the repealed and transferred sections
+      the Revisor's own chapter pages hide by default.
+    </p>
+    <p>
+      How current it is: each page says when our pipeline last published the data. The Revisor's page behind
+      it may have been fetched up to 180 days before that, and the Revisor may have changed it since, so check
+      its page (linked on every section) for the law as it stands today.
+    </p>
+    <p>What each status means:</p>
+    <ul>
+      <li>
+        <strong>In force</strong>: the version the Revisor prints as current law.
+      </li>
+      <li>
+        <strong>In force (earlier version)</strong>: an older version the Revisor still prints beside the
+        current one, for example while a change applies only to some cases or dates.
+      </li>
+      <li>
+        <strong>Not yet effective</strong>: passed, but takes effect on a later date, which the section shows.
+      </li>
+      <li>
+        <strong>Contingent</strong>: takes effect only when some event happens (a vote, a federal action, a
+        funding condition), not on a set date. The Revisor gives no real date for it.
+      </li>
+      <li>
+        <strong>Historical</strong>: an expired version the Revisor still prints.
+      </li>
+      <li>
+        <strong>Repealed</strong> and <strong>transferred</strong>: the section is no longer law under that
+        number; a transferred section names the number it moved to.
+      </li>
+    </ul>
+    <p>
+      The index and chapter pages count distinct section numbers: "12 of 30 sections in force" means 30
+      section numbers in the chapter, 12 of them with a version in force.
+    </p>
+  </section>
+
   <section class="card" id="freshness">
     <h2>Sources and data freshness</h2>
     <div class="table-scroll">

@@ -2,6 +2,7 @@
 // The law's text is shown exactly as the Revisor of Statutes publishes it. The only structure we add is the
 // Revisor's own: a blank line starts a new paragraph, a single line break stays a line break, and a line whose
 // cells are tab-separated is a row of a table. Everything is escaped; no source text reaches the page as HTML.
+import { count, plural } from "./format.ts";
 
 /** One row of fct_statute_sections (with its footnotes attached by the loader). */
 export interface StatuteVersion {
@@ -224,6 +225,96 @@ export const statutePath = (sectionId: string): string => `/statutes/${sectionId
 
 /** Slug of the one placeholder page built when the statute exports are missing. */
 export const NOT_LOADED = "not-loaded";
+
+/** Path (no base) of a chapter's list of sections (#841). Chapter numbers are digits with an optional letter. */
+export const statuteChapterPath = (chapter: string): string => `/statutes/chapter/${chapter}/`;
+
+/** Anchor on /statutes/ for a title ("XXVI" -> "title-xxvi"), or for the chapters the Revisor no longer lists. */
+export const titleAnchor = (numeral: string | null): string =>
+  numeral ? `title-${numeral.toLowerCase()}` : "no-longer-listed";
+
+/** The Revisor's page for one chapter. */
+export const revisorChapterUrl = (chapter: string): string =>
+  `https://revisor.mo.gov/main/OneChapter.aspx?chapter=${encodeURIComponent(chapter)}`;
+
+const ROMAN: Record<string, number> = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
+
+/** "XXXIV" -> 34; anything that is not a roman numeral -> NaN. */
+export function romanValue(numeral: string): number {
+  const s = numeral.toUpperCase();
+  if (!/^[IVXLCDM]+$/.test(s)) return NaN;
+  let total = 0;
+  for (let i = 0; i < s.length; i++) {
+    const v = ROMAN[s[i]!]!;
+    const next = ROMAN[s[i + 1] ?? ""] ?? 0;
+    total += v < next ? -v : v;
+  }
+  return total;
+}
+
+/** "30A" -> [30, "A"]; a part with no leading number sorts after every numbered one. */
+function numberAndLetters(part: string): [number, string] {
+  const m = /^(\d+)(.*)$/.exec(part);
+  return m ? [Number(m[1]), m[2]!] : [Number.POSITIVE_INFINITY, part];
+}
+
+const compareParts = (a: string, b: string): number => {
+  const [an, al] = numberAndLetters(a);
+  const [bn, bl] = numberAndLetters(b);
+  return an - bn || (al < bl ? -1 : al > bl ? 1 : 0);
+};
+
+/** Chapters in number order, a letter after the plain number ("30" < "30A" < "31"); ties end in the text itself. */
+export function compareChapters(a: string, b: string): number {
+  return compareParts(a, b) || (a < b ? -1 : a > b ? 1 : 0);
+}
+
+/**
+ * Sections in the order of the Revisor's chapter pages (checked on chapter 456 in October 2026): first the plain
+ * sections by the number after the dot read as a whole number (1.190 before 1.1001, 456.995 before 456.1000), then the
+ * Uniform-Code style ones ("400.2A-101") by article (2 < 2A < 3 < 10), then section number, then a letter
+ * ("456.4-411A" < "456.4-411B"). The chapter comes first, so ids from different chapters sort by chapter. Ties
+ * end in the id itself, which is unique.
+ */
+export function compareSectionIds(a: string, b: string): number {
+  const key = (id: string): [string, number, string, string] => {
+    const dot = id.indexOf(".");
+    const chapter = dot < 0 ? id : id.slice(0, dot);
+    const rest = dot < 0 ? "" : id.slice(dot + 1);
+    const dash = rest.indexOf("-");
+    return dash < 0 ? [chapter, 0, "", rest] : [chapter, 1, rest.slice(0, dash), rest.slice(dash + 1)];
+  };
+  const [ac, ak, aa, as] = key(a);
+  const [bc, bk, ba, bs] = key(b);
+  return (
+    compareChapters(ac, bc) ||
+    ak - bk ||
+    (ak === 1 ? compareParts(aa, ba) : 0) ||
+    compareParts(as, bs) ||
+    (a < b ? -1 : a > b ? 1 : 0)
+  );
+}
+
+/** "12 of 30 sections in force": distinct section numbers, the way rpt_statute_chapters counts them. */
+export function chapterCountsText(c: { sections: number; sections_in_force: number }): string {
+  if (c.sections_in_force === 0) return `${plural(c.sections, "section", "sections")}, none in force`;
+  if (c.sections_in_force === c.sections) {
+    return c.sections === 1
+      ? "1 section, in force"
+      : `${plural(c.sections, "section", "sections")}, all in force`;
+  }
+  return `${count(c.sections_in_force)} of ${plural(c.sections, "section", "sections")} in force`;
+}
+
+/** The sections before and after `sectionId` in `ordered` (one chapter's ids in Revisor order), or null at an end. */
+export function sectionNeighbors(
+  ordered: readonly string[],
+  sectionId: string,
+): { prev: string | null; next: string | null } {
+  const i = ordered.indexOf(sectionId);
+  if (i < 0) return { prev: null, next: null };
+  return { prev: ordered[i - 1] ?? null, next: ordered[i + 1] ?? null };
+}
 
 /**
  * The pages to build: one per section, or the single "not loaded yet" page without the exports. Lives here, not in

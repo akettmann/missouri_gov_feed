@@ -37,6 +37,15 @@ export const REQUIRED_COLUMNS: Record<string, readonly string[]> = {
     "source_url",
     "loaded_at",
   ],
+  rpt_statute_chapters: [
+    "chapter",
+    "chapter_name",
+    "title_numeral",
+    "title_name",
+    "sections",
+    "sections_in_force",
+    "loaded_at",
+  ],
   fct_votes: ["vote_stage", "vote_informal"],
   rpt_attendance: ["recused_from_voting"],
   rpt_interest_vote_overlap: ["vote_description"],
@@ -104,8 +113,9 @@ export const REQUIRED_COLUMNS: Record<string, readonly string[]> = {
  */
 export const REQUIRED_TABLES: Record<string, readonly string[]> = {
   fct_jurisdiction_businesses: ["fct_jurisdiction_business_donors"],
-  fct_statute_sections: ["fct_statute_section_footnotes"],
+  fct_statute_sections: ["fct_statute_section_footnotes", "rpt_statute_chapters"],
   fct_statute_section_footnotes: ["fct_statute_sections"],
+  rpt_statute_chapters: ["fct_statute_sections"],
   fct_jurisdiction_business_donors: ["fct_jurisdiction_businesses"],
 };
 

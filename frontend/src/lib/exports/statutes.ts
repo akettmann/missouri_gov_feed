@@ -2,7 +2,12 @@
 // ~44k sections and 52 M characters of text: the ids come from one small query, the text is read one chapter
 // at a time (a few chapters stay cached because Astro renders pages concurrently), never as one object.
 import { hasExport, query } from "./db";
-import type { StatuteFootnote, StatuteVersion } from "../statuteText";
+import {
+  compareChapters,
+  compareSectionIds,
+  type StatuteFootnote,
+  type StatuteVersion,
+} from "../statuteText";
 
 /** True when both statute exports are there; pages say "not loaded yet" otherwise. */
 export const hasStatuteExports = (): boolean =>
@@ -26,6 +31,49 @@ export function statuteSectionRefs(): Promise<StatuteSectionRef[]> {
     group by section_id
     order by coalesce(min(chapter), ''), section_id`);
   return refs;
+}
+
+/** True when the chapter export is there too: the /statutes/ index and chapter pages need it (#841). */
+export const hasStatuteIndexExports = (): boolean => hasStatuteExports() && hasExport("rpt_statute_chapters");
+
+export interface StatuteChapterRow {
+  chapter: string;
+  chapter_name: string | null;
+  title_numeral: string | null;
+  title_name: string | null;
+  sections: number;
+  sections_in_force: number;
+  loaded_at: string | null;
+}
+
+let chapterRows: Promise<StatuteChapterRow[]> | undefined;
+
+/** Every chapter with its names and section counts, in chapter order (compareChapters). */
+export function statuteChapters(): Promise<StatuteChapterRow[]> {
+  chapterRows ??= query<StatuteChapterRow>(`
+    select chapter, chapter_name, title_numeral, title_name, sections::int as sections,
+           sections_in_force::int as sections_in_force, loaded_at::varchar as loaded_at
+    from {rpt_statute_chapters}`).then((rows) =>
+    rows.toSorted((a, b) => compareChapters(a.chapter, b.chapter)),
+  );
+  return chapterRows;
+}
+
+let chapterOrder: Promise<Map<string, string[]>> | undefined;
+
+/** chapter -> its section ids in the Revisor's order (compareSectionIds), for previous/next links. */
+export function statuteChapterSectionIds(): Promise<Map<string, string[]>> {
+  chapterOrder ??= statuteSectionRefs().then((refs) => {
+    const out = new Map<string, string[]>();
+    for (const r of refs) {
+      const list = out.get(r.chapter) ?? [];
+      list.push(r.section_id);
+      out.set(r.chapter, list);
+    }
+    for (const list of out.values()) list.sort(compareSectionIds);
+    return out;
+  });
+  return chapterOrder;
 }
 
 let idSet: Promise<Map<string, string>> | undefined;
