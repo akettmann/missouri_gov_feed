@@ -118,6 +118,7 @@ unit_tests:
           union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Donn', 'Parsons', '700 12th Avenue South', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't17', null
           union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Rex A. Sinquefield', 'Rex', 'Sinquefield', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't18', null
           union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Dennis M. Jones', 'Dennis', 'Jones Jr', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't19', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'J. David', 'J David', 'Levy', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't20', null
     expect:
       rows:
         - {record_id: t1, contributor_name: Wendi Alper-Pressman, contributor_type: Individual, contributor_company: null}
@@ -139,6 +140,7 @@ unit_tests:
         - {record_id: t17, contributor_name: Parsons, contributor_type: Individual, contributor_company: null}
         - {record_id: t18, contributor_name: Rex Sinquefield, contributor_type: Individual, contributor_company: null}
         - {record_id: t19, contributor_name: Dennis Jones Jr, contributor_type: Individual, contributor_company: null}
+        - {record_id: t20, contributor_name: J David Levy, contributor_type: Individual, contributor_company: null}
 
   - name: tap_contributions_placeholder_names
     model: stg_tap_mec__contributions

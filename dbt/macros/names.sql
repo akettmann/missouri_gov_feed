@@ -114,19 +114,21 @@
                 )
             )
             or (
-                -- a single-word company is a bare given name or surname: the half of the name that is missing, or one of
-                -- two different halves repeated
+                -- a single-word company is a bare given name or surname of a shifted row: the half of the name that is
+                -- missing
                 {{ mogov.name_key(company_expr) }} not like '% %'
                 and (
                     {{ mogov.real_name_part(first_expr) }} is null
                     or {{ mogov.real_last_part(last_expr) }} is null
-                    or (
-                        {{ mogov.name_key(first_expr) }} <> {{ mogov.name_key(last_expr) }}
-                        and {{ mogov.name_key(company_expr) }} in (
-                            {{ mogov.name_key(first_expr) }}, {{ mogov.name_key(last_expr) }}
-                        )
-                    )
                 )
+            )
+            or (
+                -- a company that repeats one of two different halves of the name: a multi-word given name ("Ellen Y"
+                -- as first_name and company). With the other half missing it is an organization ("Vantage CU").
+                {{ mogov.real_name_part(first_expr) }} is not null
+                and {{ mogov.real_last_part(last_expr) }} is not null
+                and {{ mogov.name_key(first_expr) }} <> {{ mogov.name_key(last_expr) }}
+                and {{ mogov.name_key(company_expr) }} in ({{ mogov.name_key(first_expr) }}, {{ mogov.name_key(last_expr) }})
             )
         ),
         false
