@@ -1,5 +1,7 @@
 # missouri-gov-feed
 
+**Goal:** A site to undo all of the intentional and institutional obfuscation and misdirection so that all citizens can get a direct understanding of if a politician is likely working for the citizenry or for themselves, an external benefactor, a corporate overlord, whatever.
+
 A data pipeline that profiles every current Missouri public official: statewide executives, the
 General Assembly, the congressional delegation, tracked mayors, and state and federal judges in Missouri.
 Python loaders fetch public records; dbt (DuckDB locally) turns them into one profile per official.
