@@ -4,7 +4,11 @@ version: 2
 models:
 - name: stg_house_fd__filings
   description: 'U.S. House Clerk financial disclosure index (all members/candidates nationally). FilingType: O annual,
-    A amendment, P periodic transaction report, C candidate, T termination, X extension.'
+    A amendment, P periodic transaction report, C candidate, T termination, X extension, D candidate threshold notice,
+    H new filer report (the PDF header reads "Filing Type: New Filer Report"; it covers the preceding year plus
+    the current year to the filing date, so it is a separate report from the annual O). W, B, E and G stay ''other'':
+    we have not identified their meaning and the loader does not read them.'
 - name: stg_house_fd__pdf_lines
   description: U.S. House disclosure PDF text, one row per extracted line (Missouri filers); scanned filings appear
-    once with has_text = false.
+    once with has_text = false. A PDF the loader could not download or extract (fetch error, extraction timeout)
+    lands as one row with load_error set and no has_text/page/line (#714).

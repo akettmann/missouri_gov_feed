@@ -9,7 +9,7 @@ uv run mogov run --shards 4
 ```
 
 Loaders that land files rather than rows (today `mo_house`, whose XML goes to `data/raw/mo_house_xml/` as
-gzip) keep the file bytes unchanged and parse them in a second step inside the same run. To change only the
+gzip, and `mo_house_pdf`, whose PDFs go to `data/raw/mo_house_pdf/` unchanged) keep the file bytes unchanged and parse them in a second step inside the same run. To change only the
 parsing, re-parse the landed files without fetching: `uv run python -m mogov.parsers.mo_house`.
 
 Existing environments: `mo_house` used to land JSON tables. Run `uv run mogov load mo_house` once before the next
@@ -34,11 +34,14 @@ ignore empty witness rows, so a build before the re-parse is still correct. Dele
 | mo_house                      | daily in session (Jan–May), rarely otherwise | session zips weekly (current year), monthly (past); roll-call PDFs forever | daily in session, weekly otherwise                    |
 | mo_senate                     | daily in session                             | current-year listing daily, past monthly; journal PDFs forever             | daily in session, weekly otherwise                    |
 | mo_senate_topics              | daily in session (new bills indexed)         | current year daily, past years monthly                                     | daily in session, weekly otherwise                    |
+| mo_senate_bills               | daily in session (new bills and actions)     | current year 1 day, past years 30 days; ~1 request/s, five per bill (`MOGOV_SENATE_BILL_DOCS=0`: one) | daily in session, weekly otherwise (a full year is ~85 min cold, ~17 with docs skipped). The current year's 1-day cache means every daily run re-fetches ~5 x 1,060 requests, about 90 min/day; set `MOGOV_SENATE_BILL_DOCS=0` for cheap daily runs (~17 min) and run with documents weekly |
 | mo_revisor | mostly each 28 August (new laws take effect), plus emergency clauses and contingent dates | table of contents, chapter lists and repeals list 7 days; section pages 180 days (a new version is a new URL) | weekly; never above ~1 request/s from one IP (the site blocks the IP, browsers included; requests from all shards share one 2 s pacing lock) |
 | mec (opt-in)                  | continuously                                 | exports: current year weekly, past years monthly                           | weekly                                                |
 | tap_mec                       | frozen (ends 2022)                           | 30 days                                                                    | monthly                                               |
 | fec                           | weekly bulk refresh                          | bulk zips daily; sponsor lookups 30 days                                   | weekly                                                |
 | voteview                      | after each roll call                         | daily                                                                      | weekly                                                |
+| govinfo_billstatus            | as bills move (daily while Congress sits)    | newest (and until Mar 1 the outgoing) Congress daily, older monthly        | weekly                                                |
+| mo_house_pdf (stage 2)       | as bills move (new versions, notes, amendments) | PDFs of closed sessions forever (versioned file names); open session re-checked after 7 days | weekly in session, after `mo_house`; first run ~19 h at 1 request/s, so split it with `MOGOV_HOUSE_PDF_KINDS` / `MOGOV_HOUSE_PDF_SESSIONS` |
 | house_fd                      | as filed                                     | current + previous year index daily; PDFs forever                          | weekly                                                |
 | senate_efd (opt-in)           | as filed                                     | not cached (search + reports fetched each run)                             | weekly                                                |
 | courtlistener_bulk            | quarterly snapshot                           | per snapshot, forever                                                      | monthly (picks up new snapshots)                      |
@@ -66,6 +69,11 @@ uv run mogov load mo_house mo_senate --shards 4
 uv run mogov build
 ```
 
+`mo_house_pdf` also fills `mo_house_pdf_statute_refs` (the RSMo sections each bill text repeals, amends or enacts,
+#594). Texts landed before that table existed have no rows until the loader runs over them again: a run over PDFs
+already landed reads them from disk and fetches nothing for closed sessions, so after upgrading run
+`uv run mogov load mo_house_pdf` once, then `mogov build` (#736).
+
 ## When a loader fails
 
 - `mogov load` always runs every selected loader, even if one fails. It logs a `loader.summary` naming
@@ -83,6 +91,19 @@ uv run mogov build
   It logs a `build.stale_source` warning naming each such source, builds on its previous raw data, and
   still exits non-zero (a Cloud Run job still shows the failure). A failure in any other loader still
   stops the run. Check `mogov freshness` to see how stale the data is.
+
+## Skipping unit tests on a data refresh
+
+dbt unit tests run on fixed rows, so they check the SQL logic, not the data; a refresh that changes no
+model cannot change their result. They are about a quarter of a full build's work. A scheduled refresh
+can leave them out:
+
+```
+uv run mogov run --skip-unit-tests
+uv run mogov build --exclude-resource-type unit_test
+```
+
+Keep them in any build after changing a model: a failing unit test is what skips a model with broken logic.
 
 ## Moving the windows
 
@@ -123,6 +144,9 @@ cd frontend && pnpm build
 methodology page's "data freshness" table shows each export's timestamp. `pnpm build` finishes by running the size budgets (`pnpm sizes`) and exits non-zero if a payload is over
 budget or a budgeted file is missing from the output, because a new source can push one official's JSON over the per-page budget.
 Set `MOGOV_SKIP_SIZE_BUDGET=1` (exactly `1`) to skip the check; `pnpm deploy:pages` and `pnpm deploy:gcs` run the same check before publishing and honour the same variable (the budgets are still enforced by a plain `pnpm sizes` unless it is set there too).
+
+After a sync that touched rankings or sorts, run the tie check (`uv run python scripts/check_site_determinism.py --shuffle`, minutes; scheduled locally, see [environment](environment.md#checking-that-the-site-build-is-deterministic-226-459)).
+
 Separately, the build fails if the pay-per-vote year rows (`rpt_attendance_pay`) do not add up to their dbt total for any official, which means `rpt_attendance` and `rpt_attendance_pay` were exported from different builds; re-run `mogov build` and `mogov export` together. `MOGOV_SKIP_PAY_YEARS_CHECK=1` (exactly `1`) skips that check and logs that it did.
 
 The frontend words award periods from `rpt_awards.period_kind` (`year`, `fec_cycle`, `lifetime`); the build fails when the export has no such column or when a `fec_cycle` list has an odd period (a stale export); re-run `uv run mogov build` and `uv run mogov export`. `MOGOV_SKIP_AWARD_CYCLES_CHECK=1` (exactly `1`) skips the odd-period guard and also lets a stale export without `period_kind` build, inferring the kind from award and office (federal `least_committee_money_share` is a cycle) with a warning (re-export to stop inferring).

@@ -25,7 +25,7 @@ from pathlib import Path
 
 from mogov import db, obs
 from mogov.config import CACHE_DIR
-from mogov.http import fetch_to_file
+from mogov.http import fetch_to_file, replace_file, sweep_stale_parts, tmp_sibling
 from mogov.loaders import loader
 from mogov.loaders.courtlistener_bulk import BUCKET, _latest_snapshot
 
@@ -78,22 +78,26 @@ def _filter(stem: str, snap: str, column: str, keep: set[str], prefilter=None) -
     if out.exists() and ids_path.exists():
         return out, set(ids_path.read_text().split())
     src = fetch_to_file(f"{BUCKET}/bulk-data/{stem}-{snap}.csv.bz2", CACHE / f"{stem}-{snap}.csv.bz2", max_age=None)
-    tmp = out.with_name(f".{out.name}.part")
+    sweep_stale_parts(out)
+    tmp = tmp_sibling(out)
     ids: set[str] = set()
     records = _records(src, stem)
     header = next(records)
     columns = _parse(header)
     key_at, id_at = columns.index(column), columns.index("id")
-    with tmp.open("w", encoding="utf-8", errors="surrogateescape", newline="") as fh:
-        fh.write(header)
-        for record in records:
-            if prefilter and not prefilter(record):
-                continue
-            row = _parse(record)
-            if row[key_at] in keep:
-                fh.write(record)
-                ids.add(row[id_at])
-    tmp.replace(out)
+    try:
+        with tmp.open("w", encoding="utf-8", errors="surrogateescape", newline="") as fh:
+            fh.write(header)
+            for record in records:
+                if prefilter and not prefilter(record):
+                    continue
+                row = _parse(record)
+                if row[key_at] in keep:
+                    fh.write(record)
+                    ids.add(row[id_at])
+        replace_file(tmp, out)
+    finally:
+        tmp.unlink(missing_ok=True)
     ids_path.write_text("\n".join(sorted(ids)))
     log.info("cl_bulk.filtered", file=stem, kept=len(ids))
     return out, ids

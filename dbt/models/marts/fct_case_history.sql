@@ -19,25 +19,25 @@ with api as (
 cases as (
     select * from api
     {% if var('cl_case_bulk', false) %}
-    union all
-    select
-        m.official_id,
-        m.role,
-        c.cluster_id,
-        c.case_name,
-        c.court,
-        c.court_id,
-        c.docket_number,
-        c.date_filed,
-        c.judges_text,
-        c.attorneys_text,
-        c.publication_status,
-        c.disposition,
-        null as opinion_tail,
-        c.source_url,
-        'bulk' as input
-    from {{ ref('int_courtlistener__bulk_case_matches') }} as m
-    inner join {{ ref('int_courtlistener__mo_cases') }} as c on m.cluster_id = c.cluster_id
+        union all
+        select
+            m.official_id,
+            m.role,
+            c.cluster_id,
+            c.case_name,
+            c.court,
+            c.court_id,
+            c.docket_number,
+            c.date_filed,
+            c.judges_text,
+            c.attorneys_text,
+            c.publication_status,
+            c.disposition,
+            null as opinion_tail,
+            c.source_url,
+            'bulk' as input
+        from {{ ref('int_courtlistener__bulk_case_matches') }} as m
+        inner join {{ ref('int_courtlistener__mo_cases') }} as c on m.cluster_id = c.cluster_id
     {% endif %}
 ),
 

@@ -16,13 +16,13 @@ unit_tests:
       - input: ref('stg_mo_revisor__sections')
         format: sql
         rows: |
-            select '324.406' as section_id, 60569 as bid, '324.406/60569' as section_version_id, '324' as chapter, 'Heading' as heading, false as is_historical, true as is_contingent, cast(null as date) as effective_date, false as held_unconstitutional, '(L. 2020 S.B. 1)' as history_note, 'text' as section_text, 'u1' as source_url union all
-            select '1.010', 42, '1.010/42', '1', 'Common law', false, false, cast('2015-08-28' as date), false, '(L. 2015 S.B. 239)', 'text', 'u2'
+            select '324.406' as section_id, 60569 as bid, '324.406/60569' as section_version_id, '324' as chapter, 'Heading' as heading, false as is_historical, true as is_contingent, cast(null as date) as effective_date, false as held_unconstitutional, '(L. 2020 S.B. 1)' as history_note, 'text' as section_text, 'u1' as source_url, cast('2026-05-01 08:00:00' as timestamp) as fetched_at, cast('2026-10-26 04:00:00' as timestamp) as loaded_at union all
+            select '1.010', 42, '1.010/42', '1', 'Common law', false, false, cast('2015-08-28' as date), false, '(L. 2015 S.B. 239)', 'text', 'u2', cast(null as timestamp), cast('2026-10-26 05:00:00' as timestamp)
       - input: ref('stg_mo_revisor__repeals')
         format: sql
         rows: |
-            select '324.406' as section_id, 60569 as bid, '324.406/60569' as section_version_id, '324' as chapter, 'repealed' as change_kind, cast(null as date) as action_date, cast(null as varchar) as transferred_to, '(Repealed L. 2026 S.B. 1233)' as note, 'r1' as source_url union all
-            select '85.270', 1, '85.270/1', '85', 'repealed', cast('1983-08-13' as date), cast(null as varchar), '(Repealed L. 1983 H.B. 68 § 1)', 'r2'
+            select '324.406' as section_id, 60569 as bid, '324.406/60569' as section_version_id, '324' as chapter, 'repealed' as change_kind, cast(null as date) as action_date, cast(null as varchar) as transferred_to, '(Repealed L. 2026 S.B. 1233)' as note, 'r1' as source_url, cast('2026-10-20 01:00:00' as timestamp) as fetched_at, cast('2026-10-25 01:00:00' as timestamp) as loaded_at union all
+            select '85.270', 1, '85.270/1', '85', 'repealed', cast('1983-08-13' as date), cast(null as varchar), '(Repealed L. 1983 H.B. 68 § 1)', 'r2', cast('2026-10-20 02:00:00' as timestamp), cast('2026-10-25 02:00:00' as timestamp)
       - input: ref('stg_mo_revisor__chapters')
         format: sql
         rows: |
@@ -30,9 +30,9 @@ unit_tests:
             select '1', 'Laws', 'I', 'T'
     expect:
       rows:
-        - {section_version_id: '324.406/60569', status: contingent, is_current: false, repeal_pending: true}
-        - {section_version_id: '1.010/42', status: in force, is_current: true, repeal_pending: false}
-        - {section_version_id: '85.270/1', status: repealed, is_current: false, repeal_pending: false}
+        - {section_version_id: '324.406/60569', status: contingent, is_current: false, repeal_pending: true, fetched_at: '2026-05-01 08:00:00', loaded_at: '2026-10-26 04:00:00'}
+        - {section_version_id: '1.010/42', status: in force, is_current: true, repeal_pending: false, fetched_at: , loaded_at: '2026-10-26 05:00:00'}
+        - {section_version_id: '85.270/1', status: repealed, is_current: false, repeal_pending: false, fetched_at: '2026-10-20 02:00:00', loaded_at: '2026-10-25 02:00:00'}
 
   - name: combined_act_bills_are_linked_but_only_the_first_is_the_lead
     model: fct_bill_statute_links
@@ -62,3 +62,34 @@ unit_tests:
         - {bill: HB7, section_id: s2, is_lead_bill: true, combined_into: , in_fct_bills: false}
         - {bill: HB99, section_id: s2, is_lead_bill: false, combined_into: HB7, in_fct_bills: true}
         - {bill: HB5, section_id: s3, is_lead_bill: true, combined_into: , in_fct_bills: false}
+
+  - name: statute_footnotes_keep_order_and_flag_only_the_history_note
+    model: fct_statute_section_footnotes
+    description: >
+      A version's footnotes come out one row each in the Revisor's page order (footnote_number), verbatim; only the
+      first one, when it equals the version's history_note, is flagged is_history_note. A first footnote that is not
+      the history note (a fragment, as on 82.136) is not flagged, and a later footnote that happens to equal it is
+      not either. Footnotes of a version that is not in fct_statute_sections are dropped. Flagging by text alone, or
+      by position alone, fails this test.
+    given:
+      - input: ref('stg_mo_revisor__section_footnotes')
+        format: sql
+        rows: |
+            select 'a/1' as section_version_id, 1 as footnote_number, '(L. 1972 S.B. 549)' as footnote_text union all
+            select 'a/1', 2, 'Prior revisions: 1929 § 645' union all
+            select 'a/1', 3, '(1953) Fact that statute changed a rule. Steggall v. Morris, 363 Mo. 1224.' union all
+            select 'b/2', 1, 'L. 2016 S.B. 572)' union all
+            select 'b/2', 2, '(L. 2016 S.B. 572)' union all
+            select 'gone/9', 1, '(L. 1999 H.B. 1)'
+      - input: ref('fct_statute_sections')
+        format: sql
+        rows: |
+            select 'a/1' as section_version_id, 'a' as section_id, '(L. 1972 S.B. 549)' as history_note, 'ua' as source_url, cast('2026-05-01 08:00:00' as timestamp) as fetched_at, cast('2026-10-26 04:00:00' as timestamp) as loaded_at union all
+            select 'b/2', 'b', '(L. 2016 S.B. 572)', 'ub', cast(null as timestamp), cast('2026-10-26 04:00:00' as timestamp)
+    expect:
+      rows:
+        - {section_version_id: 'a/1', footnote_number: 1, section_id: a, footnote_text: '(L. 1972 S.B. 549)', is_history_note: true, fetched_at: '2026-05-01 08:00:00'}
+        - {section_version_id: 'a/1', footnote_number: 2, section_id: a, footnote_text: 'Prior revisions: 1929 § 645', is_history_note: false, fetched_at: '2026-05-01 08:00:00'}
+        - {section_version_id: 'a/1', footnote_number: 3, section_id: a, footnote_text: '(1953) Fact that statute changed a rule. Steggall v. Morris, 363 Mo. 1224.', is_history_note: false, fetched_at: '2026-05-01 08:00:00'}
+        - {section_version_id: 'b/2', footnote_number: 1, section_id: b, footnote_text: 'L. 2016 S.B. 572)', is_history_note: false, fetched_at: }
+        - {section_version_id: 'b/2', footnote_number: 2, section_id: b, footnote_text: '(L. 2016 S.B. 572)', is_history_note: false, fetched_at: }

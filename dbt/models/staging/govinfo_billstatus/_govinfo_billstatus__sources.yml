@@ -1,0 +1,71 @@
+# Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
+# default (no) freshness come from dbt_project.yml. The loader lands each BILLSTATUS XML file unchanged as gzip
+# (listed in govinfo_billstatus_files) and one JSON row per entity parsed from it with lxml; `mogov build`
+# creates empty placeholders while the loader has not run.
+version: 2
+sources:
+- name: govinfo_billstatus
+  description: GovInfo BILLSTATUS bulk XML (federal bills), one row per bill, sponsor, cosponsor, action, recorded
+    vote and law, for every bill of the loaded Congresses (all states; filtered to Missouri in dbt).
+  tables:
+  - name: files
+    identifier: govinfo_billstatus_files
+    description: One row per landed BILLSTATUS XML file with its gzip path under MOGOV_RAW_DIR, size, sha256 and
+      landing time. The XML itself is the gzip file, unchanged.
+  - name: bills
+    identifier: govinfo_billstatus_bills
+    description: One row per bill (payload JSON) as published; the key is "<congress>-<type>-<number>".
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 45
+          period: day
+        error_after:
+          count: 120
+          period: day
+  - name: sponsors
+    identifier: govinfo_billstatus_sponsors
+    description: One row per sponsor of a bill (payload JSON), with the member's bioguideId, state and district.
+  - name: cosponsors
+    identifier: govinfo_billstatus_cosponsors
+    description: One row per cosponsor of a bill (payload JSON), with sponsorship date and original / withdrawn flags.
+  - name: actions
+    identifier: govinfo_billstatus_actions
+    description: One row per action on a bill (payload JSON), in the order the file lists them.
+  - name: recorded_votes
+    identifier: govinfo_billstatus_recorded_votes
+    description: One row per roll call an action cites (payload JSON); the link from a bill to a House or Senate vote.
+  - name: laws
+    identifier: govinfo_billstatus_laws
+    description: One row per Public Law number a bill became (payload JSON).
+  - name: committees
+    identifier: govinfo_billstatus_committees
+    description: One row per committee a bill was referred to and one per subcommittee (payload JSON); subcommittee
+      rows name their parent committee.
+  - name: committee_activities
+    identifier: govinfo_billstatus_committee_activities
+    description: One row per dated activity of a bill in a committee or subcommittee (payload JSON).
+  - name: subjects
+    identifier: govinfo_billstatus_subjects
+    description: One row per CRS legislative subject term of a bill (payload JSON).
+  - name: related_bills
+    identifier: govinfo_billstatus_related_bills
+    description: One row per related bill a bill lists (payload JSON).
+  - name: related_bill_relationships
+    identifier: govinfo_billstatus_related_bill_relationships
+    description: One row per relationship type a related bill carries (payload JSON).
+  - name: amendments
+    identifier: govinfo_billstatus_amendments
+    description: One row per amendment filed to a bill (payload JSON); the key is "<congress>-<type>-<number>" of the
+      amendment ("118-hamdt-180").
+  - name: amendment_sponsors
+    identifier: govinfo_billstatus_amendment_sponsors
+    description: One row per sponsor of an amendment, and per senator it was proposed on behalf of (payload JSON).
+  - name: amendment_actions
+    identifier: govinfo_billstatus_amendment_actions
+    description: One row per action on an amendment (payload JSON), in the order the file lists them.
+  - name: amendment_recorded_votes
+    identifier: govinfo_billstatus_amendment_recorded_votes
+    description: One row per roll call an amendment action cites (payload JSON); the link from an amendment to a House
+      or Senate vote.

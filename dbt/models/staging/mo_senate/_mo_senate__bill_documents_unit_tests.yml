@@ -1,0 +1,92 @@
+# Unit tests for the Senate bill-page document staging models (#589): fixed source rows -> exact expected rows.
+version: 2
+
+unit_tests:
+  - name: senate_bill_texts_split_label_clean_text_and_map_session
+    model: stg_mo_senate__bill_texts
+    description: >
+      One row per text link as landed. The session code comes from the seed by (year, session type), never by
+      arithmetic (2025 E1 is 253). The year is `list_year` when the loader wrote one, else the served `year`. Text is
+      cleaned by the shared macros: an HTML entity is decoded, a doubled comma collapses, whitespace runs become one
+      space and U+FFFD is dropped; the url is trimmed. A version with no " - " keeps its whole label and has no LR
+      number. A session with no seed row has a null code. Skipping the cleaning, mapping on year alone, or reading
+      the url untrimmed fails this test.
+    given:
+      - input: source('mo_senate', 'bill_texts')
+        format: sql
+        rows: |
+            select cast('{"year": 2024, "list_year": 2025, "session_type": "E1", "bill_id": 5, "bill": "SB1", "doc_index": 0, "url": " https://www.senate.mo.gov/25info/pdf-bill/tat/SB1.pdf ", "title": "Truly  Agreed &amp; Passed", "label": "0001S.04T - Truly Agreed,, to and Finally Passed", "lr_number": "0001S.04T", "version": "Truly Agreed,, to and Finally Passed"}' as varchar) as payload union all
+            select cast('{"year": 2024, "session_type": "R", "bill_id": 6, "bill": "SB2", "doc_index": 1, "url": "https://www.senate.mo.gov/24info/pdf-bill/intro/SB2.pdf", "title": null, "label": "Introd�uced", "lr_number": null, "version": "Introd�uced"}' as varchar) as payload union all
+            select cast('{"year": 1999, "session_type": "R", "bill_id": 7, "bill": "SB3", "doc_index": 0, "url": "https://www.senate.mo.gov/99info/x.pdf", "title": "x", "label": "Introduced", "lr_number": null, "version": "Introduced"}' as varchar) as payload
+      - input: ref('mo_senate_session_codes')
+        format: sql
+        rows: |
+            select 2024 as session_year, 'R' as session_type, '241' as house_session_code union all
+            select 2025, 'E1', '253' union all
+            select 2025, 'R', '251'
+    expect:
+      rows:
+        - {session_year: 2025, session_type: E1, session_code: '253', bill_id: 5, bill: SB1, doc_index: 0, document_url: 'https://www.senate.mo.gov/25info/pdf-bill/tat/SB1.pdf', title: Truly Agreed & Passed, label: '0001S.04T - Truly Agreed, to and Finally Passed', lr_number: 0001S.04T, version: 'Truly Agreed, to and Finally Passed'}
+        - {session_year: 2024, session_type: R, session_code: '241', bill_id: 6, bill: SB2, doc_index: 1, document_url: 'https://www.senate.mo.gov/24info/pdf-bill/intro/SB2.pdf', title: null, label: Introduced, lr_number: null, version: Introduced}
+        - {session_year: 1999, session_type: R, session_code: null, bill_id: 7, bill: SB3, doc_index: 0, document_url: 'https://www.senate.mo.gov/99info/x.pdf', title: x, label: Introduced, lr_number: null, version: Introduced}
+
+  - name: senate_bill_amendments_keep_status_and_id
+    model: stg_mo_senate__bill_amendments
+    description: >
+      One row per amendment link: label and status cleaned by the shared macros, amendment_id the numeric site key
+      (null when the loader found none), a missing status chip stays null. A `&` in "offered & adopted" is not an
+      entity and stays.
+    given:
+      - input: source('mo_senate', 'bill_amendments')
+        format: sql
+        rows: |
+            select cast('{"year": 2024, "session_type": "R", "bill_id": 6, "bill": "SB2", "doc_index": 0, "amendment_id": 1522, "url": "https://www.senate.mo.gov/BillTracking/Bills/BillInformation?handler=AmendmentPdf&year=2024&amendmentId=1522", "title": "t", "label": "2/4/2024 - SA 1 offered & adopted (Crawford)", "status": "2/4/2024 - Adopted"}' as varchar) as payload union all
+            select cast('{"year": 2024, "session_type": "R", "bill_id": 6, "bill": "SB2", "doc_index": 1, "amendment_id": null, "url": "https://www.senate.mo.gov/x", "title": "t", "label": "SA 2", "status": null}' as varchar) as payload
+      - input: ref('mo_senate_session_codes')
+        format: sql
+        rows: |
+            select 2024 as session_year, 'R' as session_type, '241' as house_session_code union all
+            select 2025, 'E1', '253' union all
+            select 2025, 'R', '251'
+    expect:
+      rows:
+        - {session_code: '241', bill: SB2, doc_index: 0, amendment_id: 1522, label: 2/4/2024 - SA 1 offered & adopted (Crawford), status: 2/4/2024 - Adopted}
+        - {session_code: '241', bill: SB2, doc_index: 1, amendment_id: null, label: SA 2, status: null}
+
+  - name: senate_bill_summaries_keep_text_as_printed
+    model: stg_mo_senate__bill_summaries
+    description: >
+      The summary text keeps its line breaks and tabs (it is prose laid out by the page) and loses only U+FFFD; the
+      version heading is cleaned like any label. Collapsing whitespace in the text fails this test.
+    given:
+      - input: source('mo_senate', 'bill_summaries')
+        format: sql
+        rows: |
+            select cast('{"year": 2024, "session_type": "R", "bill_id": 6, "bill": "SB2", "doc_index": 0, "summary_id": 77, "label": " Introduced ", "text": "Line one.\n\tLine  two�."}' as varchar) as payload
+      - input: ref('mo_senate_session_codes')
+        format: sql
+        rows: |
+            select 2024 as session_year, 'R' as session_type, '241' as house_session_code union all
+            select 2025, 'E1', '253' union all
+            select 2025, 'R', '251'
+    expect:
+      rows:
+        - {session_code: '241', bill: SB2, doc_index: 0, summary_id: 77, label: Introduced, summary_text: "Line one.\n\tLine  two."}
+
+  - name: senate_bill_fiscal_notes_clean_label_and_map_session
+    model: stg_mo_senate__bill_fiscal_notes
+    description: A fiscal-note link keeps its printed label (whitespace collapsed) and its trimmed url, with the seed's session code.
+    given:
+      - input: source('mo_senate', 'bill_fiscal_notes')
+        format: sql
+        rows: |
+            select cast('{"year": 2024, "session_type": "R", "bill_id": 6, "bill": "SB2", "doc_index": 0, "url": "https://www.senate.mo.gov/FiscalNotes/2024-1/0002-01N.ORG.pdf ", "title": null, "label": "Introduced   (0002-01N.ORG)"}' as varchar) as payload
+      - input: ref('mo_senate_session_codes')
+        format: sql
+        rows: |
+            select 2024 as session_year, 'R' as session_type, '241' as house_session_code union all
+            select 2025, 'E1', '253' union all
+            select 2025, 'R', '251'
+    expect:
+      rows:
+        - {session_code: '241', doc_index: 0, document_url: 'https://www.senate.mo.gov/FiscalNotes/2024-1/0002-01N.ORG.pdf', label: Introduced (0002-01N.ORG)}

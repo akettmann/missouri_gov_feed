@@ -1,0 +1,130 @@
+unit_tests:
+  - name: awards_house_passage_share_ranks_decided_bills_of_ended_sessions
+    model: rpt_awards
+    description: >
+      most_bills_passed_house (issue 603) ranks the share of decided House bills the House passed, from
+      fct_sponsorship_outcomes, with awards_min_bills_decided = 10. Yearly: a year's sessions are summed (e has
+      two 2020 sessions of 5 decided bills each, 3 passed each, so 6 of 10 = 60.0; neither session reaches 10
+      alone); a has 6 of 12 (50.0), b 9 of 10 (90.0), d 1 of 10 (10.0), so b, e, a, d. c's 9 of 9 and a's 2021
+      (8 of 8) are under the minimum and get no yearly row; b's 2021 is ranked alone, and one member is too thin
+      a field (awards_min_field_size 2). Lifetime sums counts, not shares: a is 14 of 20 = 70.0 (the average of
+      its yearly shares would be 75.0) and b is 12 of 40 = 30.0 (the average would be 60.0), so a, e, b, d; c's 9
+      stay under the minimum. d's 2022 session is still open (20 of 20 passed): counting it would make d the
+      lifetime leader, so it is left out. Every row is a state_house row, even for d, who now holds a us_senate
+      seat. Ignoring the minimum, averaging shares, dropping the open-session filter or the per-year sum
+      fails this test.
+    overrides:
+      vars:
+        awards_threshold: {default: 5}
+        awards_min_field_size: 2
+        awards_min_bills_decided: 10
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: a, office: state_house}
+          - {official_id: b, office: state_house}
+          - {official_id: c, office: state_house}
+          - {official_id: d, office: us_senate}
+          - {official_id: e, office: state_house}
+      - input: ref('rpt_attendance')
+        rows: []
+      - input: ref('rpt_donor_rollup')
+        rows: []
+      - input: ref('fct_federal_donor_summary')
+        rows: []
+      - input: ref('fct_party_unity_yearly')
+        rows: []
+      - input: ref('fct_sponsorship_outcomes')
+        rows:
+          - {official_id: a, session_code: '201', session_year: 2020, is_session_over: true, bills_decided: 12, bills_passed_house: 6}
+          - {official_id: a, session_code: '211', session_year: 2021, is_session_over: true, bills_decided: 8, bills_passed_house: 8}
+          - {official_id: b, session_code: '201', session_year: 2020, is_session_over: true, bills_decided: 10, bills_passed_house: 9}
+          - {official_id: b, session_code: '211', session_year: 2021, is_session_over: true, bills_decided: 30, bills_passed_house: 3}
+          - {official_id: c, session_code: '201', session_year: 2020, is_session_over: true, bills_decided: 9, bills_passed_house: 9}
+          - {official_id: d, session_code: '201', session_year: 2020, is_session_over: true, bills_decided: 10, bills_passed_house: 1}
+          - {official_id: d, session_code: '221', session_year: 2022, is_session_over: false, bills_decided: 20, bills_passed_house: 20}
+          - {official_id: e, session_code: '201', session_year: 2020, is_session_over: true, bills_decided: 5, bills_passed_house: 3}
+          - {official_id: e, session_code: '203', session_year: 2020, is_session_over: true, bills_decided: 5, bills_passed_house: 3}
+    expect:
+      rows:
+        - {award: most_bills_passed_house, office: state_house, period: '2020', period_kind: year, official_id: b, award_rank: 1, metric: 90.0, sample_size: 10, group_size: 4, streak_years: 1}
+        - {award: most_bills_passed_house, office: state_house, period: '2020', period_kind: year, official_id: e, award_rank: 2, metric: 60.0, sample_size: 10, group_size: 4, streak_years: 1}
+        - {award: most_bills_passed_house, office: state_house, period: '2020', period_kind: year, official_id: a, award_rank: 3, metric: 50.0, sample_size: 12, group_size: 4, streak_years: 1}
+        - {award: most_bills_passed_house, office: state_house, period: '2020', period_kind: year, official_id: d, award_rank: 4, metric: 10.0, sample_size: 10, group_size: 4, streak_years: 1}
+        - {award: most_bills_passed_house, office: state_house, period: lifetime, period_kind: lifetime, official_id: a, award_rank: 1, metric: 70.0, sample_size: 20, group_size: 4, streak_years: null}
+        - {award: most_bills_passed_house, office: state_house, period: lifetime, period_kind: lifetime, official_id: e, award_rank: 2, metric: 60.0, sample_size: 10, group_size: 4, streak_years: null}
+        - {award: most_bills_passed_house, office: state_house, period: lifetime, period_kind: lifetime, official_id: b, award_rank: 3, metric: 30.0, sample_size: 40, group_size: 4, streak_years: null}
+        - {award: most_bills_passed_house, office: state_house, period: lifetime, period_kind: lifetime, official_id: d, award_rank: 4, metric: 10.0, sample_size: 10, group_size: 4, streak_years: null}
+
+  - name: awards_house_passage_has_no_low_end_and_ranks_unrounded_shares
+    model: rpt_awards
+    description: >
+      Only the top end exists (issue 603): the House passes none of most members' bills, so a "fewest passed"
+      award would be a tie at 0%, and rpt_awards must not emit one (s, with 0 of 10, gets no row). The share
+      ranks unrounded: p is 2124 of 2500 (84.96, shown as 85.0) and q is 17 of 20 (85.0), so q is first and p
+      second; ranking the rounded figure would tie them and, with a cutoff of 1, list both.
+    overrides:
+      vars:
+        awards_threshold: {default: 1}
+        awards_min_field_size: 2
+        awards_min_bills_decided: 10
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p, office: state_house}
+          - {official_id: q, office: state_house}
+          - {official_id: s, office: state_house}
+      - input: ref('rpt_attendance')
+        rows: []
+      - input: ref('rpt_donor_rollup')
+        rows: []
+      - input: ref('fct_federal_donor_summary')
+        rows: []
+      - input: ref('fct_party_unity_yearly')
+        rows: []
+      - input: ref('fct_sponsorship_outcomes')
+        rows:
+          - {official_id: p, session_code: '231', session_year: 2023, is_session_over: true, bills_decided: 2500, bills_passed_house: 2124}
+          - {official_id: q, session_code: '231', session_year: 2023, is_session_over: true, bills_decided: 20, bills_passed_house: 17}
+          - {official_id: s, session_code: '231', session_year: 2023, is_session_over: true, bills_decided: 10, bills_passed_house: 0}
+    expect:
+      rows:
+        - {award: most_bills_passed_house, office: state_house, period: '2023', period_kind: year, official_id: q, award_rank: 1, metric: 85.0, sample_size: 20, group_size: 3, streak_years: 1}
+        - {award: most_bills_passed_house, office: state_house, period: lifetime, period_kind: lifetime, official_id: q, award_rank: 1, metric: 85.0, sample_size: 20, group_size: 3, streak_years: null}
+
+  - name: awards_house_passage_needs_at_least_one_passed_bill
+    model: rpt_awards
+    description: >
+      A winner needs at least one passed bill (like Maverick's one break). In a thin field of 4 with a cutoff of
+      2, q (3 of 10) is first and s, t and u (0 of 10 each) tie for second, which would put three 0% members on
+      the list. They get no row, and group_size stays 4 (the whole ranked field, as Maverick reports it).
+    overrides:
+      vars:
+        awards_threshold: {default: 2}
+        awards_min_field_size: 2
+        awards_min_bills_decided: 10
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: q, office: state_house}
+          - {official_id: s, office: state_house}
+          - {official_id: t, office: state_house}
+          - {official_id: u, office: state_house}
+      - input: ref('rpt_attendance')
+        rows: []
+      - input: ref('rpt_donor_rollup')
+        rows: []
+      - input: ref('fct_federal_donor_summary')
+        rows: []
+      - input: ref('fct_party_unity_yearly')
+        rows: []
+      - input: ref('fct_sponsorship_outcomes')
+        rows:
+          - {official_id: q, session_code: '231', session_year: 2023, is_session_over: true, bills_decided: 10, bills_passed_house: 3}
+          - {official_id: s, session_code: '231', session_year: 2023, is_session_over: true, bills_decided: 10, bills_passed_house: 0}
+          - {official_id: t, session_code: '231', session_year: 2023, is_session_over: true, bills_decided: 10, bills_passed_house: 0}
+          - {official_id: u, session_code: '231', session_year: 2023, is_session_over: true, bills_decided: 10, bills_passed_house: 0}
+    expect:
+      rows:
+        - {award: most_bills_passed_house, office: state_house, period: '2023', period_kind: year, official_id: q, award_rank: 1, metric: 30.0, sample_size: 10, group_size: 4, streak_years: 1}
+        - {award: most_bills_passed_house, office: state_house, period: lifetime, period_kind: lifetime, official_id: q, award_rank: 1, metric: 30.0, sample_size: 10, group_size: 4, streak_years: null}

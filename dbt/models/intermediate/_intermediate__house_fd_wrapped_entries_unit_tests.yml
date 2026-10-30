@@ -1,0 +1,136 @@
+# Unit tests for int_house_fd__schedule_lines: entries the PDF wraps over several lines on schedules A, B, D and H come
+# out as one row each (#641).
+version: 2
+
+unit_tests:
+  - name: house_fd_wrapped_entries_joined_a_b_d_h
+    model: int_house_fd__schedule_lines
+    description: >
+      Schedule A: a line of only income-type words ("Dividends"), only amounts (the high end of a range), only
+      form-checkbox glyphs ("gfedc"), or a ticker and asset-type code ("(OANEX) [MF]") belongs to the entry above; the
+      head line keeps the amount and owner code. A line with an asset name and an amount is its own entry, and
+      Location / Description lines stay lines of their own. Schedule B: a line with no transaction
+      type before an amount is the asset name wrapped under the account line, even when it holds a bond maturity date
+      ("Rev 5% 07/01/2031 [GS]"); the column-header spills "$200?" and "$1,000?" are
+      dropped. Schedule D: a line with no amount belongs to the entry above, a line ending on "Over" starts one.
+      A range the PDF wrapped takes its high end from the tail (A, B, D: the line above holds only the low end, with
+      the checkbox glyphs possibly between): "$50,001 -" / "$100,000", "$250,001 -" / "Residence
+      $500,000" (a description wrapped with the range), "Over" / "$1,000,000". Owner codes exist on A, B and D only (on D
+      at the start of the line): "Washington, DC" in a Schedule H itinerary or in a D creditor's name is a city.
+      "Undetermined" before the first "$" is the asset's value (like "None"): amount_range is "Undetermined" and the
+      "$" range is the income. An income range wrapped after a complete value range ("... $15,001 - $50,000 Interest
+      $201 -" / "Clark Cnty WA Sch Dist $1,000", glyph line possibly between) joins, but a line with its own range, or
+      a head whose income range is complete, does not. A value "Over None" with the amount on the next line reads
+      "Over $50,000,000"; a "Description: ... Roll Over" line is not such a head.
+      Schedule H: a line with no date is the wrapped sponsor / itinerary of the entry above. The head line's page and
+      line number stay the row's identity.
+    given:
+      - input: ref('stg_house_fd__pdf_lines')
+        format: sql
+        rows: |
+          select 'w' as doc_id, 'u_w' as document_url, true as has_text, 1 as page, 1 as line_no, 'Schedule A: Assets and "Unearned" Income' as line_text union all
+          select 'w', 'u_w', true, 1, 2, 'Widget Fund [MF] SP $15,001 - $50,000 Capital Gains, $1 - $200' union all
+          select 'w', 'u_w', true, 1, 3, 'Dividends' union all
+          select 'w', 'u_w', true, 1, 4, 'Oakmark International Small Cap Fund Institutional Class' union all
+          select 'w', 'u_w', true, 1, 5, '(OANEX) [MF]' union all
+          select 'w', 'u_w', true, 1, 6, 'Mass Mutual Life $50,001 -' union all
+          select 'w', 'u_w', true, 1, 7, '$100,000' union all
+          select 'w', 'u_w', true, 1, 8, 'Gadget Fund [MF] $1,001 - $15,000' union all
+          select 'w', 'u_w', true, 1, 9, 'Location: Salem, MO, US' union all
+          select 'w', 'u_w', true, 1, 10, 'Fidelity Trust ⇒ JT $250,001 - Dividends $5,001 -' union all
+          select 'w', 'u_w', true, 1, 11, 'gfedc' union all
+          select 'w', 'u_w', true, 1, 12, 'Baillie Gifford Fund - Class I (BGEGX) [MF] $500,000 $15,000' union all
+          select 'w', 'u_w', true, 1, 13, 'Next Fund [MF] $1,001 - $15,000' union all
+          select 'w', 'u_w', true, 1, 14, 'Fidelity Trust ⇒ JT None Interest $1,001 - gfedc' union all
+          select 'w', 'u_w', true, 1, 15, 'New York NY [GS] $2,500' union all
+          select 'w', 'u_w', true, 1, 16, 'Low Only Fund [MF] $1,001 -' union all
+          select 'w', 'u_w', true, 1, 17, 'Own Range Fund [MF] $15,001 - $50,000' union all
+          select 'w', 'u_w', true, 1, 18, 'Sam Farms $100,001 -' union all
+          select 'w', 'u_w', true, 1, 19, '$1,000?' union all
+          select 'w', 'u_w', true, 1, 20, 'Grain Bin $250,000' union all
+          select 'w', 'u_w', true, 1, 21, 'Rental Trust ⇒ JT $50,001 - None Interest $1,001 -' union all
+          select 'w', 'u_w', true, 1, 22, 'Rental Property [RP] $100,000 $5,000' union all
+          select 'w', 'u_w', true, 1, 23, 'State of Missouri Pension [DB] Undetermined Pension $5,001 - $15,000' union all
+          select 'w', 'u_w', true, 1, 24, 'John Hancock Life [FN] SP Undetermined annuity Payment $1,001 - gfedc' union all
+          select 'w', 'u_w', true, 1, 25, 'Annuity Contract $2,500' union all
+          select 'w', 'u_w', true, 1, 26, 'Alford LLC [OL] Undetermined None' union all
+          select 'w', 'u_w', true, 1, 27, 'Fidelity Trust ⇒ JT $15,001 - $50,000 Interest $201 - gfedc' union all
+          select 'w', 'u_w', true, 1, 28, 'Clark Cnty WA Sch Dist $1,000' union all
+          select 'w', 'u_w', true, 1, 29, 'Edward Jones Acct ⇒ $1,001 - $15,000 Dividends $201 -' union all
+          select 'w', 'u_w', true, 1, 30, 'gfedc' union all
+          select 'w', 'u_w', true, 1, 31, 'Duke Energy (DUK) [ST] $1,000' union all
+          select 'w', 'u_w', true, 1, 32, 'Complete Acct ⇒ $1,001 - $15,000 Dividends $201 - $1,000' union all
+          select 'w', 'u_w', true, 1, 33, 'Wrap Head Acct ⇒ $1,001 - $15,000 Dividends $201 -' union all
+          select 'w', 'u_w', true, 1, 34, 'Own Range Fund [MF] $15,001 - $50,000 Tax-Deferred' union all
+          select 'w', 'u_w', true, 1, 35, 'Equity Trust CO ⇒ Over None' union all
+          select 'w', 'u_w', true, 1, 36, 'Berkshire Hathaway Inc. New (BRK.B) $50,000,000' union all
+          select 'w', 'u_w', true, 1, 37, 'Next Co ⇒ $1,001 - $15,000 Tax-Deferred' union all
+          select 'w', 'u_w', true, 1, 38, 'Description: 401K & IRA Roll Over' union all
+          select 'w', 'u_w', true, 1, 39, 'MOST 529 Funds $2,500' union all
+          select 'w', 'u_w', true, 2, 1, 'Schedule B: Transactions' union all
+          select 'w', 'u_w', true, 2, 2, '$200?' union all
+          select 'w', 'u_w', true, 2, 3, 'Fidelity Trust ⇒ JT 09/5/2019 S $100,001 -' union all
+          select 'w', 'u_w', true, 2, 4, 'Vanguard Windsor II [MF] (partial) $250,000' union all
+          select 'w', 'u_w', true, 2, 5, 'Enterprise 401k - SP Monthly P $1,001 - $15,000' union all
+          select 'w', 'u_w', true, 2, 6, 'Dodge & Cox Stock Fund [MF]' union all
+          select 'w', 'u_w', true, 2, 7, 'Description: Inherited Asset' union all
+          select 'w', 'u_w', true, 2, 8, 'Brokerage Acct 03/02/2020 P $15,001 - $50,000 Arizona ST Transn Brd' union all
+          select 'w', 'u_w', true, 2, 9, 'HWY Rev 5% 07/01/2031 [GS]' union all
+          select 'w', 'u_w', true, 2, 10, '05/24/2028 [GS]' union all
+          select 'w', 'u_w', true, 3, 1, 'Schedule D: Liabilities' union all
+          select 'w', 'u_w', true, 3, 2, 'FNMa Co-Signatore of Wyloris april 1998 Student Loan $10,000 - $15,000' union all
+          select 'w', 'u_w', true, 3, 3, 'McNeel (Niece)' union all
+          select 'w', 'u_w', true, 3, 4, 'U.S. Department of Education 1988-2014 Student Loans Over' union all
+          select 'w', 'u_w', true, 3, 5, '$1,000,000' union all
+          select 'w', 'u_w', true, 3, 6, 'COMMENTS: Mortgage paid in 2019' union all
+          select 'w', 'u_w', true, 3, 7, 'Town Bank July 2009 Mortgage $15,001 - $50,000' union all
+          select 'w', 'u_w', true, 3, 8, 'JT FCS Financial, Jefferson City, MO March 2011 Farm Real Estate Mortgage - Farm & $250,001 -' union all
+          select 'w', 'u_w', true, 3, 9, 'Residence $500,000' union all
+          select 'w', 'u_w', true, 3, 10, 'DC Great Lakes Student Loan August 2014 Student Loan $15,001 - $50,000' union all
+          select 'w', 'u_w', true, 3, 11, 'Bank of Washington DC 2012 Mortgage $15,001 - $50,000' union all
+          select 'w', 'u_w', true, 4, 1, 'Schedule H: Travel Payments' union all
+          select 'w', 'u_w', true, 4, 2, 'Congressional Black 08/6/2015 08/9/2015 Chicago, IL - 0' union all
+          select 'w', 'u_w', true, 4, 3, 'Caucus Institute Tunica, MS - Kansas City, MO' union all
+          select 'w', 'u_w', true, 4, 4, 'National Bar 07/20/2015 07/21/2015 Kansas City, MO - Los 0' union all
+          select 'w', 'u_w', true, 4, 5, 'angeles, Ca - Washington, DC' union all
+          select 'w', 'u_w', true, 4, 6, 'Think Tank 03/01/2016 03/02/2016 Washington, DC - 0' union all
+          select 'w', 'u_w', true, 4, 7, 'Conference Center Austin, TX - Washington, DC'
+    expect:
+      rows:
+        - {doc_id: w, page: 1, line_no: 2, schedule: 'A: assets & unearned income', owner_code: SP, amount_range: '$15,001 - $50,000', line_text: 'Widget Fund [MF] SP $15,001 - $50,000 Capital Gains, $1 - $200 Dividends'}
+        - {doc_id: w, page: 1, line_no: 4, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Oakmark International Small Cap Fund Institutional Class (OANEX) [MF]'}
+        - {doc_id: w, page: 1, line_no: 6, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$50,001 - $100,000', line_text: 'Mass Mutual Life $50,001 - $100,000'}
+        - {doc_id: w, page: 1, line_no: 8, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Gadget Fund [MF] $1,001 - $15,000'}
+        - {doc_id: w, page: 1, line_no: 9, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Location: Salem, MO, US'}
+        - {doc_id: w, page: 1, line_no: 10, schedule: 'A: assets & unearned income', owner_code: JT, amount_range: '$250,001 - $500,000', line_text: 'Fidelity Trust ⇒ JT $250,001 - Dividends $5,001 - gfedc Baillie Gifford Fund - Class I (BGEGX) [MF] $500,000 $15,000'}
+        - {doc_id: w, page: 1, line_no: 13, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Next Fund [MF] $1,001 - $15,000'}
+        - {doc_id: w, page: 1, line_no: 14, schedule: 'A: assets & unearned income', owner_code: JT, amount_range: 'None', line_text: 'Fidelity Trust ⇒ JT None Interest $1,001 - gfedc New York NY [GS] $2,500'}
+        - {doc_id: w, page: 1, line_no: 16, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$1,001', line_text: 'Low Only Fund [MF] $1,001 -'}
+        - {doc_id: w, page: 1, line_no: 17, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$15,001 - $50,000', line_text: 'Own Range Fund [MF] $15,001 - $50,000'}
+        - {doc_id: w, page: 1, line_no: 18, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$100,001 - $250,000', line_text: 'Sam Farms $100,001 - Grain Bin $250,000'}
+        - {doc_id: w, page: 1, line_no: 21, schedule: 'A: assets & unearned income', owner_code: JT, amount_range: '$50,001 - $100,000', line_text: 'Rental Trust ⇒ JT $50,001 - None Interest $1,001 - Rental Property [RP] $100,000 $5,000'}
+        - {doc_id: w, page: 1, line_no: 23, schedule: 'A: assets & unearned income', owner_code: null, amount_range: Undetermined, line_text: 'State of Missouri Pension [DB] Undetermined Pension $5,001 - $15,000'}
+        - {doc_id: w, page: 1, line_no: 24, schedule: 'A: assets & unearned income', owner_code: SP, amount_range: Undetermined, line_text: 'John Hancock Life [FN] SP Undetermined annuity Payment $1,001 - gfedc Annuity Contract $2,500'}
+        - {doc_id: w, page: 1, line_no: 26, schedule: 'A: assets & unearned income', owner_code: null, amount_range: Undetermined, line_text: 'Alford LLC [OL] Undetermined None'}
+        - {doc_id: w, page: 1, line_no: 27, schedule: 'A: assets & unearned income', owner_code: JT, amount_range: '$15,001 - $50,000', line_text: 'Fidelity Trust ⇒ JT $15,001 - $50,000 Interest $201 - gfedc Clark Cnty WA Sch Dist $1,000'}
+        - {doc_id: w, page: 1, line_no: 29, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Edward Jones Acct ⇒ $1,001 - $15,000 Dividends $201 - gfedc Duke Energy (DUK) [ST] $1,000'}
+        - {doc_id: w, page: 1, line_no: 32, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Complete Acct ⇒ $1,001 - $15,000 Dividends $201 - $1,000'}
+        - {doc_id: w, page: 1, line_no: 33, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Wrap Head Acct ⇒ $1,001 - $15,000 Dividends $201 -'}
+        - {doc_id: w, page: 1, line_no: 34, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$15,001 - $50,000', line_text: 'Own Range Fund [MF] $15,001 - $50,000 Tax-Deferred'}
+        - {doc_id: w, page: 1, line_no: 35, schedule: 'A: assets & unearned income', owner_code: null, amount_range: 'Over $50,000,000', line_text: 'Equity Trust CO ⇒ Over None Berkshire Hathaway Inc. New (BRK.B) $50,000,000'}
+        - {doc_id: w, page: 1, line_no: 37, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Next Co ⇒ $1,001 - $15,000 Tax-Deferred'}
+        - {doc_id: w, page: 1, line_no: 38, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Description: 401K & IRA Roll Over'}
+        - {doc_id: w, page: 1, line_no: 39, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$2,500', line_text: 'MOST 529 Funds $2,500'}
+        - {doc_id: w, page: 2, line_no: 3, schedule: 'B: transactions', owner_code: JT, amount_range: '$100,001 - $250,000', line_text: 'Fidelity Trust ⇒ JT 09/5/2019 S $100,001 - Vanguard Windsor II [MF] (partial) $250,000'}
+        - {doc_id: w, page: 2, line_no: 5, schedule: 'B: transactions', owner_code: SP, amount_range: '$1,001 - $15,000', line_text: 'Enterprise 401k - SP Monthly P $1,001 - $15,000 Dodge & Cox Stock Fund [MF]'}
+        - {doc_id: w, page: 2, line_no: 7, schedule: 'B: transactions', owner_code: null, amount_range: null, line_text: 'Description: Inherited Asset'}
+        - {doc_id: w, page: 2, line_no: 8, schedule: 'B: transactions', owner_code: null, amount_range: '$15,001 - $50,000', line_text: 'Brokerage Acct 03/02/2020 P $15,001 - $50,000 Arizona ST Transn Brd HWY Rev 5% 07/01/2031 [GS] 05/24/2028 [GS]'}
+        - {doc_id: w, page: 3, line_no: 2, schedule: 'D: liabilities', owner_code: null, amount_range: '$10,000 - $15,000', line_text: 'FNMa Co-Signatore of Wyloris april 1998 Student Loan $10,000 - $15,000 McNeel (Niece)'}
+        - {doc_id: w, page: 3, line_no: 4, schedule: 'D: liabilities', owner_code: null, amount_range: 'Over $1,000,000', line_text: 'U.S. Department of Education 1988-2014 Student Loans Over $1,000,000 COMMENTS: Mortgage paid in 2019'}
+        - {doc_id: w, page: 3, line_no: 7, schedule: 'D: liabilities', owner_code: null, amount_range: '$15,001 - $50,000', line_text: 'Town Bank July 2009 Mortgage $15,001 - $50,000'}
+        - {doc_id: w, page: 3, line_no: 8, schedule: 'D: liabilities', owner_code: JT, amount_range: '$250,001 - $500,000', line_text: 'JT FCS Financial, Jefferson City, MO March 2011 Farm Real Estate Mortgage - Farm & $250,001 - Residence $500,000'}
+        - {doc_id: w, page: 3, line_no: 10, schedule: 'D: liabilities', owner_code: DC, amount_range: '$15,001 - $50,000', line_text: 'DC Great Lakes Student Loan August 2014 Student Loan $15,001 - $50,000'}
+        - {doc_id: w, page: 3, line_no: 11, schedule: 'D: liabilities', owner_code: null, amount_range: '$15,001 - $50,000', line_text: 'Bank of Washington DC 2012 Mortgage $15,001 - $50,000'}
+        - {doc_id: w, page: 4, line_no: 2, schedule: 'H: travel', owner_code: null, amount_range: null, line_text: 'Congressional Black 08/6/2015 08/9/2015 Chicago, IL - 0 Caucus Institute Tunica, MS - Kansas City, MO'}
+        - {doc_id: w, page: 4, line_no: 4, schedule: 'H: travel', owner_code: null, amount_range: null, line_text: 'National Bar 07/20/2015 07/21/2015 Kansas City, MO - Los 0 angeles, Ca - Washington, DC'}
+        - {doc_id: w, page: 4, line_no: 6, schedule: 'H: travel', owner_code: null, amount_range: null, line_text: 'Think Tank 03/01/2016 03/02/2016 Washington, DC - 0 Conference Center Austin, TX - Washington, DC'}

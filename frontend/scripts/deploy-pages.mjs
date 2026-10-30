@@ -1,15 +1,16 @@
 // Publish a locally built site to GitHub Pages via an orphan `gh-pages` branch (Pages source: "Deploy from a
 // branch"). CI has no data, so the build happens here. Only the `gh-pages` branch is ever written, and its
-// history is replaced on every deploy (force push) so ~200 MB snapshots do not pile up; main is untouched.
-//   pnpm deploy:pages --dry-run   # build, check, commit into a temp repo, report; pushes nothing
+// history is replaced on every deploy (force push) so ~600 MB snapshots do not pile up; main is untouched.
+// The live branch is fetched into frontend/.pages-cache first, so the push only uploads files that changed.
+//   pnpm deploy:pages --dry-run   # build, check, commit into the cache, report the change; pushes nothing
 //   pnpm deploy:pages             # the same, then force-push to gh-pages (publishes the site!)
 // The branch is fixed to gh-pages (there is no --branch flag). Flags: --skip-build (reuse dist/, which must
 // have been built with the Pages base), --allow-stale, --allow-dirty (deploy with uncommitted frontend/
-// changes), --keep (keep the temp repo), --remote NAME (default origin; only used to learn which GitHub repo
+// changes), --keep (keep the temp dir with the throwaway index), --remote NAME (default origin; only used to learn which GitHub repo
 // this is: the push goes to https://github.com/<owner>/<name>.git).
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { cp, readdir, stat, writeFile } from "node:fs/promises";
+import { readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -32,6 +33,9 @@ import { resolveDbPath, resolveExportsDir, staleExportsWarning } from "./stale-e
 // Everything below resolves from frontend/ (this file's parent), so the cwd the script is started from is irrelevant.
 const FRONTEND = fileURLToPath(new URL("..", import.meta.url));
 const DIST = path.join(FRONTEND, "dist");
+// Kept between deploys (gitignored): holds the live gh-pages objects so a push only sends what changed.
+// Safe to delete; the next deploy fetches the live branch again.
+const CACHE = path.join(FRONTEND, ".pages-cache");
 
 function run(cmd, args, opts = {}) {
   const r = spawnSync(cmd, args, { encoding: "utf8", cwd: FRONTEND, ...opts });
@@ -136,6 +140,7 @@ if (lc.status !== 0) {
 }
 
 const identity = ["-c", "user.name=mogov deploy", "-c", "user.email=noreply@users.noreply.github.com"];
+const TRACKING = `refs/remotes/pages/${PAGES_BRANCH}`;
 let keptDir = null;
 let pushStarted = false;
 try {
@@ -143,41 +148,59 @@ try {
     "mogov-pages-",
     async (work, guard) => {
       keptDir = work;
-      await cp(DIST, work, { recursive: true });
-      await writeFile(path.join(work, ".nojekyll"), ""); // serve _astro/ as-is
-      if (!existsSync(path.join(work, "404.html"))) console.warn("warning: dist has no 404.html");
+      await writeFile(path.join(DIST, ".nojekyll"), ""); // serve _astro/ as-is
+      if (!existsSync(path.join(DIST, "404.html"))) console.warn("warning: dist has no 404.html");
 
-      const { totalBytes, largest, problems } = checkLimits(await listFiles(work));
+      const { totalBytes, largest, problems } = checkLimits(await listFiles(DIST));
       const mb = (n) => (n / 1048576).toFixed(1);
       console.log(`${mb(totalBytes)} MB total, largest file ${largest?.path} (${mb(largest?.size ?? 0)} MB)`);
       if (problems.length) throw new Error(problems.join("\n"));
 
-      const git = (...a) => runAsync("git", [...identity, ...a], { cwd: work });
+      // dist/ is the work tree, the cache holds the objects and the index is throwaway (in the temp dir).
+      const env = { ...process.env, GIT_INDEX_FILE: path.join(work, "index") };
+      const git = (...a) =>
+        runAsync("git", [...identity, `--git-dir=${CACHE}`, `--work-tree=${DIST}`, ...a], { cwd: work, env });
       await guard.check();
-      await git("init", "-q", "-b", PAGES_BRANCH);
+      if (!existsSync(CACHE)) await runAsync("git", ["init", "-q", "--bare", CACHE]);
+      // Fetch the live tip so the push can leave out every object the remote already has.
+      const live = (await git("ls-remote", pushTo, `refs/heads/${PAGES_BRANCH}`)).split(/\s/)[0];
+      if (live) {
+        console.log(`> fetching the live ${PAGES_BRANCH} (${live.slice(0, 7)}) into ${CACHE}`);
+        await git("fetch", "-q", "--depth", "1", pushTo, `+refs/heads/${PAGES_BRANCH}:${TRACKING}`);
+      }
       await guard.check();
       await git("add", "-A");
       await guard.check();
-      await git("commit", "-q", "-m", `Deploy site (${new Date().toISOString()})`);
-      await guard.check();
-      const sha = await git("rev-parse", "--short", "HEAD");
+      const tree = await git("write-tree");
+      if (live && tree === (await git("rev-parse", `${live}^{tree}`))) {
+        console.log(`No changes from the live ${PAGES_BRANCH}; nothing to push.`);
+        return;
+      }
+      // Orphan commit (no parent): the branch keeps one snapshot, as before.
+      const sha = await git("commit-tree", tree, "-m", `Deploy site (${new Date().toISOString()})`);
+      await git("update-ref", `refs/heads/${PAGES_BRANCH}`, sha);
+      console.log(
+        live ? `Changes: ${await git("diff", "--shortstat", live, sha)}` : "First deploy: every file is new.",
+      );
 
       if (opts.dryRun) {
-        console.log(`Dry run: committed ${sha} on ${PAGES_BRANCH}; nothing pushed.`);
+        console.log(`Dry run: committed ${sha.slice(0, 7)} in ${CACHE}; nothing pushed.`);
         console.log(`Would run: git push --force ${pushTo} ${PAGES_BRANCH}:refs/heads/${PAGES_BRANCH}`);
         console.log(`Would be live at ${target.url}`);
       } else {
         await beginPush(guard, () => (pushStarted = true)); // last stop before the force-push
-        await git("push", "--force", pushTo, `${PAGES_BRANCH}:refs/heads/${PAGES_BRANCH}`);
-        console.log(`Pushed ${sha} to ${PAGES_BRANCH}. Live shortly at ${target.url}`);
+        await git("push", "-q", "--force", pushTo, `refs/heads/${PAGES_BRANCH}:refs/heads/${PAGES_BRANCH}`);
+        await git("update-ref", TRACKING, sha);
+        console.log(`Pushed ${sha.slice(0, 7)} to ${PAGES_BRANCH}. Live shortly at ${target.url}`);
       }
+      await git("gc", "--auto", "--quiet"); // drop superseded snapshots' objects over time
     },
     { keep: opts.keep },
   );
-  if (opts.keep) console.log(`Kept temp repo: ${keptDir}`);
+  if (opts.keep) console.log(`Kept temp dir: ${keptDir}`);
 } catch (e) {
   const report = failureReport(e, pushStarted);
   console.error(report.message);
-  if (opts.keep) console.error(`Kept temp repo: ${keptDir}`);
+  if (opts.keep) console.error(`Kept temp dir: ${keptDir}`);
   process.exit(report.code);
 }

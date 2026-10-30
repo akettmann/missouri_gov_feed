@@ -4,7 +4,9 @@
 -- int_officials__identity_terms gets one row: alias_id (as the source gave it) -> person_id (what the pipeline calls
 -- the person). Rules, in order:
 --   1. seed official_id_links, same_person: a curated id for a person the name rule can't join (statewide officers,
---      judges). basis = curated.
+--      judges). basis = curated. A row moves the whole person its alias_id was merged into by the rules below to the
+--      person its person_id was merged into, so naming a merged id the rules did not choose, on either side, does
+--      not split the person (#174, #682).
 --   2. ids with the same exact full name (case, punctuation and spacing ignored: "Van Schoiack" and "VanSchoiack"
 --      are one name, #228) are one person, basis = name_continuity, unless two of them hold different seats in more
 --      than one shared year. The same seat in the
@@ -27,6 +29,16 @@
 --      Ken's, while a successor's term starts on or after the predecessor's ends (or is no stub). Undated
 --      House-roster rows prove no overlap. A name left with more than one partner (a chain or a fork) is ambiguous
 --      and joins nothing.
+--   2d. duplicate stubs (#294, #292): Open States holds some members twice, once as a stub. An Open States id whose
+--      only seat-term is a dated stub under 90 days joins another name when that name's dated term (90 days or more)
+--      in the same office and district contains the stub and starts at most 7 days before it, the surnames match
+--      (one side may drop a one-letter middle initial: "David A." / "David" Dolan) and the given names fit
+--      (mogov.first_name_fit: "Martin" / "Marty" Jacobs; not "Daniel" / "Robert"), basis = duplicate_stub. Every id
+--      of the stub's name must be such a stub, the stub must have exactly one such partner name, neither name may
+--      be kept apart, and a stub name already in a rule 2b pair (Kenneth / Ken Jamison) is left to rule 2b. A
+--      special-election successor never qualifies: its term starts on or after the predecessor's ends, or (when Open
+--      States leaves a departed member's normal term end) months after the predecessor's term starts. The stub's
+--      name joins the other name's group, so rule 2c still applies to the joined person.
 --   2c. MO House member id continuity (#151): the House keeps one member id per person across sessions and name
 --      changes (Mazzie Boyd, 2023, and Mazzie Christensen, 2024-26, are member 2381), so ids that share a House member
 --      id are one person whatever their names, basis = member_id_continuity. This is applied after rules 2 and 2b
@@ -36,9 +48,10 @@
 --      official_id_links. Only ids with a roster row (a House member id) take part; Senate-only ids rely on names.
 --   3. otherwise the id is its own person, basis = self.
 -- Among merged ids the person_id is an Open States id over mohouse:, then the one whose service ends latest, then
--- the smaller id. The choice never looks at the latest roster year, so an official's id does not change when they
--- leave office.
--- Curated rows (official_id_links) take effect only once a maintainer has signed them off (checked_by filled).
+-- the one that is not a duplicate stub, then the smaller id. The choice never looks at the latest roster year, so
+-- an official's id does not change when they leave office.
+-- Curated rows (official_id_links) take effect only once a maintainer has signed them off (checked_by and checked_on
+-- both filled, #174).
 with terms as (
     select * from {{ ref('int_officials__identity_terms') }}
 ),
@@ -56,6 +69,20 @@ alias_names as (
     group by alias_id
 ),
 
+-- rest is the name after the given name with spaces removed ("adolan" for "david a dolan"), and core the same
+-- without a leading one-letter middle initial ("dolan"), for the duplicate-stub rule 2d.
+alias_parts as (
+    select
+        alias_id,
+        name_key,
+        last_year,
+        first_year,
+        is_openstates,
+        {{ mogov.regex_replace_all('name_key', ' .*$', '') }} as given,
+        {{ mogov.regex_replace_all('name_key', '^[^ ]* ?', '') }} as rest_key
+    from alias_names
+),
+
 aliases as (
     select
         alias_id,
@@ -64,8 +91,10 @@ aliases as (
         first_year,
         is_openstates,
         replace(name_key, ' ', '') as sq,
-        {{ mogov.regex_replace_all('name_key', ' .*$', '') }} as given
-    from alias_names
+        given,
+        replace(rest_key, ' ', '') as rest,
+        replace({{ mogov.regex_replace_all('rest_key', '^[a-z] ', '') }}, ' ', '') as core
+    from alias_parts
 ),
 
 -- the same name holding two different seats in more than one year. One shared year is a hand-over: a member sworn
@@ -87,11 +116,21 @@ seat_conflicts as (
     ) as pairs
 ),
 
+-- a curated row counts once a maintainer has signed it off: checked_by and checked_on filled together (#174)
+signed_links as (
+    select
+        alias_id,
+        person_id,
+        relation
+    from {{ ref('official_id_links') }}
+    where checked_by is not null and checked_on is not null
+),
+
 separated as (
     select distinct a.sq
-    from {{ ref('official_id_links') }} as l
+    from signed_links as l
     inner join aliases as a on l.alias_id = a.alias_id or l.person_id = a.alias_id
-    where l.relation = 'different_people' and l.checked_by is not null
+    where l.relation = 'different_people'
 ),
 
 keep_apart as (
@@ -247,15 +286,98 @@ name_groups as (
     inner join variant_counts as cb on p.sq_b = cb.sq and cb.n_pairs = 1
 ),
 
+-- rule 2d, duplicate stubs (#294, #292). An Open States id whose only seat-term is a dated stub under 90 days
+-- (one office and district, start and end known).
+stub_terms as (
+    select
+        alias_id,
+        min(office) as office,
+        min(district) as district,
+        min(term_start) as term_start,
+        max(term_end) as term_end
+    from terms
+    where alias_id not like 'mohouse:%'
+    group by alias_id
+    having
+        count(distinct office) = 1
+        and count(distinct district) = 1
+        and count(term_start) = count(*)
+        and count(term_end) = count(*)
+        and {{
+            dbt.datediff('min(term_start)', 'max(term_end)', 'day')
+        }} < 90
+),
+
+-- another name's dated term in the same seat that contains the stub, starts at most 7 days before it and is no
+-- stub itself; the surnames match (a dropped one-letter middle initial is allowed: "david a dolan" ~ "david dolan",
+-- not "david b dolan") and the given names fit (mogov.first_name_fit: "martin" ~ "marty", not "daniel" ~ "robert").
+-- A successor's term starts on or after the predecessor's ends, so it is never inside it; one inside a departed
+-- member's on-paper term starts months after it, not within 7 days.
+stub_candidates as (
+    select distinct
+        s.alias_id as stub_id,
+        sa.sq as stub_sq,
+        oa.sq as other_sq
+    from stub_terms as s
+    inner join aliases as sa on s.alias_id = sa.alias_id
+    inner join terms as ot
+        on
+            s.office = ot.office and s.district = ot.district
+            and s.term_start >= ot.term_start and s.term_end <= ot.term_end
+            and s.term_start <= {{ dbt.dateadd('day', 7, 'ot.term_start') }}
+    inner join aliases as oa on ot.alias_id = oa.alias_id
+    where
+        sa.sq <> oa.sq
+        and {{
+            dbt.datediff('ot.term_start', 'ot.term_end', 'day')
+        }} >= 90
+        and length(oa.core) > 0
+        and (sa.rest = oa.rest or sa.core = oa.rest or sa.rest = oa.core)
+        and {{ mogov.first_name_fit('sa.given', 'sa.given', 'oa.given') }} >= 1
+),
+
+-- a stub name joins the other name when it has exactly one candidate, every id of the stub name is such a stub,
+-- neither name is kept apart, the stub name is not already in a rule 2b pair (Kenneth / Ken Jamison) and the other
+-- name is no stub name itself. It joins the other name's group (its rule 2b group, if it has one).
+stub_links as (
+    select
+        stub_sq,
+        min(other_sq) as other_sq
+    from stub_candidates
+    group by stub_sq
+    having count(distinct other_sq) = 1
+),
+
+stub_groups as (
+    select
+        l.stub_sq as sq,
+        coalesce(g.group_key, l.other_sq) as group_key
+    from stub_links as l
+    left join name_groups as g on l.other_sq = g.sq
+    where
+        not exists (
+            select 1 from aliases as a
+            where
+                a.sq = l.stub_sq
+                and a.alias_id not in (select sc.stub_id from stub_candidates as sc)
+        )
+        and l.stub_sq not in (select k.sq from keep_apart as k)
+        and l.other_sq not in (select k.sq from keep_apart as k)
+        and l.stub_sq not in (select ng.sq from name_groups as ng)
+        and l.other_sq not in (select sc.stub_sq from stub_candidates as sc)
+),
+
 keyed as (
     select
         a.alias_id,
         a.sq,
         a.last_year,
         a.is_openstates,
-        coalesce(g.group_key, a.sq) as group_key
+        sg.sq is not null as via_stub,
+        coalesce(g.group_key, sg.group_key, a.sq) as group_key
     from aliases as a
     left join name_groups as g on a.sq = g.sq
+    left join stub_groups as sg on a.sq = sg.sq
 ),
 
 ranked as (
@@ -267,6 +389,7 @@ ranked as (
             order by
                 k.is_openstates desc,
                 k.last_year desc,
+                case when k.via_stub then 1 else 0 end asc,
                 k.alias_id asc
         ) as rn
     from keyed as k
@@ -279,6 +402,7 @@ ranked as (
 name_person as (
     select
         k.alias_id,
+        k.via_stub,
         coalesce(r.alias_id, k.alias_id) as person_id
     from keyed as k
     left join ranked as r on k.group_key = r.group_key and r.rn = 1
@@ -299,9 +423,9 @@ member_aliases as (
         t.house_member_id is not null
         and not exists (
             select 1
-            from {{ ref('official_id_links') }} as l
+            from signed_links as l
             where
-                l.relation = 'different_people' and l.checked_by is not null
+                l.relation = 'different_people'
                 and (l.alias_id = t.alias_id or l.person_id = t.alias_id)
         )
     group by t.alias_id
@@ -374,28 +498,38 @@ merged as (
         n.alias_id,
         coalesce(mp.person_id, n.person_id) as person_id,
         n.person_id as name_person_id,
+        n.via_stub,
         mp.person_id is not null as via_member_id
     from name_person as n
     left join member_person as mp on n.alias_id = mp.alias_id
 ),
 
+-- a signed same_person row moves the whole person its alias_id was merged into, so naming an id the rules merged
+-- but did not choose still moves every id of that person (#174). Its target is read the same way: a person_id the
+-- rules merged into another id is replaced by that person's chosen id, so the moved person joins the target's
+-- whole person instead of splitting it (#682). A target no rule saw (a mojudge: id) is kept as written. Two signed
+-- rows sending one person to different ids are a seed error; the smaller id is taken so the output stays
+-- deterministic.
 same_person as (
     select
-        alias_id,
-        person_id
-    from {{ ref('official_id_links') }}
-    where relation = 'same_person' and checked_by is not null
+        n.person_id as merged_person_id,
+        min(coalesce(t.person_id, l.person_id)) as person_id
+    from signed_links as l
+    inner join merged as n on l.alias_id = n.alias_id
+    left join merged as t on l.person_id = t.alias_id
+    where l.relation = 'same_person'
+    group by n.person_id
 )
 
 select
     n.alias_id,
-    coalesce(by_alias.person_id, by_person.person_id, n.person_id) as person_id,
+    coalesce(c.person_id, n.person_id) as person_id,
     case
-        when by_alias.person_id is not null or by_person.person_id is not null then 'curated'
+        when c.person_id is not null then 'curated'
         when n.via_member_id and n.person_id <> n.name_person_id then 'member_id_continuity'
+        when n.via_stub and n.person_id <> n.alias_id then 'duplicate_stub'
         when n.person_id <> n.alias_id then 'name_continuity'
         else 'self'
     end as basis
 from merged as n
-left join same_person as by_alias on n.alias_id = by_alias.alias_id
-left join same_person as by_person on n.person_id = by_person.alias_id
+left join same_person as c on n.person_id = c.merged_person_id

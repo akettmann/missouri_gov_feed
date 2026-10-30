@@ -5,6 +5,7 @@
 --   not applicable   category doesn't apply to this office
 --   not public       required by law but not published online (obtainable by records request)
 --   no source        no machine-readable source exists or is accessible
+--   none recorded    no public list exists; finds are added by hand (voluntary disclosures)
 {% set facts = [
     ('votes', 'fct_votes'),
     ('donations', 'fct_campaign_finance'),
@@ -70,7 +71,7 @@ select
         when donations_n.n > 0 then 'available'
         when b.is_federal_judge or b.office in ('mo_supreme_court', 'mo_court_of_appeals') then 'not applicable'
         when b.level = 'federal' then 'none found'
-        else 'none found (no MEC committee linked to this official)'
+        else 'none found (no Missouri Ethics Commission committee linked to this official)'
     end as donations_status,
     case
         when disclosures_n.n > 0 then 'available'
@@ -81,7 +82,7 @@ select
     end as disclosures_status,
     case
         when voluntary_disclosures_n.n > 0 then 'available'
-        else 'none recorded (no feed exists; add finds to seeds/voluntary_disclosures.csv)'
+        else 'none recorded (no public list exists; we add these by hand)'
     end as voluntary_disclosures_status,
     case
         when bias_indicators_n.n > 0 then 'available'
@@ -91,12 +92,20 @@ select
     case
         when commercial_ties_n.n > 0 then 'available'
         when b.is_congress or b.is_federal_judge then 'none found'
-        else 'not public (state disclosures not online; MO SOS business registry not machine-accessible)'
+        else
+            'not public (state disclosures not online; Secretary of State business registry not machine-accessible)'
     end as commercial_ties_status,
     case when family_ties_n.n > 0 then 'available' else 'none found' end as family_ties_status,
     case
         when cases_n.n > 0 then 'available'
-        when b.is_judge_or_lawyer then 'none found (CourtListener covers appellate + federal courts only)'
+        when
+            b.is_judge_or_lawyer
+            and (b.is_federal_judge or b.office in ('mo_supreme_court', 'mo_court_of_appeals'))
+            then 'none found (no case matched in the courts we load from CourtListener)'
+        when b.is_judge_or_lawyer
+            then
+                'none found (no case matched in the Missouri appellate and federal courts we load; '
+                || 'CourtListener has no Missouri circuit-court cases)'
         else 'not applicable'
     end as cases_status
 from base as b

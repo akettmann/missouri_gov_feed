@@ -1,0 +1,32 @@
+@startuml mo_senate_bills
+title mo_senate_bills: MO Senate bill list, actions and document lists
+start
+:years of the lookback window;
+:GET senate.mo.gov/BillTracking/Bills/BillList?year=YYYY&session=R
+then E1, E2, ... until one is empty
+(3-6 MB, every shard, once, from the shared cache);
+note right
+  The bill list is the JSON in
+  "const bills = [...]" in a script element.
+  billId is not the bill number.
+end note
+:bills of every session;
+:keep the bills this shard owns
+(hash of year/session/billId);
+repeat
+  :GET BillList?billId=N&year=YYYY&billPrefix=SB&billSuffix=1&handler=Actions
+  (~1 request/s host-wide, shared by all shards,
+  current year cached 1 day, past years 30 days);
+  :parse the action table (newest first):
+  date, action, journal ref and link;
+  :GET the same URL with handler=BillText, FiscalNotes,
+  Amendments, Summaries (4 more requests, skipped when
+  MOGOV_SENATE_BILL_DOCS=0; an error page is not cached);
+  :parse each list: one row per link or summary;
+repeat while (more owned bills?)
+:mo_senate_bill_list (one row per bill)
+mo_senate_bill_actions (one row per action)
+mo_senate_bill_texts, _fiscal_notes, _amendments (one row per link)
+mo_senate_bill_summaries (one row per summary);
+stop
+@enduml

@@ -20,19 +20,28 @@ with house_members as (
         f.filing_year,
         f.filing_kind,
         f.filing_date,
-        f.document_url
+        f.document_url,
+        pc.period_end
     from {{ ref('dim_official') }} as o
     inner join {{ ref('stg_house_fd__filings') }} as f
         on
             o.office = 'us_house'
             and f.state_district = 'MO' || {{ mogov.zero_pad('o.district', 2) }}
             and {{ mogov.name_key('f.last_name') }} = {{ mogov.name_key('o.family_name') }}
+    left join {{ ref('int_house_fd__period_covered') }} as pc on f.doc_id = pc.doc_id
 ),
 
 -- Which report a House "amended report" amends. The Clerk index carries no link, so the amendment is taken to
--- amend the most recent annual or candidate report the same filer filed that year on or before the amendment's
--- date. amends_candidate_url is that candidate report's url, or null when the base is an annual report (or none
--- is on file, the long-standing default).
+-- amend the most recent annual, candidate or termination report the same filer filed that year on or before the
+-- amendment's date. Index type H is a New Filer Report (the PDF header says so), a separate report from the
+-- Annual Report (O) for the same year, so it is a base like a candidate or termination report: an amendment of
+-- it joins its group and supersedes it, and it never shares the annual group with an O. Other index kinds are
+-- no base:
+-- a periodic transaction report is its own filing; the rest of "other" (withdrawals, B, E, G) holds no report to
+-- restate. When the amendment's PDF has a "Period Covered:" line (candidate reports and their amendments carry
+-- it; annual and termination reports do not), a base covering through the same last day wins over a later one,
+-- and an annual report or H is the last resort. amends_url is the url of a candidate, termination or H base, or
+-- null when the base is an annual report (or none is on file, the long-standing default).
 house_amendment_base as (
     select
         a.official_id,
@@ -40,14 +49,22 @@ house_amendment_base as (
         b.document_url as base_url,
         b.filing_kind as base_kind,
         row_number() over (
-            partition by a.official_id, a.doc_id order by b.filing_date desc, b.doc_id desc
+            partition by a.official_id, a.doc_id
+            order by
+                case
+                    when b.period_end = a.period_end then 2
+                    when a.period_end is not null and b.filing_kind in ('annual report', 'new filer report') then 0
+                    else 1
+                end desc,
+                b.filing_date desc,
+                b.doc_id desc
         ) as base_rank
     from house_members as a
     left join house_members as b
         on
             a.official_id = b.official_id
             and a.filing_year = b.filing_year
-            and b.filing_kind in ('annual report', 'candidate report')
+            and b.filing_kind in ('annual report', 'candidate report', 'termination report', 'new filer report')
             and a.filing_date >= b.filing_date
     where a.filing_kind = 'amended report'
 ),
@@ -56,7 +73,9 @@ house_amends as (
     select
         official_id,
         doc_id,
-        case when base_kind = 'candidate report' then base_url end as amends_candidate_url
+        case
+            when base_kind in ('candidate report', 'termination report', 'new filer report') then base_url
+        end as amends_url
     from house_amendment_base
     where base_rank = 1
 ),
@@ -73,7 +92,7 @@ house as (
         l.amount_range as amount,
         l.line_text as description,
         h.document_url,
-        am.amends_candidate_url,
+        am.amends_url,
         false as is_garbled,
         'house:' || h.doc_id || ':' || cast(l.page as {{ dbt.type_string() }}) || ':'
         || cast(l.line_no as {{ dbt.type_string() }}) as disclosure_item_id
@@ -82,24 +101,41 @@ house as (
     left join house_amends as am on h.official_id = am.official_id and h.doc_id = am.doc_id
 ),
 
+house_pdf_status as (
+    -- one row per doc the loader tried to fetch: did any of its rows carry a load error?
+    -- A filing with no row here was not fetched: its filing type is outside the loader's PDF_TYPES, or the loader
+    -- has not fetched it yet (4 real H filings).
+    select
+        doc_id,
+        max(case when load_error is not null then 1 else 0 end) as has_error
+    from {{ ref('stg_house_fd__pdf_lines') }}
+    group by doc_id
+),
+
 house_unparsed as (
-    -- filings with no extractable text (scanned paper) or not downloaded: still list them
+    -- filings with no extractable text (scanned paper) or whose PDF the loader failed to download/extract: still
+    -- list them, with a section that says which (#714)
     select
         h.official_id,
         'U.S. House financial disclosure' as disclosure_type,
         h.filing_kind,
         h.filing_year as report_year,
         h.filing_date,
-        'document (not text-extractable; see PDF)' as section,
+        case
+            when ps.doc_id is null then 'document (not fetched; see PDF)'
+            when ps.has_error = 1 then 'document (download or text extraction failed; see PDF)'
+            else 'document (not text-extractable; see PDF)'
+        end as section,
         cast(null as {{ dbt.type_string() }}) as owner,
         cast(null as {{ dbt.type_string() }}) as amount,
         cast(null as {{ dbt.type_string() }}) as description,
         h.document_url,
-        am.amends_candidate_url,
+        am.amends_url,
         false as is_garbled,
         'house:' || h.doc_id as disclosure_item_id
     from house_members as h
     left join house_amends as am on h.official_id = am.official_id and h.doc_id = am.doc_id
+    left join house_pdf_status as ps on h.doc_id = ps.doc_id
     where h.doc_id not in (select sl.doc_id from {{ ref('int_house_fd__schedule_lines') }} as sl)
 ),
 
@@ -118,7 +154,7 @@ senate as (
         coalesce(s.amount, s.income_amount) as amount,
         s.description,
         s.document_url,
-        cast(null as {{ dbt.type_string() }}) as amends_candidate_url,
+        cast(null as {{ dbt.type_string() }}) as amends_url,
         false as is_garbled,
         'senate:' || s.row_key as disclosure_item_id
     from {{ ref('dim_official') }} as o
@@ -140,7 +176,7 @@ judges as (
         i.amount_code as amount,
         i.description,
         i.document_url,
-        cast(null as {{ dbt.type_string() }}) as amends_candidate_url,
+        cast(null as {{ dbt.type_string() }}) as amends_url,
         i.is_garbled,
         'courtlistener:' || i.item_id as disclosure_item_id
     from {{ ref('int_judges__federal') }} as o
@@ -164,18 +200,21 @@ unioned as (
 --                   document url), because those are separate filings, not revisions of each other.
 --                   A report with no report_year can't be matched to its siblings either (Senate candidate
 --                   reports), so it stays its own group.
---                   A House amendment of a candidate report joins that candidate report's group instead
+--                   A House amendment of a candidate, termination or H (New Filer)
+--                   report joins that report's group instead
 --                   (house_amendment_base); otherwise it would be a second "latest" beside the report it amends
 --                   and could supersede an annual report it does not amend.
---   report_version  0 = original, N = amendment N (Senate "(amendment N)"; House "amended report" = 1; AO-10
---                   pdf name suffix "_1" = 1)
---   has_text        false for House scans with no extractable text. Such an amendment cannot stand in for a
---                   readable report, so it never supersedes one.
+--   report_version  0 = original, N = amendment N (Senate "(amendment N)"; AO-10 pdf name suffix "_1" = 1;
+--                   House "amended report": the clerk index carries no amendment number, so N is the amendment's
+--                   position by filing date among the amendments of its report, ties broken by the numeric
+--                   doc id in the url, which grows with time)
+--   has_text        false for House filings with only a placeholder row (scan, failed download, never fetched).
+--                   Such an amendment cannot stand in for a readable report, so it never supersedes one.
 keyed as (
     select
         *,
         case
-            when amends_candidate_url is not null then amends_candidate_url
+            when amends_url is not null then amends_url
             when report_year is not null and filing_kind in ('annual report', 'amended report') then 'annual report'
             when report_year is not null and filing_kind like 'annual report for cy%' then 'annual report'
             else document_url
@@ -190,10 +229,35 @@ keyed as (
                 then case when filing_kind = 'amended report' then 1 else 0 end
             else
                 coalesce(
-                    {{ dbt.safe_cast(mogov.regex_extract('document_url', '_([0-9]+)[.]pdf$'), dbt.type_int()) }}, 0
+                    {{ dbt.safe_cast(
+                        mogov.regex_extract('lower(document_url)', '_([0-9]+)[.]pdf$'), dbt.type_int()
+                    ) }}, 0
                 )
         end as report_version
     from unioned
+),
+
+document_reports as (
+    select
+        official_id,
+        disclosure_type,
+        report_year,
+        document_url,
+        report_group,
+        max(report_version) as report_version,
+        max(filing_date) as filing_date,
+        min(
+            case
+                when section in (
+                    'document (not text-extractable; see PDF)',
+                    'document (download or text extraction failed; see PDF)',
+                    'document (not fetched; see PDF)'
+                ) then 0
+                else 1
+            end
+        ) as has_text
+    from keyed
+    group by official_id, disclosure_type, report_year, document_url, report_group
 ),
 
 reports as (
@@ -203,11 +267,23 @@ reports as (
         report_year,
         document_url,
         report_group,
-        max(report_version) as report_version,
-        max(filing_date) as filing_date,
-        min(case when section like 'document (not text-extractable%' then 0 else 1 end) as has_text
-    from keyed
-    group by official_id, disclosure_type, report_year, document_url, report_group
+        case
+            when disclosure_type like 'U.S. House%' and report_version > 0
+                then
+                    cast(row_number() over (
+                        partition by official_id, disclosure_type, report_year, report_group, report_version
+                        order by
+                            filing_date,
+                            {{ dbt.safe_cast(
+                                mogov.regex_extract('lower(document_url)', '([0-9]+)[.]pdf$'), dbt.type_int()
+                            ) }},
+                            document_url
+                    ) as {{ dbt.type_int() }})
+            else report_version
+        end as report_version,
+        filing_date,
+        has_text
+    from document_reports
 ),
 
 ranked as (

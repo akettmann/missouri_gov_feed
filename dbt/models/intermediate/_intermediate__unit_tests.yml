@@ -34,6 +34,9 @@ unit_tests:
           - {session_code: '251', district_number: 4, surname_key: van schoiack, person_key: p_vanschoiack, party: Republican}
           - {session_code: '251', district_number: 89, surname_key: plocher, person_key: p_plocher, party: Republican}
           - {session_code: '241', district_number: 12, surname_key: brown, person_key: p_brown, party: Democratic}
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {person_id: p_senator, chamber: upper, district_number: 1, start_date: '2025-01-01', end_date: '9999-12-31'}
     expect:
       rows:
         - {member_token: SMITH 46, person_key: p_smith46}
@@ -57,7 +60,7 @@ unit_tests:
           - {vote_id: v1, journal_url: j1, session_year: 2025, vote_date: '2025-03-10', senator_token: Brown, token_name: Brown, token_district: null, vote_cast: yea}
           - {vote_id: v1, journal_url: j1, session_year: 2025, vote_date: '2025-03-10', senator_token: Eigel, token_name: Eigel, token_district: null, vote_cast: nay}
           - {vote_id: v1, journal_url: j1, session_year: 2025, vote_date: '2025-03-10', senator_token: Schupp, token_name: Schupp, token_district: null, vote_cast: nay}
-      - input: ref('int_mo_legislators__seats')
+      - input: ref('int_mo_legislators__seats_as_given')
         rows:
           - {openstates_id: p_brown16, person_id: p_brown16, chamber: upper, district_number: 16, surname_key: brown, party: Republican, start_date: '2023-01-04', end_date: '2026-12-31'}
           - {openstates_id: p_brown26, person_id: p_brown26, chamber: upper, district_number: 26, surname_key: brown, party: Republican, start_date: '2023-01-04', end_date: '2026-12-31'}
@@ -192,6 +195,10 @@ unit_tests:
       - input: ref('fct_office_history')
         rows:
           - {official_id: j_hall, office_title: 'Judge, Missouri Court of Appeals', start_date: '2010-01-01'}
+      - input: ref('fct_salaries')
+        rows: []
+      - input: ref('stg_mo_employee_pay__pay')
+        rows: []
       - input: ref('mo_courts')
         rows:
           - {court_id: mo, office: mo_supreme_court}
@@ -216,6 +223,230 @@ unit_tests:
         - {official_id: j_hall, role: judge, cluster_id: c1, matched_by: judges text}
         - {official_id: j_smith, role: judge, cluster_id: c4, matched_by: panel}
         - {official_id: l_doe, role: attorney, cluster_id: c5, matched_by: attorneys text}
+
+  - name: bulk_case_matches_attorney_keys_match_whole_word_runs_of_any_length
+    model: int_courtlistener__bulk_case_matches
+    description: >
+      The attorneys join picks candidate cases by one word of the "<first> <last>" key and then applies the padded
+      LIKE (#884), so the result is the same whatever the key's length. l_ann ("ann lee"): a match at the start of the
+      text (a1), at the end (a2), in the middle (a3) and twice in one text (a4, one row), but not inside longer words
+      ("joann lee" a5, "ann leeds" a6) nor split by another word ("ann marie lee" a7), nor before 1975 (a8).
+      l_cher has no given name, so her key is the one word "cher" (a9, a10; not "cherie" in a11). l_buren's key has
+      three words, "ann van buren" (a12 matches, a13 "ann van" and a14 "van buren ann" don't).
+    overrides:
+      vars:
+        cl_case_bulk: true
+        case_history_min_year: 1975
+    given:
+      - input: ref('fct_legal_careers')
+        rows:
+          - {official_id: l_ann, legal_role: lawyer}
+          - {official_id: l_cher, legal_role: lawyer}
+          - {official_id: l_buren, legal_role: lawyer}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: l_ann, given_name: Ann, family_name: Lee, office: state_house, current_term_start: null}
+          - {official_id: l_cher, given_name: '', family_name: Cher, office: state_house, current_term_start: null}
+          - {official_id: l_buren, given_name: Ann, family_name: Van Buren, office: state_house, current_term_start: null}
+      - input: ref('fct_office_history')
+        rows: []
+      - input: ref('fct_salaries')
+        rows: []
+      - input: ref('stg_mo_employee_pay__pay')
+        rows: []
+      - input: ref('mo_courts')
+        rows:
+          - {court_id: mo, office: mo_supreme_court}
+      - input: ref('int_courtlistener__mo_cases')
+        rows:
+          - {cluster_id: a1, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Ann Lee, for appellant; Bo Day.'}
+          - {cluster_id: a2, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Bo Day and Ann Lee'}
+          - {cluster_id: a3, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Bo Day, Ann Lee, Cy Fox'}
+          - {cluster_id: a4, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Ann Lee; Cy Fox; Ann Lee'}
+          - {cluster_id: a5, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Joann Lee'}
+          - {cluster_id: a6, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Ann Leeds'}
+          - {cluster_id: a7, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Ann Marie Lee'}
+          - {cluster_id: a8, court_id: mo, date_filed: '1970-01-01', judges_text: null, attorneys_text: 'Ann Lee'}
+          - {cluster_id: a9, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Cher'}
+          - {cluster_id: a10, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Bo Day, Cher, Cy Fox'}
+          - {cluster_id: a11, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Cherie Day'}
+          - {cluster_id: a12, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Bo Day, Ann Van Buren'}
+          - {cluster_id: a13, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Ann Van Dyke'}
+          - {cluster_id: a14, court_id: mo, date_filed: '2000-01-01', judges_text: null, attorneys_text: 'Van Buren Ann'}
+      - input: ref('stg_courtlistener__mo_cluster_panel')
+        rows: []
+      - input: ref('int_courtlistener__official_people')
+        rows: []
+    expect:
+      rows:
+        - {official_id: l_ann, role: attorney, cluster_id: a1, matched_by: attorneys text}
+        - {official_id: l_ann, role: attorney, cluster_id: a2, matched_by: attorneys text}
+        - {official_id: l_ann, role: attorney, cluster_id: a3, matched_by: attorneys text}
+        - {official_id: l_ann, role: attorney, cluster_id: a4, matched_by: attorneys text}
+        - {official_id: l_cher, role: attorney, cluster_id: a9, matched_by: attorneys text}
+        - {official_id: l_cher, role: attorney, cluster_id: a10, matched_by: attorneys text}
+        - {official_id: l_buren, role: attorney, cluster_id: a12, matched_by: attorneys text}
+
+  - name: bulk_case_matches_date_state_appellate_judges_without_a_courtlistener_person
+    model: int_courtlistener__bulk_case_matches
+    description: >
+      A state appellate or Supreme Court judge with no CourtListener person and no dated position (#847) starts on
+      the first payroll year under the title of their own court (the Court of Appeals judge's earlier CIRCUIT JUDGE
+      pay, and the Supreme Court judge's APPELLATE JUDGE pay, don't count), else on their Official Manual retention
+      year. Cases before that date (a predecessor of the same surname) and in another court don't match.
+      j_dowd: paid APPELLATE JUDGE from 2017 and CIRCUIT JUDGE in 2010, so c1 (2018) matches, c2 (2012), c3
+      (2016) and c4 (a Supreme Court case) don't. j_gooch: APPELLATE JUDGE pay in 2022, SUPREME COURT JUDGE
+      pay in 2024, so c5 (2023) doesn't and c6 (2024) does. j_powell: payroll prints WESLEY BRENT, which fct_salaries
+      doesn't pair, but he is the only Powell on his court and the initial W agrees, so 2017 (the 2015 ZACHARY row has
+      another initial, so c15 from 2016 doesn't match), so both c7 (2019) and c8 (2017-06) match. j_gabbert: the same for ANTHONY REX from 2018 (his
+      2016 CIRCUIT JUDGE pay doesn't count), so c10 (2019) matches, c11 (2017) doesn't. j_wright_a and j_wright_b share
+      a surname on one court, so neither is dated from the payroll and c12 doesn't match either. j_retained: no payroll,
+      retained in 2018, so c13 (2019) does and c14 (2017) doesn't. j_none: no date of any kind, so c9 doesn't match.
+    overrides:
+      vars:
+        cl_case_bulk: true
+        case_history_min_year: 1975
+    given:
+      - input: ref('fct_legal_careers')
+        rows:
+          - {official_id: j_dowd, legal_role: judge}
+          - {official_id: j_gooch, legal_role: judge}
+          - {official_id: j_powell, legal_role: judge}
+          - {official_id: j_none, legal_role: judge}
+          - {official_id: j_gabbert, legal_role: judge}
+          - {official_id: j_wright_a, legal_role: judge}
+          - {official_id: j_wright_b, legal_role: judge}
+          - {official_id: j_retained, legal_role: judge}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: j_dowd, given_name: James, family_name: Dowd, office: mo_court_of_appeals, current_term_start: null}
+          - {official_id: j_gooch, given_name: Ginger, family_name: Gooch, office: mo_supreme_court, current_term_start: null}
+          - {official_id: j_powell, given_name: W. Brent, family_name: Powell, office: mo_supreme_court, current_term_start: null}
+          - {official_id: j_none, given_name: Zed, family_name: Nodate, office: mo_court_of_appeals, current_term_start: null}
+          - {official_id: j_gabbert, given_name: A. Rex, family_name: Gabbert, office: mo_court_of_appeals, current_term_start: null}
+          - {official_id: j_wright_a, given_name: Michael S., family_name: Wright, office: mo_court_of_appeals, current_term_start: null}
+          - {official_id: j_wright_b, given_name: David, family_name: Wright, office: mo_court_of_appeals, current_term_start: null}
+          - {official_id: j_retained, given_name: Rita, family_name: Retained, office: mo_supreme_court, current_term_start: null}
+      - input: ref('fct_office_history')
+        rows:
+          - {official_id: j_retained, office_title: retained by voters in November 2018, jurisdiction: mo judiciary, start_date: '2018-01-01'}
+          - {official_id: j_retained, office_title: served as chief of the General Crimes Unit, jurisdiction: mo judiciary, start_date: null}
+      - input: ref('fct_salaries')
+        rows:
+          - {official_id: j_dowd, calendar_year: 2017, position_title: APPELLATE JUDGE}
+          - {official_id: j_dowd, calendar_year: 2010, position_title: CIRCUIT JUDGE}
+          - {official_id: j_gooch, calendar_year: 2022, position_title: APPELLATE JUDGE}
+          - {official_id: j_gooch, calendar_year: 2024, position_title: SUPREME COURT JUDGE}
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {agency_name: JUDICIARY, position_title: SUPREME COURT JUDGE, calendar_year: 2017, last_name: POWELL, first_names: WESLEY BRENT}
+          - {agency_name: JUDICIARY, position_title: SUPREME COURT JUDGE, calendar_year: 2015, last_name: POWELL, first_names: ZACHARY}
+          - {agency_name: JUDICIARY, position_title: APPELLATE JUDGE, calendar_year: 2018, last_name: GABBERT, first_names: ANTHONY REX}
+          - {agency_name: JUDICIARY, position_title: APPELLATE JUDGE, calendar_year: 2018, last_name: WRIGHT, first_names: MICHAEL}
+          - {agency_name: JUDICIARY, position_title: APPELLATE JUDGE, calendar_year: 2018, last_name: WRIGHT, first_names: DAVID}
+          - {agency_name: JUDICIARY, position_title: CIRCUIT JUDGE, calendar_year: 2016, last_name: GABBERT, first_names: ANTHONY REX}
+      - input: ref('mo_courts')
+        rows:
+          - {court_id: mo, office: mo_supreme_court}
+          - {court_id: moctapp, office: mo_court_of_appeals}
+      - input: ref('int_courtlistener__mo_cases')
+        rows:
+          - {cluster_id: c1, court_id: moctapp, date_filed: '2018-03-01', judges_text: 'Dowd, J.', attorneys_text: null}
+          - {cluster_id: c2, court_id: moctapp, date_filed: '2012-03-01', judges_text: 'Dowd, J.', attorneys_text: null}
+          - {cluster_id: c3, court_id: moctapp, date_filed: '2016-12-31', judges_text: 'Dowd, J.', attorneys_text: null}
+          - {cluster_id: c4, court_id: mo, date_filed: '2020-03-01', judges_text: 'Dowd', attorneys_text: null}
+          - {cluster_id: c5, court_id: mo, date_filed: '2023-03-01', judges_text: 'Judge Ginger Gooch', attorneys_text: null}
+          - {cluster_id: c6, court_id: mo, date_filed: '2024-03-01', judges_text: 'Judge Ginger Gooch', attorneys_text: null}
+          - {cluster_id: c7, court_id: mo, date_filed: '2019-03-01', judges_text: 'Judge W. Brent Powell', attorneys_text: null}
+          - {cluster_id: c8, court_id: mo, date_filed: '2017-06-01', judges_text: 'Judge W. Brent Powell', attorneys_text: null}
+          - {cluster_id: c9, court_id: moctapp, date_filed: '2020-03-01', judges_text: 'Nodate, J.', attorneys_text: null}
+          - {cluster_id: c10, court_id: moctapp, date_filed: '2019-03-01', judges_text: 'Gabbert, C.J.', attorneys_text: null}
+          - {cluster_id: c11, court_id: moctapp, date_filed: '2017-03-01', judges_text: 'Gabbert, C.J.', attorneys_text: null}
+          - {cluster_id: c12, court_id: moctapp, date_filed: '2019-03-01', judges_text: 'Wright, J.', attorneys_text: null}
+          - {cluster_id: c15, court_id: mo, date_filed: '2016-03-01', judges_text: 'Judge W. Brent Powell', attorneys_text: null}
+          - {cluster_id: c13, court_id: mo, date_filed: '2019-03-01', judges_text: 'Judge Rita Retained', attorneys_text: null}
+          - {cluster_id: c14, court_id: mo, date_filed: '2017-03-01', judges_text: 'Judge Rita Retained', attorneys_text: null}
+      - input: ref('stg_courtlistener__mo_cluster_panel')
+        rows: []
+      - input: ref('int_courtlistener__official_people')
+        rows: []
+    expect:
+      rows:
+        - {official_id: j_dowd, role: judge, cluster_id: c1, matched_by: judges text}
+        - {official_id: j_gooch, role: judge, cluster_id: c6, matched_by: judges text}
+        - {official_id: j_powell, role: judge, cluster_id: c7, matched_by: judges text}
+        - {official_id: j_powell, role: judge, cluster_id: c8, matched_by: judges text}
+        - {official_id: j_gabbert, role: judge, cluster_id: c10, matched_by: judges text}
+        - {official_id: j_retained, role: judge, cluster_id: c13, matched_by: judges text}
+
+  - name: bulk_case_matches_skip_namesakes_paid_on_the_same_court
+    model: int_courtlistener__bulk_case_matches
+    description: >
+      A namesake on the payroll who is not an official (Robert G. Dowd, Jr., APPELLATE JUDGE 2017-2021 beside
+      James M. Dowd) makes a bare "Dowd" ambiguous while he was paid, so j_dowd starts in 2022, the year after
+      (d1 in 2018 and d2 in 2021, "Dowd, Hess, Hoff" and "Dowd, J.", don't match; d3 in 2022 does). A text that
+      prints the surname right after another first name or a middle initial that isn't the judge's is the namesake
+      even after that: d4 "Robert G. Dowd, Jr., J." and d6 "Robert Dowd" don't match, d5 "James M. Dowd, J." and d7
+      "J. Dowd" and d8 "Dowd, Hess, Hoff" do. A CIRCUIT JUDGE named Dowd (2030) is not on the judge's court and
+      doesn't push the start. j_hall, with no namesake, keeps his payroll start in 2017 (d9). j_page's own first name
+      before a middle initial she doesn't have in her given name ("Lisa P. Page", d10) is still her, and a trailing letter of the word before a comma ("División, Hall", read as "divisi n") is no first initial (d11).
+    overrides:
+      vars:
+        cl_case_bulk: true
+        case_history_min_year: 1975
+    given:
+      - input: ref('fct_legal_careers')
+        rows:
+          - {official_id: j_dowd, legal_role: judge}
+          - {official_id: j_hall, legal_role: judge}
+          - {official_id: j_page, legal_role: judge}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: j_dowd, given_name: James M., family_name: Dowd, office: mo_court_of_appeals, current_term_start: null}
+          - {official_id: j_hall, given_name: Gary, family_name: Hall, office: mo_court_of_appeals, current_term_start: null}
+          - {official_id: j_page, given_name: Lisa, family_name: Page, office: mo_court_of_appeals, current_term_start: null}
+      - input: ref('fct_office_history')
+        rows: []
+      - input: ref('fct_salaries')
+        rows:
+          - {official_id: j_dowd, calendar_year: 2017, position_title: APPELLATE JUDGE}
+          - {official_id: j_hall, calendar_year: 2017, position_title: APPELLATE JUDGE}
+          - {official_id: j_page, calendar_year: 2017, position_title: APPELLATE JUDGE}
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {agency_name: JUDICIARY, position_title: APPELLATE JUDGE, calendar_year: 2017, last_name: DOWD, first_names: ROBERT G.}
+          - {agency_name: JUDICIARY, position_title: APPELLATE JUDGE, calendar_year: 2021, last_name: DOWD, first_names: ROBERT G.}
+          - {agency_name: JUDICIARY, position_title: APPELLATE JUDGE, calendar_year: 2017, last_name: DOWD, first_names: JAMES M}
+          - {agency_name: JUDICIARY, position_title: CIRCUIT JUDGE, calendar_year: 2030, last_name: DOWD, first_names: LARRY}
+      - input: ref('mo_courts')
+        rows:
+          - {court_id: moctapp, office: mo_court_of_appeals}
+      - input: ref('int_courtlistener__mo_cases')
+        rows:
+          - {cluster_id: d1, court_id: moctapp, date_filed: '2018-03-01', judges_text: 'Dowd, Hess, Hoff', attorneys_text: null}
+          - {cluster_id: d2, court_id: moctapp, date_filed: '2021-12-31', judges_text: 'Dowd, J.', attorneys_text: null}
+          - {cluster_id: d3, court_id: moctapp, date_filed: '2022-03-01', judges_text: 'Dowd, J.', attorneys_text: null}
+          - {cluster_id: d4, court_id: moctapp, date_filed: '2023-03-01', judges_text: 'Robert G. Dowd, Jr., J.', attorneys_text: null}
+          - {cluster_id: d5, court_id: moctapp, date_filed: '2023-03-01', judges_text: 'James M. Dowd, J.', attorneys_text: null}
+          - {cluster_id: d6, court_id: moctapp, date_filed: '2023-03-01', judges_text: 'Robert Dowd, J.', attorneys_text: null}
+          - {cluster_id: d7, court_id: moctapp, date_filed: '2023-03-01', judges_text: 'J. Dowd, J.', attorneys_text: null}
+          - {cluster_id: d8, court_id: moctapp, date_filed: '2023-03-01', judges_text: 'Dowd, Hess, Hoff', attorneys_text: null}
+          - {cluster_id: d9, court_id: moctapp, date_filed: '2017-03-01', judges_text: 'Hall, J.', attorneys_text: null}
+          - {cluster_id: d11, court_id: moctapp, date_filed: '2018-03-01', judges_text: 'División, Hall, Jbdge, Witt', attorneys_text: null}
+          - {cluster_id: d10, court_id: moctapp, date_filed: '2018-03-01', judges_text: 'Lisa P. Page, J.', attorneys_text: null}
+      - input: ref('stg_courtlistener__mo_cluster_panel')
+        rows: []
+      - input: ref('int_courtlistener__official_people')
+        rows: []
+    expect:
+      rows:
+        - {official_id: j_dowd, role: judge, cluster_id: d3, matched_by: judges text}
+        - {official_id: j_dowd, role: judge, cluster_id: d5, matched_by: judges text}
+        - {official_id: j_dowd, role: judge, cluster_id: d7, matched_by: judges text}
+        - {official_id: j_dowd, role: judge, cluster_id: d8, matched_by: judges text}
+        - {official_id: j_hall, role: judge, cluster_id: d9, matched_by: judges text}
+        - {official_id: j_hall, role: judge, cluster_id: d11, matched_by: judges text}
+        - {official_id: j_page, role: judge, cluster_id: d10, matched_by: judges text}
 
   - name: epa_frs_facility_industry_prefers_naics_over_sic_sector
     model: int_epa_frs__facilities
@@ -499,6 +730,93 @@ unit_tests:
         - {registry_id: c6, naics_code: '237310', naics_source: naics}
         - {registry_id: c7, naics_code: '23', naics_source: sic}
 
+  - name: epa_frs_facility_naics_merges_air_systems_and_code_lengths
+    model: int_epa_frs__facilities
+    description: >
+      AIR and AIRS/AFS are one program under two names, and a 5-digit code is the 6-digit code at the same
+      facility it prefixes (#432). p1: 311111 from AIR and AIRS/AFS counts one system, so 722511 from two real systems
+      (RCRAINFO, NPDES) wins; counted as two it would tie and the lower 311111 would win. p2: RCRAINFO's 81232 and
+      NPDES's 812320 are one code with two systems and beat 811111 from one system, and the displayed code and
+      description are the 6-digit ones (a split vote ties three ways and the lowest, 811111, would win);
+      p3: a 5-digit code with no 6-digit code at the facility stays as it is; p4: SIC 3714 from AIR and AIRS/AFS counts once, so 4952 from two real systems wins (as two it would tie and the lower 3714 would win).
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: p1, facility_name: Air mirrored, latitude: 38.5, longitude: -92.1}
+          - {registry_id: p2, facility_name: Five and six digits, latitude: 38.5, longitude: -92.1}
+          - {registry_id: p3, facility_name: Lone five digits, latitude: 38.5, longitude: -92.1}
+          - {registry_id: p4, facility_name: SIC air mirrored, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows: []
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: p1, program_system: AIR, naics_code: '311111', naics_description: Dog food, is_primary: true, is_secondary: false}
+          - {registry_id: p1, program_system: AIRS/AFS, naics_code: '311111', naics_description: Dog food, is_primary: true, is_secondary: false}
+          - {registry_id: p1, program_system: RCRAINFO, naics_code: '722511', naics_description: Restaurants, is_primary: true, is_secondary: false}
+          - {registry_id: p1, program_system: NPDES, naics_code: '722511', naics_description: Restaurants, is_primary: true, is_secondary: false}
+          - {registry_id: p2, program_system: RCRAINFO, naics_code: '81232', naics_description: Drycleaning (short), is_primary: true, is_secondary: false}
+          - {registry_id: p2, program_system: NPDES, naics_code: '812320', naics_description: Drycleaning and laundry, is_primary: true, is_secondary: false}
+          - {registry_id: p2, program_system: AIR, naics_code: '811111', naics_description: General auto repair, is_primary: true, is_secondary: false}
+          - {registry_id: p3, program_system: RCRAINFO, naics_code: '56291', naics_description: Remediation, is_primary: true, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows:
+          - {registry_id: p4, program_system: AIR, sic_code: '3714', sic_description: MOTOR VEHICLE PARTS, is_primary: true, is_secondary: false}
+          - {registry_id: p4, program_system: AIRS/AFS, sic_code: '3714', sic_description: MOTOR VEHICLE PARTS, is_primary: true, is_secondary: false}
+          - {registry_id: p4, program_system: NPDES, sic_code: '4952', sic_description: SEWERAGE SYSTEMS, is_primary: true, is_secondary: false}
+          - {registry_id: p4, program_system: RCRAINFO, sic_code: '4952', sic_description: SEWERAGE SYSTEMS, is_primary: true, is_secondary: false}
+      - input: ref('sic_naics_sectors')
+        rows:
+          - {sic_prefix: '37', naics_prefix: '31'}
+          - {sic_prefix: '49', naics_prefix: '22'}
+      - input: ref('naics_sectors')
+        rows:
+          - {naics_prefix: '22', sector_code: '22', sector_name: Utilities}
+          - {naics_prefix: '31', sector_code: 31-33, sector_name: Manufacturing}
+    expect:
+      rows:
+        - {registry_id: p1, naics_code: '722511', naics_description: Restaurants, naics_source: naics}
+        - {registry_id: p2, naics_code: '812320', naics_description: Drycleaning and laundry, naics_source: naics}
+        - {registry_id: p3, naics_code: '56291', naics_description: Remediation, naics_source: naics}
+        - {registry_id: p4, naics_code: '22', naics_description: "Utilities sector, from SIC 4952 SEWERAGE SYSTEMS", naics_source: sic}
+
+  - name: epa_frs_facility_naics_within_tier_ties
+    model: int_epa_frs__facilities
+    description: >
+      Codes tied on tier and program-system count break the tie in order (#432). q1 (all tiers): 311111 and 311119
+      each have one primary system, but 311119 also has an UNKNOWN-tier system, so it wins (lowest code would pick
+      311111). q2 (short code, full vote): EIS's 32541 gives a full vote to both 325411 and 325412 (it extends both): 325411 has RCRAINFO and EIS (two systems), 325412 has NPDES, AIR and EIS (three) and wins. If the short code voted for just one of them (the lowest) they would tie at two systems each and the lowest, 325411, would win. q3 (length): 5-digit 32222 and 6-digit 327320 are
+      unrelated codes with one primary system each; the 6-digit code wins (lowest code would pick 32222).
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: q1, facility_name: All tiers, latitude: 38.5, longitude: -92.1}
+          - {registry_id: q2, facility_name: Short code votes for both, latitude: 38.5, longitude: -92.1}
+          - {registry_id: q3, facility_name: Length, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows: []
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: q1, program_system: NPDES, naics_code: '311111', naics_description: Dog food, is_primary: true, is_secondary: false}
+          - {registry_id: q1, program_system: NPDES, naics_code: '311119', naics_description: Other animal food, is_primary: true, is_secondary: false}
+          - {registry_id: q1, program_system: RCRAINFO, naics_code: '311119', naics_description: Other animal food, is_primary: false, is_secondary: false}
+          - {registry_id: q2, program_system: EIS, naics_code: '32541', naics_description: Pharma (short), is_primary: true, is_secondary: false}
+          - {registry_id: q2, program_system: RCRAINFO, naics_code: '325411', naics_description: Medicinal, is_primary: true, is_secondary: false}
+          - {registry_id: q2, program_system: NPDES, naics_code: '325412', naics_description: Preparations, is_primary: true, is_secondary: false}
+          - {registry_id: q2, program_system: AIR, naics_code: '325412', naics_description: Preparations, is_primary: true, is_secondary: false}
+          - {registry_id: q3, program_system: NPDES, naics_code: '32222', naics_description: Paper (short), is_primary: true, is_secondary: false}
+          - {registry_id: q3, program_system: NPDES, naics_code: '327320', naics_description: Ready-mix, is_primary: true, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows: []
+      - input: ref('sic_naics_sectors')
+        rows: []
+      - input: ref('naics_sectors')
+        rows: []
+    expect:
+      rows:
+        - {registry_id: q1, naics_code: '311119', naics_source: naics}
+        - {registry_id: q2, naics_code: '325412', naics_source: naics}
+        - {registry_id: q3, naics_code: '327320', naics_source: naics}
+
   - name: epa_frs_facility_naics_tie_sic_sector_merges_31_33
     model: int_epa_frs__facilities
     description: >
@@ -637,6 +955,127 @@ unit_tests:
       rows:
         - {registry_id: c1, naics_code: '111998', naics_source: naics}
         - {registry_id: c2, naics_code: '236220', naics_source: naics}
+
+  - name: epa_frs_facility_naics_238910_loses_to_all_tier_count
+    model: int_epa_frs__facilities
+    description: >
+      Modeled on B N S F RAILYARD (#432). 238910 (the construction stormwater permit) is given by NPDES in the
+      primary tier and mirrored by an MO-DNR UNKNOWN row, so it has two systems over all tiers against 482111's one
+      (RCRAINFO, primary). Tier and primary-tier count tie at one system each; the all-tier count would pick
+      238910, but the 238910 demotion comes before it, so 482111 wins. SIC 1629 gives no sector signal.
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: r1, facility_name: Railyard, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows: []
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: r1, program_system: NPDES, naics_code: '238910', naics_description: Site preparation, is_primary: true, is_secondary: false}
+          - {registry_id: r1, program_system: NPDES, naics_code: '238910', naics_description: Site preparation, is_primary: true, is_secondary: false}
+          - {registry_id: r1, program_system: RCRAINFO, naics_code: '482111', naics_description: Line-haul railroads, is_primary: true, is_secondary: false}
+          - {registry_id: r1, program_system: MO-DNR, naics_code: '238910', naics_description: Site preparation, is_primary: false, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows:
+          - {registry_id: r1, program_system: NPDES, sic_code: '1629', sic_description: HEAVY CONSTRUCTION NEC, is_primary: true, is_secondary: false}
+      - input: ref('sic_naics_sectors')
+        rows:
+          - {sic_prefix: '16', naics_prefix: '23'}
+      - input: ref('naics_sectors')
+        rows:
+          - {naics_prefix: '23', sector_code: '23', sector_name: Construction}
+          - {naics_prefix: '48', sector_code: '48-49', sector_name: Transportation and Warehousing}
+    expect:
+      rows:
+        - {registry_id: r1, naics_code: '482111', naics_source: naics}
+
+  - name: epa_frs_facility_naics_mirror_rows_do_not_outvote_sic_sector
+    model: int_epa_frs__facilities
+    description: >
+      Modeled on Clark Printing (#513). r1: AIR gives 323111 and RCRAINFO gives 81232, which extends the 812320 an
+      MO-DNR UNKNOWN row lists, so over all tiers 812320 has two systems against 323111's one. The MO-DNR row only
+      copies what another system reports, so it must not outvote the SIC sector: the SIC code (AIR, 2752 printing)
+      sits in manufacturing and 323111 wins. r2 (Dairy Farmers): the SIC sector does not separate the codes (both
+      manufacturing), so the RMP copy still backs 312111 over 311422 as the last all-tier tie-break.
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: r1, facility_name: Site r1, latitude: 38.5, longitude: -92.1}
+          - {registry_id: r2, facility_name: Site r2, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows: []
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: r1, program_system: AIR, naics_code: '323111', naics_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r1, program_system: RCRAINFO, naics_code: '81232', naics_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r1, program_system: MO-DNR, naics_code: '812320', naics_description: d, is_primary: false, is_secondary: false}
+          - {registry_id: r2, program_system: AIR, naics_code: '311422', naics_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r2, program_system: RCRAINFO, naics_code: '312111', naics_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r2, program_system: RMP, naics_code: '312111', naics_description: d, is_primary: false, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows:
+          - {registry_id: r1, program_system: AIR, sic_code: '2752', sic_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r2, program_system: AIR, sic_code: '2032', sic_description: d, is_primary: true, is_secondary: false}
+      - input: ref('sic_naics_sectors')
+        rows:
+          - {sic_prefix: '27', naics_prefix: '32'}
+          - {sic_prefix: '20', naics_prefix: '31'}
+      - input: ref('naics_sectors')
+        rows:
+          - {naics_prefix: '31', sector_code: '31-33', sector_name: Manufacturing}
+          - {naics_prefix: '32', sector_code: '31-33', sector_name: Manufacturing}
+          - {naics_prefix: '81', sector_code: '81', sector_name: Other Services}
+    expect:
+      rows:
+        - {registry_id: r1, naics_code: '323111', naics_source: naics}
+        - {registry_id: r2, naics_code: '312111', naics_source: naics}
+
+  - name: epa_frs_facility_naics_construction_sic_noise_only_from_npdes
+    model: int_epa_frs__facilities
+    description: >
+      Modeled on D&S Hauling and the other facilities that left 238910 in #509 (#513). A construction SIC code (1541,
+      1542, 1611) that only NPDES gives is the stormwater permit and says nothing about the sector; one another
+      program gives is a real industry. r1: AIR gives 238910 and SIC 1795 (demolition), RCRAINFO gives 56291, so
+      the SIC sector picks 238910 even though 238910 is the permit code. r2: only NPDES gives SIC 1541, so there is
+      no sector signal, 238910 loses to a real code and 311111 wins. r3: AIR also gives SIC 1541, so the signal
+      holds and 236220 wins over the lower code 111110.
+    given:
+      - input: ref('stg_epa_frs__facilities')
+        rows:
+          - {registry_id: r1, facility_name: Site r1, latitude: 38.5, longitude: -92.1}
+          - {registry_id: r2, facility_name: Site r2, latitude: 38.5, longitude: -92.1}
+          - {registry_id: r3, facility_name: Site r3, latitude: 38.5, longitude: -92.1}
+      - input: ref('stg_epa_frs__organizations')
+        rows: []
+      - input: ref('stg_epa_frs__naics')
+        rows:
+          - {registry_id: r1, program_system: AIR, naics_code: '238910', naics_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r1, program_system: RCRAINFO, naics_code: '56291', naics_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r2, program_system: NPDES, naics_code: '238910', naics_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r2, program_system: RCRAINFO, naics_code: '311111', naics_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r3, program_system: AIR, naics_code: '236220', naics_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r3, program_system: RCRAINFO, naics_code: '111110', naics_description: d, is_primary: true, is_secondary: false}
+      - input: ref('stg_epa_frs__sic')
+        rows:
+          - {registry_id: r1, program_system: AIR, sic_code: '1795', sic_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r2, program_system: NPDES, sic_code: '1541', sic_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r3, program_system: NPDES, sic_code: '1541', sic_description: d, is_primary: true, is_secondary: false}
+          - {registry_id: r3, program_system: AIR, sic_code: '1541', sic_description: d, is_primary: true, is_secondary: false}
+      - input: ref('sic_naics_sectors')
+        rows:
+          - {sic_prefix: '15', naics_prefix: '23'}
+          - {sic_prefix: '17', naics_prefix: '23'}
+      - input: ref('naics_sectors')
+        rows:
+          - {naics_prefix: '23', sector_code: '23', sector_name: Construction}
+          - {naics_prefix: '31', sector_code: '31-33', sector_name: Manufacturing}
+          - {naics_prefix: '56', sector_code: '56', sector_name: Administrative and Support}
+          - {naics_prefix: '11', sector_code: '11', sector_name: Agriculture}
+    expect:
+      rows:
+        - {registry_id: r1, naics_code: '238910', naics_source: naics}
+        - {registry_id: r2, naics_code: '311111', naics_source: naics}
+        - {registry_id: r3, naics_code: '236220', naics_source: naics}
 
   - name: epa_frs_facility_owner_tie_is_deterministic
     model: int_epa_frs__facilities

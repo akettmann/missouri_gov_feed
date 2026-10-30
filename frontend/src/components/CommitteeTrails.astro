@@ -5,6 +5,8 @@
 import type { CommitteeDonorRow, CommitteeTrail } from "../lib/exports/types";
 import { count, money } from "../lib/format";
 import { href } from "../lib/site";
+import { quotedNames, trailsGiveToEachOther } from "../lib/trailNames";
+import { sumByTrailStatus, sumGaveOfficial, type TrailKind } from "../lib/trailSummary";
 import SourceLink from "./SourceLink.astro";
 
 interface Props {
@@ -25,11 +27,30 @@ const TRAIL_LABEL: Record<string, string> = {
   "mec committee": "Missouri committee: its own donors are on MEC",
   "ambiguous mec name": "Several Missouri committees use this name",
   "not an mec filer": "Not a Missouri filer (federal and out-of-state PACs report elsewhere)",
+  "own name": "Filed under one of this committee's own names; not followed",
+  "similar name":
+    "Name close to this committee's own (may be a parent body or another state's affiliate); not followed",
   "end of trail": "End of the trail: an organization's own funders aren't reported to MEC",
   individuals: "People, each giving itemized amounts",
 };
+// What each kind counts in the summary, in the same words the methodology page uses.
+const SUMMARY_LABEL: Record<TrailKind, string> = {
+  "end of trail":
+    "Businesses and other organizations: the Missouri Ethics Commission (MEC) does not receive their own donors",
+  "not an mec filer": "Not found among Missouri filers (federal or out-of-state PACs)",
+  "own name": "Filed under one of the committee's own names, which does not fund itself; not followed",
+  "similar name":
+    "Name close to the committee's own (a parent body or another state's affiliate?); not followed",
+  "ambiguous mec name": "Name shared by several Missouri committees",
+  individuals: "Individuals (itemized gifts, added together)",
+  "mec committee": "Missouri committees: their own donors are on MEC",
+};
 const MEC_PAGE = "https://www.mec.mo.gov/MEC/Campaign_Finance/CF11_CommInfo.aspx?MECID=";
 const years = (a: number | null, b: number | null) => (a === b ? `${a ?? ""}` : `${a}–${b}`);
+const summary = sumByTrailStatus(trails ?? []);
+const gaveOfficial = sumGaveOfficial(trails ?? []);
+const giveToEachOther = trailsGiveToEachOther(trails ?? []);
+const committeeCount = trails?.length ?? 0;
 const donorName = (d: CommitteeDonorRow) =>
   d.trail_status === "individuals" ? "Individuals (itemized)" : d.donor_name;
 ---
@@ -47,6 +68,54 @@ const donorName = (d: CommitteeDonorRow) =>
       </a>
       .
     </p>
+    <div class="trail-summary" data-confidence="medium">
+      <h4>
+        Who gave to the {count(committeeCount)} {committeeCount === 1 ? "committee" : "committees"} listed
+        below, and where that money goes out of view{" "}
+        <span
+          class="badge medium"
+          title="Every committee here was found by matching a name: MEC records no ID for a donor committee"
+        >
+          possible match
+        </span>
+      </h4>
+      <p class="small muted">
+        Adds up who gave to the {count(committeeCount)} {committeeCount === 1 ? "committee" : "committees"}{" "}
+        listed below, across every year on file: each one's 10 largest donors that are not individuals, plus
+        its individual donors added together. This is money those committees took in, not money given to this
+        official; {committeeCount === 1 ? "that committee" : "those committees"} gave this official{" "}
+        {money(gaveOfficial)}.{" "}
+        {giveToEachOther &&
+          "A listed committee also gave to another listed one, so some dollars appear twice. "}
+        These figures are not a measure of influence.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>What the Ethics Commission can show</th>
+              <th class="num">Dollars</th>
+              <th class="num">Donor rows</th>
+              <th>Why</th>
+            </tr>
+          </thead>
+          <tbody>
+            {summary.map((r) => (
+              <tr>
+                <td>{SUMMARY_LABEL[r.kind]}</td>
+                <td class="num">{money(r.amount)}</td>
+                <td class="num">{count(r.rows)}</td>
+                <td class="small">
+                  <a href={href("/methodology/#committee-donors")}>
+                    How this is decided<span class="sr-only"> for: {SUMMARY_LABEL[r.kind]}</span>
+                  </a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
     {trails.map((t) => (
       <section
         class="trail"
@@ -63,9 +132,11 @@ const donorName = (d: CommitteeDonorRow) =>
           </span>
         </h4>
         <p class="small muted">
-          Filed by this official's committee as "{t.donor_names}": {money(t.gave_official)},{" "}
-          {years(t.first_year, t.last_year)}. The committee took in {money(t.committee_total_amount)} in
-          itemized contributions in total.{" "}
+          {t.donor_names.length > 0
+            ? `Filed by this official's committee as ${quotedNames(t.donor_names)}: `
+            : ""}
+          {money(t.gave_official)}, {years(t.first_year, t.last_year)}. The committee took in{" "}
+          {money(t.committee_total_amount)} in itemized contributions in total.{" "}
           <SourceLink url={t.source_url} label={`MEC committee ${t.mec_committee_id}`} />
         </p>
         <div class="table-scroll">
@@ -123,6 +194,9 @@ const donorName = (d: CommitteeDonorRow) =>
   }
   .lede {
     max-width: 72ch;
+  }
+  .trail-summary {
+    margin-top: 12px;
   }
   .trail {
     border-top: 1px solid var(--hairline);

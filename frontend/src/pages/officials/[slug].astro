@@ -9,6 +9,7 @@ import ProfileScript from "../../components/ProfileScript.astro";
 import SectionBusinesses from "../../components/SectionBusinesses.astro";
 import SectionExpenses from "../../components/SectionExpenses.astro";
 import SectionCommittees from "../../components/SectionCommittees.astro";
+import SectionSponsorship from "../../components/SectionSponsorship.astro";
 import SectionCourts from "../../components/SectionCourts.astro";
 import SectionGifts from "../../components/SectionGifts.astro";
 import SectionIdeology from "../../components/SectionIdeology.astro";
@@ -84,7 +85,7 @@ const term = o ? [o.current_term_start, o.current_term_end].filter(Boolean).join
         </div>
       </header>
 
-      <CoverageStrip items={visibleCoverage(bundle.coverage)} />
+      <CoverageStrip items={visibleCoverage(bundle.coverage)} all={bundle.coverage} />
 
       <div class="tools small">
         <ConfidenceToggle />
@@ -99,20 +100,21 @@ const term = o ? [o.current_term_start, o.current_term_end].filter(Boolean).join
         </a>
       </div>
 
+      <SectionMoney bundle={bundle} />
+      <SectionGifts bundle={bundle} />
+      <SectionInterests bundle={bundle} />
+      <SectionBusinesses bundle={bundle} />
+      <SectionOverlap bundle={bundle} />
+      <SectionSponsorship bundle={bundle} />
+      <SectionVoting bundle={bundle} />
+      <SectionCommittees bundle={bundle} />
+      <SectionExpenses bundle={bundle} />
       <SectionIdeology
         indicators={bundle.indicators}
         status={bias.status}
         peers={bundle.peers}
         office={o.office}
       />
-      <SectionVoting bundle={bundle} />
-      <SectionCommittees bundle={bundle} />
-      <SectionMoney bundle={bundle} />
-      <SectionGifts bundle={bundle} />
-      <SectionExpenses bundle={bundle} />
-      <SectionOverlap bundle={bundle} />
-      <SectionBusinesses bundle={bundle} />
-      <SectionInterests bundle={bundle} />
       <SectionCourts bundle={bundle} />
     </article>
     <ProfileScript />

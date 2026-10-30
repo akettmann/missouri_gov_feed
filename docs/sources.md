@@ -10,17 +10,20 @@ How a bill moves between the two chambers, which the `mo_house` and `mo_senate` 
 | Loader | Source | Data it provides | Coverage | Gate |
 |---|---|---|---|---|
 | `mo_house` | Missouri House (documents.house.mo.gov) | members, bills, per-member roll-call votes | `MOGOV_LOOKBACK_YEARS` (default 10; PDFs from 2014) | |
+| `mo_house_pdf` | Missouri House bill documents (documents.house.mo.gov) | the PDFs behind the `mo_house` document links (bill text versions, summaries, fiscal notes, amendments), unchanged, with their extracted text | every link `mo_house` landed (about 68.7k PDFs, sessions 171-261) | stage 2; slow: ~1 request/s |
 | `mo_senate` | Missouri Senate journals (senate.mo.gov) | per-senator roll-call votes | `MOGOV_LOOKBACK_YEARS` | |
 | `mo_senate_topics` | Missouri Senate topical index (senate.mo.gov) | Senate bills, subject terms for Senate bills and House bills that reached the Senate | `MOGOV_LOOKBACK_YEARS` (regular sessions) | |
+| `mo_senate_bills` | Missouri Senate bill tracking (senate.mo.gov) | every Senate bill and resolution of each session (regular and extraordinary) and its full action history, with journal references, plus its text-version, fiscal-note, amendment and summary lists | `MOGOV_LOOKBACK_YEARS` | slow: ~1 request/s, five requests per bill (`MOGOV_SENATE_BILL_DOCS=0`: one) |
 | `mo_revisor` | Missouri Revisor of Statutes (revisor.mo.gov) | statute text (RSMo) by section version, repeals and transfers, which bills enacted, amended or repealed each section | current statutes; repeals since 1945 | slow: ~1 request/s |
 | `mec` | Missouri Ethics Commission | state campaign contributions and spending, candidate↔committee links, lobbyist gifts | 2023+ | opt-in |
 | `tap_mec` | MEC via The Accountability Project | state campaign finance and lobbyist gifts | 2011–2022 (gifts from 2004) | |
 | `fec` | Federal Election Commission | federal candidates, committees, PAC contributions, donor aggregates | `MOGOV_FEC_CYCLES` | API key for aggregates |
 | `voteview` | Voteview | Congress roll calls, votes, DW-NOMINATE ideology | `MOGOV_VOTEVIEW_CONGRESSES` | |
+| `govinfo_billstatus` | GovInfo congressional bill status | federal bills: sponsor, cosponsors, actions, roll calls cited, Public Law number, committee referrals, subjects, related bills | `MOGOV_BILLSTATUS_CONGRESSES` (default 117 to today's Congress) | |
 | `house_fd` | U.S. House Clerk | House members' financial disclosures and trades | 2015+ | |
 | `senate_efd` | U.S. Senate eFD | senators' financial disclosures | as filed | opt-in |
-| `courtlistener_bulk` | CourtListener bulk files | judges, positions, education, federal judges' disclosures | quarterly snapshot | |
-| `courtlistener_case_bulk` | CourtListener bulk files | Missouri state and federal court dockets and opinions | quarterly snapshot | |
+| `courtlistener_bulk` | CourtListener judge records | judges, positions, education, federal judges' disclosures | quarterly snapshot | |
+| `courtlistener_case_bulk` | CourtListener court records | Missouri state and federal court dockets and opinions | quarterly snapshot | |
 | `courtlistener_cases` | CourtListener API | recent cases and outcomes for judges and lawyers | ~125 requests/day | token for outcomes |
 | `bluebook` | Missouri Official Manual | biographies, judges, county→judicial circuit table | `MOGOV_BLUEBOOK_EDITIONS` | |
 | `openstates_people` | Open States | state legislators, executives, mayors: roles, party, ids | current + retired | |
@@ -57,12 +60,32 @@ the only per-member House vote record.
   `rollcalls`, `hearings`, `summaries`, `fiscal_notes`, `witnesses` (each child row carries a `bill`
   column naming its Senate bill; the list has no sponsor or subject children, the sponsor is on the bill row as
   `sponsor_name`/`sponsor_district`/`sponsor_link`). Bill, text, amendment, summary, fiscal-note and witness-form
-  links reach `marts.fct_bill_documents`. The roll-call PDFs land as `mo_house_rollcalls` and
+  links reach `marts.fct_bill_documents`. Hearing notices (`_bill_hearings`, and the SenateActList's) reach `marts.fct_bill_hearings` (18,739 + 593 rows, 2017-2026; one row per notice, a moved hearing is noticed again and the XML has no cancelled flag; email addresses and phone numbers in comments are replaced by a marker; an exact repeat of a notice is flagged `is_superseded`). The roll-call PDFs land as `mo_house_rollcalls` and
   `mo_house_rollcall_votes`.
 - Window: `MOGOV_LOOKBACK_YEARS` (default 10). Roll-call PDFs go back to 2014.
 - Shard units: session codes (XML) and session days (roll-call PDFs).
 
 Quirks:
+- The member roster can keep listing a member after they left. Rebecca Roeber (member 1790, HD34) died 2019-07-30, yet
+  the 2019 veto session (193, September 2019) and all three 2020 sessions (201, 203, 204) still list her, and the
+  member XML for 181-204 looks like a stale snapshot (later files do use `vacant_name='Vacant'`). Her House roll-call
+  PDFs carry no ROEBER token after about day 38 of session 191, and Open States ends her term 2019-07-30. Rick Roeber
+  (member 2215, elected November 2020, expelled April 2021) is the next holder, so HD34 was vacant for all of 2020,
+  from 2019-07-30 until January 2021, and the 2020 rows carry no votes. The seat match lands on Rick, so
+  `int_mo_house__member_seat_keys` keeps a member id on the person its other sessions matched by given name (only when
+  exactly one person matches; member ids with two Open States duplicates keep the seat match), and
+  `int_officeholders__years` drops a roster row whose roster member carries an Open States id (the name-anchor
+  override assigns it) when that person's last Open States House term ended before the year's January 15 handover,
+  so HD34 has no 2020 officeholder. Raw keeps the roster as served. Issue #152.
+- The same stale roster also outlives members whose seat match failed, so their row has no Open States id and the
+  term test cannot see it. Scott Fitzpatrick (HD158) cast his last vote on 2019-01-09 and became State Treasurer;
+  the 2019 roster still lists him though HD158 had no member until Scott Cupps in 2020. Mike Cierpiot (HD30) left for
+  the Senate (his last House vote was 2017-09-13) yet the 2018 roster lists him. `int_officeholders__years` therefore
+  also drops a roster row when the person's last roll-call vote is before the year's January 15 handover, but only in a year that has House roll calls on or after the handover (each
+  January the roster stays whole until that year's roll calls are loaded). Open States
+  dates alone are not enough: Lauren Arthur's House term ends 2016-12-31 but she voted through 2018, so her row stays.
+  The Speaker must be in the `house_speakers` seed for 2017-2022 as well as 2023+, else a Speaker with no named votes
+  (Haahr 2019-2020, Vescovo 2021-2022) would read as a member who stopped voting. Issue #491.
 - `bills171/rollcalls/` still holds the 2016 session's roll-call PDFs (numbered by 2016 session day, header
   "98th General Assembly, Second Regular Session"). The probe walks past the last 2017 roll call of a day, so
   it lands them under session 171: 415 roll calls dated 2016 (45 session days, 1/13/2016 to 5/13/2016,
@@ -79,6 +102,22 @@ Quirks:
   drops a row; an unknown label is kept and fails an accepted_values test. The House also
   publishes some roll calls twice under two file names (261: `003.001`/`003.002`, `004.002`/`004.004`,
   `004.003`/`004.005`, identical content); the file whose name carries the printed roll-call number is kept.
+- Voting-board test records survive the header check in 173 and 231 (issue #449): `bills173/rollcalls/002.001`
+  (a QUORUM CALL with one voter, HUBRECHT) and `002.002` (a PQ with one voter, LOVE), 2017-05-23, and
+  `bills231/rollcalls/026.003`/`026.004` (ADJOURNMENT, 7 and 5 voters, the first names alphabetically, printed after the
+  day's last real vote on 2023-02-21). Real roll calls never go below 83 voters of about 162 (a quorum call; a quorum is
+  82), so `stg_mo_house__rollcalls` drops a roll call where fewer than a quarter of the listed members cast a vote
+  (`house_rollcall_min_participation`; the 204 and 171 test records fall under it as well). The singular test
+  `assert_house_rollcalls_quorum_participation` fails on any survivor under half the members unless its URL is in
+  `house_rollcall_small_quorum_allowlist` (a genuine call that failed to produce a quorum). Effect: 4 roll calls and 650
+  member votes fewer; the 173 attendance of 16 members moves from 80% to 100%, and the House attendance awards for
+  2017, 2023 and lifetime shuffle by a rank or a tenth of a point.
+- Session 204 has only 5 roll-call PDFs, all "Session Day : 3", and that is complete (issue #449). The only House floor
+  vote that session was 2020-11-10 (HB 14 third read and passed; HR 1 was adopted without a roll call); no later House
+  action in the bill XML (2020-11-13 to 2020-12-16) is a floor roll call: they are introductions, readings, referrals,
+  HR 2's committee hearing and executive session, and the Speaker signing HB 14 and its truly agreed and finally
+  passed after Senate passage (which needs no House roll call). The loader probes days up to the last linked day plus 3 (here days 4-6, all the site's 404 page), and
+  spot checks of days 7, 8, 10 and 13 also answer 404. Not a loader gap.
 - The XML is never converted on the way in: the loader gzips each file as received. The parser reads the
   gzip with lxml (hardened settings in `mogov.xmlparse`) and selects elements by local name, so namespaces,
   attributes, entities and CDATA are the parser's problem, not a regex's. The links that drive crawling
@@ -95,7 +134,8 @@ Quirks:
 - The House BillList lists some bills twice (HR1 and HR2 in the odd-year sessions); the loader fetches and lands
   each linked file once.
 - `AmendmentText` is misnamed: it holds the link to the amendment's PDF (`.../bills181/amendpdf/4083H03.02H.pdf`), not text, and is filled on every amendment (8,775 House, 1,023 SenateActList). `MapLink` (the change map) is filled on only a handful, so `stg_mo_house__bill_amendments` stages `amendment_text` as `amendment_url` and `fct_bill_documents` carries both an `amendment` and an `amendment_map` kind.
-- `AmendmentSortValue` looks like `0507HH`, so `mo_house_xml_bill_amendments.sort_value` is text. A value that
+- The XML lists some amendments twice on the same bill, so `stg_mo_house__bill_amendments` is one row per listing, not per amendment (9,798 rows, 9,686 distinct amendments): 112 pairs (64 in session 251, 2 in 254, 46 in 261). Each pair has adjacent `amendment_index` values and the same `amendment_url`, `lr_number`, `description` and `status`; only `sponsor` differs: a surname with and without its district (83 pairs, "Black" / "Black (137)") or two members who share a surname (29 pairs, "Smith (045)" / "Smith (046)", "Sharp (036)" / "Sharp (037)"). The real key is (`session_code`, `bill`, `amendment_url`). `fct_bill_documents` collapses the pairs (its grain is one row per link). Nothing consumes the amendment sponsor yet; how to resolve it for these pairs is an open policy question (needs-user issue #530), to settle before anything joins amendment sponsor to a legislator or counts amendments by member. `assert_mo_house_amendments_duplicates_are_adjacent_pairs` fails if a duplicate is anything but that adjacent pair.
+- `AmendmentSortValue` looks like `0507HH`, so `mo_house_xml_bill_amendments.sort_value` is text. It is filled only from session 241 on (3,275 of 9,798 rows) and only restates `lr_number`: round and amendment number, then the chamber letter and last letter of `lr_number` (`0010H03.04H` is `0304HH`). It disagrees with that reading on 16 rows, all SB1421 in session 261, where it is reordered (`5940S03.01X` is `03XS01`). `stg_mo_house__bill_amendments` does not stage it; the raw column stays. A value that
   does not fit its column type (an integer or date field holding something else) becomes NULL and is logged
   (`mo_house.value_not_integer` / `mo_house.value_not_date`), and a document lxml had to repair is logged as
   `mo_house.xml_recovered` with its file name.
@@ -112,12 +152,27 @@ Quirks:
 - Vote tokens are printed surnames, sometimes with a district ("SMITH 46"), plus "MR SPEAKER".
   Some names are truncated ("FOUNTAIN HENDERS"). dbt matches them to members
   (`int_mo_house__member_identity`, seed `house_speakers`).
+- Tokens do not always spell the roster surname: a compound surname is printed by its last word ("REHDER" is Holly
+  Thompson Rehder, "REISCH" is Cheri Toalson Reisch, "COURTWAY" is Cyndi Buchheit-Courtway), a generational suffix is
+  dropped ("PRICE" is Wiley Price IV in 2019-2022, Tiffany Price from 2025), and a district is added only while two
+  members share a surname ("EVANS 99" / "EVANS 154" until Jean Evans left on 2019-02-05, then a bare "EVANS" is
+  David Evans). The roster is an end-of-session list, so a member who left mid-session is missing from their last
+  session (Rory Rowland in 2022). `int_mo_house__votes` handles all of these (#539, #581). Members of the vote's
+  own session come first, and among them the better name fit wins: the whole surname, then the surname without
+  its suffix (so "PRICE" is Price, not Price IV), then the last word of a compound surname. Only when no member of
+  the session fits does it look at other sessions' lists. There a person whose dated Open States seat missed the
+  vote date is ruled out, even when alone, and one whose seat covered the date outranks one with no dated seat.
+  Last, the seat dates break a tie between the remaining candidates only when one of their seats covers the vote
+  date. The full rules, their tests and the open cases (#565, #629) are in [person_ids.md](person_ids.md).
 - A member's seat is matched to an Open States person (district, date and surname; when several same-surname terms overlap, the one whose name starts with the member's given name); when that fails the key is `mohouse:<member id>`.
-  Open States also holds some people twice (after a redistricting or a move to the Senate). Both are
+  Open States also holds some people twice (after a redistricting or a move to the Senate, or as a short duplicate
+  stub: three 2025-01-08 to 2025-02-03 stubs, Kenneth Jamison, Martin Jacobs and David A. Dolan, each beside the
+  member's full record in the same seat). All are
   reconciled to one stable `official_id` per person by `int_officials__person_ids` (the same MO House member id, which follows a name change such as Mazzie Boyd/Christensen, member 2381, #151; otherwise the same exact name, or names that differ only in the given
   name like Steve/Steven or Ken/Kenneth (#228, #263), no conflicting seats, and
   either overlapping dated terms in one seat or a chamber move (years alone cannot tell a duplicate record, Kenneth
-  Jamison's 2025 stub inside Ken's term, from a successor like Danielle after Dan Smith; dates can, using the dates exactly as Open States gives them: the January-1 adjustment used for year membership would make a January successor overlap a predecessor ending Jan 6-9. Known edge: `int_officials__identity_terms` collapses each (id, year, seat, House member id) to min(start)/max(end), spanning any gap if one id held the seat in two terms in a year); seed `official_id_links` for statewide officers and judges), #97.
+  Jamison's 2025 stub inside Ken's term, from a successor like Danielle after Dan Smith; dates can, using the dates exactly as Open States gives them: the January-1 adjustment used for year membership would make a January successor overlap a predecessor ending Jan 6-9. Known edge: `int_officials__identity_terms` collapses each (id, year, seat, House member id) to min(start)/max(end), spanning any gap if one id held the seat in two terms in a year); a duplicate stub (rule 2d: an id whose only term is under 90 days, inside another name's term in the same seat and starting within 7 days of it, with the same surname and a fitting given name, so Jacobs and Dolan, which rule 2b's given-name prefix misses; Jamison is joined by rule 2b); seed `official_id_links` for statewide officers and judges), #97. The rules in precedence order, with the
+  known bad inputs and a registry of the people each case covers, are in [person_ids.md](person_ids.md).
 - The site asks clients not to poll its XML more than every 30 minutes. Cached copies keep it well
   under that.
 - Every shard reads every session zip to list the roll calls. In the October 2026 full run, two shards
@@ -134,6 +189,14 @@ Quirks:
   (`matched_by = 'measure text'`). In October 2026 5,274 of 6,449 roll calls were linked; most of the rest
   are procedural (approve journal, quorum calls, rules, previous question).
 - Bill sponsors list senators (conferees, handlers) with district 200 + their senate district.
+  The XML lists a member's *latest* district in every session, so a representative who later moved to the Senate
+  has his House-era sponsor, co-sponsor, handler and House-conferee rows listed as 200 + a senate district
+  (Mike Moon on 191-HB161: 229). `fct_bill_sponsors` reads those rows as House rows when the bill is a House bill
+  (or the row is a handler or House conferee) and matches them to the session's House roster on surname and given
+  name, provided that person held the listed senate seat in some session (#646; as of 2026-10-27, 1,575 rows, 1,282 of them
+  reaching an official). The district shown is then the roster's.
+  Senate conferees, and sponsors of Senate bills, keep the listed-district reading. The redistricting match
+  (members whose House district number changed) also requires the given name (#647).
 - The bill XML only links roll calls nested under a House bill. It misses House votes on Senate bills
   (third reading, conference reports) and procedural votes ("APPROVE JOURNAL", "QUORUM", "PQ"). Until
   October 2026 the loader found PDFs only through the XML: 3,873 roll calls, 108 of them on Senate
@@ -144,6 +207,27 @@ Quirks:
   links none in). That found 6,449 roll calls, 1,526 on Senate measures. Misses are cached for good once
   the session's year is over and re-checked daily before that. The first probe took about 8 minutes per
   shard with 4 shards.
+- Limits of the roll-call probe (issue #538). The probe is bounded by what the XML links, so a House vote the XML
+  never mentions can be missed in two ways. (1) Days: it stops at the last day the XML links a roll call for plus
+  `DAY_SLACK` (3, `src/mogov/loaders/mo_house.py`). A recorded vote more than 3 session days past the last linked day
+  is never requested. For session 204 this does not bite (see above: days 4-6 are all the site's 404 page), but it is a
+  structural limit; widening it costs one request per extra empty day per session (a day the XML links nothing
+  for has `last_linked = 0`, so `_probe_day` stops at the first miss, roll call 001; a day that does have votes costs
+  one request per roll call plus the final miss). Misses are cached for good once the year is over, so re-runs cost
+  nothing. It cannot be tested without the network, so it is left as is. (2) Numbers: within a day it
+  stops at the first missing number past the highest the XML links for that day, so a gap in the numbering past
+  that point hides later roll calls. A session that has XML files but whose XML links no roll call is probed for 10
+  days (`DAYS_IF_UNKNOWN`). A session code with no XML files at all gets no `linked` entry and is never probed (unless
+  another session's XML links a roll call under its code).
+- The XML also links roll-call PDFs the House never published: the fetch returns the HTML error page, and the loader
+  keeps the miss in `mo_house_rollcalls` as a row with `error = 'not a pdf'` (60 in October 2026: 201 one, 211 eight,
+  221 one, 241 fifty). 55 of them are named under a bill (e.g. `bills241/rollcalls/062.013.pdf`, listed on HB 2634).
+  `stg_mo_house__rollcalls` drops error rows, and `fct_vote_bills` now links only roll calls that are in staging, so
+  those 55 links are gone (32 bills, 13 of which now have no linked vote; they were dangling `vote_id`s that no
+  member vote row carries). A relationships test keeps it that way.
+  Those 13 bills have no linked vote in `fct_vote_bills` even though the House recorded one (the XML lists the roll
+  call with totals). A bill page, if one is built, could show "roll call recorded, PDF not published" without new loading: the link is in `stg_mo_house__bill_rollcalls` and the miss
+  is in the raw `mo_house_rollcalls` rows with `error = 'not a pdf'`. Not built; an open product decision (#570).
 - Committee posts (`fct_committee_memberships`, `fct_committee_posts`): the member XML page lists each
   member's committees and subcommittees with a position (Chair, Vice-Chair, Co-Chair, Ranking Minority
   Member, Member), in every session from 2017 except 253, whose pages list none. For 253 the
@@ -156,24 +240,54 @@ Quirks:
   file inside a zip has no address of its own. Committee names change between sessions. The metric counts
   full-committee chairs separately from subcommittee chairs.
   The `COMMITTEELIST` lists carry no Co-Chair seats at all (2025 regular session: member pages show 3 co-chair posts the list lacks), and 253's list names fewer committees than 251 or 254 (no Conference Committee on Budget, 22 seats; neither of the two property tax special committees, 40 seats), so 253 shows 617 committee seats against 697 in 251 and 685 in 254. The joint committees are in the list. The profile says so under the 253 row. Re-checked against the typed XML raw (2026-10): no other landed file carries 253 co-chair seats. The 253 member pages have no `Committees` element at all, `UPCOMINGHEARINGLIST` names only a committee's chair, and bill files carry no committee roles. The House does not publish them in the exports, so the gap is accepted and not inferred from 251 or 254 (co-chairs of a joint committee are not guaranteed to carry over); 251 and 254 co-chair posts come from the member pages (3 in 251, 2 in 254).
-- Bill sponsorship success (share of a member's sponsored bills that passed) is not built yet: it needs the
-  bill status (`fct_bills.status` and `outcome`, from #34), but Senate bills before 2024 have no status (see
-  Bill status below), so it can only cover House bills and 2024 and later until #317 lands.
+- Bill sponsorship outcomes (`marts.fct_sponsorship_outcomes`, one row per official and House session) count the
+  House bills (HB) and House joint resolutions (HJR) a member was the primary sponsor of (`sponsor_type =
+  'Sponsor'`, one per bill) and what became of them: `bills_decided` (the denominator: every outcome but
+  `pending` and `awaiting governor`), `bills_passed_house` (the House's third-reading passage, including bills
+  that then died in the Senate), `bills_became_law` (`enacted` for an HB, `sent to voters` for an HJR; a bill
+  with `no governor action recorded` is decided but not counted as law) and the two shares over `bills_decided`
+  (null when it is 0). Resolutions (HR, HCR) and Senate sponsors are left out. Appropriation bills are kept
+  (the Budget chair sponsors them and almost all pass). Only current officials (`dim_official`) have an
+  `official_id`, so former members are absent: for 2017 only 136 of 1,263 House primary-sponsor rows match (October 2026), for
+  2026 1,982 of 2,022. A member with House and Senate careers has rows for House sessions only.
+  Survivorship: the earliest sessions (2017-2018) hold only members still in office today, mostly long-serving
+  leaders, so their shares are not comparable with recent sessions. The profile page ("Bills sponsored in the
+  House") shows the counts with their n, a percent only when `bills_decided >= 5`, and this caveat.
 - PDF text extraction is cached by PDF content (`data/cache/pdftext/`). Before that, a re-run spent
   3–10 minutes per shard re-parsing PDFs that were already downloaded.
 - Bill status (`fct_bills.status`, `outcome`; `int_bills__status`) comes from each bill's `Action` list. The
   `SenateActList` file adds the Senate bills that reached the House, but only with their House-side and governor
   actions. In 2024 it stops at the speaker's signature for 17 of its 38 bills: 2024 SB 727 was signed into law, yet the list ends at
   "Signed by House Speaker". Such bills get the outcome "no governor action recorded", not "failed". Senate bills
-  that never reached the House have no actions in any source we load, so their status is null: 906 of 972 SBs
-  and 56 of 58 SJRs in 2026. `SenateActList` exists only for 2024 and later, so every Senate bill of 2017 to
-  2023 has a null status and outcome, enacted ones included (2017 to 2023: 0 of 4,143 SBs have a status; 2024: 29
-  of 796, none enacted because the list stops before the governor). Counts of failed, pending or enacted bills
-  therefore leave out Senate bills, almost all of them before 2024; House bills are complete.
+  that never reached the House have no actions in this export. From the Senate's own action history
+  (`mo_senate_bills`, below) they do (#588): `int_bills__status` reads `stg_mo_senate__bill_actions` too and maps the
+  Senate's wording to the same stage flags through the seed `mo_senate_action_flags` (one row per phrasing; an
+  action no row matches counts for no stage, and substitute or amendment actions such as "SS for SCS S withdrawn"
+  or "HCS H defeated" are deliberately unmapped). A bill in both feeds takes the furthest stage of either, so 2024
+  SB 727 ("Signed by House Speaker" in the House list) is now signed and enacted from the Senate's "Signed by
+  Governor"; a law without signature shows as "Governor took no action, sent to Secretary of State/Article III,
+  Sec. 31" (2024 SB 751) and is enacted. The relisting rule and `action_count` still use the House XML actions only.
+  A Senate bill whose Actions tab was not landed (`mo_senate_bills.fragment_rejected`) has no actions in either
+  feed and so no status: unknown, not a stage. For a session the `mo_senate_bills` loader has not landed, a Senate
+  bill that never reached the House still has a null status (a lookback of ten years lands 2017 on). Until then
+  counts of failed, pending or enacted bills leave out those Senate bills; House bills are complete. Withdrawals read
+  "Bill Withdrawn" (2024 SB 961, 1121, 1122, 1171, 1339: status "withdrawn"). A veto override reads "Legislature voted
+  to override Governor's veto" (the House's "Passed over Veto" is a different phrase), preceded by one "Motion to
+  override Governor's veto S adopted" and one "... H adopted" line that map to nothing on their own (2016 SB 608, 641,
+  656, 844 and 994 were overridden on 2016-09-14). No other override of a Senate bill was found (checked: the 2018
+  sample, 2021 SB 53 was signed, a full sweep of 2023's 723 SBs; 2017, 2019, 2020 and 2022 were not swept). The failed
+  or skipped ones end "No motion made to override Governor's veto" (2023 SB 189; 2018 SCR 50 adds "when called from
+  calendar") and map to nothing. A line-item veto never shows in the Senate feed: it is limited to appropriations,
+  which are House bills (#715). "Bill Combined (w/SCS SBs 901 & 820)" (also written "Bill Combined w/(SCS SBS 975 &
+  1024)") means the bill's content went into a substitute for other bills: status "combined into another bill" (2024:
+  21 bills, 2018: 3 in the sample). It is not enacted; whether the content became law is on the vehicle bill. Its
+  outcome is still "failed" once the session is over, which is a policy question (#756). "Removed S Consent Calendar"
+  maps to nothing (the bill is re-reported).
   The same list names the special-session Senate bills (`stg_mo_house__senate_act_bills`, with titles, version, last
   action and effective date), which the Senate topical index never covers: `int_bills__list` adds those the index lacks
-  (2025's 253 SB 1, 3 and 4), for `fct_bills` and `fct_vote_bills` alike. Senate bills of older special sessions are still
-  missing (#237).
+  (2025's 253 SB 1, 3 and 4), for `fct_bills` and `fct_vote_bills` alike. Once `mo_senate_bills` has landed a session,
+  the Senate's own bill list is the source of that session's Senate bills instead (see mo_senate_bills below); Senate
+  bills of older special sessions are missing until it has (#237).
   Quirk: 143 bills (15 to 17 per regular session, 2017 to 2026, none in 2021; e.g. 2024 HB 1 and HB 2) list
   only "Message Received from the Governor, pursuant to Article IV, Section 27" as their action. They are
   re-listings, not new bills: the House repeats the previous regular session's appropriation bills (same bill
@@ -182,13 +296,144 @@ Quirks:
   128) the bill string is identical and the original is already "enacted"; the 15 of 2017 repeat the unloaded
   2016 session (161). They get status "relisted for governor message", a null outcome (it is on the original) and
   `relisted_from_session_code` naming the original's session (null for 2017), rather than "introduced" /
-  "failed" (#396). Leave them out of per-session bill counts. Loading
-  Senate-side actions is #317 (and #237).
+  "failed" (#396). Leave them out of per-session bill counts.
 - `ActivitySequence` (action order) is only present from 2024. About 1,000 of 138,000 actions are repeated word
   for word under one `Guid` (mostly 2017–2018); staging keeps them once.
 - Session codes: 1 is the regular session and 2–4 are special sessions, in order. Code 2 doesn't appear in
   2017–2026: the first special session of a year is 3. 2018's 183 was a legislature-called session with
   resolutions only.
+
+## mo_house_pdf: Missouri House bill documents
+
+Flow: [diagrams/sources/mo_house_pdf.svg](diagrams/sources/mo_house_pdf.svg)
+
+Stage 2 companion of `mo_house` (issue #591, part of #241): fetches the PDFs that the House XML links and
+extracts their text. It reads the link tables `mo_house` landed (`mo_house_xml_{bill,senate_act}_{texts,summaries,
+fiscal_notes,amendments}`), so run `mo_house` first; no crawl is needed.
+
+- Kinds and counts (distinct URLs, sessions 171-261, measured 2026-10-26): `bill_text` 22,439 (`text_link`),
+  `summary` 23,291 (`summary_text_link`), `fiscal_note` 13,304 (`fiscal_note_link`), `amendment` 9,686
+  (`amendment_text`, which holds the PDF link). 68,720 in all.
+- Raw bytes: each PDF is stored unchanged at `<raw dir>/mo_house_pdf/<session>/<kind>/<file name>`, with one state
+  row per URL in `mo_house_pdf_files` (session, kind, relative path, size, sha256, HTTP status, error, last write,
+  `checked_at` = when the site was last asked, and the `etag` / `last_modified` it sent).
+  Size: about 3-6 GB for the full set (a 206-PDF slice averaged 68 KB: amendments 69 KB, bill texts 85 KB, fiscal
+  notes 96 KB, summaries 32 KB; appropriation bills and omnibus substitutes run to hundreds of pages). The HTTP
+  cache is not used for the PDFs (it would double the disk). The extracted text is cached in `data/cache/pdftext`
+  (`CACHE_DIR`), which on Cloud Run is on the mounted bucket and survives between jobs.
+- Text: `mo_house_pdf_texts`, one row per URL: kind, session, bill file name, LR number and version code from the
+  first link row naming the URL (`n_links` counts the rest), `page_count`, joined `text`, `pages_json` (per-page
+  text as a JSON array) and `error`. Text is pdfplumber's `extract_text()` via `mogov.pdftext` (cached by PDF
+  hash), stored as-is; clean-up is in dbt: `stg_mo_house__document_texts` strips control characters (#593) and
+  `fct_bill_document_texts` is the mart (one row per URL; `fct_bill_documents` carries `page_count`, `text_length`,
+  `has_text`, `fetch_error`). The tables are optional for dbt: a build without the loader gets empty placeholders
+  (`db.OPTIONAL_TYPED_TABLES`).
+- Statute references (#594): for each `bill_text` document with text, `mogov.parsers.mo_house_statute_refs` reads the
+  enacting title (`AN ACT To repeal sections 1.010 and 2.020, RSMo, and to enact ...`; `To amend section ...` gives
+  action `amend`) and Section A (`... to be known as sections ..., to read as follows`) into
+  `mo_house_pdf_statute_refs`: one row per section or range as written (`section_start`, `section_end`), with
+  `action` (`repeal`, `amend`, `enact`), `ordinal` within the action, `supp_year` (from `RSMo Supp. 2023`), the
+  matched `clause`, and the document's URL, session, file name, LR number and version code. Ranges are not
+  expanded here. dbt: `stg_mo_house__statute_refs`, `int_mo_house__bill_text_statute_refs` (joins
+  `fct_bill_documents` for the bill and expands ranges against `fct_statute_sections`) and
+  `fct_bill_text_statute_links`. Appropriation bills, land conveyances and joint resolutions that amend the
+  Constitution name no RSMo section and give no rows. The parser runs on the stored text, so a change to it means
+  re-running the loader (a re-read of the landed PDFs, no downloads).
+- Not fetched: witness forms (`mo_house_xml_bill_witnesses`; they print citizens' contact details, #244) and
+  change-map PDFs (`map_link`). `fetch_document` and the `KINDS` table are the reusable seam for adding a kind.
+- Rate: every request waits at the host-wide throttle (`REQUEST_INTERVAL` = 1 s, shared by every shard and by
+  `mo_house` on one machine). Measured on a 216-URL slice with 2 shards: 225 s, one request a second; more shards
+  do not go faster. The first full run is therefore about 68.7k requests, around 19 hours; use
+  `MOGOV_HOUSE_PDF_KINDS=bill_text` (comma list of `bill_text,summary,fiscal_note,amendment`) and
+  `MOGOV_HOUSE_PDF_SESSIONS=261` (session codes) to run it in pieces. The options only limit what is fetched: documents already on
+  disk outside them still get their rows, so the pieces add up (a piece does not drop the earlier pieces' rows).
+  Use the same `--shards` for every piece.
+- Freshness: published versions have versioned file names, so a file already on disk for a closed session is read,
+  never fetched; the open session's files (current year or later) are re-checked when older than 7 days with a
+  conditional GET (`If-None-Match` / `If-Modified-Since` from the previous row; a `304` only touches the file) and
+  replaced only if the bytes changed. Re-checks cost one request per file (about 8.2k, 2.3 h at 1 request/s) but
+  transfer nothing when unchanged. A re-run of the 216-URL slice made only the 10 requests for URLs that had failed,
+  in about 30 s, and rewrote no file.
+- Re-runs read the previous `mo_house_pdf_files` row: when a file's size and mtime still match it, the file is not
+  read or hashed again and its text comes from the `pdftext` cache by the recorded sha256 (a pointer file under
+  `cache/pdftext/by-hash/`, written whenever the text is extracted; without a cache hit the file is read and extracted
+  as before). Over Cloud Storage FUSE this avoids re-reading the 3-6 GB set every run.
+- Negative cache: a closed session's permanent failures (HTTP 4xx except 408/429, or `200` with an HTML page, i.e.
+  `error = 'not a PDF'`) are not asked for again for 30 days (`NEGATIVE_CACHE_S`, judged by the previous row's
+  `checked_at`; about 800 resolution-summary links, ~13 min per run). Timeouts, 429, 5xx and any failure in the open
+  session are retried every run. To force a retry of one URL, set its row's `checked_at` in the `mo_house_pdf_files` part
+  to NULL or an old date (a part holds many URLs; deleting it forgets all of them). Without editing the data, wait 30 days.
+- Filtered runs (`MOGOV_HOUSE_PDF_KINDS` / `_SESSIONS`) carry the previous error rows of URLs outside the filter, so
+  the error history survives a piecewise load.
+- Text extraction is bounded: pages are released as they are read, and one document may take at most
+  `pdftext.MAX_SECONDS` (600 s, checked between pages); past that the document lands as an error row
+  (`ExtractTimeout`) instead of hanging the shard. A single page that never returns is not interrupted. A timeout is remembered by the
+  PDF's hash and the pdfplumber version (`<cache>/mo_house_pdf_timeouts/`) for the same 30 days, so later runs
+  report the error row (prefixed `(cached) `; the first run's row has no prefix, so a rerun is not byte-identical for
+  that column, which is by design: the prefix is the only record that nothing was re-extracted) without extracting again; an extractor upgrade retries on its own, or
+  delete the marker file to retry sooner. The marker is written best-effort: if it cannot be written the row still
+  lands and the next run tries again.
+- Changing the shard count: `db` keeps the old-count parts until every shard of the new count has landed, so a shard
+  that starts late (Cloud Run waves) still sees the earlier rows for its URLs. `previous_files()` and `links()` read
+  through `db.own_rows_sql`, so while both counts exist a URL has one state row (the newest `checked_at`/`landed_at`,
+  ties to the highest part name) and `n_links` counts each link row once (a row is session, file, index; for the Senate-act tables, which hold many bills per file, also the bill); `previous_files()` also retries its read when
+  a part vanishes mid-listing. Finish every shard of `mo_house` before `mo_house_pdf` runs (see docs/environment.md).
+- A URL that is new to an already-started session/kind but outside a filtered run's kinds/sessions gets no row, so
+  `assert_house_documents_have_landed_rows` fails until a full (unfiltered) run; normal syncs are unaffected.
+- Only rows fetched this run log `mo_house_pdf.failed`; carried-over and negative-cached error rows are quiet.
+- Shard units: distinct document URLs, split by the URL's hash (`--shards`/`--shard`). Failures (HTTP errors,
+  timeouts, a non-PDF answer) land as rows with `error` set; transient ones are retried on the next run, permanent ones
+  after the negative-cache window. A failed weekly re-check of an open-session file already on disk keeps that file,
+  its row and its text, logs `mo_house_pdf.recheck_failed` and retries next run.
+
+Quirks:
+- The site answers some bad links with `200` and an HTML error page ("Missouri House of Representatives - Error"),
+  so a PDF is recognized by its `%PDF-` header, not the status. Seen in the slice: 10 of 50 summaries (resolution
+  summaries such as `sumpdf/HR0001I.pdf` in 173, 174, 183, 184, 204). They land as `error = 'not a PDF'` and no file.
+- Two fiscal-note links point to `www.moga.mo.gov/OverSight/...htm` (HTML, 2018, a host that did not answer when
+  probed); they land as error rows. Two bill-text links use `house.mo.gov` rather than `documents.house.mo.gov`; such
+  a file is stored as `<host>__<file name>` so it cannot collide with the same name on the main host.
+- Statute references (#594), measured on a 378-document slice (sessions 241, 251 and 261: every truly agreed text,
+  120 random introduced texts, HB 1-13; first 8 pages of each): 192 documents give 2,768 rows (1,134 repeal, 1,634
+  enact; no range, no `Supp.` citation and no `To amend section` title among them, so those three forms are
+  tested on made-up text only). The other 186 are 168 appropriation bills, 9 joint resolutions, 3 land
+  conveyances or transfers, 3 not-a-PDF links and 3 with no text layer. Section A prints its line numbers either at the start of the line
+  (`2 sections enacted in lieu`) or alone on the line before it (`2` then `one new section`, seen in
+  5627H.09T); both are stripped before reading. `To amend chapter 160, RSMo, by adding thereto one new section`
+  has no repealed section, only the enacted one. New sections that Section A adds without a number (`..., and 1, to read as follows`, a bare
+  `1` standing for a section the Revisor numbers later) are not captured: 19 of 714 bill texts from 2024-26.
+  `as enacted by house bill no. N` inside a repeal list does not end it (the list ends at `to enact`, `relating to`
+  or `by adding`). A pure repeal (`Sections 559.301 ... are repealed`) has no enact
+  rows. Sections within a chapter run in the order of the number after the point as an integer (140.995 is followed
+  by 140.1000), not as a decimal: 1,698 of 1,699 consecutive pairs in the slice's lists follow it. For the 82 truly
+  agreed texts whose bill the Revisor also links, 891 of 918 repealed or amended sections are in
+  `fct_bill_statute_links` (`assert_bill_text_repeals_agree_with_revisor_links`, warn). 2026 HB 3279 renumbers
+  620.580-620.592 to 173.4000-173.4012 and the Revisor credits it only with the new numbers (a moved section's
+  repeal note reads `(Transferred 2026; now 173.4000)`, no bill), so `int_mo_house__bill_text_revisor_agreement` counts a
+  repealed section the Revisor lists as transferred to a section credited to the same bill (7 of 7; it was 0 of 7).
+  A mid-list `relating to` (`To repeal section 1.010, relating to x, and section 2.020, ...`) does not end the
+  repeal list when another `section N` follows before `to enact`; none of 714 real titles has one, so this is
+  tested on made-up titles. Limit: a pure repeal whose trailing topic itself says `section 3.030` reads it as a
+  continuation.
+- A summary PDF is linked by every version of a bill that shares it (23,648 link rows, 23,291 distinct URLs), so
+  `mo_house_pdf_texts` has one row per URL, not per link.
+- Small-caps and some display glyphs can extract as NUL characters (seen in `house_fd` text); that is stored as-is.
+  None appeared in the 206 extracted slice documents or in a 524-document slice of the 2018 and 2022-2025 special
+  sessions; `clean_pdf_text` strips them (and other control characters) in dbt anyway, proven on a fixed row.
+- Word spacing (#639): the House's Word output sets inter-word spaces at exactly 3.0pt (12pt Times), which is
+  pdfplumber's default `x_tolerance`, so the default glued words (`AMENDHouse Committee Substitute for House Bill
+  No.12,Page 3`), mostly in amendments, also on some bill-text lines. The loader extracts with `x_tolerance=2`
+  (`X_TOLERANCE`). On 14 amendments, tokens over 25 characters fell from 0.77% to 0.16% (the rest are underscore
+  rules) and the token count rose 26,666 to 31,170; 5 bill texts, 5 fiscal notes and 4 summaries did not get worse
+  (bill texts gained 20 tokens, the others were identical). That sample understates appropriation bills: dot
+  leaders are spaced glyphs (gaps 1.7-2.7pt) that now split, so 211 HB2 (0002H.03C, 27 pages) went from 7,139 to
+  14,719 tokens and 52,391 to 59,971 chars (+14%), `Fund.....$25,927,525` becoming `Fund.. . . . . $25,927,525`;
+  171 HB1 grew 9% in chars and its 8 long tokens fell to 0; 231 0619H.01I's 5 glued whole lines fell to 0. Fiscal
+  notes, summaries and 4 of 7 amendments were byte-identical and no mid-word splits were found. For future amount
+  parsing: leaders extract as `. . . .` and an amount can stay glued to the last dot (`.7,771,056`). Re-extraction
+  of the ~68.7k PDFs costs up to ~10 CPU-hours (about 1.3 h wall with 8 shards). `x_tolerance` is part of the `pdftext` cache key,
+  so changing it makes the next `mo_house_pdf` run re-extract every document from the PDF already on disk (no
+  re-download for closed sessions) and rewrite `mo_house_pdf_texts`; old `pdftext` cache entries remain as orphans.
 
 ## mo_senate: Missouri Senate journals
 
@@ -238,6 +483,149 @@ Quirks:
   exists from session 241, so no source lists those bills and a vote on one links to nothing. House bills in
   special sessions link through the House XML actions. From 253 on, Senate bills link through the House XML
   actions (the Senate's own steps are not listed, so the match is by date span).
+- The journals also date Open States' Senate seat-terms (`int_mo_legislators__seats`, #516, #522), term by term, so
+  every consumer of the seat table (officeholders by year, salary pairing, attendance, peers, sponsors) sees the
+  corrected dates. 25 senators in office from 2017 have no Open States start date; the term's first roll-call vote
+  stands in as the start. That is the latest the start can be, not the start itself: 23 of the 25 first voted on
+  2017-01-04, the journals' first day, so they were seated by then, and the other two first voted later (Jacob
+  Hummel 2017-01-10, Bill White 2019-01-09). It agrees with every dated start (first vote on or just after it) and with the 4-year term rule where the rule
+  applies; it contradicts the rule for six senators whose Open States term ends 2023-01-04 (two consecutive
+  terms). A term Open States ends over a year after its last vote ends at that vote (Ryan Silvey, last vote
+  2017-09-13, was listed to 2018-12-31; Will Kraus, 2017-07-25), and a closed term running into the journal years
+  with no vote (Joseph Keaveny, Eric Schmitt, Kurt Schaefer, David Pearce) ends the day before the journals begin,
+  2017-01-03, the latest it can have ended (the exact date is unknown). Votes are attributed to a senator against
+  Open States' own dates (`int_mo_legislators__seats_as_given`), so the correction does not feed back into who a
+  vote belongs to.
+  Dropping or capping a term for lacking votes only happens when the journals cover it: with no journal loaded, or a
+  calendar year of the term with no journal vote (including years after the journals stop, for a closed term), the
+  term stays as Open States gives it (#534). Two dbt tests guard
+  the attribution these rules trust: `assert_senate_vote_tokens_attributed` (more than 0.05% of vote rows
+  unattributed; 0 of 75,677 today) and `assert_senate_terms_have_votes` (a closed Senate term with no attributed
+  vote, other than the four who never voted in the journals). The last-vote cap ends Ryan Silvey's term 2017-09-13
+  although he was paid into January 2018; whether payroll should override it is open (#551). Mike Cierpiot (SD 8) voted in the House through 2017-09-13, when the Senate seat was vacant
+  (Kraus's last vote was 2017-07-25), and first voted in the Senate on 2018-01-08; Open States starts his Senate
+  term 2018-01-03. Nothing loaded dates his seating within 2017-09-14 to 2018-01-03 more closely. Only the
+  2025-2026 Official Manual is loaded, so it gives no evidence for earlier years.
+
+## mo_senate_bills: Missouri Senate bill list, action history and document lists
+
+Flow: [diagrams/sources/mo_senate_bills.svg](diagrams/sources/mo_senate_bills.svg)
+
+senate.mo.gov's bill tracking (`/BillTracking/Bills/BillList`) has one page per session listing every Senate
+bill and resolution (SB, SJR, SCR, SR), and one small HTML fragment per bill with its whole action history:
+the Senate's referral, hearing, perfection and third reading, the House side, enrollment and the governor,
+each with the journal page that records it. This is the only source of Senate-side actions; the House XML
+lists actions for House bills and for Senate bills only once they reach the House.
+
+- Lands: `mo_senate_bill_list`, one row per bill, the page's embedded JSON object as printed (ids, prefix and
+  number, sponsor and handler, description, links; the served `year` is left as is) plus `list_year` (the year
+  asked for) and `session_type`. `mo_senate_bill_actions`,
+  one row per action: `year`, `session_type`, `bill_id`, `bill` (e.g. `SB1`), `action_index` (0 = top row as
+  served, newest first), `action_date` (as printed, MM/DD/YYYY), `action`, `journal_ref`, `journal_url`.
+- Also lands the bill page's other tabs (`handler=BillText`, `FiscalNotes`, `Amendments`, `Summaries`), each
+  row carrying `year`, `session_type`, `bill_id`, `bill` and `doc_index` (position as served), keyed
+  `year/session/billId/doc_index`, in the same shard as the bill. The PDFs behind the links are not fetched.
+  - `mo_senate_bill_texts`: `url`, `title` (`SB 1 - 0453S.04T`), `label` as printed (`0453S.04T - Truly Agreed
+    to and Finally Passed`) and its two halves `lr_number` and `version`.
+  - `mo_senate_bill_fiscal_notes`: `url`, `title`, `label` as printed (`Perfected (0453S.04P.ORG)`).
+  - `mo_senate_bill_amendments`: `amendment_id` (from the PDF url), `url`, `title`, `label` (date, who offered
+    it, LR number), `status` (the chip, e.g. `2/4/2025 - Adopted`).
+  - `mo_senate_bill_summaries`: `summary_id`, `label` (the version, e.g. `Introduced`) and `text` exactly as
+    printed (tabs and CR LF kept).
+- In the marts (#589): the text, fiscal-note and amendment links reach `marts.fct_bill_documents` with
+  `source_site = 'senate'`. The summaries have no URL, so they stay in `stg_mo_senate__bill_summaries` and are not
+  `summary` rows. A 2024+ Senate bill that the House also acted on carries links from both sites (different URLs,
+  so both rows are kept; only an identical URL is deduped). The Senate serves one PDF URL for several text versions
+  (e.g. two House Committee Substitutes), and that link collapses to one row. The Senate PDFs are not fetched yet
+  (#590), so `page_count` and the text columns are null on Senate rows.
+- In the marts (#839): each bill's sponsor (`sponsorLastName`, `sponsorFirstName`, `districtNumber`) becomes the
+  `Sponsor` row of the bill in `marts.fct_bill_sponsors` (`stg_mo_senate__bill_sponsors`), matched to the senator
+  holding the district's seat that year. The list names one sponsor and no co-sponsors, so a Senate bill has one row.
+  The list prints a surname shared by two senators with the district, "Brown (16)"; staging drops the suffix.
+  One list row (2022 SB 2162) has no sponsor at all and is left out.
+- Window: `MOGOV_LOOKBACK_YEARS`: the regular session (`R`) of each year plus every extraordinary session
+  (`E1`, `E2`, ... until one comes back empty). Shard units: bills, split by a stable hash of
+  `year/session/billId`. Every shard reads every session list once (cached) and takes its bills, so the split
+  does not depend on listing order or on who else is running.
+- Pace: five requests per bill (Actions, BillText, FiscalNotes, Amendments, Summaries), ~1 request/second to
+  the host (accepted by the maintainer in #584), a lock shared by every process on the machine, so shards add
+  no speed. A regular session is ~1,000 bills: about 85 minutes cold (~17 of them for the action histories
+  alone); the default ten-year lookback is ~50,000 requests, about 14 hours cold. `MOGOV_SENATE_BILL_DOCS=0`
+  fetches only the bill lists and Actions (one request per bill) and leaves the four document tables as they
+  were last landed. Past sessions are cached 30 days, the current
+  year 1 day, so a daily run re-fetches the current year's five requests per bill (~5,300 for 2026's ~1,060
+  bills, about 90 minutes a day with documents against ~17 without; see docs/sync.md). Cloud Run tasks do not share a filesystem, so each task slows to `1 s x CLOUD_RUN_TASK_COUNT`.
+  `mo_senate` (journal PDFs) and `mo_senate_topics` use the same shared lock, so all senate.mo.gov traffic from
+  one machine stays at ~1 request/second, whichever loaders run together.
+- Bill lists come from the `const bills = [...]` array in a script element, read with a JSON parser; the
+  bill cards in the page are not parsed.
+
+Quirks:
+- `billId` is the site's own key, not the bill number: 2025 SB 1 is 233, 2017 SB 1 is 57095344. The number is
+  `billPrefix` + `billSuffix`.
+- Session codes are `R` and `E1`, `E2`, ...; `session=E` and `S1` return an empty list. They are not the House
+  codes: the 2025 special session `E1` (29 bills, SB 1 is id 18267452) is House session `253` (SB1-SB4 there),
+  not `252`, and 2025 also has an `E2` (2 bills). Map session to House code by evidence, not arithmetic.
+- Action wording differs from the House's (for example "S First Read", "Second Read and Referred S
+  Government Efficiency Committee"); normalize in dbt.
+- The history is newest first and covers both chambers. The journal reference can name both (`H2291 / S1216`)
+  and links to the journal PDF page (`.../25info/pdf-jrnl/DAY68.pdf#page=32`).
+- A bill whose fragment has no action table logs `mo_senate_bills.no_actions` and lands no action rows.
+- Resolutions have no handler: those keys are absent from the bill's JSON.
+- Revision bills are `SRB` (2018 `SRB975` and `SRB1024`, the "SB 975 & 1024 Revision" act), which the Revisor cites as
+  `S.B.`; the list carries them under no topical-index keyword (#627 for the Revisor link).
+- The Senate site returns an empty list for 2017 `E1` (the House has 173 and 174), so the 2017 special-session
+  Senate bills are not landed and stay missing from `int_bills__list`; the seed has no 2017 `E` row.
+- The Senate's `E1` is not always the House's first special session: 2018's only Senate extraordinary session (the
+  September STEM one, 5 bills) is House `184`; the House's `183` (May impeachment) has no Senate session.
+
+- A bill with no fiscal notes or amendments is answered with `No Fiscal Notes available for this bill.` /
+  `No amendments available for this bill.` (HTTP 200, zero rows). Most bills have no fiscal note; bills that
+  died in committee have only the introduced text. A bill with no summaries is answered `No summaries
+  available for this bill.` (seen on 2026 SRM1), so resolutions don't always have text versions and summaries
+  like bills.
+- Fragments are checked before they are cached: a body with neither the tab's container nor that tab's own
+  notice (`No Fiscal Notes available`, `No amendments available`, `No summaries available`, a text-versions
+  one; Actions: its container or the 81-byte `No actions found for this bill.` a bill with no actions gets) is
+  rejected and not cached. A generic "No ... available" error page does not pass. A rejected fragment is
+  skipped, not fatal: `mo_senate_bills.fragment_rejected` is logged with the bill key and the tab, the bill-list row
+  and the bill's other tabs still land, and the rejected tab lands no rows. A missing tab therefore means "not
+  fetched this run" (the next run retries it), never "none": a bill with no actions has the notice and logs
+  `no_actions`; a bill with a rejected Actions tab has neither rows nor that notice, so an absent action history
+  for a listed bill is a gap to check against the warnings, not evidence of no actions. If bills with rejected
+  fragments reach 3 in a row, or 5% of the shard's bills (at least 3), the shard raises
+  `TooManyRejectedFragments` and publishes nothing, so the previous landing stays.
+- For some bills the site's own backend fails on a tab, every time: the tab is answered HTTP 200 with a 230-byte
+  `<p ...>Error loading bill text: The HTTP status code of the response was not expected (500). Status: 500
+  Response: {"title":"An unexpected error occurred.","status":500}</p>` (#872). Seen only on BillText: 11 of ~3,200
+  bills of 2017-2021 (2017 SB 82, 197, 313, 326; 2019 SB 369, 374, SR 254; 2020 E1 SB 6; 2021 SB 351, SJR 2,
+  SR 22), as of 2026-10. It is rejected and not cached like any other bad fragment, so those bills have no
+  text-version rows ("not fetched", never "no text versions"), but it logs `mo_senate_bills.upstream_tab_error`
+  with the tab and the `status` instead of `fragment_rejected`, and it does not count toward the block-page bound
+  above. It has its own: 10 bills in a row, or 5% of the shard's bills (at least 10), raise
+  `TooManyRejectedFragments`, since the notice on every bill means the site is down, not one bill.
+- In the 2017 R list 561 of 604 bill objects have `session` = `"R "` with a trailing space (the loader's own
+  `session_type` is clean).
+- `FiscalNotes` is sent with `sessionType=<session>` as the tab's own script does (the list page's
+  `data-modal-url` omits it); in a probe (2026-10-26) the fragment was the same without it. `CommitteeMinutes` answers HTTP 500 and is not requested (see #280).
+- Amendment links go to `BillInformation?handler=AmendmentPdf&year=YYYY&amendmentId=N`; text and fiscal-note
+  links go to static PDFs (`/25info/pdf-bill/tat/SB1.pdf`, `/FiscalNotes/2025-1/0453S.04T.ORG.pdf`).
+In dbt (#586): `stg_mo_senate__bills` (one row per bill, parsed from the JSON) and `stg_mo_senate__bill_actions` (one
+row per action, date parsed) read the two raw tables; `mogov build` creates empty placeholders until the loader has
+run (`db.OPTIONAL_JSON_TABLES`), so a build without it still works. `stg_mo_senate__bills` also carries `bill_type`
+(the prefix: SB, SJR, SCR, SR, SRM, SRB) and `legislator_id` (the list's `legislatorId`, the sponsor's id on the
+Senate site); `stg_mo_senate__bill_actions` adds `action_seq` (1 = the oldest action; the site serves newest first)
+and `chamber` (`G` when the action names the Governor, `H` or `S` when the wording has the standalone token, null
+otherwise). The session year is read from the payload's `list_year` when the loader wrote one, else from the served
+`year` key (#613 may rename the key the loader adds). The seed `mo_senate_session_codes` maps
+(year, `R`/`E1`/`E2`) to the House's session code, with its evidence per row: `R` is the two-digit year + 1 (251),
+but the House has no 252, and 2025's June special session (`E1`) is 253, its September one (`E2`) 254. A session
+with no seed row fails `assert_senate_sessions_have_house_codes` and its bills stay out of `int_bills__list` until
+a row is added. `int_bills__list` takes Senate bills from this list for every session it has landed; for other
+sessions it keeps the topical index and the House `SenateActList`. To add a special session: find the House code
+whose bills share the Senate's titles and whose dates overlap, append `year,E<n>,<code>,"<evidence>"` to
+`dbt/seeds/mo_senate_session_codes.csv` (titles and dates in the evidence, as the 2019 to 2022 rows have), and
+`dbt seed`; the failing test's header repeats this. Status from the Senate's actions is `int_bills__status` (#588; see mo_house_xml above).
 
 ## mo_senate_topics: Missouri Senate topical index
 
@@ -288,9 +676,38 @@ of their own.
   is a new version with its own `bid` and URL, so the weekly chapter lists find it. A version's own page only
   changes with annotations, so it is re-read every 180 days.
 - dbt: `stg_mo_revisor__*`, then `int_mo_revisor__session_law_bills` (history and repeal notes split into one
-  row per bill), then `fct_statute_sections` and `fct_bill_statute_links`.
+  row per bill), then `fct_statute_sections`, `fct_statute_section_footnotes` (one row per footnote, in page order,
+  verbatim; the first is usually the session-law history) and `fct_bill_statute_links`. For the site's statute pages
+  (#355): `rpt_statute_section_bills` (each section's bill links with the bill's title, outcome, page and primary
+  sponsor from `fct_bills` / `fct_bill_sponsors`; a link to a bill before 2017 or outside `fct_bills` has the citation
+  only) and `rpt_statute_chapters` (section versions per chapter by status).
+- `fetched_at` vs `loaded_at` (#852): `fetched_at` (on `fct_statute_sections`, `fct_statute_section_footnotes`, and as
+  `oldest_fetched_at`, the earliest per chapter, on `rpt_statute_chapters`) is when the page's bytes came from
+  revisor.mo.gov. The loader writes it into each `mo_revisor_sections` / `mo_revisor_repeals` payload (all
+  `mo_revisor_repeals` rows share the one `rx.aspx` fetch time) as ISO-8601 UTC, taken from the HTTP cache entry's
+  mtime (`http.fetch_stamped`): the cache file is written the moment the response lands, and the same mtime decides
+  whether the entry is still fresh. A page reused from the cache therefore keeps the time of the fetch that filled it,
+  not the time of reuse (the site sends a `Date` header, but it is not stored, and the cache file is the only record
+  of a cache hit). The cache directory must keep file mtimes (copying it without them makes pages look freshly
+  fetched). `loaded_at` is when our pipeline last published the raw table, so a page can be up to 180 days older than
+  `loaded_at` (the repeals list up to 7). Raw rows loaded before #852 have no `fetched_at` (null in dbt); only a
+  loader re-run fills it, and `oldest_fetched_at` ignores nulls until then.
 
 Quirks:
+- **Footnotes are the whole annotation, not just the history.** A page's footnotes (1 to 39 on a version; 13,600+
+  versions have more than one) are the session-law history, "Prior revisions" lines, the Revisor's court-case
+  annotations ("(1960) An alley in a city is a highway ... Timmons v. Kilpatrick (Mo.), 332 S.W.2d 918.") and notes
+  such as "Effective 1-01-17". They keep the Revisor's own typography: ellipses ("*...*Words ... appear here in
+  original rolls"), elided party names ("G....v.Souder") and the odd typo ("paraphernalia.. State"). Four versions
+  (82.136, 324.023, and the two contingent 324.406 / 324.424 versions) print a first footnote that is not the history
+  note, so they have no `history_note` and no `is_history_note` row.
+- **Cross-chamber combined acts.** Five acts join a Senate and a House bill with "&" or "and" ("A.L. 1977 S.B. 111
+  & H.B. 130"; 1998 and 2005 use "and"), all before 2017: 1977 SB 111 and HB 130 (6 sections), 1981 HB 519 and SB 16 (1), 1982 SB 649 and HB 1096 (1),
+  1998 SB 820 and HB 1587 (1), 2005 HB 353 and SB 254 (2). The section text never names the bill, so the
+  combined-act reading (the first bill passed, the other's subject went into it) can't be confirmed from the
+  Revisor; it needs the journals. The data argues against it for some: HB 130 (1977) and SB 16 (1981) are the lead
+  bill of 53 and 259 other sections, and HB 1096 (1982) leads 5 others. The model still reads these
+  as combined (issue #571); `assert_cross_chamber_combined_acts_are_known` pins the five so a new one gets looked at (it warns; add the act to the `known` CTE in that test after a spot-check).
 - **Rate limit.** The site blocks an IP address that sends requests less than a second apart several times in
   30 seconds. First it serves a warning page with status 200 in place of the page asked for (the same page it
   serves for a page that doesn't exist). If requests keep coming, every request from that IP, browsers
@@ -322,6 +739,11 @@ Quirks:
   and is skipped (logged as `mo_revisor.section_page_refused`; a re-run tries it again). Three skipped in a row
   stop the load, since that is a real warning, and so does a total above max(20, 0.5% of the pages) however
   they are spread; the run ends with `mo_revisor.sections_skipped total=N`.
+- The site has also served its home page (the table of contents), with status 200 and no redirect, in place of
+  a listed section: 161.415 (bid 7908) on 2026-10-29, which read normally on the next request. A section
+  response without the content block is refused like the warning page (`Misserved`): retried after a minute,
+  never cached, and skipped and counted the same way if it persists. Before this check the home page was cached
+  for 180 days and every run failed with "section page without a content block".
 - Several versions of one section can be in force side by side: a later version with a future effective date
   (27.117 has one effective 28 Aug 2026 and one effective 1 Jul 2027), or conflicting enactments of the same
   year (`MultiEnact.aspx`). `fct_statute_sections.is_current` marks the in-force version with the latest
@@ -362,9 +784,15 @@ Quirks:
 - Some versions are on both pages: 324.406/60569 and 324.424/60572 are listed contingent on their chapter page
   and printed on `rx.aspx` as "Repealed L. 2026 S.B. 1233" with the 2099 date. `fct_statute_sections` keeps the
   listed row and sets `repeal_pending`.
+- One bill can be both `repealed` and `amended` for the same section in `int_mo_revisor__session_law_bills` and
+  `fct_bill_statute_links`. A repeal-and-enact-in-lieu act is cited twice in the note ("A.L. 2026 S.B. 888 and
+  Repealed L. 2026 H.B. 2637 & 3155", 566.211), once as the repeal and once as the new text. Anyone counting
+  "sections a bill repealed" should expect rows for sections it also amended, and filter on `change`. In a repeal
+  note "Repealed" covers every "and L." act after it, however long the chain, and any bill-only pieces that follow.
 - Some chapters list no sections at all: every section in them was repealed or transferred.
-- History notes only cover bills that became law. A pending bill's statute targets are in its text, which
-  isn't loaded yet (#175).
+- History notes only cover bills that became law. A pending bill's statute targets are read from its text
+  (`mo_house_pdf`, #594) into `fct_bill_text_statute_links`; `link_source` is `revisor_history` in
+  `fct_bill_statute_links` and `bill_text` there.
 
 ## mec: Missouri Ethics Commission (opt-in)
 
@@ -401,6 +829,8 @@ Quirks:
   was lost, but committees first registered for a pre-2020 election are only linked to an official if
   they also filed for a later one. An offered year with no dates is still logged as
   `mec.crosswalk_no_elections` and not cached.
+- The 24-hour notices repeat here too (#156): 74 direct-export rows ($0.51M, report years 2023-26) are notice lines
+  that a full report itemizes again; `int_mec__contributions_direct` drops them (see tap_mec Quirks for the rule). The second tier (#542) drops 4 more ($19.6k) whose donor name was misspelled in the notice or the report.
 - MEC answers in under a second (the lobbyist search takes about 13 s). The fixed `MOGOV_MEC_PAUSE`
   (3 s) between requests is most of the runtime. A cold run is about 4 requests per export year and
   3 per election date.
@@ -469,6 +899,46 @@ Quirks:
   older rows against one newer row and keep the extra older row. Gifts that differ in amount, date, committee or
   name are not matched, so some re-filed gifts may remain.
   Net effect of the dedupe: staging goes from 1,603,397 to 1,486,204 rows ($1.2487B to $1.0550B).
+- A "24 Hour" notice is also listed again, as a line of its own, in the committee's next full report, within the same
+  layout (#156). The notice (report `24 Hour Expenditure Report-...`, a gift of $5,000+) and the full report's line
+  carry the same committee, date, amount and donor. Staging keeps both; `int_tap_mec__contributions` (what committee
+  receipts, donor summaries and the campaign-finance fact read) drops the notice line when the same committee's full
+  report itemizes the same gift (donor compared by `name_key`: case, punctuation and spaces ignored), matched one-to-one,
+  so a notice with no later full-report line and two equal gifts that both appear in full reports stay. Measured
+  October 2026: 127 TAP rows, $1.30M. A second tier (#542) catches the same donor spelled differently: among the lines
+  left over, a committee/date/amount with exactly one notice and one full-report line, both naming the same city and
+  state, is one gift when the names are equal after dropping MO/Missouri, "and"/"of"/"the", legal forms and middle
+  initials ("MO Soybean Association" / "Missouri Soybean Association", "James Nutter" / "James B Nutter"), or are a
+  typo apart (up to 2 letters, names of 10+ characters, same digits: "Lathrop GPM" / "Lanthrop GPM"; "LIUNA Local 110"
+  is not "LIUNA Local 100"). Measured October 2026: 7 TAP rows ($35.4k). A third rule (#557) in the same tier
+  also pairs an abbreviation or an added word: word by word one name is a prefix of the other ("deVries & Associates" /
+  "DeVries and Assoc", "...Technical Ed" / "...Technical Education") and the longer name has at most two more words
+  ("Committee to Elect Jamie Burger HD"); the first word must be equal and the digits match. A word that is only the
+  start of another word counts (#634) only when the longer word is an organisation word from a curated list (macro
+  `is_org_word_prefix`: association, committee, construction, insurance, telecommunications, ...) and the prefix has at
+  least 3 letters (2 for "Ed" / "Education"): "Assoc" / "Associates", "Ins" / "Insurance", "Technical Ed" /
+  "Technical Education". Person surnames are not on the list, so "John Hill" / "John Hillhouse", "Smith Alex" /
+  "Smith Alexandra", "John Smith" / "John Smithson" and "Committee to Elect John Smith" / "... Smithson" stay unpaired,
+  and Roman numerals and 1-2 letter words must be equal ("Holding III" / "Holdings II"). Two different abbreviations of one word also pair (#740), through a map in the macro
+  `org_word_abbreviation` ("Ass" / "Assoc" / "Assn" / "Association", "Ed" / "Edu" / "Educ", "Int" / "Intl", "Com" / "Comm",
+  "Telecom" / "Telecomm", "Dist" / "District", "Govt" / "Government"; "Assoc" can also mean "Associates", a firm, but maps to
+  "association": no wrong match seen in the data; the map applies from word 2 on, so "John Ed Smith" / "John Edu Smith" pair by design). An organisation abbreviated in a way the list and the map do not cover
+  (a misspelling, "Mfg") is not paired by this rule. The typo rule (#735) only pairs names whose differing words are 5+ letters in both names, so a change to a short
+  word ("Citizens for Ann Smith" / "Citizens for Anne Smith", "Joan" / "John", "Sara" / "Sarah") is two people and both
+  lines stay; "Fran Froelich" / "Fran Froehlich" and "Lathrop GPM" / "Lanthrop GPM" still pair. Spacing
+  variants that change the word count ("Century Link" / "CenturyLink", "Fire Fighters" / "Firefighters", "Kansas City Life" /
+  "KansasCity Life", "Van Dyke" / "Vandyke") pair again (#753): with the spaces removed the two names are identical (6+ characters, different
+  word counts, so "Marc Anthony" / "Marca Nthony" does not pair). That is no looser than an exact match. October 2026: no notice/full-report
+  pair of the two feeds is a spacing variant, so no row changes. The typo rule cannot tell a person from an organisation, so 5+-letter first
+  name and surname variants (Frances / Francis, Peterson / Petersen) still pair when one lone notice and one lone full-report line share committee,
+  date, amount, city and state; no such pair exists in the data, and skipping word 1 would break real organisation typos ("Lathrop GPM" /
+  "Lanthrop GPM"). A name whose loose key is empty
+  (only stop words, legal forms and initials) is never paired. On the October 2026 data the tightening changes no
+  row (the same records: still 138 TAP notices and 78 direct-export notices dropped). With several lines in the
+  group a notice is dropped only when it has exactly one name-compatible full-report line, that line has exactly one
+  name-compatible notice, and no line in the group lacks a donor name. Measured October 2026: 4 more TAP notices
+  ($10.9k). Left in place on purpose: two compatible candidates on either side, names that need outside knowledge
+  ("UP Railroad Company" / "Union Pacific Railroad Company"), and different donors who happened to give the same amount.
 - A few MECIDs are lower-case (`c000525`); the intermediate models upper-case them.
 - A committee-to-committee gift names the donor committee only. `cmte_id` / `mecid` is the receiving
   committee's ID, and there is no donor MECID. The same holds for MEC's direct export (see mec below).
@@ -513,6 +983,184 @@ Quirks:
 - The rollcalls file has only House and Senate rows, and the source `accepted_values` tests on all three files
   flag any new chamber value; staging drops unknown chambers either way.
 
+## govinfo_billstatus: federal bills, sponsors and outcomes
+
+Flow: [diagrams/sources/govinfo_billstatus.svg](diagrams/sources/govinfo_billstatus.svg)
+
+GovInfo's Bill Status bulk data (https://www.govinfo.gov/bulkdata/BILLSTATUS): one zip per Congress and bill type
+(`/119/hr/BILLSTATUS-119-hr.zip`, 33 MB; `/118/s/...`, 14 MB), each member one bill's XML. No key, no robots.txt
+rule against `/bulkdata`, US government work (the page states no licence). Congresses 108 (2003) to 119 exist;
+`MOGOV_BILLSTATUS_CONGRESSES` picks the loaded ones (default: the 117th through the Congress in session today, so the
+120th joins on 2027-01-03 with no change) and
+`MOGOV_BILLSTATUS_TYPES` the bill types (default all eight).
+
+- Lands: every XML file unchanged as gzip under `data/raw/govinfo_billstatus_xml/<congress>/<type>/` plus
+  `govinfo_billstatus_files` (path, URL, size, sha256, landing time); parsed with lxml into one JSON row per entity:
+  `govinfo_billstatus_bills`, `_sponsors`, `_cosponsors`, `_actions`, `_recorded_votes`, `_laws`, and (#625)
+  `_committees` (committees and subcommittees a bill was referred to), `_committee_activities` (their dated steps),
+  `_subjects` (CRS legislative subject terms), `_related_bills` and `_related_bill_relationships`.
+  `_amendments`, `_amendment_sponsors`, `_amendment_actions` and `_amendment_recorded_votes` (#738). Summaries,
+  titles, text versions, amendment cosponsors and amendment text versions and links stay in the raw XML only.
+- Shard units: (congress, bill type) zips, each downloaded by exactly one shard (so no shard repeats another's
+  download). The House `hr` zip is by far the largest, so more shards than zips (8 per Congress) gain nothing.
+- Everything is landed (all states): cosponsor lists need the whole file anyway, and the Missouri filter
+  (sponsor `state` = MO) is applied in dbt, in `fct_federal_sponsorship` (one row per Missouri member, bill and
+  role, with `became_law`, `law_type` and `law_number`).
+- Votes to bills: `fct_federal_vote_bills` links each cited roll call to its Voteview roll call (one row per roll
+  call and bill). The bill is the one the roll call was "taken on", not always the one it decided: of the 1,708
+  linked rows in the 117th and 118th, 136 are motions to recommit and 130 order the previous question on a rule,
+  and cloture, motion-to-proceed, tabling and discharge votes are in there too. Read `vote_question`. Roll calls cited by an amendment's actions are in `fct_federal_vote_amendments` (below), not here. BILLSTATUS cites the chamber clerk's roll number within the session; Voteview's `rollnumber`
+  runs across the whole Congress (House session 2 starts at 720 in the 118th), so the join uses Voteview's
+  `clerk_rollnumber` and `session`, not `rollnumber`. On the 117th and 118th (checked 2026-10-27) all 914 and 794 distinct cited roll calls were found in Voteview
+  (117th: House 764, Senate 150 rows; 118th: House 661, Senate 133). On the 118th and 119th, all 1,646 cited roll
+  calls were found in Voteview and every one names the same bill as Voteview's own `bill_number` text. Only roll calls a bill
+  action cites are linked (118th: 794 of 1,926 roll calls; 119th so far: 852 of 1,589), so votes on nominations,
+  quorum calls and amendments to a bill the file does not cite for them have no bill here.
+- Laws: `law_type` is Public Law or Private Law; the two are numbered separately (118-5 can be either). A private
+  law relieves a named person or entity; the 118th Congress's hr/s/hjres bills have 274 public laws (hr 178, s 91, hjres 5) and
+  no private laws. `became_law` is true for either type, so read `law_type` before calling a law broad policy. A
+  bill with two laws shows the earliest by number (compared as integers).
+- Stage and veto outcomes: `int_federal_bills__stage` (one row per bill) reads how far each bill got from the
+  Library of Congress's coded copy of each action (`source_system` 'Library of Congress'; the chamber's own copy is
+  ignored): 8000/17000 passed the House/Senate, 28000 presented, 31000 vetoed, 32000/34000 passed over the veto,
+  33000/35000 failed of passage over the veto, 36000/41000 became Public/Private Law, E30000 "Signed by President".
+  `stage` runs introduced, committee_reported_or_discharged, passed_one_chamber, passed_both_chambers (each chamber
+  passed a version; texts may still differ), presented_to_president, then vetoed, veto_overridden or
+  became_law; a simple resolution agreed to in its own chamber is `agreed_to`. `president_outcome` separates signed
+  from became_law_without_signature (law with no "Signed by President" action; the House's own copy says "Sent to
+  Archivist of the United States unsigned") and `veto_result` says whether an override failed in the House or the
+  Senate. 118th and 119th (loaded 2026-10-27): 412 laws (118th: 274; 119th: 138 = 136 public + 2 private), 15 vetoes
+  (118th: 13; 119th: 2), every veto sustained or never put to an override vote, no override in these two Congresses.
+  `became_law` comes from the actions only; `has_law_number` flags the laws list separately (see the quirk below).
+  The test `assert_federal_bills_stage_plausible` fails the build on impossible counts, but a bill whose actions say
+  it became law while the laws list lacks it is only a warning (`assert_federal_bills_became_law_on_laws_list`):
+  GovInfo can add the 36000 action a day or so before it updates `<laws>` for a just-signed bill.
+  A concurrent resolution (hconres, sconres) adopted by both chambers is `agreed_to`, like a simple resolution; it
+  is never presented. `goes_to_president` is true for every hr, s, hjres and sjres, including a joint resolution
+  proposing a constitutional amendment (that goes to the states; none in the 118th or 119th). BILLSTATUS has no
+  code or wording for a pocket veto: a claimed one is a plain 31000 "Vetoed by President." (110 H.R. 1585, 111
+  H.J.Res. 64, 111 H.R. 3808), so it shows as `vetoed`. Whether a bill
+  "succeeded" is left to the reader (#622).
+- Cache: the zips of the Congress in session today (derived from the date, not from the configured list) are
+  re-read daily (bills move all the time), and so are the previous Congress's until March 1 of the new Congress's
+  first year (signings and Public Law numbers land after Jan 3); others monthly. The date is read once per run.
+  The cache is `<MOGOV_DATA_DIR>/cache`, which on Cloud Run
+  Jobs is the mounted bucket (see environment.md), so the schedule holds across runs. A 404 for a zip
+  (a bill type with no zip for a Congress) is logged and skipped.
+
+Quirks:
+- Outcome is only the `<laws>` list. The latest-action text is a free-text field and a bill can fail, be vetoed,
+  or be folded into another bill with the same words; `became_law` in the staging model therefore means "carries a law number" (the stage model uses the actions).
+  Vetoes, veto overrides and pocket vetoes appear only as actions (type `Veto`, `President`, `BecameLaw`); they
+  are read in `int_federal_bills__stage` (see "Stage and veto outcomes" above), by action code, not text.
+- `<legislationUrl>` is present on only about a third of the files (S.J.Res. 118th: 47 of 122; H.Res.: 335 of
+  1,627), so `stg_govinfo_billstatus__bills` builds the congress.gov link from the type, Congress and number
+  when it is missing.
+- GovInfo data error: 119-hr-766 (the SEWER Act; actions end at referral) lists Public Law 119-120, which is
+  really 119 S. 766 (that bill's own actions show it signed). `int_federal_bills__stage` therefore takes
+  `became_law` from the actions only and keeps the laws list as the separate `has_law_number` flag; a test checks
+  each law maps to one `became_law` bill. `fct_federal_sponsorship` reads `became_law` from that stage and only
+  shows a law number for such bills, so 119-hr-766's sponsors are not credited with the law; a second test checks
+  each law in the fact maps to one bill (#729).
+- Each action is often listed twice: the chamber's own and the Library of Congress's coded copy (`sourceSystem`
+  names which). Roll calls cited by both appear twice in `_recorded_votes`. Count distinct roll calls, not rows.
+- `isOriginalCosponsor` is the text `True`/`False`; a cosponsor who later withdrew keeps their row with
+  `sponsorshipWithdrawnDate` set (the mart drops them). `district` is present for House members only.
+- Sponsors carry the member's state at the time of the bill; a member who changed states has rows under both.
+- Eleven reserved 117th House bills (hr2, hr9-17, hr20; "Reserved for the Speaker." / "...Minority Leader.") use `<billType>` and `<billNumber>` where every other file uses `<type>` and `<number>`. The parser reads either, so they keep their real id (`117-hr-2`); they are real bills with no sponsors, cosponsors or votes, and are recognizable by that title. The 118th has nine such
+  reserved bills too (hr3, hr4, hr6, hr8, hr9, hr10, hr13, hr18, hr19); every one's only action is "Introduced in House". They stay in `stg_govinfo_billstatus__bills` as ordinary empty bills, so a count of bills introduced per Congress includes them; there is no `is_reserved` flag, filter on the two titles.
+- Committees, subjects and related bills (staging only so far; checked on the 118th hr and s, 16,213 bills, and the
+  117th hr and s, 15,066 bills): a subcommittee is its own row with `subposition` set and `parent_system_code`; the
+  file gives it no chamber, so staging takes the parent's.
+  - Activity labels vary in case and wording, so filter on `activity_normalized` (lower case, hyphens as spaces,
+    trimmed). Seen: "Referred to" / "Referred To", "Markup by" / "Markup By", "Reported by" / "Reported By",
+    "Discharged from" / "Discharged From", "Hearings by" (117th), "Hearings By (full committee)" and "Hearings By
+    (subcommittee)" (118th), "Reported Original Measure" / "Reported original measure", "Unknown" and "Bills of
+    Interest - Exchange of Letters". The last has no `<date>` in the file, so `activity_date` is null for exactly
+    those rows (44 in the 118th hr and s, e.g. 118-hr-3935 on hssy00); the not-null rule is relaxed for that label
+    only. Activity counts, 118th hr and s: "Referred to" 25,770, "Markup by" 2,202, "Reported by" 1,692,
+    "Discharged from" 790, "Hearings by" 777 (206 full committee, 571 subcommittee), "Unknown" 265, "Reported
+    Original Measure" 56, "Bills of Interest" 44.
+  - A bill's one policy area is `policy_area` on the bills model; the legislative subjects are many per bill and
+    only some bills have any (118th hr and s: 6,021 of 16,213 bills; 117th: 9,275 of 15,066).
+  - Related bills carry one or more relationship types, and the label is not stable: use
+    `relationship_type_normalized`. Seen: "Identical bill", "Related bill", "Procedurally related" and
+    "Procedurally-related" (one value once normalized), "Text similarities" (59 in the 118th hr and s), "Related
+    document" (6, 117th). The 119th adds five (first seen 2026-10-28, none in the 117th or 118th), counted
+    across all 119th types: "Cross-Congress related bill" (923, CRS), "Contained in public law" (220, CRS) and
+    its reverse "Public law contains the text" (216, CRS), and "PrimaryCompanionBillBecameLaw" /
+    "SecondaryCompanionBillBecameLaw" (15 each, identified by "U.S. Government Publishing Office"; CamelCase, so
+    they normalize to `primarycompanionbillbecamelaw` with no spaces). GovInfo's BILLSTATUS user guide lists no
+    labels (one example, and it still says relationships are same-Congress only). The nearest to a full list is
+    congress.gov's "About Related Bills" (https://www.congress.gov/help/related-bills, checked 2026-10-28; it
+    answers scripted fetches with 403): CRS adds Contained in public law (119th on), Identical bill and Related
+    bill (93rd on) and Cross-Congress related bill (119th on, at most two Congresses apart); the House adds
+    Related bill (101st on), Procedurally related (93rd on) and Text similarities (101st-106th, 108th-118th);
+    the Senate added Companion bill (95th-112th, retired); the Library of Congress adds Reintroduction (114th-118th,
+    automated). Reintroduction and Companion bill are accepted but absent from our 117th-119th files
+    (Reintroduction appears to be congress.gov only). The page does not list Public law contains the text,
+    Related document or the two GPO labels. A new label fails the `accepted_values` test on
+    `relationship_type_normalized`; add it there and here.
+    The link is listed on both bills 98% of the time in the 118th hr and s (11,946 of the 12,171 relations whose
+    other bill is loaded), not always.
+  - CRS sometimes lists a bill as related to itself (34 of 12,472 related-bill rows in the 118th hr and s, e.g.
+    118-hr-9541, hr-292, hr-8205). Staging drops those rows (and their relationship rows), so `position` and
+    `related_position` have gaps; the raw table keeps them.
+  - `related_bill_id` joins the bills model only when that Congress and type are loaded (a 117th bill relates to a
+    118th one and the reverse). The 118th relates back only to the 116th through the 119th; the allowed range is
+    93 to 125 so a deeper backfill does not trip the test.
+- The older export of the eleven reserved 117th bills wraps these lists one level deeper
+  (`<committees><billCommittees/>`, `<subjects><billSubjects><legislativeSubjects/>`); all eleven are empty, and
+  the parser looks through the wrapper if one ever has entries.
+- Amendments (#738): BILLSTATUS keeps each amendment, with its own actions and recorded roll calls, under `<amendments>`
+  of the bill it was filed to. The parser lands four tables: `govinfo_billstatus_amendments` (number, type, chamber,
+  purpose, description, dates, the bill amended), `_amendment_sponsors`, `_amendment_actions` and
+  `_amendment_recorded_votes` (the roll calls those actions cite). Staging is `stg_govinfo_billstatus__amendments`,
+  `__amendment_sponsors`, `__amendment_actions` and `__amendment_recorded_votes`; `fct_federal_vote_amendments` joins
+  the cited roll calls to Voteview (same key as `fct_federal_vote_bills`: congress, chamber, session and Voteview's
+  `clerk_rollnumber`) and to the bill. Grain: (congress, chamber, rollnumber, `amendment_id`); an amendment can have
+  several roll calls and a roll call can cite more than one amendment. It is a sibling of `fct_federal_vote_bills`,
+  not part of it, so a bill's vote list is not a pile of floor amendments. Counts as of 2026-10-27, 117th and 118th:
+  11,545 amendments (117th: 333 HAMDT, 6,618 SAMDT; 118th: 1,235 HAMDT, 3,359 SAMDT); their actions cite 1,059
+  distinct roll calls and every one is in Voteview.
+  - The mart holds more than votes on the amendment itself: 9 Senate cloture votes on substitute amendments, 3 House
+    "Ordering the Previous Question" votes cited under a minority amendment to the H.Res, and 43 Senate "On the
+    Motion" rows. Read `vote_question` to tell them apart.
+  - Most Senate amendments are never proposed: 9,216 of 9,977 SAMDTs have a null `proposed_date` (only proposed ones have
+    one; House ones carry `submitted_date`). `purpose` and `description` are free text and null for 9,211 of 11,545.
+  - `stg_govinfo_billstatus__amendment_recorded_votes.vote_date` (and `stg_govinfo_billstatus__recorded_votes.vote_date`)
+    is the date part of a UTC timestamp, so it is off by a day from Voteview's date for 213 of 1,060 linked (amendment,
+    roll call) rows (1,060 rows over the 1,059 distinct roll calls; #790). `fct_federal_vote_amendments.vote_date` is
+    Voteview's date (`r.vote_date` from `stg_voteview__rollcalls`), so use the mart for the day of the vote.
+  - Amendment actions nest one level deeper than a bill's: `<actions><count/><actions><item/>`.
+  - Some House amendments are sponsored by a committee (e.g. "Rules Committee"): the file gives a name and no
+    `bioguideId`, so `bioguide_id` is null and `is_committee` is true in `stg_govinfo_billstatus__amendment_sponsors`.
+  - The same sponsor is sometimes listed twice under two spellings of the name, so a member can appear twice for an
+    amendment; `position` keeps the file's order.
+  - Amendments can amend other amendments: `amended_amendment_id` and `amendments_to_amendment_count` in
+    `stg_govinfo_billstatus__amendments` (4,499 amendments on the 117th and 118th have an `amended_amendment_id`, #792).
+  - A roll call missing here means no amendment was found for it, not that none was voted on.
+- Per-member summaries (#772): `fct_federal_member_committees` (one row per member, Congress, role and committee:
+  distinct bills referred, with hearing, markup, reported and discharged counts) and `fct_federal_member_subjects`
+  (one row per member, Congress, role and CRS subject: distinct bills, marked up, reported by a full committee, became
+  law). A bill referred to several committees counts once in each; a bill CRS has not tagged has no subject row. The
+  member's own committee assignments are separate (#284).
+- Committees and subjects of Missouri members' bills (#737): `fct_federal_sponsorship_committees` (one row per
+  member, bill, role and committee or subcommittee, with the earliest referred, hearing, markup, reported and
+  discharged dates in that committee) and `fct_federal_sponsorship_subjects` (one row per member, bill, role and CRS
+  subject). Both are `fct_federal_sponsorship` times the staging rows, so they cover the same members and roles. On
+  the 118th hr and s: 3,991 committee rows over 1,560 of Missouri's sponsored or cosponsored bills (797 are
+  subcommittee rows), 10,342 subject rows over 719 bills; the rest have no subject yet. A cosponsorship is much
+  weaker evidence than a sponsorship, so read `role`. `reported_date` on a subcommittee row means the subcommittee
+  forwarded the bill to the full committee (118-hr-1774 hsvr03 "Reported by"; 35 such rows on the 118th hr and s); on a full committee it
+  means reported to the chamber. A House full committee's `discharged_date` can be the day its subcommittee was
+  discharged, because Congress.gov records it under the parent too (118-hr-6494 hspw00 discharged 2023-12-06, marked
+  up the same day, reported 2024-12-16; 21 of the 115 full-committee rows with a discharged date, all House, also have a
+  later markup or report; counts as of 2026-10-27 on the 118th hr and s), so check `reported_date`; a warn-level test flags growth in that pattern. The "Re-Referred to" label (normalized
+  `re referred to`) was accepted in staging after one review build saw it; it does not occur in the 118th hr and s loaded for #737.
+  Related bills and subcommittee-level summaries are not in a mart yet.
+- Rate: the loader makes one request per zip (24 for the default window), not per bill.
+
 ## house_fd: U.S. House financial disclosures
 
 Flow: [diagrams/sources/house_fd.svg](diagrams/sources/house_fd.svg)
@@ -525,7 +1173,57 @@ Yearly national index plus each Missouri filing's PDF, split into text lines.
 Quirks:
 - Scanned paper filings (DocID 8xxxxxxx/9xxxxxxx) have no text layer. They land as one
   `has_text = false` row, so the gap is visible.
+- `fct_disclosures` gives a filing with no schedule lines one placeholder row, labelled by why: "not text-extractable"
+  (a scan), "download or text extraction failed" (the loader stored a `load_error` row; the PDF link may itself be
+  dead), or "not fetched" (no `house_fd_pdf_lines` row at all: a filing type the loader skips, such as an extension
+  request). "Not fetched" is derived from the absence of rows, so it also covers a filing the loader has not reached yet.
 - Periodic transaction reports live under `ptr-pdfs/`; everything else is under `financial-pdfs/`.
+- From 2021 on, the PDFs set their small-caps text (schedule headers, the Location/Description/Comments labels,
+  the page section titles) in a font that text extraction turns into NUL characters: the capital stays and each
+  smaller letter becomes one NUL, so `Schedule A:` lands as `S` + 7 NULs + ` A:`. Values (asset names, amounts)
+  extract normally. The raw lines are stored unchanged; `int_house_fd__schedule_lines` restores the words from
+  the exact NUL counts (macro `mogov.house_fd_restore_text`) and strips any NUL left, so no NUL reaches the
+  marts. Before this fix no 2022+ report (and 8 of 25 in 2021) produced a schedule line (#576); a sanity test now
+  fails if under 90% of a year's text PDFs do.
+  The form's closing pages (the "Exclusions of spouse, dependent, or trust information" questions, certification
+  and signature) follow Schedule J but belong to no schedule, and "Schedule A ... Investment Vehicle Details"
+  blocks follow it too, so the parser stops emitting lines at the exclusions page and opens schedule A at those
+  detail headers; otherwise that boilerplate and the vehicle names surfaced as J compensation sources.
+  Column headers wrap onto lines of their own ("Type(s) Current Year to Filing / Preceding Year", the schedule B, D,
+  H and I headers, the asset-type-code footnote, the PTR "IPO / IVD" labels); they are dropped by exact line match.
+  An entry wrapped over several lines is joined into one row. On the tie schedules a line is a tail when it has no
+  amount (C) or does not start with the agreement date (F); on A, B, D and H the same is done so a wrapped entry is
+  not counted as several disclosure items (#599, #641). On every one of those schedules a line that closes a parenthesis the entry above left
+  open (or starts with one) is joined too, so a tail like "KY, US)" is not an entry of its own. A joins a line of only
+  income-type words, only amounts, form-checkbox glyphs or a ticker and asset-type code; B joins a line with no
+  transaction type (P / S / E) before an amount, which is the asset name wrapped under the account line, and a bond's
+  maturity date does not make such a line an entry; D joins a line with no amount (a line ending on "Over" starts the
+  amount, a line of only amounts is the high end of a range) and a `Comments:` line; H joins a line with no date and
+  a `Comments:` line. A and B keep `Location:` / `Description:` / `Comments:` lines as rows of their own. The
+  schedule B column-header spills `$200?` and `$1,000?` are dropped.
+  The row keeps the owner code of its first line, and only on the schedules that have an owner column (A, B, D, and
+  the PTR; on D the code opens the line): "DC" in a Schedule H itinerary ("Washington, DC") is a city, not a
+  dependent child (#702). `amount_range` starts on the first line too, and a range the PDF wrapped takes its high end
+  from the tail: A, B and D join a line with an amount but no range of its own when the line above holds only the
+  low end ("... $250,001 -" / "Road $500,000", or in the 2021+ layout "$500,001 - Dividends $2,501 -" / the asset
+  name with "$1,000,000 $5,000"), and "Over" / "$1,000,000" reads "Over $1,000,000". When the asset's value is
+  "None" ("... JT None Interest $1,001 - ..."), the first `$` on the line is the income range, not the asset's value,
+  and `amount_range` is `None`; the same for "Undetermined" (pensions, annuities, royalties: 47 A rows), which
+  `amount_range` reads as `Undetermined`. On A an income range wrapped after a complete value range joins too
+  ("Fidelity Trust => JT $15,001 - $50,000 Interest $201 -" / "Clark Cnty WA Sch Dist $1,000": the tail holds the
+  income high end and the asset name; the glyph line may sit between; 245 rows in all), and so does a value of
+  "Over" (or "Over None") with the amount on the next line ("Equity Trust CO => Over None" / "Berkshire Hathaway Inc.
+  New (BRK.B) $50,000,000" reads `Over $50,000,000`; `Location:` / `Description:` / `Comments:` lines ending on
+  "Over" are not heads). Residual cases that still split:
+  an A asset name wrapped with no structural signal ("Fidelity Managed Income II III [HE]" / "Unit Cl I [HE]"),
+  and a few A `DESCRIPTION:` lines that join through the open-parenthesis
+  rule. On the PTR, a transaction line (owner code, two dates) that holds only the low end of its range joins the next
+  line when that has an amount, no transaction dates of its own and no `Description:` / `Location:` / `Comments:` /
+  `Filing Status:` / `Subholding Of:` label ("JT ... P 12/05/2025 12/08/2025 $100,001 -" / "[GS] $250,000", #749); the
+  rest of a wrapped PTR asset name ("NITTANYMED [GS]") is not joined.
+- Index type `H` is the New Filer Report (PDF header `Filing Type: New Filer Report`), filed by new members; a
+  separate report from that year's Annual Report (O). The loader reads it like O/A/P/C/T. Other index types
+  (D, X, G, E, B, W) are not downloaded.
 
 ## senate_efd: U.S. Senate eFD (opt-in)
 
@@ -594,9 +1292,30 @@ Quirks:
   items only over `is_latest_version`; the filing list shows all. It assumes an amendment restates the whole
   report, and a House amendment that is a scan with no extractable text never supersedes a readable report.
   Periodic transaction reports, candidate reports and extension requests are separate filings, never collapsed.
-  The Clerk index does not say which report a House amendment amends, so it is taken to amend the latest annual or
-  candidate report the filer filed that year on or before it (a candidate-report amendment supersedes that candidate
-  report only) (#142).
+  The index has no amendment number either, so a House amendment's `report_version` is its position by filing date
+  among the amendments of its report (ties: numeric doc id).
+  The Clerk index does not say which report a House amendment amends, so it is taken to amend the latest annual,
+  candidate or termination report the filer filed that year on or before it (an amendment of a candidate or
+  termination report supersedes that report only) (#142, #463). Index type H is a New Filer Report (the PDF header says
+  "Filing Type: New Filer Report"; e.g. Carey OH15 #10050139, Alford MO04 #10051960; staging labels it
+  `filing_kind = 'new filer report'`, #573), a separate report from the
+  Annual Report (O) of the same year, so it is a base like a candidate report: an amendment filed after an H amends
+  it and supersedes it, while an H and an O of one year are both kept latest (Carey OH15 2022, Wied WI08 2025; for
+  O, A, H, A as in Miller WV03 2018 the first A supersedes the O and the second the H). Whether both should be
+  latest, and which report a later amendment amends, is open (#572). Of 346 H filings only 3 have an O for the same
+  filer and year, 233 have an extension request X that year, and the H counts follow the freshman classes of
+  election years (Missouri freshmen Alford and Burlison (2022), Onder and Bell (2024) each have an X then an H in
+  August and no O). Periodic transaction reports and the remaining "other" kinds (W withdrawal, B, E, G) are never a base.
+  The "Period Covered: mm/dd/yyyy-mm/dd/yyyy" line in the amendment's PDF text (`int_house_fd__period_covered`;
+  candidate reports and their amendments carry it, annual and termination reports do not) refines this: the base
+  covering through the same last day wins, and an amendment with such a line is taken for an amendment of an
+  annual report only as a last resort, when no candidate or termination report is on file.
+  Measured on the Clerk index (all filers, 2,095 amendments; name-matched, ignoring the Period Covered line, which
+  is loaded for Missouri filers only, so approximate): counting H as a base re-points 195 amendments (169 off a
+  candidate or termination report, 1 off an annual report, 25 that had no base), W, B, E and G re-point none; before
+  H was added, counting termination reports as bases re-pointed 18. For Missouri officials neither change moves a
+  row: the rebuilt `fct_disclosures` is identical to origin/main (EXCEPT ALL both ways, 0 rows differ). Only 3 of
+  the 10 Missouri amendments carry the line.
 
 ## courtlistener_case_bulk: case history from bulk files
 
@@ -622,6 +1341,18 @@ Quirks:
   and sons on the Court of Appeals. Judges-text matches therefore count only from the judge's first
   known judicial start date; with no start date, only panel matches count. Attorney matches start at
   dbt var `case_history_min_year` (default 1975).
+- State appellate and Supreme Court judges with no CourtListener person have no start date there (#847). Their
+  start is the first state payroll year (2017 on) under their own court's title (`APPELLATE JUDGE`, or `SUPREME
+  COURT JUDGE`; earlier circuit pay doesn't count), found in `fct_salaries` or, when the payroll prints a legal first
+  name ("GABBERT, ANTHONY REX" for A. Rex Gabbert), by a surname held by one judge of that court and the same first
+  initial; else the year of their retention in the Official Manual biography. Both are upper bounds on the real
+  start, so early cases are lost (a judge seated since 1979 starts in 2017), and no predecessor is knowingly credited;
+  a payroll year is only year-precise, so the start is January 1 of it. A namesake on the same court's payroll
+  (same surname, another first initial, under the court's title) makes a bare surname ambiguous while they were
+  paid: James M. Dowd shared the Court of Appeals with Robert G. Dowd, Jr. in 2017-2021, so James starts in 2022. A
+  `judges` text that prints the surname right after a first name or middle initial that isn't the judge's ("Robert
+  G. Dowd, Jr., J.") is dropped. Remaining risk: a namesake who never appears on the payroll under that title
+  (e.g. before 2017, or sitting by assignment from another court) and a text with no first name at all.
 - In the 2026-09 snapshot, 8th Circuit (ca8) opinions stop in August 2019. The API loader covers later
   ones.
 - Time to disposition (`fct_judge_time_to_disposition`): only the federal districts (`moed`, `mowd`) have a
@@ -634,8 +1365,8 @@ Quirks:
   these dockets) and from the number itself otherwise. Of the 173,882 dockets: civil 164,058 (`cv` 164,027,
   `md` multidistrict 31), criminal 3,776 (`cr`), miscellaneous 5,967 (`mc` 5,082, `mj` 646, `sw` 194, `wi` 30,
   `sm` 13, `pr` 2: warrants, subpoenas, complaints, not cases; left out) and 81 other (`fp` 76, `cn` 2, `sc` 2
-  and one with a date in the docket-number field; left out, pending #465). Only 2,149 of the 3,776 criminal
-  dockets have both dates, so criminal coverage is thin. One docket (`1:00-cr-00008`) has a `cr` number but is
+  and one with a date in the docket-number field; left out, pending #465). Only 2,152 of the 3,776 criminal
+  dockets have both dates (2,149 are measured: 3 end before they were filed), so criminal coverage is thin. One docket (`1:00-cr-00008`) has a `cr` number but is
   a civil suit; CourtListener's own type (`cv`) wins.
 - The filtered CSVs are cached per snapshot (`data/cache/courtlistener/mo-*.csv`), so re-runs within
   a quarter are quick. Cases can be up to three months stale; `courtlistener_cases` tops up.
@@ -657,7 +1388,7 @@ Quirks:
   starts and nothing is cached yet, `cl_cases` lands 0 rows (seen in the October 2026 runs:
   `cases.quota_exhausted` with `retry_after_s` about 16 hours). Run it again the next day.
 - Without a token it can only search (5 requests per minute) and gets no dispositions.
-- CourtListener has no trial-court (circuit) cases, and Case.net forbids automated access.
+- CourtListener has no Missouri circuit-court (state trial court) cases, and Case.net forbids automated access.
 - It's now a top-up for `courtlistener_case_bulk`. Where both have a case, an API row with outcome data
   wins.
 
@@ -669,6 +1400,16 @@ Chapter PDFs (executive, legislative, judicial), one row per text line.
 
 - Lands: `bluebook_lines`.
 - Window: `MOGOV_BLUEBOOK_EDITIONS`.
+- Besides biographies and the judges, dbt reads the executive chapter's "Historical Listing" tables (every governor,
+  lieutenant governor, secretary of state, auditor, treasurer and attorney general since 1820, terms in whole years)
+  into `int_bluebook__statewide_officeholders`.
+  `int_statewide__terms` dates those terms (seed `statewide_office_handovers`, else the second Monday of January) and links
+  each to the current official of the same name, but only when the official's known service corroborates the match
+  (the office they hold today, or an overlap with dated Open States / congress-legislators / Wikidata service; the
+  1871 governor Benjamin Gratz Brown is not the legislator Ben Brown, #760); `fct_office_history` lists the earlier
+  statewide terms of current officials from it (Malek's 2023 appointment as Treasurer, Fitzpatrick's 2019-2023
+  Treasurer term) and lists one row per statewide term even when sources title it differently ("Governor", "Governor
+  of Missouri").
 
 Quirks:
 - PDF file names differ between editions. Links are scraped from the edition page, with a fallback to
@@ -689,6 +1430,9 @@ Flow: [diagrams/sources/openstates_people.svg](diagrams/sources/openstates_peopl
 
 Quirks:
 - The flat CSV carries Wikidata QIDs that the YAML often lacks.
+- Seat-term dates are often missing or wrong: undated starts, placeholder January-1 starts, ends that are
+  really mid-term departures, and duplicate records for one person. How the pipeline joins Open States records
+  to one person despite this is in [person_ids.md](person_ids.md).
 
 ## congress_legislators: unitedstates/congress-legislators
 
@@ -1020,8 +1764,8 @@ offices, shops and most service businesses are missing.
   (one row per official, site, donor and filing page; #370), the donors and their links. A page is the MEC committee
   matched to the official, which is not filtered to the donor, or the FEC disbursements of the donor's committee
   filtered to the receiving committee; a donor filed on both keeps both. Line breaks in a donor name become spaces so a
-  line never splits; the frontend writes them as `<url> <donor name>` lines, which in the published sites.csv sit in one
-  cell. A donor with no page has one row with a null `source_url`.
+  line never splits; the frontend writes them as `<url> <donor name>` lines for the page, and the published
+  sites-donors.csv has one line per site, donor and filing page (sites.csv has no donor columns). A donor with no page has one row with a null `source_url`.
 - Industry: the NAICS code the most program systems (RCRAINFO, NPDES, AIR, ...) give, one count per system however many records it has, taking primary codes first (`naics_source` `naics`,
   31% of the geocoded sites in October 2026), then codes FRS leaves UNKNOWN (`naics_unknown`, 2%), then SECONDARY
   ones (`naics_secondary`, 0.1%). A real NAICS code is more precise than a SIC-derived sector, so only a site with
@@ -1087,10 +1831,23 @@ Flow: [diagrams/sources/mo_auditor.svg](diagrams/sources/mo_auditor.svg)
   - The rating is not in the list. It is the sentence "In the areas audited, the overall performance of this entity was
     Good." in the one-page Citizens Summary PDF (`citz_sum_fk`) or, when there is none, in the first pages of the full
     report. pdfplumber sometimes splits a word of that sentence, so the match ignores spaces.
-  - Ratings start in 2012. Financial statements (singular or plural), county-wide fire protection district reviews (no rating sentence; a single district's own audit is rated and is read), monthly filing reports, follow-ups, property tax rate filings and
-    compilations are never rated and are not downloaded. Performance audits and special reports have no sentence (status
+  - Ratings start in 2012. Financial statements (singular or plural), county-wide fire protection district reviews (no rating sentence; a single district's own audit is rated and is read), monthly filing reports, follow-ups, property tax rate filings,
+    compilations and the state's annual financial reports (titled "Comprehensive Annual Financial Report" until 2021, "Annual
+    Comprehensive Financial Report" since 2022) are never rated and are not downloaded. Performance audits and special reports have no sentence (status
     `no_rating_sentence`). A few 2012-2014 summaries left the template unfilled ("was XXXX"); staging gives them no rating
     (`placeholder_rating`).
+  - The link for report 2013-009 (the 2012 Comprehensive Annual Financial Report) is a dead PDF (`Repository/Press/2013-009.pdf`
+    404s; the first full run recorded status `http_404`). It is no longer fetched, since annual financial reports are skipped by title.
+    The "Report on Internal Control..." companions of the annual financial report have a Citizens Summary, which is still read
+    (status `no_rating_sentence`).
   - The ratings cover only the areas audited. A county's rating is the county's, never one official's: only audits of a
-    statewide office (seed `mo_auditor_statewide_entities`) are linked to an officeholder, and then only to whoever held
-    the office on the release date ("in office when published", not "audited"), and only for current officials.
+    statewide office (seed `mo_auditor_statewide_entities`) are linked to officeholders, in `fct_audit_report_officeholders`
+    (#323, policy #333: everyone in office during the years the audit covers). Former holders come from the Official
+    Manual's "Historical Listing" tables (`int_bluebook__statewide_officeholders`; whole years only). The period is read
+    from the title when it names one ("Year Ended June 30, 2015", "Period July 1, 2022 through January 9, 2023"; 26 of 78
+    statewide-office audits); the Auditor's other titles ("Office of Governor") name no period, and the PDFs are not
+    parsed for it, so those audits are linked to everyone in office from January 1 of the year before the release to the
+    release date (`link_basis` = `release_window`). That is a bounded guess at the period, not the period: say "in
+    office around the time of the audit", never "audited". A mid-term change (Parson, June 2018) has no date in the
+    Manual, so both people are credited for the year. Sub-unit audits ("Office of Attorney General - Missouri Office of
+    Prosecution Services", "...Medicaid Fraud Control Unit") match the office prefix and count as the office's (#333).

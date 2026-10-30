@@ -26,6 +26,8 @@ unit_tests:
           - {person_id: p_brattin, full_name: Rick Brattin, surname_key: brattin, chamber: upper, start_date: '2021-01-01', end_date: '9999-12-31'}
           - {person_id: p_haden, full_name: Kent Haden, surname_key: haden, chamber: lower, start_date: '2019-01-01', end_date: '9999-12-31'}
           - {person_id: p_murray, full_name: Joseph Murray, surname_key: murray, chamber: lower, start_date: '2019-01-01', end_date: '9999-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows: &no_final_checks []
       - input: ref('dim_official')
         rows:
           - {official_id: p_brattin, office: state_senate}
@@ -67,6 +69,8 @@ unit_tests:
         rows:
           - {person_id: p_moore, full_name: Bridget Moore, surname_key: moore, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
           - {person_id: p_pouche, full_name: Sean Pouche, surname_key: pouche, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows: *no_final_checks
       - input: ref('dim_official')
         rows:
           - {official_id: p_moore, office: state_house}
@@ -100,6 +104,8 @@ unit_tests:
           - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
       - input: ref('int_mo_legislators__seats')
         rows: []
+      - input: ref('int_mo_legislators__final_checks')
+        rows: *no_final_checks
       - input: ref('dim_official')
         rows:
           - {official_id: 'mohouse:2243', office: state_house}
@@ -135,6 +141,8 @@ unit_tests:
         rows:
           - {person_id: p_ken, full_name: Ken Jamison, surname_key: jamison, chamber: lower, start_date: '2025-01-01', end_date: '9999-12-31'}
           - {person_id: p_ken, full_name: Kenneth Jamison, surname_key: jamison, chamber: lower, start_date: '2025-01-01', end_date: '2025-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows: *no_final_checks
       - input: ref('dim_official')
         rows:
           - {official_id: p_ken, office: state_house}
@@ -173,6 +181,8 @@ unit_tests:
           - {person_id: p_ed, full_name: Ed Lewis, surname_key: lewis, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
           - {person_id: p_patty, full_name: Patty Lewis, surname_key: lewis, chamber: lower, start_date: '2021-01-01', end_date: '2025-01-08'}
           - {person_id: p_david, full_name: David Smith, surname_key: smith, chamber: lower, start_date: '2017-01-01', end_date: '9999-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows: *no_final_checks
       - input: ref('dim_official')
         rows:
           - {official_id: p_ed, office: state_house}
@@ -220,6 +230,9 @@ unit_tests:
           - {person_id: p_mike, full_name: Mike Jones, surname_key: jones, chamber: lower, start_date: '2025-01-01', end_date: '9999-12-31'}
           - {person_id: p_lisa, full_name: Lisa Thomas, surname_key: thomas, chamber: lower, start_date: '2021-01-01', end_date: '2025-01-07'}
           - {person_id: p_wick, full_name: Wick Thomas, surname_key: thomas, chamber: lower, start_date: '2025-01-01', end_date: '9999-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows:
+          - {calendar_year: 2025, seat_chamber: lower, employee_name: 'THOMAS, LISA A.', person_id: p_lisa}
       - input: ref('dim_official')
         rows:
           - {official_id: p_holly, office: state_house}
@@ -261,6 +274,8 @@ unit_tests:
           - {agency_name: JUDICIARY, position_title: ASSOCIATE CIRCUIT JUDGE, office_group: judiciary}
       - input: ref('int_mo_legislators__seats')
         rows: []
+      - input: ref('int_mo_legislators__final_checks')
+        rows: *no_final_checks
       - input: ref('dim_official')
         rows:
           - {official_id: j_hansbrough, office: mo_circuit_judge}
@@ -302,11 +317,13 @@ unit_tests:
           - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
       - input: ref('int_mo_legislators__seats')
         rows:
-          - {person_id: p_david, full_name: David Smith, surname_key: smith, chamber: lower, start_date: '1900-01-01', end_date: '2023-01-03'}
+          - {person_id: p_david, full_name: David Smith, surname_key: smith, chamber: lower, start_date: '1900-01-01', start_quality: undated, end_date: '2023-01-03'}
           - {person_id: p_david, full_name: David Smith, surname_key: smith, chamber: lower, start_date: '2023-01-01', end_date: '9999-12-31'}
           - {person_id: p_cody, full_name: Cody Smith, surname_key: smith, chamber: lower, start_date: '2017-01-01', end_date: '2025-01-07'}
           - {person_id: p_hough, full_name: Lincoln Hough, surname_key: hough, chamber: lower, start_date: '2019-01-01', end_date: '9999-12-31'}
           - {person_id: p_cooper, full_name: Ann Cooper, surname_key: cooper, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows: *no_final_checks
       - input: ref('dim_official')
         rows:
           - {official_id: p_david, office: state_house}
@@ -352,6 +369,8 @@ unit_tests:
           - {person_id: p_alexander, full_name: Alexander King, surname_key: king, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
           - {person_id: p_alexis, full_name: Alexis King, surname_key: king, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
           - {person_id: p_abel, full_name: Zed Abel, surname_key: abel, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows: *no_final_checks
       - input: ref('dim_official')
         rows:
           - {official_id: p_alexander, office: state_house}
@@ -391,6 +410,8 @@ unit_tests:
           - {person_id: p_edwin_lewis, full_name: Edwin Lewis, surname_key: lewis, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
           - {person_id: p_ed_lewis, full_name: Ed Lewis, surname_key: lewis, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
           - {person_id: p_edwin_hunt, full_name: Edwin Hunt, surname_key: hunt, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows: *no_final_checks
       - input: ref('dim_official')
         rows:
           - {official_id: p_edwin_lewis, office: state_house}
@@ -429,6 +450,8 @@ unit_tests:
         rows:
           - {person_id: p_cody, full_name: Cody Smith, surname_key: smith, chamber: lower, start_date: '2017-01-01', end_date: '9999-12-31'}
           - {person_id: p_david, full_name: David Smith, surname_key: smith, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows: *no_final_checks
       - input: ref('dim_official')
         rows:
           - {official_id: p_cody, office: state_house}
@@ -467,6 +490,8 @@ unit_tests:
         rows:
           - {person_id: p_steve, full_name: Steve Roberts, surname_key: roberts, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
           - {person_id: p_steven, full_name: Steven Roberts, surname_key: roberts, chamber: lower, start_date: '2017-01-01', end_date: '2020-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows: *no_final_checks
       - input: ref('dim_official')
         rows:
           - {official_id: p_steve, office: state_house}
@@ -505,6 +530,8 @@ unit_tests:
         rows:
           - {person_id: p_steve, full_name: Steve Roberts, surname_key: roberts, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
           - {person_id: p_lane, full_name: Lane Roberts, surname_key: roberts, chamber: lower, start_date: '2017-01-01', end_date: '2020-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows: *no_final_checks
       - input: ref('dim_official')
         rows:
           - {official_id: p_steve, office: state_house}
@@ -542,6 +569,9 @@ unit_tests:
         rows:
           - {person_id: p_rusty, full_name: Rusty Black, surname_key: black, chamber: lower, start_date: '2017-01-01', end_date: '9999-12-31'}
           - {person_id: p_linda, full_name: Linda Black, surname_key: black, chamber: lower, start_date: '2013-01-01', end_date: '2016-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows:
+          - {calendar_year: 2017, seat_chamber: lower, employee_name: 'BLACK, LINDA R.', person_id: p_linda}
       - input: ref('dim_official')
         rows:
           - {official_id: p_rusty, office: state_house}
@@ -564,7 +594,8 @@ unit_tests:
   - name: salaries_a_full_salary_fitting_a_departed_member_is_not_a_final_check
     model: fct_salaries
     description: >
-      Same seats as the Black case, but "BLACK, LINDA R." earns a full salary in 2017, so it is not a final check:
+      Same seats as the Black case, but "BLACK, LINDA R." earns a full salary in 2017, so it is not a final check
+      (int_mo_legislators__final_checks has no row for it):
       two payees compete for Rusty Black's one seat and neither is given to him.
     given:
       - input: ref('stg_mo_employee_pay__pay')
@@ -578,6 +609,8 @@ unit_tests:
         rows:
           - {person_id: p_rusty, full_name: Rusty Black, surname_key: black, chamber: lower, start_date: '2017-01-01', end_date: '9999-12-31'}
           - {person_id: p_linda, full_name: Linda Black, surname_key: black, chamber: lower, start_date: '2013-01-01', end_date: '2016-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows: *no_final_checks
       - input: ref('dim_official')
         rows:
           - {official_id: p_rusty, office: state_house}
@@ -601,7 +634,8 @@ unit_tests:
     model: fct_salaries
     description: >
       Linda Black's first seat ended 2016-12-31, but she holds another House seat from 2019, so "BLACK, LINDA R."
-      in 2017 (a small payment) is not her final check: she is not the member who left. Two payees then compete
+      in 2017 (a small payment) is not her final check (the later-seat guard itself is tested on
+      int_mo_legislators__final_checks; here the model has no row for it): she is not the member who left. Two payees then compete
       for Rusty Black's one seat and neither is given to him. Without the later-seat guard the small payment would
       be set aside as a final check and "BLACK, JAMES R" would be paired with Rusty.
     given:
@@ -617,6 +651,8 @@ unit_tests:
           - {person_id: p_rusty, full_name: Rusty Black, surname_key: black, chamber: lower, start_date: '2017-01-01', end_date: '9999-12-31'}
           - {person_id: p_linda, full_name: Linda Black, surname_key: black, chamber: lower, start_date: '2013-01-01', end_date: '2016-12-31'}
           - {person_id: p_linda, full_name: Linda Black, surname_key: black, chamber: lower, start_date: '2019-01-01', end_date: '2020-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows: *no_final_checks
       - input: ref('dim_official')
         rows:
           - {official_id: p_rusty, office: state_house}
@@ -654,6 +690,9 @@ unit_tests:
         rows:
           - {person_id: p_linda_new, full_name: Linda Black, surname_key: black, chamber: lower, start_date: '2023-01-04', end_date: '9999-12-31'}
           - {person_id: p_linda_old, full_name: Linda Black, surname_key: black, chamber: lower, start_date: '2019-01-01', end_date: '2023-01-03'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows:
+          - {calendar_year: 2023, seat_chamber: lower, employee_name: 'BLACK, LINDA R.', person_id: p_linda_old}
       - input: ref('dim_official')
         rows:
           - {official_id: p_linda_new, office: state_house}
@@ -694,6 +733,9 @@ unit_tests:
           - {person_id: p_cody, full_name: Cody Smith, surname_key: smith, chamber: lower, start_date: '2019-01-01', end_date: '9999-12-31'}
           - {person_id: p_david, full_name: David Smith, surname_key: smith, chamber: lower, start_date: '2019-01-01', end_date: '9999-12-31'}
           - {person_id: p_neil, full_name: Neil Smith, surname_key: smith, chamber: lower, start_date: '2019-01-01', end_date: '2023-01-03'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows:
+          - {calendar_year: 2023, seat_chamber: lower, employee_name: 'SMITH, NEIL I', person_id: p_neil}
       - input: ref('dim_official')
         rows:
           - {official_id: p_cody, office: state_house}
@@ -716,3 +758,133 @@ unit_tests:
       rows:
         - {official_id: p_cody, calendar_year: 2023, employee_name: 'SMITH, DAVID C', match_confidence: medium}
         - {official_id: p_david, calendar_year: 2023, employee_name: 'SMITH, DAVID T', match_confidence: medium}
+
+
+  - name: salaries_a_final_check_is_not_given_to_the_member_left_in_the_chamber
+    model: fct_salaries
+    description: >
+      Neil Smith's seat ended 2022-12-31 and "SMITH, NEIL I" in 2023 is his small final check (a row of
+      int_mo_legislators__final_checks). Samuel Smith is the only Smith who sits in 2023 and the final check is the
+      only Smith payee, so by seat alone it would be paired with Samuel, the wrong person (#471). A final check is
+      only ever set aside, and matched by name, which needs the departed member to have a row in
+      int_officials__name_keys; Neil has none, so the check stays unmatched (Fred Jones is the full-salary payee that makes
+      1500 a small payment, as the real model needs).
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'SMITH, NEIL I', last_name: SMITH, first_names: NEIL I, gross_pay: 1500.0}
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'JONES, FRED', last_name: JONES, first_names: FRED, gross_pay: 38000.0}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_samuel, full_name: Samuel Smith, surname_key: smith, chamber: lower, start_date: '2019-01-01', end_date: '9999-12-31'}
+          - {person_id: p_neil, full_name: Neil Smith, surname_key: smith, chamber: lower, start_date: '2019-01-01', end_date: '2022-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows:
+          - {calendar_year: 2023, seat_chamber: lower, employee_name: 'SMITH, NEIL I', person_id: p_neil}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p_samuel, office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: p_samuel, level: state, office: state_house, family_key: smith, given_key: samuel}
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows:
+          - {year: 2023, official_id: p_samuel, office: state_house}
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        []
+
+  - name: salaries_match_a_spaced_surname_by_seat_when_the_first_name_does_not_fit
+    model: fct_salaries
+    description: >
+      An invented member (not a real case): the roster spells "Zed Van Fixture" with a space in the surname and the
+      payroll prints "VANFIXTURE, ROBERT Q", a legal first name that does not fit Zed. The by-name step needs the
+      first name to fit, so it can't pick the row up; only the seat match can, by seat (the only member of the
+      House with the surname that year, and the only payee), which needs the seat side to ignore spaces too. Paired
+      at medium, since the first name doesn't fit (#679).
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2023, agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, employee_name: 'VANFIXTURE, ROBERT Q', last_name: VANFIXTURE, first_names: ROBERT Q, gross_pay: 38385.46}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: STATE REPRESENTATIVE, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_van_fixture, full_name: Zed Van Fixture, surname_key: van fixture, chamber: lower, start_date: '2021-01-01', end_date: '9999-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows: *no_final_checks
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p_van_fixture, office: state_house}
+      - input: ref('int_officials__name_keys')
+        rows:
+          - {official_id: p_van_fixture, level: state, office: state_house, family_key: van fixture, given_key: zed}
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows: *no_years
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: p_van_fixture, calendar_year: 2023, employee_name: 'VANFIXTURE, ROBERT Q', match_confidence: medium}
+
+  - name: salaries_a_first_vote_senate_start_counts_from_its_own_year
+    model: fct_salaries
+    description: >
+      Invented senators (not real cases), #690. Zoe Firstvote's seat has no Open States start, so
+      int_mo_legislators__seats dates it from her first journal vote, 2017-01-04 (start_quality first_vote), and her
+      2017 pay is hers by seat. Her first int_officeholders__years row is 2018 (as when 2017's Senate is not complete
+      for every district), but a first_vote start is a known date, so the seat counts from 2017, not from that first
+      listed year. Una Undated's seat has no start at all (undated, 1900-01-01): it counts from her first listed year,
+      2018, so her 2017 pay pairs with nobody. Neither is a current official, so they have no name keys and only the
+      seat match can pair them.
+    given:
+      - input: ref('stg_mo_employee_pay__pay')
+        rows:
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'FIRSTVOTE, ZOE', last_name: FIRSTVOTE, first_names: ZOE, gross_pay: 35914.80}
+          - {calendar_year: 2018, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'FIRSTVOTE, ZOE', last_name: FIRSTVOTE, first_names: ZOE, gross_pay: 35914.80}
+          - {calendar_year: 2017, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'UNDATED, UNA', last_name: UNDATED, first_names: UNA, gross_pay: 35914.80}
+          - {calendar_year: 2018, agency_name: LEGISLATURE, position_title: SENATOR, employee_name: 'UNDATED, UNA', last_name: UNDATED, first_names: UNA, gross_pay: 35914.80}
+      - input: ref('mo_payroll_office_titles')
+        rows:
+          - {agency_name: LEGISLATURE, position_title: SENATOR, office_group: legislature}
+      - input: ref('int_mo_legislators__seats')
+        rows:
+          - {person_id: p_firstvote, full_name: Zoe Firstvote, surname_key: firstvote, chamber: upper, start_date: '2017-01-04', start_quality: first_vote, end_date: '9999-12-31'}
+          - {person_id: p_undated, full_name: Una Undated, surname_key: undated, chamber: upper, start_date: '1900-01-01', start_quality: undated, end_date: '9999-12-31'}
+      - input: ref('int_mo_legislators__final_checks')
+        rows: *no_final_checks
+      - input: ref('dim_official')
+        rows:
+          - {official_id: p_firstvote, office: state_senate}
+          - {official_id: p_undated, office: state_senate}
+      - input: ref('int_officials__name_keys')
+        rows: *no_name_keys
+      - input: ref('int_officials__current')
+        rows: *no_current
+      - input: ref('stg_congress__terms')
+        rows: *no_terms
+      - input: ref('int_officeholders__years')
+        rows:
+          - {year: 2018, official_id: p_firstvote, office: state_senate}
+          - {year: 2018, official_id: p_undated, office: state_senate}
+      - input: ref('federal_salaries')
+        rows: *no_federal
+    expect:
+      rows:
+        - {official_id: p_firstvote, calendar_year: 2017, employee_name: 'FIRSTVOTE, ZOE', match_confidence: high}
+        - {official_id: p_firstvote, calendar_year: 2018, employee_name: 'FIRSTVOTE, ZOE', match_confidence: high}
+        - {official_id: p_undated, calendar_year: 2018, employee_name: 'UNDATED, UNA', match_confidence: high}

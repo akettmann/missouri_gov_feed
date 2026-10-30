@@ -1,0 +1,138 @@
+version: 2
+
+models:
+  - name: fct_federal_member_committees
+    description: >
+      Per Missouri member of Congress, Congress, role and committee, how many distinct federal bills the member
+      sponsored or cosponsored were referred to that committee and how far they got there. It is
+      fct_federal_sponsorship_committees (one row per member, bill, role, committee) counted over bills: a bill
+      referred to three committees counts once in each of the three rows, never twice in one. A subcommittee is its
+      own row (is_subcommittee, parent_system_code) and its bills also appear in the parent's row. Cosponsors who
+      withdrew are already dropped upstream. A bill with no committee referral is in no row. Sponsor and cosponsor
+      rows are separate (a member never has both roles on one bill), so add them for "bills that carry the member's
+      name". The member's own committee assignments are not here. Grain: (bioguide_id, congress, role,
+      committee_system_code).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [bioguide_id, congress, role, committee_system_code]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }} Null for members who are no longer in office."
+      - name: bioguide_id
+        data_type: varchar
+        description: Bioguide id of the member (joins congress_legislators).
+        data_tests: [not_null]
+      - name: congress
+        data_type: integer
+        description: Congress number (118 = 2023-2025).
+        data_tests: [not_null]
+      - name: role
+        data_type: varchar
+        description: "`sponsor` or `cosponsor`."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['sponsor', 'cosponsor']
+      - name: committee_system_code
+        data_type: varchar
+        description: Congress.gov's committee code (hsba00); a subcommittee's code ends in a non-zero number.
+        data_tests: [not_null]
+      - name: committee_name
+        data_type: varchar
+        description: Committee or subcommittee name as published.
+        data_tests: [not_null]
+      - name: committee_chamber
+        data_type: varchar
+        description: "`House`, `Senate` or `Joint`."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['House', 'Senate', 'Joint']
+      - name: is_subcommittee
+        data_type: boolean
+        description: True for a subcommittee row.
+        data_tests: [not_null]
+      - name: parent_system_code
+        data_type: varchar
+        description: The parent committee's code for a subcommittee; null for a full committee.
+      - name: bills
+        data_type: bigint
+        description: Distinct bills referred to this committee.
+        data_tests: [not_null]
+      - name: bills_with_hearing
+        data_type: bigint
+        description: >
+          Of those, bills with a "Hearings by" activity in this committee. BILLSTATUS records "Hearings By" mostly on
+          subcommittee rows, so full-committee rows undercount and 0 does not mean the bill had no hearing.
+      - name: bills_marked_up
+        data_type: bigint
+        description: Of those, bills with a "Markup by" activity in this committee.
+      - name: bills_reported
+        data_type: bigint
+        description: >
+          Of those, bills with a "Reported by" or "Reported original measure" activity in this committee. For a
+          subcommittee row this means forwarded to the full committee.
+      - name: bills_discharged
+        data_type: bigint
+        description: >
+          Of those, bills with a "Discharged from" activity (the committee lost the bill without reporting it). A
+          House full committee can carry the date of its subcommittee's discharge, so this can overcount for full
+          committees.
+      - name: first_referred_date
+        data_type: date
+        description: Earliest referral date among the bills. Null when none of them has a dated "Referred to" activity.
+      - name: last_referred_date
+        data_type: date
+        description: Latest referral date among the bills. Null when none of them has a dated "Referred to" activity.
+
+  - name: fct_federal_member_subjects
+    description: >
+      Per Missouri member of Congress, Congress, role and CRS legislative subject term, how many distinct federal
+      bills the member sponsored or cosponsored carry that subject and how far they got. It is
+      fct_federal_sponsorship_subjects (one row per member, bill, role, subject) counted over bills. A subject belongs
+      to the bill, not to one committee, so the steps are bill-level: marked up means any committee marked the bill
+      up, reported means a full committee reported it (a subcommittee forwarding it does not count). A bill CRS has
+      not tagged yet has no subject and is in no row, so these counts are not "all of the member's bills". Grain:
+      (bioguide_id, congress, role, subject).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [bioguide_id, congress, role, subject]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }} Null for members who are no longer in office."
+      - name: bioguide_id
+        data_type: varchar
+        description: Bioguide id of the member (joins congress_legislators).
+        data_tests: [not_null]
+      - name: congress
+        data_type: integer
+        description: Congress number (118 = 2023-2025).
+        data_tests: [not_null]
+      - name: role
+        data_type: varchar
+        description: "`sponsor` or `cosponsor`."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['sponsor', 'cosponsor']
+      - name: subject
+        data_type: varchar
+        description: CRS legislative subject term (controlled vocabulary).
+        data_tests: [not_null]
+      - name: bills
+        data_type: bigint
+        description: Distinct bills carrying the subject.
+        data_tests: [not_null]
+      - name: bills_marked_up
+        data_type: bigint
+        description: Of those, bills any committee or subcommittee marked up.
+      - name: bills_reported
+        data_type: bigint
+        description: Of those, bills a full committee reported.
+      - name: bills_became_law
+        data_type: bigint
+        description: Of those, bills that became Public or Private Law.

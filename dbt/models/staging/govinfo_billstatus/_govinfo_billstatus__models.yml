@@ -1,0 +1,495 @@
+# Generated from each model's header comment (+ grain for intermediate models); edit the SQL header,
+# not this file, then regenerate.
+version: 2
+models:
+- name: stg_govinfo_billstatus__actions
+  description: Actions on federal bills from the GovInfo BILLSTATUS bulk XML, one row per (bill, action) in the
+    file's order. A file lists a House or Senate action and often the Library of Congress's coded copy of it (source_system),
+    so counts of rows overcount actions; action_type is as published (President, Veto, BecameLaw, Floor, ...).
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - bill_id
+        - position
+  columns:
+  - name: bill_id
+    data_tests:
+    - not_null
+- name: stg_govinfo_billstatus__amendment_actions
+  description: Actions on federal bill amendments from the GovInfo BILLSTATUS bulk XML, one row per (amendment,
+    action) in the file's order. As for bills, a chamber action is often followed by the Library of Congress's coded
+    copy of it (source_system), so counts of rows overcount actions.
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - amendment_id
+        - position
+  columns:
+  - name: amendment_id
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('stg_govinfo_billstatus__amendments')
+          field: amendment_id
+  - name: action_date
+    data_tests:
+    - not_null
+- name: stg_govinfo_billstatus__amendment_recorded_votes
+  description: Roll calls cited by federal bill amendment actions in the GovInfo BILLSTATUS bulk XML, one row per
+    (amendment, action, roll call). Like the bill-level ones (stg_govinfo_billstatus__recorded_votes), the same
+    roll call is cited by the chamber's own action and its Library of Congress copy; (congress, chamber, session_number,
+    roll_number) identifies the vote and links to Voteview's roll calls.
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - amendment_id
+        - action_position
+        - roll_number
+        - chamber
+  columns:
+  - name: amendment_id
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('stg_govinfo_billstatus__amendments')
+          field: amendment_id
+  - name: chamber
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - House
+          - Senate
+  - name: roll_number
+    data_tests:
+    - not_null
+  - name: session_number
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - 1
+          - 2
+- name: stg_govinfo_billstatus__amendment_sponsors
+  description: 'Sponsors of federal bill amendments from the GovInfo BILLSTATUS bulk XML, one row per (amendment,
+    sponsor). role is "sponsor" or "on_behalf_of" (a senator offering an amendment on another senator''s behalf).
+    A House committee can sponsor an amendment ("Rules Committee"): bioguide_id is then null and name carries the
+    committee. bioguide_id joins congress_legislators. The file sometimes lists the same member twice, under two
+    spellings of the name, so a member can appear twice for an amendment; position keeps the file''s order.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - amendment_id
+        - position
+  columns:
+  - name: amendment_id
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('stg_govinfo_billstatus__amendments')
+          field: amendment_id
+  - name: role
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - sponsor
+          - on_behalf_of
+  - name: name
+    data_tests:
+    - not_null
+- name: stg_govinfo_billstatus__amendments
+  description: Amendments filed to federal bills in the GovInfo BILLSTATUS bulk XML (loaded Congresses, all states),
+    one row per amendment. amendment_id has the form of bill_id ("118-hamdt-180", "118-samdt-999"); amendment_type
+    is lower case (hamdt, samdt) and chamber is the chamber the amendment belongs to as published ("House of Representatives",
+    "Senate"). bill_id is the bill the amendment was filed to and joins stg_govinfo_billstatus__bills; amended_bill_id
+    is the same bill as the amendment itself names it (the two agree for every amendment loaded). When an amendment
+    amends another amendment, amended_amendment_id names that one. Senate amendments carry proposed_date; House
+    ones submitted_date only. Purpose and description are free text as published and are often missing (the House
+    writes a description, the Senate a purpose). Sponsors are in stg_govinfo_billstatus__amendment_sponsors, actions
+    and roll calls in the two models after it.
+  data_tests:
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: amended_bill_id = bill_id
+  columns:
+  - name: amendment_id
+    data_tests:
+    - unique
+    - not_null
+  - name: bill_id
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('stg_govinfo_billstatus__bills')
+          field: bill_id
+  - name: amendment_type
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - hamdt
+          - samdt
+  - name: chamber
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - House of Representatives
+          - Senate
+  - name: amendment_number
+    data_tests:
+    - not_null
+  - name: submitted_date
+    data_tests:
+    - not_null
+- name: stg_govinfo_billstatus__bills
+  description: Federal bills from the GovInfo BILLSTATUS bulk XML (loaded Congresses, all states), one row per bill.
+    bill_type is lower-case (hr, s, hjres, sjres, hconres, sconres, hres, sres). The latest action is the text as
+    published; whether a bill became law is read from the actions (int_federal_bills__stage), never from this text.
+    Only about a third of the files carry their congress.gov link, so the rest get it built from the type, congress
+    and number (https://www.congress.gov/bill/118th-congress/house-joint-resolution/7), which is the form the files
+    use. Some House bills are placeholders reserved for the Speaker or the Minority Leader (titled Reserved for
+    the Speaker. or Reserved for the Minority Leader.), eleven in the 117th (hr2, hr9-17 and hr20) and nine in the
+    118th. They are ordinary bills whose only action is Introduced in House and that have no roll calls, kept as
+    rows. No is_reserved flag exists, so a count of bills introduced per Congress includes them unless it filters
+    on those titles.
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - bill_id
+  columns:
+  - name: bill_id
+    data_tests:
+    - not_null
+  - name: bill_type
+    data_tests:
+    - accepted_values:
+        arguments:
+          values:
+          - hr
+          - s
+          - hjres
+          - sjres
+          - hconres
+          - sconres
+          - hres
+          - sres
+  - name: congress
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 100
+          max_value: 125
+  - name: introduced_date
+    description: Never in the future and never before 2003 (the first Congress loaded, the 108th, starts then).
+    data_tests:
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: cast('2003-01-01' as date)
+          max_value: current_date
+          inclusive: true
+  - name: origin_chamber
+    data_tests:
+    - accepted_values:
+        arguments:
+          values:
+          - House
+          - Senate
+- name: stg_govinfo_billstatus__committee_activities
+  description: 'Dated steps of a federal bill in a committee or subcommittee, from the GovInfo BILLSTATUS bulk XML:
+    one row per (bill, committee or subcommittee, activity). activity is the label as published ("Referred to",
+    "Markup by", "Reported by", "Hearings by", "Discharged from"); the wording differs between the House and Senate
+    and over time ("Referred To" vs "Referred to", "Markup by" vs "Markup By"), so filter on activity_normalized
+    (lower case, hyphens and spaces collapsed to one space, trimmed). activity_date is null only for "Bills of Interest
+    - Exchange of Letters", which the file publishes without a date. position / subposition point at the row in
+    stg_govinfo_billstatus__committees (subposition is null for a full committee).'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - bill_id
+        - position
+        - subposition
+        - activity_position
+  - dbt_utils.expression_is_true:
+      name: stg_govinfo_billstatus__committee_activities_date_null_only_for_exchange_of_letters
+      arguments:
+        expression: activity_date is not null or activity_normalized = 'bills of interest exchange of letters'
+  columns:
+  - name: bill_id
+    data_tests:
+    - not_null
+  - name: activity
+    description: The label as published; its case and wording vary (see activity_normalized).
+    data_tests:
+    - not_null
+  - name: activity_normalized
+    description: activity in lower case with hyphens as spaces and trimmed ("Markup By" and "Markup by" are both
+      "markup by"). Filter on this one.
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - referred to
+          - re referred to
+          - markup by
+          - reported by
+          - reported original measure
+          - hearings by
+          - hearings by (full committee)
+          - hearings by (subcommittee)
+          - discharged from
+          - bills of interest exchange of letters
+          - unknown
+  - name: activity_date
+    description: Never in the future and never before 2003 (the first Congress loaded, the 108th, starts then).
+      Null only for "Bills of Interest - Exchange of Letters", which the file publishes without a date (44 rows
+      in the 118th hr and s).
+    data_tests:
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: cast('2003-01-01' as date)
+          max_value: current_date
+          inclusive: true
+- name: stg_govinfo_billstatus__committees
+  description: 'Committees (and subcommittees) federal bills were referred to, from the GovInfo BILLSTATUS bulk
+    XML: one row per (bill, committee) and one per (bill, subcommittee). A subcommittee row has subposition set
+    and parent_system_code naming its committee; the file gives it no chamber, so it takes its parent''s. system_code
+    is Congress.gov''s committee code (hsba00 House Financial Services; a subcommittee code ends in a non-zero number,
+    hsif03). The dated steps (referred, markup, reported) are in stg_govinfo_billstatus__committee_activities.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - bill_id
+        - position
+        - subposition
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: (parent_system_code is not null) = is_subcommittee
+  columns:
+  - name: bill_id
+    data_tests:
+    - not_null
+  - name: system_code
+    data_tests:
+    - not_null
+  - name: name
+    data_tests:
+    - not_null
+  - name: chamber
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - House
+          - Senate
+          - Joint
+- name: stg_govinfo_billstatus__cosponsors
+  description: Federal bill cosponsors from the GovInfo BILLSTATUS bulk XML, one row per (bill, cosponsor). A cosponsor
+    who later withdrew keeps the row with sponsorship_withdrawn_date set. is_original_cosponsor is true when the
+    member signed on when the bill was introduced; state and district are the member's at the time of the bill.
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - bill_id
+        - position
+  columns:
+  - name: bill_id
+    data_tests:
+    - not_null
+  - name: bioguide_id
+    data_tests:
+    - not_null
+- name: stg_govinfo_billstatus__laws
+  description: Law numbers of federal bills from the GovInfo BILLSTATUS bulk XML, one row per (bill, law). Only
+    bills that were enacted have one. law_type is "Public Law" or "Private Law"; law_number is "<congress>-<n>"
+    (118-1) and is numbered separately per type, so 118-5 can exist as both. A bill can carry two (a measure folded
+    into another). law_congress and law_sequence are the two parts as integers, because the text sorts wrongly ("118-100"
+    < "118-21").
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - bill_id
+        - law_type
+        - law_number
+  columns:
+  - name: bill_id
+    data_tests:
+    - not_null
+  - name: law_type
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - Public Law
+          - Private Law
+  - name: law_number
+    data_tests:
+    - not_null
+  - name: law_congress
+    data_tests:
+    - not_null
+  - name: law_sequence
+    data_tests:
+    - not_null
+- name: stg_govinfo_billstatus__recorded_votes
+  description: Roll calls cited by federal bill actions in the GovInfo BILLSTATUS bulk XML, one row per (bill, action,
+    roll call). The same roll call is cited by the chamber's own action and its Library of Congress copy, so it
+    can appear twice for a bill; (congress, chamber, session_number, roll_number) identifies the vote and links
+    to Voteview's roll calls.
+  columns:
+  - name: bill_id
+    data_tests:
+    - not_null
+  - name: chamber
+    data_tests:
+    - accepted_values:
+        arguments:
+          values:
+          - House
+          - Senate
+- name: stg_govinfo_billstatus__related_bill_relationships
+  description: 'How a federal bill relates to one of its related bills, from the GovInfo BILLSTATUS bulk XML: one
+    row per (bill, related bill, relationship). relationship_type is as published ("Identical bill", "Related bill",
+    "Procedurally related", ...) and identified_by says who made the link (CRS, or the House or Senate itself).
+    related_position is the position of the row in stg_govinfo_billstatus__related_bills. relationship_type_normalized
+    is lower case with hyphens as spaces ("Procedurally-related" = "Procedurally related"); filter on it. CRS sometimes
+    lists a bill as related to itself; those rows are dropped here and in the related bills model, so related_position
+    gaps are expected.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - bill_id
+        - related_position
+        - position
+  columns:
+  - name: bill_id
+    data_tests:
+    - not_null
+  - name: relationship_type
+    description: The label as published; its wording varies ("Procedurally related" and "Procedurally-related").
+    data_tests:
+    - not_null
+  - name: relationship_type_normalized
+    description: relationship_type in lower case with hyphens as spaces and trimmed. Filter on this one.
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - identical bill
+          - related bill
+          - procedurally related
+          - text similarities
+          - related document
+          - bill replaced by
+          - bill replaces
+          - contained in public law
+          - public law contains the text
+          - cross congress related bill
+          - primarycompanionbillbecamelaw
+          - secondarycompanionbillbecamelaw
+          - reintroduction
+          - companion bill
+- name: stg_govinfo_billstatus__related_bills
+  description: 'Bills a federal bill is related to, from the GovInfo BILLSTATUS bulk XML: one row per (bill, related
+    bill). related_bill_id has the same form as bill_id ("118-hjres-125"), so it joins stg_govinfo_billstatus__bills
+    when the related bill''s Congress is loaded. The kind of relationship (identical, related, procedurally related,
+    a bill folded into another) is in stg_govinfo_billstatus__related_bill_relationships: one related bill can carry
+    several. A relation is usually also listed on the other bill; do not assume it. CRS sometimes lists a bill as
+    related to itself (34 of 12,472 rows in the 118th hr and s); those rows are dropped, so position has gaps.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - bill_id
+        - related_bill_id
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: related_bill_id <> bill_id
+  columns:
+  - name: bill_id
+    data_tests:
+    - not_null
+  - name: related_bill_type
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - hr
+          - s
+          - hjres
+          - sjres
+          - hconres
+          - sconres
+          - hres
+          - sres
+  - name: related_congress
+    data_tests:
+    - not_null
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 93
+          max_value: 125
+  - name: related_number
+    data_tests:
+    - not_null
+- name: stg_govinfo_billstatus__sponsors
+  description: Federal bill sponsors from the GovInfo BILLSTATUS bulk XML, one row per (bill, sponsor). bioguide_id
+    joins congress_legislators; state and district are the member's at the time of the bill (district is null for
+    senators). is_by_request is Y when the sponsor introduced the bill by request of the executive.
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - bill_id
+        - position
+  columns:
+  - name: bill_id
+    data_tests:
+    - not_null
+  - name: bioguide_id
+    data_tests:
+    - not_null
+- name: stg_govinfo_billstatus__subjects
+  description: 'CRS legislative subject terms of federal bills, from the GovInfo BILLSTATUS bulk XML: one row per
+    (bill, subject). The terms are the Congressional Research Service''s controlled vocabulary ("Taxation", "Health
+    care coverage and access"); a bill''s single broader policy area is policy_area in stg_govinfo_billstatus__bills.
+    The CRS tags a bill only after it is introduced, so a new bill can have none yet.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - bill_id
+        - subject
+  columns:
+  - name: bill_id
+    data_tests:
+    - not_null
+  - name: subject
+    data_tests:
+    - not_null

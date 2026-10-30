@@ -1,0 +1,167 @@
+# Unit tests for the BILLSTATUS committee, subject and related-bill staging models (#625): fixed source rows -> exact rows.
+version: 2
+
+unit_tests:
+  - name: billstatus_subcommittee_takes_the_chamber_of_its_committee
+    model: stg_govinfo_billstatus__committees
+    description: >
+      The file gives a subcommittee no chamber or type, so its row takes its parent's (same bill and position). A
+      full committee keeps its own, and a subcommittee of another committee on the same bill is not mixed up.
+    given:
+      - input: source('govinfo_billstatus', 'committees')
+        format: sql
+        rows: |
+            select cast('{"bill_id": "118-hjres-99", "position": 0, "subposition": null, "system_code": "hsif00", "parent_system_code": null, "name": "Energy and Commerce Committee", "chamber": "House", "committee_type": "Standing"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-hjres-99", "position": 0, "subposition": 0, "system_code": "hsif14", "parent_system_code": "hsif00", "name": "Health Subcommittee", "chamber": null, "committee_type": null}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-hjres-99", "position": 1, "subposition": null, "system_code": "hsju00", "parent_system_code": null, "name": "Judiciary Committee", "chamber": "House", "committee_type": "Select"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-hjres-99", "position": 1, "subposition": 0, "system_code": "hsju03", "parent_system_code": "hsju00", "name": "Courts Subcommittee", "chamber": null, "committee_type": null}' as varchar) as payload, 'u' as source_url
+    expect:
+      rows:
+        - {bill_id: 118-hjres-99, position: 0, subposition: null, system_code: hsif00, parent_system_code: null, name: Energy and Commerce Committee, chamber: House, committee_type: Standing, is_subcommittee: false}
+        - {bill_id: 118-hjres-99, position: 0, subposition: 0, system_code: hsif14, parent_system_code: hsif00, name: Health Subcommittee, chamber: House, committee_type: Standing, is_subcommittee: true}
+        - {bill_id: 118-hjres-99, position: 1, subposition: null, system_code: hsju00, parent_system_code: null, name: Judiciary Committee, chamber: House, committee_type: Select, is_subcommittee: false}
+        - {bill_id: 118-hjres-99, position: 1, subposition: 0, system_code: hsju03, parent_system_code: hsju00, name: Courts Subcommittee, chamber: House, committee_type: Select, is_subcommittee: true}
+
+  - name: billstatus_committee_parent_lookup_edge_cases
+    model: stg_govinfo_billstatus__committees
+    description: >
+      The parent lookup (#876) keeps its old semantics. A full committee is never matched to a parent and keeps its
+      own (possibly null) chamber and type. A subcommittee takes the chamber and type only where its own is null,
+      and only from a parent with the same bill and position. One with no such parent (none at that position, the
+      parent on another bill, or a null bill id) stays null. Two candidate parents give the subcommittee one row
+      each.
+    given:
+      - input: source('govinfo_billstatus', 'committees')
+        format: sql
+        rows: |
+            select cast('{"bill_id": "b1", "position": 0, "subposition": null, "system_code": "p1", "parent_system_code": null, "name": "Parent One", "chamber": "Senate", "committee_type": null}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "b1", "position": 0, "subposition": 0, "system_code": "s1", "parent_system_code": "p1", "name": "Sub inherits", "chamber": null, "committee_type": null}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "b1", "position": 1, "subposition": 0, "system_code": "s2", "parent_system_code": "zz", "name": "Sub no parent", "chamber": null, "committee_type": null}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "b1", "position": 2, "subposition": null, "system_code": "p3", "parent_system_code": null, "name": "Parent Three", "chamber": "House", "committee_type": "Select"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "b1", "position": 2, "subposition": 1, "system_code": "s3", "parent_system_code": "p3", "name": "Sub keeps own", "chamber": "Joint", "committee_type": "Standing"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "b2", "position": 0, "subposition": null, "system_code": "p4a", "parent_system_code": null, "name": "Twin A", "chamber": "House", "committee_type": "Standing"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "b2", "position": 0, "subposition": null, "system_code": "p4b", "parent_system_code": null, "name": "Twin B", "chamber": "Senate", "committee_type": "Special"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "b2", "position": 0, "subposition": 0, "system_code": "s4", "parent_system_code": "p4a", "name": "Sub of twins", "chamber": null, "committee_type": null}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "b3", "position": 0, "subposition": 0, "system_code": "s5", "parent_system_code": "p5", "name": "Sub other bill", "chamber": null, "committee_type": null}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": null, "position": 0, "subposition": null, "system_code": "p6", "parent_system_code": null, "name": "Null bill parent", "chamber": "House", "committee_type": "Standing"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": null, "position": 0, "subposition": 0, "system_code": "s6", "parent_system_code": "p6", "name": "Null bill sub", "chamber": null, "committee_type": null}' as varchar) as payload, 'u' as source_url
+    expect:
+      rows:
+        - {bill_id: b1, position: 0, subposition: null, system_code: p1, parent_system_code: null, name: Parent One, chamber: Senate, committee_type: null, is_subcommittee: false}
+        - {bill_id: b1, position: 0, subposition: 0, system_code: s1, parent_system_code: p1, name: Sub inherits, chamber: Senate, committee_type: null, is_subcommittee: true}
+        - {bill_id: b1, position: 1, subposition: 0, system_code: s2, parent_system_code: zz, name: Sub no parent, chamber: null, committee_type: null, is_subcommittee: true}
+        - {bill_id: b1, position: 2, subposition: null, system_code: p3, parent_system_code: null, name: Parent Three, chamber: House, committee_type: Select, is_subcommittee: false}
+        - {bill_id: b1, position: 2, subposition: 1, system_code: s3, parent_system_code: p3, name: Sub keeps own, chamber: Joint, committee_type: Standing, is_subcommittee: true}
+        - {bill_id: b2, position: 0, subposition: null, system_code: p4a, parent_system_code: null, name: Twin A, chamber: House, committee_type: Standing, is_subcommittee: false}
+        - {bill_id: b2, position: 0, subposition: null, system_code: p4b, parent_system_code: null, name: Twin B, chamber: Senate, committee_type: Special, is_subcommittee: false}
+        - {bill_id: b2, position: 0, subposition: 0, system_code: s4, parent_system_code: p4a, name: Sub of twins, chamber: House, committee_type: Standing, is_subcommittee: true}
+        - {bill_id: b2, position: 0, subposition: 0, system_code: s4, parent_system_code: p4a, name: Sub of twins, chamber: Senate, committee_type: Special, is_subcommittee: true}
+        - {bill_id: b3, position: 0, subposition: 0, system_code: s5, parent_system_code: p5, name: Sub other bill, chamber: null, committee_type: null, is_subcommittee: true}
+        - {bill_id: null, position: 0, subposition: null, system_code: p6, parent_system_code: null, name: Null bill parent, chamber: House, committee_type: Standing, is_subcommittee: false}
+        - {bill_id: null, position: 0, subposition: 0, system_code: s6, parent_system_code: p6, name: Null bill sub, chamber: null, committee_type: null, is_subcommittee: true}
+
+  - name: billstatus_committee_activities_cut_the_timestamp_to_a_date
+    model: stg_govinfo_billstatus__committee_activities
+    description: >
+      The activity timestamp (2024-07-30T17:44:28Z) becomes its date and the label is kept as published; the
+      subcommittee position stays null for a full committee.
+    given:
+      - input: source('govinfo_billstatus', 'committee_activities')
+        format: sql
+        rows: |
+            select cast('{"bill_id": "118-hjres-126", "position": 0, "subposition": null, "activity_position": 0, "system_code": "hsba00", "activity": "Reported By", "activity_date": "2024-07-30T17:44:28Z"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-hjres-99", "position": 0, "subposition": 0, "activity_position": 1, "system_code": "hsif14", "activity": "Referred to", "activity_date": "2023-11-10T15:23:53Z"}' as varchar) as payload, 'u' as source_url
+    expect:
+      rows:
+        - {bill_id: 118-hjres-126, position: 0, subposition: null, activity_position: 0, system_code: hsba00, activity: Reported By, activity_date: '2024-07-30'}
+        - {bill_id: 118-hjres-99, position: 0, subposition: 0, activity_position: 1, system_code: hsif14, activity: Referred to, activity_date: '2023-11-10'}
+
+  - name: billstatus_related_bills_build_the_bill_id_of_the_related_bill
+    model: stg_govinfo_billstatus__related_bills
+    description: >
+      The related bill's type arrives upper-case (HJRES) and its number as text; related_bill_id has the form of
+      bill_id (118-hjres-125) so it joins the bills model. Other columns are cast.
+    given:
+      - input: source('govinfo_billstatus', 'related_bills')
+        format: sql
+        rows: |
+            select cast('{"bill_id": "118-hjres-126", "position": 0, "related_congress": "118", "related_bill_type": "HJRES", "related_number": "125", "title": "T", "latest_action_date": "2024-09-09", "latest_action_text": "Placed on the Union Calendar."}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-sjres-9", "position": 1, "related_congress": "117", "related_bill_type": "S", "related_number": "7", "title": null, "latest_action_date": null, "latest_action_text": null}' as varchar) as payload, 'u' as source_url
+    expect:
+      rows:
+        - {bill_id: 118-hjres-126, position: 0, related_congress: 118, related_bill_type: hjres, related_number: 125, related_bill_id: 118-hjres-125, title: T, latest_action_date: '2024-09-09', latest_action_text: Placed on the Union Calendar.}
+        - {bill_id: 118-sjres-9, position: 1, related_congress: 117, related_bill_type: s, related_number: 7, related_bill_id: 117-s-7, title: null, latest_action_date: null, latest_action_text: null}
+
+  - name: billstatus_subjects_cast_dates
+    model: stg_govinfo_billstatus__subjects
+    description: >
+      One row per subject term; the update timestamp is cut to its date and a missing one stays null (older files
+      carry none).
+    given:
+      - input: source('govinfo_billstatus', 'subjects')
+        format: sql
+        rows: |
+            select cast('{"bill_id": "118-hjres-126", "position": 0, "name": "Climate change and greenhouse gases", "update_date": "2024-10-31T19:27:45Z"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "117-hr-1319", "position": 0, "name": "Aging", "update_date": null}' as varchar) as payload, 'u' as source_url
+    expect:
+      rows:
+        - {bill_id: 118-hjres-126, position: 0, subject: Climate change and greenhouse gases, update_date: '2024-10-31'}
+        - {bill_id: 117-hr-1319, position: 0, subject: Aging, update_date: null}
+
+  - name: billstatus_activity_normalized_unifies_case_and_hyphens
+    model: stg_govinfo_billstatus__committee_activities
+    description: >
+      activity_normalized is lower case, hyphens as spaces, runs of spaces and hyphens collapsed to one space, and trimmed, so the case variants (Markup By / Markup by)
+      and the undated "Bills of Interest - Exchange of Letters" (no date in the file) map to one value each.
+    given:
+      - input: source('govinfo_billstatus', 'committee_activities')
+        format: sql
+        rows: |
+            select cast('{"bill_id": "118-hr-1", "position": 0, "subposition": null, "activity_position": 0, "system_code": "hsba00", "activity": "Markup By", "activity_date": "2023-05-01T10:00:00Z"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-hr-1", "position": 0, "subposition": null, "activity_position": 1, "system_code": "hsba00", "activity": "Markup by ", "activity_date": "2023-05-02T10:00:00Z"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-hr-3935", "position": 0, "subposition": null, "activity_position": 0, "system_code": "hssy00", "activity": "Bills of Interest - Exchange of Letters", "activity_date": null}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-hr-2", "position": 0, "subposition": null, "activity_position": 0, "system_code": "hsba00", "activity": " Markup  by -- Full  Committee ", "activity_date": null}' as varchar) as payload, 'u' as source_url
+    expect:
+      rows:
+        - {bill_id: 118-hr-1, position: 0, subposition: null, activity_position: 0, system_code: hsba00, activity: Markup By, activity_normalized: markup by, activity_date: '2023-05-01'}
+        - {bill_id: 118-hr-1, position: 0, subposition: null, activity_position: 1, system_code: hsba00, activity: 'Markup by ', activity_normalized: markup by, activity_date: '2023-05-02'}
+        - {bill_id: 118-hr-3935, position: 0, subposition: null, activity_position: 0, system_code: hssy00, activity: Bills of Interest - Exchange of Letters, activity_normalized: bills of interest exchange of letters, activity_date: null}
+        - {bill_id: 118-hr-2, position: 0, subposition: null, activity_position: 0, system_code: hsba00, activity: ' Markup  by -- Full  Committee ', activity_normalized: markup by full committee, activity_date: null}
+
+  - name: billstatus_relationship_type_normalized_unifies_hyphens_and_self_relations_are_dropped
+    model: stg_govinfo_billstatus__related_bill_relationships
+    description: >
+      "Procedurally-related" and "Procedurally related" share a normalized value. A relationship whose related bill
+      is the bill itself (CRS lists 118-hr-9541 as related to itself) is dropped; the same bill's other relation stays.
+    given:
+      - input: source('govinfo_billstatus', 'related_bill_relationships')
+        format: sql
+        rows: |
+            select cast('{"bill_id": "118-hr-9541", "related_position": 0, "position": 0, "relationship_type": "Related bill", "identified_by": "CRS"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-hr-9541", "related_position": 1, "position": 0, "relationship_type": "Procedurally-related", "identified_by": "House"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-s-5", "related_position": 0, "position": 0, "relationship_type": "Procedurally related", "identified_by": "Senate"}' as varchar) as payload, 'u' as source_url
+      - input: source('govinfo_billstatus', 'related_bills')
+        format: sql
+        rows: |
+            select cast('{"bill_id": "118-hr-9541", "position": 0, "related_congress": "118", "related_bill_type": "HR", "related_number": "9541"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-hr-9541", "position": 1, "related_congress": "118", "related_bill_type": "S", "related_number": "5"}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-s-5", "position": 0, "related_congress": "118", "related_bill_type": "HR", "related_number": "9541"}' as varchar) as payload, 'u' as source_url
+    expect:
+      rows:
+        - {bill_id: 118-hr-9541, related_position: 1, position: 0, relationship_type: Procedurally-related, relationship_type_normalized: procedurally related, identified_by: House, source_url: u}
+        - {bill_id: 118-s-5, related_position: 0, position: 0, relationship_type: Procedurally related, relationship_type_normalized: procedurally related, identified_by: Senate, source_url: u}
+
+  - name: billstatus_related_bills_drop_a_bill_related_to_itself
+    model: stg_govinfo_billstatus__related_bills
+    description: >
+      CRS sometimes lists a bill as related to itself (118-hr-9541); that row is dropped and the bill's real
+      relation keeps its original position.
+    given:
+      - input: source('govinfo_billstatus', 'related_bills')
+        format: sql
+        rows: |
+            select cast('{"bill_id": "118-hr-9541", "position": 0, "related_congress": "118", "related_bill_type": "HR", "related_number": "9541", "title": null, "latest_action_date": null, "latest_action_text": null}' as varchar) as payload, 'u' as source_url union all
+            select cast('{"bill_id": "118-hr-9541", "position": 1, "related_congress": "118", "related_bill_type": "S", "related_number": "5", "title": null, "latest_action_date": null, "latest_action_text": null}' as varchar) as payload, 'u' as source_url
+    expect:
+      rows:
+        - {bill_id: 118-hr-9541, position: 1, related_congress: 118, related_bill_type: s, related_number: 5, related_bill_id: 118-s-5, title: null, latest_action_date: null, latest_action_text: null, source_url: u}

@@ -19,6 +19,7 @@ package "Votes" {
   [mo_senate] as L_mos
   [mo_senate_topics] as L_most
   [voteview] as L_vv
+  [govinfo_billstatus] as L_gib
 }
 package "Money" {
   [fec] as L_fec
@@ -78,6 +79,7 @@ package "intermediate (identity resolution)" {
   [int_officeholders__years] as I_years
   [int_epa_frs__facilities] as I_frs
   [int_mo_auditor__reports] as I_aud
+  [int_bluebook__statewide_officeholders] as I_swho
 }
 
 package "marts" {
@@ -89,6 +91,7 @@ package "marts" {
   [dim_district\nfct_official_districts] as D_dist
   [dim_zcta] as D_zcta
   [fct_votes\nfct_federal_votes] as F_votes
+  [fct_federal_sponsorship\nfct_federal_sponsorship_committees\nfct_federal_sponsorship_subjects\nfct_federal_vote_bills\nfct_federal_vote_amendments] as F_spons
   [fct_campaign_finance\nfct_federal_donor_summary\nfct_campaign_spending\nfct_campaign_reports] as F_money
   [fct_lobbyist_gifts] as F_gifts
   [fct_disclosures\nfct_voluntary_disclosures] as F_disc
@@ -103,6 +106,7 @@ package "marts" {
   [fct_jurisdiction_businesses] as F_biz
   [fct_jurisdiction_business_donors] as F_bizd
   [fct_audit_reports] as F_aud
+  [fct_audit_report_officeholders] as F_audho
 }
 
 package "reporting (frontend views)" {
@@ -140,6 +144,9 @@ L_mos --> I_votes
 I_seats --> I_votes
 I_votes --> F_votes
 L_vv --> F_votes
+L_gib --> F_spons
+L_vv --> F_spons
+L_cl --> F_spons
 L_vv --> F_bias
 I_votes --> I_party
 L_vv --> I_party
@@ -264,7 +271,10 @@ F_fac --> F_biz
 L_aud --> I_aud
 S_aud --> I_aud
 I_aud --> F_aud
-F_office --> F_aud
+I_aud --> F_audho
+L_bb --> I_swho
+I_swho --> F_audho
+F_audho --> F_aud
 D_dist --> I_bizm
 D_dist --> F_biz
 F_money --> I_bizm

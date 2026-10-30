@@ -27,6 +27,10 @@
 -- only a bill ("S.B. 628", "merged with S.B. 5") continues the act before it (same year, session and change), as
 -- long as only such pieces come between (or the act is just a year, "A.L. 1985, H.B. 366"); after a page cite
 -- ("p. 509") or an RSMo piece there is no act to continue.
+-- A section cite may follow a bill ("H.B. 1574 § 6 and S.B. 721 § 2", "H.B. 1807, et al. § 301.4044 and S.B. 480"):
+-- it is read past, so the bill after "and" is kept; the typo ".S.B. 58" (stray period) is read as "S.B. 58".
+-- A Senate bill the note marks "Revision" (2018 "S.B. 975 & 1024 Revision") is named SRB975 and SRB1024, as the
+-- Senate's list and fct_bills do, when the session's list has SRB n and no SB n (#627).
 -- Parse bounds (macros/session_law_bounds.sql): a note is read up to 60 acts (longest real note: 43, RSMo 301.010), an
 -- act up to 10 "merged with" bills (longest: 6) and 6 "&"/"and" bills (longest: 4). Parts past a bound would be dropped
 -- silently, and notes list acts oldest first, so the newest acts would go; assert_session_law_bounds_not_exceeded
@@ -51,6 +55,7 @@ with notes as (
     select
         section_id,
         section_version_id,
+        'history' as note_kind,
         history_note as note
     from {{ ref('stg_mo_revisor__sections') }}
     where history_note is not null
@@ -60,6 +65,7 @@ with notes as (
     select
         section_id,
         section_version_id,
+        'repeal' as note_kind,
         note
     from {{ ref('stg_mo_revisor__repeals') }}
     where change_kind = 'repealed'
@@ -69,6 +75,7 @@ normalized as (
     select
         section_id,
         section_version_id,
+        note_kind,
         -- one separator between acts; "et al." belongs to the act before it
         {{ mogov.normalize_session_law_note('note') }} as note
     from notes
@@ -83,6 +90,7 @@ acts as (
     select
         o.section_id,
         o.section_version_id,
+        o.note_kind,
         s.n as act_index,
         trim({{ mogov.split_part_at('o.note', "', '", 's.n', max_acts) }}) as act
     from normalized as o
@@ -90,12 +98,24 @@ acts as (
     where s.n <= {{ dbt.length('o.note') }} - {{ dbt.length(dbt.replace('o.note', "','", "''")) }} + 1
 ),
 
+-- "@" marks an act the note joined with " and L." (normalize_session_law_note): it follows its previous act's change
+acts_marked as (
+    select
+        section_id,
+        section_version_id,
+        note_kind,
+        act_index,
+        act like '@%' as after_and_l,
+        {{ mogov.regex_replace_all('act', '^@', '') }} as act
+    from acts
+),
+
 acts_flagged as (
     select
         *,
         {{ mogov.regex_matches('act', act_head ~ '[0-9]{4}') }} as is_head,
         {{ mogov.regex_matches('act', '^(merged with )?' ~ bill_item ~ '[0-9]') }} as is_continuation
-    from acts
+    from acts_marked
 ),
 
 -- the last piece before each continuation that isn't itself a continuation: the act it continues, if that is an act
@@ -104,23 +124,27 @@ last_break as (
     select
         c.section_id,
         c.section_version_id,
+        c.note_kind,
         c.act_index,
         max(b.act_index) as break_index
     from acts_flagged as c
     inner join acts_flagged as b
         on
             c.section_version_id = b.section_version_id
+            and c.note_kind = b.note_kind
             and c.act_index > b.act_index
             and not b.is_continuation
     where c.is_continuation
-    group by c.section_id, c.section_version_id, c.act_index
+    group by c.section_id, c.section_version_id, c.note_kind, c.act_index
 ),
 
 acts_resolved as (
     select
         section_id,
         section_version_id,
+        note_kind,
         act_index,
+        after_and_l,
         act
     from acts_flagged
     where is_head
@@ -130,15 +154,23 @@ acts_resolved as (
     select
         c.section_id,
         c.section_version_id,
+        c.note_kind,
         c.act_index,
+        h.after_and_l,
         -- the head's "A.L. 1978" (and session), then the continuing piece
         {{ mogov.regex_extract('h.act', '^((Repealed )?(A\\.L\\.|L\\.|A\\.) [0-9]{4}( ' ~ ex_sess ~ ')?)( |$)', 1) }}
         || ' ' || {{ mogov.regex_replace_all('c.act', '^merged with ', '') }} as act
     from acts_flagged as c
     inner join last_break as l
-        on c.section_version_id = l.section_version_id and c.act_index = l.act_index
+        on
+            c.section_version_id = l.section_version_id
+            and c.note_kind = l.note_kind
+            and c.act_index = l.act_index
     inner join acts_flagged as h
-        on l.section_version_id = h.section_version_id and l.break_index = h.act_index
+        on
+            l.section_version_id = h.section_version_id
+            and l.note_kind = h.note_kind
+            and l.break_index = h.act_index
     where
         c.is_continuation
         and h.is_head
@@ -146,17 +178,55 @@ acts_resolved as (
         and {{ mogov.regex_matches('h.act', act_head ~ '[0-9]{4}( ' ~ ex_sess ~ ')?( ' ~ bill_item ~ '[0-9]|$)') }}
 ),
 
-parsed_acts as (
+own_change as (
     select
-        section_id,
-        section_version_id,
-        act_index,
-        act,
+        *,
         case
             when act like 'Repealed %' then 'repealed'
             when act like 'A.L. %' or act like 'A. %' then 'amended'
             else 'enacted'
-        end as change,
+        end as change
+    from acts_resolved
+),
+
+-- a bare "L." joined with " and L." to a repealed act is repealed too: "Repealed" in a repeal note covers the list
+-- ("Repealed L. A and L. B and L. C": B and C are repealed). An "and L." act follows the nearest act before it that
+-- was not joined that way (its anchor), not the act just before it, which may itself be an inheriting one; a
+-- continuation piece after an "and L." head ("@L. B S.B. 5, S.B. 6") shares the head's flag, so it gets the same.
+anchored as (
+    select
+        *,
+        max(case when not after_and_l then act_index end) over (
+            partition by section_id, section_version_id, note_kind
+            order by act_index
+        ) as anchor_index
+    from own_change
+),
+
+inherited_change as (
+    select
+        a.*,
+        case
+            when a.after_and_l and p.change = 'repealed' then 'repealed'
+            else a.change
+        end as final_change
+    from anchored as a
+    left join own_change as p
+        on
+            a.section_id = p.section_id
+            and a.section_version_id = p.section_version_id
+            and a.note_kind = p.note_kind
+            and a.anchor_index = p.act_index
+),
+
+parsed_acts as (
+    select
+        section_id,
+        section_version_id,
+        note_kind,
+        act_index,
+        act,
+        final_change as change,
         {{ dbt.safe_cast(mogov.regex_extract('act', act_head ~ '([0-9]{4})', 3), dbt.type_int()) }} as act_year,
         {{ mogov.regex_extract('act', act_head ~ '[0-9]{4} ' ~ ex_ord ~ ' (Ex\\.|Extraordinary)', 3) }} as ex_ordinal,
         {{ mogov.regex_matches('act', act_head ~ '[0-9]{4} ' ~ ex_sess ~ ' ') }} as is_extra,
@@ -164,7 +234,7 @@ parsed_acts as (
         {{ mogov.regex_replace_all(
             mogov.regex_replace_all('act', act_head ~ '[0-9]{4} ', ''), '^' ~ ex_sess ~ ' ', ''
         ) }} as refs
-    from acts_resolved
+    from inherited_change
 ),
 
 numbered as (
@@ -197,6 +267,7 @@ sessioned as (
     select
         n.section_id,
         n.section_version_id,
+        n.note_kind,
         n.act_index,
         n.act,
         n.change,
@@ -214,6 +285,7 @@ merged as (
     select
         a.section_id,
         a.section_version_id,
+        a.note_kind,
         a.act_index,
         a.act,
         a.change,
@@ -228,29 +300,51 @@ merged as (
         and {{ mogov.split_part_at('a.refs', "' merged with '", 's.n', max_merged) }} <> ''
 ),
 
+-- "H.B. 1574 § 6 and S.B. 721 § 2" (a section cite, with its "et al." and "subsec.", between bills joined by "and")
+-- reads as "H.B. 1574 and S.B. 721"; the typo ".S.B. 58" (stray period) loses it. Without this the second bill is
+-- dropped, as numbers stops at the first section cite.
+bills_joined as (
+    select
+        *,
+        {{ mogov.regex_replace_all(
+            dbt.replace('ref', "' and .'", "' and '"),
+            '( et al\.)? § [0-9A-Za-z.]+( subsec\. [0-9A-Za-z]+)? and ',
+            ' and '
+        ) }} as joined_ref
+    from merged
+),
+
 typed as (
     select
         *,
         -- "299 & 40 § A Revision" -> "299 & 40"; "H.B. 1270 and H.B. 2032" -> "H.B. 1270 & @H.B. 2032" (@ marks a bill
         -- after "and": a lead bill only if cited as one elsewhere, see cited_leads)
         {{ dbt.replace(
-            mogov.regex_extract('ref', '^(' ~ bill_item ~ '[0-9]+( (&|and) (' ~ bill_item ~ ')?[0-9]+)*)', 1),
+            mogov.regex_extract('joined_ref', '^(' ~ bill_item ~ '[0-9]+( (&|and) (' ~ bill_item ~ ')?[0-9]+)*)', 1),
             "' and '",
             "' & @'"
-        ) }} as numbers
-    from merged
+        ) }} as numbers,
+        -- a "Revision" right after the numbers ("S.B. 975 & 1024 Revision") marks a revision bill, which the Senate
+        -- numbers SRB, not SB
+        {{ mogov.regex_matches(
+            'joined_ref',
+            '^' ~ bill_item ~ '[0-9]+( (&|and) (' ~ bill_item ~ ')?[0-9]+)* Revision'
+        ) }} as is_revision
+    from bills_joined
 ),
 
 items as (
     select
         t.section_id,
         t.section_version_id,
+        t.note_kind,
         t.act_index,
         t.act,
         t.change,
         t.act_year,
         t.extra_session,
         t.ref_index,
+        t.is_revision,
         s.n as item_n,
         trim({{ dbt.replace(mogov.split_part_at('t.numbers', "' & '", 's.n', max_combined), "'@'", "''") }}) as item,
         {{ mogov.split_part_at('t.numbers', "' & '", 's.n', max_combined) }} like '@%' as after_and
@@ -271,7 +365,7 @@ item_types as (
         {{ mogov.regex_extract('item', '([0-9]+)$', 1) }} as number,
         -- the nearest item at or before this one that has a bill head
         max(case when {{ mogov.regex_matches('item', bill_head ~ '[0-9]') }} then item_n end) over (
-            partition by section_id, section_version_id, act_index, ref_index
+            partition by section_id, section_version_id, note_kind, act_index, ref_index
             order by item_n
         ) as head_item
     from items
@@ -286,6 +380,7 @@ item_bills as (
         on
             i.section_id = h.section_id
             and i.section_version_id = h.section_version_id
+            and i.note_kind = h.note_kind
             and i.act_index = h.act_index
             and i.ref_index = h.ref_index
             and i.head_item = h.item_n
@@ -308,7 +403,7 @@ item_groups as (
         -- the item that starts this item's group of combined bills: item 1, or a bill after "and" that is also cited
         -- as the first bill of an act elsewhere in its year and session
         max(case when b.item_n = 1 or (b.after_and and c.number is not null) then b.item_n end) over (
-            partition by b.section_id, b.section_version_id, b.act_index, b.ref_index
+            partition by b.section_id, b.section_version_id, b.note_kind, b.act_index, b.ref_index
             order by b.item_n
         ) as group_start
     from item_bills as b
@@ -324,6 +419,7 @@ bills as (
     select
         b.section_id,
         b.section_version_id,
+        b.note_kind,
         b.act_index,
         b.act,
         b.change,
@@ -332,13 +428,16 @@ bills as (
         b.ref_index,
         b.bill_type,
         b.number as bill_number,
+        b.is_revision,
         b.item_n = b.group_start as is_lead_bill,
-        l.bill_type || l.number as lead_bill
+        l.bill_type as lead_type,
+        l.number as lead_number
     from item_groups as b
     inner join item_groups as l
         on
             b.section_id = l.section_id
             and b.section_version_id = l.section_version_id
+            and b.note_kind = l.note_kind
             and b.act_index = l.act_index
             and b.ref_index = l.ref_index
             and b.group_start = l.item_n
@@ -353,26 +452,74 @@ extra_sessions as (
             as ordinal
     from {{ ref('stg_mo_house__sessions') }}
     where session_of_general_assembly like '%Extraordinary Session'
+),
+
+-- Senate revision bills: the Senate's own list (via int_bills__list) names them SRB n ("S.B. 975 & 1024 Revision" in
+-- 2018 is SRB975 and SRB1024; #627). A Revisor Senate bill marked "Revision" is read as SRB n in a session whose bill
+-- list has SRB n and no SB n; a session whose list isn't loaded keeps SB n.
+list_bills as (
+    select distinct
+        session_code,
+        bill
+    from {{ ref('int_bills__list') }}
+    where bill like 'SB%' or bill like 'SRB%'
+),
+
+revision_srbs as (
+    select
+        r.session_code,
+        {{ dbt.replace('r.bill', "'SRB'", "''") }} as number
+    from list_bills as r
+    left join list_bills as s
+        on r.session_code = s.session_code and s.bill = 'SB' || {{ dbt.replace('r.bill', "'SRB'", "''") }}
+    where r.bill like 'SRB%' and s.bill is null
+),
+
+named as (
+    select
+        b.section_id,
+        b.section_version_id,
+        b.change,
+        b.act_year,
+        b.extra_session,
+        case
+            when b.extra_session is null
+                then {{ dbt.right(dbt.safe_cast('b.act_year', dbt.type_string()), 2) }} || '1'
+            else coalesce(
+                x.session_code,
+                {{ dbt.right(dbt.safe_cast('b.act_year', dbt.type_string()), 2) }}
+                || {{ dbt.safe_cast('b.extra_session + 2', dbt.type_string()) }}
+            )
+        end as session_code,
+        b.bill_type,
+        b.bill_number,
+        b.is_revision,
+        b.is_lead_bill,
+        b.lead_type,
+        b.lead_number,
+        b.act
+    from bills as b
+    left join extra_sessions as x on b.act_year = x.session_year and b.extra_session = x.ordinal
 )
 
 select distinct
-    b.section_id,
-    b.section_version_id,
-    b.change,
-    b.act_year,
-    b.extra_session,
+    n.section_id,
+    n.section_version_id,
+    n.change,
+    n.act_year,
+    n.extra_session,
+    n.session_code,
     case
-        when b.extra_session is null
-            then {{ dbt.right(dbt.safe_cast('b.act_year', dbt.type_string()), 2) }} || '1'
-        else coalesce(
-            x.session_code,
-            {{ dbt.right(dbt.safe_cast('b.act_year', dbt.type_string()), 2) }}
-            || {{ dbt.safe_cast('b.extra_session + 2', dbt.type_string()) }}
-        )
-    end as session_code,
-    b.bill_type || b.bill_number as bill,
-    b.is_lead_bill,
-    case when b.is_lead_bill then null else b.lead_bill end as combined_into,
-    b.act
-from bills as b
-left join extra_sessions as x on b.act_year = x.session_year and b.extra_session = x.ordinal
+        when n.bill_type = 'SB' and n.is_revision and r.number is not null then 'SRB' || n.bill_number
+        else n.bill_type || n.bill_number
+    end as bill,
+    n.is_lead_bill,
+    case
+        when n.is_lead_bill then null
+        when n.lead_type = 'SB' and n.is_revision and lr.number is not null then 'SRB' || n.lead_number
+        else n.lead_type || n.lead_number
+    end as combined_into,
+    n.act
+from named as n
+left join revision_srbs as r on n.session_code = r.session_code and n.bill_number = r.number
+left join revision_srbs as lr on n.session_code = lr.session_code and n.lead_number = lr.number

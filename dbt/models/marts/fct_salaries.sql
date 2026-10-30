@@ -8,16 +8,26 @@
 --                payroll surname is compared without suffixes the payroll prints inside it ("BRATTIN JR.",
 --                "HADEN DVM"), with spaces ignored ("VANSCHOIACK" = Van Schoiack), and, when the first name
 --                fits too, by its last words ("WALSH MOORE" for Moore). Kept when
---                  1. exactly one member of that chamber that year has the surname and exactly one payee does, or
---                  2. several share it and a payee and a member are each other's only best first-name fit
---                     (Ed = EDWIN, Patty = PATRICIA), or
---                  3. a payee's middle initial is the initial of the name a member goes by, and no one else fits
+--                  1. a payee and a member are each other's only best first-name fit (Ed = EDWIN, Patty = PATRICIA;
+--                     a surname only one member and one payee have is paired here when the first names fit), or
+--                  2. a payee's middle initial is the initial of the name a member goes by, and no one else fits
 --                     that way ("SMITH, DAVID C" is Cody Smith), or
---                  4. once 1 to 3 have paired the rest, one payee and one member remain (Mike Jones =
---                     JONES, MICHAEL J after Holly Jones)
+--                  3. once 1 and 2 have paired the rest, one payee and one member remain (Mike Jones =
+--                     JONES, MICHAEL J after Holly Jones; a lone Smith and lone payee SMITH whose first names
+--                     differ are paired here too)
 --                A seat counts from the member's first roster year in that chamber (House and Senate each) when Open
 --                States has no start date (#227). A small payment that fits a member whose seat ended the December
---                before, or that January, is that member's final check and is left out of 1 to 4 (#250).
+--                before, or that January, is that member's final check and is left out of 1 to 3 (#250).
+--                A final check is only ever set aside, never paired by seat: a December one is matched by name as
+--                well, and so is a January one (#269). Both depend on the departed member having a row in
+--                int_officials__name_keys and on the by-name checks passing (exactly one matching official, one row);
+--                without them the final check stays unmatched rather than mis-paired (#471). A payee set aside
+--                who is paid in the same chamber in a later year is suspect (a mid-year special-election successor
+--                with a similar name): tests/assert_salaries_final_checks_not_paid_again_later flags it.
+--                The final checks are int_mo_legislators__final_checks. The by-name step also guards a December final
+--                check by service years: pay outside the years a member sat is kept for them only when no other
+--                member of the chamber shares the surname that year, unless that member fits the departed member's
+--                first name (the 2017 pay of a member whose seat ended that December, #227).
 --   by name      payroll "LAST, FIRST" against the official's name variants within the same group of
 --                offices, first names that fit (see mogov.first_name_fit): statewide officials, judges, and
 --                legislator rows the seat match leaves open (members without an Open States seat), and only in
@@ -40,17 +50,17 @@ with pay as (
         {{ dbt.replace(mogov.surname_key('p.last_name'), "' '", "''") }} as last_flat,
         {{ mogov.name_key(dbt.split_part('p.first_names', "' '", 1)) }} as first_key,
         {{ mogov.name_key('p.first_names') }} as first_all_key,
-        {{ mogov.name_key(dbt.split_part('p.first_names', "' '", 2)) }} as middle_key,
-        max(p.gross_pay) over (partition by p.calendar_year, p.position_title) as top_pay
+        {{ mogov.name_key(dbt.split_part('p.first_names', "' '", 2)) }} as middle_key
     from {{ ref('stg_mo_employee_pay__pay') }} as p
     inner join {{ ref('mo_payroll_office_titles') }} as t
         on p.agency_name = t.agency_name and p.position_title = t.position_title
 ),
 
 -- legislature: by seat ----------------------------------------------------------------------------------
--- The first year each member really sat in a chamber (a roster year). Open States gives some seats no start date,
--- which int_mo_legislators__seats turns into 1900-01-01; such a seat starts here instead, so pay from the years
--- before the member took office never pairs with them (#227). Members with no roster year keep the placeholder.
+-- The first year each member really sat in a chamber (a roster year). Open States gives some seats no start date
+-- (start_quality undated in int_mo_legislators__seats, where the date is 1900-01-01); such a seat starts here
+-- instead, so pay from the years before the member took office never pairs with them (#227). Members with no roster
+-- year keep the 1900 start.
 first_roster_years as (
     select
         official_id as person_id,
@@ -76,8 +86,8 @@ seat_years as (
         on
             y.calendar_year between
             case
-                when s.start_date > {{ dbt.safe_cast("'1900-01-01'", 'date') }} then extract(year from s.start_date)
-                else coalesce(f.first_year, extract(year from s.start_date))
+                when s.start_quality = 'undated' then coalesce(f.first_year, extract(year from s.start_date))
+                else extract(year from s.start_date)
             end
             and extract(year from s.end_date)
 ),
@@ -90,48 +100,6 @@ service_years as (
         max(calendar_year) as last_year
     from seat_years
     group by person_id
-),
-
--- A final check: a payee whose first name fits a member of the chamber whose seat ended the December before,
--- and who was paid well under a full year's salary (under half of the year's highest pay for the position).
--- It is that departed member's last pay (unless the member later held a seat in the chamber again), so neither
--- it nor the member competes for the seats held now ("BLACK, LINDA R." 2017 is Linda Black's, not a second
--- claimant to Rusty Black's seat, whose middle initial it shares, #250).
-final_checks as (
-    select distinct
-        p.calendar_year,
-        p.seat_chamber,
-        p.employee_name,
-        d.person_id
-    from pay as p
-    inner join {{ ref('int_mo_legislators__seats') }} as d
-        on
-            p.seat_chamber = d.chamber
-            -- the seat ended in December of the year before, or in January of this year (Open States ends the
-            -- 2022 and 2024 departures on 2023-01-03 and 2025-01-07)
-            and (
-                (extract(year from d.end_date) = p.calendar_year - 1 and extract(month from d.end_date) = 12)
-                or (extract(year from d.end_date) = p.calendar_year and extract(month from d.end_date) = 1)
-            )
-            and {{ dbt.replace('d.surname_key', "' '", "''") }} = p.last_flat
-            and {{
-                mogov.first_name_fit(
-                    'p.first_key',
-                    'p.first_all_key',
-                    mogov.name_key(dbt.split_part('d.full_name', "' '", 1))
-                )
-            }} >= 1
-    where
-        p.office_group = 'legislature'
-        and p.gross_pay * 2 < p.top_pay
-        and not exists (
-            select 1
-            from {{ ref('int_mo_legislators__seats') }} as later
-            where
-                later.person_id = d.person_id
-                and later.chamber = d.chamber
-                and later.end_date > d.end_date
-        )
 ),
 
 -- every (payroll row, member of the same chamber and year) pair whose surnames agree: the whole surname
@@ -157,10 +125,10 @@ seat_pairs_raw as (
             p.calendar_year = s.calendar_year
             and p.seat_chamber = s.chamber
             and (p.last_flat = s.surname_flat or p.last_key like '% ' || s.surname_key)
-    left join final_checks as f
+    left join {{ ref('int_mo_legislators__final_checks') }} as f
         on p.calendar_year = f.calendar_year and p.seat_chamber = f.seat_chamber and p.employee_name = f.employee_name
     -- a member who left in January and was paid that final check is no claimant to the year's pay either
-    left join final_checks as fm
+    left join {{ ref('int_mo_legislators__final_checks') }} as fm
         on s.calendar_year = fm.calendar_year and s.chamber = fm.seat_chamber and s.person_id = fm.person_id
     where p.office_group = 'legislature' and f.employee_name is null and fm.person_id is null
 ),
@@ -185,30 +153,14 @@ seat_pairs_best as (
 seat_pairs as (
     select
         *,
-        count(distinct person_id) over (partition by calendar_year, seat_chamber, employee_name) as n_members,
-        count(distinct employee_name) over (partition by calendar_year, seat_chamber, person_id) as n_payees,
         max(name_fit) over (partition by calendar_year, seat_chamber, employee_name) as payee_best,
         max(name_fit) over (partition by calendar_year, seat_chamber, person_id) as member_best
     from seat_pairs_best
     where same_surname or name_fit >= 1
 ),
 
--- 1. the only member of the chamber with the surname that year, and the only payee
-seat_unique as (
-    select
-        person_id,
-        calendar_year,
-        seat_chamber,
-        employee_name,
-        agency_name,
-        position_title,
-        gross_pay,
-        name_fit
-    from seat_pairs
-    where n_members = 1 and n_payees = 1
-),
-
--- 2. several share the surname: pair those whose first names fit, when each is the other's only best fit
+-- 1. pair a payee and a member whose first names fit, when each is the other's only best fit. A surname only
+-- one member and one payee have is paired here too, when the first names fit.
 -- (Ed Lewis = LEWIS, EDWIN G; Patty Lewis = LEWIS, PATRICIA)
 seat_fitted as (
     select
@@ -220,8 +172,6 @@ seat_fitted as (
 ),
 
 seat_matched as (
-    select * from seat_unique
-    union
     select
         person_id,
         calendar_year,
@@ -235,7 +185,7 @@ seat_matched as (
     where n_best_members = 1 and n_best_payees = 1
 ),
 
--- what is left of a shared surname after steps 1 and 2
+-- what is left of the seat pairs after step 1
 seat_open as (
     select p.*
     from seat_pairs as p
@@ -252,7 +202,7 @@ seat_open as (
     where m_payee.person_id is null and m_member.person_id is null
 ),
 
--- 3. a payee and a member that fit by the payee's middle initial and no one else does: "SMITH, DAVID C" is
+-- 2. a payee and a member that fit by the payee's middle initial and no one else does: "SMITH, DAVID C" is
 -- Cody Smith, though David Smith fits the first name just as well
 seat_initial as (
     select
@@ -276,8 +226,9 @@ seat_initial_matched as (
     where n_init_members = 1 and n_init_payees = 1
 ),
 
--- 4. what is left once 1 to 3 have paired the rest: one payee and one member with nobody else to pair with,
--- though their first names don't fit (Mike Jones = JONES, MICHAEL J after Holly Jones; David Smith =
+-- 3. what is left once 1 and 2 have paired the rest: one payee and one member with nobody else to pair with,
+-- though their first names don't fit; this is also how a surname only one member and one payee have is paired
+-- when the first names don't fit (Mike Jones = JONES, MICHAEL J after Holly Jones; David Smith =
 -- SMITH, DAVID T after Cody Smith)
 seat_left as (
     select

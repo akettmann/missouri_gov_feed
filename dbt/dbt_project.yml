@@ -10,9 +10,15 @@ test-paths: ["tests"]
 target-path: "target"
 clean-targets: ["target", "dbt_packages"]
 
-# A test that reads a model outside the selection would run against that model's stale table (#198: `-s +rpt_awards`
+# A test that reads a node outside the selection would run against that node's stale table (#198: `-s +rpt_awards`
 # ran assert_official_ids_one_per_person against an old int_officeholders__years and failed on rows a full build
-# does not produce). `buildable` runs a test only when every model it reads is selected or upstream of the selection.
+# does not produce). `buildable` runs a test only when every node it depends on (models and seeds; sources always
+# pass) is selected or an ancestor of a selected node. An ancestor is not rebuilt unless selected, so a test can still
+# read a stale one. The selection is safe (never reads an un-rebuilt model) only when it includes every ancestor of
+# every selected node: `+model`, `@model` or `+test`. `+model` still skips tests that also read models outside the
+# model's ancestors. `model+` and `+model+` are NOT safe: `dbt ls -s int_officeholders__years+` (and `+...+`)
+# includes assert_official_ids_one_per_person but not int_officials__current, which it also reads. After changing a
+# model other tests read, build `@model`; for one test, `+test_name`.
 flags:
   indirect_selection: buildable
 
@@ -65,6 +71,13 @@ sources:
       external_location: "read_parquet('{{ env_var('MOGOV_RAW_DIR', 'data/raw') }}/{identifier}/*.parquet', union_by_name = true)"
 
 vars:
+  # stg_mo_house__rollcalls (#449): a House roll call on which fewer than this share of the listed members cast a
+  # vote is a voting-board test record and is dropped. The fewest voters on a real roll call is 84 of 162 (a quorum
+  # call, 52%; 83 voters occurred once, with 158 listed); the test records have 1 to 28 voters (under 18%).
+  house_rollcall_min_participation: 0.25
+  # assert_house_rollcalls_quorum_participation: roll call URLs allowed to fall under half the members voting
+  # (genuine calls that failed to produce a quorum). None so far.
+  house_rollcall_small_quorum_allowlist: []
   # rpt_awards: an official qualifies for an award when award_rank <= its threshold (`default` covers every
   # award not listed; keys are award names, e.g. lowest_attendance: 3). A field smaller than
   # awards_min_field_size is not ranked at all (it guards against thin rankings; it is not a threshold).
@@ -74,6 +87,10 @@ vars:
   # party-unity awards (rpt_awards): fewest party-line votes cast in a calendar year for that year to be ranked.
   # Attendance uses 100 recorded votes, but the Missouri Senate casts only 16-50 party-line votes a year.
   awards_min_party_line_votes: 20
+  # most_bills_passed_house (rpt_awards): fewest decided House bills (HB/HJR the member was primary sponsor of, whose
+  # outcome is known) for a period to be ranked. Decided bills per member and year run 1 to 44 (median 9); at 5, one
+  # bill moves the share 20 points and early years end in ties at 100%, at 10 the field is 7 to 97 members a year (#603).
+  awards_min_bills_decided: 10
 
 # Let this project override dbt's cross-database macros per adapter (see macros/compat/casts.sql).
 dispatch:

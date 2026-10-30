@@ -1,15 +1,21 @@
 -- Who held each tracked office in each year, for the offices whose past holders have dated records:
 --   state_house    the House's own roster for each session year (int_mo_house__member_identity). Members who
 --                  left mid-session are missing from that session's end-of-session list.
---   state_senate   Open States seat-terms with a start date (int_mo_legislators__seats). A year is kept only
---                  when all 34 districts have a dated holder, so a partial year doesn't pass as the full Senate.
+--   state_senate   Open States seat-terms (int_mo_legislators__seats, which dates them from the Senate journal
+--                  roll calls where Open States has no start or a wrong end). A year is kept only when all 34
+--                  districts have a dated holder, so a partial year doesn't pass as the full Senate.
 --   us_house, us_senate                 congress-legislators terms for Missouri
 --   us_district_court, us_court_of_appeals   FJC commissions on the E.D./W.D. Mo. district courts, and
 --                  Eighth Circuit judges whose FJC career mentions Missouri (as int_judges__federal)
 -- A term counts for a year when it runs past January 15 of it, so a hand-over in the first days of January
 -- (Congress turns over on January 3) doesn't list both the outgoing and the incoming holder.
--- Years are those with a House roster. Statewide officers, mayors and state judges have no dated past rosters
--- here. person keys match dim_official.official_id, so a past holder who serves today links to their profile.
+-- Years are those with a House roster. A roster row is dropped when the roster outlived the member, by either of two
+-- tests: the person's last roll-call vote was before the year's handover (any row, #491; only in a year with House
+-- roll calls on or after the handover, so a roster stays whole until that year's roll calls are loaded), or the row's
+-- Open States person has a last House term that ended before the handover (only rows whose roster member carries an
+-- Open States id: the name-anchor override, #152).
+-- Statewide officers, mayors and state judges have no dated past rosters here.
+-- person keys match dim_official.official_id, so a past holder who serves today links to their profile.
 -- official_id is the stable person id; openstates_id is the Open States record the senate row came from (null for
 -- other sources), kept so rpt_officeholders_by_year can find that record's folder. session_code is the House
 -- session file (e.g. 251, 253) listing the member, the earliest one in the year; null for other sources.
@@ -21,6 +27,45 @@ with years as (
         {{ dbt.safe_cast(dbt.concat([dbt.safe_cast('session_year', dbt.type_string()), "'-12-31'"]), 'date') }}
             as year_end
     from {{ ref('int_mo_house__member_identity') }}
+),
+
+-- the end of each person's last Open States House term. A House roster can keep listing a member after they left
+-- (Rebecca Roeber, HD34, died 2019-07-30 yet the 2020 sessions still list her; the seat sat vacant until January
+-- 2021, #152), so a roster row counts only while that term runs past the year's handover, the rule the other
+-- offices use. Only rows whose roster member carries an Open States id (the name-anchor override assigns it): a
+-- row matched by member id alone (Lauren Arthur, 2017-2018, whose Open States House term stops in 2016 though she
+-- voted through 2018) has no Open States term to hold it to; the roll calls below cover those.
+last_house_term as (
+    select
+        person_id,
+        max(end_date) as last_end_date
+    from {{ ref('int_mo_legislators__seats') }}
+    where chamber = 'lower'
+    group by person_id
+),
+
+-- the date of each person's last roll-call vote. Roll calls, not Open States, say when a member stopped: Scott
+-- Fitzpatrick (HD158) cast his last vote on 2019-01-09 and became State Treasurer, HD158 had no member until
+-- Scott Cupps in 2020, and the roster still lists him for 2019 because the seat match found no Open States
+-- person for his 2019 row (#491). A person with no attributed votes has no entry and is never dropped by this
+-- test. The Speaker is on every roll call (house_speakers), so a Speaker's last vote is the end of the term.
+last_house_vote as (
+    select
+        person_key,
+        max(vote_date) as last_vote_date
+    from {{ ref('int_mo_house__votes') }}
+    where person_key is not null
+    group by person_key
+),
+
+-- the roster years with House roll calls on or after the handover. The vote test applies only to these: in January,
+-- before the year's first roll calls are loaded, every returning member's last vote is still in the previous
+-- year, and the test would drop the whole roster. A year whose roll calls end before the handover has no
+-- evidence to hold anyone to.
+rollcall_years as (
+    select distinct y.year
+    from years as y
+    inner join {{ ref('int_mo_house__votes') }} as v on y.handover_date <= v.vote_date and y.year_end >= v.vote_date
 ),
 
 house as (
@@ -38,6 +83,13 @@ house as (
         m.session_code
     from {{ ref('int_mo_house__member_identity') }} as m
     left join {{ ref('stg_openstates__people') }} as p on m.openstates_id = p.openstates_id
+    inner join years as y on m.session_year = y.year
+    left join last_house_term as t on m.person_key = t.person_id
+    left join last_house_vote as v on m.person_key = v.person_key
+    left join rollcall_years as rc on m.session_year = rc.year
+    where
+        (m.openstates_id is null or t.last_end_date is null or t.last_end_date > y.handover_date)
+        and (v.last_vote_date is null or rc.year is null or v.last_vote_date >= y.handover_date)
 ),
 
 senate_terms as (
@@ -57,8 +109,9 @@ senate_terms as (
     inner join years as y on s.start_date <= y.year_end and s.end_date > y.handover_date
     where
         s.chamber = 'upper'
-        -- int_mo_legislators__seats puts undated starts at 1900-01-01: their first year is unknown
-        and s.start_date > {{ dbt.safe_cast("'1900-01-01'", 'date') }}
+        -- an undated start in the journal years is dated from the senator's first vote there (start_quality
+        -- first_vote, #522); the first year of any left undated is unknown
+        and s.start_quality <> 'undated'
 ),
 
 senate_complete_years as (

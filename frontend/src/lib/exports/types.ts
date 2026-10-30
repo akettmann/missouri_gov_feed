@@ -4,6 +4,7 @@
 import type { PayVoteRow } from "../attendancePay";
 import type { LegislatorExpenseRow } from "../legislatorExpenses";
 import type { CommitteeSession } from "../committeePosts";
+import type { SponsorshipSession } from "../sponsorshipOutcomes";
 
 export type Confidence = string; // 'exact id' | 'exact (MEC crosswalk)' | 'high' | 'medium' | ...
 
@@ -75,7 +76,7 @@ export interface CommitteeDonorRow {
   contribution_count: number;
   first_year: number | null;
   last_year: number | null;
-  /** mec committee | ambiguous mec name | not an mec filer | end of trail | individuals */
+  /** mec committee | ambiguous mec name | not an mec filer | own name (high-confidence self match) | similar name (core-name self match) | end of trail | individuals */
   trail_status: string;
   donor_mec_committee_id: string | null;
 }
@@ -87,8 +88,8 @@ export interface CommitteeDonorRow {
 export interface CommitteeTrail {
   mec_committee_id: string;
   committee_name: string | null;
-  /** the donor's name(s) as the official's committee reported them */
-  donor_names: string;
+  /** the donor's name(s) as the official's committee reported them, one entry per distinct name */
+  donor_names: string[];
   gave_official: number;
   first_year: number;
   last_year: number;
@@ -185,6 +186,10 @@ export interface PartyBreak {
   democratic_yea: number | null;
   democratic_nay: number | null;
   source_url: string | null;
+  /** fct_votes.vote_stage (#804): null for a federal vote, which carries no stage */
+  vote_stage: string | null;
+  /** fct_votes.vote_informal: a House calendar item on the informal calendar; null for a federal vote */
+  vote_informal: boolean | null;
 }
 
 /** rpt_attendance: one session. */
@@ -241,10 +246,22 @@ export interface InterestOverlap {
   roll_calls: number;
   yea: number;
   nay: number;
+  /**
+   * roll calls recused from (Senate Rule 91); counted in roll_calls and in other, not in yea or nay. null when
+   * none of the votes are Senate votes: the House source records no recusals, so 0 there would not mean never.
+   */
+  recused: number | null;
+  /** distinct Senate roll calls among roll_calls; the recused count covers only these (a mixed-chamber row also has House votes) */
+  senate_roll_calls: number;
   other: number;
   bills: number;
-  /** the most recent overlapping votes */
+  /** the most recent overlapping votes, then any recusals not among them (recent = false) */
   examples: {
+    recent: boolean;
+    chamber: string;
+    /** fct_votes.vote_stage (#804) of the example roll call */
+    vote_stage: string | null;
+    vote_informal: boolean | null;
     vote_date: string;
     bill: string;
     short_title: string | null;
@@ -325,6 +342,8 @@ export interface OfficialBundle {
   overlap: InterestOverlap[] | null;
   /** House committee posts by session, newest first; null when either committee export is missing */
   committees: CommitteeSession[] | null;
+  /** House bill sponsorship outcomes by session, newest first; null when the fct_sponsorship_outcomes export is missing */
+  sponsorship: SponsorshipSession[] | null;
   courts: {
     status: string;
     /** federal district judges only (fct_judge_time_to_disposition): one entry per case type the judge has dockets of, civil first; null for everyone else or when the export is missing */

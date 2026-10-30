@@ -3,8 +3,9 @@
 -- Missouri) assigned to each judge, each case type apart (a criminal docket takes about twice as long as a civil
 -- one and the mix differs by judge, so one combined median would compare case mix, not pace). Miscellaneous
 -- dockets (mc, mj, sw, wi, sm, pr: warrants, subpoenas, complaints) are not cases and 'other' (unclassified old
--- docket types) is unruled; both are left out (see int_courtlistener__district_dockets), from the CourtListener bulk export (var cl_case_bulk). One measured number per judge, shown
--- with its n: dockets_measured counts dockets with both dates and a non-negative duration. Dockets that end
+-- docket types) is unruled; both are left out (see int_courtlistener__district_dockets), from the
+-- CourtListener bulk export (var cl_case_bulk). One measured number per judge, shown with its n:
+-- dockets_measured counts dockets with both dates and a non-negative duration. Dockets that end
 -- before they were filed (a source error) are counted in dockets_ends_before_filed and left out of the median.
 -- share_with_both_dates is the share of the judge's assigned dockets that have both dates, so a median from a
 -- thin share can be read as such. Includes judges who no longer sit (official_id is null for those not in
@@ -31,8 +32,10 @@ select
     j.cl_person_id,
     j.case_type,
     op.official_id,
-    trim(coalesce(p.name_first || ' ', '') || coalesce(p.name_middle || ' ', '') || coalesce(p.name_last, '')
-        || coalesce(' ' || p.name_suffix, '')) as judge_name,
+    trim(
+        coalesce(p.name_first || ' ', '') || coalesce(p.name_middle || ' ', '') || coalesce(p.name_last, '')
+        || coalesce(' ' || p.name_suffix, '')
+    ) as judge_name,
     case when j.n_courts > 1 then 'moed+mowd' else j.first_court end as court_id,
     cast(j.dockets_assigned as {{ dbt.type_bigint() }}) as dockets_assigned,
     cast(j.dockets_with_both_dates as {{ dbt.type_bigint() }}) as dockets_with_both_dates,

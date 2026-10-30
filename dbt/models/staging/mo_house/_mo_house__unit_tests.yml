@@ -204,6 +204,10 @@ unit_tests:
             select '{"url": "u4", "session_code": "173", "session_day": "1", "rollcall_number": "1", "vote_date": "9/12/2017"}' union all
             select '{"url": "u5", "session_code": "181", "session_day": "1", "rollcall_number": "1", "vote_date": "1/4/2017"}' union all
             select '{"url": "u6", "session_code": "171", "session_day": "2", "rollcall_number": "1", "vote_date": "1/5/2017", "error": "not a pdf"}'
+      - input: source('mo_house', 'rollcall_votes')
+        format: sql
+        rows: |
+            select cast(null as varchar) as payload where 1 = 0
     expect:
       rows:
         - {rollcall_url: u1, session_code: '171', session_day: 35, rollcall_number: 8, vote_date: '2017-03-02'}
@@ -238,6 +242,76 @@ unit_tests:
         - {session_code: '251', bill: HB1, witness_index: 1, witness_forms_url: 'https://documents.house.mo.gov/w/HB1Testimony.pdf', description: Testimony}
         - {session_code: '251', bill: SB7, witness_index: 1, witness_forms_url: 'https://documents.house.mo.gov/w/SB7.pdf', description: null}
 
+  - name: house_bill_hearings_join_bills_split_time_and_redact_contact_strings
+    model: stg_mo_house__bill_hearings
+    description: >
+      A House bill's hearing rows are matched to the bill by session and file (the same file name in another session
+      does not bleed in) and a Senate bill comes in through the SenateActList table under its own bill name. A bill
+      heard twice keeps both rows. notice_time is stored as 1900-01-01THH:MM:SS: the clock time becomes HH:MM, and
+      midnight with the free-text alt_time given becomes null; midnight with no alt_time stays 00:00. An email
+      address or phone number in a comment or location is replaced by a marker and the rest of the text is kept
+      (a sentence-ending dot after an address stays); phones may be 3-3-4 digits with or without separators and
+      parentheses, a leading +1 or 1-, a trailing extension, or the 7-digit Capitol form 751-6662 (dash only, #711); year ranges, dates, RSMo
+      section numbers, amounts and times are not phones; text with neither is unchanged. Reading only one table,
+      taking midnight as a time, dropping the whole comment, or keeping a contact string fails this test.
+    given:
+      - input: source('mo_house', 'xml_bills')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast('HB1' as varchar) as bill
+      - input: source('mo_house', 'xml_bill_hearings')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast(1 as bigint) as hearing_index, cast('Judiciary' as varchar) as committee_name, cast('2025-02-04' as date) as notice_date, cast('1900-01-01T08:15:00' as varchar) as notice_time, cast(null as varchar) as alt_time, cast('House Hearing Room 1' as varchar) as location, cast('Time change.' as varchar) as comments union all
+            select '251', '251-HB1.XML', 2, 'Fiscal Review', '2025-02-11', '1900-01-01T00:00:00', '4:30 PM or upon adjournment', 'House Hearing Room 5', 'Ask bob.smith@house.mo.gov. Call (573) 751-1167 or 573-751-1168 or 573.751.1169 for the substitute' union all
+            select '251', '251-HB1.XML', 3, 'Rules', '2025-02-12', '1900-01-01T00:00:00', null, 'Room 5 (573) 751-1170', 'Dated 2025-02-12 and 1234 Main St' union all
+            select '251', '251-HB1.XML', 4, 'Ways and Means', '2025-02-13', '1900-01-01T10:00:00', null, 'Room 5 call 5737511167', 'Notify my office at 751-6662 or (573)751-1167 or +1 573-751-1168 ext. 12 or 573.751.1169 x4. Sessions 2001-2013 and 3001-3013 met 2/13/19 and 1-23-17 per RSMo 135.1150 and 610.021(10) for $1,000 in room 110 at 10:30' union all
+            select '241', '251-HB1.XML', 1, 'Other session', '2024-02-04', '1900-01-01T09:00:00', null, null, null
+      - input: source('mo_house', 'xml_senate_act_hearings')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-SENATEACTLIST.XML' as varchar) as file_name, cast(1 as bigint) as hearing_index, cast('Rules - Regulatory Oversight' as varchar) as committee_name, cast('2025-03-05' as date) as notice_date, cast('1900-01-01T14:00:00' as varchar) as notice_time, cast(null as varchar) as alt_time, cast('House Hearing Room 5' as varchar) as location, cast(null as varchar) as comments, cast('SB7' as varchar) as bill
+    expect:
+      rows:
+        - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 1, committee_name: Judiciary, hearing_date: '2025-02-04', hearing_time: '08:15', hearing_time_note: null, location: House Hearing Room 1, comments: Time change.}
+        - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 2, committee_name: Fiscal Review, hearing_date: '2025-02-11', hearing_time: null, hearing_time_note: 4:30 PM or upon adjournment, location: House Hearing Room 5, comments: 'Ask [email removed]. Call [phone removed] or [phone removed] or [phone removed] for the substitute'}
+        - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 3, committee_name: Rules, hearing_date: '2025-02-12', hearing_time: '00:00', hearing_time_note: null, location: 'Room 5 [phone removed]', comments: Dated 2025-02-12 and 1234 Main St}
+        - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 4, committee_name: Ways and Means, hearing_date: '2025-02-13', hearing_time: '10:00', hearing_time_note: null, location: 'Room 5 call [phone removed]', comments: 'Notify my office at [phone removed] or [phone removed] or [phone removed] or [phone removed]. Sessions 2001-2013 and 3001-3013 met 2/13/19 and 1-23-17 per RSMo 135.1150 and 610.021(10) for $1,000 in room 110 at 10:30'}
+        - {session_code: '251', session_year: 2025, bill: SB7, hearing_index: 1, committee_name: Rules - Regulatory Oversight, hearing_date: '2025-03-05', hearing_time: '14:00', hearing_time_note: null, location: House Hearing Room 5, comments: null}
+
+  - name: house_bill_hearings_redact_phones_with_spaced_separators_not_bill_lists_or_citations
+    model: stg_mo_house__bill_hearings
+    description: >
+      Guard for shapes not in current data (#751). A 10-digit phone whose dashes have spaces around them is redacted
+      whole: "573 - 751 - 1167", "573 -751- 1167", "(573) 751 - 1167", "(573) - 751-1167" (no area code left behind).
+      Bill lists with spaced dashes ("HB 1 - 3"), amount ranges, dates, times, room numbers and legal citations
+      (RSMo, "Section 105.145", "sections 105.145 and 105.450", "Chapter 610.010", "RSMo 135.1150") are not phones.
+      The dotted 7-digit form "751.6662" is deliberately NOT redacted (same shape as "RSMo 135.1150", left to the
+      warn-level check, see #751). Allowing only a bare single separator again fails this test.
+    given:
+      - input: source('mo_house', 'xml_bills')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast('HB1' as varchar) as bill
+      - input: source('mo_house', 'xml_bill_hearings')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast(1 as bigint) as hearing_index, cast('Judiciary' as varchar) as committee_name, cast('2025-02-04' as date) as notice_date, cast('1900-01-01T08:15:00' as varchar) as notice_time, cast(null as varchar) as alt_time, cast('Room 5' as varchar) as location, cast('Call 573 - 751 - 1167 or 573 -751- 1167 or (573) 751 - 1167 or (573) - 751-1167 today' as varchar) as comments union all
+            select '251', '251-HB1.XML', 2, 'Rules', '2025-02-05', '1900-01-01T08:15:00', null, 'Room 110', 'HB 1 - 3 and HB 5 - 7 heard with 12 - 15 and $100 - $1,000 on 2/5/25 at 9:00 - 10:30 AM' union all
+            select '251', '251-HB1.XML', 3, 'Ways and Means', '2025-02-06', '1900-01-01T08:15:00', null, 'Room 5', 'See RSMo 135.1150, Section 105.145, sections 105.145 and 105.450, Chapter 610.010 and 610.021 - 610.026' union all
+            select '251', '251-HB1.XML', 4, 'Fiscal Review', '2025-02-07', '1900-01-01T08:15:00', null, 'Room 5', 'Dotted seven digits 751.6662 are left to the warn check'
+      - input: source('mo_house', 'xml_senate_act_hearings')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-SENATEACTLIST.XML' as varchar) as file_name, cast(1 as bigint) as hearing_index, cast('Rules' as varchar) as committee_name, cast('2025-03-05' as date) as notice_date, cast('1900-01-01T14:00:00' as varchar) as notice_time, cast(null as varchar) as alt_time, cast('Room 5' as varchar) as location, cast(null as varchar) as comments, cast('SB7' as varchar) as bill
+    expect:
+      rows:
+        - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 1, committee_name: Judiciary, hearing_date: '2025-02-04', hearing_time: '08:15', hearing_time_note: null, location: Room 5, comments: 'Call [phone removed] or [phone removed] or [phone removed] or [phone removed] today'}
+        - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 2, committee_name: Rules, hearing_date: '2025-02-05', hearing_time: '08:15', hearing_time_note: null, location: Room 110, comments: 'HB 1 - 3 and HB 5 - 7 heard with 12 - 15 and $100 - $1,000 on 2/5/25 at 9:00 - 10:30 AM'}
+        - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 3, committee_name: Ways and Means, hearing_date: '2025-02-06', hearing_time: '08:15', hearing_time_note: null, location: Room 5, comments: 'See RSMo 135.1150, Section 105.145, sections 105.145 and 105.450, Chapter 610.010 and 610.021 - 610.026'}
+        - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 4, committee_name: Fiscal Review, hearing_date: '2025-02-07', hearing_time: '08:15', hearing_time_note: null, location: Room 5, comments: Dotted seven digits 751.6662 are left to the warn check}
+        - {session_code: '251', session_year: 2025, bill: SB7, hearing_index: 1, committee_name: Rules, hearing_date: '2025-03-05', hearing_time: '14:00', hearing_time_note: null, location: Room 5, comments: null}
+
   - name: house_rollcalls_whose_header_names_another_session_are_dropped
     model: stg_mo_house__rollcalls
     description: >
@@ -267,6 +341,10 @@ unit_tests:
             select '{"url": "keep_unknown_label", "session_code": "201", "session_day": "13", "rollcall_number": "1", "vote_date": "9/16/2020", "text": "UNOFFICIAL COPY 100th General Assembly\n   VETO SESSION\n State of Missouri"}' union all
             select '{"url": "keep_unknown_label_204", "session_code": "204", "session_day": "5", "rollcall_number": "1", "vote_date": "11/12/2020", "text": "UNOFFICIAL COPY 100th General Assembly\n   VETO SESSION\n State of Missouri"}' union all
             select '{"url": "keep_no_text", "session_code": "211", "session_day": "1", "rollcall_number": "1", "vote_date": "1/6/2021"}'
+      - input: source('mo_house', 'rollcall_votes')
+        format: sql
+        rows: |
+            select cast(null as varchar) as payload where 1 = 0
     expect:
       rows:
         - {rollcall_url: keep_171, header_general_assembly: 99, header_session_label: FIRST REGULAR SESSION}
@@ -300,6 +378,10 @@ unit_tests:
             select '{"url": "https://x/bills261/rollcalls/006.002.pdf", "session_code": "261", "session_day": "6", "vote_date": "1/15/2026"}' union all
             select '{"url": "https://x/bills261/rollcalls/007.001.pdf", "session_code": "261", "session_day": "7", "rollcall_number": "1", "vote_date": "1/16/2026"}' union all
             select '{"url": "https://x/bills251/rollcalls/007.001.pdf", "session_code": "251", "session_day": "7", "rollcall_number": "1", "vote_date": "1/16/2025"}'
+      - input: source('mo_house', 'rollcall_votes')
+        format: sql
+        rows: |
+            select cast(null as varchar) as payload where 1 = 0
     expect:
       rows:
         - {rollcall_url: https://x/bills261/rollcalls/003.001.pdf, session_code: '261', session_day: 3, rollcall_number: 1}
@@ -309,3 +391,79 @@ unit_tests:
         - {rollcall_url: https://x/bills261/rollcalls/006.002.pdf, session_code: '261', session_day: 6, rollcall_number: null}
         - {rollcall_url: https://x/bills261/rollcalls/007.001.pdf, session_code: '261', session_day: 7, rollcall_number: 1}
         - {rollcall_url: https://x/bills251/rollcalls/007.001.pdf, session_code: '251', session_day: 7, rollcall_number: 1}
+
+  - name: house_rollcalls_where_hardly_anyone_voted_are_voting_board_tests
+    model: stg_mo_house__rollcalls
+    description: >
+      A roll call on which fewer than a quarter of the listed members cast a vote (house_rollcall_min_participation,
+      #449) is a voting-board test record and is dropped (231 026.003 had 7 voters of 163, 173 002.001 had 1). Exactly a quarter
+      (1 of 4) stays, a roll call where nobody voted goes, and a roll call with no parsed vote rows at all stays
+      (its votes were not loaded, which says nothing about turnout). Counting absent ('@') members as voters,
+      using a strict instead of an inclusive threshold, or dropping rows with no votes fails this test.
+    given:
+      - input: source('mo_house', 'rollcalls')
+        format: sql
+        rows: |
+            select cast('{"url": "keep_all", "session_code": "231", "session_day": "1", "rollcall_number": "1", "vote_date": "2/21/2023"}' as varchar) as payload union all
+            select '{"url": "keep_exact_quarter", "session_code": "231", "session_day": "2", "rollcall_number": "1", "vote_date": "2/21/2023"}' union all
+            select '{"url": "drop_under_quarter", "session_code": "231", "session_day": "3", "rollcall_number": "1", "vote_date": "2/21/2023"}' union all
+            select '{"url": "drop_nobody", "session_code": "231", "session_day": "4", "rollcall_number": "1", "vote_date": "2/21/2023"}' union all
+            select '{"url": "keep_no_votes_rows", "session_code": "231", "session_day": "5", "rollcall_number": "1", "vote_date": "2/21/2023"}'
+      - input: source('mo_house', 'rollcall_votes')
+        format: sql
+        rows: |
+            select cast('{"url": "keep_all", "vote_code": "Y"}' as varchar) as payload union all
+            select '{"url": "keep_all", "vote_code": "Y"}' union all
+            select '{"url": "keep_all", "vote_code": "N"}' union all
+            select '{"url": "keep_all", "vote_code": "P"}' union all
+            select '{"url": "keep_exact_quarter", "vote_code": "Y"}' union all
+            select '{"url": "keep_exact_quarter", "vote_code": "@"}' union all
+            select '{"url": "keep_exact_quarter", "vote_code": "@"}' union all
+            select '{"url": "keep_exact_quarter", "vote_code": "@"}' union all
+            select '{"url": "drop_under_quarter", "vote_code": "Y"}' union all
+            select '{"url": "drop_under_quarter", "vote_code": "@"}' union all
+            select '{"url": "drop_under_quarter", "vote_code": "@"}' union all
+            select '{"url": "drop_under_quarter", "vote_code": "@"}' union all
+            select '{"url": "drop_under_quarter", "vote_code": "@"}' union all
+            select '{"url": "drop_nobody", "vote_code": "@"}' union all
+            select '{"url": "drop_nobody", "vote_code": "@"}' union all
+            select '{"url": "drop_nobody", "vote_code": "@"}' union all
+            select '{"url": "drop_nobody", "vote_code": "@"}'
+    expect:
+      rows:
+        - {rollcall_url: keep_all, members_listed: 4, members_voting: 4}
+        - {rollcall_url: keep_exact_quarter, members_listed: 4, members_voting: 1}
+        - {rollcall_url: keep_no_votes_rows, members_listed: null, members_voting: null}
+
+  - name: house_document_texts_drop_control_characters_and_flag_blank_or_failed_documents
+    model: stg_mo_house__document_texts
+    description: >
+      A small-caps heading extracts with NUL characters ("B" NUL "ILL"): the NULs and other control characters are
+      removed while tabs and line feeds stay, and text_length counts the cleaned text. A PDF of scanned images has
+      pages but only whitespace: has_text false. A failed fetch keeps its row with the error, no text and a zero
+      length. The URL is trimmed to join the links, the bill comes from the House XML row of the first link (null
+      when that is a Senate act list file), and the state row adds the HTTP status. Leaving the NULs in, treating
+      whitespace as text, or dropping failed rows fails this test.
+    given:
+      - input: source('mo_house', 'pdf_texts')
+        format: sql
+        rows: |
+            select cast(' https://documents.house.mo.gov/t/1.pdf ' as varchar) as url, cast('bill_text' as varchar) as kind, cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast('1234H.01I' as varchar) as lr_number, cast('I' as varchar) as version_code, cast(1 as bigint) as n_links, cast(2 as bigint) as page_count, cast('B' || chr(0) || 'ILL' || chr(1) || chr(10) || 'AN ACT' || chr(9) || 'to repeal' as varchar) as text, cast(null as varchar) as error union all
+            select 'https://documents.house.mo.gov/s/scan.pdf', 'summary', '251', '251-HB1.XML', null, null, 2, 3, ' ' || chr(10) || ' ' || chr(10), null union all
+            select 'https://documents.house.mo.gov/a/bad.pdf', 'amendment', '251', '251-SENATEACTLIST.XML', null, null, 1, null, null, 'not a PDF'
+      - input: source('mo_house', 'pdf_files')
+        format: sql
+        rows: |
+            select cast('https://documents.house.mo.gov/t/1.pdf' as varchar) as url, cast(200 as bigint) as http_status, cast(5000 as bigint) as size_bytes union all
+            select 'https://documents.house.mo.gov/s/scan.pdf', 200, 800 union all
+            select 'https://documents.house.mo.gov/a/bad.pdf', 200, null
+      - input: source('mo_house', 'xml_bills')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast('HB1' as varchar) as bill
+    expect:
+      format: sql
+      rows: |
+          select cast('https://documents.house.mo.gov/t/1.pdf' as varchar) as document_url, cast('bill_text' as varchar) as document_kind, cast('251' as varchar) as session_code, cast('HB1' as varchar) as bill, cast('1234H.01I' as varchar) as lr_number, cast('I' as varchar) as version_code, cast(1 as bigint) as n_links, cast(2 as bigint) as page_count, cast('BILL' || chr(10) || 'AN ACT' || chr(9) || 'to repeal' as varchar) as document_text, cast(21 as bigint) as text_length, cast(true as boolean) as has_text, cast(null as varchar) as fetch_error, cast(200 as bigint) as http_status, cast(5000 as bigint) as size_bytes union all
+          select 'https://documents.house.mo.gov/s/scan.pdf', 'summary', '251', 'HB1', null, null, 2, 3, ' ' || chr(10) || ' ' || chr(10), 4, false, null, 200, 800 union all
+          select 'https://documents.house.mo.gov/a/bad.pdf', 'amendment', '251', null, null, null, 1, null, null, 0, false, 'not a PDF', 200, null

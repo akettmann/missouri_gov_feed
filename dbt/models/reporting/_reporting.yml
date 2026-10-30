@@ -458,6 +458,12 @@ models:
       - name: vote_date
         data_type: date
         description: Date of the vote.
+      - name: vote_description
+        data_type: varchar
+        description: >
+          What the roll call decided, as in fct_votes. Senate journal text names the question ("read the 3rd time
+          and passed", "SA 2 failed of adoption"); House roll calls carry only the calendar item, which does not
+          tell an amendment from passage. The site uses it to pick one example vote per bill.
       - name: bill
         data_type: varchar
         description: The bill voted on (fct_vote_bills).
@@ -531,7 +537,9 @@ models:
         description: Of those, roll calls where they voted nay.
       - name: other
         data_type: bigint
-        description: Of those, roll calls where they were present, absent or not voting.
+        description: >
+          Of those, roll calls where they did anything other than vote yea or nay: present, absent, absent with
+          leave or recused (Senate Rule 91).
       - name: bills
         data_type: bigint
         description: Distinct bills with this subject among those roll calls.
@@ -555,7 +563,14 @@ models:
       their party (party unity from fct_party_unity_yearly, current chamber, per calendar year and lifetime, at
       least awards_min_party_line_votes party-line votes in the period (default 20); the lifetime figure equals
       the profile's party_unity_pct, the yearly figures appear with the award only). Most breaks needs at least
-      one break. Only attendance and party unity are pairs (the two ends rank one number over one field); each end's
+      one break. Most bills passed the House ranks, among state_house, the share of a member's decided HB and
+      HJR primary sponsorships (fct_sponsorship_outcomes: not pending, not awaiting the governor; sessions
+      that have ended only; co-sponsored bills and resolutions not counted; appropriation bills counted) that
+      the House passed, per session year and lifetime (counts summed), with at least awards_min_bills_decided
+      decided bills (default 10) and at least one passed (a 0% member never wins; group_size stays the whole
+      ranked field, as for Maverick). It has no low end: most bills are never passed, so a "fewest" list would be
+      a tie at 0%. Early years are not comparable with recent ones (only current officials are in the data).
+      Only attendance and party unity are pairs (the two ends rank one number over one field); each end's
       cutoff is at most half that field (floor(group_size / 2)), ties at the cutoff can add more, so
       no official is in both lists of a pair for one office and period; an official a tie at the cut would put
       in both is in neither. Only offices with awards_min_field_size
@@ -570,13 +585,14 @@ models:
         data_type: varchar
         description: >
           lowest_attendance, highest_attendance, most_committee_money, least_committee_money_share,
-          most_party_breaks, most_party_loyal.
+          most_party_breaks, most_party_loyal, most_bills_passed_house.
         data_tests:
           - not_null
           - accepted_values:
               arguments:
                 values: ['lowest_attendance', 'highest_attendance', 'most_committee_money',
-                  'least_committee_money_share', 'most_party_breaks', 'most_party_loyal']
+                  'least_committee_money_share', 'most_party_breaks', 'most_party_loyal',
+                  'most_bills_passed_house']
       - name: office
         data_type: varchar
         description: The comparison group (dim_official.office); officials are ranked only against their office.
@@ -606,11 +622,11 @@ models:
       - name: metric
         data_type: decimal(28,6)
         description: >
-          The ranked number: attendance %, dollars from PACs/committees/parties, % of money from them, or party
-          unity %.
+          The ranked number: attendance %, dollars from PACs/committees/parties, % of money from them, party
+          unity %, or % of decided sponsored House bills the House passed.
       - name: sample_size
         data_type: decimal(28,6)
-        description: What the metric is out of (recorded votes, total dollars raised, or party-line votes cast).
+        description: What the metric is out of (recorded votes, total dollars raised, party-line votes cast, or decided sponsored bills).
       - name: group_size
         data_type: bigint
         description: >
@@ -755,7 +771,7 @@ models:
       Who held each tracked office in each year, for the browse page's year control. The current calendar
       year is everyone serving now (dim_official, every office). Earlier years list the past holders of the
       offices with dated rosters only (int_officeholders__years: MO House from its session rosters, MO Senate
-      in years where Open States dates all 34 seats, Congress, federal judges); statewide officers, mayors and
+      dated from the journal roll calls where Open States has no start or a wrong end, Congress, federal judges); statewide officers, mayors and
       state judges have no rows before the current year. A term counts for a year when it runs past January 15.
       Grain: one row per (year, office, person).
     data_tests:
@@ -887,12 +903,12 @@ models:
         description: Latest contribution year.
       - name: trail_status
         data_type: varchar
-        description: mec committee, ambiguous mec name, not an mec filer, end of trail, or individuals (see above).
+        description: mec committee, ambiguous mec name, not an mec filer, own name (a name the committee itself files under), similar name (close to its own name; not followed), end of trail, or individuals (see above).
         data_tests:
           - not_null
           - accepted_values:
               arguments:
-                values: ['mec committee', 'ambiguous mec name', 'not an mec filer', 'end of trail', 'individuals']
+                values: ['mec committee', 'ambiguous mec name', 'not an mec filer', 'own name', 'similar name', 'end of trail', 'individuals']
       - name: donor_mec_committee_id
         data_type: varchar
         description: >
@@ -909,6 +925,154 @@ models:
       - name: source_url
         data_type: varchar
         description: The committee's MEC page, where its reports and itemized contributions are.
+
+  - name: rpt_statute_section_bills
+    description: >
+      The bills that enacted, amended or repealed each RSMo section, shaped for a statute section page: one row per
+      link in fct_bill_statute_links, with the bill's short title, outcome and official page when fct_bills has it
+      (2017 on) and its primary sponsor. Older links show the Revisor's citation only. A combined act's non-lead
+      bill keeps is_lead_bill false and names the lead bill in combined_into. Grain: one row per (session_code,
+      bill, section_id, change).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [session_code, bill, section_id, change]
+    columns:
+      - name: section_id
+        data_type: varchar
+        description: The RSMo section (fct_statute_sections.section_id).
+        data_tests:
+          - not_null
+      - name: session_year
+        data_type: integer
+        description: Year of the act (the Revisor's citation year).
+        data_tests:
+          - not_null
+      - name: session_code
+        data_type: varchar
+        description: Session code as in fct_bills (e.g. 231 for the 2023 regular session).
+        data_tests:
+          - not_null
+      - name: bill
+        data_type: varchar
+        description: Bill id without spaces ("HB115", "SB153").
+        data_tests:
+          - not_null
+      - name: change
+        data_type: varchar
+        description: enacted (L.), amended (A.L.) or repealed (Repealed L.), as in fct_bill_statute_links.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [enacted, amended, repealed]
+      - name: citation
+        data_type: varchar
+        description: The act as the Revisor cites it, e.g. "A.L. 2021 S.B. 153 & 97".
+      - name: is_lead_bill
+        data_type: boolean
+        description: >
+          False for a bill that was combined into another in one act (fct_bill_statute_links.is_lead_bill); only the
+          lead bill reached the governor.
+        data_tests:
+          - not_null
+      - name: combined_into
+        data_type: varchar
+        description: The lead bill a non-lead bill was combined into (SB153 for 2021 SB97); null for lead bills.
+        data_tests:
+          - not_null:
+              config:
+                where: not is_lead_bill
+      - name: in_fct_bills
+        data_type: boolean
+        description: Whether fct_bills has the bill; when false, short_title, outcome, source_url and the sponsor are null.
+        data_tests:
+          - not_null
+      - name: short_title
+        data_type: varchar
+        description: The bill's short title (fct_bills).
+      - name: outcome
+        data_type: varchar
+        description: The bill's outcome (fct_bills.outcome).
+      - name: source_url
+        data_type: varchar
+        description: The bill's official House or Senate page (fct_bills.source_url); null when fct_bills lacks the bill.
+      - name: official_id
+        data_type: varchar
+        description: >
+          The bill's primary sponsor (fct_bill_sponsors, sponsor_type 'Sponsor') as an official; null when the sponsor
+          is not matched to one or none is loaded (Senate bills, #839).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: sponsor_name
+        data_type: varchar
+        description: The primary sponsor's name as the bill lists it; null when no primary sponsor is loaded.
+
+  - name: rpt_statute_chapters
+    description: >
+      One row per RSMo chapter with the number of section versions in each status, for the statutes index pages.
+      Every count is of fct_statute_sections rows (versions), so the status counts add up to section_versions; sections
+      counts distinct section numbers. Chapter and title names are null for chapters the Revisor's table of contents no
+      longer lists. Grain: one row per chapter.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [chapter]
+    columns:
+      - name: chapter
+        data_type: varchar
+        description: RSMo chapter number, as text because a few carry a letter.
+        data_tests:
+          - not_null
+      - name: chapter_name
+        data_type: varchar
+        description: Chapter name from the Revisor's table of contents; null for a chapter no longer listed there.
+      - name: title_numeral
+        data_type: varchar
+        description: The chapter's title, as a roman numeral; null with chapter_name.
+      - name: title_name
+        data_type: varchar
+        description: The title's name, e.g. "LAWS AND STATUTES".
+      - name: section_versions
+        data_type: bigint
+        description: All fct_statute_sections rows of the chapter; equals the sum of the six status counts.
+      - name: sections
+        data_type: bigint
+        description: Distinct section numbers in the chapter, whatever their status.
+      - name: sections_in_force
+        data_type: bigint
+        description: Distinct section numbers with at least one version whose status is in force.
+      - name: in_force_versions
+        data_type: bigint
+        description: Versions with status in force.
+      - name: not_yet_effective_versions
+        data_type: bigint
+        description: Versions with status not yet effective (a later version printed beside the one in force).
+      - name: contingent_versions
+        data_type: bigint
+        description: Versions with status contingent (take effect on an event, not a date).
+      - name: historical_versions
+        data_type: bigint
+        description: Versions with status historical (expired versions still printed).
+      - name: repealed_versions
+        data_type: bigint
+        description: Rows for repealed sections.
+      - name: transferred_versions
+        data_type: bigint
+        description: Rows for transferred sections.
+      - name: oldest_fetched_at
+        data_type: timestamp with time zone
+        description: >
+          The earliest fetch time among the chapter's rows: when the chapter's stalest page was fetched from
+          revisor.mo.gov. Null until the loader has run again since #852; rows without a fetch time are ignored, so
+          before a full reload this is the oldest of the pages that have one.
+      - name: loaded_at
+        data_type: timestamp with time zone
+        description: >
+          The earliest publish time among the chapter's rows (when our pipeline last published the raw tables),
+          not when the pages were fetched (see oldest_fetched_at), which was up to 180 days earlier.
 
 exposures:
   - name: voter_frontend

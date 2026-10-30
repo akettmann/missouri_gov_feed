@@ -10,20 +10,23 @@ The site has no bulk download; every page is server-rendered HTML.
 - rx.aspx is one ~10 MB page listing every repealed and transferred section with its repealing act and date,
   so those ~15,000 sections need no page of their own.
 
-Each section version lands as the page's content block, verbatim, plus its text split into paragraphs; dbt
-parses dates, status and the history citations. Units: chapters, plus rx.aspx (owned by one shard).
+Each section version lands as the page's content block, verbatim, plus its text split into paragraphs and
+fetched_at (when the page came from the site, from the HTTP cache entry's fetch time); dbt parses dates,
+status and the history citations. Units: chapters, plus rx.aspx (owned by one shard).
 """
 
 import os
 import re
 import time
+from collections.abc import Callable
+from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
 import httpx
 import lxml.html
 
 from mogov import db, obs
-from mogov.http import fetch, pause_host
+from mogov.http import fetch_stamped, pause_host
 from mogov.loaders import loader
 
 log = obs.get_logger(__name__)
@@ -51,6 +54,11 @@ MAX_CONSECUTIVE_SKIPS = 3
 MIN_SKIPS_ALLOWED = 20
 MAX_SKIPPED_SHARE = 0.005
 REFUSED_MARKER = b"Recent accesses are tracked over a thirty second interval"
+# A section page's content block (header, body, footnotes) runs from CONTENT_START to the page footer. The site has
+# also served its home page, with 200 and no redirect, in place of a listed section (161.415, 2026-10); a section
+# response without the block is refused like the warning page, so it is retried and never cached.
+CONTENT_START = '<div style="margin:.1em 0em .4em .5em;">'
+CONTENT_END = '<div id="BOTTOM"'
 # A new enactment or amendment is a new version with its own bid (a new URL), found through the chapter lists,
 # which are re-read weekly. A version's page only changes with annotations, so it is re-read twice a year.
 SECTION_MAX_AGE = 180 * 86400
@@ -61,6 +69,8 @@ REPEALS_UNIT = "rx.aspx"
 CHAPTER_PATH = "/main/OneChapter.aspx"
 SECTION_PATH = "/main/PageSelect.aspx"
 CHAPTER_ID = re.compile(r"[0-9A-Za-z]+")  # a chapter id; this matches an attribute value, not markup
+# Pages are parsed without ever fetching what they reference (external DTDs, entities); that is also lxml's default.
+PARSER = lxml.html.HTMLParser(no_network=True)
 
 
 class Blocked(RuntimeError):
@@ -72,6 +82,10 @@ class Warned(Blocked):
     """The too-fast / no-such-page warning (not yet a block)."""
 
 
+class Misserved(Warned):
+    """Another page (the home page) served with 200 in place of the section asked for."""
+
+
 def _not_blocked(resp: httpx.Response) -> None:
     if resp.url.path.lower().endswith("/block.aspx"):
         raise Blocked(f"revisor.mo.gov blocked this IP address; stop and retry later ({resp.url})")
@@ -79,13 +93,32 @@ def _not_blocked(resp: httpx.Response) -> None:
         raise Warned(f"revisor.mo.gov answered with its too-fast / no-such-page warning for {resp.url}")
 
 
+def _section_served(resp: httpx.Response) -> None:
+    _not_blocked(resp)
+    if CONTENT_START.encode() not in resp.content:
+        raise Misserved(f"revisor.mo.gov served a page without a section content block for {resp.url}")
+
+
 def _get(
     url: str, params: dict | None = None, *, max_age: float = LIST_MAX_AGE, backoff: tuple[float, ...] | None = None
 ) -> str:
+    return _get_stamped(url, params, max_age=max_age, backoff=backoff)[0]
+
+
+def _get_stamped(
+    url: str,
+    params: dict | None = None,
+    *,
+    max_age: float = LIST_MAX_AGE,
+    backoff: tuple[float, ...] | None = None,
+    check: Callable[[httpx.Response], None] = _not_blocked,
+) -> tuple[str, str]:
+    """The page text and fetched_at: when its bytes came from revisor.mo.gov, as an ISO-8601 UTC string. A page
+    served from the HTTP cache carries the time of the fetch that filled the cache, not the time it was reused."""
     for wait in (*(WARNING_BACKOFF if backoff is None else backoff), None):
         try:
-            page = fetch(url, params, max_age=max_age, min_interval=POLITE_DELAY, check=_not_blocked)
-            return page.decode("utf-8", "replace")
+            page, fetched = fetch_stamped(url, params, max_age=max_age, min_interval=POLITE_DELAY, check=check)
+            return page.decode("utf-8", "replace"), datetime.fromtimestamp(fetched, UTC).isoformat(timespec="seconds")
         except Warned:
             if wait is None:
                 raise
@@ -97,9 +130,10 @@ def _get(
 
 
 def _query(href: str, path: str) -> dict[str, str] | None:
-    """The (undecoded) query parameters of an href on `path`, or None for any other link."""
+    """The (undecoded) query parameters of a site-relative href on `path`, or None for any other link (an
+    absolute or scheme-relative href is another site's, even when its path matches)."""
     split = urlsplit(href.strip())
-    if split.path != path:
+    if split.scheme or split.netloc or split.path != path:
         return None
     return dict(part.partition("=")[::2] for part in split.query.split("&"))
 
@@ -127,7 +161,7 @@ def _text(el) -> str:
 def parse_toc(page: str) -> list[dict]:
     """Home.aspx -> [{title, chapter, chapter_name}] in the site's order."""
     rows = []
-    for details in lxml.html.fromstring(page).iter("details"):
+    for details in lxml.html.fromstring(page, parser=PARSER).iter("details"):
         spans = details.find("summary").findall("span") if details.find("summary") is not None else []
         title = _text(spans[-1]) if spans else None
         for a in details.iterfind(".//a[@href]"):
@@ -141,7 +175,7 @@ def parse_toc(page: str) -> list[dict]:
 def parse_chapter(page: str) -> list[tuple[str, int]]:
     """A chapter page -> its (section, bid) versions, in page order, without duplicates."""
     seen: dict[tuple[str, int], None] = {}
-    for a in lxml.html.fromstring(page).iterfind(".//a[@href]"):
+    for a in lxml.html.fromstring(page, parser=PARSER).iterfind(".//a[@href]"):
         if link := section_link(a.get("href")):
             seen[link] = None
     return list(seen)
@@ -164,12 +198,12 @@ def parse_section(page: str) -> dict:
     html is the content block as served (header with title and effective line, body, footnotes); the
     other fields are its text, unparsed. text is the body's paragraphs separated by blank lines (table rows
     one per line, cells tab-separated)."""
-    start = page.find('<div style="margin:.1em 0em .4em .5em;">')
-    end = page.find('<div id="BOTTOM"', start)
+    start = page.find(CONTENT_START)
+    end = page.find(CONTENT_END, start)
     if start < 0 or end < 0:
         raise ValueError("section page without a content block")
     block = page[start:end]
-    root = lxml.html.fragment_fromstring(block, create_parent="div")
+    root = lxml.html.fragment_fromstring(block, create_parent="div", parser=PARSER)
     header = root[0]
     title_p = header.find("p")
     effdt = root.find('.//span[@id="effdt"]')
@@ -197,7 +231,7 @@ def parse_repeals(page: str) -> list[dict]:
     """rx.aspx -> [{kind: repealed|transferred, section, bid, note, date}], note and date as printed."""
     rows = []
     in_transfers = False  # the transferred sections follow the element with id="xfer", in document order
-    for el in lxml.html.fromstring(page).iter():
+    for el in lxml.html.fromstring(page, parser=PARSER).iter():
         if el.get("id") == "xfer":
             in_transfers = True
         if el.tag != "tr" or el.get("style") != "width:100%;":
@@ -242,8 +276,14 @@ def load(shard: db.Shard) -> dict[str, int]:
             sink.add("mo_revisor_chapters", c["chapter"], c)
         if shard.owns(REPEALS_UNIT):
             rx_url = f"{BASE}/rx.aspx"
-            for r in parse_repeals(_get(rx_url)):
-                sink.add("mo_revisor_repeals", f"{r['section']}/{r['bid']}", r, source_url=rx_url)
+            rx_page, rx_fetched_at = _get_stamped(rx_url)
+            for r in parse_repeals(rx_page):
+                sink.add(
+                    "mo_revisor_repeals",
+                    f"{r['section']}/{r['bid']}",
+                    {**r, "fetched_at": rx_fetched_at},
+                    source_url=rx_url,
+                )
         versions = []
         for c in chapters:
             listed = parse_chapter(_get(f"{BASE}/OneChapter.aspx", {"chapter": c["chapter"]}))
@@ -256,8 +296,12 @@ def load(shard: db.Shard) -> dict[str, int]:
         skipped_total = 0
         for chapter, section, bid in versions:
             try:
-                page = _get(
-                    url, {"section": section, "bid": bid}, max_age=SECTION_MAX_AGE, backoff=SECTION_WARNING_BACKOFF
+                page, fetched_at = _get_stamped(
+                    url,
+                    {"section": section, "bid": bid},
+                    max_age=SECTION_MAX_AGE,
+                    backoff=SECTION_WARNING_BACKOFF,
+                    check=_section_served,
                 )
             except Warned:
                 skipped += 1
@@ -281,7 +325,7 @@ def load(shard: db.Shard) -> dict[str, int]:
             sink.add(
                 "mo_revisor_sections",
                 f"{section}/{bid}",
-                {"chapter": chapter, "section": section, "bid": bid, **parsed},
+                {"chapter": chapter, "section": section, "bid": bid, **parsed, "fetched_at": fetched_at},
                 source_url=f"{url}?section={section}&bid={bid}",
             )
             progress.tick()

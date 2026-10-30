@@ -1,0 +1,130 @@
+---
+// One page per RSMo chapter (#841): every section in the Revisor's order (compareSectionIds) with its heading and
+// status, linking to the section's own page. Repealed and transferred sections are listed with the Revisor's note.
+import Layout from "../../../layouts/Layout.astro";
+import SourceLink from "../../../components/SourceLink.astro";
+import {
+  hasStatuteIndexExports,
+  statuteChapter,
+  statuteChapterSectionIds,
+  statuteChapters,
+  statuteSectionChapters,
+} from "../../../lib/exports/statutes";
+import {
+  asOfText,
+  chapterCountsText,
+  isNotice,
+  orderVersions,
+  revisorChapterUrl,
+  sectionNeighbors,
+  statusLabel,
+  statuteChapterPath,
+  statutePath,
+  titleAnchor,
+} from "../../../lib/statuteText";
+import { href } from "../../../lib/site";
+
+export async function getStaticPaths() {
+  if (!hasStatuteIndexExports()) return [];
+  return (await statuteChapters()).map((c) => ({ params: { chapter: c.chapter } }));
+}
+
+const { chapter } = Astro.params as { chapter: string };
+const rows = await statuteChapters();
+const info = rows.find((c) => c.chapter === chapter)!;
+const ids = (await statuteChapterSectionIds()).get(chapter) ?? [];
+const byId = await statuteChapter(chapter);
+const known = await statuteSectionChapters();
+const sections = ids.map((id) => {
+  const versions = orderVersions(byId.get(id) ?? []);
+  const first = versions[0];
+  return {
+    id,
+    heading: versions.find((v) => v.heading)?.heading ?? null,
+    status: first ? statusLabel(first) : null,
+    notice: first ? isNotice(first) : false,
+    texts: versions.filter((v) => !isNotice(v)).length,
+  };
+});
+const chapterIds = rows.map((c) => c.chapter);
+const around = sectionNeighbors(chapterIds, chapter);
+const label = `Chapter ${chapter}`;
+---
+
+<Layout
+  title={`RSMo ${label}`}
+  description={`The sections of Missouri Revised Statutes chapter ${chapter}${info.chapter_name ? `, ${info.chapter_name}` : ""}.`}
+>
+  <nav aria-label="Breadcrumb" class="small">
+    <a href={href("/statutes/")}>Statutes</a>
+    {" › "}
+    <a href={href(`/statutes/#${titleAnchor(info.title_numeral)}`)}>
+      {info.title_numeral ? `Title ${info.title_numeral}` : "Chapters no longer listed"}
+    </a>
+    {" › "}
+    <span aria-current="page">{label}</span>
+  </nav>
+  <h1>
+    {label}
+    {info.chapter_name && <span class="muted"> · {info.chapter_name}</span>}
+  </h1>
+  {info.title_name && (
+    <p class="muted small">
+      Title {info.title_numeral}, {info.title_name}
+    </p>
+  )}
+  <p>
+    {chapterCountsText(info)}. Repealed and transferred sections are listed too; the Revisor's own chapter
+    page hides them unless asked.
+  </p>
+  <p class="small muted">
+    Source: <SourceLink url={revisorChapterUrl(chapter)} label={`chapter ${chapter} on revisor.mo.gov`} />
+    <br />
+    As of: {asOfText(info.loaded_at)}
+  </p>
+
+  <ul class="statute-sections">
+    {sections.map((s) => (
+      <li>
+        <a href={href(statutePath(s.id))}>{s.id}</a>
+        {s.heading && <span> {s.heading}</span>}
+        {s.status && (
+          <span class="muted small">
+            {" · "}
+            {s.notice ? s.status.detail : s.status.label}
+            {s.status.transferredTo && known.has(s.status.transferredTo) && (
+              <>
+                {" "}
+                <a href={href(statutePath(s.status.transferredTo))}>Go to section {s.status.transferredTo}</a>
+              </>
+            )}
+            {s.texts > 1 && ` · ${s.texts} versions`}
+          </span>
+        )}
+      </li>
+    ))}
+  </ul>
+
+  <nav aria-label="Other chapters" class="statute-pager small">
+    {around.prev && <a href={href(statuteChapterPath(around.prev))}>← Chapter {around.prev}</a>}
+    {around.next && <a href={href(statuteChapterPath(around.next))}>Chapter {around.next} →</a>}
+  </nav>
+</Layout>
+
+<style>
+  .statute-sections {
+    padding-left: 0;
+    list-style: none;
+  }
+  .statute-sections li {
+    margin-bottom: 0.45rem;
+    overflow-wrap: anywhere;
+  }
+  .statute-pager {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 16px;
+    margin-top: 2rem;
+  }
+</style>

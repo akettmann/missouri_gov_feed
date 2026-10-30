@@ -1,0 +1,311 @@
+# Unit tests for int_mo_house__votes: how PDF tokens that the plain surname match misses are attributed (#539).
+version: 2
+
+unit_tests:
+  - name: house_vote_tokens_match_compound_and_suffixed_surnames
+    model: int_mo_house__votes
+    description: >
+      The PDF prints a compound surname by its last word (REHDER for Thompson Rehder) and drops a generational
+      suffix (PRICE for Price IV), and a later session's namesake (Price, 2025) must not take the vote. A last word
+      shared by two members of the session stays ambiguous (MOORE: Walsh Moore and Smith Moore); a whole-surname
+      match beats a last-word match (HENDERSON is Henderson, not Fountain Henderson); a token that is only a suffix
+      matches nobody.
+    given:
+      - input: ref('stg_mo_house__rollcall_votes')
+        rows:
+          - {rollcall_url: r1, session_code: '191', member_token: REHDER, token_name: REHDER, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: PRICE, token_name: PRICE, token_district: null, vote_cast: nay}
+          - {rollcall_url: r1, session_code: '191', member_token: MOORE, token_name: MOORE, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: THOMPSON, token_name: THOMPSON, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: IV, token_name: IV, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: HENDERSON, token_name: HENDERSON, token_district: null, vote_cast: yea}
+      - input: ref('stg_mo_house__rollcalls')
+        rows:
+          - {rollcall_url: r1, session_code: '191', vote_date: '2019-03-05', measure: HB 10}
+      - input: ref('house_speakers')
+        rows:
+          - {session_year: 2019, district_number: 89, name: Somebody}
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '191', district_number: 148, surname_key: thompson rehder, person_key: p_rehder, party: Republican}
+          - {session_code: '191', district_number: 84, surname_key: price iv, person_key: p_price_iv, party: Democratic}
+          - {session_code: '191', district_number: 10, surname_key: walsh moore, person_key: p_walsh_moore, party: Democratic}
+          - {session_code: '191', district_number: 11, surname_key: smith moore, person_key: p_smith_moore, party: Republican}
+          - {session_code: '191', district_number: 12, surname_key: thompson, person_key: p_thompson, party: Republican}
+          - {session_code: '251', district_number: 26, surname_key: price, person_key: p_price_later, party: Democratic}
+          - {session_code: '191', district_number: 20, surname_key: henderson, person_key: p_henderson, party: Republican}
+          - {session_code: '191', district_number: 21, surname_key: fountain henderson, person_key: p_fountain_henderson, party: Democratic}
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {person_id: p_senator, chamber: upper, district_number: 1, start_date: '2019-01-01', end_date: '9999-12-31'}
+    expect:
+      rows:
+        - {member_token: REHDER, person_key: p_rehder}
+        - {member_token: PRICE, person_key: p_price_iv}
+        - {member_token: MOORE, person_key: null}
+        - {member_token: THOMPSON, person_key: p_thompson}
+        - {member_token: IV, person_key: null}
+        - {member_token: HENDERSON, person_key: p_henderson}
+
+  - name: house_vote_tokens_shared_surname_resolved_by_seat_dates
+    model: int_mo_house__votes
+    description: >
+      When two members share a surname, the Open States seat dates decide a bare token only if exactly one of them
+      held the seat on the vote date. EVANS on 2019-03-25 is David (Jean's seat ended 2019-02-05); EVANS on
+      2019-01-15 is ambiguous (both seated) while EVANS 99 on that day still names Jean. A member missing from the
+      vote's own session list is found in an earlier session's list and dated the same way (ROWLAND in 2022 is
+      Rory, whose seat was open; Lyle's ended in 2018). A candidate with no dated seat is never dropped, so it is not
+      picked over a dated candidate whose seat missed the date (UNDATED stays unattributed); a lone candidate is
+      kept even if the dates miss.
+    given:
+      - input: ref('stg_mo_house__rollcall_votes')
+        rows:
+          - {rollcall_url: r1, session_code: '191', member_token: EVANS, token_name: EVANS, token_district: null, vote_cast: yea}
+          - {rollcall_url: r2, session_code: '191', member_token: EVANS, token_name: EVANS, token_district: null, vote_cast: yea}
+          - {rollcall_url: r2, session_code: '191', member_token: EVANS 99, token_name: EVANS, token_district: 99, vote_cast: nay}
+          - {rollcall_url: r3, session_code: '221', member_token: ROWLAND, token_name: ROWLAND, token_district: null, vote_cast: yea}
+          - {rollcall_url: r3, session_code: '221', member_token: LONE, token_name: LONE, token_district: null, vote_cast: yea}
+          - {rollcall_url: r3, session_code: '221', member_token: UNDATED, token_name: UNDATED, token_district: null, vote_cast: yea}
+      - input: ref('stg_mo_house__rollcalls')
+        rows:
+          - {rollcall_url: r1, session_code: '191', vote_date: '2019-03-25', measure: HB 10}
+          - {rollcall_url: r2, session_code: '191', vote_date: '2019-01-15', measure: HB 11}
+          - {rollcall_url: r3, session_code: '221', vote_date: '2022-02-02', measure: HB 12}
+      - input: ref('house_speakers')
+        rows:
+          - {session_year: 2019, district_number: 89, name: Somebody}
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '191', district_number: 99, surname_key: evans, person_key: p_jean, party: Republican}
+          - {session_code: '191', district_number: 154, surname_key: evans, person_key: p_david, party: Republican}
+          - {session_code: '213', district_number: 29, surname_key: rowland, person_key: p_rory, party: Democratic}
+          - {session_code: '181', district_number: 155, surname_key: rowland, person_key: p_lyle, party: Republican}
+          - {session_code: '221', district_number: 40, surname_key: lone, person_key: p_lone, party: Republican}
+          - {session_code: '221', district_number: 41, surname_key: undated, person_key: p_undated_a, party: Republican}
+          - {session_code: '221', district_number: 42, surname_key: undated, person_key: p_undated_b, party: Republican}
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {person_id: p_jean, chamber: lower, district_number: 99, start_date: '1900-01-01', end_date: '2019-02-05'}
+          - {person_id: p_david, chamber: lower, district_number: 154, start_date: '2019-01-01', end_date: '2025-01-07'}
+          - {person_id: p_rory, chamber: lower, district_number: 29, start_date: '1900-01-01', end_date: '2023-01-03'}
+          - {person_id: p_lyle, chamber: lower, district_number: 155, start_date: '1900-01-01', end_date: '2018-12-31'}
+          - {person_id: p_lone, chamber: lower, district_number: 40, start_date: '2023-01-01', end_date: '9999-12-31'}
+          - {person_id: p_undated_a, chamber: lower, district_number: 41, start_date: '2023-01-01', end_date: '9999-12-31'}
+    expect:
+      rows:
+        - {vote_id: r1, member_token: EVANS, person_key: p_david}
+        - {vote_id: r2, member_token: EVANS, person_key: null}
+        - {vote_id: r2, member_token: EVANS 99, person_key: p_jean}
+        - {vote_id: r3, member_token: ROWLAND, person_key: p_rory}
+        - {vote_id: r3, member_token: LONE, person_key: p_lone}
+        - {vote_id: r3, member_token: UNDATED, person_key: null}
+
+  - name: house_vote_tokens_cross_session_fallback_uses_seat_dates
+    model: int_mo_house__votes
+    description: >
+      Outside the vote's own session (members who left mid-session), the seat dates count (#581). A whole-surname
+      namesake whose seat ended before the vote date does not beat the compound-surname member who held the seat
+      (LOWE is Ames Lowe, not the 2017-18 Lowe); a lone later-session namesake whose dated seat starts after the vote
+      is not credited (LATER stays unattributed); a person whose seat covers the date outranks one with no dated seat
+      (PAIR is the dated one). A same-session member is still found first.
+    given:
+      - input: ref('stg_mo_house__rollcall_votes')
+        rows:
+          - {rollcall_url: r1, session_code: '221', member_token: LOWE, token_name: LOWE, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '221', member_token: LATER, token_name: LATER, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '221', member_token: PAIR, token_name: PAIR, token_district: null, vote_cast: yea}
+      - input: ref('stg_mo_house__rollcalls')
+        rows:
+          - {rollcall_url: r1, session_code: '221', vote_date: '2022-03-01', measure: HB 10}
+      - input: ref('house_speakers')
+        rows:
+          - {session_year: 2022, district_number: 89, name: Somebody}
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '213', district_number: 5, surname_key: ames lowe, person_key: p_compound, party: Republican}
+          - {session_code: '191', district_number: 6, surname_key: lowe, person_key: p_namesake, party: Republican}
+          - {session_code: '251', district_number: 7, surname_key: later, person_key: p_later, party: Republican}
+          - {session_code: '213', district_number: 8, surname_key: pair, person_key: p_pair_dated, party: Republican}
+          - {session_code: '191', district_number: 9, surname_key: pair, person_key: p_pair_undated, party: Republican}
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {person_id: p_compound, chamber: lower, district_number: 5, start_date: '2021-01-01', end_date: '2023-01-03'}
+          - {person_id: p_namesake, chamber: lower, district_number: 6, start_date: '2017-01-01', end_date: '2018-12-31'}
+          - {person_id: p_later, chamber: lower, district_number: 7, start_date: '2025-01-01', end_date: '9999-12-31'}
+          - {person_id: p_pair_dated, chamber: lower, district_number: 8, start_date: '2021-01-01', end_date: '2023-01-03'}
+    expect:
+      rows:
+        - {member_token: LOWE, person_key: p_compound}
+        - {member_token: LATER, person_key: null}
+        - {member_token: PAIR, person_key: p_pair_dated}
+
+  - name: house_vote_tokens_exact_surname_beats_suffix_stripped
+    model: int_mo_house__votes
+    description: >
+      In one session, a token that is a member's whole surname is that member, not the suffix-stripped spelling of a
+      namesake (PRICE is Price, not Price IV; #581). Neither seat is dated, so the dates cannot be what decides. The
+      suffix-stripped member is still found when nobody has the whole surname (JONES is Jones IV).
+    given:
+      - input: ref('stg_mo_house__rollcall_votes')
+        rows:
+          - {rollcall_url: r1, session_code: '221', member_token: PRICE, token_name: PRICE, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '221', member_token: JONES, token_name: JONES, token_district: null, vote_cast: yea}
+      - input: ref('stg_mo_house__rollcalls')
+        rows:
+          - {rollcall_url: r1, session_code: '221', vote_date: '2022-03-01', measure: HB 10}
+      - input: ref('house_speakers')
+        rows:
+          - {session_year: 2022, district_number: 89, name: Somebody}
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '221', district_number: 1, surname_key: price, person_key: p_price, party: Republican}
+          - {session_code: '221', district_number: 2, surname_key: price iv, person_key: p_price_iv, party: Republican}
+          - {session_code: '221', district_number: 3, surname_key: jones iv, person_key: p_jones_iv, party: Republican}
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {person_id: p_senator, chamber: upper, district_number: 1, start_date: '2019-01-01', end_date: '9999-12-31'}
+    expect:
+      rows:
+        - {member_token: PRICE, person_key: p_price}
+        - {member_token: JONES, person_key: p_jones_iv}
+
+  - name: house_vote_tokens_match_when_the_roll_call_date_did_not_parse
+    model: int_mo_house__votes
+    description: >
+      stg_mo_house__rollcalls keeps a roll call whose date did not parse (vote_date null). Its tokens still match a
+      same-session member by name; the null date must not break the joins on the vote date.
+    given:
+      - input: ref('stg_mo_house__rollcall_votes')
+        rows:
+          - {rollcall_url: r1, session_code: '221', member_token: PRICE, token_name: PRICE, token_district: null, vote_cast: yea}
+      - input: ref('stg_mo_house__rollcalls')
+        rows:
+          - {rollcall_url: r1, session_code: '221', vote_date: null, measure: HB 10}
+      - input: ref('house_speakers')
+        rows:
+          - {session_year: 2022, district_number: 89, name: Somebody}
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '221', district_number: 1, surname_key: price, person_key: p_price, party: Republican}
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {person_id: p_senator, chamber: upper, district_number: 1, start_date: '2019-01-01', end_date: '9999-12-31'}
+    expect:
+      rows:
+        - {member_token: PRICE, person_key: p_price}
+
+  - name: house_vote_mr_speaker_follows_the_speaker_of_the_vote_year
+    model: int_mo_house__votes
+    description: >
+      MR SPEAKER is the house_speakers seat of the year the roll call was held (one speaker per session_year), so the
+      same token on dates in two years is two different people.
+    given:
+      - input: ref('stg_mo_house__rollcall_votes')
+        rows:
+          - {rollcall_url: r1, session_code: '221', member_token: MR SPEAKER, token_name: MR SPEAKER, token_district: null, vote_cast: yea}
+          - {rollcall_url: r2, session_code: '221', member_token: MR SPEAKER, token_name: MR SPEAKER, token_district: null, vote_cast: yea}
+      - input: ref('stg_mo_house__rollcalls')
+        rows:
+          - {rollcall_url: r1, session_code: '221', vote_date: '2022-03-01', measure: HB 10}
+          - {rollcall_url: r2, session_code: '221', vote_date: '2023-03-01', measure: HB 11}
+      - input: ref('house_speakers')
+        rows:
+          - {session_year: 2022, district_number: 112, name: First Speaker}
+          - {session_year: 2023, district_number: 89, name: Second Speaker}
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '221', district_number: 112, surname_key: first, person_key: p_first, party: Republican}
+          - {session_code: '221', district_number: 89, surname_key: second, person_key: p_second, party: Republican}
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {person_id: p_senator, chamber: upper, district_number: 1, start_date: '2019-01-01', end_date: '9999-12-31'}
+    expect:
+      rows:
+        - {vote_id: r1, member_token: MR SPEAKER, person_key: p_first}
+        - {vote_id: r2, member_token: MR SPEAKER, person_key: p_second}
+
+  - name: house_vote_best_tier_is_chosen_per_vote_date
+    model: int_mo_house__votes
+    description: >
+      The same token in the same session can fit differently on two days. FOO is looked up in other sessions' lists;
+      on 2022-01-15 the dated seat of p_dated covers the date and outranks the undated p_undated, on 2022-03-01 that
+      seat is over, so only p_undated is left and is a match in its own right (its tier is worse than the first
+      day's, which must not rule it out).
+    given:
+      - input: ref('stg_mo_house__rollcall_votes')
+        rows:
+          - {rollcall_url: r1, session_code: '221', member_token: FOO, token_name: FOO, token_district: null, vote_cast: yea}
+          - {rollcall_url: r2, session_code: '221', member_token: FOO, token_name: FOO, token_district: null, vote_cast: yea}
+      - input: ref('stg_mo_house__rollcalls')
+        rows:
+          - {rollcall_url: r1, session_code: '221', vote_date: '2022-01-15', measure: HB 10}
+          - {rollcall_url: r2, session_code: '221', vote_date: '2022-03-01', measure: HB 11}
+      - input: ref('house_speakers')
+        rows:
+          - {session_year: 2022, district_number: 89, name: Somebody}
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '213', district_number: 5, surname_key: foo, person_key: p_dated, party: Republican}
+          - {session_code: '191', district_number: 6, surname_key: foo, person_key: p_undated, party: Republican}
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {person_id: p_dated, chamber: lower, district_number: 5, start_date: '2021-01-01', end_date: '2022-01-31'}
+    expect:
+      rows:
+        - {vote_id: r1, member_token: FOO, person_key: p_dated}
+        - {vote_id: r2, member_token: FOO, person_key: p_undated}
+
+  - name: house_vote_tokens_match_through_each_join_branch
+    model: int_mo_house__votes
+    description: >
+      The token-to-member match is one equi-join per way a token can fit (Speaker seat, whole surname, suffix-less
+      surname, last word of a compound surname, prefix of a long truncated surname), unioned (#825). Each token here
+      reaches its member through a different branch or a combination: MR SPEAKER by seat only; ADAMS through the whole
+      surname (also its suffix-less form, so two branches hit the same member once); BAKER through the suffix-less
+      surname only; CARTER through the last word only; WASHINGTONIANX through the prefix only; CHRISTOPHERSON through
+      the whole surname and the prefix at once; NOBODY through none (unattributed). DAVIS fits two members and stays
+      unattributed, DAVIS 31 is narrowed to one by its district, and DAVIS 99 names no seat.
+    given:
+      - input: ref('stg_mo_house__rollcall_votes')
+        rows:
+          - {rollcall_url: r1, session_code: '191', member_token: MR SPEAKER, token_name: MR SPEAKER, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: ADAMS, token_name: ADAMS, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: BAKER, token_name: BAKER, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: CARTER, token_name: CARTER, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: WASHINGTONIANX, token_name: WASHINGTONIANX, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: CHRISTOPHERSON, token_name: CHRISTOPHERSON, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: NOBODY, token_name: NOBODY, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: DAVIS, token_name: DAVIS, token_district: null, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: DAVIS 31, token_name: DAVIS, token_district: 31, vote_cast: yea}
+          - {rollcall_url: r1, session_code: '191', member_token: DAVIS 99, token_name: DAVIS, token_district: 99, vote_cast: yea}
+      - input: ref('stg_mo_house__rollcalls')
+        rows:
+          - {rollcall_url: r1, session_code: '191', vote_date: '2019-03-05', measure: HB 10}
+      - input: ref('house_speakers')
+        rows:
+          - {session_year: 2019, district_number: 89, name: Somebody}
+      - input: ref('int_mo_house__member_identity')
+        rows:
+          - {session_code: '191', district_number: 89, surname_key: somebody, person_key: p_speaker, party: Republican}
+          - {session_code: '191', district_number: 1, surname_key: adams, person_key: p_adams, party: Republican}
+          - {session_code: '191', district_number: 2, surname_key: baker iv, person_key: p_baker, party: Democratic}
+          - {session_code: '191', district_number: 3, surname_key: lee carter, person_key: p_carter, party: Republican}
+          - {session_code: '191', district_number: 4, surname_key: washingtonianxyz, person_key: p_washington, party: Democratic}
+          - {session_code: '191', district_number: 5, surname_key: christopherson, person_key: p_christopherson, party: Republican}
+          - {session_code: '191', district_number: 30, surname_key: davis, person_key: p_davis_30, party: Republican}
+          - {session_code: '191', district_number: 31, surname_key: davis, person_key: p_davis_31, party: Democratic}
+      - input: ref('int_mo_legislators__seats_as_given')
+        rows:
+          - {person_id: p_senator, chamber: upper, district_number: 1, start_date: '2019-01-01', end_date: '9999-12-31'}
+    expect:
+      rows:
+        - {member_token: MR SPEAKER, person_key: p_speaker}
+        - {member_token: ADAMS, person_key: p_adams}
+        - {member_token: BAKER, person_key: p_baker}
+        - {member_token: CARTER, person_key: p_carter}
+        - {member_token: WASHINGTONIANX, person_key: p_washington}
+        - {member_token: CHRISTOPHERSON, person_key: p_christopherson}
+        - {member_token: NOBODY, person_key: null}
+        - {member_token: DAVIS, person_key: null}
+        - {member_token: DAVIS 31, person_key: p_davis_31}
+        - {member_token: DAVIS 99, person_key: null}

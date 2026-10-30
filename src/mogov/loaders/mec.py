@@ -30,6 +30,7 @@ import httpx
 
 from mogov import db, obs
 from mogov.config import CACHE_DIR, USER_AGENT
+from mogov.http import write_atomic
 from mogov.loaders import loader
 
 log = obs.get_logger(__name__)
@@ -117,9 +118,7 @@ def _fresh(path: Path, year: int) -> bool:
 
 def _write(path: Path, content: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.part")
-    tmp.write_bytes(content)
-    tmp.replace(path)
+    write_atomic(path, content)
 
 
 class _Exports:

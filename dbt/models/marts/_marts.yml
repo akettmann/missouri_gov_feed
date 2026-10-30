@@ -184,7 +184,9 @@ models:
   - name: fct_office_history
     description: >
       Past and present offices held by each official, from every source that records careers: Open States
-      roles, congress-legislators terms, the statewide seed, FJC appointments, Wikidata "position held",
+      roles, congress-legislators terms, the statewide seed, earlier statewide terms of current officials (Official
+      Manual listings with exact dates from the statewide_office_handovers seed, terms from 2000 on: Malek's 2023
+      appointment as Treasurer, Fitzpatrick's 2019-2023 Treasurer term), FJC appointments, Wikidata "position held",
       CourtListener's judge database, and appointment/election sentences in Official Manual judge bios.
       Grain: one row per (official, office_title, start_date); when several sources report the same term,
       the most authoritative is kept (seed and FJC > congress-legislators > Open States > Wikidata >
@@ -231,9 +233,11 @@ models:
       Citizens Summary: "In the areas audited, the overall performance of this entity was Good." The rating
       covers only the areas audited, not the whole operation of the entity. Ratings exist from 2012 and only
       for audits the Auditor rates (not performance audits, financial statements or follow-ups); rating_status says why a
-      row has none. Grain: one row per report. The officeholder is filled only for audits of a statewide office,
-      and is whoever held it on the release date (the audit may cover a predecessor's term). A county audit is never linked
-      to a person: the Auditor says a county's rating does not indicate the performance of any one elected official.
+      row has none. Grain: one row per report. The people an audit of a statewide office is credited to (everyone who held
+      the office during the period the audit covers, or for most reports, which name no period, in the year before
+      release) are in fct_audit_report_officeholders; here only their count and basis (`release_window` is an
+      approximation). A county audit is never linked to a person: the Auditor says a county's rating does not indicate the
+      performance of any one elected official.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -303,17 +307,90 @@ models:
       - name: citizens_summary_url
         data_type: varchar
         description: The one-page Citizens Summary PDF, where the Auditor published one.
-      - name: officeholder_at_release_id
+      - name: audit_period_start
+        data_type: date
+        description: First day of the period the report title names ("Year Ended June 30, 2015" starts 2014-07-01); null when the title names none.
+      - name: audit_period_end
+        data_type: date
+        description: Last day of the period the report title names; null when the title names none.
+      - name: officeholder_link_basis
         data_type: varchar
-        description: "{{ doc('official_id') }} Holder of the audited statewide office on the release date, when a current official; null for any other audit."
+        description: "How fct_audit_report_officeholders chose the people for this audit: `audit_period` (the title names a period) or `release_window` (it does not). Null for audits that are not of a statewide office."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [audit_period, release_window]
+      - name: officeholder_count
+        data_type: integer
+        description: Number of people in fct_audit_report_officeholders for this report; 0 for any audit that is not of a statewide office.
+
+  - name: fct_audit_report_officeholders
+    description: >
+      The people an audit of a statewide office is credited to. Most rows are an
+      approximation: `link_basis` = `release_window` means the report title names no period, so the people are
+      those in office from January 1 of the year before the release through the release date, not a period the audit
+      states. Only `audit_period` rows follow a period the title names. Grain: one row per (report, person). Only audits of a statewide office have rows; a county audit never
+      does. link_basis says what "during the audit" means for the row: `audit_period` when the report title names
+      the period it covers ("Period July 1, 2022 through January 9, 2023", "Year Ended June 30, 2015"), else
+      `release_window`, the calendar year before the release through the release date. Most titles name no period,
+      so most rows are `release_window`: the link says "in office when the audit was probably being done", not
+      "audited". Terms come from the Official Manual in whole years (a term starts on the second Monday of January of its
+      first year, when regular terms begin: 2017-01-09, 2021-01-11, 2025-01-13), so a term ending in an inauguration
+      year (2017, 2021, 2025) ends that day; a window that ends on the hand-over day is credited to the outgoing holder only. Mid-term changes the Manual does not
+      date use the exact dates in the statewide_office_handovers seed; one missing from the seed credits both holders
+      for that whole year.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [report_number, office, full_name, term_start_year]
+    columns:
+      - name: report_number
+        data_type: varchar
+        description: Compact report number, as in fct_audit_reports.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_audit_reports')
+                field: report_number
+      - name: office
+        data_type: varchar
+        description: Key of the statewide office (as in statewide_officials).
+        data_tests: [not_null]
+      - name: full_name
+        data_type: varchar
+        description: The officeholder's name as the Official Manual prints it.
+        data_tests: [not_null]
+      - name: party
+        data_type: varchar
+        description: Party letter from the Official Manual (D, R, U...).
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }} Set only when the person also holds a tracked office today (matched on first and last name); null for people who left public life."
         data_tests:
           - relationships:
               arguments:
                 to: ref('dim_official')
                 field: official_id
-      - name: officeholder_at_release_name
+      - name: term_start_year
+        data_type: integer
+        description: First year of the person's term in this office, per the Official Manual.
+      - name: term_end_year
+        data_type: integer
+        description: Last year of the term; null while the person still holds the office.
+      - name: link_basis
         data_type: varchar
-        description: full_name of that official.
+        description: "`audit_period` or `release_window`; see the model description."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [audit_period, release_window]
+      - name: window_start
+        data_type: date
+        description: Start of the window the person's term was matched against.
+      - name: window_end
+        data_type: date
+        description: End of that window (the audit period's end, or the release date).
 
   - name: fct_votes
     description: >
@@ -356,6 +433,35 @@ models:
       - name: vote_description
         data_type: varchar
         description: What was voted on - the House calendar item, the Senate journal sentence introducing the vote, or Voteview's description.
+      - name: vote_stage
+        data_type: varchar
+        description: >
+          Stage of the Missouri roll call, from vote_description and measure by the rules in the seed
+          mo_vote_stage_rules (#804): perfection, third_reading, third_reading_consent (consent and federal-mandate
+          calendars), senate_amendments (House vote on Senate amendments), conference (conference committee
+          report), veto_override, amendment (an amendment or substitute; a House committee substitute adopted in the
+          Senate is labelled amendment too), emergency_clause, previous_question,
+          procedural_motion (approve the journal, suspend rules, reconsider, adjourn, lay on the table), quorum,
+          resolution, other (recognised, none of the above, e.g. officer elections) or unknown (no rule matches;
+          mostly Senate journal page headers or vote lists that run into the sentence that introduces a vote). Null for Congress
+          rows, which carry Voteview's own vote_description. Informational: attendance and party unity do not read
+          it (#192, #351 decide how procedural votes count).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [perfection, third_reading, third_reading_consent, senate_amendments, conference, veto_override,
+                         amendment, emergency_clause, previous_question, procedural_motion, quorum, resolution, other,
+                         unknown]
+                config:
+                  where: "chamber in ('state_house', 'state_senate')"
+          - not_null:
+              config:
+                where: "chamber in ('state_house', 'state_senate')"
+      - name: vote_informal
+        data_type: boolean
+        description: >
+          True when a Missouri House calendar item ends in the informal-calendar marker (INFORMAL or INF, e.g.
+          "SBs 3rd READ - INFORMAL"). False for every Senate vote (the journal has no such marker); null for Congress.
       - name: vote_cast
         data_type: varchar
         description: "{{ doc('vote_cast') }}"
@@ -423,6 +529,168 @@ models:
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"
+        data_tests: [not_null]
+
+  - name: fct_federal_vote_bills
+    description: >
+      Which federal bill each House or Senate roll call was taken on, read from the roll calls the GovInfo BILLSTATUS
+      bill actions cite and joined to Voteview. The vote is not always on the bill itself: many are procedural
+      (motion to recommit, ordering the previous question on the rule's H.Res., motion to proceed, cloture, tabling),
+      so read `vote_question` before calling a row a vote for or against the bill. Amendment roll calls are not
+      linked (BILLSTATUS keeps them under `<amendments>`, which is not parsed yet, #738). BILLSTATUS numbers a roll call by the chamber clerk's number within
+      the session; Voteview's `rollnumber` runs across the Congress, so the join uses Voteview's `clerk_rollnumber`
+      and `session`. Only roll calls both sources know are listed: it covers the loaded BILLSTATUS Congresses and
+      bill types, so a roll call absent here means no bill was found, not that none exists (votes on nominations,
+      quorum calls and some procedural questions cite no bill). Grain: (congress, chamber, rollnumber, bill_id).
+      Join to fct_federal_votes on (congress, chamber, rollnumber) to see each Missouri member's vote on the bill.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [congress, chamber, rollnumber, bill_id]
+    columns:
+      - name: congress
+        data_type: integer
+        description: Congress number (119 = 2025-2027).
+      - name: chamber
+        data_type: varchar
+        description: "`House` or `Senate` (Voteview spelling)."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['House', 'Senate']
+      - name: rollnumber
+        data_type: integer
+        description: Voteview roll-call number within the congress and chamber (as in fct_federal_votes).
+        data_tests: [not_null]
+      - name: session
+        data_type: integer
+        description: Session of the Congress (1 or 2).
+      - name: clerk_rollnumber
+        data_type: integer
+        description: The chamber clerk's roll-call number within the session, which BILLSTATUS cites.
+      - name: vote_date
+        data_type: date
+        description: Date of the vote (Voteview).
+      - name: bill_id
+        data_type: varchar
+        description: "`<congress>-<type>-<number>`, e.g. 118-hr-815."
+        data_tests: [not_null]
+      - name: bill_type
+        data_type: varchar
+        description: hr, s, hjres, sjres, hconres, sconres, hres or sres.
+      - name: bill_no
+        data_type: integer
+        description: Bill number within its type and congress.
+      - name: bill_title
+        data_type: varchar
+        description: The bill's title as published.
+      - name: legislation_url
+        data_type: varchar
+        description: Congress.gov page of the bill.
+      - name: voteview_bill_number
+        data_type: varchar
+        description: Voteview's own bill text for the roll call (e.g. HR815), kept for comparison; null for some roll calls it ties to no bill.
+      - name: vote_question
+        data_type: varchar
+        description: Question put to the chamber (e.g. "On Passage").
+      - name: vote_result
+        data_type: varchar
+        description: Outcome of the roll call (e.g. "Passed").
+      - name: yea_count
+        data_type: integer
+        description: Yea votes cast.
+      - name: nay_count
+        data_type: integer
+        description: Nay votes cast.
+      - name: source_url
+        data_type: varchar
+        description: "{{ doc('source_url') }}"
+        data_tests: [not_null]
+
+  - name: fct_federal_sponsorship
+    description: >
+      Federal bills sponsored or cosponsored by Missouri's members of Congress, from the GovInfo BILLSTATUS bulk
+      XML (loaded congresses, MOGOV_BILLSTATUS_CONGRESSES), with the outcome as a fact: became_law is true when
+      the bill's actions record it becoming law (int_federal_bills__stage; the BILLSTATUS laws list only supplies
+      the number, since it can credit a law to the wrong bill, #729), public or private (law_type says which; a private law relieves one named person
+      or entity and is rare, none among the 118th Congress's bills). Withdrawn cosponsorships are dropped. Whether that counts as a
+      "successful" bill is a policy call this model does not make. Grain: (bioguide_id, bill_id, role).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [bioguide_id, bill_id, role]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: "{{ doc('official_id') }} Null for members who are no longer in office."
+      - name: bioguide_id
+        data_type: varchar
+        description: Bioguide id of the member (joins congress_legislators).
+        data_tests: [not_null]
+      - name: full_name
+        data_type: varchar
+        description: Name as printed in the bill file, with party and state, e.g. "Rep. Graves, Sam [R-MO-6]".
+      - name: party
+        data_type: varchar
+        description: Party letter as printed in the bill file (R, D, I).
+      - name: role
+        data_type: varchar
+        description: "`sponsor` or `cosponsor`."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['sponsor', 'cosponsor']
+      - name: is_original_cosponsor
+        data_type: boolean
+        description: True for a cosponsor who signed on when the bill was introduced; false for sponsors.
+      - name: bill_id
+        data_type: varchar
+        description: "`<congress>-<type>-<number>`, e.g. 119-hr-1."
+        data_tests: [not_null]
+      - name: congress
+        data_type: integer
+        description: Congress number (119 = 2025-2027).
+      - name: bill_type
+        data_type: varchar
+        description: hr, s, hjres, sjres, hconres, sconres, hres or sres.
+      - name: bill_number
+        data_type: integer
+        description: Bill number within its type and congress.
+      - name: introduced_date
+        data_type: date
+        description: Date the bill was introduced.
+      - name: title
+        data_type: varchar
+        description: The bill's title as published.
+      - name: policy_area
+        data_type: varchar
+        description: Congress.gov policy area (one per bill); null before one is assigned.
+      - name: latest_action_date
+        data_type: date
+        description: Date of the bill's most recent action.
+      - name: latest_action_text
+        data_type: varchar
+        description: Text of the most recent action, as published.
+      - name: law_type
+        data_type: varchar
+        description: Public Law or Private Law, filled only for bills whose actions record them becoming law (became_law);
+          null otherwise.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [Public Law, Private Law]
+      - name: law_number
+        data_type: varchar
+        description: Law number, e.g. 119-21, filled only for bills whose actions record them becoming law (became_law). Public and private laws are numbered
+          separately, so read it with law_type. When a bill carries two laws, the earliest by number.
+      - name: became_law
+        data_type: boolean
+        description: True when the bill's actions record it becoming Public or Private Law (int_federal_bills__stage);
+          the laws list alone never sets it.
+        data_tests: [not_null]
+      - name: source_url
+        data_type: varchar
+        description: The bill's page on congress.gov.
         data_tests: [not_null]
 
   - name: fct_campaign_finance
@@ -612,7 +880,7 @@ models:
       reports (PDF text, tagged by schedule), Senate eFD reports (structured tables), and federal judges'
       AO-10 reports via CourtListener (mostly 2020 and earlier). Missouri state officials' and judges'
       personal financial disclosures are not online (see official_profile.disclosures_status). Grain:
-      (official_id, disclosure_item_id), one disclosed item; scanned filings appear once with section "document (not text-extractable...)".
+      (official_id, disclosure_item_id), one disclosed item; scanned filings appear once with section "document (not text-extractable; see PDF)", filings whose PDF the loader failed to download or extract once with "document (download or text extraction failed; see PDF)" (the PDF link may itself be dead), and filings of a type the loader never fetches (e.g. extension requests) once with "document (not fetched; see PDF)".
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -938,8 +1206,8 @@ models:
     description: >
       Court cases (CourtListener) involving officials who are or were judges or lawyers. Built from the
       quarterly bulk export (Missouri state appellate and federal courts in Missouri plus the 8th Circuit)
-      matched in int_courtlistener__bulk_case_matches, topped up by REST API search hits. Trial-court
-      (circuit) cases are not in CourtListener. Grain: (official, role, case). Caveats: judges-text matches
+      matched in int_courtlistener__bulk_case_matches, topped up by REST API search hits. Missouri circuit-court
+      (state trial court) cases are not in CourtListener. Grain: (official, role, case). Caveats: judges-text matches
       are by surname within the judge's own courts and tenure; attorney text names an Attorney General on
       every brief their office filed (role `attorney` = office of record).
     data_tests:
@@ -1298,10 +1566,12 @@ models:
   - name: fct_bills
     description: >
       Missouri bills and resolutions per session. House bills from the House XML export (titles, current version,
-      last action); Senate bills from the Senate topical index (its one-line description as short_title; the other
-      House-only columns are null), plus the Senate bills the House XML's SenateActList lists as reaching the House
-      that the index does not (the special-session Senate bills, 2024 on, with the titles, version, last action and
-      effective date the XML gives; older special sessions' Senate bills are missing, #237). `subjects` holds the
+      last action); Senate bills from the Senate's own bill list on senate.mo.gov (regular and special sessions, every
+      bill including those under no topical-index keyword; its one-line description as short_title; the other
+      House-only columns are null). A session whose Senate list is not loaded (the mo_senate_bills loader covers a
+      window) falls back to the Senate topical index, plus the Senate bills the House XML's SenateActList lists
+      as reaching the House that neither has (2024 on, with the titles, version, last action and effective date the
+      XML gives). `subjects` holds the
       subject index terms, "; "-separated (fct_bill_subjects).
       Each regular session also has 15 to 17 relistings of the previous session's appropriation bills (status
       "relisted for governor message"): not new bills, so leave them out of per-session bill counts.
@@ -1341,7 +1611,9 @@ models:
           The furthest stage the House XML's actions record (int_bills__status): introduced, in committee, reported
           do pass, perfected, passed one chamber, passed both chambers, truly agreed, signed, signed with line-item
           vetoes, vetoed, veto overridden; adopted for resolutions; withdrawn or defeated when the bill stopped
-          there. relisted for governor message: a re-listing, not a new bill. The House relists the previous
+          there. combined into another bill: the Senate's history says "Bill Combined (w/SCS SBs ...)", its content
+          went into a substitute for other bills; it is not enacted (look at the vehicle bill). relisted for
+          governor message: a re-listing, not a new bill. The House relists the previous
           regular session's appropriation bills (same number and bill string, e.g. 2024 HB 1, the FY2024 budget
           bill of the 2023 session) only to record the governor's Art. IV, s. 27 message, which is their only
           action; 15 to 17 per regular session, 2017 to 2026 (143 in all), none in 2021. Their outcome is null: it
@@ -1353,7 +1625,7 @@ models:
               arguments:
                 values: [introduced, in committee, reported do pass, perfected, passed one chamber,
                   passed both chambers, truly agreed, signed, signed with line-item vetoes, vetoed, veto overridden,
-                  adopted, withdrawn, defeated, relisted for governor message]
+                  adopted, withdrawn, defeated, combined into another bill, relisted for governor message]
       - name: outcome
         data_type: varchar
         description: >
@@ -1384,6 +1656,29 @@ models:
       listed in force (heading, text, effective date, session-law history) and the repealed and transferred sections
       (note and date only). A section can have several versions at once, e.g. one not yet effective; is_current
       marks the version(s) in effect on the build date. Grain: one row per section version (section_version_id).
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            name: fct_statute_sections_fetched_at_not_after_loaded_at
+            expression: "fetched_at <= loaded_at"
+            where: "fetched_at is not null"
+          config:
+            severity: warn
+      # section pages are cached up to 180 days, the repeals list up to 7 (+1 day slack for each)
+      - dbt_utils.expression_is_true:
+          arguments:
+            name: fct_statute_sections_fetched_at_within_page_cache_window
+            expression: "fetched_at >= {{ dbt.dateadd('day', -181, 'loaded_at') }}"
+            where: "fetched_at is not null and status not in ('repealed', 'transferred')"
+          config:
+            severity: warn
+      - dbt_utils.expression_is_true:
+          arguments:
+            name: fct_statute_sections_fetched_at_within_repeals_cache_window
+            expression: "fetched_at >= {{ dbt.dateadd('day', -8, 'loaded_at') }}"
+            where: "fetched_at is not null and status in ('repealed', 'transferred')"
+          config:
+            severity: warn
     columns:
       - name: section_id
         data_type: varchar
@@ -1482,12 +1777,85 @@ models:
       - name: source_url
         data_type: varchar
         description: "{{ doc('source_url') }}"
+      - name: fetched_at
+        data_type: timestamp with time zone
+        description: >
+          When the section's page was fetched from revisor.mo.gov (for repealed and transferred sections, when the
+          repeals list was). A page served from the loader's HTTP cache keeps the time of the fetch that filled the
+          cache. Null for rows loaded before the loader recorded it; the loader must run again to fill it (#852).
+      - name: loaded_at
+        data_type: timestamp with time zone
+        description: >
+          When our pipeline last published the raw table (for repealed and transferred sections, the repeals list).
+          Not the fetch time (see fetched_at): the page itself was fetched from revisor.mo.gov up to 180 days earlier
+          (section pages) or up to 7 days earlier (repeals list), and every row of a run shares one value.
+        data_tests:
+          - not_null
+
+  - name: fct_statute_section_footnotes
+    description: >
+      The footnotes the Revisor prints under each RSMo section version (fct_statute_sections), one row per footnote
+      in page order: the session-law history, "Prior revisions" lines, the Revisor's court-case annotations (a section
+      can carry dozens) and notes such as "Effective 1-01-17". footnote_text is verbatim, never rewritten. Repealed
+      and transferred sections have no footnotes. Grain: one row per footnote (section_version_id, footnote_number).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [section_version_id, footnote_number]
+    columns:
+      - name: section_version_id
+        data_type: varchar
+        description: The section version the footnote is printed under (fct_statute_sections.section_version_id).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_statute_sections')
+                field: section_version_id
+      - name: footnote_number
+        data_type: integer
+        description: Position of the footnote on the version's page, 1-based; sort by it to print them in order.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 100
+                inclusive: true
+      - name: section_id
+        data_type: varchar
+        description: The RSMo section (fct_statute_sections.section_id), repeated so a section's footnotes can be read without the version table.
+        data_tests:
+          - not_null
+      - name: footnote_text
+        data_type: varchar
+        description: >
+          The footnote as the Revisor prints it. Checked for HTML entities, U+FFFD, filler values and doubled
+          punctuation by tests/assert_statute_footnotes_are_clean_text.sql.
+        data_tests:
+          - not_null
+      - name: is_history_note
+        data_type: boolean
+        description: True for the first footnote when it is the session-law history that fct_statute_sections carries as history_note.
+        data_tests:
+          - not_null
+      - name: source_url
+        data_type: varchar
+        description: "{{ doc('source_url') }}"
+      - name: fetched_at
+        data_type: timestamp with time zone
+        description: When the section version's page was fetched from revisor.mo.gov (see fct_statute_sections.fetched_at); null until the loader has run again since #852.
+      - name: loaded_at
+        data_type: timestamp with time zone
+        description: When our pipeline last published the raw table; the page was fetched up to 180 days earlier (see fetched_at and fct_statute_sections.loaded_at).
+        data_tests:
+          - not_null
 
   - name: fct_bill_statute_links
     description: >
       Which RSMo sections each bill enacted, amended or repealed, from the Revisor's session-law history notes
       (int_mo_revisor__session_law_bills). Covers bills that became law, back to the 1950s; a pending bill's
-      targets are in its text, which isn't loaded yet (#175). Grain: one row per (session, bill, section, change).
+      targets are read from its text in fct_bill_text_statute_links (#594). Grain: one row per (session, bill, section, change).
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -1538,12 +1906,93 @@ models:
       - name: in_fct_bills
         data_type: boolean
         description: Whether fct_bills has the bill (it covers the House XML export's sessions, 2017 on).
+      - name: link_source
+        data_type: varchar
+        description: Where the link comes from, always 'revisor_history' here ('bill_text' in fct_bill_text_statute_links).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [revisor_history]
+
+  - name: fct_bill_text_statute_links
+    description: >
+      Which RSMo sections each House bill text version would repeal, amend or enact, read from the enacting title and
+      Section A of the bill text PDF (mo_house_pdf loader, int_mo_house__bill_text_statute_refs; empty until that
+      loader has run). Covers pending and failed bills as well as those that became law, which
+      fct_bill_statute_links (the Revisor's history notes) cannot. Grain: one row per (text version, bill, section);
+      a range such as "sections 1.010 to 1.050" is expanded against fct_statute_sections. A text with no RSMo
+      section (appropriations, joint resolutions amending the Constitution, land conveyances) has no row. Bills are
+      rewritten as they move, so read version_code T (truly agreed) or the latest lr_number for what a bill ended
+      up doing; the introduced text is what the sponsor first asked for.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [document_url, bill, section_id]
+    columns:
+      - name: session_code
+        data_type: varchar
+        description: House-style session code.
+        data_tests:
+          - not_null
+      - name: bill
+        data_type: varchar
+        description: Bill number without spaces (HB945, HJR12).
+        data_tests:
+          - not_null
+      - name: document_url
+        data_type: varchar
+        description: The bill text PDF the link was read from (fct_bill_documents.document_url).
+        data_tests:
+          - not_null
+      - name: lr_number
+        data_type: varchar
+        description: Legislative Research number of the text version (0474H.01I introduced; 5057S.04T truly agreed).
+      - name: version_code
+        data_type: varchar
+        description: House version code of the text (I introduced, P perfected, T truly agreed, ...).
+      - name: section_id
+        data_type: varchar
+        description: The RSMo section, in the form fct_statute_sections.section_id uses.
+        data_tests:
+          - not_null
+      - name: change
+        data_type: varchar
+        description: >
+          In the words of fct_bill_statute_links.change. amended: the text repeals and enacts the section in lieu
+          thereof, or amends it; repealed: only repeals it; enacted: only adds it (a new section).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [enacted, amended, repealed]
+      - name: link_source
+        data_type: varchar
+        description: Always 'bill_text' here ('revisor_history' in fct_bill_statute_links).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [bill_text]
+      - name: supp_year
+        data_type: integer
+        description: Year of the "RSMo Supp." the text cites the section from, when it does; else null.
+      - name: from_range
+        data_type: boolean
+        description: Whether the section came from a range ("1.010 to 1.050"), whose members come from the statutes.
+      - name: in_statutes
+        data_type: boolean
+        description: >
+          Whether fct_statute_sections has the section today. False for a section the bill would enact, or one the
+          Revisor has since moved or dropped.
 
   - name: fct_bill_documents
     description: >
-      Links to the House's PDFs for each bill, one row per document: summaries, fiscal notes, witness forms, bill
-      text versions, amendments and the change maps of text versions and amendments. The PDFs are not fetched.
-      Covers House bills and the Senate bills the House acted on (2024 sessions on). Witness forms name citizens,
+      Links to the PDFs for each bill, one row per document: the House's summaries, fiscal notes, witness forms, bill
+      text versions, amendments and the change maps of text versions and amendments, and the Senate's bill text, fiscal
+      note and amendment links. The PDFs are not fetched. source_site says whose link it is: the House's links cover
+      House bills and the Senate bills the House acted on (2024 sessions on); the Senate's come from senate.mo.gov's
+      own bill pages for every Senate bill of a session the mo_senate_bills loader has landed (none until it has). A
+      Senate bill both sites list has links from both, with different URLs, so both are kept. The Senate's summaries
+      are text on the page, not a link, and are in stg_mo_senate__bill_summaries only. Witness forms name citizens,
       so only the link is kept. Join to fct_bills on (session_code, bill); a few special-session Senate bills have
       documents here but no fct_bills row (#438). Grain: one row per (session, bill, document_kind, document_url).
     data_tests:
@@ -1563,25 +2012,172 @@ models:
           - not_null
       - name: document_kind
         data_type: varchar
-        description: What the link is (summary, fiscal_note, witness_form, bill_text, text_map, amendment, amendment_map). An amendment is the amendment's own PDF; amendment_map is its change map, which few amendments have.
+        description: What the link is (summary, fiscal_note, witness_form, bill_text, text_map, amendment, amendment_map). An amendment is the amendment's own PDF; amendment_map is its change map, which few amendments have. The Senate's links are bill_text, fiscal_note and amendment only.
         data_tests:
           - accepted_values:
               arguments:
                 values: ['summary', 'fiscal_note', 'witness_form', 'bill_text', 'text_map', 'amendment', 'amendment_map']
       - name: document_url
         data_type: varchar
-        description: Link to the PDF (documents.house.mo.gov; a few 2018 links point at the older house.mo.gov and moga.mo.gov hosts).
+        description: Link to the PDF (documents.house.mo.gov; a few 2018 links point at the older house.mo.gov and moga.mo.gov hosts; www.senate.mo.gov for the Senate's own).
         data_tests:
           - not_null
           - dbt_utils.expression_is_true:
               arguments:
-                expression: "like 'http%://documents.house.mo.gov/%' or document_url like 'http%://house.mo.gov/%' or document_url like 'http%://www.moga.mo.gov/%'"
+                expression: "like 'http%://documents.house.mo.gov/%' or document_url like 'http%://house.mo.gov/%' or document_url like 'http%://www.moga.mo.gov/%' or document_url like 'http%://www.senate.mo.gov/%'"
+      - name: source_site
+        data_type: varchar
+        description: Whose link it is, 'house' (the House XML) or 'senate' (a Senate bill page on senate.mo.gov). The fetched-text columns below are House-only until the Senate PDFs are fetched (#590).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['house', 'senate']
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "= case when document_url like 'http%://www.senate.mo.gov/%' then 'senate' else 'house' end"
       - name: document_index
         data_type: bigint
         description: Position of the link in the bill's XML among documents of its kind (lowest, when listed twice).
       - name: label
         data_type: varchar
         description: The House's name for the document (summary or text version name, amendment description, witness-form description); null for fiscal notes.
+      - name: page_count
+        data_type: bigint
+        description: Pages in the fetched PDF; null when the mo_house_pdf loader has not fetched the link (not run yet, witness forms, change maps) or the fetch failed.
+      - name: text_length
+        data_type: bigint
+        description: Characters of extracted text (see fct_bill_document_texts); null when not fetched, 0 when fetched with no text.
+      - name: has_text
+        data_type: boolean
+        description: True when the PDF has a text layer; null when not fetched.
+      - name: fetch_error
+        data_type: varchar
+        description: Why the loader could not get the text ("not a PDF", HTTP error); null when fetched or not tried.
+
+  - name: fct_bill_document_texts
+    description: >
+      The text of the House's bill documents, one row per document URL: bill text versions, summaries, fiscal notes
+      and amendments the mo_house_pdf loader fetched (empty until it has run). A sibling of fct_bill_documents rather
+      than columns on it, because the text is wide (a few GB for 2017-2026) and the link mart is small and is read
+      for every bill page; join on document_url for the bill, label and index. A summary shared by several
+      versions is one row here and one row per bill in fct_bill_documents. Control characters (NUL from small-caps
+      glyphs) are removed. A scanned page adds to page_count but has no text. Grain: one row per document_url.
+    columns:
+      - name: document_url
+        data_type: varchar
+        description: Link to the PDF; joins to fct_bill_documents.document_url.
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_bill_documents')
+                field: document_url
+      - name: document_kind
+        data_type: varchar
+        description: bill_text, summary, fiscal_note or amendment.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['bill_text', 'summary', 'fiscal_note', 'amendment']
+      - name: session_code
+        data_type: varchar
+        description: House session code of the first link that names the URL.
+      - name: lr_number
+        data_type: varchar
+        description: Legislative Research number (null for fiscal notes).
+      - name: version_code
+        data_type: varchar
+        description: Bill text version code (I introduced, H committee substitute, P perfected, T truly agreed, ...); null for fiscal notes and amendments.
+      - name: n_links
+        data_type: bigint
+        description: How many links in the House XML name this URL.
+      - name: page_count
+        data_type: bigint
+        description: Pages in the PDF; null when the fetch failed. Between 1 and 1,500.
+      - name: text_length
+        data_type: bigint
+        description: Characters in document_text; 0 when there is none.
+      - name: has_text
+        data_type: boolean
+        description: True when document_text has a non-blank character.
+      - name: fetch_error
+        data_type: varchar
+        description: Why there is no text (HTTP error, "not a PDF"); null when fetched.
+      - name: document_text
+        data_type: varchar
+        description: The PDF's text as extracted, control characters removed; null when the fetch failed.
+
+  - name: fct_bill_hearings
+    description: >
+      House committee hearings per bill, one row per hearing notice, for House bills and the Senate bills the House
+      acted on (2024 sessions on). A bill heard twice, or by two committees, has several rows. A moved hearing is
+      noticed again, so one bill can show two notices on one day; the House XML has no cancelled flag, so read the
+      comments ("Rescheduled hearing, previously noticed for ..."). Referrals that never got a hearing are bill
+      actions ("Referred: ..."), not rows here. Email addresses and phone numbers in comments and locations are
+      replaced by "[email removed]" / "[phone removed]" (a public official's office phone too); the rest of the
+      text stays, and a build-failing test checks none remain. A notice the House lists twice (same committee,
+      date, time and room) is one hearing: count hearings with is_superseded = false. Join to fct_bills on
+      (session_code, bill). Grain: one row per (session, bill, hearing_index).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [session_code, bill, hearing_index]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "hearing_date >= cast(session_year || '-01-01' as date) and hearing_date <= cast(session_year || '-12-31' as date)"
+    columns:
+      - name: session_code
+        data_type: varchar
+        description: House session code.
+        data_tests:
+          - not_null
+      - name: session_year
+        data_type: integer
+        description: Calendar year of the session (2000 + the first two digits of the code). Every hearing falls in it, special sessions included.
+        data_tests:
+          - not_null
+      - name: bill
+        data_type: varchar
+        description: Bill number without spaces (HB2, SB727).
+        data_tests:
+          - not_null
+      - name: hearing_index
+        data_type: bigint
+        description: Position of the notice in the House's list for the bill. The XML order is not chronological (a later list entry can carry an earlier date), so do not read it as the order the notices were issued.
+        data_tests:
+          - not_null
+      - name: committee_name
+        data_type: varchar
+        description: House committee noticed to hear the bill (Rules and Fiscal Review committees included).
+        data_tests:
+          - not_null
+      - name: hearing_date
+        data_type: date
+        description: Date of the hearing as noticed.
+        data_tests:
+          - not_null
+      - name: hearing_time
+        data_type: varchar
+        description: Clock time as HH:MM (24-hour); null when the House gave only hearing_time_note.
+      - name: hearing_time_note
+        data_type: varchar
+        description: The House's free-text time when it is not a clock time ("4:30 PM or upon adjournment (whichever is later)"); null when hearing_time is set.
+      - name: location
+        data_type: varchar
+        description: Hearing room (House Hearing Room 5). Contact strings are redacted as in comments.
+      - name: comments
+        data_type: varchar
+        description: The committee's note on the notice (time or room change, rescheduling, bills added, COVID-19 procedures). Email addresses and phone numbers are replaced by "[email removed]" / "[phone removed]".
+      - name: superseded_by_index
+        data_type: bigint
+        description: hearing_index of the later notice that repeats this one exactly (same committee, date, time or time note, and room); null when no later notice does.
+      - name: is_superseded
+        data_type: boolean
+        description: True when the House lists the same notice again later (superseded_by_index is set). Filter to false to count hearings once.
+        data_tests:
+          - not_null
 
   - name: fct_bill_subjects
     description: >
@@ -1595,7 +2191,7 @@ models:
     columns:
       - name: session_code
         data_type: varchar
-        description: House session code.
+        description: House session code (the Senate's sessions are mapped to the House's codes).
       - name: bill
         data_type: varchar
         description: Bill number (fct_bills).
@@ -1616,7 +2212,10 @@ models:
   - name: fct_bill_sponsors
     description: >
       Sponsors, co-sponsors, handlers and House/Senate conferees of each House bill, as the House lists them,
-      matched to officials where the district and surname agree. Re-listed appropriation bills (fct_bills status
+      and the primary sponsor of each Senate bill (SB, SJR, SCR, SR) from senate.mo.gov's bill list (one Sponsor
+      row per Senate bill; that list has no co-sponsors; a bill it gives no sponsor has no row), matched to officials where the district and surname agree (a Senate bill's sponsor: the senator who held the
+      listed district's seat in the session's year and whose surname is in the listed name). Only current officials
+      (dim_official) get an official_id, so a former senator's bills keep it null. The House lists a member's latest district for every session, so for a member whose district number changed (2022 redistricting) the match goes through the session's roster by surname and the listed district being one the member held; two candidates leave the row unmatched. Re-listed appropriation bills (fct_bills status
       "relisted for governor message") are excluded: they repeat the original's sponsors only to record the
       governor's message. Grain: one row per (session, bill, sponsor type, sponsor name).
     data_tests:
@@ -1635,10 +2234,10 @@ models:
         description: Sponsor, Co-Sponsor, Handler, HouseConferee or SenateConferee.
       - name: sponsor_name
         data_type: varchar
-        description: Name as the House lists it.
+        description: Name as the House lists it ("First Last" from the Senate's list for a Senate bill).
       - name: sponsor_chamber
         data_type: varchar
-        description: state_house or state_senate (the House numbers senators 200 + senate district).
+        description: state_house or state_senate (the House numbers senators 200 + senate district; a Senate bill's sponsor is always state_senate).
       - name: sponsor_district
         data_type: integer
         description: District in the sponsor's own chamber.
@@ -1646,6 +2245,98 @@ models:
         data_type: varchar
         description: "{{ doc('official_id') }} Null when the sponsor isn't a current official or didn't match."
 
+
+  - name: fct_sponsorship_outcomes
+    description: >
+      What became of the bills each House member sponsored, per member and House session: counts from the House's
+      own bill actions (int_bills__status), each with its n; not a score. Counted: bills where the member is the
+      primary sponsor (sponsor_type Sponsor, exactly one per bill), as a House bill (HB) or House joint resolution
+      (HJR: a proposed law or constitutional amendment). Co-sponsors, handlers and conferees are not counted.
+      Resolutions (HR, HCR) are left out: they are adopted on a voice vote or not at all and would swamp the
+      share. Senate bills and their senator sponsors are left out (fct_bill_sponsors carries them since #839; this model counts House bills only). Re-listed appropriation
+      bills are not counted twice (fct_bill_sponsors drops them). Appropriation bills are kept: they are real
+      sponsorships, and the Budget chair sponsors them and almost all pass, so the chair's shares are high for
+      that reason (a member who has left office, such as a former Budget chair, has no row). Only current officials (dim_official) have an official_id, so former members are not here
+      (2026: 2,044 of 2,086 House sponsor rows match; 2017: 32 of 1,205). Survivorship: the earliest sessions (2017-2018) hold only
+      members still in office today, mostly long-serving leaders, so their shares are not comparable with recent sessions. A bill is "decided" unless its outcome
+      is pending (session still open) or awaiting governor (truly agreed this year); decided bills are the
+      denominator of both shares, and the passed and became-law counts only include decided bills, so a share
+      is always between 0 and 1. A member who moved between chambers has rows only for the House sessions in
+      which they sponsored House bills. Grain: one row per (official, House session) with at least one counted
+      bill.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [official_id, session_code]
+    columns:
+      - name: official_id
+        data_type: varchar
+        description: The sponsoring member (dim_official).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_official')
+                field: official_id
+      - name: session_code
+        data_type: varchar
+        description: House session code.
+        data_tests:
+          - not_null
+      - name: session_year
+        data_type: integer
+        description: Calendar year of the session.
+      - name: is_session_over
+        data_type: boolean
+        description: >
+          Whether the session has ended (int_bills__status). While it is false, most bills are still pending
+          and not counted as decided.
+      - name: bills_sponsored
+        data_type: bigint
+        description: >
+          House bills (HB) and House joint resolutions (HJR) the member is the primary sponsor of in the session,
+          whatever their outcome, pending ones included.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 60
+      - name: bills_decided
+        data_type: bigint
+        description: >
+          The denominator: those bills whose outcome is known, i.e. everything except pending (session still open)
+          and awaiting governor. A bill the House passed but that failed in the Senate is decided. A truly agreed bill
+          with "no governor action recorded" is decided but not counted as law.
+      - name: bills_passed_house
+        data_type: bigint
+        description: >
+          Decided bills the House passed on third reading (int_bills__status passed_house), including ones that then
+          died in the Senate, were vetoed or were withdrawn afterwards. Appropriation bills are included.
+      - name: bills_became_law
+        data_type: bigint
+        description: >
+          Decided bills that became law: outcome enacted for an HB (signed, line-item vetoed, veto overridden, or
+          delivered to the Secretary of State without signature), sent to voters for an HJR. A vetoed bill is not
+          counted.
+      - name: passed_house_share
+        data_type: decimal(28,6)
+        description: bills_passed_house over bills_decided; null when bills_decided is 0. Always between 0 and 1.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1
+      - name: became_law_share
+        data_type: decimal(28,6)
+        description: bills_became_law over bills_decided; null when bills_decided is 0. Always between 0 and 1.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1
+      - name: source_url
+        data_type: varchar
+        description: The House XML export for the session (documents.house.mo.gov), where the bill actions come from.
   - name: fct_vote_bills
     description: >
       Which bill a state vote was on. House roll calls are linked exactly where the bill XML names the roll-call
@@ -1669,6 +2360,22 @@ models:
       - name: vote_id
         data_type: varchar
         description: Vote identifier (fct_votes.vote_id).
+        data_tests:
+          # a link may only name a roll call that exists (#538): the XML links 55 PDFs the House never published
+          - relationships:
+              name: fct_vote_bills_house_vote_id_in_rollcalls
+              arguments:
+                to: ref('stg_mo_house__rollcalls')
+                field: rollcall_url
+              config:
+                where: "chamber = 'state_house'"
+          - relationships:
+              name: fct_vote_bills_senate_vote_id_in_votes
+              arguments:
+                to: ref('int_mo_senate__votes')
+                field: vote_id
+              config:
+                where: "chamber = 'state_senate'"
       - name: session_code
         data_type: varchar
         description: House session code of the bill.

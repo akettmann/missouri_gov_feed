@@ -29,5 +29,10 @@ with items as (
 
 select
     *,
-    item_kind <> 'investment' and {{ mogov.is_garbled_text('description') }} as is_garbled
+    -- the guard skips the regex passes for the 93% of rows that are investments; they are false either way
+    -- (false and x is false), and the else branch is the original expression, so null item_kind is unchanged
+    case
+        when item_kind = 'investment' then false
+        else item_kind <> 'investment' and {{ mogov.is_garbled_text('description') }}
+    end as is_garbled
 from items

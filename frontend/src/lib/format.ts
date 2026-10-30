@@ -18,12 +18,30 @@ export function officeLine(o: { office_title: string | null; office: string; dis
 }
 
 /** Coverage status text -> one of a few visual states (the full text is always shown too). */
-export function statusKind(status: string): "available" | "none" | "not-public" | "na" {
+export type StatusKind = "available" | "none" | "unrecorded" | "not-public" | "na";
+export function statusKind(status: string): StatusKind {
   if (status === "available") return "available";
+  if (status.startsWith("none recorded")) return "unrecorded";
   if (status.startsWith("not public")) return "not-public";
   if (status === "not applicable") return "na";
   return "none";
 }
+
+/** Icon and short cell text per kind; "none recorded" must not read as "none found". */
+export const STATUS_ICON: Record<StatusKind, string> = {
+  available: "●",
+  none: "○",
+  unrecorded: "◌",
+  "not-public": "⊘",
+  na: "–",
+};
+export const STATUS_SHORT: Record<StatusKind, string> = {
+  available: "available",
+  none: "none found",
+  unrecorded: "none recorded",
+  "not-public": "not public",
+  na: "n/a",
+};
 
 /** 1st, 2nd, 3rd, 4th, 11th, 22nd. */
 export function ordinal(n: number): string {
@@ -56,6 +74,29 @@ export const pct = (n: number | null | undefined, digits = 1) => (n == null ? "�
 export const HIDE_UNLESS_AVAILABLE = ["disclosures", "commercial_ties"];
 export const visibleCoverage = <T extends { key: string; status: string }>(items: T[]) =>
   items.filter((c) => !HIDE_UNLESS_AVAILABLE.includes(c.key) || statusKind(c.status) === "available");
+
+/**
+ * One coverage item as a phrase: "financial disclosures (the status's own parenthetical, if any)". The whole
+ * parenthetical is kept: status text is reader-facing and a dbt test keeps maintainer notes out of it.
+ */
+const gapPhrase = (c: { label: string; status: string }) => {
+  const detail = /\(([^)]*)\)\s*$/.exec(c.status)?.[1];
+  const label = c.label.charAt(0).toLowerCase() + c.label.slice(1);
+  return detail ? `${label} (${detail})` : label;
+};
+
+/**
+ * The coverage gaps for one official: items whose status is "not public" (we can't see them), "none found"
+ * (we looked and found nothing) and "none recorded" (no public list exists, so we only hold what was added by
+ * hand; that is not a search that came up empty). "n/a" and "available" items are never listed. Same template
+ * for everyone.
+ */
+export function coverageGaps<T extends { label: string; status: string }>(items: T[]) {
+  const cant = items.filter((c) => statusKind(c.status) === "not-public").map(gapPhrase);
+  const unrecorded = items.filter((c) => statusKind(c.status) === "unrecorded").map(gapPhrase);
+  const none = items.filter((c) => statusKind(c.status) === "none").map(gapPhrase);
+  return { cant, none, unrecorded };
+}
 
 export const isMedium = (confidence: string | null | undefined) => confidence === "medium";
 

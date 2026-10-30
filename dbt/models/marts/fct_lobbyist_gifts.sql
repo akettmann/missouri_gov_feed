@@ -23,22 +23,22 @@ with all_gifts as (
         'MEC lobbyist reports (via Accountability Project)' as source
     from {{ ref('stg_tap_mec__lobbyist_gifts') }}
     {% if var('mec_direct', false) %}
-    where expenditure_date < {{ dbt.safe_cast("'2019-01-01'", 'date') }}
-    union all
-    select
-        lobbyist_id,
-        lobbyist_name,
-        principal_name,
-        recipient_raw,
-        upper(recipient_title) as recipient_title,
-        recipient_last,
-        recipient_first,
-        expenditure_category,
-        description,
-        amount,
-        expenditure_date,
-        'MEC lobbyist reports' as source
-    from {{ ref('stg_mec__lobbyist_gifts') }}
+        where expenditure_date < {{ dbt.safe_cast("'2019-01-01'", 'date') }}
+        union all
+        select
+            lobbyist_id,
+            lobbyist_name,
+            principal_name,
+            recipient_raw,
+            upper(recipient_title) as recipient_title,
+            recipient_last,
+            recipient_first,
+            expenditure_category,
+            description,
+            amount,
+            expenditure_date,
+            'MEC lobbyist reports' as source
+        from {{ ref('stg_mec__lobbyist_gifts') }}
     {% endif %}
 ),
 

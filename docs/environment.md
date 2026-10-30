@@ -56,6 +56,8 @@ Layout under `data/` (override the root with `MOGOV_DATA_DIR`):
 | `data/cache/`                              | HTTP cache (one file per request, keyed by URL + params) and large downloads |
 | `data/raw/<table>/part-<i>-of-<N>.parquet` | Raw landings, one part per loader shard (`MOGOV_RAW_DIR`)                    |
 | `data/raw/mo_house_xml/<session>/*.gz`     | Raw files landed unchanged, gzipped; `mo_house_xml_files` records each path  |
+| `data/raw/govinfo_billstatus_xml/<congress>/<type>/*.gz` | Federal bill XML landed unchanged, gzipped; `govinfo_billstatus_files` records each path |
+| `data/raw/mo_house_pdf/<session>/<kind>/*.pdf` | House bill document PDFs landed unchanged (3-6 GB); `mo_house_pdf_files` records each |
 | `data/mogov.duckdb`                        | dbt warehouse (`MOGOV_DB`)                                                   |
 | `data/exports/`                            | `mogov export` output                                                        |
 
@@ -155,7 +157,7 @@ aren't loaded.
 The officials list (`/`) shows the people serving now; its year control loads earlier years from
 `dist/lookup/officeholders/<year>.json`, built from `rpt_officeholders_by_year`. Without that export the page
 lists today's officials only and hides the year control. Past years cover only offices with dated rosters (MO
-House, MO Senate where every seat is dated, Congress, federal courts). Both the JavaScript year control and the static `dist/years/<year>/index.html` pages name the
+House, MO Senate (seats dated from the journal roll calls where Open States has no start or a wrong end), Congress, federal courts). Both the JavaScript year control and the static `dist/years/<year>/index.html` pages name the
 offices a year lacks, using one shared helper (`frontend/src/lib/lookback.ts`).
 
 Without JavaScript, the home page's `<noscript>` block links to those static `/years/<year>/` pages, one per past
@@ -176,9 +178,9 @@ profile's (or another past entry's) shows a neutral "same name" cross-link; name
 The businesses section of a profile carries only the donor-tied sites and counts by industry (a U.S. House
 district holds about 10,000 EPA-regulated sites). The full list per district or city is built from
 `fct_jurisdiction_businesses` into `dist/districts/<district>/sites/index.html` (a plain table, no JavaScript
-needed) and `dist/districts/<district>/sites.csv`, 201 districts in all; `<district>` is the `district_id` with
+needed) `dist/districts/<district>/sites.csv` and `dist/districts/<district>/sites-donors.csv`, 201 districts in all; `<district>` is the `district_id` with
 `:` replaced by `-` (`state_house-135`). Donor-tied rows name the donor, link to where the contributions are filed
-and carry the "possible match" badge, so the "Hide possible matches" toggle applies; the CSV has the same columns.
+and carry the "possible match" badge, so the "Hide possible matches" toggle applies; `sites.csv` has the page's columns plus `registry_id`, one value per cell; `sites-donors.csv` has one line per site, donor and filing page (`registry_id`, `facility_name`, `donor_name`, `filing_page_url`).
 `lib/exports/districtSites.ts` reads `fct_jurisdiction_businesses` and `fct_jurisdiction_business_donors` once each (two queries, grouped in memory) and fails the build if a
 district maps to several officials or an official to several districts. Measured on this machine against main
 (about 218k site rows, 402 extra routes): `dist/` 64 MB to 174 MB; peak node memory about 0.6-0.7 GB to about
@@ -190,6 +192,44 @@ Without the export no site pages are built and the section shows no link.
 Optional build-time environment: `PUBLIC_SITE_URL` (canonical site URL), `PUBLIC_BASE_PATH` (path prefix such as `/missouri_gov_feed`; unset =
 site at the root, set by `deploy:pages`), `PUBLIC_REPORT_ERROR_URL`
 (where "Report an error" goes; default: a prefilled GitHub issue on this repo).
+
+### Checking that the site build is deterministic (#226, #459)
+
+Two builds of the same data must give byte-identical output, including on tied rows (a ranking that ends on a tie
+without a tiebreaker). `scripts/check_site_determinism.py` builds the site twice and diffs every file; with
+`--shuffle` the second build reads a copy of the exports with their rows in random order, which exposes ties that the
+engine happened to read the same way twice:
+
+```
+uv run python scripts/check_site_determinism.py --shuffle     # exit 1 and a file list on any difference
+```
+
+It runs on the local exports and takes two site builds (minutes), so there is no GitHub Actions job for it: CI has no
+`data/exports` (local and gitignored), and a fixture export covering the roughly 90 tables the site reads would not
+hold real ties. Run it by hand after touching a ranking, a sort or an award, and on a schedule on the machine that
+holds the exports, after the weekly `mogov run` and `mogov export` (see [sync](sync.md)). For example, Windows Task
+Scheduler (weekly, Sunday 06:00; adjust the path):
+
+```
+schtasks /create /tn mogov-determinism /sc weekly /d SUN /st 06:00 /tr "cmd /c cd /d C:\path\to\missouri_gov_feed && uv run python scripts/check_site_determinism.py --shuffle >> data\determinism.log 2>&1"
+```
+
+or cron: `0 6 * * 0 cd ~/missouri_gov_feed && uv run python scripts/check_site_determinism.py --shuffle >> data/determinism.log 2>&1`.
+A scheduler does not run with your shell's PATH, so a scheduled run can fail silently (the log stays empty or holds
+only "command not found"). cron's PATH is usually just `/usr/bin:/bin`, which lacks `uv` (installed to
+`~/.local/bin`) and `pnpm`; set PATH on the line itself (adjust the pnpm directory, see `command -v pnpm`):
+
+```
+0 6 * * 0 PATH="$HOME/.local/bin:$HOME/.local/share/pnpm:$PATH" && cd ~/missouri_gov_feed && uv run python scripts/check_site_determinism.py --shuffle >> data/determinism.log 2>&1
+```
+
+`schtasks /create` without `/ru` makes the task run only while you are logged on. To have it run whether or not you are
+logged on, add `/ru <your user> /rp *` (prompts once for your password; `/rp *` is a documented way to ask for it and
+keeps it off the command line), and use full paths in `/tr` if `uv` or `pnpm` is not on the system PATH (user PATH
+entries are not always loaded for a non-interactive task).
+
+A non-zero exit means a tie needs a tiebreaker; fix the model or page, do not skip the check. What CI does cover is the
+script's compare and shuffle logic (`tests/test_site_determinism.py`: a tied sort is flagged, a total order passes).
 
 ### Publishing to Google Cloud Storage
 
@@ -217,15 +257,20 @@ The build is plain static files, so any static host works; the repo ships a scri
 GCS (above) stays the end goal; Pages is a free stopgap while traffic is tiny. The site is built **locally** (CI has no data) and pushed to an
 orphan `gh-pages` branch; `main` history is never touched.
 
-Findings (checked against the ~200 MB `dist/`, 1052 pages):
+Findings (first checked against the ~200 MB `dist/`, 1052 pages; with the RSMo section pages it is ~460 MB and ~45k files as of 2026-10-29):
 
 - Limits: a published Pages site must be <= 1 GB, each file < 100 MB (git push limit), and the soft bandwidth cap is
-  100 GB/month. Our `dist/` is about 200 MB, the largest file is a 4.4 MB HTML page, so it fits comfortably.
+  100 GB/month. Our `dist/` is about 460 MB, the largest file is a 4.8 MB HTML page, so it still fits.
   `deploy:pages` refuses to push if either limit would be broken.
-- Method (a), orphan `gh-pages` branch from a temp dir, was chosen over (b) `workflow_dispatch` +
+- Method (a), orphan `gh-pages` branch pushed from this machine, was chosen over (b) `workflow_dispatch` +
   `upload-pages-artifact`: (b) needs the built site inside CI, and CI has no data, so we would have to upload 200 MB
   from a laptop anyway. (a) is one command, needs no workflow, and force-pushing the orphan branch replaces history
   so snapshots do not accumulate.
+- Pushes are incremental: the live `gh-pages` tip is fetched (`--depth 1`) into `frontend/.pages-cache/` (a
+  gitignored bare repo kept between deploys), `dist/` is committed there as a new orphan commit, and the force-push
+  then sends only the objects the live branch does not already have. The first deploy from a machine downloads the
+  live site once; if nothing changed the script says so and pushes nothing. Deleting `.pages-cache/` is always safe
+  (the next deploy fetches again), and is the fix if it is ever left in a bad state.
 - Project sites are served under `/missouri_gov_feed/`, so the build sets Astro `base` from `PUBLIC_BASE_PATH`.
   Every internal link goes through `href()` (`src/lib/site.ts`); the default (GCS) build has no base and is
   unchanged. `scripts/link-check.mjs` verifies a built `dist/` (every root-relative reference resolves under the base).
@@ -250,8 +295,9 @@ the build now rejects that); the script sets it for you.
 The deploy only ever writes the `gh-pages` branch (there is no `--branch` flag), pushing to
 `https://github.com/<owner>/<name>.git` for the repo of the `origin` remote (`--remote NAME` picks another remote
 to read the repo from). It refuses to run with uncommitted changes under `frontend/` (`--allow-dirty` overrides)
-and removes its ~200 MB temp repo on every exit, dry runs and failures included (`--keep` leaves it for
-inspection). It can be started from any directory. It runs the size budget check (as `pnpm build` does) before publishing, including with `--skip-build`; `MOGOV_SKIP_SIZE_BUDGET=1` skips it, as it does for `pnpm deploy:gcs`. If deleting the temp repo fails (for example EBUSY) during an interrupt, the interrupt result stays (exit 130) and the left-over directory is named in an extra warning.
+and removes its temp dir (only a throwaway git index; `dist/` itself is the work tree) on every exit, dry runs and
+failures included (`--keep` leaves it for inspection). A dry run commits into `.pages-cache/` and prints the change
+summary (`git diff --shortstat` against the live branch). It can be started from any directory. It runs the size budget check (as `pnpm build` does) before publishing, including with `--skip-build`; `MOGOV_SKIP_SIZE_BUDGET=1` skips it, as it does for `pnpm deploy:gcs`. If deleting the temp dir fails (for example EBUSY) during an interrupt, the interrupt result stays (exit 130) and the left-over directory is named in an extra warning.
 
 A Ctrl+C before the push starts stops it. What happens depends on the stage:
 
@@ -259,12 +305,12 @@ A Ctrl+C before the push starts stops it. What happens depends on the stage:
 | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm build`                                | Node's default handler (no listener is installed yet) kills the script and the build; no temp dir exists yet; exit code is the signal's (on Windows typically `0xC000013A`).                                                                                                                                                                                                                 |
 | `pnpm build` / link check                   | Same as the build: no listener is installed yet, so Node's default handler kills the script (the link check is a child process); no temp dir exists yet.                                                                                                                                                                                                                                     |
-| Copy of `dist/` and size scan               | The first Ctrl+C deletes the temp repo (unless `--keep`) and exits 130 ("Interrupted; nothing was pushed.").                                                                                                                                                                                                                                                                                 |
-| `git init` / `add` / `commit` / `rev-parse` | These run as asynchronous child processes, so the same listener handles the signal: temp repo deleted, exit 130. If git itself dies from the Ctrl+C first (status 130 or `0xC000013A`), that is reported as "Interrupted; nothing was pushed.", also exit 130. An interrupt flag is also checked (after yielding to the event loop) before every git step and immediately before `git push`. |
+| Size scan                                   | The first Ctrl+C deletes the temp dir (unless `--keep`) and exits 130 ("Interrupted; nothing was pushed.").                                                                                                                                                                                                                                                                                 |
+| `git fetch` / `add` / `commit-tree`         | These run as asynchronous child processes, so the same listener handles the signal: temp dir deleted, exit 130. If git itself dies from the Ctrl+C first (status 130 or `0xC000013A`), that is reported as "Interrupted; nothing was pushed.", also exit 130. An interrupt flag is also checked (after yielding to the event loop) before every git step and immediately before `git push`. |
 | `git push`                                  | If Ctrl+C arrives after the push has started the script exits 130 with "the push may or may not have completed"; check the `gh-pages` branch.                                                                                                                                                                                                                                                |
 
-A second Ctrl+C while the temp repo is being deleted is ignored until the deletion finishes, so no ~200 MB directory is
-left in the temp folder.
+A second Ctrl+C while the temp dir is being deleted is ignored until the deletion finishes. `.pages-cache/` is never
+deleted by the script.
 
 The repo is always taken from a GitHub remote URL (`https://github.com/o/n`, `git@github.com:o/n`, or
 `ssh://git@github.com/o/n`). Explicit ports, `ssh.github.com:443` and SSH host aliases are not recognised; use a
@@ -308,18 +354,49 @@ Loaders that talk to different services run at the same time. Each loader names 
 (`mogov list` shows it), and the work is split into jobs of (one service's loaders, one shard). A pool of
 `--workers` processes runs the jobs (default `$MOGOV_WORKERS`, else the larger of the shard count and
 min(CPUs, 8)). Loaders of the same service run one after another within a shard, so a site never sees
-more than one request stream per shard. Slow loaders (`mo_senate`, `mo_house`, `house_fd`, `mec`, `fec`,
+more than one request stream per shard. Slow loaders (`mo_senate`, `mo_house`, `mo_house_pdf`, `house_fd`, `mec`, `fec`,
 `courtlistener_case_bulk`) start first. Each worker can use up to `MOGOV_DUCKDB_MEMORY` (default 3GB) while
 it lands a table, so lower that or `--workers` on a small machine.
 
 Each shard replaces only its own part. If you change the shard count, run every shard before the next
-`dbt build`. Parts left by the old count are deleted as the new shards write theirs.
+`dbt build`. Parts left by the old count are deleted only once every shard of the new count has landed (a shard
+that owns no data leaves a hidden `.none` marker instead), so shards that start late still see the old history.
+Until then dbt would read both counts and double-count rows: building mid-transition shows up as
+uniqueness test failures on the staging models (loaders reading their own tables dedupe, dbt does not). One
+consequence: a file that exists only in an old-count part (say one the House stopped publishing) is still listed
+by `mo_house.landed_files` until the transition completes and the old parts are deleted, so shard 0 of the new
+count may parse it once more; it disappears on the next run.
+
+Every shard of a loader must finish before any loader that reads its tables starts (not only before `dbt build`):
+`mo_house_pdf` reads `mo_house`'s link tables, and while `mo_house` is between shard counts a reader that doesn't
+dedupe sees every row twice. The loaders' own readers use `db.own_rows_sql`, which dedupes, but run stages in order.
+
+Only one run may write a given table's shard at a time. A sink takes an exclusive OS lock on
+`data/raw/<table>/.part-<i>-of-<N>.parquet.lock` when it opens and holds it until it finishes. A second
+`mogov load` of the same shard fails at once with `ShardBusyError: another run is already writing <table>
+shard i of N`, and the first run is untouched. Different shards don't conflict. The OS drops the lock when the
+process exits, even if it was killed, so a crash never leaves a lock that blocks the next run (the empty
+`.lock` files are harmless; dbt reads only `*.parquet`). The lock covers one machine or any filesystem with
+working file locks. On a mount without them (some network or FUSE volumes) the sink logs
+`shard_lock_unsupported` and runs unlocked, so on Cloud Run keep one task per shard (the default).
 
 Shards on one machine share `data/cache`. When several need the same URL (every `mo_house` shard reads
 every session zip, for example), the first takes a lock file next to the cache entry
 (`.<entry>.lock`) and downloads it; the others wait and read its copy. A lock untouched for 5 minutes
 is treated as left by a crashed process. Cloud Run tasks run on separate machines, so there the lock
 only helps as far as Cloud Storage FUSE honours exclusive creates; expect some duplicate downloads.
+
+Temp files: every writer in the cache (`write_atomic`, large downloads, the CourtListener case filter) writes
+`.<name>.<pid>.<32 hex>.part` and renames it into place (the raw-table writers in `db.py` do the same for their
+`.part` and `.jsonl` scratch files); a failed writer deletes its own. A crash leaves the file behind, so the first
+`write_atomic` into a directory in each process sweeps that directory (every directory it writes to, not only the
+cache: raw dirs such as the `mo_house` XML dirs and govinfo `<congress>/<bill_type>/` too; once per directory per
+process, not per write), and each large download sweeps its own name, deleting only such files untouched for 24
+hours. A live writer's file is always fresh (a small file takes milliseconds; a download rewrites its file
+continuously), and on a Cloud Storage FUSE mount a file still open for writing is not yet an object, so another
+task cannot list it. A raw-table shard clears its own leftover scratch when it starts. Scratch left under an old
+shard count is swept once every shard of the new count has landed, and only if it is 24 hours old and its old
+shard's lock is not held, so a still-running old-count run is never touched.
 
 Be polite with small state sites. Each shard keeps its own request pace, so N shards make N times the
 request rate. That matters most for `mec` (ask MEC before running it in parallel) and less for the
@@ -367,10 +444,21 @@ instead run `mogov run` as a job, it is strict by default; set `MOGOV_ALLOW_FAIL
    gcloud run jobs create mogov-build ... --tasks 1 --memory 8Gi \
      --command sh --args -c,'cp /data/mogov.duckdb /tmp/ 2>/dev/null; MOGOV_DB=/tmp/mogov.duckdb mogov build && cp /tmp/mogov.duckdb /data/mogov.duckdb'
    ```
+   `MOGOV_DUCKDB_MEMORY` (default 4GB here) also caps the dbt build's DuckDB (`dbt/profiles.yml`, under `settings:`;
+   a top-level `memory_limit:` key is ignored by dbt-duckdb). The build does not spill to disk
+   (`temp_directory: ''`), so a model that needs more than the cap fails with an out-of-memory error instead of
+   slowing down. 3GB is too small (`rpt_votes_by_subject` runs out of memory); 4GB builds everything. Keep the
+   cap below the container memory minus the in-memory `/tmp` database (#818).
 6. Chain them in order: stage-1 load jobs, then `mogov-build`, then
    `mogov load courtlistener_cases wikidata` (stage 2; `mogov list` shows each loader's stage), then
    `mogov-build` again. Use Cloud Workflows, or Cloud Scheduler triggers spaced far
    enough apart. See [sync.md](sync.md) for cadences.
+
+The HTTP cache is `$MOGOV_DATA_DIR/cache` (`/data/cache`), so it lives on the mounted bucket and survives
+between job runs. Loaders that re-fetch on a schedule (`govinfo_billstatus` re-reads the in-session Congress's zips
+daily and older ones monthly) judge freshness by the cached file's modification time, which Cloud Storage FUSE
+reports from the object's `gcsfuse_mtime` metadata when set, else its update time. Keep `/data` mounted on every load job; without it each run starts cold and
+downloads every zip again.
 
 Metrics: set `OTEL_EXPORTER_OTLP_ENDPOINT` to an OTLP/HTTP collector, for example an OpenTelemetry
 Collector sidecar that exports to Cloud Monitoring.

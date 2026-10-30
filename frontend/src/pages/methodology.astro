@@ -43,7 +43,7 @@ const tables = freshness();
     <h2>How records are matched to officials</h2>
     <p>
       Many sources (campaign finance, lobbyist reports) identify people by name only. Each matched record
-      keeps a<code>match_confidence</code>:
+      keeps a <code>match_confidence</code>:
     </p>
     <ul>
       <li>
@@ -58,7 +58,7 @@ const tables = freshness();
       </li>
       <li>
         <strong>medium</strong>: surname matches but the first-name signal is weaker (only the first three
-        letters, or a surname-first committee name with no other official sharing the surname). These carry a
+        letters, or a surname-first committee name with no other official sharing the surname). These carry a{" "}
         <span class="badge medium">possible match</span> badge, and "Hide possible matches" on any profile
         removes them from every table and chart.
       </li>
@@ -77,13 +77,23 @@ const tables = freshness();
       ("MO" as Missouri, "Assn" as Association); and the name without words like PAC, Political Action
       Committee or Fund (or a short name the filer put in parentheses). A committee only counts if it was
       active within a year of the gift, and only when exactly one committee fits. When several do, no link is
-      made.
+      made. A name that matches the committee receiving the gift is not followed, because a committee does not
+      fund itself. If the name is one that committee files under (or filed under before), the donor shows as
+      having the committee's own name; if only the name without words like PAC or Fund matched, it shows as a
+      similar name, which may be a parent body or another state's affiliate.
     </p>
     <p>
       About 71% of the committee-to-committee dollars on record match one Missouri committee this way. Most of
       the rest come from federal and out-of-state PACs, which report to the FEC or another state instead, and
       from less common groups known by an acronym that no name rule can expand. Because the match rests on a
       name, every link carries a <span class="badge medium">possible match</span> badge.
+    </p>
+    <p>
+      Above the trails, each profile adds up who gave to the committees listed there, by where the trail goes
+      out of view. It counts only those committees: for each, its 10 largest donors that are not individuals
+      plus its individual donors added together, across every year on file. This is money those committees
+      took in, not money given to the official; the profile states how much those committees gave the
+      official. The listed committees sometimes give to each other, so some dollars appear twice.
     </p>
     <p>
       The trail ends at businesses and other organizations, nonprofits included: the Ethics Commission gets
@@ -105,28 +115,126 @@ const tables = freshness();
       </li>
       <li>
         <strong>⊘ not public</strong>: the records exist but aren't published online (for example, Missouri
-        personal financial disclosures need a Sunshine Law request). Absence here says nothing about the
-        official.
+        personal financial disclosures need a Sunshine Law request). We can't see them.
       </li>
       <li>
         <strong>– n/a</strong>: the measure doesn't apply to this office (for example, judges don't cast
         roll-call votes).
       </li>
     </ul>
+    <p>
+      Under the strip, one sentence lists every item marked "not public" or "none found". It uses the same
+      wording for every official and party, and it is left out when nothing is missing. Items marked n/a are
+      not listed. The sentence also names items the strip leaves out as cells, such as financial disclosures
+      for state officials, so a gap there is still stated.
+    </p>
+    <p>
+      <strong>What you can conclude from "none found":</strong> our sources, as of the last update, held no
+      matching record. That is weaker than "there is nothing". A source may not cover this office or this
+      court (CourtListener, for example, has no Missouri circuit-court cases, the state trial courts), a name
+      may not have matched, or a filing may be late. Do not read it as a clean record or as a sign of
+      wrongdoing.
+    </p>
+    <p>
+      <strong>What you can conclude from "none recorded":</strong> no public list of the item exists, so we
+      hold only what we found and added by hand. It does not mean the official has nothing to report.
+    </p>
+    <p>
+      <strong>What you can conclude from "not public":</strong> nothing about the official. The records may
+      exist and may say anything; we simply can't see them without a records request. A blank here is a hole
+      in the public record, not a verdict, and it says nothing either way.
+    </p>
   </section>
 
   <section class="card" id="courts">
     <h2>Court records</h2>
     <p>
       Cases come from CourtListener: published opinions and dockets that name the official as the judge on the
-      panel or as an attorney. CourtListener covers appellate and federal courts well and most Missouri trial
-      courts barely, so a circuit judge with few cases here may simply sit in a court it doesn't index.
+      panel or as an attorney. CourtListener covers appellate and federal courts well but holds no Missouri
+      circuit-court (state trial court) cases, so a circuit judge with few cases here may simply sit in a
+      court it doesn't index.
     </p>
     <p>
       Profiles count cases per year and list the most recent ones with the court's own disposition text. They
       do not tally outcomes (affirmed, reversed, who won): turning dispositions into win/loss figures needs a
       reviewed method, and raw rates mislead when judges hear different kinds of cases.
     </p>
+  </section>
+
+  <section class="card" id="sponsorship">
+    <h2>Bills sponsored in the House</h2>
+    <p>
+      For each current House member and House session, we count the House bills (HB) and House joint
+      resolutions (HJR) they are the primary sponsor of, as the House's own bill actions list them.
+      Co-sponsors, handlers and conferees are not counted, and neither are resolutions (HR, HCR), which are
+      adopted on a voice vote or not at all, or Senate bills. Appropriation bills are included: the Budget
+      chair sponsors them and nearly all pass, so that member's share is high for that reason.
+    </p>
+    <p>
+      A bill is <em>decided</em> unless it is still pending (the session is open) or awaiting the governor.
+      <em>Passed the House</em> counts decided bills the House passed on third reading, including ones that
+      then died in the Senate or were vetoed. <em>Became law</em> counts an enacted HB (signed, line-item
+      vetoed, veto overridden or filed without signature) or an HJR sent to the voters; a truly agreed bill
+      with no governor action recorded is decided but not counted as law. A percent is shown only when at
+      least 5 bills were decided; it is the count over the decided bills, not a score.
+    </p>
+    <p>
+      Only current officials have profiles, so bills sponsored by members who have since left office are not
+      counted. That makes the earliest sessions (2017 and 2018) a survivor group, mostly long-serving leaders,
+      and their numbers are not comparable with recent sessions.
+    </p>
+  </section>
+
+  <section class="card" id="vote-stage">
+    <h2>Stage of a Missouri vote</h2>
+    <p>
+      Wherever the profile lists individual Missouri roll calls, each roll call is labeled with the kind of
+      question the vote decided, so a final-passage vote is not mistaken for an amendment, a procedural motion
+      or a consent-calendar bill. It is a label only: attendance, party unity and the awards do not read it.
+      Federal votes keep their own description and get no stage.
+    </p>
+    <ul>
+      <li>
+        <strong>Perfection</strong>: the House or Senate working over a bill's text, usually by amendment,
+        before it is read a third time. <strong>Third reading</strong>: the vote to pass the bill in that
+        chamber.
+      </li>
+      <li>
+        <strong>Consent calendar, third reading</strong>: a bill on the House consent or federal-mandate
+        calendar. These bills are grouped and pass with little or no floor debate.
+      </li>
+      <li>
+        <strong>Informal calendar</strong>, added in brackets: the House calendar item was marked informal,
+        which means the bill was listed on the informal calendar when the vote was taken. The Senate journal
+        has no such marker, so Senate votes are never labeled this way.
+      </li>
+      <li>
+        <strong>Senate amendments</strong> and <strong>Conference report</strong>: the vote on the other
+        chamber's changes to a bill, or on the conference version. In the House these stages also include the
+        final-passage vote that follows (the bill truly agreed to and finally passed), so one measure can show
+        two roll calls under the same stage.
+      </li>
+      <li>
+        <strong>Veto override</strong>, <strong>Amendment</strong> and <strong>Emergency clause</strong>:
+        votes on those questions, not the vote to pass the bill in that chamber.
+      </li>
+      <li>
+        <strong>Procedural motion</strong>, <strong>Previous question</strong> and{" "}
+        <strong>Quorum call</strong>: votes about how the chamber runs (approving the journal, suspending the
+        rules, reconsidering, adjourning, ending debate, checking attendance), not about a bill's contents.
+      </li>
+      <li>
+        <strong>Resolution</strong> and <strong>Other question</strong>: a resolution, or a vote we recognise
+        but that fits none of the stages above (for example an officer election). Some Other question votes
+        are still being sorted into proper stages (for example House roll calls on bills carrying request
+        messages, tracked in issue 816).
+      </li>
+      <li>
+        <strong>Stage not identified</strong>: the stage is worked out from the House calendar item or the
+        wording of the Senate journal, and when neither says enough (some House votes on the General calendar,
+        and some Senate journal lines), we say so rather than guess.
+      </li>
+    </ul>
   </section>
 
   <section class="card" id="attendance">
@@ -152,11 +260,11 @@ const tables = freshness();
     </ul>
     <p>
       Only the MO Senate records leave and recusals. The MO House and Congress sources don't, so a 0 in those
-      bars does not mean the official was never excused: an excused House absence shows up as plain absent.
-      The chamber average tick is 100 minus the whole chamber's attendance for that session (every member who
-      voted that session, not only the officials this site covers). It lumps all non-attended positions
-      together, because the export doesn't split out the chamber's excused absences or recusals, so compare it
-      with the end of the official's whole bar, not with one part alone.
+      bars (or a dash in the table) does not mean the official was never excused: an excused House absence
+      shows up as plain absent. The chamber average tick is 100 minus the whole chamber's attendance for that
+      session (every member who voted that session, not only the officials this site covers). It lumps all
+      non-attended positions together, because the export doesn't split out the chamber's excused absences or
+      recusals, so compare it with the end of the official's whole bar, not with one part alone.
     </p>
   </section>
 
@@ -235,20 +343,20 @@ const tables = freshness();
   <section class="card" id="awards">
     <h2>Awards</h2>
     <p>
-      Each award ranks one measured number, among officials holding the same office, and comes with its
-      opposite (lowest and highest attendance, and so on). Ranks use the unrounded figure, so two officials
-      shown at the same rounded percentage can hold different ranks; only exact ties share a rank (this holds
-      for every award, including the lowest share of money from PACs, committees and parties). The top five
-      qualify unless an award sets its own cutoff (the awards_threshold setting). For the attendance and
-      party-unity pairs, which rank one number over one field, each end's cutoff is at most half the field
-      (ties at the cutoff can add more), and an official tied into both lists is left out of both, so nobody
-      holds both ends of a pair in one period. An office needs at least five qualifying officials in a period,
-      so single-seat offices like governor have no awards. An official who qualified for the same award in
-      consecutive years gets a marker such as X3 (3 qualifying years in a row; for the federal money share, 3
-      qualifying cycles in a row). Years the official wasn't ranked for that award (in another office, not
-      eligible for the measure, or too few officials to rank) are skipped: they neither add to nor break the
-      run, so the years in a run can span more calendar years than the number shown. A year ranked outside the
-      cutoff breaks it. Lifetime rankings have no marker.
+      Each award ranks one measured number, among officials holding the same office, and, except for bills
+      passed, comes with its opposite (lowest and highest attendance, and so on). Ranks use the unrounded
+      figure, so two officials shown at the same rounded percentage can hold different ranks; only exact ties
+      share a rank (this holds for every award, including the lowest share of money from PACs, committees and
+      parties). The top five qualify unless an award sets its own cutoff (the awards_threshold setting). For
+      the attendance and party-unity pairs, which rank one number over one field, each end's cutoff is at most
+      half the field (ties at the cutoff can add more), and an official tied into both lists is left out of
+      both, so nobody holds both ends of a pair in one period. An office needs at least five qualifying
+      officials in a period, so single-seat offices like governor have no awards. An official who qualified
+      for the same award in consecutive years gets a marker such as X3 (3 qualifying years in a row; for the
+      federal money share, 3 qualifying cycles in a row). Years the official wasn't ranked for that award (in
+      another office, not eligible for the measure, or too few officials to rank) are skipped: they neither
+      add to nor break the run, so the years in a run can span more calendar years than the number shown. A
+      year ranked outside the cutoff breaks it. Lifetime rankings have no marker.
     </p>
     <ul>
       <li>
@@ -273,13 +381,21 @@ const tables = freshness();
         the party. The lifetime figure is the same number the profile page shows; yearly figures appear with
         the award only.
       </li>
+      <li>
+        <strong>Bills passed</strong>: the share of House bills (HB) and House joint resolutions (HJR) the
+        member sponsored as primary sponsor, in sessions that have ended, that the House passed, out of those
+        whose outcome is known (pending bills are not counted). A year adds its regular and special sessions;
+        lifetime adds the counts. Needs at least 10 decided bills (the awards_min_bills_decided setting;
+        provisional, see issue 773) and at least one bill passed. There is no lowest-share list, because most
+        members pass none.
+      </li>
     </ul>
   </section>
 
   <section class="card" id="interest-votes">
     <h2>Interests and votes</h2>
     <p>
-      Where the site shows money or gifts from an interest next to votes on related bills, that is
+      Where the site shows money or gifts from an interest next to votes on related bills, that is{" "}
       <strong>co-occurrence, not causation</strong>. A donation alongside a vote doesn't show the vote was
       bought, and officials often get money from groups that already agree with them.
     </p>
@@ -291,6 +407,13 @@ const tables = freshness();
       names don't say what they do, and many large PACs (leadership or pass-through PACs) belong to no single
       industry. <a href={href("/pacs/")}>How PACs move money</a> explains how money can pass through PACs and
       nonprofits before it reaches a candidate.
+    </p>
+    <p>
+      The example list shows one vote per bill, newest bills first. When a bill had several roll calls on its
+      latest day, the one shown is picked in this order: final passage, then any other question, then an
+      amendment; otherwise the day's last roll call. A motion to reconsider is never taken as passage. Senate
+      Rule 91 recusals (a senator on the floor excusing themselves from a vote) are always listed (one per
+      bill), even past the newest bills, because they are the votes most likely to matter here.
     </p>
   </section>
 
@@ -314,6 +437,50 @@ const tables = freshness();
       name is missed, and the amount shown is everything those donors gave the official, not money tied to one
       site. A company giving to the official for the area it operates in is{" "}
       <strong>co-occurrence, not influence</strong>.
+    </p>
+  </section>
+
+  <section class="card" id="statutes">
+    <h2>Missouri statutes</h2>
+    <p>
+      The <a href={href("/statutes/")}>statute pages</a> show the Revised Statutes of Missouri as the Revisor
+      of Statutes publishes them on revisor.mo.gov, by title, chapter and section. A section's text is the
+      Revisor's word for word: we keep its paragraphs, line breaks and tables and add no summary or rewording.
+      Chapters list their sections in the Revisor's order, and also list the repealed and transferred sections
+      the Revisor's own chapter pages hide by default.
+    </p>
+    <p>
+      How current it is: each page says when our pipeline last published the data. The Revisor's page behind
+      it may have been fetched up to 180 days before that, and the Revisor may have changed it since, so check
+      its page (linked on every section) for the law as it stands today.
+    </p>
+    <p>What each status means:</p>
+    <ul>
+      <li>
+        <strong>In force</strong>: the version the Revisor prints as current law.
+      </li>
+      <li>
+        <strong>In force (earlier version)</strong>: an older version the Revisor still prints beside the
+        current one, for example while a change applies only to some cases or dates.
+      </li>
+      <li>
+        <strong>Not yet effective</strong>: passed, but takes effect on a later date, which the section shows.
+      </li>
+      <li>
+        <strong>Contingent</strong>: takes effect only when some event happens (a vote, a federal action, a
+        funding condition), not on a set date. The Revisor gives no real date for it.
+      </li>
+      <li>
+        <strong>Historical</strong>: an expired version the Revisor still prints.
+      </li>
+      <li>
+        <strong>Repealed</strong> and <strong>transferred</strong>: the section is no longer law under that
+        number; a transferred section names the number it moved to.
+      </li>
+    </ul>
+    <p>
+      The index and chapter pages count distinct section numbers: "12 of 30 sections in force" means 30
+      section numbers in the chapter, 12 of them with a version in force.
     </p>
   </section>
 

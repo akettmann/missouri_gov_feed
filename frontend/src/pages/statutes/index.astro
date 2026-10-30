@@ -1,0 +1,142 @@
+---
+// Table of contents of the RSMo (#841): the Revisor's titles, each with its chapters and how many of their
+// sections are in force. Plain links all the way down: /statutes/ -> chapter -> section, no JavaScript.
+import Layout from "../../layouts/Layout.astro";
+import SourceLink from "../../components/SourceLink.astro";
+import { hasStatuteIndexExports, statuteChapters, type StatuteChapterRow } from "../../lib/exports/statutes";
+import {
+  asOfText,
+  chapterCountsText,
+  romanValue,
+  statuteChapterPath,
+  titleAnchor,
+} from "../../lib/statuteText";
+import { plural } from "../../lib/format";
+import { href } from "../../lib/site";
+
+const loaded = hasStatuteIndexExports();
+const chapters = loaded ? await statuteChapters() : [];
+
+interface TitleGroup {
+  numeral: string | null;
+  name: string | null;
+  chapters: StatuteChapterRow[];
+}
+// Titles in numeral order; chapters keep statuteChapters' order. Chapters the Revisor no longer lists in its table
+// of contents (no title, no name; 63 in October 2026, none with a section in force) go last, in one group.
+const byTitle = new Map<string | null, TitleGroup>();
+for (const c of chapters) {
+  const g = byTitle.get(c.title_numeral) ?? { numeral: c.title_numeral, name: c.title_name, chapters: [] };
+  g.chapters.push(c);
+  byTitle.set(c.title_numeral, g);
+}
+const titles = [...byTitle.values()].toSorted((a, b) =>
+  a.numeral === null
+    ? 1
+    : b.numeral === null
+      ? -1
+      : romanValue(a.numeral) - romanValue(b.numeral) || a.numeral.localeCompare(b.numeral),
+);
+const titledCount = titles.filter((t) => t.numeral !== null).length;
+const sectionCount = chapters.reduce((n, c) => n + c.sections, 0);
+const oldestLoad =
+  chapters
+    .map((c) => c.loaded_at)
+    .filter((d): d is string => d !== null)
+    .toSorted()[0] ?? null;
+const titleLabel = (t: TitleGroup) => (t.numeral ? `Title ${t.numeral}` : "Chapters no longer listed");
+---
+
+<Layout
+  title="Missouri statutes"
+  description="Table of contents of the Revised Statutes of Missouri: every title and chapter, with links to each section's text."
+>
+  <h1>Missouri statutes</h1>
+  {!loaded ? (
+    <p class="notice">
+      Statute text is not loaded yet. Build the data (<code>uv run mogov build</code>), export it (
+      <code>uv run mogov export --format parquet</code>) and rebuild the site.
+    </p>
+  ) : (
+    <>
+      <p class="lede">
+        The Revised Statutes of Missouri (RSMo), as the Revisor of Statutes publishes them:{" "}
+        {plural(titledCount, "title", "titles")}, {plural(chapters.length, "chapter", "chapters")} and{" "}
+        {plural(sectionCount, "section number", "section numbers")}, including repealed and transferred ones.
+        Pick a chapter to see its sections; each section page has the law's text word for word. See the{" "}
+        <a href={href("/methodology/#statutes")}>methodology</a> for what the statuses mean.
+      </p>
+      <p class="small muted">
+        Source: <SourceLink url="https://revisor.mo.gov/main/Home.aspx" label="revisor.mo.gov" />
+        <br />
+        As of: {asOfText(oldestLoad)}
+      </p>
+
+      <nav aria-labelledby="statute-toc">
+        <h2 id="statute-toc">Titles</h2>
+        <ol class="statute-toc">
+          {titles.map((t) => (
+            <li>
+              <a href={`#${titleAnchor(t.numeral)}`}>
+                {titleLabel(t)}
+                {t.name && <span class="muted"> · {t.name}</span>}
+              </a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+
+      {titles.map((t) => (
+        <section class="statute-title" aria-labelledby={titleAnchor(t.numeral)}>
+          <h2 id={titleAnchor(t.numeral)}>
+            {titleLabel(t)}
+            {t.name && <span class="muted"> · {t.name}</span>}
+          </h2>
+          {t.numeral === null && (
+            <p class="small">
+              The Revisor's table of contents no longer lists these chapters, but it still has pages for their
+              repealed or transferred sections.
+            </p>
+          )}
+          <ul class="statute-chapters">
+            {t.chapters.map((c) => (
+              <li>
+                <a href={href(statuteChapterPath(c.chapter))}>
+                  Chapter {c.chapter}
+                  {c.chapter_name && ` · ${c.chapter_name}`}
+                </a>{" "}
+                <span class="muted small">{chapterCountsText(c)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </>
+  )}
+</Layout>
+
+<style>
+  .statute-toc {
+    columns: 2 22rem;
+    column-gap: 2rem;
+    padding-left: 0;
+    list-style: none;
+  }
+  .statute-toc li {
+    break-inside: avoid;
+    margin-bottom: 0.3rem;
+  }
+  .statute-title {
+    margin: 2rem 0;
+    padding-top: 1rem;
+    border-top: 1px solid var(--hairline);
+  }
+  .statute-chapters {
+    padding-left: 0;
+    list-style: none;
+  }
+  .statute-chapters li {
+    margin-bottom: 0.35rem;
+    overflow-wrap: anywhere;
+  }
+</style>

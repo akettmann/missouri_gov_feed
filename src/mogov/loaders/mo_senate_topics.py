@@ -8,51 +8,62 @@ have no index (the page comes back empty). Each card lands as-is: keyword, bill 
 sponsors.
 """
 
-import html
-import re
 from datetime import date
+
+from lxml import etree, html
 
 from mogov import db, obs
 from mogov.config import window_years
 from mogov.http import fetch
 from mogov.loaders import loader
+from mogov.loaders.mo_senate_bills import senate_interval
 
 log = obs.get_logger(__name__)
 
 BASE = "https://www.senate.mo.gov"
 TABLE = "mo_senate_bill_topics"
 
-KEYWORD = re.compile(r'<span class="heading--label">(.*?)</span>', re.S)
-CARD = re.compile(
-    r'<a href="([^"]+)" class="bill-number-color">\s*(.*?)\s*</a>.*?<p[^>]*>(.*?)</p>(.*?)(?=<div class="card card|$)',
-    re.S,
-)
-SPONSOR = re.compile(r'<a href="([^"]+)" class="sponsor-item"[^>]*>\s*(.*?)\s*</a>', re.S)
+
+def _has_class(name: str) -> str:
+    """XPath test for one whole token of the class attribute (so "card" does not match "card__header")."""
+    return f"contains(concat(' ', normalize-space(@class), ' '), ' {name} ')"
 
 
-def _text(fragment: str) -> str:
-    return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", "", fragment))).strip()
+# a keyword heading or a bill link, in document order: the headings partition the bill cards into sections
+MARKS = etree.XPath(f"//span[{_has_class('heading--label')}] | //a[{_has_class('bill-number-color')}]")
+CARD_OF = etree.XPath(f"ancestor::div[{_has_class('card')}][1]")
+PARAGRAPHS = etree.XPath(".//p")
+SPONSORS = etree.XPath(f".//a[{_has_class('sponsor-item')}]")
+
+
+def _text(el: html.HtmlElement) -> str:
+    return " ".join(el.text_content().split())
 
 
 def parse_index(page: str) -> list[dict]:
     """A topical index page -> [{keyword, bill_label, bill_url, description, sponsors: [{name, url}]}]."""
     rows = []
-    marks = list(KEYWORD.finditer(page))
-    for i, m in enumerate(marks):
-        section = page[m.end() : marks[i + 1].start() if i + 1 < len(marks) else len(page)]
-        for url, label, description, rest in CARD.findall(section):
-            rows.append(
-                {
-                    "keyword": _text(m.group(1)),
-                    "bill_label": _text(label),
-                    "bill_url": html.unescape(url),
-                    "description": _text(description),
-                    "sponsors": [
-                        {"name": _text(name).removeprefix("Sponsor:").strip(), "url": html.unescape(href)}
-                        for href, name in SPONSOR.findall(rest)
-                    ],
-                }
-            )
+    keyword = None
+    for el in MARKS(html.document_fromstring(page)):
+        if el.tag == "span":
+            keyword = _text(el)
+            continue
+        if keyword is None:  # a bill link above the first heading belongs to no keyword
+            continue
+        cards = CARD_OF(el)
+        card = cards[0] if cards else el
+        paragraphs = PARAGRAPHS(card)
+        rows.append(
+            {
+                "keyword": keyword,
+                "bill_label": _text(el),
+                "bill_url": el.get("href"),
+                "description": _text(paragraphs[0]) if paragraphs else "",
+                "sponsors": [
+                    {"name": _text(a).removeprefix("Sponsor:").strip(), "url": a.get("href")} for a in SPONSORS(card)
+                ],
+            }
+        )
     return rows
 
 
@@ -66,7 +77,9 @@ def load(shard: db.Shard) -> dict[str, int]:
             url = f"{BASE}/BillTracking/bills/keywords"
             # the open session's index changes daily; a past one only with late corrections
             max_age = 86400 if year >= date.today().year else 30 * 86400
-            page = fetch(url, {"year": year, "session": "R"}, max_age=max_age, delay=0.5).decode("utf-8", "replace")
+            page = fetch(url, {"year": year, "session": "R"}, max_age=max_age, min_interval=senate_interval()).decode(
+                "utf-8", "replace"
+            )
             rows = parse_index(page)
             if not rows:
                 log.warning("mo_senate_topics.empty_index", year=year)

@@ -7,11 +7,14 @@ import type { OfficialBundle } from "../lib/exports/types";
 import { voteCastLabel } from "../lib/attendance";
 import { count, money } from "../lib/format";
 import { href } from "../lib/site";
+import { stageLabel } from "../lib/voteStage";
+import { mixedChamberNote, mostRecentBillsLabel, recusedCell, voteLinkLabel } from "../lib/overlapLabels";
 
 interface Props {
   bundle: OfficialBundle;
 }
 const { overlap } = Astro.props.bundle;
+const chamberNote = overlap === null ? null : mixedChamberNote(overlap);
 const industryLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).replaceAll("_", " ");
 ---
 
@@ -45,7 +48,8 @@ const industryLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).repl
             <th class="num">Roll calls</th>
             <th class="num">Yea</th>
             <th class="num">Nay</th>
-            <th>Recent votes</th>
+            <th class="num">Recused (roll calls)</th>
+            <th>Recent bills voted on</th>
           </tr>
         </thead>
         <tbody>
@@ -66,16 +70,25 @@ const industryLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).repl
               <td class="num">{count(o.roll_calls)}</td>
               <td class="num">{count(o.yea)}</td>
               <td class="num">{count(o.nay)}</td>
+              <td class="num">{recusedCell(o.recused, o.senate_roll_calls, o.roll_calls)}</td>
               <td>
                 <details>
-                  <summary class="small">{o.examples.length} most recent</summary>
+                  <summary class="small">
+                    {mostRecentBillsLabel(
+                      o.examples.filter((e) => e.recent).length,
+                      o.examples.filter((e) => !e.recent).length,
+                    )}
+                  </summary>
                   <ul class="ex small">
                     {o.examples.map((e) => (
                       <li>
                         {e.vote_date} · <SourceLink url={e.bill_source_url} label={e.bill} />
                         {e.short_title && <span class="muted"> {e.short_title}</span>} · voted{" "}
                         {voteCastLabel(e.vote_cast)} ·{" "}
-                        <SourceLink url={e.vote_source_url} label="roll call" />
+                        {stageLabel(e.chamber, e.vote_stage, e.vote_informal) && (
+                          <>{stageLabel(e.chamber, e.vote_stage, e.vote_informal)} · </>
+                        )}
+                        <SourceLink url={e.vote_source_url} label={voteLinkLabel(e.vote_source_url)} />
                       </li>
                     ))}
                   </ul>
@@ -86,6 +99,16 @@ const industryLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).repl
         </tbody>
       </table>
     </div>
+  )}
+  {overlap !== null && overlap.length > 0 && (
+    <p class="muted small">
+      "Roll calls" counts every recorded vote on these bills, including absences and non-votes, so Yea, Nay
+      and Recused may not add up to it. "Recused" is a Missouri Senate Rule 91 recusal: the legislator was on
+      the floor and excused themselves from the vote. Only the Senate records recusals (the House source does
+      not), so a dash means not recorded, not never.{chamberNote !== null && ` ${chamberNote}`} Recused counts
+      roll calls; the list shows one vote per bill (the latest), so a bill recused on at several roll calls
+      appears once. Every bill with a recusal is listed, even past the most recent bills.
+    </p>
   )}
 </section>
 

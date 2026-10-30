@@ -31,6 +31,7 @@ entity fct_votes {
   --
   chamber, session_code, vote_date
   measure, vote_description
+  vote_stage, vote_informal
   vote_cast, party_at_vote, source_url
 }
 
@@ -39,6 +40,35 @@ entity fct_federal_votes {
   --
   vote_date, bill_number, vote_question
   vote_result, vote_cast, source_url
+}
+
+entity fct_federal_vote_bills {
+  congress, chamber, rollnumber, bill_id
+  --
+  session, clerk_rollnumber, vote_date
+  bill_type, bill_title, legislation_url
+  voteview_bill_number, vote_question
+  vote_result, source_url
+}
+
+entity fct_federal_vote_amendments {
+  congress, chamber, rollnumber, amendment_id
+  --
+  session, clerk_rollnumber, vote_date
+  amendment_type, amendment_number
+  amendment_purpose, amendment_description
+  bill_id, bill_type, bill_no, bill_title
+  vote_question, vote_result, source_url
+}
+
+entity fct_federal_sponsorship {
+  bioguide_id, bill_id, role
+  --
+  official_id (current members)
+  congress, bill_type, bill_number
+  title, policy_area, introduced_date
+  law_type, law_number, became_law
+  source_url
 }
 
 entity fct_campaign_finance {
@@ -132,6 +162,9 @@ dim_official ||--|| official_profile
 dim_official ||--o{ fct_votes
 fct_federal_votes }o--|| dim_official
 fct_federal_votes ..> fct_votes : federal rows\nunioned in
+fct_federal_sponsorship }o--o| dim_official
+fct_federal_vote_bills }o..o{ fct_federal_votes : same roll call
+fct_federal_vote_amendments }o..o{ fct_federal_votes : same roll call
 dim_official ||--o{ fct_campaign_finance
 dim_official ||--o{ fct_federal_donor_summary
 dim_official ||--o{ fct_lobbyist_gifts

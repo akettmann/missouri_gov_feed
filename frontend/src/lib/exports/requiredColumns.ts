@@ -7,7 +7,48 @@
 // Tables not listed here still get a clear message: query() turns a binder error naming a column an
 // export lacks into the same stale-export error. Listing a column here only adds the up-front, all-at-once report.
 export const REQUIRED_COLUMNS: Record<string, readonly string[]> = {
+  fct_statute_sections: [
+    "section_id",
+    "bid",
+    "section_version_id",
+    "chapter",
+    "chapter_name",
+    "title_numeral",
+    "title_name",
+    "heading",
+    "status",
+    "is_current",
+    "effective_date",
+    "held_unconstitutional",
+    "ended_date",
+    "transferred_to",
+    "history_note",
+    "section_text",
+    "repeal_pending",
+    "source_url",
+    "loaded_at",
+  ],
+  fct_statute_section_footnotes: [
+    "section_version_id",
+    "footnote_number",
+    "section_id",
+    "footnote_text",
+    "is_history_note",
+    "source_url",
+    "loaded_at",
+  ],
+  rpt_statute_chapters: [
+    "chapter",
+    "chapter_name",
+    "title_numeral",
+    "title_name",
+    "sections",
+    "sections_in_force",
+    "loaded_at",
+  ],
+  fct_votes: ["vote_stage", "vote_informal"],
   rpt_attendance: ["recused_from_voting"],
+  rpt_interest_vote_overlap: ["vote_description"],
   rpt_attendance_pay: ["pay_source_url", "covered_years", "voting_years"],
   fct_committee_posts: [
     "official_id",
@@ -19,6 +60,17 @@ export const REQUIRED_COLUMNS: Record<string, readonly string[]> = {
     "co_chair_posts",
     "ranking_posts",
     "is_current_official",
+    "source_url",
+  ],
+  fct_sponsorship_outcomes: [
+    "official_id",
+    "session_code",
+    "session_year",
+    "is_session_over",
+    "bills_sponsored",
+    "bills_decided",
+    "bills_passed_house",
+    "bills_became_law",
     "source_url",
   ],
   fct_committee_memberships: [
@@ -61,6 +113,9 @@ export const REQUIRED_COLUMNS: Record<string, readonly string[]> = {
  */
 export const REQUIRED_TABLES: Record<string, readonly string[]> = {
   fct_jurisdiction_businesses: ["fct_jurisdiction_business_donors"],
+  fct_statute_sections: ["fct_statute_section_footnotes", "rpt_statute_chapters"],
+  fct_statute_section_footnotes: ["fct_statute_sections"],
+  rpt_statute_chapters: ["fct_statute_sections"],
   fct_jurisdiction_business_donors: ["fct_jurisdiction_businesses"],
 };
 

@@ -6,7 +6,16 @@ mogov:
       path: "{{ env_var('MOGOV_DB', 'data/mogov.duckdb') }}"
       # point-in-polygon for facilities in districts (macros/compat/spatial.sql)
       extensions: [spatial]
-      threads: 4
+      # One thread so the shared memory pool fails the same model on every run
+      threads: 1
+      settings:
+        # DuckDB's own cap (#818). It must sit under `settings:`: dbt-duckdb ignores a top-level `memory_limit:`
+        # key, and DuckDB then defaults to 80% of RAM. MOGOV_DUCKDB_MEMORY is the same knob the loaders read.
+        # 4GB is the smallest default that builds every model (3GB runs out in rpt_votes_by_subject).
+        memory_limit: "{{ env_var('MOGOV_DUCKDB_MEMORY', '4GB') }}"
+        # No spilling to disk: a query that exceeds memory_limit errors instead of silently writing temp files.
+        # (max_temp_directory_size: '0B' does not do this on DuckDB 1.5.6; it still spills.)
+        temp_directory: ''
     # Used only by sqlfluff (see .sqlfluff): compiling models never needs real data, so linting works in a
     # fresh clone/worktree where the gitignored data/ directory doesn't exist.
     lint:

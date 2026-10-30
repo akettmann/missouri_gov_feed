@@ -29,6 +29,7 @@ end fork
 :mo_revisor_chapters;
 :dbt: stg_mo_revisor__chapters / __sections / __repeals
 -> int_mo_revisor__session_law_bills (history notes -> bills)
--> fct_statute_sections, fct_bill_statute_links;
+-> fct_statute_sections, fct_statute_section_footnotes,
+fct_bill_statute_links -> rpt_statute_chapters, rpt_statute_section_bills;
 stop
 @enduml

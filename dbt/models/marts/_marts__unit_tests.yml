@@ -103,7 +103,7 @@ unit_tests:
     description: >
       A committee donor's own MECID is attached from the name crosswalk only for a unique match in the gift's
       year (TAP's year column, or the date's year when it's missing); an ambiguous name, a crosswalk row for
-      another year, and non-committee donors get none (#9).
+      another year, and non-committee donors get none (#9). A name matched to the receiving committee itself is no link either (#833).
     overrides:
       vars:
         mec_direct: false
@@ -111,18 +111,20 @@ unit_tests:
       - input: ref('int_mec__official_committees')
         rows:
           - {official_id: o1, mec_committee_id: C000100, committee_name: Friends of Jane Doe, confidence: high}
-      - input: ref('stg_tap_mec__contributions')
+      - input: ref('int_tap_mec__contributions')
         rows:
           - {mec_committee_id: C000100, contributor_name: Missouri Chamber PAC, contributor_type: Committee, contributor_committee_name: Missouri Chamber PAC, amount: 500, contribution_date: '2020-03-01', contribution_year: 2020}
           - {mec_committee_id: C000100, contributor_name: Missouri Chamber PAC, contributor_type: Committee, contributor_committee_name: Missouri Chamber PAC, amount: 250, contribution_date: '2021-03-01', contribution_year: null}
           - {mec_committee_id: C000100, contributor_name: Missouri Chamber PAC, contributor_type: Committee, contributor_committee_name: Missouri Chamber PAC, amount: 100, contribution_date: '2019-03-01', contribution_year: 2019}
           - {mec_committee_id: C000100, contributor_name: Twin PAC, contributor_type: Committee, contributor_committee_name: Twin PAC, amount: 200, contribution_date: '2020-03-01', contribution_year: 2020}
+          - {mec_committee_id: C000100, contributor_name: Friends of Jane Doe, contributor_type: Committee, contributor_committee_name: Friends of Jane Doe, amount: 25, contribution_date: '2020-03-01', contribution_year: 2020}
           - {mec_committee_id: C000100, contributor_name: Ann Doe, contributor_type: Individual, contributor_committee_name: null, amount: 50, contribution_date: '2020-03-01', contribution_year: 2020}
       - input: ref('int_mec__donor_committees')
         rows:
           - {donor_committee_name: Missouri Chamber PAC, contribution_year: 2020, mec_committee_id: C000001, match_status: matched, match_confidence: high}
           - {donor_committee_name: Missouri Chamber PAC, contribution_year: 2021, mec_committee_id: C000001, match_status: matched, match_confidence: medium}
           - {donor_committee_name: Twin PAC, contribution_year: 2020, mec_committee_id: null, match_status: ambiguous, match_confidence: null}
+          - {donor_committee_name: Friends of Jane Doe, contribution_year: 2020, mec_committee_id: C000100, match_status: matched, match_confidence: high}
       - input: ref('stg_tap_mec__expenditures')
         rows:
           - {record_id: E1, mec_committee_id: C999999, purpose: contribution, amount: 1}  # committee not attributed to an official
@@ -144,6 +146,7 @@ unit_tests:
         - {counterparty: Missouri Chamber PAC, amount: 250, counterparty_mec_committee_id: C000001, counterparty_link_confidence: medium}
         - {counterparty: Missouri Chamber PAC, amount: 100, counterparty_mec_committee_id: null, counterparty_link_confidence: null}
         - {counterparty: Twin PAC, amount: 200, counterparty_mec_committee_id: null, counterparty_link_confidence: null}
+        - {counterparty: Friends of Jane Doe, amount: 25, counterparty_mec_committee_id: null, counterparty_link_confidence: null}
         - {counterparty: Ann Doe, amount: 50, counterparty_mec_committee_id: null, counterparty_link_confidence: null}
 
   - name: campaign_finance_fec_received_links_donor_disbursements
@@ -158,7 +161,7 @@ unit_tests:
     given:
       - input: ref('int_mec__official_committees')
         rows: []
-      - input: ref('stg_tap_mec__contributions')
+      - input: ref('int_tap_mec__contributions')
         rows: []
       - input: ref('int_mec__donor_committees')
         rows: []
@@ -199,7 +202,7 @@ unit_tests:
       - input: ref('int_mec__official_committees')
         rows:
           - {official_id: o1, mec_committee_id: C000100, committee_name: Friends of Jane Doe, confidence: high}
-      - input: ref('stg_tap_mec__contributions')
+      - input: ref('int_tap_mec__contributions')
         rows:
           - {record_id: '777', mec_committee_id: C000100, contributor_name: Ann Doe, contributor_type: Individual, contributor_committee_name: null, amount: 50, contribution_date: '2020-03-01', contribution_year: 2020}
       - input: ref('int_mec__donor_committees')
@@ -238,7 +241,21 @@ unit_tests:
       date: a lower amendment number filed later does not supersede a higher one. The base must have been filed
       on or before the amendment (a candidate report amended before the annual report was filed is not
       re-pointed at the annual report), and in the same filing year (a later year's candidate report filed
-      before the amendment is not its base).
+      before the amendment is not its base). Several House amendments of one report are numbered by filing date
+      (1, 2, ...), and the latest wins; same-day amendments are ordered by numeric doc id, not url string order,
+      where 100 sorts before 20, and a url ending .PDF sorts the same way (#463). A termination report is a base
+      too: an amendment filed after an annual and a termination report amends the termination report and leaves
+      the annual report latest. The amendment's "Period Covered" line (int_house_fd__period_covered) picks the
+      candidate report covering the same last day over a later candidate report, and an amendment with a period
+      is taken for an amendment of an annual report only as a last resort, when no candidate or termination report
+      is on file (#463). Index type H is a New Filer Report (its PDF header says so), a separate report from the
+      annual report (O) of the same year, and a base like a candidate report: an amendment filed after a candidate
+      report and a later H amends the H, leaves the candidate report latest, and supersedes the H rather than
+      leaving it latest beside it (#560). An amendment with a Period Covered line still prefers an earlier
+      candidate report over a later H (the H is a last-resort base). An H and an O of one year are both latest
+      (Carey: H then O), a lone H stays latest, and an O, A, H, A chain (Miller) has the first A supersede the O
+      and the second A supersede the H, leaving one latest per report. An amendment whose period matches no
+      base still amends the only base on file, an H (#560; whether H and O should both be latest is #572).
     given:
       - input: ref('dim_official')
         rows:
@@ -250,6 +267,17 @@ unit_tests:
           - {official_id: h6, office: us_house, district: 6, family_name: Black}
           - {official_id: h7, office: us_house, district: 7, family_name: Red}
           - {official_id: h8, office: us_house, district: 8, family_name: Gray}
+          - {official_id: h9, office: us_house, district: 9, family_name: Blue}
+          - {official_id: h10, office: us_house, district: 10, family_name: Teal}
+          - {official_id: h11, office: us_house, district: 11, family_name: Pink}
+          - {official_id: h12, office: us_house, district: 12, family_name: Gold}
+          - {official_id: h13, office: us_house, district: 13, family_name: Cyan}
+          - {official_id: h14, office: us_house, district: 14, family_name: Violet}
+          - {official_id: h15, office: us_house, district: 15, family_name: Amber}
+          - {official_id: h16, office: us_house, district: 16, family_name: Carey}
+          - {official_id: h17, office: us_house, district: 17, family_name: Lone}
+          - {official_id: h18, office: us_house, district: 18, family_name: Miller}
+          - {official_id: h19, office: us_house, district: 19, family_name: Zed}
       - input: ref('stg_senate_efd__items')
         rows:
           - {last_name: Smith, filing_title: Annual Report for CY 2022, submitted_date: '2023-05-15', row_key: a0, document_url: u_a0}
@@ -283,6 +311,49 @@ unit_tests:
           - {doc_id: n1, filing_year: 2023, filing_kind: candidate report, filing_date: '2023-10-01', state_district: MO08, last_name: Gray, document_url: u_n1}
           - {doc_id: n2, filing_year: 2024, filing_kind: candidate report, filing_date: '2024-06-20', state_district: MO08, last_name: Gray, document_url: u_n2}
           - {doc_id: n3, filing_year: 2023, filing_kind: amended report, filing_date: '2024-06-20', state_district: MO08, last_name: Gray, document_url: u_n3}
+          - {doc_id: '9001', filing_year: 2023, filing_kind: annual report, filing_date: '2024-05-01', state_district: MO09, last_name: Blue, document_url: 'https://x/9001.pdf'}
+          - {doc_id: '100', filing_year: 2023, filing_kind: amended report, filing_date: '2024-06-01', state_district: MO09, last_name: Blue, document_url: 'https://x/100.pdf'}
+          - {doc_id: '20', filing_year: 2023, filing_kind: amended report, filing_date: '2024-06-01', state_district: MO09, last_name: Blue, document_url: 'https://x/20.pdf'}
+          - {doc_id: '30', filing_year: 2023, filing_kind: amended report, filing_date: '2024-05-15', state_district: MO09, last_name: Blue, document_url: 'https://x/30.pdf'}
+          - {doc_id: p1, filing_year: 2023, filing_kind: annual report, filing_date: '2024-05-01', state_district: MO10, last_name: Teal, document_url: u_p1}
+          - {doc_id: p2, filing_year: 2023, filing_kind: termination report, filing_date: '2024-06-01', state_district: MO10, last_name: Teal, document_url: u_p2}
+          - {doc_id: p3, filing_year: 2023, filing_kind: amended report, filing_date: '2024-07-01', state_district: MO10, last_name: Teal, document_url: u_p3}
+          - {doc_id: q1, filing_year: 2023, filing_kind: candidate report, filing_date: '2023-03-01', state_district: MO11, last_name: Pink, document_url: u_q1}
+          - {doc_id: q2, filing_year: 2023, filing_kind: candidate report, filing_date: '2023-11-01', state_district: MO11, last_name: Pink, document_url: u_q2}
+          - {doc_id: q3, filing_year: 2023, filing_kind: amended report, filing_date: '2024-02-01', state_district: MO11, last_name: Pink, document_url: u_q3}
+          - {doc_id: r1, filing_year: 2023, filing_kind: candidate report, filing_date: '2023-03-01', state_district: MO12, last_name: Gold, document_url: u_r1}
+          - {doc_id: r2, filing_year: 2023, filing_kind: annual report, filing_date: '2024-05-01', state_district: MO12, last_name: Gold, document_url: u_r2}
+          - {doc_id: r4, filing_year: 2023, filing_kind: amended report, filing_date: '2024-08-01', state_district: MO12, last_name: Gold, document_url: u_r4}
+          - {doc_id: '9002', filing_year: 2023, filing_kind: annual report, filing_date: '2024-05-01', state_district: MO13, last_name: Cyan, document_url: 'https://x/9002.PDF'}
+          - {doc_id: '1000', filing_year: 2023, filing_kind: amended report, filing_date: '2024-06-01', state_district: MO13, last_name: Cyan, document_url: 'https://x/1000.PDF'}
+          - {doc_id: '300', filing_year: 2023, filing_kind: amended report, filing_date: '2024-06-01', state_district: MO13, last_name: Cyan, document_url: 'https://x/300.PDF'}
+          - {doc_id: v1, filing_year: 2023, filing_kind: candidate report, filing_type: C, filing_date: '2023-03-01', state_district: MO14, last_name: Violet, document_url: u_v1}
+          - {doc_id: v2, filing_year: 2023, filing_kind: new filer report, filing_type: H, filing_date: '2024-05-01', state_district: MO14, last_name: Violet, document_url: u_v2}
+          - {doc_id: v3, filing_year: 2023, filing_kind: amended report, filing_type: A, filing_date: '2024-07-01', state_district: MO14, last_name: Violet, document_url: u_v3}
+          - {doc_id: w1, filing_year: 2023, filing_kind: candidate report, filing_type: C, filing_date: '2023-03-01', state_district: MO15, last_name: Amber, document_url: u_w1}
+          - {doc_id: w2, filing_year: 2023, filing_kind: new filer report, filing_type: H, filing_date: '2024-05-01', state_district: MO15, last_name: Amber, document_url: u_w2}
+          - {doc_id: w3, filing_year: 2023, filing_kind: amended report, filing_type: A, filing_date: '2024-07-01', state_district: MO15, last_name: Amber, document_url: u_w3}
+          - {doc_id: x1, filing_year: 2023, filing_kind: new filer report, filing_type: H, filing_date: '2024-03-01', state_district: MO16, last_name: Carey, document_url: u_x1}
+          - {doc_id: x2, filing_year: 2023, filing_kind: annual report, filing_type: O, filing_date: '2024-05-01', state_district: MO16, last_name: Carey, document_url: u_x2}
+          - {doc_id: l1, filing_year: 2023, filing_kind: new filer report, filing_type: H, filing_date: '2024-03-01', state_district: MO17, last_name: Lone, document_url: u_l1}
+          - {doc_id: y1, filing_year: 2023, filing_kind: annual report, filing_type: O, filing_date: '2024-01-10', state_district: MO18, last_name: Miller, document_url: u_y1}
+          - {doc_id: y2, filing_year: 2023, filing_kind: amended report, filing_type: A, filing_date: '2024-02-01', state_district: MO18, last_name: Miller, document_url: u_y2}
+          - {doc_id: y3, filing_year: 2023, filing_kind: new filer report, filing_type: H, filing_date: '2024-03-01', state_district: MO18, last_name: Miller, document_url: u_y3}
+          - {doc_id: y4, filing_year: 2023, filing_kind: amended report, filing_type: A, filing_date: '2024-04-01', state_district: MO18, last_name: Miller, document_url: u_y4}
+          - {doc_id: z1, filing_year: 2023, filing_kind: new filer report, filing_type: H, filing_date: '2024-03-01', state_district: MO19, last_name: Zed, document_url: u_z1}
+          - {doc_id: z2, filing_year: 2023, filing_kind: amended report, filing_type: A, filing_date: '2024-05-01', state_district: MO19, last_name: Zed, document_url: u_z2}
+      - input: ref('stg_house_fd__pdf_lines')
+        rows: []
+      - input: ref('int_house_fd__period_covered')
+        rows:
+          - {doc_id: q1, period_start: '2023-01-01', period_end: '2023-02-28'}
+          - {doc_id: q2, period_start: '2023-03-01', period_end: '2023-10-30'}
+          - {doc_id: q3, period_start: '2023-01-01', period_end: '2023-02-28'}
+          - {doc_id: r1, period_start: '2023-01-01', period_end: '2023-02-28'}
+          - {doc_id: r4, period_start: '2023-01-01', period_end: '2023-06-30'}
+          - {doc_id: w1, period_start: '2023-01-01', period_end: '2023-02-28'}
+          - {doc_id: w3, period_start: '2023-01-01', period_end: '2023-06-30'}
+          - {doc_id: z2, period_start: '2023-01-01', period_end: '2023-04-30'}
       - input: ref('int_house_fd__schedule_lines')
         rows:
           - {doc_id: d1, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
@@ -304,6 +375,31 @@ unit_tests:
           - {doc_id: n1, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
           - {doc_id: n2, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
           - {doc_id: n3, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: '9001', page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: '100', page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: '20', page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: '30', page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: p1, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: p2, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: p3, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: q1, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: q2, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: q3, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: r1, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: r2, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: r4, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: '9002', page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: '1000', page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: '300', page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: v1, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: v3, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: w1, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: w3, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: x2, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: y1, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: y2, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: y4, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
+          - {doc_id: z2, page: 1, line_no: 1, schedule: 'A: assets', line_text: asset}
       - input: ref('int_judges__federal')
         rows:
           - {official_id: j1, fjc_nid: 7}
@@ -346,6 +442,37 @@ unit_tests:
         - {disclosure_item_id: 'house:n2:1:1', report_version: 0, is_latest_version: true}
         - {disclosure_item_id: 'house:n3:1:1', report_version: 1, is_latest_version: true}
         - {disclosure_item_id: 'house:e2', report_version: 1, is_latest_version: false}
+        - {disclosure_item_id: 'house:9001:1:1', report_version: 0, is_latest_version: false}
+        - {disclosure_item_id: 'house:30:1:1', report_version: 1, is_latest_version: false}
+        - {disclosure_item_id: 'house:20:1:1', report_version: 2, is_latest_version: false}
+        - {disclosure_item_id: 'house:100:1:1', report_version: 3, is_latest_version: true}
+        - {disclosure_item_id: 'house:p1:1:1', report_version: 0, is_latest_version: true}
+        - {disclosure_item_id: 'house:p2:1:1', report_version: 0, is_latest_version: false}
+        - {disclosure_item_id: 'house:p3:1:1', report_version: 1, is_latest_version: true}
+        - {disclosure_item_id: 'house:q1:1:1', report_version: 0, is_latest_version: false}
+        - {disclosure_item_id: 'house:q2:1:1', report_version: 0, is_latest_version: true}
+        - {disclosure_item_id: 'house:q3:1:1', report_version: 1, is_latest_version: true}
+        - {disclosure_item_id: 'house:r1:1:1', report_version: 0, is_latest_version: false}
+        - {disclosure_item_id: 'house:r2:1:1', report_version: 0, is_latest_version: true}
+        - {disclosure_item_id: 'house:r4:1:1', report_version: 1, is_latest_version: true}
+        - {disclosure_item_id: 'house:9002:1:1', report_version: 0, is_latest_version: false}
+        - {disclosure_item_id: 'house:300:1:1', report_version: 1, is_latest_version: false}
+        - {disclosure_item_id: 'house:1000:1:1', report_version: 2, is_latest_version: true}
+        - {disclosure_item_id: 'house:v1:1:1', report_version: 0, is_latest_version: true}
+        - {disclosure_item_id: 'house:v2', report_version: 0, is_latest_version: false}
+        - {disclosure_item_id: 'house:v3:1:1', report_version: 1, is_latest_version: true}
+        - {disclosure_item_id: 'house:w1:1:1', report_version: 0, is_latest_version: false}
+        - {disclosure_item_id: 'house:w2', report_version: 0, is_latest_version: true}
+        - {disclosure_item_id: 'house:w3:1:1', report_version: 1, is_latest_version: true}
+        - {disclosure_item_id: 'house:x1', report_version: 0, is_latest_version: true}
+        - {disclosure_item_id: 'house:x2:1:1', report_version: 0, is_latest_version: true}
+        - {disclosure_item_id: 'house:l1', report_version: 0, is_latest_version: true}
+        - {disclosure_item_id: 'house:y1:1:1', report_version: 0, is_latest_version: false}
+        - {disclosure_item_id: 'house:y2:1:1', report_version: 1, is_latest_version: true}
+        - {disclosure_item_id: 'house:y3', report_version: 0, is_latest_version: false}
+        - {disclosure_item_id: 'house:y4:1:1', report_version: 1, is_latest_version: true}
+        - {disclosure_item_id: 'house:z1', report_version: 0, is_latest_version: false}
+        - {disclosure_item_id: 'house:z2:1:1', report_version: 1, is_latest_version: true}
         - {disclosure_item_id: 'courtlistener:t1', report_version: 0, is_latest_version: false}
         - {disclosure_item_id: 'courtlistener:t2', report_version: 1, is_latest_version: true}
         - {disclosure_item_id: 'courtlistener:t3', report_version: 0, is_latest_version: true}
@@ -457,6 +584,44 @@ unit_tests:
       rows:
         - {official_id: o1, registry_id: F1, donor_key: ameren, donor_name: AMEREN CORPORATION, by_name: 1, amount: 150, n_contributions: 2, first_year: 2020, last_year: 2021, is_medium: 1}
         - {official_id: o1, registry_id: F1, donor_key: acme holdings, donor_name: ACME HOLDINGS INC, by_name: 1, amount: 70, n_contributions: 1, first_year: 2022, last_year: 2022, is_medium: 0}
+
+  - name: jurisdiction_business_donor_matches_match_brand_keywords_in_normalized_names
+    model: int_jurisdiction_business_donor_matches
+    description: >
+      A donor and a facility tie by brand when a company_brands keyword appears as whole words in the normalized
+      (name_key) donor name and in the facility, owner or parent name: at the start of a name, at the end of one,
+      or after punctuation is normalised away ("AT&T" is "at t"). A keyword inside a longer word ("Rebayer",
+      "Bayerische") is a near miss and ties nothing. These ties are marked by_name 0 (#883).
+    given:
+      - input: ref('fct_official_districts')
+        rows:
+          - {official_id: o1, district_id: 'state_house:1', relation: elected from}
+      - input: ref('fct_district_facilities')
+        rows:
+          - {district_id: 'state_house:1', registry_id: F1, is_government: false}
+          - {district_id: 'state_house:1', registry_id: F2, is_government: false}
+          - {district_id: 'state_house:1', registry_id: F3, is_government: false}
+          - {district_id: 'state_house:1', registry_id: F4, is_government: false}
+      - input: ref('int_epa_frs__facilities')
+        rows:
+          - {registry_id: F1, facility_key: k1, owner_key: k1o, parent_company_key: null, facility_name: Bayer Crop Science, owner_name: null, parent_company_name: null}
+          - {registry_id: F2, facility_key: k2, owner_key: k2o, parent_company_key: null, facility_name: Plant Two, owner_name: Holdings of Bayer, parent_company_name: null}
+          - {registry_id: F3, facility_key: k3, owner_key: k3o, parent_company_key: k3p, facility_name: Plant Three, owner_name: null, parent_company_name: Rebayer Corp}
+          - {registry_id: F4, facility_key: k4, owner_key: k4o, parent_company_key: null, facility_name: Plant Four, owner_name: null, parent_company_name: 'AT&T Wireless'}
+      - input: ref('company_brands')
+        rows:
+          - {keyword: bayer, brand: bayer}
+          - {keyword: at t, brand: at_t}
+      - input: ref('fct_campaign_finance')
+        rows:
+          - {official_id: o1, direction: received, counterparty: x, counterparty_organization: 'Bayer, Inc.', counterparty_type: committee, amount: 100, transaction_date: '2020-03-01', match_confidence: high}
+          - {official_id: o1, direction: received, counterparty: x, counterparty_organization: 'AT&T Services', counterparty_type: committee, amount: 40, transaction_date: '2021-03-01', match_confidence: high}
+          - {official_id: o1, direction: received, counterparty: x, counterparty_organization: 'Bayerische Motor Works', counterparty_type: committee, amount: 7, transaction_date: '2021-03-01', match_confidence: high}
+    expect:
+      rows:
+        - {official_id: o1, registry_id: F1, donor_key: bayer, by_name: 0, amount: 100}
+        - {official_id: o1, registry_id: F2, donor_key: bayer, by_name: 0, amount: 100}
+        - {official_id: o1, registry_id: F4, donor_key: at t services, by_name: 0, amount: 40}
 
   - name: jurisdiction_business_donor_matches_hold_no_line_breaks
     model: int_jurisdiction_business_donor_matches
@@ -620,6 +785,8 @@ unit_tests:
         rows: []
       - input: ref('statewide_officials')
         rows: []
+      - input: ref('int_statewide__terms')
+        rows: []
       - input: ref('stg_fjc__appointments')
         rows: []
       - input: ref('int_officials__wikidata')
@@ -698,3 +865,165 @@ unit_tests:
         - {official_id: judge1, role: judge, case_name: Case 4, source_url: 'https://x/4a'}
         - {official_id: judge1, role: judge, case_name: Case 5, source_url: 'https://x/5a'}
         - {official_id: judge1, role: judge, case_name: Case 6, source_url: 'https://x/6a'}
+
+  - name: federal_sponsorship_private_law_is_a_law_with_its_own_type
+    model: fct_federal_sponsorship
+    description: >
+      A Private Law counts as became_law but is labelled by law_type, so it is not read as a Public Law. Public and
+      private laws are numbered separately: bill 119-s-1 carries both Private Law 119-5 and Public Law 119-5, the
+      tie on number going to the Public Law. Dropping law_type from the output or the tie-break fails this test.
+    given:
+      - input: ref('stg_govinfo_billstatus__bills')
+        rows:
+          - {bill_id: 119-s-1, congress: 119, bill_type: s, bill_number: 1, introduced_date: '2025-01-03', title: One, policy_area: null, latest_action_date: '2025-02-01', latest_action_text: x, legislation_url: 'https://c/1'}
+          - {bill_id: 119-s-2, congress: 119, bill_type: s, bill_number: 2, introduced_date: '2025-01-03', title: Two, policy_area: null, latest_action_date: '2025-02-01', latest_action_text: x, legislation_url: 'https://c/2'}
+      - input: ref('stg_govinfo_billstatus__sponsors')
+        rows:
+          - {bill_id: 119-s-1, position: 0, bioguide_id: M1, full_name: 'Sen. M One', party: R, state: MO}
+          - {bill_id: 119-s-2, position: 0, bioguide_id: M1, full_name: 'Sen. M One', party: R, state: MO}
+      - input: ref('stg_govinfo_billstatus__cosponsors')
+        rows:
+          - {bill_id: 119-s-1, position: 0, bioguide_id: M9, full_name: 'Sen. M Nine', party: D, state: MO, is_original_cosponsor: false, sponsorship_withdrawn_date: '2025-03-01'}
+      - input: ref('stg_govinfo_billstatus__laws')
+        rows:
+          - {bill_id: 119-s-1, law_type: Private Law, law_number: 119-5, law_congress: 119, law_sequence: 5}
+          - {bill_id: 119-s-1, law_type: Public Law, law_number: 119-5, law_congress: 119, law_sequence: 5}
+          - {bill_id: 119-s-2, law_type: Private Law, law_number: 119-6, law_congress: 119, law_sequence: 6}
+      - input: ref('int_federal_bills__stage')
+        rows:
+          - {bill_id: 119-s-1, stage: became_law}
+          - {bill_id: 119-s-2, stage: became_law}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: o_m1, bioguide_id: M1}
+    expect:
+      rows:
+        - {bill_id: 119-s-1, role: sponsor, law_type: Public Law, law_number: 119-5, became_law: true}
+        - {bill_id: 119-s-2, role: sponsor, law_type: Private Law, law_number: 119-6, became_law: true}
+
+  - name: federal_sponsorship_ignores_law_credited_to_wrong_bill
+    model: fct_federal_sponsorship
+    description: >
+      GovInfo lists Public Law 119-120 under both 119 H.R. 766 and 119 S. 766 (#729). Only S. 766 has a law action
+      (stage became_law); H.R. 766 stops at introduction. Its sponsor must not be credited with the law: became_law
+      false and no law number, while the S. 766 sponsor keeps both. Reading became_law from the laws list
+      (the old rule) marks H.R. 766 true with law 119-120 and fails this test.
+    given:
+      - input: ref('stg_govinfo_billstatus__bills')
+        rows:
+          - {bill_id: 119-hr-766, congress: 119, bill_type: hr, bill_number: 766, introduced_date: '2025-01-24', title: SEWER, policy_area: null, latest_action_date: '2025-01-24', latest_action_text: Referred, legislation_url: 'https://c/h766'}
+          - {bill_id: 119-s-766, congress: 119, bill_type: s, bill_number: 766, introduced_date: '2025-02-27', title: GENIUS, policy_area: null, latest_action_date: '2025-07-18', latest_action_text: Became Public Law No. 119-120., legislation_url: 'https://c/s766'}
+      - input: ref('stg_govinfo_billstatus__sponsors')
+        rows:
+          - {bill_id: 119-hr-766, position: 0, bioguide_id: M1, full_name: 'Rep. M One', party: R, state: MO}
+          - {bill_id: 119-s-766, position: 0, bioguide_id: M2, full_name: 'Sen. M Two', party: R, state: MO}
+      - input: ref('stg_govinfo_billstatus__cosponsors')
+        rows: []
+      - input: ref('stg_govinfo_billstatus__laws')
+        rows:
+          - {bill_id: 119-hr-766, law_type: Public Law, law_number: 119-120, law_congress: 119, law_sequence: 120}
+          - {bill_id: 119-s-766, law_type: Public Law, law_number: 119-120, law_congress: 119, law_sequence: 120}
+      - input: ref('int_federal_bills__stage')
+        rows:
+          - {bill_id: 119-hr-766, stage: introduced}
+          - {bill_id: 119-s-766, stage: became_law}
+      - input: ref('dim_official')
+        rows: []
+    expect:
+      rows:
+        - {bioguide_id: M1, role: sponsor, bill_id: 119-hr-766, law_type: null, law_number: null, became_law: false}
+        - {bioguide_id: M2, role: sponsor, bill_id: 119-s-766, law_type: Public Law, law_number: 119-120, became_law: true}
+
+  - name: federal_sponsorship_keeps_mo_members_and_flags_laws
+    model: fct_federal_sponsorship
+    description: >
+      Only members whose bill-file state is MO are kept (X1 is a Kansas sponsor). A cosponsor who withdrew is
+      dropped. became_law comes only from the bill's stage (the action codes): bill 119-hr-1 reached became_law and is
+      true for its sponsor and for the cosponsor; 119-hr-2 did not (its latest action text claims a law, which is
+      ignored) so it is false.
+      Reading the outcome from the latest action text, or keeping withdrawn cosponsors, fails this test. A current
+      member is linked to dim_official by bioguide; a past member keeps a null official_id. Bill 119-hr-1 carries
+      two laws, 119-100 listed first: the earlier one by number (119-21) is kept, which a text min() gets wrong.
+    given:
+      - input: ref('stg_govinfo_billstatus__bills')
+        rows:
+          - {bill_id: 119-hr-1, congress: 119, bill_type: hr, bill_number: 1, introduced_date: '2025-01-03', title: One, policy_area: Economics, latest_action_date: '2025-07-04', latest_action_text: Became Public Law No. 119-21., legislation_url: 'https://c/1'}
+          - {bill_id: 119-hr-2, congress: 119, bill_type: hr, bill_number: 2, introduced_date: '2025-01-03', title: Two, policy_area: null, latest_action_date: '2025-02-01', latest_action_text: Became Public Law No. 119-99., legislation_url: 'https://c/2'}
+      - input: ref('stg_govinfo_billstatus__sponsors')
+        rows:
+          - {bill_id: 119-hr-1, position: 0, bioguide_id: M1, full_name: 'Rep. M One', party: R, state: MO}
+          - {bill_id: 119-hr-2, position: 0, bioguide_id: X1, full_name: 'Rep. X One', party: R, state: KS}
+      - input: ref('stg_govinfo_billstatus__cosponsors')
+        rows:
+          - {bill_id: 119-hr-1, position: 0, bioguide_id: M2, full_name: 'Rep. M Two', party: D, state: MO, is_original_cosponsor: true, sponsorship_withdrawn_date: null}
+          - {bill_id: 119-hr-1, position: 1, bioguide_id: M3, full_name: 'Rep. M Three', party: D, state: MO, is_original_cosponsor: false, sponsorship_withdrawn_date: '2025-03-01'}
+          - {bill_id: 119-hr-2, position: 1, bioguide_id: M1, full_name: 'Rep. M One', party: R, state: MO, is_original_cosponsor: false, sponsorship_withdrawn_date: null}
+      - input: ref('stg_govinfo_billstatus__laws')
+        rows:
+          - {bill_id: 119-hr-1, law_type: Public Law, law_number: 119-100, law_congress: 119, law_sequence: 100}
+          - {bill_id: 119-hr-1, law_type: Public Law, law_number: 119-21, law_congress: 119, law_sequence: 21}
+      - input: ref('int_federal_bills__stage')
+        rows:
+          - {bill_id: 119-hr-1, stage: became_law}
+          - {bill_id: 119-hr-2, stage: introduced}
+      - input: ref('dim_official')
+        rows:
+          - {official_id: o_m1, bioguide_id: M1}
+    expect:
+      rows:
+        - {official_id: o_m1, bioguide_id: M1, role: sponsor, bill_id: 119-hr-1, law_type: Public Law, law_number: 119-21, became_law: true, is_original_cosponsor: false}
+        - {official_id: null, bioguide_id: M2, role: cosponsor, bill_id: 119-hr-1, law_type: Public Law, law_number: 119-21, became_law: true, is_original_cosponsor: true}
+        - {official_id: o_m1, bioguide_id: M1, role: cosponsor, bill_id: 119-hr-2, law_type: null, law_number: null, became_law: false, is_original_cosponsor: false}
+
+  - name: official_profile_status_wording
+    model: official_profile
+    description: >
+      Pins the reader-facing coverage status text (#830): voluntary disclosures read "none recorded" and say
+      entries are added by hand; the MEC gap spells out Missouri Ethics Commission; the court-case gap gives a
+      federal judge or a justice a reason that can apply to them (no case matched in the courts we load), and
+      gives a circuit judge, a legislator or a Congress member who is a lawyer both reasons (the lawyer search covers every court we load, and CourtListener has no circuit courts).
+    overrides:
+      vars:
+        mec_direct: false
+    given:
+      - input: ref('dim_official')
+        rows:
+          - {official_id: o_rep, full_name: A Rep, party: R, level: state, office: state_house, office_title: Representative, district: '1'}
+          - {official_id: o_circuit, full_name: A Circuit, party: null, level: state, office: mo_circuit_judge, office_title: Judge, district: '2'}
+          - {official_id: o_fed, full_name: A Fed, party: null, level: federal, office: us_district_court, office_title: Judge, district: 'E'}
+          - {official_id: o_cong, full_name: A Congress Lawyer, party: R, level: federal, office: us_house, office_title: Representative, district: '1'}
+          - {official_id: o_appeals, full_name: An Appeals Judge, party: null, level: state, office: mo_court_of_appeals, office_title: Judge, district: 'W'}
+      - input: ref('fct_legal_careers')
+        rows:
+          - {official_id: o_rep}
+          - {official_id: o_circuit}
+          - {official_id: o_fed}
+          - {official_id: o_cong}
+          - {official_id: o_appeals}
+      - input: ref('fct_votes')
+        rows: [{official_id: nobody}]
+      - input: ref('fct_campaign_finance')
+        rows: [{official_id: nobody}]
+      - input: ref('fct_lobbyist_gifts')
+        rows: [{official_id: nobody}]
+      - input: ref('fct_disclosures')
+        rows: [{official_id: nobody, is_latest_version: true}]
+      - input: ref('fct_bias_indicators')
+        rows: [{official_id: nobody}]
+      - input: ref('fct_office_history')
+        rows: [{official_id: nobody}]
+      - input: ref('fct_commercial_ties')
+        rows: [{official_id: nobody}]
+      - input: ref('fct_family_ties')
+        rows: [{official_id: nobody}]
+      - input: ref('fct_case_history')
+        rows: [{official_id: nobody}]
+      - input: ref('fct_voluntary_disclosures')
+        rows: [{official_id: nobody}]
+    expect:
+      rows:
+        - {official_id: o_rep, donations_status: 'none found (no Missouri Ethics Commission committee linked to this official)', voluntary_disclosures_status: 'none recorded (no public list exists; we add these by hand)', cases_status: 'none found (no case matched in the Missouri appellate and federal courts we load; CourtListener has no Missouri circuit-court cases)'}
+        - {official_id: o_circuit, donations_status: 'none found (no Missouri Ethics Commission committee linked to this official)', voluntary_disclosures_status: 'none recorded (no public list exists; we add these by hand)', cases_status: 'none found (no case matched in the Missouri appellate and federal courts we load; CourtListener has no Missouri circuit-court cases)'}
+        - {official_id: o_fed, donations_status: 'not applicable', voluntary_disclosures_status: 'none recorded (no public list exists; we add these by hand)', cases_status: 'none found (no case matched in the courts we load from CourtListener)'}
+        - {official_id: o_cong, donations_status: 'none found', voluntary_disclosures_status: 'none recorded (no public list exists; we add these by hand)', cases_status: 'none found (no case matched in the Missouri appellate and federal courts we load; CourtListener has no Missouri circuit-court cases)'}
+        - {official_id: o_appeals, donations_status: 'not applicable', voluntary_disclosures_status: 'none recorded (no public list exists; we add these by hand)', cases_status: 'none found (no case matched in the courts we load from CourtListener)'}

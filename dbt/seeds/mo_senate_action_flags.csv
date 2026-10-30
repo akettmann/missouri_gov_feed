@@ -1,0 +1,33 @@
+action_pattern,bill_type,flag,evidence
+Second Read and Referred S %,any,referred,"Second Read and Referred S Judiciary and Civil and Criminal Jurisprudence Committee (every Senate bill)"
+Referred S %,any,referred,"Referred S Rules, Joint Rules, Resolutions and Ethics Committee (resolutions); Referred S Fiscal Oversight Committee"
+Re-referred S %,any,referred,Re-referred S Education Committee
+Referred H %,any,referred,Referred H Insurance Policy (the House committee a Senate bill is sent to)
+Re-Referred H %,any,referred,Re-Referred H Rules - Administrative Oversight
+HCS Referred H %,any,referred,HCS Referred H Rules - Administrative
+%Voted Do Pass%,any,reported,"Voted Do Pass S Fiscal Oversight Committee; SCS Voted Do Pass S Education Committee (4858S.04C); Voted Do Pass H Fiscal Review"
+%Reported Do Pass%,any,reported,Reported Do Pass H Rules - Legislative Oversight; HCS Reported Do Pass H Fiscal Review
+%Reported from S %,any,reported,"Reported from S Insurance and Banking Committee; ... w/SCS; ... - Consent (the committee's do-pass report to the floor); SCS Reported from S Professional Registration Committee (2018 SB 988, the substitute prefix)"
+Resolutions Calendar - Reported from Committee,any,reported,"2024 SCR 36: the resolution is calendared after the committee's report"
+Motion to pass bill as consent%Consent vote adopted%,any,reported,"2024 SB 1393: Motion to pass bill as consent taken by S ... Committee - Consent vote adopted (follows Voted Do Pass)"
+Perfected%,any,perfected,"Perfected; Perfected, as amended"
+Reported Truly Perfected %,any,perfected,Reported Truly Perfected S Rules Joint Rules Resolutions and Ethics Committee (follows Perfected)
+%S Third Read and Passed%,any,passed_senate,"S Third Read and Passed; CCS S Third Read and Passed; S Third Read and Passed - Consent; ... - EC adopted / EC defeated (the emergency clause vote, the bill passed)"
+%H Third Read and Passed%,any,passed_house,"H Third Read and Passed; CCS H Third Read and Passed; H Third Read and Passed, as amended"
+S adopted,SCR,passed_senate,"SCR 21 (2026): S adopted, then H adopted; a concurrent resolution needs both chambers"
+S adopted,SR,adopted,"SR 980 (2024): S Offered, Rules Suspended, S adopted (a simple resolution is the Senate's alone)"
+H adopted,SCR,passed_house,SCR 21 (2026) H adopted
+H adopted,SCR,adopted,SCR 21 (2026) H adopted (the second chamber's adoption completes a concurrent resolution)
+Defeated on S Third Reading%,any,defeated,Defeated on S Third Reading
+Defeated on Third Reading%,any,defeated,"2024 SB 1351: Defeated on Third Reading (then reconsidered and passed; the passed flags outrank defeated)"
+Resolution S defeated,any,defeated,"2024 SR 552: Resolution S defeated (the resolution itself, not an SA/SS)"
+Bill Withdrawn,any,withdrawn,"2024 SB 961, 1121, 1122, 1171, 1339: Bill Withdrawn (the sponsor withdrew the prefiled bill)"
+Truly Agreed To and Finally Passed,any,truly_agreed,Truly Agreed To and Finally Passed (51 of the sampled bills)
+Signed by Governor%,any,approved,"Signed by Governor (SB 594 (2018), SB 982 (2026))"
+Letter of approval from the Governor,any,approved,"SB 982 (2026): follows Signed by Governor; not seen alone"
+Vetoed by Governor%,any,vetoed,"SCR 50 (2018), 2016 SB 608/641/656/844/994 Vetoed by Governor"
+Legislature voted to override Governor%,any,veto_overridden,"2016 SB 656 (09/14/2016): Legislature voted to override Governor's veto, after Motion to override Governor's veto S adopted / H adopted (those alone are one chamber, not mapped)"
+Vetoed in Part by Governor%,any,vetoed_in_part,"The House XML's wording; the Senate feed lists no appropriation bill (HBs), so it never shows there (checked 2016-2025, #715)"
+Delivered to Secretary of State%,any,delivered_to_sos,Delivered to Secretary of State (6 sampled bills)
+Governor took no action%,any,delivered_to_sos,"SB 751 (2024): Governor took no action, sent to Secretary of State/Article III, Sec. 31 (law without signature)"
+"Bill Combined%",any,combined,"Bill Combined (w/SCS SBs 901 & 820); Bill Combined w/(SCS SBS 975 & 1024) (no paren after Combined); Bill Combined w/(SCS/SCRs 24 & 25) (a resolution): the bill went into a substitute for other bills (#750); seen in the 2018 and 2024 samples"

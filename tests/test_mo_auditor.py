@@ -155,6 +155,20 @@ def test_rating_source_reads_a_single_fire_district_but_not_county_wide_reviews(
     assert (mo_auditor.rating_source(_filing(title)) is not None) is read
 
 
+@pytest.mark.parametrize(
+    "title",
+    [
+        # CAFR: the Auditor's title until 2021 (2013-009)
+        "Comprehensive Annual Financial Report / Year Ended June 30, 2012",
+        # ACFR: the word order since 2022, which "annual (financial) report" alone does not match
+        "State of Missouri Annual Comprehensive Financial Report / Year Ended June 30, 2025",
+        "Annual Comprehensive Financial Report - Report on Internal Control, Compliance, and Other Matters",
+    ],
+)
+def test_rating_source_skips_annual_financial_reports_even_with_a_pdf(title):
+    assert mo_auditor.rating_source(_filing(title)) is None
+
+
 def test_requests_are_throttled_across_shards_not_slept_per_process(monkeypatch):
     calls = []
 

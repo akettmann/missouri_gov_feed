@@ -1,0 +1,165 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<billStatus>
+  <version>3.0.0</version>
+  <bill>
+    <number>1319</number>
+    <updateDate>2023-05-11T15:46:24Z</updateDate>
+    <originChamber>House</originChamber>
+    <type>HR</type>
+    <introducedDate>2021-02-24</introducedDate>
+    <congress>117</congress>
+    <title>American Rescue Plan Act of 2021</title>
+    <amendments>
+      <amendment>
+        <number>996</number>
+        <congress>117</congress>
+        <type>SAMDT</type>
+        <purpose>To strike section 9831.</purpose>
+        <updateDate>2021-03-08T17:31:46Z</updateDate>
+        <latestAction>
+          <actionDate>2021-03-06</actionDate>
+          <text>Amendment SA 996 not agreed to in Senate by Yea-Nay Vote. 49 - 50. Record Vote Number: 93.</text>
+          <links>
+            <link>
+              <name>Record Vote Number: 93</name>
+              <url>https://www.senate.gov/legislative/LIS/roll_call_votes/vote1171/vote_117_1_00093.xml</url>
+            </link>
+            <link>
+              <name>SA 996</name>
+              <url>https://www.congress.gov/amendment/117th-congress/senate-amendment/996</url>
+            </link>
+          </links>
+        </latestAction>
+        <sponsors>
+          <item>
+            <bioguideId>B001243</bioguideId>
+            <fullName>Sen. Blackburn, Marsha [R-TN]</fullName>
+            <firstName>Marsha</firstName>
+            <lastName>Blackburn</lastName>
+            <party>R</party>
+            <state>TN</state>
+          </item>
+        </sponsors>
+        <proposedDate>2021-03-06T05:00:00Z</proposedDate>
+        <submittedDate>2021-03-04T05:00:00Z</submittedDate>
+        <chamber>Senate</chamber>
+        <amendedBill>
+          <congress>117</congress>
+          <type>HR</type>
+          <originChamber>House</originChamber>
+          <originChamberCode>H</originChamberCode>
+          <number>1319</number>
+          <title>American Rescue Plan Act of 2021</title>
+          <updateDateIncludingText>2023-05-11T15:46:24Z</updateDateIncludingText>
+        </amendedBill>
+        <amendedAmendment>
+          <number>891</number>
+          <congress>117</congress>
+          <type>SAMDT</type>
+          <purpose>To improve the bill.</purpose>
+          <updateDate>2022-05-20T16:27:56Z</updateDate>
+        </amendedAmendment>
+        <actions>
+          <count>7</count>
+          <actions>
+            <item>
+              <actionDate>2021-03-06</actionDate>
+              <sourceSystem>
+                <code>0</code>
+                <name>Senate</name>
+              </sourceSystem>
+              <text>Amendment SA 996 not agreed to in Senate by Yea-Nay Vote. 49 - 50. Record Vote Number: 93.</text>
+              <type>Floor</type>
+              <recordedVotes>
+                <recordedVote>
+                  <rollNumber>93</rollNumber>
+                  <chamber>Senate</chamber>
+                  <congress>117</congress>
+                  <date>2021-03-06T12:26:13Z</date>
+                  <sessionNumber>1</sessionNumber>
+                  <url>https://www.senate.gov/legislative/LIS/roll_call_votes/vote1171/vote_117_1_00093.xml</url>
+                </recordedVote>
+              </recordedVotes>
+            </item>
+            <item>
+              <actionDate>2021-03-06</actionDate>
+              <sourceSystem>
+                <code>0</code>
+                <name>Senate</name>
+              </sourceSystem>
+              <text>Amendment SA 996 proposed by Senator Blackburn to Amendment SA 891. (consideration: CR S1246-1247; text: CR S1246) To strike section 9831.</text>
+              <type>Floor</type>
+            </item>
+            <item>
+              <actionDate>2021-03-06</actionDate>
+              <text>Roll call votes on amendments in Senate: Amendment SA 996 not agreed to in Senate by Yea-Nay Vote. 49 - 50. Record Vote Number: 93.</text>
+              <type>Floor</type>
+              <actionCode>97000</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+              <recordedVotes>
+                <recordedVote>
+                  <rollNumber>93</rollNumber>
+                  <chamber>Senate</chamber>
+                  <congress>117</congress>
+                  <date>2021-03-06T12:26:13Z</date>
+                  <sessionNumber>1</sessionNumber>
+                  <url>https://www.senate.gov/legislative/LIS/roll_call_votes/vote1171/vote_117_1_00093.xml</url>
+                </recordedVote>
+              </recordedVotes>
+            </item>
+            <item>
+              <actionDate>2021-03-06</actionDate>
+              <text>Senate amendment not agreed to: Amendment SA 996 not agreed to in Senate by Yea-Nay Vote. 49 - 50. Record Vote Number: 93.</text>
+              <type>Floor</type>
+              <actionCode>95000</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+              <recordedVotes>
+                <recordedVote>
+                  <rollNumber>93</rollNumber>
+                  <chamber>Senate</chamber>
+                  <congress>117</congress>
+                  <date>2021-03-06T12:26:13Z</date>
+                  <sessionNumber>1</sessionNumber>
+                  <url>https://www.senate.gov/legislative/LIS/roll_call_votes/vote1171/vote_117_1_00093.xml</url>
+                </recordedVote>
+              </recordedVotes>
+            </item>
+            <item>
+              <actionDate>2021-03-06</actionDate>
+              <text>Senate amendment proposed (on the floor): Amendment SA 996 proposed by Senator Blackburn to Amendment SA 891.</text>
+              <type>Floor</type>
+              <actionCode>93000</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+            </item>
+            <item>
+              <actionDate>2021-03-04</actionDate>
+              <text>Senate amendment submitted</text>
+              <type>Floor</type>
+              <actionCode>91000</actionCode>
+              <sourceSystem>
+                <code>9</code>
+                <name>Library of Congress</name>
+              </sourceSystem>
+            </item>
+          </actions>
+        </actions>
+      </amendment>
+      </amendments>
+    </bill>
+  <dublinCore xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:format>text/xml</dc:format>
+    <dc:language>EN</dc:language>
+    <dc:rights>Pursuant to Title 17 Section 105 of the United States Code, this file is not subject to copyright protection and is in the public domain.</dc:rights>
+    <dc:contributor>Congressional Research Service, Library of Congress</dc:contributor>
+    <dc:description>This file contains bill summaries and statuses for federal legislation. A bill summary describes the most significant provisions of a piece of legislation and details the effects the legislative text may have on current law and federal programs. Bill summaries are authored by the Congressional Research Service (CRS) of the Library of Congress. As stated in Public Law 91-510 (2 USC 166 (d)(6)), one of the duties of CRS is "to prepare summaries and digests of bills and resolutions of a public general nature introduced in the Senate or House of Representatives". For more information, refer to the User Guide that accompanies this file.</dc:description>
+  </dublinCore>
+</billStatus>

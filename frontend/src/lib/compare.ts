@@ -85,13 +85,49 @@ export function compareRows(bundles: OfficialBundle[], hideMedium: boolean): Com
     { section: "Office", label: "Party", values: each((b) => b.official.party ?? "none listed") },
   ];
 
-  const indicators = [...new Set(bundles.flatMap((b) => b.indicators.map((i) => i.indicator)))];
-  for (const key of indicators)
+  const m = bundles.map((b) => moneyCells(b, hideMedium));
+  rows.push({ section: "Money in", label: "Received, all loaded years", values: m.map((x) => x[0]) });
+  rows.push({ section: "Money in", label: "Received, latest cycle", values: m.map((x) => x[1]) });
+  rows.push({
+    section: "Money in",
+    label: "Share from PACs, committees & parties",
+    values: m.map((x) => x[2]),
+  });
+
+  const g = bundles.map((b) => giftCells(b, hideMedium));
+  rows.push({ section: "Lobbyist gifts", label: "Total", values: g.map((x) => x[0]) });
+  rows.push({ section: "Lobbyist gifts", label: "Largest principal", values: g.map((x) => x[1]) });
+
+  // disclosures and commercial ties exist for federal officials only: show a row only if one side has data
+  const anyAvailable = (key: string) =>
+    bundles.some((b) => statusKind(b.coverage.find((x) => x.key === key)?.status ?? "") === "available");
+  if (anyAvailable("commercial_ties"))
     rows.push({
-      section: "Ideology",
-      label: indicatorMeta(key).label,
-      values: each((b) => indicatorCells(b, key)),
+      section: "Personal interests",
+      label: "Commercial ties (latest report)",
+      values: each((b) =>
+        statusKind(b.interests.commercial_ties_status) === "available"
+          ? count(b.interests.commercial_ties.length)
+          : NA,
+      ),
     });
+  rows.push({
+    section: "Personal interests",
+    label: "Family ties",
+    values: each((b) => count(b.interests.family_ties.length)),
+  });
+  const biz = bundles.map((b) => businessCounts(b.businesses, hideMedium));
+  rows.push({
+    section: "Businesses in their area",
+    label: "EPA-regulated sites in their district or city",
+    values: biz.map((x) => (x ? sitesText(x.totalSites) : NA)),
+  });
+  rows.push({
+    section: "Businesses in their area",
+    label: "Donors with sites there (co-occurrence, not influence)",
+    values: biz.map((x) => (x ? donorsText(x) : NA)),
+    note: "One donor can file under several names, so counts are inferred from matched name groups.",
+  });
 
   rows.push({
     section: "Voting",
@@ -120,50 +156,14 @@ export function compareRows(bundles: OfficialBundle[], hideMedium: boolean): Com
     values: pay.map((x) => x[1]),
   });
 
-  const m = bundles.map((b) => moneyCells(b, hideMedium));
-  rows.push({ section: "Money in", label: "Received, all loaded years", values: m.map((x) => x[0]) });
-  rows.push({ section: "Money in", label: "Received, latest cycle", values: m.map((x) => x[1]) });
-  rows.push({
-    section: "Money in",
-    label: "Share from PACs, committees & parties",
-    values: m.map((x) => x[2]),
-  });
-
-  const g = bundles.map((b) => giftCells(b, hideMedium));
-  rows.push({ section: "Lobbyist gifts", label: "Total", values: g.map((x) => x[0]) });
-  rows.push({ section: "Lobbyist gifts", label: "Largest principal", values: g.map((x) => x[1]) });
-
-  const biz = bundles.map((b) => businessCounts(b.businesses, hideMedium));
-  rows.push({
-    section: "Businesses in their area",
-    label: "EPA-regulated sites in their district or city",
-    values: biz.map((x) => (x ? sitesText(x.totalSites) : NA)),
-  });
-  rows.push({
-    section: "Businesses in their area",
-    label: "Donors with sites there (co-occurrence, not influence)",
-    values: biz.map((x) => (x ? donorsText(x) : NA)),
-    note: "One donor can file under several names, so counts are inferred from matched name groups.",
-  });
-
-  // disclosures and commercial ties exist for federal officials only: show a row only if one side has data
-  const anyAvailable = (key: string) =>
-    bundles.some((b) => statusKind(b.coverage.find((x) => x.key === key)?.status ?? "") === "available");
-  if (anyAvailable("commercial_ties"))
+  const indicators = [...new Set(bundles.flatMap((b) => b.indicators.map((i) => i.indicator)))];
+  for (const key of indicators)
     rows.push({
-      section: "Personal interests",
-      label: "Commercial ties (latest report)",
-      values: each((b) =>
-        statusKind(b.interests.commercial_ties_status) === "available"
-          ? count(b.interests.commercial_ties.length)
-          : NA,
-      ),
+      section: "Ideology",
+      label: indicatorMeta(key).label,
+      values: each((b) => indicatorCells(b, key)),
     });
-  rows.push({
-    section: "Personal interests",
-    label: "Family ties",
-    values: each((b) => count(b.interests.family_ties.length)),
-  });
+
   for (const c of bundles[0]?.coverage ?? [])
     if (!HIDE_UNLESS_AVAILABLE.includes(c.key) || anyAvailable(c.key))
       rows.push({

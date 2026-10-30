@@ -15,6 +15,7 @@ from mogov import db, obs, pdftext
 from mogov.config import window_years
 from mogov.http import fetch
 from mogov.loaders import loader
+from mogov.loaders.mo_senate_bills import senate_interval
 
 log = obs.get_logger(__name__)
 
@@ -24,8 +25,11 @@ DASH = "[—–-]"
 CATEGORIES = ["YEAS", "NAYS", "Absent with leave", "Absent", "Excused from voting", "Vacancies"]
 CATEGORY = "|".join(CATEGORIES)
 # bounded so a block missing its "Vacancies" line can't swallow the rest of the journal. From 2024 the journal prints
-# "Excused from voting—Senator X—1" AFTER the Vacancies line (possibly past a page header), so a trailing one is kept.
-_PAGE_LINE = r"(?:Journal of the Senate \d+|\d+ Journal of the Senate)[ \t]*\n"
+# "Excused from voting—Senator X—1" AFTER the Vacancies line (a page break can fall between the two, leaving running
+# page-header lines in between), so a trailing one is kept.
+# running page headers: "Journal of the Senate 118", "623 Forty-Fourth Day - Thursday, April 4, 2024"
+_PAGE_ALTERNATIVES = r"Journal of the Senate \d+|\d+ Journal of the Senate|[^\n]*\bDAY\s*[—–-]\s*[A-Z]+DAY,[^\n]*"
+_PAGE_LINE = rf"(?i:{_PAGE_ALTERNATIVES})[ \t]*\n"
 BLOCK = re.compile(
     rf"YEAS{DASH}Senators?.{{0,2500}}?Vacancies{DASH}[^\n]*(?:\n(?:{_PAGE_LINE})*Excused from voting{DASH}[^\n]*)?",
     re.S,
@@ -44,10 +48,7 @@ NAME = re.compile(rf"({'|'.join(COMPOUND_SURNAMES)}|[A-Z][A-Za-z'’\-]+)(?: \((
 # Two surnames with the space lost: a capitalized word of 3+ letters running into another ("SaterSchatz"), but not
 # "Mac"/"Mc" names (McCreery has one lowercase letter before the second capital; MacDonald is excluded by name).
 RUN_TOGETHER = re.compile(r"\b(?!Mac)([A-Z][a-z]{2,})([A-Z][a-z]{2,})\b")
-# running page headers: "Journal of the Senate 118", "Sixty-Sixth Day—Thursday, April 24, 2025"
-PAGE_FURNITURE = re.compile(
-    r"^(?:Journal of the Senate \d+|\d+ Journal of the Senate|.*\bDAY\s*[—–-]\s*[A-Z]+DAY,.*)$", re.M | re.I
-)
+PAGE_FURNITURE = re.compile(rf"^(?:{_PAGE_ALTERNATIVES})$", re.M | re.I)
 DAY_HEADER = re.compile(r"([A-Z\-]+ DAY)\s*[—–-]\s*[A-Z]+DAY,\s*([A-Z]+ \d{1,2}, \d{4})")
 # veto session journals have no "...DAY—": "VETO SESSION" then "WEDNESDAY, SEPTEMBER 15, 2021"
 DATE_LINE = re.compile(r"^[A-Z]+DAY,\s*([A-Z]+ \d{1,2}, \d{4})$", re.M)
@@ -117,7 +118,7 @@ def parse_journal(text: str) -> list[dict]:
 def _journal_urls(year: int) -> list[str]:
     # past years monthly, not never: a listing cached mid-session would otherwise miss that session's later journals
     max_age = 86400 if year >= date.today().year else 30 * 86400
-    html = fetch(f"{BASE}/journallist/", {"SelectedYear": year}, max_age=max_age)
+    html = fetch(f"{BASE}/journallist/", {"SelectedYear": year}, max_age=max_age, min_interval=senate_interval())
     links = re.findall(rb'href="(/\d{2}info/Journals/[^"]+\.pdf)"', html, flags=re.I)
     return sorted({BASE + link.decode() for link in links})
 
@@ -131,11 +132,16 @@ def load(shard: db.Shard) -> dict[str, int]:
         for url, year in journals:
             progress.tick()
             try:
-                data = fetch(url, max_age=None, delay=0.5)
+                data = fetch(url, max_age=None, min_interval=senate_interval())
             except Exception as exc:
                 sink.add("mo_senate_journals", url, {"year": year, "url": url, "error": str(exc)})
                 continue
-            text = "\n".join(pdftext.page_texts(data))
+            try:
+                text = "\n".join(pdftext.page_texts(data))
+            except pdftext.ExtractTimeout as exc:  # a pathological PDF must not stop the run; it lands as an error
+                log.warning("mo_senate.extract_timeout", url=url, error=str(exc))
+                sink.add("mo_senate_journals", url, {"year": year, "url": url, "error": str(exc)})
+                continue
             rows = parse_journal(text)
             sink.add("mo_senate_journals", url, {"year": year, "url": url, "n_vote_rows": len(rows)})
             sink.extend(

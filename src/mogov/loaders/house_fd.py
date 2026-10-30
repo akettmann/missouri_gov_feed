@@ -20,8 +20,9 @@ log = obs.get_logger(__name__)
 
 BASE = "https://disclosures-clerk.house.gov/public_disc"
 FIRST_YEAR = int(os.environ.get("MOGOV_HOUSE_FD_FIRST_YEAR", "2015"))
-# Filing types worth reading: O original annual, A amendment, P periodic transaction report, C candidate, T termination.
-PDF_TYPES = {"O", "A", "P", "C", "T"}
+# Filing types worth reading: O original annual, A amendment, P periodic transaction report, C candidate, T termination,
+# H new filer report (the PDF says "Filing Type: New Filer Report").
+PDF_TYPES = {"O", "A", "P", "C", "T", "H"}
 
 
 def _pdf_url(year: str, doc_id: str, filing_type: str) -> str:
@@ -59,7 +60,12 @@ def load(shard: db.Shard) -> dict[str, int]:
             except Exception as exc:
                 sink.add("house_fd_pdf_lines", url, {"doc_id": rec["DocID"], "url": url, "error": str(exc)})
                 continue
-            texts = list(enumerate(pdftext.page_texts(pdf_bytes, layout=False), 1))
+            try:
+                texts = list(enumerate(pdftext.page_texts(pdf_bytes, layout=False), 1))
+            except pdftext.ExtractTimeout as exc:  # a pathological PDF must not stop the run; it lands as an error
+                log.warning("house_fd.extract_timeout", url=url, error=str(exc))
+                sink.add("house_fd_pdf_lines", url, {"doc_id": rec["DocID"], "url": url, "error": str(exc)})
+                continue
             if not any(t.strip() for _, t in texts):
                 sink.add("house_fd_pdf_lines", url, {"doc_id": rec["DocID"], "url": url, "has_text": False})
                 continue

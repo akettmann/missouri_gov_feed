@@ -1,9 +1,9 @@
 # Raw landings of this system (identifier = directory under MOGOV_RAW_DIR); external_location and the
 # default (no) freshness come from dbt_project.yml. Freshness is set on always-on JSON landings only.
 # The mo_house_xml_* tables are written by mogov.parsers.mo_house from the gzipped XML files that the
-# loader lands unchanged (listed in mo_house_xml_files). Other parsed tables (mo_house_xml_bill_hearings,
+# loader lands unchanged (listed in mo_house_xml_files). Other parsed tables (
 # _member_counties, _bill_list, _member_list, _upcoming_hearings, _calendar_bills, _list_notices and the
-# SenateActList's _hearings and _rollcalls) are landed too but not read by any model yet (#384).
+# SenateActList's _rollcalls) are landed too but not read by any model yet (#384).
 # (The SenateActList carries no sponsors or subjects: its bill row names the sponsor.)
 version: 2
 sources:
@@ -166,6 +166,30 @@ sources:
         error_after:
           count: 32
           period: day
+  - name: xml_bill_hearings
+    identifier: mo_house_xml_bill_hearings
+    description: "One row per committee hearing noticed for a bill (the Hearings element of the bill XML): committee, notice date, notice time (00:00 when only the free-text alt_time is given), location and the committee's comments."
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
+  - name: xml_senate_act_hearings
+    identifier: mo_house_xml_senate_act_hearings
+    description: "SenateActList twin of xml_bill_hearings (bill names the Senate bill)."
+    config:
+      loaded_at_field: loaded_at
+      freshness:
+        warn_after:
+          count: 8
+          period: day
+        error_after:
+          count: 32
+          period: day
   - name: xml_bill_texts
     identifier: mo_house_xml_bill_texts
     description: "One row per text version of a bill: text PDF link and the House's change map link (map_link)."
@@ -310,3 +334,12 @@ sources:
         error_after:
           count: 32
           period: day
+  - name: pdf_files
+    identifier: mo_house_pdf_files
+    description: "One row per House document URL the mo_house_pdf loader tried: session, kind, path of the unchanged PDF under MOGOV_RAW_DIR, size, sha256, HTTP status, error, last write, when the site was last asked (checked_at) and the ETag / Last-Modified it sent. Optional: empty until `mogov load mo_house_pdf` has run (slow, stage 2)."
+  - name: pdf_texts
+    identifier: mo_house_pdf_texts
+    description: "One row per House document URL: kind, session, the link row's file name, LR number and version code, link count, page count, pdfplumber text as extracted (joined and per page, small-caps NULs included) and the error if the fetch or extraction failed. Optional: empty until `mogov load mo_house_pdf` has run."
+  - name: pdf_statute_refs
+    identifier: mo_house_pdf_statute_refs
+    description: "One row per RSMo section (or range, as written) a bill text version repeals, amends or enacts, read by the mo_house_pdf loader from the enacting title and Section A (#594): document URL, session, link row's file name, LR number and version code, ordinal within the action, action (repeal, amend, enact), section_start, section_end, RSMo Supp. year and the matched clause. Optional: empty until `mogov load mo_house_pdf` has run."

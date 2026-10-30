@@ -29,6 +29,14 @@ How the parquet exports become the static site. Source: [frontend_data_flow.puml
 
 ![Frontend data flow](frontend_data_flow.svg)
 
+### Person ids
+
+Which models feed which when the pipeline joins a legislator's ids into one person, and what each stage may
+not read without a dbt cycle. The rules are in [person_ids.md](../person_ids.md). Source:
+[person_ids.puml](person_ids.puml)
+
+![Person ids](person_ids.svg)
+
 ### Missouri bill flow
 
 How a bill becomes law in the Missouri General Assembly, which the `mo_house` and `mo_senate` records follow.
@@ -106,6 +114,12 @@ Federal Judicial Center directory of federal judges. Source: [sources/fjc_judges
 
 ![fjc_judges](sources/fjc_judges.svg)
 
+### mo_house_pdf
+
+Missouri House bill document PDFs and their text. Source: [sources/mo_house_pdf.puml](sources/mo_house_pdf.puml)
+
+![mo_house_pdf](sources/mo_house_pdf.svg)
+
 ### house_fd
 
 U.S. House Clerk financial disclosures. Source: [sources/house_fd.puml](sources/house_fd.puml)
@@ -154,6 +168,12 @@ Missouri Senate topical index of bills. Source: [sources/mo_senate_topics.puml](
 
 ![mo_senate_topics](sources/mo_senate_topics.svg)
 
+### mo_senate_bills
+
+Missouri Senate bill list, action history and document lists. Source: [sources/mo_senate_bills.puml](sources/mo_senate_bills.puml)
+
+![mo_senate_bills](sources/mo_senate_bills.svg)
+
 ### openstates_people
 
 The Open States people repo. Source: [sources/openstates_people.puml](sources/openstates_people.puml)
@@ -177,6 +197,12 @@ Shor-McCarty state legislator ideology scores. Source: [sources/shor_mccarty.pum
 MEC campaign finance via The Accountability Project mirror. Source: [sources/tap_mec.puml](sources/tap_mec.puml)
 
 ![tap_mec](sources/tap_mec.svg)
+
+### govinfo_billstatus
+
+GovInfo BILLSTATUS federal bills, sponsors and Public Laws. Source: [sources/govinfo_billstatus.puml](sources/govinfo_billstatus.puml)
+
+![govinfo_billstatus](sources/govinfo_billstatus.svg)
 
 ### voteview
 

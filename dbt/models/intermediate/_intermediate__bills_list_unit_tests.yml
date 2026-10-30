@@ -30,6 +30,12 @@ unit_tests:
             select '251' as session_code, 2025 as session_year, 'SB5' as bill, 'INDEX TITLE' as description,
                 'http://index/sb5' as bill_url union all
             select '251', 2025, 'HB9', 'NOT A SENATE BILL', 'http://index/hb9'
+      - input: ref('stg_mo_senate__bills')
+        format: sql
+        rows: |
+            select
+                '999' as session_code, 2099 as session_year, 'SB1' as bill, 'x' as short_title, 'x' as bill_url
+            where 1 = 0
       - input: ref('stg_mo_house__senate_act_bills')
         format: sql
         rows: |
@@ -51,3 +57,72 @@ unit_tests:
         - {session_code: '251', session_year: 2025, bill: SB5, current_bill_string: null, short_title: INDEX TITLE, long_title: null, last_action: null, proposed_effective_date: null, source_url: 'http://index/sb5'}
         - {session_code: '253', session_year: 2025, bill: HB1, current_bill_string: HB1, short_title: TITLE, long_title: null, last_action: null, proposed_effective_date: null, source_url: null}
         - {session_code: '253', session_year: 2025, bill: SB1, current_bill_string: SS SB 1, short_title: APPROPRIATIONS BILL, long_title: To appropriate money, last_action: 06/16/2025 - Delivered, proposed_effective_date: 2025-07-01, source_url: 'http://house/sb1'}
+
+  - name: bill_list_senate_list_is_the_source_of_senate_bills
+    model: int_bills__list
+    description: >
+      The Senate's own bill list is the source of Senate bills in the sessions it covers (#586). 181 SRB975 is in the
+      list but under no topical-index keyword, so it exists only through the list (the 2018 revision bill SRB 975
+      & 1024); 181 SB1 is in both and takes the list's title and link, not the index's; a House bill number the
+      index lists (HB9) is not a Senate bill; the list's resolution (SR2) is a bill. 191 is a session the list has
+      not landed: the index still supplies its Senate bill (SB7), and the House XML's SenateActList its SB8. 181
+      SB3 is in the House's SenateActList and the Senate list, and stays one row with the list's title. A list row
+      whose session has no seed code (null session_code) is not a bill here and does not hide the index's row for
+      that session. Reading the index for every session (not only uncovered ones), or dropping the House anti-join to
+      the list, fails this test.
+    given:
+      - input: ref('stg_mo_house__bills')
+        format: sql
+        rows: |
+            select
+                '181' as session_code,
+                2018 as session_year,
+                'HB1' as bill,
+                'HB1' as current_bill_string,
+                'TITLE' as short_title,
+                cast(null as varchar) as long_title,
+                cast(null as varchar) as last_action,
+                cast(null as date) as proposed_effective_date,
+                cast(null as varchar) as source_url
+      - input: ref('stg_mo_senate__bills')
+        format: sql
+        rows: |
+            select '181' as session_code, 2018 as session_year, 'SRB975' as bill, 'REVISION BILL' as short_title,
+                'http://list/sb975' as bill_url union all
+            select '181', 2018, 'SB1', 'LIST TITLE', 'http://list/sb1' union all
+            select '181', 2018, 'SB3', 'LIST SB3', 'http://list/sb3' union all
+            select '181', 2018, 'SR2', 'A RESOLUTION', 'http://list/sr2' union all
+            select cast(null as varchar), 2017, 'SB44', 'UNMAPPED SESSION', 'http://list/sb44'
+      - input: ref('stg_mo_senate__bill_topics')
+        format: sql
+        rows: |
+            select '181' as session_code, 2018 as session_year, 'SB1' as bill, 'INDEX TITLE' as description,
+                'http://index/sb1' as bill_url union all
+            select '181', 2018, 'HB9', 'NOT A SENATE BILL', 'http://index/hb9' union all
+            select '181', 2018, 'SB2', 'INDEX ONLY IN A COVERED SESSION', 'http://index/sb2' union all
+            select '191', 2019, 'SB7', 'INDEX SB7', 'http://index/sb7'
+      - input: ref('stg_mo_house__senate_act_bills')
+        format: sql
+        rows: |
+            select
+                '181' as session_code,
+                2018 as session_year,
+                'SB3' as bill,
+                'SB 3' as current_bill_string,
+                'HOUSE TITLE' as short_title,
+                'HOUSE LONG' as long_title,
+                'x' as last_action,
+                cast('2018-08-28' as date) as proposed_effective_date,
+                'Y' as sponsor_name,
+                'http://house/sb3' as source_url
+            union all
+            select '191', 2019, 'SB8', 'SB 8', 'HOUSE SB8', 'HOUSE LONG 8', 'y', cast('2019-08-28' as date), 'Z', 'http://house/sb8'
+    expect:
+      rows:
+        - {session_code: '181', session_year: 2018, bill: HB1, current_bill_string: HB1, short_title: TITLE, long_title: null, last_action: null, proposed_effective_date: null, source_url: null}
+        - {session_code: '181', session_year: 2018, bill: SRB975, current_bill_string: null, short_title: REVISION BILL, long_title: null, last_action: null, proposed_effective_date: null, source_url: 'http://list/sb975'}
+        - {session_code: '181', session_year: 2018, bill: SB1, current_bill_string: null, short_title: LIST TITLE, long_title: null, last_action: null, proposed_effective_date: null, source_url: 'http://list/sb1'}
+        - {session_code: '181', session_year: 2018, bill: SB3, current_bill_string: null, short_title: LIST SB3, long_title: null, last_action: null, proposed_effective_date: null, source_url: 'http://list/sb3'}
+        - {session_code: '181', session_year: 2018, bill: SR2, current_bill_string: null, short_title: A RESOLUTION, long_title: null, last_action: null, proposed_effective_date: null, source_url: 'http://list/sr2'}
+        - {session_code: '191', session_year: 2019, bill: SB7, current_bill_string: null, short_title: INDEX SB7, long_title: null, last_action: null, proposed_effective_date: null, source_url: 'http://index/sb7'}
+        - {session_code: '191', session_year: 2019, bill: SB8, current_bill_string: 'SB 8', short_title: HOUSE SB8, long_title: HOUSE LONG 8, last_action: y, proposed_effective_date: 2019-08-28, source_url: 'http://house/sb8'}

@@ -5,8 +5,11 @@ import { createHash } from "node:crypto";
 import { DONOR_GROUP_SQL } from "../rollups";
 import { groupBySiteDonors, siteKey } from "../siteDonors";
 import { siteDonors } from "./businessDonors";
-import { trailRowsSql } from "./trailQuery";
+import { overlapExamplesSql, recusedSql, senateRollCallsSql } from "./overlapQuery";
+import { trailDonorNamesSql, trailRowsSql } from "./trailQuery";
+import { withVoteStages } from "./voteStageQuery";
 import { exportedAt, hasExport, query } from "./db";
+import { buildSponsorshipSessions, type SponsorshipRow } from "../sponsorshipOutcomes";
 import { buildCommitteeSessions, type PostCounts, type TitledMembership } from "../committeePosts";
 import { payYearsGate, type PayVoteRow } from "../attendancePay";
 import { loadLegislatorExpenses } from "./legislatorExpenses";
@@ -44,14 +47,14 @@ import type {
 type ProfileRow = Omit<Official, "slug"> & Record<string, string | number | boolean | null>;
 
 export const COVERAGE: { key: string; label: string }[] = [
-  { key: "votes", label: "Votes" },
-  { key: "bias", label: "Ideology indicators" },
   { key: "donations", label: "Donations" },
   { key: "disclosures", label: "Financial disclosures" },
   { key: "commercial_ties", label: "Commercial ties" },
   { key: "family_ties", label: "Family ties" },
-  { key: "cases", label: "Court cases" },
   { key: "voluntary_disclosures", label: "Voluntary disclosures" },
+  { key: "votes", label: "Votes" },
+  { key: "bias", label: "Ideology indicators" },
+  { key: "cases", label: "Court cases" },
 ];
 const COUNT_COLUMN: Record<string, string> = { bias: "n_bias_indicators" }; // the rest are n_<key>
 
@@ -174,13 +177,25 @@ async function loadAll(): Promise<OfficialBundle[]> {
   const hasTrails = hasDonors && hasExport("rpt_committee_donors");
   type TrailRow = Omit<
     CommitteeTrail,
-    "donors" | "committee_name" | "committee_total_amount" | "source_url"
+    "donors" | "donor_names" | "committee_name" | "committee_total_amount" | "source_url"
   > & {
     official_id: string;
   };
   const trailRows = hasTrails
     ? await query<TrailRow>(trailRowsSql(TRAILS, "{rpt_donor_rollup}", "{rpt_committee_donors}"))
     : [];
+  // The names each official's committee filed the donor under: one row per name, grouped here (#833).
+  const trailNames = new Map<string, string[]>();
+  if (hasTrails) {
+    for (const r of await query<{ official_id: string; mec_committee_id: string; donor_name: string }>(
+      trailDonorNamesSql(TRAILS, "{rpt_donor_rollup}", "{rpt_committee_donors}"),
+    )) {
+      const key = `${r.official_id}|${r.mec_committee_id}`;
+      const names = trailNames.get(key);
+      if (names) names.push(r.donor_name);
+      else trailNames.set(key, [r.donor_name]);
+    }
+  }
   const committeeDonors = new Map<
     string,
     Pick<CommitteeTrail, "committee_name" | "committee_total_amount" | "source_url" | "donors">
@@ -220,7 +235,8 @@ async function loadAll(): Promise<OfficialBundle[]> {
     ? groupBy(
         trailRows.flatMap((t) => {
           const hop = committeeDonors.get(t.mec_committee_id);
-          return hop ? [{ ...t, ...hop }] : [];
+          const donor_names = trailNames.get(`${t.official_id}|${t.mec_committee_id}`) ?? [];
+          return hop ? [{ ...t, ...hop, donor_names }] : [];
         }),
       )
     : null;
@@ -290,9 +306,9 @@ async function loadAll(): Promise<OfficialBundle[]> {
                  vote_description, vote_cast, party_position, other_party_position,
                  cast(republican_yea as integer) as republican_yea, cast(republican_nay as integer) as republican_nay,
                  cast(democratic_yea as integer) as democratic_yea, cast(democratic_nay as integer) as democratic_nay,
-                 source_url
-          from {rpt_party_breaks}
-          order by official_id, vote_date desc, chamber, session_code, vote_id, measure, vote_description, source_url`),
+                 b.source_url, b.vote_stage, b.vote_informal
+          from ${withVoteStages("{rpt_party_breaks}")} as b
+          order by official_id, vote_date desc, chamber, session_code, vote_id, measure, vote_description, b.source_url`),
       )
     : null;
 
@@ -375,6 +391,8 @@ async function loadAll(): Promise<OfficialBundle[]> {
                cast(count(distinct vote_id) as integer) as roll_calls,
                cast(count(distinct case when vote_cast = 'yea' then vote_id end) as integer) as yea,
                cast(count(distinct case when vote_cast = 'nay' then vote_id end) as integer) as nay,
+               ${recusedSql()} as recused,
+               ${senateRollCallsSql()} as senate_roll_calls,
                cast(count(distinct case when vote_cast not in ('yea', 'nay') then vote_id end) as integer) as other,
                cast(count(distinct bill) as integer) as bills
         from {rpt_interest_vote_overlap}
@@ -386,14 +404,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
     for (const r of await query<
       InterestOverlap["examples"][number] & { official_id: string; industry: string }
     >(`
-      select official_id, industry, cast(vote_date as varchar) as vote_date, bill, short_title, vote_cast,
-             vote_source_url, bill_source_url
-      from (
-        select *, row_number() over (partition by official_id, industry order by vote_date desc, bill, vote_id, chamber) as rank
-        from {rpt_interest_vote_overlap}
-      ) ranked
-      where rank <= 5
-      order by official_id, industry, rank`)) {
+      ${overlapExamplesSql(5, withVoteStages("{rpt_interest_vote_overlap}"))}`)) {
       const { official_id, industry, ...ex } = r;
       const key = `${official_id}|${industry}`;
       examples.set(key, [...(examples.get(key) ?? []), ex]);
@@ -475,6 +486,19 @@ async function loadAll(): Promise<OfficialBundle[]> {
           ),
         )
       : null;
+
+  // Bill sponsorship outcomes: the mart only has current officials (dim_official), so no further filter
+  const sponsorshipSessions = hasExport("fct_sponsorship_outcomes")
+    ? buildSponsorshipSessions(
+        await query<SponsorshipRow>(`
+          select official_id, session_code, cast(session_year as integer) as session_year, is_session_over,
+                 cast(bills_sponsored as integer) as bills_sponsored, cast(bills_decided as integer) as bills_decided,
+                 cast(bills_passed_house as integer) as bills_passed_house,
+                 cast(bills_became_law as integer) as bills_became_law, source_url
+          from {fct_sponsorship_outcomes}`),
+        houseSessionNames,
+      )
+    : null;
 
   // a federal appellate judge has ~6k cases: ship yearly counts plus the most recent ones
   const RECENT_CASES = 50;
@@ -580,6 +604,7 @@ async function loadAll(): Promise<OfficialBundle[]> {
         },
         overlap: hasOverlap ? ((overlap.get(id) ?? []) as InterestOverlap[]) : null,
         committees: committeeSessions ? (committeeSessions.get(id) ?? []) : null,
+        sponsorship: sponsorshipSessions ? (sponsorshipSessions.get(id) ?? []) : null,
         courts: {
           status: status("cases"),
           time_to_disposition: dispositions.get(id) ?? null,
@@ -702,11 +727,13 @@ export function freshness(): { table: string; exported_at: string | null; sample
     "rpt_party_breaks",
     "fct_committee_posts",
     "fct_committee_memberships",
+    "fct_sponsorship_outcomes",
     "rpt_attendance",
     "rpt_attendance_pay",
     "dim_house_session",
     "rpt_votes_by_subject",
     "rpt_interest_vote_overlap",
+    "fct_votes",
     "fct_jurisdiction_businesses",
     "rpt_district_business_industries",
     "rpt_officeholders_by_year",

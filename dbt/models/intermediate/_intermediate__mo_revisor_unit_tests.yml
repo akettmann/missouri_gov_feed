@@ -11,6 +11,10 @@ unit_tests:
       2018 "1st Ex. Sess." is House session 184 (the House's name for it): 183 was a special session with resolutions only.
       The numbers after "&" are bills combined into the first, the lead bill: only it passed.
     given:
+      - input: ref('int_bills__list')
+        format: sql
+        rows: |
+            select '000' as session_code, 'SB0' as bill
       - input: ref('stg_mo_revisor__sections')
         format: sql
         rows: |
@@ -56,6 +60,10 @@ unit_tests:
       is in that session too, not the regular one. Matching only "1st/2nd/3rd" (the old regex) loses 2017's
       "2d Ex. Sess." S.B. 5 and puts 1997's merged S.B. 3 in the regular session.
     given:
+      - input: ref('int_bills__list')
+        format: sql
+        rows: |
+            select '000' as session_code, 'SB0' as bill
       - input: ref('stg_mo_revisor__sections')
         format: sql
         rows: |
@@ -99,6 +107,10 @@ unit_tests:
       H.B. 1142 and H.B. 1201" (a real 2004 combined act) is one act led by HB996. A "§ 1" after the numbers is not
       read as another bill.
     given:
+      - input: ref('int_bills__list')
+        format: sql
+        rows: |
+            select '000' as session_code, 'SB0' as bill
       - input: ref('stg_mo_revisor__sections')
         format: sql
         rows: |
@@ -146,6 +158,10 @@ unit_tests:
       session must match too: 2004's regular-session "H.B. 20 and S.B. 30" combines SB30 although the 1st extraordinary
       session cites SB 30 alone.
     given:
+      - input: ref('int_bills__list')
+        format: sql
+        rows: |
+            select '000' as session_code, 'SB0' as bill
       - input: ref('stg_mo_revisor__sections')
         format: sql
         rows: |
@@ -198,6 +214,10 @@ unit_tests:
       year) and "merged with" as its own piece are read too, and the session and the change carry over
       ("Repealed L. 1989 1st Ex. Sess. H.B. 3, S.B. 4").
     given:
+      - input: ref('int_bills__list')
+        format: sql
+        rows: |
+            select '000' as session_code, 'SB0' as bill
       - input: ref('stg_mo_revisor__sections')
         format: sql
         rows: |
@@ -242,6 +262,10 @@ unit_tests:
       reads it as the 1st (2003 names both "1st" and "2nd", so it is ambiguous; 2011 names none). Before the fix
       these spellings parsed as no bill at all.
     given:
+      - input: ref('int_bills__list')
+        format: sql
+        rows: |
+            select '000' as session_code, 'SB0' as bill
       - input: ref('stg_mo_revisor__sections')
         format: sql
         rows: |
@@ -270,3 +294,355 @@ unit_tests:
         - {section_id: e.4, bill: HB3, session_code: '893'}
         - {section_id: e.5, bill: HB7, session_code: '033'}
         - {section_id: e.6, bill: HB8, session_code: '113'}
+
+  - name: trailing_and_act_citation_is_an_act_of_its_own
+    model: int_mo_revisor__session_law_bills
+    description: >
+      A history note can join a later act to the bills before it with "and A.L." or "and L." ("H.B. 996 and H.B.
+      1489 and A.L. 2004 S.B. 1233 et al."). The trailing act is its own act: SB 1233 is a bill of the section, not
+      lost and not combined into the bills before it; the "and" inside the first act still joins its bills.
+    given:
+      - input: ref('int_bills__list')
+        format: sql
+        rows: |
+            select '000' as session_code, 'SB0' as bill
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 't.1' as section_id, 't.1/1' as section_version_id, '(A.L. 2004 H.B. 996 and H.B. 1489 and A.L. 2004 S.B. 1233 et al.)' as history_note union all
+            select 't.2', 't.2/1', '(L. 1990 H.B. 5 and L. 1991 S.B. 7, A.L. 1995 H.B. 9)'
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select '9.010' as section_id, '9.010/3' as section_version_id, 'transferred' as change_kind, '(Transferred 1959; now 442.560 )' as note
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: t.1, bill: HB996, act_year: 2004, is_lead_bill: true, combined_into: }
+        - {section_id: t.1, bill: HB1489, act_year: 2004, is_lead_bill: false, combined_into: HB996}
+        - {section_id: t.1, bill: SB1233, act_year: 2004, is_lead_bill: true, combined_into: }
+        - {section_id: t.2, bill: HB5, act_year: 1990, is_lead_bill: true, combined_into: }
+        - {section_id: t.2, bill: SB7, act_year: 1991, is_lead_bill: true, combined_into: }
+        - {section_id: t.2, bill: HB9, act_year: 1995, is_lead_bill: true, combined_into: }
+
+  - name: repealing_acts_joined_with_and_stay_repealed
+    model: int_mo_revisor__session_law_bills
+    description: >
+      In a repeal note "Repealed" covers the whole list, so a bare "L." joined with "and" to a repealed act is one more
+      repealing act: 478.170's "Repealed L. 2013 H.B. 374 & 434 and L. 2016 S.B. 585" is repealed by SB 585, not
+      enacted by it. "A.L." names an amending act, so "Repealed L. ... and A.L. ..." (192.737, 8.710) is amended; a
+      bare "L." after an amending or enacting act is enacted ("L. 1990 H.B. 5 and L. 1991 S.B. 7").
+    given:
+      - input: ref('int_bills__list')
+        format: sql
+        rows: |
+            select '000' as session_code, 'SB0' as bill
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 't.1' as section_id, 't.1/1' as section_version_id, '(L. 1990 H.B. 5 and L. 1991 S.B. 7)' as history_note union all
+            select 't.2', 't.2/1', '(Repealed L. 2000 H.B. 1 and A.L. 2001 S.B. 2)'
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select '478.170' as section_id, '478.170/1' as section_version_id, 'repealed' as change_kind, '(Repealed L. 2013 H.B. 374 & 434 and L. 2016 S.B. 585)' as note
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: '478.170', bill: HB374, act_year: 2013, change: repealed, is_lead_bill: true}
+        - {section_id: '478.170', bill: HB434, act_year: 2013, change: repealed, is_lead_bill: false}
+        - {section_id: '478.170', bill: SB585, act_year: 2016, change: repealed, is_lead_bill: true}
+        - {section_id: t.1, bill: HB5, act_year: 1990, change: enacted, is_lead_bill: true}
+        - {section_id: t.1, bill: SB7, act_year: 1991, change: enacted, is_lead_bill: true}
+        - {section_id: t.2, bill: HB1, act_year: 2000, change: repealed, is_lead_bill: true}
+        - {section_id: t.2, bill: SB2, act_year: 2001, change: amended, is_lead_bill: true}
+
+  - name: trailing_and_repealed_act_is_a_repealed_act_of_its_own
+    model: int_mo_revisor__session_law_bills
+    description: >
+      566.211's note ends "A.L. 2026 S.B. 888 and Repealed L. 2026 H.B. 2637 & 3155". The repealed act is its own act:
+      HB 2637 and HB 3155 (combined into it) are repealed, and SB 888 is an amendment that does not take their bills.
+    given:
+      - input: ref('int_bills__list')
+        format: sql
+        rows: |
+            select '000' as session_code, 'SB0' as bill
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 't.1' as section_id, 't.1/1' as section_version_id, '(A.L. 2026 S.B. 888 and Repealed L. 2026 H.B. 2637 & 3155)' as history_note
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select '9.010' as section_id, '9.010/3' as section_version_id, 'transferred' as change_kind, '(Transferred 1959; now 442.560 )' as note
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: t.1, bill: SB888, change: amended, is_lead_bill: true, combined_into: , act: A.L. 2026 S.B. 888}
+        - {section_id: t.1, bill: HB2637, change: repealed, is_lead_bill: true, combined_into: , act: Repealed L. 2026 H.B. 2637 & 3155}
+        - {section_id: t.1, bill: HB3155, change: repealed, is_lead_bill: false, combined_into: HB2637, act: Repealed L. 2026 H.B. 2637 & 3155}
+
+  - name: chained_repeals_all_inherit_the_repeal
+    model: int_mo_revisor__session_law_bills
+    description: >
+      "Repealed" covers the whole list in a repeal note, however long the "and L." chain: in "Repealed L. 2000 H.B. 1
+      and L. 2001 S.B. 2 and L. 2002 H.B. 3" the third act is repealed too, not enacted. Each act follows the first
+      act of its chain, not the act just before it, which may itself have inherited the change. A chain that starts
+      with an amending act ("A.L. 2000 H.B. 1 and L. 2001 S.B. 2 and L. 2002 H.B. 3") stays enacted.
+    given:
+      - input: ref('int_bills__list')
+        format: sql
+        rows: |
+            select '000' as session_code, 'SB0' as bill
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 't.1' as section_id, 't.1/1' as section_version_id, '(A.L. 2000 H.B. 1 and L. 2001 S.B. 2 and L. 2002 H.B. 3)' as history_note
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select 'r.1' as section_id, 'r.1/1' as section_version_id, 'repealed' as change_kind, '(Repealed L. 2000 H.B. 1 and L. 2001 S.B. 2 and L. 2002 H.B. 3)' as note
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: r.1, bill: HB1, act_year: 2000, change: repealed}
+        - {section_id: r.1, bill: SB2, act_year: 2001, change: repealed}
+        - {section_id: r.1, bill: HB3, act_year: 2002, change: repealed}
+        - {section_id: t.1, bill: HB1, act_year: 2000, change: amended}
+        - {section_id: t.1, bill: SB2, act_year: 2001, change: enacted}
+        - {section_id: t.1, bill: HB3, act_year: 2002, change: enacted}
+
+  - name: continuation_pieces_after_an_and_l_act_share_its_change
+    model: int_mo_revisor__session_law_bills
+    description: >
+      A bill-only piece after an "and L." act continues that act ("Repealed L. 2000 H.B. 1 and L. 2001 S.B. 2, S.B.
+      3": SB 3 is part of the 2001 act). It must get the same change as the act it continues (repealed), not the
+      change of the act before the head.
+    given:
+      - input: ref('int_bills__list')
+        format: sql
+        rows: |
+            select '000' as session_code, 'SB0' as bill
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 't.1' as section_id, 't.1/1' as section_version_id, '(A.L. 2000 H.B. 1 and L. 2001 S.B. 2, S.B. 3)' as history_note
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select 'r.1' as section_id, 'r.1/1' as section_version_id, 'repealed' as change_kind, '(Repealed L. 2000 H.B. 1 and L. 2001 S.B. 2, S.B. 3)' as note
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: r.1, bill: HB1, act_year: 2000, change: repealed}
+        - {section_id: r.1, bill: SB2, act_year: 2001, change: repealed}
+        - {section_id: r.1, bill: SB3, act_year: 2001, change: repealed}
+        - {section_id: t.1, bill: HB1, act_year: 2000, change: amended}
+        - {section_id: t.1, bill: SB2, act_year: 2001, change: enacted}
+        - {section_id: t.1, bill: SB3, act_year: 2001, change: enacted}
+
+  - name: history_and_repeal_notes_on_one_section_version_are_parsed_apart
+    model: int_mo_revisor__session_law_bills
+    description: >
+      A contingent repeal puts a history note and a repeal note on the same section version (324.406/60569 is on both
+      Revisor pages). Each note is parsed on its own: the acts of one never take the other's act_index, so "and L."
+      inherits "repealed" only inside the repeal note and a continuation piece joins only its own note's act.
+    given:
+      - input: ref('int_bills__list')
+        format: sql
+        rows: |
+            select '000' as session_code, 'SB0' as bill
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 'c.1' as section_id, 'c.1/1' as section_version_id, '(A.L. 2000 H.B. 1 and L. 2001 S.B. 2, S.B. 3)' as history_note
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select 'c.1' as section_id, 'c.1/1' as section_version_id, 'repealed' as change_kind, '(Repealed L. 2005 H.B. 5 and L. 2006 S.B. 6, S.B. 7)' as note
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: c.1, bill: HB1, act_year: 2000, change: amended}
+        - {section_id: c.1, bill: SB2, act_year: 2001, change: enacted}
+        - {section_id: c.1, bill: SB3, act_year: 2001, change: enacted}
+        - {section_id: c.1, bill: HB5, act_year: 2005, change: repealed}
+        - {section_id: c.1, bill: SB6, act_year: 2006, change: repealed}
+        - {section_id: c.1, bill: SB7, act_year: 2006, change: repealed}
+
+  - name: note_kind_keeps_history_and_repeal_notes_apart_in_every_step
+    model: int_mo_revisor__session_law_bills
+    description: >
+      One fixed case per step that keys on note_kind, each putting a history note and a repeal note on one section
+      version, so dropping note_kind from any single step (the anchor window, the last_break self-join, the item_types
+      head window, the item_bills join, the item_groups window, the final bills join) changes a row. d.1: the repeal's
+      "and L." must not inherit the history's amended/enacted anchor, and the history's must not turn repealed. d.2:
+      the continuation "S.B. 17" joins the repeal's own act, not the history's. d.3: "& 26" takes the repeal note's
+      head "S.B.", not the history's "H.B.". d.4 and d.5: the repeal's "S.B. 36" is combined into S.B. 35, not made a
+      lead bill by the history note's grouping or by another section's citation of H.B. 32.
+    given:
+      - input: ref('int_bills__list')
+        format: sql
+        rows: |
+            select '000' as session_code, 'SB0' as bill
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 'd.1' as section_id, 'd.1/1' as section_version_id, '(L. 2000 H.B. 1, A.L. 2001 H.B. 2)' as history_note
+            union all select 'd.2', 'd.2/1', '(A.L. 2000 H.B. 11, A.L. 2001 H.B. 12)'
+            union all select 'd.3', 'd.3/1', '(A.L. 2000 H.B. 21 & H.B. 22)'
+            union all select 'd.4', 'd.4/1', '(A.L. 2002 H.B. 31 and H.B. 32)'
+            union all select 'd.5', 'd.5/1', '(A.L. 2002 H.B. 32)'
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select 'd.1' as section_id, 'd.1/1' as section_version_id, 'repealed' as change_kind, '(Repealed L. 2005 H.B. 5 and L. 2006 S.B. 6)' as note
+            union all select 'd.2', 'd.2/1', 'repealed', '(Repealed L. 2005 H.B. 15, S.B. 16, S.B. 17)'
+            union all select 'd.3', 'd.3/1', 'repealed', '(Repealed L. 2005 S.B. 25 & 26)'
+            union all select 'd.4', 'd.4/1', 'repealed', '(Repealed L. 2007 S.B. 35 & 36)'
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: d.1, bill: HB1, act_year: 2000, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: d.1, bill: HB2, act_year: 2001, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: d.1, bill: HB5, act_year: 2005, change: repealed, is_lead_bill: true, combined_into: }
+        - {section_id: d.1, bill: SB6, act_year: 2006, change: repealed, is_lead_bill: true, combined_into: }
+        - {section_id: d.2, bill: HB11, act_year: 2000, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: d.2, bill: HB12, act_year: 2001, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: d.2, bill: HB15, act_year: 2005, change: repealed, is_lead_bill: true, combined_into: }
+        - {section_id: d.2, bill: SB16, act_year: 2005, change: repealed, is_lead_bill: true, combined_into: }
+        - {section_id: d.2, bill: SB17, act_year: 2005, change: repealed, is_lead_bill: true, combined_into: }
+        - {section_id: d.3, bill: HB21, act_year: 2000, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: d.3, bill: HB22, act_year: 2000, change: amended, is_lead_bill: false, combined_into: HB21}
+        - {section_id: d.3, bill: SB25, act_year: 2005, change: repealed, is_lead_bill: true, combined_into: }
+        - {section_id: d.3, bill: SB26, act_year: 2005, change: repealed, is_lead_bill: false, combined_into: SB25}
+        - {section_id: d.4, bill: HB31, act_year: 2002, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: d.4, bill: HB32, act_year: 2002, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: d.4, bill: SB35, act_year: 2007, change: repealed, is_lead_bill: true, combined_into: }
+        - {section_id: d.4, bill: SB36, act_year: 2007, change: repealed, is_lead_bill: false, combined_into: SB35}
+        - {section_id: d.5, bill: HB32, act_year: 2002, change: amended, is_lead_bill: true, combined_into: }
+
+  - name: and_bill_after_a_section_cite_is_not_dropped
+    model: int_mo_revisor__session_law_bills
+    description: >
+      An act may cite a section of each bill: "H.B. 1574 § 6 and S.B. 721 § 2". The section cite (with its "et al."
+      and "subsec.") sits between the bills, so the bill after "and" was dropped (RSMo 301.3166 lost SB 480, 192.667
+      lost SB 721, 281.102 SB 26, 214.500 SB 58). The Revisor's typo ".S.B. 58" (stray period) must not hide the bill
+      either. A bill after "and" is combined into the bill before it, unless its year and session cite it as the first
+      bill of an act elsewhere (SB 480 in 2012: it is a lead).
+    given:
+      - input: ref('int_bills__list')
+        format: sql
+        rows: |
+            select '000' as session_code, 'SB0' as bill
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 'e.1' as section_id, 'e.1/1' as section_version_id, '(L. 2012 H.B. 1807, et al. § 301.4044 and S.B. 480 § 301.4036, A.L. 2014 H.B. 1245)' as history_note
+            union all select 'e.2', 'e.2/1', '(L. 2012 S.B. 480)'
+            union all select 'e.3', 'e.3/1', '(L. 1992 H.B. 1574 § 6 and S.B. 721 § 2 merged with S.B. 796 § 15, A.L. 1993 S.B. 52)'
+            union all select 'e.4', 'e.4/1', '(L. 1997 H.B. 592 § 1 and .S.B. 58 § 1, A.L. 2010 H.B. 1692, et al. merged with S.B. 754)'
+            union all select 'e.5', 'e.5/1', '(L. 2021 H.B. 476 § B and S.B. 26 § B, A.L. 2023 S.B. 138)'
+            union all select 'e.6', 'e.6/1', '(L. 1993 H.B. 551 & 552 § 2 subsec. 1 and S.B. 67 § 10 subsec. 1 merged with S.B. 88 § 1 subsec. l)'
+            union all select 'e.7', 'e.7/1', '(L. 2000 H.B. 5 § 3 and the like, A.L. 2001 H.B. 6)'
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select 'e.1' as section_id, 'e.1/1' as section_version_id, 'transferred' as change_kind, '(Transferred 1959)' as note
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: e.1, bill: HB1807, act_year: 2012, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.1, bill: SB480, act_year: 2012, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.1, bill: HB1245, act_year: 2014, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: e.2, bill: SB480, act_year: 2012, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.3, bill: HB1574, act_year: 1992, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.3, bill: SB721, act_year: 1992, change: enacted, is_lead_bill: false, combined_into: HB1574}
+        - {section_id: e.3, bill: SB796, act_year: 1992, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.3, bill: SB52, act_year: 1993, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: e.4, bill: HB592, act_year: 1997, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.4, bill: SB58, act_year: 1997, change: enacted, is_lead_bill: false, combined_into: HB592}
+        - {section_id: e.4, bill: HB1692, act_year: 2010, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: e.4, bill: SB754, act_year: 2010, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: e.5, bill: HB476, act_year: 2021, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.5, bill: SB26, act_year: 2021, change: enacted, is_lead_bill: false, combined_into: HB476}
+        - {section_id: e.5, bill: SB138, act_year: 2023, change: amended, is_lead_bill: true, combined_into: }
+        - {section_id: e.6, bill: HB551, act_year: 1993, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.6, bill: HB552, act_year: 1993, change: enacted, is_lead_bill: false, combined_into: HB551}
+        - {section_id: e.6, bill: SB67, act_year: 1993, change: enacted, is_lead_bill: false, combined_into: HB551}
+        - {section_id: e.6, bill: SB88, act_year: 1993, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.7, bill: HB5, act_year: 2000, change: enacted, is_lead_bill: true, combined_into: }
+        - {section_id: e.7, bill: HB6, act_year: 2001, change: amended, is_lead_bill: true, combined_into: }
+
+  - name: senate_revision_bills_are_srb_not_sb
+    model: int_mo_revisor__session_law_bills
+    description: >
+      The Revisor cites the Senate's revision bills as "S.B. 975 & 1024 Revision" (2018); the Senate's list, and so
+      fct_bills, calls them SRB975 and SRB1024 (#627). A Senate bill marked "Revision" whose session's list has SRB n
+      and no SB n is SRB n, and so is the lead it is combined into. Plain "S.B. 592" merged into the revision act
+      stays SB592, and the list's real SB 800 stays SB800. A "Revision" SB with no SRB n in the list (2019 SB 77, or a
+      session the list has not landed) stays SB, and so does a House revision bill (HB 1299, which the House keeps as
+      HB). A "Revision" SB whose number also exists as an SB in the session (2018 SB 800 here) is not renamed, and a plain "S.B. 975" with no "Revision" stays SB975. Renaming
+      every "S.B. ... Revision", or leaving them SB, fails this test.
+    given:
+      - input: ref('int_bills__list')
+        format: sql
+        rows: |
+            select '181' as session_code, 'SRB975' as bill union all
+            select '181', 'SRB1024' union all
+            select '181', 'SB592' union all
+            select '181', 'SB800' union all
+            select '181', 'SRB800' union all
+            select '191', 'SB77'
+      - input: ref('stg_mo_revisor__sections')
+        format: sql
+        rows: |
+            select 'r.1' as section_id, 'r.1/1' as section_version_id, '(A.L. 2018 S.B. 975 & 1024 Revision)' as history_note union all
+            select 'r.2', 'r.2/1', '(A.L. 2018 S.B. 592 merged with S.B. 975 & 1024 Revision)' union all
+            select 'r.3', 'r.3/1', '(A.L. 2019 S.B. 77 Revision)' union all
+            select 'r.4', 'r.4/1', '(A.L. 2014 H.B. 1299 Revision)' union all
+            select 'r.5', 'r.5/1', '(A.L. 2018 S.B. 800 Revision)' union all
+            select 'r.6', 'r.6/1', '(A.L. 2018 S.B. 975)'
+      - input: ref('stg_mo_revisor__repeals')
+        format: sql
+        rows: |
+            select '9.010' as section_id, '9.010/3' as section_version_id, 'transferred' as change_kind, '(Transferred 1959; now 442.560 )' as note
+      - input: ref('stg_mo_house__sessions')
+        format: sql
+        rows: |
+            select 2018 as session_year, '181' as session_code, '' as session_of_general_assembly
+    expect:
+      rows:
+        - {section_id: r.1, bill: SRB975, session_code: '181', is_lead_bill: true, combined_into: }
+        - {section_id: r.1, bill: SRB1024, session_code: '181', is_lead_bill: false, combined_into: SRB975}
+        - {section_id: r.2, bill: SB592, session_code: '181', is_lead_bill: true, combined_into: }
+        - {section_id: r.2, bill: SRB975, session_code: '181', is_lead_bill: true, combined_into: }
+        - {section_id: r.2, bill: SRB1024, session_code: '181', is_lead_bill: false, combined_into: SRB975}
+        - {section_id: r.3, bill: SB77, session_code: '191', is_lead_bill: true, combined_into: }
+        - {section_id: r.4, bill: HB1299, session_code: '141', is_lead_bill: true, combined_into: }
+        - {section_id: r.5, bill: SB800, session_code: '181', is_lead_bill: true, combined_into: }
+        - {section_id: r.6, bill: SB975, session_code: '181', is_lead_bill: true, combined_into: }

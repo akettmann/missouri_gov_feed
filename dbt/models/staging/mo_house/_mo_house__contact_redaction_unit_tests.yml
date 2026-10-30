@@ -1,0 +1,35 @@
+unit_tests:
+  - name: house_bill_hearings_phone_redaction_second_pass_run_together_and_bill_lists
+    model: stg_mo_house__bill_hearings
+    description: >
+      Phone redaction edge cases (#711). Two 7-digit phones separated by one comma are both redacted, which needs the
+      second pass (the first pass consumes the comma that the second number needs as its leading character). A run of
+      phones with single spaces is redacted whole, not mangled into "751-[phone removed]" by reading "-1167 751-1168"
+      as a 1-prefixed number. Longer lists are redacted whole. A 7-digit number with a space (bill lists such as
+      "SB 123 4567", "100 1000 dollars", "2,000 1000") is not a phone; the dash form is. 1 + 10 plain digits and a
+      1(area) form are still redacted. Dropping the second pass, reading a bare 1 as a prefix, or allowing the
+      space-separated 7-digit form fails this test.
+    given:
+      - input: source('mo_house', 'xml_bills')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast('HB1' as varchar) as bill
+      - input: source('mo_house', 'xml_bill_hearings')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast(1 as bigint) as hearing_index, cast('Judiciary' as varchar) as committee_name, cast('2025-02-04' as date) as notice_date, cast('1900-01-01T08:15:00' as varchar) as notice_time, cast(null as varchar) as alt_time, cast('751-6662,751-1167' as varchar) as location, cast('Call 751-6662,751-1167 today' as varchar) as comments union all
+            select '251', '251-HB1.XML', 2, 'Judiciary', '2025-02-04', '1900-01-01T08:15:00', null, '751-6662 751-1167 751-1168', 'Lines 751-6662 751-1167 751-1168 751-1169 751-1170 are open' union all
+            select '251', '251-HB1.XML', 3, 'Judiciary', '2025-02-04', '1900-01-01T08:15:00', null, 'SB 123 4567', 'See HB 100 1234 and SB 123 4567, 100 1000 dollars, 2,000 1000' union all
+            select '251', '251-HB1.XML', 4, 'Judiciary', '2025-02-04', '1900-01-01T08:15:00', null, '18005551212', 'Call 1(573) 751-1167 or 1-573-751-1167 or +1(573)751-1167' union all
+            select '251', '251-HB1.XML', 5, 'Judiciary', '2025-02-04', '1900-01-01T00:00:00', '4:30 PM, call 751–6662', null, null
+      - input: source('mo_house', 'xml_senate_act_hearings')
+        format: sql
+        rows: |
+            select cast('251' as varchar) as session_code, cast('251-SENATEACTLIST.XML' as varchar) as file_name, cast(1 as bigint) as hearing_index, cast('x' as varchar) as committee_name, cast('2025-03-05' as date) as notice_date, cast('1900-01-01T14:00:00' as varchar) as notice_time, cast(null as varchar) as alt_time, cast(null as varchar) as location, cast(null as varchar) as comments, cast('SB7' as varchar) as bill where false
+    expect:
+      rows:
+        - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 1, committee_name: Judiciary, hearing_date: '2025-02-04', hearing_time: '08:15', hearing_time_note: null, location: '[phone removed],[phone removed]', comments: 'Call [phone removed],[phone removed] today'}
+        - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 2, committee_name: Judiciary, hearing_date: '2025-02-04', hearing_time: '08:15', hearing_time_note: null, location: '[phone removed] [phone removed] [phone removed]', comments: 'Lines [phone removed] [phone removed] [phone removed] [phone removed] [phone removed] are open'}
+        - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 3, committee_name: Judiciary, hearing_date: '2025-02-04', hearing_time: '08:15', hearing_time_note: null, location: SB 123 4567, comments: 'See HB 100 1234 and SB 123 4567, 100 1000 dollars, 2,000 1000'}
+        - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 4, committee_name: Judiciary, hearing_date: '2025-02-04', hearing_time: '08:15', hearing_time_note: null, location: '[phone removed]', comments: 'Call [phone removed] or [phone removed] or [phone removed]'}
+        - {session_code: '251', session_year: 2025, bill: HB1, hearing_index: 5, committee_name: Judiciary, hearing_date: '2025-02-04', hearing_time: null, hearing_time_note: '4:30 PM, call [phone removed]', location: null, comments: null}

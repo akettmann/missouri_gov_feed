@@ -1,0 +1,20 @@
+# Unit test for stg_mo_house__statute_refs: fixed loader rows -> exact expected rows.
+version: 2
+
+unit_tests:
+  - name: house_statute_refs_trim_ids_and_drop_control_characters_from_the_clause
+    model: stg_mo_house__statute_refs
+    description: >
+      The URL and the section ids are trimmed (they join fct_bill_documents and the statutes), a range keeps both
+      endpoints, a missing end stays null, and the clause loses NUL and other control characters but keeps its text.
+      Passing the clause through untouched fails this test.
+    given:
+      - input: source('mo_house', 'pdf_statute_refs')
+        format: sql
+        rows: |
+            select cast(' https://documents.house.mo.gov/t/1.pdf ' as varchar) as url, cast('251' as varchar) as session_code, cast('251-HB1.XML' as varchar) as file_name, cast('1234H.01' as varchar) as lr_number, cast('IN' as varchar) as version_code, cast(1 as integer) as ordinal, cast('repeal' as varchar) as action, cast(' 1.010 ' as varchar) as section_start, cast('1.050' as varchar) as section_end, cast(2023 as integer) as supp_year, cast('To repeal sections 1.010 to 1.0' || chr(0) || '50, RSMo Supp. 2023' || chr(1) as varchar) as clause union all
+            select 'https://documents.house.mo.gov/t/1.pdf', '251', '251-HB1.XML', '1234H.01', 'IN', 1, 'enact', '1.011', null, null, 'to be known as section 1.011'
+    expect:
+      rows:
+        - {document_url: 'https://documents.house.mo.gov/t/1.pdf', action: repeal, ordinal: 1, section_start: '1.010', section_end: '1.050', supp_year: 2023, clause_text: 'To repeal sections 1.010 to 1.050, RSMo Supp. 2023'}
+        - {document_url: 'https://documents.house.mo.gov/t/1.pdf', action: enact, ordinal: 1, section_start: '1.011', section_end: null, supp_year: null, clause_text: to be known as section 1.011}

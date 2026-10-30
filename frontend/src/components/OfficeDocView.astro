@@ -1,0 +1,179 @@
+---
+// One reference doc (docs/reference/office_*.md) as a page body: the same layout for every office. Shared by
+// the responsibilities page and the requirements page (#296) so both read the same way.
+import { officeCoverage, type OfficeDoc } from "../lib/officeDoc";
+import { href } from "../lib/site";
+
+interface Props {
+  doc: OfficeDoc;
+  /** Repo path of the markdown, linked as the source of the text. */
+  sourcePath: string;
+  /** Show a coverage strip (which project sources cover each bullet). Responsibilities only. */
+  coverage?: boolean;
+}
+const { doc, sourcePath, coverage = false } = Astro.props;
+const SOURCE_URL = `https://github.com/akettmann/missouri_gov_feed/blob/main/${sourcePath}`;
+const STATE = { loaded: "● loaded", candidate: "○ not loaded yet" } as const;
+---
+
+<p class="lede muted">
+  Legal text checked <time datetime={doc.checked}>{doc.checked}</time>. Written from{" "}
+  <a href={SOURCE_URL}>{sourcePath}</a>.
+</p>
+
+<section class="card preface" set:html={doc.prefaceHtml} />
+
+<nav class="card toc" aria-label="Offices on this page">
+  <ul>
+    {doc.offices.map((o) => (
+      <li>
+        <a href={`#${o.id}`}>{o.title}</a>
+      </li>
+    ))}
+  </ul>
+</nav>
+
+{doc.offices.map((o) => {
+  const cov = officeCoverage(o, doc.names);
+  const example = Math.min(2, cov.total);
+  return (
+    <section class="card office" id={o.id}>
+      <h2>{o.title}</h2>
+      {o.introHtml && <div set:html={o.introHtml} />}
+      {coverage && (
+        <>
+          <ul class="strip" aria-label={`Project sources that cover ${o.title}`}>
+            {cov.cells.map((c) => (
+              <li class={`cell ${c.kind}`}>
+                <span class="label">{c.name}</span>
+                <span class="state">{STATE[c.kind]}</span>
+                <span class="muted small">
+                  {c.bullets} of {cov.total} {cov.total === 1 ? "item" : "items"}
+                </span>
+              </li>
+            ))}
+            {cov.noData > 0 && (
+              <li class="cell none">
+                <span class="label">no data yet</span>
+                <span class="state">○ none loaded</span>
+                <span class="muted small">
+                  {cov.noData} of {cov.total} {cov.total === 1 ? "item" : "items"}
+                </span>
+              </li>
+            )}
+          </ul>
+          <p class="gaps small muted">
+            Each source box counts the items below whose "Data" line names that source, so "{example} of{" "}
+            {cov.total}" means {example} of this office's {cov.total} {cov.total === 1 ? "item" : "items"}.
+            One item can name several sources, so the boxes can add up to more than {cov.total}. The "no data
+            yet" box counts items with no loaded source. A source can cover an item only in part, and the
+            "Data" line says so when it does. A gap means we have not loaded data on that duty or power. It
+            says nothing about the officeholder.{" "}
+            <a href={href("/methodology/#coverage")}>How to read these gaps</a>
+          </p>
+        </>
+      )}
+      <ul class="items">
+        {o.bullets.map((b) => (
+          <li>
+            <span class="tag">{b.label}</span>
+            <span set:html={b.html} />
+            {b.dataHtml !== null && (
+              <span class="data small muted">
+                Data: <span set:html={b.dataHtml} />
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {o.notes.length > 0 && (
+        <>
+          <h3>Notes</h3>
+          <ol class="notes small">
+            {o.notes.map((n) => (
+              <li id={`${o.id}-n${n.n}`} value={n.n} set:html={n.html} />
+            ))}
+          </ol>
+        </>
+      )}
+    </section>
+  );
+})}
+
+{doc.otherSections.map((s) => (
+  <section class="card" id={s.id}>
+    <h2>{s.title}</h2>
+    <div set:html={s.introHtml} />
+  </section>
+))}
+
+<style>
+  .toc ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    columns: 2 220px;
+  }
+  .items {
+    list-style: none;
+    padding: 0;
+    margin: 12px 0 0;
+    display: grid;
+    gap: 10px;
+  }
+  .items li {
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .tag {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 1px 8px;
+    margin-right: 6px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  .data {
+    display: block;
+    margin-top: 2px;
+  }
+  .notes {
+    padding-left: 1.5rem;
+  }
+  .notes li::marker {
+    content: "[" counter(list-item) "] ";
+  }
+  .strip {
+    list-style: none;
+    padding: 0;
+    margin: 12px 0 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 6px;
+  }
+  .cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 0.8125rem;
+  }
+  .label {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .candidate,
+  .none {
+    background: var(--surface-2);
+  }
+  .gaps {
+    margin: 8px 0 0;
+    line-height: 1.4;
+  }
+</style>

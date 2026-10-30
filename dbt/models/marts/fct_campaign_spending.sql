@@ -22,26 +22,27 @@ with tap as (
         'tap_cd3_b:' || cast(e.record_id as {{ dbt.type_string() }}) as source_record_id
     from {{ ref('stg_tap_mec__expenditures') }} as e
     inner join {{ ref('int_mec__official_committees') }} as m on e.mec_committee_id = m.mec_committee_id
-){% if var('mec_direct', false) %},
+){% if var('mec_direct', false) %}
+    ,
 
-direct as (
-    select
-        m.official_id,
-        e.expenditure_date,
-        e.amount,
-        e.payee_name,
-        e.payee_city,
-        e.payee_state,
-        e.purpose,
-        e.expenditure_type,
-        m.committee_name,
-        m.mec_committee_id,
-        m.confidence as match_confidence,
-        'MEC' as source,
-        'mec_cd3_b:' || cast(e.record_id as {{ dbt.type_string() }}) as source_record_id
-    from {{ ref('stg_mec__expenditures') }} as e
-    inner join {{ ref('int_mec__official_committees') }} as m on e.mec_committee_id = m.mec_committee_id
-)
+    direct as (
+        select
+            m.official_id,
+            e.expenditure_date,
+            e.amount,
+            e.payee_name,
+            e.payee_city,
+            e.payee_state,
+            e.purpose,
+            e.expenditure_type,
+            m.committee_name,
+            m.mec_committee_id,
+            m.confidence as match_confidence,
+            'MEC' as source,
+            'mec_cd3_b:' || cast(e.record_id as {{ dbt.type_string() }}) as source_record_id
+        from {{ ref('stg_mec__expenditures') }} as e
+        inner join {{ ref('int_mec__official_committees') }} as m on e.mec_committee_id = m.mec_committee_id
+    )
 {% endif %}
 
 {% set cols = 'official_id, expenditure_date, amount, payee_name, payee_city, payee_state, purpose,

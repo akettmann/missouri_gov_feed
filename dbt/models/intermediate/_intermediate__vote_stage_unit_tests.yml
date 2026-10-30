@@ -1,0 +1,86 @@
+# Unit tests for the roll-call stage classifier (#804): fixed roll calls and a mocked rule seed -> exact stages.
+# The real rules are pinned by assert_vote_stage_rules_map_known_wordings.
+version: 2
+
+unit_tests:
+  - name: vote_stage_first_matching_rule_wins_per_chamber
+    model: int_votes__stage
+    description: >
+      Each stage is reached from its own rule; the lowest priority number that matches both the description and
+      the measure wins; rules apply only to their own chamber (House calendar text in a Senate row, and the other
+      way round, is unknown); a roll call no rule matches, or one with no description and no matching measure
+      rule, is `unknown`, never null. The informal marker is read from a House calendar item only.
+    given:
+      - input: ref('int_mo_house__votes')
+        rows:
+          - {chamber: state_house, vote_id: h_third, calendar_item: HBs FOR THIRD READING, measure: HB 1}
+          - {chamber: state_house, vote_id: h_third, calendar_item: HBs FOR THIRD READING, measure: HB 1}
+          - {chamber: state_house, vote_id: h_perf_inf, calendar_item: HBs PERFECTION - INFORMAL, measure: HB 2}
+          - {chamber: state_house, vote_id: h_consent, calendar_item: HBs 3rd READING - CONSENT, measure: HB 3}
+          - {chamber: state_house, vote_id: h_consent_inf, calendar_item: HBs 3rd READ-CONSENT-INF, measure: HB 3}
+          - {chamber: state_house, vote_id: h_conf, calendar_item: BILLS IN CONFERENCE, measure: CCR SCS HB 4}
+          - {chamber: state_house, vote_id: h_veto, calendar_item: VETOED HOUSE BILLS, measure: CCS HB 5}
+          - {chamber: state_house, vote_id: h_sen_amd, calendar_item: HBs w/SENATE AMENDMENTS - INF, measure: HB 6}
+          - {chamber: state_house, vote_id: h_quorum, calendar_item: General, measure: QUORUM}
+          - {chamber: state_house, vote_id: h_journal, calendar_item: null, measure: APPROVE JOURNAL}
+          - {chamber: state_house, vote_id: h_pq, calendar_item: General, measure: PQ}
+          - {chamber: state_house, vote_id: h_res, calendar_item: HOUSE RESOLUTIONS, measure: HR 7}
+          - {chamber: state_house, vote_id: h_unknown, calendar_item: General, measure: HCS SB 182}
+          - {chamber: state_house, vote_id: h_null, calendar_item: null, measure: null}
+          - {chamber: state_house, vote_id: h_senate_text, calendar_item: The emergency clause was adopted, measure: HB 8}
+      - input: ref('int_mo_senate__votes')
+        rows:
+          - {chamber: state_senate, vote_id: s_third, context: 'On motion of Senator X, HB 1 was read the 3rd time and passed by the following vote:', measure: HB 1}
+          - {chamber: state_senate, vote_id: s_emerg, context: 'The emergency clause was adopted by the following vote:', measure: null}
+          - {chamber: state_senate, vote_id: s_amd, context: 'SA 1 failed of adoption by the following vote:', measure: SB 2}
+          - {chamber: state_senate, vote_id: s_conf, context: 'Senator X moved that the above conference committee report be adopted, which motion prevailed by the following vote:', measure: HB 3}
+          - {chamber: state_senate, vote_id: s_pq, context: 'The motion to move the previous question was adopted by the following vote:', measure: null}
+          - {chamber: state_senate, vote_id: s_res, context: 'On motion of Senator X, HCR 1 was adopted by the following vote:', measure: HCR 1}
+          - {chamber: state_senate, vote_id: s_perf, context: 'HCS for SB 4 was declared perfected and ordered printed by the following vote:', measure: SB 4}
+          - {chamber: state_senate, vote_id: s_artifact, context: 'Journal of the Senate 1234', measure: null}
+          - {chamber: state_senate, vote_id: s_house_text, context: HBs FOR THIRD READING INFORMAL, measure: null}
+      - input: ref('mo_vote_stage_rules')
+        rows:
+          - {chamber: state_house, priority: 30, description_pattern: '%consent%', measure_pattern: '%', stage: third_reading_consent}
+          - {chamber: state_house, priority: 40, description_pattern: '%conference%', measure_pattern: '%', stage: conference}
+          - {chamber: state_house, priority: 20, description_pattern: '%veto%', measure_pattern: '%', stage: veto_override}
+          - {chamber: state_house, priority: 50, description_pattern: '%senate amendments%', measure_pattern: '%', stage: senate_amendments}
+          - {chamber: state_house, priority: 60, description_pattern: '%perfection%', measure_pattern: '%', stage: perfection}
+          - {chamber: state_house, priority: 70, description_pattern: '%3rd read%', measure_pattern: '%', stage: third_reading}
+          - {chamber: state_house, priority: 71, description_pattern: '%third reading%', measure_pattern: '%', stage: third_reading}
+          - {chamber: state_house, priority: 90, description_pattern: '%resolutions', measure_pattern: '%', stage: resolution}
+          - {chamber: state_house, priority: 100, description_pattern: '%', measure_pattern: 'quorum%', stage: quorum}
+          - {chamber: state_house, priority: 101, description_pattern: '%', measure_pattern: 'approve journal%', stage: procedural_motion}
+          - {chamber: state_house, priority: 102, description_pattern: '%', measure_pattern: 'pq', stage: previous_question}
+          - {chamber: state_senate, priority: 20, description_pattern: '%conference committee report%', measure_pattern: '%', stage: conference}
+          - {chamber: state_senate, priority: 30, description_pattern: '%emergency clause%', measure_pattern: '%', stage: emergency_clause}
+          - {chamber: state_senate, priority: 40, description_pattern: '%previous question%', measure_pattern: '%', stage: previous_question}
+          - {chamber: state_senate, priority: 50, description_pattern: '%declared perfected%', measure_pattern: '%', stage: perfection}
+          - {chamber: state_senate, priority: 60, description_pattern: '%3rd time and passed%', measure_pattern: '%', stage: third_reading}
+          - {chamber: state_senate, priority: 70, description_pattern: '%sa %failed of adoption%', measure_pattern: '%', stage: amendment}
+          - {chamber: state_senate, priority: 100, description_pattern: '%was adopted by the following vote%', measure_pattern: '%', stage: resolution}
+    expect:
+      rows:
+        - {chamber: state_house, vote_id: h_third, vote_stage: third_reading, vote_informal: false}
+        - {chamber: state_house, vote_id: h_perf_inf, vote_stage: perfection, vote_informal: true}
+        - {chamber: state_house, vote_id: h_consent, vote_stage: third_reading_consent, vote_informal: false}
+        - {chamber: state_house, vote_id: h_consent_inf, vote_stage: third_reading_consent, vote_informal: true}
+        - {chamber: state_house, vote_id: h_conf, vote_stage: conference, vote_informal: false}
+        - {chamber: state_house, vote_id: h_veto, vote_stage: veto_override, vote_informal: false}
+        - {chamber: state_house, vote_id: h_sen_amd, vote_stage: senate_amendments, vote_informal: true}
+        - {chamber: state_house, vote_id: h_quorum, vote_stage: quorum, vote_informal: false}
+        - {chamber: state_house, vote_id: h_journal, vote_stage: procedural_motion, vote_informal: false}
+        - {chamber: state_house, vote_id: h_pq, vote_stage: previous_question, vote_informal: false}
+        - {chamber: state_house, vote_id: h_res, vote_stage: resolution, vote_informal: false}
+        - {chamber: state_house, vote_id: h_unknown, vote_stage: unknown, vote_informal: false}
+        - {chamber: state_house, vote_id: h_null, vote_stage: unknown, vote_informal: false}
+        - {chamber: state_house, vote_id: h_senate_text, vote_stage: unknown, vote_informal: false}
+        - {chamber: state_senate, vote_id: s_third, vote_stage: third_reading, vote_informal: false}
+        - {chamber: state_senate, vote_id: s_emerg, vote_stage: emergency_clause, vote_informal: false}
+        - {chamber: state_senate, vote_id: s_amd, vote_stage: amendment, vote_informal: false}
+        - {chamber: state_senate, vote_id: s_conf, vote_stage: conference, vote_informal: false}
+        - {chamber: state_senate, vote_id: s_pq, vote_stage: previous_question, vote_informal: false}
+        - {chamber: state_senate, vote_id: s_res, vote_stage: resolution, vote_informal: false}
+        - {chamber: state_senate, vote_id: s_perf, vote_stage: perfection, vote_informal: false}
+        - {chamber: state_senate, vote_id: s_artifact, vote_stage: unknown, vote_informal: false}
+        - {chamber: state_senate, vote_id: s_house_text, vote_stage: unknown, vote_informal: false}

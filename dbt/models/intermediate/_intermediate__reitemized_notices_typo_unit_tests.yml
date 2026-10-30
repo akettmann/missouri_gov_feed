@@ -1,0 +1,71 @@
+# Unit tests for #735: the typo tier of the 24-hour-notice dedupe never pairs a change to a short word.
+version: 2
+
+unit_tests:
+  - name: tap_contributions_notice_dedupe_typo_short_words
+    model: int_tap_mec__contributions
+    description: >
+      Typo tier (#735). Two names that differ by a letter inside a short word are two people and both lines stay:
+      Ann / Anne (a), Joan / John (b), Sara / Sarah (c), Jon / Joan (d). A typo inside a word of 5+ letters still pairs
+      and the notice is dropped: Froelich / Froehlich (e), Lathrop / Lanthrop (f), Hoberock / Hobrock (g), two typos in
+      Constructors Association (h), Rentals / Rental (i). The e-i names are real typo pairs found in the October 2026 data.
+    given:
+      - input: ref('stg_tap_mec__contributions')
+        rows:
+          - {record_id: na, mec_committee_id: T1, contributor_name: Citizens for Ann Smith, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fa, mec_committee_id: T1, contributor_name: Citizens for Anne Smith, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nb, mec_committee_id: T2, contributor_name: Joan Wilson Smith, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fb, mec_committee_id: T2, contributor_name: John Wilson Smith, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nc, mec_committee_id: T3, contributor_name: Sara Jones Smith, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fc, mec_committee_id: T3, contributor_name: Sarah Jones Smith, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nd, mec_committee_id: T4, contributor_name: Committee to Elect Jon Smith, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fd, mec_committee_id: T4, contributor_name: Committee to Elect Joan Smith, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: ne, mec_committee_id: T5, contributor_name: Fran Froelich, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fe, mec_committee_id: T5, contributor_name: Fran Froehlich, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nf, mec_committee_id: T6, contributor_name: Lathrop GPM, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: ff, mec_committee_id: T6, contributor_name: Lanthrop GPM, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: ng, mec_committee_id: T7, contributor_name: greg hoberock, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fg, mec_committee_id: T7, contributor_name: Greg Hobrock, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nh, mec_committee_id: T8, contributor_name: Heavy Constructors Assocation, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fh, mec_committee_id: T8, contributor_name: Heavy Construtors Association, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: ni, mec_committee_id: T9, contributor_name: Platte Rentals and Supply, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fi, mec_committee_id: T9, contributor_name: Platte Rental & Supply, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+    expect:
+      rows:
+        - {record_id: na}
+        - {record_id: fa}
+        - {record_id: nb}
+        - {record_id: fb}
+        - {record_id: nc}
+        - {record_id: fc}
+        - {record_id: nd}
+        - {record_id: fd}
+        - {record_id: fe}
+        - {record_id: ff}
+        - {record_id: fg}
+        - {record_id: fh}
+        - {record_id: fi}
+
+  - name: direct_contributions_notice_dedupe_typo_short_words
+    model: int_mec__contributions_direct
+    description: >
+      The same typo rule for the MEC direct export (#735): Ann / Anne stays (a), Froelich / Froehlich (e) and
+      Lathrop / Lanthrop (f) are dropped.
+    overrides:
+      vars:
+        mec_direct: true
+    given:
+      - input: ref('stg_mec__contributions')
+        rows:
+          - {record_id: na, mec_committee_id: U1, contributor_name: Citizens for Ann Smith, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fa, mec_committee_id: U1, contributor_name: Citizens for Anne Smith, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: ne, mec_committee_id: U2, contributor_name: Fran Froelich, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: fe, mec_committee_id: U2, contributor_name: Fran Froehlich, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: nf, mec_committee_id: U3, contributor_name: Lathrop GPM, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: ff, mec_committee_id: U3, contributor_name: Lanthrop GPM, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+    expect:
+      rows:
+        - {record_id: na}
+        - {record_id: fa}
+        - {record_id: fe}
+        - {record_id: ff}

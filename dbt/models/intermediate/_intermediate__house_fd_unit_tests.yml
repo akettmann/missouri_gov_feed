@@ -1,0 +1,177 @@
+# Unit tests for int_house_fd__schedule_lines: PDFs from 2021 on extract small-caps text as NUL characters
+# ("S" + 7 NULs = "Schedule"), which must still be recognized as schedule headers (#576).
+version: 2
+
+unit_tests:
+  - name: house_fd_schedule_headers_survive_nul_small_caps
+    model: int_house_fd__schedule_lines
+    description: >
+      A schedule header whose small-caps letters extracted as NULs ("S" + 7 NULs + " A:") opens its schedule just
+      like the plain-text header of older PDFs; "A and B" headers (3 NULs for "and") open schedule A; the NUL labels
+      (Location, Description, Comments, running page headers) come out readable or as the known words and never
+      carry a NUL; a label that only starts with S (the "Subholding of" label, S + 9 NULs + " O" + 1 NUL) or has the
+      wrong NUL count (S + 6) is not a header, so a document with no real header yields no lines. The closing pages
+      of the form ("Exclusions of spouse..." question, trust/exemption questions, "Yes No", "Certification and
+      Signature", the certify line, "Digitally Signed") belong to no schedule, so no line after them is emitted (not
+      under the schedule that came last, e.g. J); a "Schedule A Investment Vehicle Details" block that follows
+      Schedule J lands under A (not J); the "Subholding Of:" and "Filing Status:" labels are restored.
+    given:
+      - input: ref('stg_house_fd__pdf_lines')
+        format: sql
+        rows: |
+          select 'nul' as doc_id, 'u_nul' as document_url, true as has_text, 1 as page, 1 as line_no, 'Filing ID #1' as line_text union all
+          select 'nul', 'u_nul', true, 1, 2, 'F' || repeat(chr(0), 8) || ' D' || repeat(chr(0), 9) || ' R' || repeat(chr(0), 5) union all
+          select 'nul', 'u_nul', true, 1, 3, 'S' || repeat(chr(0), 7) || ' A: A' || repeat(chr(0), 5) || ' ' || repeat(chr(0), 3) || ' "U' || repeat(chr(0), 7) || '" I' || repeat(chr(0), 5) union all
+          select 'nul', 'u_nul', true, 1, 4, 'Asset Owner Value of Asset Income Type(s) Income Tx. >' union all
+          select 'nul', 'u_nul', true, 1, 5, 'Acme Bank [BA] SP $1,001 - $15,000 Interest $201 - $1,000' union all
+          select 'nul', 'u_nul', true, 1, 6, 'L' || repeat(chr(0), 7) || ': Kansas City, MO, US' union all
+          select 'nul', 'u_nul', true, 1, 7, 'D' || repeat(chr(0), 10) || ': Family farm' union all
+          select 'nul', 'u_nul', true, 1, 8, 'C' || repeat(chr(0), 7) || ': managed by a trust' union all
+          select 'nul', 'u_nul', true, 1, 9, 'S' || repeat(chr(0), 9) || ' O' || repeat(chr(0), 1) || ': Fidelity Trust' union all
+          select 'nul', 'u_nul', true, 1, 10, 'S' || repeat(chr(0), 7) || ' C: E' || repeat(chr(0), 5) || ' I' || repeat(chr(0), 5) union all
+          select 'nul', 'u_nul', true, 1, 11, 'Source Type Amount' union all
+          select 'nul', 'u_nul', true, 1, 12, 'Example Co Salary $50,000' union all
+          select 'nul', 'u_nul', true, 1, 13, 'C' || repeat(chr(0), 12) || ' ' || repeat(chr(0), 3) || ' S' || repeat(chr(0), 8) union all
+          select 'nul', 'u_nul', true, 1, 14, 'Yes No' union all
+          select 'nul', 'u_nul', true, 1, 15, 'Digitally Signed: A Member , 01/01/2022' union all
+          select 'form', 'u_form', true, 1, 1, 'S' || repeat(chr(0), 7) || ' J: C' || repeat(chr(0), 10) || ' O' || repeat(chr(0), 3) || ' $5,000' union all
+          select 'form', 'u_form', true, 1, 2, 'Acme Corp, Springfield, MO $60,000 Salary' union all
+          select 'form', 'u_form', true, 1, 3, 'S' || repeat(chr(0), 7) || ' A I' || repeat(chr(0), 9) || ' V' || repeat(chr(0), 6) || ' D' || repeat(chr(0), 6) union all
+          select 'form', 'u_form', true, 1, 4, 'Schwab IRA' union all
+          select 'form', 'u_form', true, 1, 5, 'F' || repeat(chr(0), 5) || ' S' || repeat(chr(0), 5) || ': New' union all
+          select 'form', 'u_form', true, 1, 6, 'E' || repeat(chr(0), 9) || ' ' || repeat(chr(0), 2) || ' S' || repeat(chr(0), 5) || ', D' || repeat(chr(0), 8) || ', ' || repeat(chr(0), 2) || ' T' || repeat(chr(0), 4) || ' I' || repeat(chr(0), 10) union all
+          select 'form', 'u_form', true, 1, 7, 'Trusts: Details regarding "Qualified Blind Trusts" need not be disclosed.' union all
+          select 'form', 'u_form', true, 1, 8, 'Yes No' union all
+          select 'form', 'u_form', true, 1, 9, 'I CERTIFY that the statements I have made are true.' union all
+          select 'cert', 'u_cert', true, 1, 1, 'S' || repeat(chr(0), 7) || ' J: C' || repeat(chr(0), 10) || ' O' || repeat(chr(0), 3) || ' $5,000' union all
+          select 'cert', 'u_cert', true, 1, 2, 'Beta LLC, Kansas City, MO $9,000 Consulting' union all
+          select 'cert', 'u_cert', true, 1, 3, 'CerTiFiCATion AnD SignATure' union all
+          select 'cert', 'u_cert', true, 1, 4, 'Digitally Signed: A Member , 01/01/2022' union all
+          select 'plain', 'u_plain', true, 1, 1, 'ScheDule A: aSSetS anD "unearneD" income' union all
+          select 'plain', 'u_plain', true, 1, 2, 'Widget Fund [MF] $15,001 - $50,000' union all
+          select 'ab', 'u_ab', true, 1, 1, 'S' || repeat(chr(0), 7) || ' A ' || repeat(chr(0), 3) || ' B A' || repeat(chr(0), 4) || ' C' || repeat(chr(0), 4) || ' D' || repeat(chr(0), 6) union all
+          select 'ab', 'u_ab', true, 1, 2, 'Some Fund [MF] $1,001 - $15,000' union all
+          select 'short', 'u_short', true, 1, 1, 'S' || repeat(chr(0), 6) || ' A: not a schedule header' union all
+          select 'short', 'u_short', true, 1, 2, 'Ghost Asset [BA] $1,001 - $15,000'
+    expect:
+      rows:
+        - {doc_id: nul, line_no: 5, schedule: 'A: assets & unearned income', owner_code: SP, amount_range: '$1,001 - $15,000', line_text: 'Acme Bank [BA] SP $1,001 - $15,000 Interest $201 - $1,000'}
+        - {doc_id: nul, line_no: 6, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Location: Kansas City, MO, US'}
+        - {doc_id: nul, line_no: 7, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Description: Family farm'}
+        - {doc_id: nul, line_no: 8, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Comments: managed by a trust'}
+        - {doc_id: nul, line_no: 9, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Subholding Of: Fidelity Trust'}
+        - {doc_id: nul, line_no: 12, schedule: 'C: earned income', owner_code: null, amount_range: '$50,000', line_text: 'Example Co Salary $50,000'}
+        - {doc_id: form, line_no: 2, schedule: 'J: compensation over $5,000 from one source', owner_code: null, amount_range: '$60,000', line_text: 'Acme Corp, Springfield, MO $60,000 Salary'}
+        - {doc_id: form, line_no: 4, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Schwab IRA'}
+        - {doc_id: form, line_no: 5, schedule: 'A: assets & unearned income', owner_code: null, amount_range: null, line_text: 'Filing Status: New'}
+        - {doc_id: cert, line_no: 2, schedule: 'J: compensation over $5,000 from one source', owner_code: null, amount_range: '$9,000', line_text: 'Beta LLC, Kansas City, MO $9,000 Consulting'}
+        - {doc_id: plain, line_no: 2, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$15,001 - $50,000', line_text: 'Widget Fund [MF] $15,001 - $50,000'}
+        - {doc_id: ab, line_no: 2, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Some Fund [MF] $1,001 - $15,000'}
+
+  - name: house_fd_column_header_spill_dropped
+    model: int_house_fd__schedule_lines
+    description: >
+      Column headers that wrap onto lines of their own ("Type(s) of Income, Current Year to Filing / Preceding Year",
+      the schedule B / D / H headers, the asset-type-code footnote, the PTR "IPO / IVD" labels) are not entries, so
+      none comes out as a schedule row (and none becomes a tie). The match is anchored to the whole line: a real asset
+      whose name merely starts with a header word ("Year End Fund", "Filing Fee Escrow", "Liability Insurance Co")
+      stays (#599).
+    given:
+      - input: ref('stg_house_fd__pdf_lines')
+        format: sql
+        rows: |
+          select 'hdr' as doc_id, 'u_hdr' as document_url, true as has_text, 1 as page, 1 as line_no, 'Schedule A: Assets and "Unearned" Income' as line_text union all
+          select 'hdr', 'u_hdr', true, 1, 2, 'Asset Owner Value of Asset Income Type(s) Income' union all
+          select 'hdr', 'u_hdr', true, 1, 3, 'Type(s) Current Year to Filing' union all
+          select 'hdr', 'u_hdr', true, 1, 4, 'Preceding Year' union all
+          select 'hdr', 'u_hdr', true, 1, 5, 'to Filing Year' union all
+          select 'hdr', 'u_hdr', true, 1, 6, 'type(s) current year to preceding' union all
+          select 'hdr', 'u_hdr', true, 1, 7, 'Year End Fund [MF] $1,001 - $15,000 Dividends $1 - $200' union all
+          select 'hdr', 'u_hdr', true, 1, 8, 'https://fd.house.gov/reference/asset-type-codes.aspx.' union all
+          select 'hdr', 'u_hdr', true, 1, 9, '* Asset class details available at the bottom of this form.' union all
+          select 'hdr', 'u_hdr', true, 1, 10, 'Filing Fee Escrow [BA] $1,001 - $15,000 None' union all
+          select 'hdr', 'u_hdr', true, 2, 1, 'Schedule B: Transactions' union all
+          select 'hdr', 'u_hdr', true, 2, 2, 'Asset Owner Date Tx. Amount Cap.' union all
+          select 'hdr', 'u_hdr', true, 2, 3, 'Type Gains >' union all
+          select 'hdr', 'u_hdr', true, 2, 4, 'Acme Stock [ST] SP 01/02/2022 P $1,001 - $15,000' union all
+          select 'hdr', 'u_hdr', true, 3, 1, 'Schedule D: Liabilities' union all
+          select 'hdr', 'u_hdr', true, 3, 2, 'Owner Creditor Date Incurred Type Amount of' union all
+          select 'hdr', 'u_hdr', true, 3, 3, 'Liability' union all
+          select 'hdr', 'u_hdr', true, 3, 4, 'Liability Insurance Co Mortgage $100,001 - $250,000' union all
+          select 'hdr', 'u_hdr', true, 4, 1, 'Schedule H: Travel Payments and Reimbursements' union all
+          select 'hdr', 'u_hdr', true, 4, 2, 'Source Start End Date Itinerary Days at Own Lodging? Food? Family?' union all
+          select 'hdr', 'u_hdr', true, 4, 3, 'Date Own Exp.' union all
+          select 'hdr', 'u_hdr', true, 4, 4, 'Trip Details Inclusions' union all
+          select 'hdr', 'u_hdr', true, 4, 5, 'Exp.' union all
+          select 'hdr', 'u_hdr', true, 4, 6, 'Some Caucus 01/02/2022 01/04/2022 Kansas City, MO - Washington, DC - Kansas City, MO 3 Yes Yes No' union all
+          select 'hdr', 'u_hdr', true, 5, 1, 'Schedule I: Payments Made to Charity in Lieu of Honoraria' union all
+          select 'hdr', 'u_hdr', true, 5, 2, 'Source Activity Date Amount Charity Name' union all
+          select 'hdr', 'u_hdr', true, 6, 1, 'Schedule A: Assets and "Unearned" Income' union all
+          select 'hdr', 'u_hdr', true, 6, 2, 'Yes No' union all
+          select 'hdr', 'u_hdr', true, 6, 3, 'I P O'
+    expect:
+      rows:
+        - {doc_id: hdr, page: 1, line_no: 7, schedule: 'A: assets & unearned income', line_text: 'Year End Fund [MF] $1,001 - $15,000 Dividends $1 - $200'}
+        - {doc_id: hdr, page: 1, line_no: 10, schedule: 'A: assets & unearned income', line_text: 'Filing Fee Escrow [BA] $1,001 - $15,000 None'}
+        - {doc_id: hdr, page: 2, line_no: 4, schedule: 'B: transactions', line_text: 'Acme Stock [ST] SP 01/02/2022 P $1,001 - $15,000'}
+        - {doc_id: hdr, page: 3, line_no: 4, schedule: 'D: liabilities', line_text: 'Liability Insurance Co Mortgage $100,001 - $250,000'}
+        - {doc_id: hdr, page: 4, line_no: 6, schedule: 'H: travel', line_text: 'Some Caucus 01/02/2022 01/04/2022 Kansas City, MO - Washington, DC - Kansas City, MO 3 Yes Yes No'}
+
+  - name: house_fd_wrapped_tie_entries_joined
+    model: int_house_fd__schedule_lines
+    description: >
+      An entry the PDF wraps over several lines is one row, so its tail never becomes a tie of its own. Schedule C: a
+      line with no amount ("$..." or "N/A") or a "Comments:" line belongs to the entry above, and the joined row keeps
+      the first line's amount and owner code (a tail must not add an owner code). Schedule F: a line that does not start
+      with the agreement's date. Schedules C, E, F, J: a line that closes a parenthesis the line above left open, or
+      starts with one. The head line's page / line number stay the row's identity. A line with none of these signals is
+      still an entry (a one-line position, the first row under a header); Schedule A joins only the tails it can recognise
+      (see house_fd_wrapped_entries_joined_a_b_d_h).
+    given:
+      - input: ref('stg_house_fd__pdf_lines')
+        format: sql
+        rows: |
+          select 'wrap' as doc_id, 'u_wrap' as document_url, true as has_text, 1 as page, 1 as line_no, 'Schedule C: Earned Income' as line_text union all
+          select 'wrap', 'u_wrap', true, 1, 2, 'KCMO Pension Plan, Benefit from Pension Plan, per $23,542.00 N/A' union all
+          select 'wrap', 'u_wrap', true, 1, 3, 'Employee, Kansas City, MO agreement between Cleaver and KCMO City' union all
+          select 'wrap', 'u_wrap', true, 1, 4, 'Government' union all
+          select 'wrap', 'u_wrap', true, 1, 5, 'Comments: spouse SP account' union all
+          select 'wrap', 'u_wrap', true, 1, 6, 'Heartland Tractor Spouse Salary N/A' union all
+          select 'wrap', 'u_wrap', true, 1, 7, 'Beta Corp SP Salary $1,000.00 $2,000.00' union all
+          select 'wrap', 'u_wrap', true, 2, 1, 'Schedule E: Positions' union all
+          select 'wrap', 'u_wrap', true, 2, 2, 'Board Member Jazz District Corporation' union all
+          select 'wrap', 'u_wrap', true, 2, 3, 'Partner (together with brothers and spouses Graves Brothers Farms' union all
+          select 'wrap', 'u_wrap', true, 2, 4, 'and Lesley Graves)' union all
+          select 'wrap', 'u_wrap', true, 2, 5, 'Trustee Real Estate Trust' union all
+          select 'wrap', 'u_wrap', true, 3, 1, 'Schedule F: Agreements' union all
+          select 'wrap', 'u_wrap', true, 3, 2, 'January 2006 City of Kansas City, MO Agreement between Cleaver and the City,' union all
+          select 'wrap', 'u_wrap', true, 3, 3, 'MO; Continuing Interest in Pension Plan Related to Former' union all
+          select 'wrap', 'u_wrap', true, 3, 4, 'Employment' union all
+          select 'wrap', 'u_wrap', true, 3, 5, '2000 State of Missouri Retirement Program' union all
+          select 'wrap', 'u_wrap', true, 3, 6, 'June 2013 Missouri State Retirement 401 plan Continued participation' union all
+          select 'wrap', 'u_wrap', true, 4, 1, 'Schedule J: Compensation Exceeding $5,000 Paid by One Source' union all
+          select 'wrap', 'u_wrap', true, 4, 2, 'Southern Star Pipeline, Inc. (Owensboro, Consulting services' union all
+          select 'wrap', 'u_wrap', true, 4, 3, 'KY, US)' union all
+          select 'wrap', 'u_wrap', true, 4, 4, 'Association of Electric Cooperatives Consulting services' union all
+          select 'wrap', 'u_wrap', true, 4, 5, '(Jefferson City, MO, US)' union all
+          select 'wrap', 'u_wrap', true, 4, 6, 'Winton Policy Group (Jefferson City, MO, US) Consulting services' union all
+          select 'wrap', 'u_wrap', true, 5, 1, 'Schedule A: Assets and "Unearned" Income' union all
+          select 'wrap', 'u_wrap', true, 5, 2, 'Widget Fund [MF] $15,001 - $50,000' union all
+          select 'wrap', 'u_wrap', true, 5, 3, 'Dividends' union all
+          select 'wrap', 'u_wrap', true, 5, 4, 'Gadget Fund [MF] $1,001 - $15,000'
+    expect:
+      rows:
+        - {doc_id: wrap, page: 1, line_no: 2, schedule: 'C: earned income', owner_code: null, amount_range: '$23,542', line_text: 'KCMO Pension Plan, Benefit from Pension Plan, per $23,542.00 N/A Employee, Kansas City, MO agreement between Cleaver and KCMO City Government Comments: spouse SP account'}
+        - {doc_id: wrap, page: 1, line_no: 6, schedule: 'C: earned income', owner_code: null, amount_range: null, line_text: 'Heartland Tractor Spouse Salary N/A'}
+        - {doc_id: wrap, page: 1, line_no: 7, schedule: 'C: earned income', owner_code: null, amount_range: '$1,000', line_text: 'Beta Corp SP Salary $1,000.00 $2,000.00'}
+        - {doc_id: wrap, page: 2, line_no: 2, schedule: 'E: positions', owner_code: null, amount_range: null, line_text: 'Board Member Jazz District Corporation'}
+        - {doc_id: wrap, page: 2, line_no: 3, schedule: 'E: positions', owner_code: null, amount_range: null, line_text: 'Partner (together with brothers and spouses Graves Brothers Farms and Lesley Graves)'}
+        - {doc_id: wrap, page: 2, line_no: 5, schedule: 'E: positions', owner_code: null, amount_range: null, line_text: 'Trustee Real Estate Trust'}
+        - {doc_id: wrap, page: 3, line_no: 2, schedule: 'F: agreements', owner_code: null, amount_range: null, line_text: 'January 2006 City of Kansas City, MO Agreement between Cleaver and the City, MO; Continuing Interest in Pension Plan Related to Former Employment'}
+        - {doc_id: wrap, page: 3, line_no: 5, schedule: 'F: agreements', owner_code: null, amount_range: null, line_text: '2000 State of Missouri Retirement Program'}
+        - {doc_id: wrap, page: 3, line_no: 6, schedule: 'F: agreements', owner_code: null, amount_range: null, line_text: 'June 2013 Missouri State Retirement 401 plan Continued participation'}
+        - {doc_id: wrap, page: 4, line_no: 2, schedule: 'J: compensation over $5,000 from one source', owner_code: null, amount_range: null, line_text: 'Southern Star Pipeline, Inc. (Owensboro, Consulting services KY, US)'}
+        - {doc_id: wrap, page: 4, line_no: 4, schedule: 'J: compensation over $5,000 from one source', owner_code: null, amount_range: null, line_text: 'Association of Electric Cooperatives Consulting services (Jefferson City, MO, US)'}
+        - {doc_id: wrap, page: 4, line_no: 6, schedule: 'J: compensation over $5,000 from one source', owner_code: null, amount_range: null, line_text: 'Winton Policy Group (Jefferson City, MO, US) Consulting services'}
+        - {doc_id: wrap, page: 5, line_no: 2, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$15,001 - $50,000', line_text: 'Widget Fund [MF] $15,001 - $50,000 Dividends'}
+        - {doc_id: wrap, page: 5, line_no: 4, schedule: 'A: assets & unearned income', owner_code: null, amount_range: '$1,001 - $15,000', line_text: 'Gadget Fund [MF] $1,001 - $15,000'}

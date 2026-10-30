@@ -1,11 +1,15 @@
 import itertools
+import os
 import subprocess
 import sys
 import threading
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import ClassVar
 
 import httpx
+import lxml.html
 import pytest
 
 from mogov import http
@@ -107,6 +111,44 @@ def test_speeding_warning_raises_and_is_not_cached(tmp_path, monkeypatch):
     with pytest.raises(mo_revisor.Warned):
         mo_revisor._get("https://revisor.mo.gov/main/OneChapter.aspx", {"chapter": "1"})
     assert not [p for p in tmp_path.iterdir() if not p.name.startswith(".")]
+
+
+SECTION_URL = "https://revisor.mo.gov/main/OneSection.aspx"
+
+
+def _serve(tmp_path, monkeypatch, answers: list[str]) -> list:
+    """Serve `answers` in turn (the last one repeats); returns the requests made."""
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url)
+        return httpx.Response(200, text=answers[min(len(calls), len(answers)) - 1])
+
+    monkeypatch.setattr(http, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(http, "_client", httpx.Client(transport=httpx.MockTransport(handler)))
+    monkeypatch.setattr(mo_revisor, "POLITE_DELAY", 0)
+    monkeypatch.setattr(mo_revisor.time, "sleep", lambda s: None)
+    monkeypatch.setattr(mo_revisor, "pause_host", lambda host, s: None)
+    return calls
+
+
+def test_home_page_served_for_a_section_is_refused_and_not_cached(tmp_path, monkeypatch):
+    # 161.415 bid 7908 once came back as the home page (table of contents), 200 and no redirect
+    _serve(tmp_path, monkeypatch, [read("home_excerpt.html")])
+    with pytest.raises(mo_revisor.Misserved):
+        mo_revisor._get_stamped(
+            SECTION_URL, {"section": "161.415", "bid": 7908}, backoff=(0,), check=mo_revisor._section_served
+        )
+    assert not [p for p in tmp_path.iterdir() if not p.name.startswith(".")]
+
+
+def test_home_page_served_for_a_section_is_retried(tmp_path, monkeypatch):
+    calls = _serve(tmp_path, monkeypatch, [read("home_excerpt.html"), read("section_1.010.html")])
+    page, _ = mo_revisor._get_stamped(
+        SECTION_URL, {"section": "1.010", "bid": 1}, backoff=(0,), check=mo_revisor._section_served
+    )
+    assert parse_section(page)["heading"]
+    assert len(calls) == 2
 
 
 def test_speeding_warning_backs_off_and_retries(tmp_path, monkeypatch):
@@ -231,10 +273,17 @@ def test_throttle_across_real_processes(tmp_path):
     assert min(b - a for a, b in itertools.pairwise(starts)) >= 0.29
 
 
+class _Added(list):
+    def __init__(self):
+        super().__init__()
+        self.payloads = {}
+
+
 def _loader_pages(monkeypatch, refused: set[str], n: int = 5):
     """Run mo_revisor.load on one chapter with sections 1.010, 1.020, ...; pages in `refused` get the warning."""
     sections = [(f"1.0{i}0", i) for i in range(1, n + 1)]
-    added, fetched = [], []
+    added, fetched = _Added(), []
+    added.checks = {}
 
     class Sink:
         counts: ClassVar[dict] = {}
@@ -250,22 +299,32 @@ def _loader_pages(monkeypatch, refused: set[str], n: int = 5):
 
         def add(self, table, key, payload, **k):
             added.append((table, key))
+            added.payloads[(table, key)] = payload
 
-    def fake_get(url, params=None, *, max_age=None, backoff=None):
+    def fake_get(url, params=None, *, max_age=None, backoff=None, check=mo_revisor._not_blocked):
+        added.checks[url.rsplit("/", 1)[-1]] = check
         if params and "section" in params:
             fetched.append(params["section"])
             if params["section"] in refused:
                 raise mo_revisor.Warned("warning page")
-        return "page"
+        return "page", "2026-05-01T12:00:00+00:00"
 
     monkeypatch.setattr(mo_revisor.db, "JsonSink", Sink)
-    monkeypatch.setattr(mo_revisor, "_get", fake_get)
+    monkeypatch.setattr(mo_revisor, "_get_stamped", fake_get)
+    monkeypatch.setattr(mo_revisor, "_get", lambda *a, **k: fake_get(*a, **k)[0])
     monkeypatch.setattr(mo_revisor, "parse_toc", lambda page: [{"title": "I", "chapter": "1", "chapter_name": "x"}])
     monkeypatch.setattr(mo_revisor, "parse_repeals", lambda page: [])
     monkeypatch.setattr(mo_revisor, "parse_chapter", lambda page: sections)
     monkeypatch.setattr(mo_revisor, "parse_section", lambda page: {"html": "h"})
     monkeypatch.delenv("CLOUD_RUN_TASK_COUNT", raising=False)
     return added, fetched
+
+
+def test_only_section_pages_must_carry_a_content_block(monkeypatch):
+    added, _ = _loader_pages(monkeypatch, refused=set())
+    mo_revisor.load(mo_revisor.db.UNSHARDED)
+    assert added.checks["OneSection.aspx"] is mo_revisor._section_served
+    assert {added.checks[page] for page in ("Home.aspx", "rx.aspx", "OneChapter.aspx")} == {mo_revisor._not_blocked}
 
 
 def test_a_section_page_that_stays_refused_is_skipped_not_fatal(monkeypatch):
@@ -342,7 +401,7 @@ def test_get_pauses_the_whole_host_on_a_warning(monkeypatch):
     monkeypatch.setattr(mo_revisor, "pause_host", lambda host, s: paused.append((host, s)))
     monkeypatch.setattr(mo_revisor, "WARNING_BACKOFF", (7,))
     monkeypatch.setattr(mo_revisor.time, "sleep", lambda s: None)
-    answers = iter([mo_revisor.Warned("w"), b"ok"])
+    answers = iter([mo_revisor.Warned("w"), (b"ok", 0.0)])
 
     def fake_fetch(*a, **k):
         r = next(answers)
@@ -350,7 +409,7 @@ def test_get_pauses_the_whole_host_on_a_warning(monkeypatch):
             raise r
         return r
 
-    monkeypatch.setattr(mo_revisor, "fetch", fake_fetch)
+    monkeypatch.setattr(mo_revisor, "fetch_stamped", fake_fetch)
     assert mo_revisor._get("https://revisor.mo.gov/main/x") == "ok"
     assert paused == [("revisor.mo.gov", 7)]
 
@@ -413,3 +472,119 @@ def test_repeal_rows_in_any_attribute_layout():
         {"kind": "repealed", "section": "1.5", "bid": 3, "note": "(Repealed 1975)", "date": "1/2/1975"},
         {"kind": "transferred", "section": "2.5", "bid": 4, "note": "(Transferred; now 3.5)", "date": None},
     ]
+
+
+@pytest.mark.parametrize(
+    "href",
+    [
+        "https://example.com/main/OneChapter.aspx?chapter=7",
+        "http://revisor.mo.gov/main/OneChapter.aspx?chapter=7",
+        "//example.com/main/OneChapter.aspx?chapter=7",
+        "https:/main/OneChapter.aspx?chapter=7",  # a scheme with no host is still not a site-relative link
+    ],
+)
+def test_links_to_other_hosts_are_not_followed(href):
+    assert mo_revisor.chapter_link(href) is None
+    assert (
+        mo_revisor.section_link(href.replace("OneChapter", "PageSelect").replace("chapter=7", "section=1.5&bid=3"))
+        is None
+    )
+    assert parse_toc(f"<details><summary><span>T</span></summary><a href='{href}'>7 Seven</a></details>") == []
+    assert mo_revisor.chapter_link("/main/OneChapter.aspx?chapter=7") == "7"
+
+
+def test_parser_never_touches_the_network():
+    page = (
+        '<!DOCTYPE html SYSTEM "http://example.invalid/x.dtd">'
+        '<a href="/main/PageSelect.aspx?section=1.5&amp;bid=3">s</a>'
+    )
+    assert parse_chapter(page) == [("1.5", 3)]
+
+
+def test_every_parse_uses_the_hardened_parser(monkeypatch):
+    seen = []
+
+    def spy(real):
+        def wrapper(*args, **kwargs):
+            seen.append(kwargs.get("parser"))
+            return real(*args, **kwargs)
+
+        return wrapper
+
+    monkeypatch.setattr(lxml.html, "fromstring", spy(lxml.html.fromstring))
+    monkeypatch.setattr(lxml.html, "fragment_fromstring", spy(lxml.html.fragment_fromstring))
+    for func, name in [
+        (parse_toc, "home_excerpt.html"),
+        (parse_chapter, "chapter_1.html"),
+        (parse_section, "section_1.010.html"),
+        (parse_repeals, "rx_excerpt.html"),
+    ]:
+        seen.clear()
+        func(read(name))
+        assert seen, f"{func.__name__} no longer parses through lxml.html"
+        assert all(parser is mo_revisor.PARSER for parser in seen), func.__name__
+
+
+def test_loader_records_the_pages_fetched_at_in_the_section_payload(monkeypatch):
+    added, _ = _loader_pages(monkeypatch, refused=set(), n=2)
+    mo_revisor.load(mo_revisor.db.UNSHARDED)
+    assert added.payloads[("mo_revisor_sections", "1.010/1")]["fetched_at"] == "2026-05-01T12:00:00+00:00"
+
+
+def test_loader_records_the_repeals_pages_fetched_at_on_every_row(monkeypatch):
+    added, _ = _loader_pages(monkeypatch, refused=set(), n=1)
+    monkeypatch.setattr(
+        mo_revisor, "parse_repeals", lambda page: [{"section": "9.1", "bid": 1}, {"section": "9.2", "bid": 2}]
+    )
+    mo_revisor.load(mo_revisor.db.UNSHARDED)
+    assert [added.payloads[("mo_revisor_repeals", k)]["fetched_at"] for k in ("9.1/1", "9.2/2")] == [
+        "2026-05-01T12:00:00+00:00"
+    ] * 2
+
+
+def _stamped_setup(tmp_path, monkeypatch):
+    monkeypatch.setattr(http, "CACHE_DIR", tmp_path)
+    hits = []
+
+    def handler(request):
+        hits.append(str(request.url))
+        return httpx.Response(200, content=b"<html>page</html>")
+
+    monkeypatch.setattr(http, "_client", httpx.Client(transport=httpx.MockTransport(handler)))
+    monkeypatch.setattr(mo_revisor, "POLITE_DELAY", 0)
+    return hits
+
+
+def test_fresh_fetch_is_stamped_with_the_time_it_was_fetched(tmp_path, monkeypatch):
+    _stamped_setup(tmp_path, monkeypatch)
+    before = datetime.now(UTC).replace(microsecond=0)
+    _, fetched_at = mo_revisor._get_stamped("https://revisor.mo.gov/main/OneSection.aspx", {"section": "1.010"})
+    after = datetime.now(UTC)
+    assert before <= datetime.fromisoformat(fetched_at) <= after
+
+
+def test_cache_hit_keeps_the_original_fetch_time_not_the_reuse_time(tmp_path, monkeypatch):
+    hits = _stamped_setup(tmp_path, monkeypatch)
+    url, params = "https://revisor.mo.gov/main/OneSection.aspx", {"section": "1.010"}
+    mo_revisor._get_stamped(url, params, max_age=mo_revisor.SECTION_MAX_AGE)
+    (entry,) = tmp_path.glob("*")
+    now = datetime(2026, 10, 28, 12, 0, 0, tzinfo=UTC)
+    long_ago = now - timedelta(days=30)
+    # one fixed clock for the expiry check and the backdated mtime, so the test does not age out with the calendar
+    monkeypatch.setattr(http, "time", SimpleNamespace(time=lambda: now.timestamp(), sleep=lambda s: None))
+    os.utime(entry, (long_ago.timestamp(), long_ago.timestamp()))  # the page was fetched a month ago
+    page, fetched_at = mo_revisor._get_stamped(url, params, max_age=mo_revisor.SECTION_MAX_AGE)
+    assert len(hits) == 1  # served from the cache
+    assert page == "<html>page</html>"
+    assert fetched_at == long_ago.isoformat()
+
+
+def test_expired_cache_entry_is_refetched_and_restamped(tmp_path, monkeypatch):
+    hits = _stamped_setup(tmp_path, monkeypatch)
+    url, params = "https://revisor.mo.gov/main/OneSection.aspx", {"section": "1.010"}
+    mo_revisor._get_stamped(url, params, max_age=60)
+    (entry,) = tmp_path.glob("*")
+    os.utime(entry, (1_700_000_000, 1_700_000_000))  # older than max_age
+    _, fetched_at = mo_revisor._get_stamped(url, params, max_age=60)
+    assert len(hits) == 2
+    assert datetime.fromisoformat(fetched_at).year >= 2026

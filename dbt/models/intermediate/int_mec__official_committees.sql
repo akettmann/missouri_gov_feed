@@ -63,58 +63,61 @@ matches as (
 {% if var('mec_direct', false) %}
 -- Exact links from MEC's own candidate<->committee crosswalk: same candidate name, and the office sought
 -- fits the official's current office (or the candidate name is unique in the crosswalk).
-crosswalk_names as (
-    select
-        candidate_key,
-        count(distinct mec_committee_id) as n_committees,
-        count(distinct office_sought) as n_offices
-    from {{ ref('stg_mec__candidate_committees') }}
-    group by 1
-),
+    crosswalk_names as (
+        select
+            candidate_key,
+            count(distinct mec_committee_id) as n_committees,
+            count(distinct office_sought) as n_offices
+        from {{ ref('stg_mec__candidate_committees') }}
+        group by 1
+    ),
 
-crosswalk as (
-    select distinct
-        k.official_id,
-        x.mec_committee_id,
-        x.committee_name,
-        'exact (MEC crosswalk)' as confidence
-    from {{ ref('stg_mec__candidate_committees') }} as x
-    inner join {{ ref('int_officials__name_keys') }} as k on x.candidate_key = k.variant_key
-    inner join crosswalk_names as n on x.candidate_key = n.candidate_key
-    where
-        k.level in ('state', 'local')
-        and (
-            n.n_offices = 1
-            or (k.office = 'state_house' and x.office_sought like '%State Representative%')
-            or (k.office = 'state_senate' and (x.office_sought like '%State Senator%' or x.office_sought like '%State Representative%'))
-            or (k.office = 'governor' and x.office_sought like '%Governor%')
-            or (k.office = 'lt_governor' and x.office_sought like '%Lieutenant Governor%')
-            or (k.office = 'secretary_of_state' and x.office_sought like '%Secretary of State%')
-            or (k.office = 'state_auditor' and x.office_sought like '%Auditor%')
-            or (k.office = 'state_treasurer' and x.office_sought like '%Treasurer%')
-            or (k.office = 'attorney_general' and x.office_sought like '%Attorney General%')
-            or (k.office like 'mo_%' and x.office_sought like '%Judge%')
-            or (k.office = 'mayor' and x.office_sought like '%Mayor%')
-        )
-),
+    crosswalk as (
+        select distinct
+            k.official_id,
+            x.mec_committee_id,
+            x.committee_name,
+            'exact (MEC crosswalk)' as confidence
+        from {{ ref('stg_mec__candidate_committees') }} as x
+        inner join {{ ref('int_officials__name_keys') }} as k on x.candidate_key = k.variant_key
+        inner join crosswalk_names as n on x.candidate_key = n.candidate_key
+        where
+            k.level in ('state', 'local')
+            and (
+                n.n_offices = 1
+                or (k.office = 'state_house' and x.office_sought like '%State Representative%')
+                or (
+                    k.office = 'state_senate'
+                    and (x.office_sought like '%State Senator%' or x.office_sought like '%State Representative%')
+                )
+                or (k.office = 'governor' and x.office_sought like '%Governor%')
+                or (k.office = 'lt_governor' and x.office_sought like '%Lieutenant Governor%')
+                or (k.office = 'secretary_of_state' and x.office_sought like '%Secretary of State%')
+                or (k.office = 'state_auditor' and x.office_sought like '%Auditor%')
+                or (k.office = 'state_treasurer' and x.office_sought like '%Treasurer%')
+                or (k.office = 'attorney_general' and x.office_sought like '%Attorney General%')
+                or (k.office like 'mo_%' and x.office_sought like '%Judge%')
+                or (k.office = 'mayor' and x.office_sought like '%Mayor%')
+            )
+    ),
 
-all_matches as (
-    select
-        official_id,
-        mec_committee_id,
-        committee_name,
-        confidence
-    from crosswalk
-    union all
-    -- name heuristics only for officials the crosswalk doesn't cover
-    select
-        official_id,
-        mec_committee_id,
-        committee_name,
-        confidence
-    from matches
-    where official_id not in (select c.official_id from crosswalk as c)
-)
+    all_matches as (
+        select
+            official_id,
+            mec_committee_id,
+            committee_name,
+            confidence
+        from crosswalk
+        union all
+        -- name heuristics only for officials the crosswalk doesn't cover
+        select
+            official_id,
+            mec_committee_id,
+            committee_name,
+            confidence
+        from matches
+        where official_id not in (select c.official_id from crosswalk as c)
+    )
 {% else %}
     all_matches as (
         select * from matches

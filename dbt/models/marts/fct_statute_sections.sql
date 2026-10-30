@@ -7,6 +7,10 @@
 -- A version can be on both pages: listed in force (or contingent) on its chapter page and printed on the repeals page
 -- with a future repeal ("Repealed L. 2026 S.B. 1233", contingent date 2099: 324.406/60569). It stays one row, the
 -- listed one, flagged repeal_pending; the repeals page's copy is dropped.
+-- fetched_at is when the section's page (or, for a repealed or transferred section, the repeals list) was fetched
+-- from revisor.mo.gov; null until the loader has run again since #852. loaded_at is when our pipeline last
+-- published the raw table, not the fetch time: section pages are served from the HTTP cache up to 180 days old,
+-- the repeals list up to 7.
 {% set as_of = "cast('" ~ var('as_of_date') ~ "' as date)" if var('as_of_date', none) else 'current_date' %}
 
 with repealed_ids as (
@@ -34,6 +38,8 @@ listed as (
         s.history_note,
         s.section_text,
         s.source_url,
+        s.fetched_at,
+        s.loaded_at,
         r.section_version_id is not null as repeal_pending
     from {{ ref('stg_mo_revisor__sections') }} as s
     left join repealed_ids as r on s.section_version_id = r.section_version_id
@@ -54,6 +60,8 @@ removed as (
         note as history_note,
         cast(null as {{ dbt.type_string() }}) as section_text,
         source_url,
+        fetched_at,
+        loaded_at,
         false as repeal_pending
     from {{ ref('stg_mo_revisor__repeals') }} as rp
     where not exists (
@@ -95,7 +103,9 @@ select
     v.history_note,
     v.section_text,
     v.repeal_pending,
-    v.source_url
+    v.source_url,
+    v.fetched_at,
+    v.loaded_at
 from versions as v
 left join {{ ref('stg_mo_revisor__chapters') }} as c on v.chapter = c.chapter
 left join latest_in_force as l on v.section_id = l.section_id

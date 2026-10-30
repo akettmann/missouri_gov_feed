@@ -8,7 +8,7 @@ Stable key for a current official, shared by every mart. Its prefix tells you wh
 | `fjc:<nid>` | federal judges (Federal Judicial Center node id) |
 | `mojudge:<key>` | Missouri state judges (Official Manual) |
 | `mohouse:<id>` | MO House members missing from Open States |
-| `statewide:<office>` | statewide executives from the `statewide_officials` seed |
+| `statewide:<office>:<name key>` | statewide executives from the `statewide_officials` seed with no Open States id; the name keeps the id with the person when the office changes hands |
 
 Join any fact to `dim_official` on this column.
 {% enddocs %}
@@ -56,6 +56,7 @@ Why this category has, or lacks, records for this official:
 |---|---|
 | `available` | records found |
 | `none found` | a source covers this official, nothing matched (a parenthetical says which gap) |
+| `none recorded (...)` | no public list exists, so we hold only entries added by hand (voluntary disclosures); not a search that came up empty |
 | `not applicable` | the category doesn't apply to this office |
 | `not public (...)` | required by law but not published online; the parenthetical says whom to ask under the Sunshine Law |
 {% enddocs %}

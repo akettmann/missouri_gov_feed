@@ -10,9 +10,12 @@ models:
     repeats some actions word for word under one Guid (about 1,000 of 138,000, mostly 2017-2018); they are kept
     once.'
 - name: stg_mo_house__bill_amendments
-  description: Amendments offered to a bill, for House bills and for the Senate bills the House acted on (SenateActList).
-    One row per amendment. amendment_url is the amendment's PDF (the XML's AmendmentText, which holds a link, not
-    text); map_url is the amendment's change map PDF, present on very few.
+  description: 'Amendments offered to a bill, for House bills and for the Senate bills the House acted on (SenateActList).
+    One row per amendment listing in the XML, not per amendment: the XML lists 112 amendments twice (adjacent amendment_index,
+    same amendment_url, lr_number, description and status; only sponsor differs), so the real key is (session_code,
+    bill, amendment_url). amendment_url is the amendment''s PDF (the XML''s AmendmentText, which holds a link, not
+    text); map_url is the amendment''s change map PDF, present on very few. The raw sort_value is not staged: it
+    only restates lr_number (see docs/sources.md).'
   data_tests:
   - dbt_utils.unique_combination_of_columns:
       arguments:
@@ -36,6 +39,30 @@ models:
         - fiscal_note_index
   columns:
   - name: fiscal_note_url
+    data_tests:
+    - not_null
+- name: stg_mo_house__bill_hearings
+  description: 'Committee hearings noticed for each bill, for House bills and for the Senate bills the House acted
+    on (SenateActList, 2024 sessions on). One row per hearing notice, in the order the House lists them. A hearing
+    that was moved is listed again under a new notice (the comments say "Rescheduled" or "Time change"), so a bill
+    can show two notices for one day; the House XML carries no cancelled flag. notice_time is the clock time as
+    HH:MM, null when the House gave only the free-text alt_time ("4:30 PM or upon adjournment"; the XML stores that
+    as midnight). Midnight without an alt_time is kept as 00:00 (not seen so far). Email addresses and phone numbers
+    in comments, locations and hearing_time_note are replaced by a marker ("[email removed]", "[phone removed]",
+    mogov.redact_contact): committee staff and members put contact details there, and this project keeps contact
+    data out of the models. The rest of the text stays.'
+  data_tests:
+  - dbt_utils.unique_combination_of_columns:
+      arguments:
+        combination_of_columns:
+        - session_code
+        - bill
+        - hearing_index
+  columns:
+  - name: committee_name
+    data_tests:
+    - not_null
+  - name: hearing_date
     data_tests:
     - not_null
 - name: stg_mo_house__bill_rollcalls
@@ -94,6 +121,72 @@ models:
     committee, member). Held only for sessions 231, 241, 251, 253 and 254 (2023 onward). The member is identified
     by the House district number, which is unique within a session. source_url is the House file the COMMITTEELIST
     export was fetched from (the session zip for a closed session).'
+- name: stg_mo_house__document_texts
+  description: 'The text of the House''s bill documents (bill text versions, summaries, fiscal notes, amendments)
+    that the mo_house_pdf loader fetched: one row per document URL, with the NUL and other control characters removed
+    from the text (see clean_pdf_text). A document that failed to download or extract has a row with fetch_error
+    set and no text; the loader retries it on its next run. A summary shared by several bill versions is one row
+    (n_links counts the links). bill is the House bill whose XML first names the URL; it is null when the first
+    link is on a Senate bill listed in the SenateActList (that list''s file holds many bills), so join to fct_bill_documents
+    on document_url for the bill. The state row in mo_house_pdf_files adds the HTTP status and the file''s size.'
+  data_tests:
+  - dbt_utils.expression_is_true:
+      arguments:
+        expression: text_length = 0 or page_count > 0
+  columns:
+  - name: document_url
+    description: Link to the PDF, trimmed.
+    data_tests:
+    - unique
+    - not_null
+  - name: document_kind
+    description: bill_text, summary, fiscal_note or amendment.
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - bill_text
+          - summary
+          - fiscal_note
+          - amendment
+  - name: session_code
+    description: House session code of the first link row that names the URL.
+    data_tests:
+    - not_null
+  - name: bill
+    description: The House bill whose XML first names the URL; null when that is a Senate bill listed in the SenateActList.
+  - name: lr_number
+    description: Legislative Research number from the first link row (null for fiscal notes).
+  - name: version_code
+    description: Bill text version code (I, H, P, T, ...) from the first link row (null for fiscal notes and amendments).
+  - name: n_links
+    description: How many link rows in the House XML name this URL.
+    data_tests:
+    - not_null
+  - name: page_count
+    description: Pages in the PDF; null when the fetch failed.
+    data_tests:
+    - dbt_utils.accepted_range:
+        arguments:
+          min_value: 1
+          max_value: 1500
+  - name: document_text
+    description: Text of the PDF as pdfplumber extracted it, control characters removed; null when the fetch failed.
+  - name: text_length
+    description: Characters in document_text (0 when there is none).
+    data_tests:
+    - not_null
+  - name: has_text
+    description: True when document_text has any non-blank character. A PDF of scanned images has none.
+    data_tests:
+    - not_null
+  - name: fetch_error
+    description: Why the document has no text (HTTP error, "not a PDF", timeout); null when it was fetched.
+  - name: http_status
+    description: HTTP status of the fetch, from mo_house_pdf_files.
+  - name: size_bytes
+    description: Size of the stored PDF, from mo_house_pdf_files.
 - name: stg_mo_house__member_committees
   description: 'Committee and subcommittee posts of each MO House member per session, as the member''s own XML page
     lists them (end-of-session snapshot): committee name and position (Chair, Vice-Chair, Co-Chair, Ranking Minority
@@ -123,7 +216,16 @@ models:
     A header that does not parse (no PDF text) is kept. 3. The same (session, day, roll-call number) published under
     two file names (#435): 261 has 003.001 = 003.002, 004.002 = 004.004 and 004.003 = 004.005, byte-identical headers
     and totals. The roll-call number printed in the PDF is the key; the file whose name carries that number (else
-    the first by URL) is kept. Raw keeps everything.'
+    the first by URL) is kept. 4. Voting-board test records (#449): a roll call on which hardly any member voted.
+    A recorded vote needs a quorum (a majority of the 163 seats, 82), and in 6,449 PDFs the fewest members who voted
+    on a real roll call is 83 (a quorum call); 211 sit between 83 and 120. Nine PDFs have 1 to 28 voters of 161
+    to 163: 171 002.001/002.002 (2 and 6) and 058.018 (4/26/2016, HCS HB 1465: only MR SPEAKER voting, 161 absent;
+    already dropped by the out-of-session-year check), 173 002.001/002.002 (HUBRECHT alone on a QUORUM CALL; LOVE
+    alone on a PQ), 231 026.003/026.004 (7 and 5 members on an ADJOURNMENT, the first names alphabetically, printed
+    after the last real vote of the day), 204 003.002/003.003 (10 and 28). A roll call where fewer than var(''house_rollcall_min_participation'')
+    (a quarter) of the listed members cast a vote is dropped; the 28-to-83 gap leaves room either way. A roll call
+    with no parsed votes is kept. The singular test assert_house_rollcalls_quorum_participation fails on any survivor
+    under half the members (an allowlist var holds genuine small-quorum calls). Raw keeps everything.'
   columns:
   - name: session_day
     description: Legislative day of the session (highest seen through 2026 is 79).
@@ -132,6 +234,11 @@ models:
         arguments:
           min_value: 1
           max_value: 120
+  - name: members_listed
+    description: Members listed on the roll call PDF (every member token, absent included). Null when no vote rows
+      were parsed.
+  - name: members_voting
+    description: Members who cast a vote (yea, nay or present), i.e. not absent. Null when no vote rows were parsed.
   - name: header_session_label
     description: Session label printed in the PDF header. Null when the header did not parse.
     data_tests:
@@ -159,3 +266,12 @@ models:
     "2018 Special Session"). Every session''s SESSIONLIST repeats the full history, so the copy from the newest
     session wins; the House numbers extraordinary sessions irregularly, so the code''s last digit cannot be turned
     into a name.'
+- name: stg_mo_house__statute_refs
+  description: 'The RSMo sections each House bill text version repeals, amends or enacts, as the mo_house_pdf loader
+    read them from the enacting title ("To repeal sections 1.010 and 2.020 to 2.040, RSMo, ...") and Section A ("...
+    to be known as sections ..."): one row per section or range as written, in the order written within its action
+    (ordinal). A range ("2.020 to 2.040") is one row with section_end set; int_mo_house__bill_text_statute_refs
+    expands it. supp_year is the year of "RSMo Supp. 2023" when the section is cited from a supplement. clause_text
+    is the title or Section A text the row came from, with control characters removed. Bill text versions only;
+    empty until `mogov load mo_house_pdf` has run. Join to fct_bill_documents on document_url for the bill (the
+    loader does not know it, and a Senate act list file holds many).'

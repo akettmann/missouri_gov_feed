@@ -45,14 +45,80 @@ seeds:
     description: >
       Missouri's six statewide elected executive officers. Curated by hand because the Open States
       executive folder is incomplete. Matched to Open States people by name to pick up prior
-      legislative careers. Review after each election / appointment.
+      legislative careers. Review after each election / appointment. term_start / term_end are the CURRENT term, as
+      dim_official.current_term_start / current_term_end show it and fct_office_history lists it: the day the term
+      the person holds now began (a second Monday of January, 2025-01-13 for the 2024 election; Malek's appointment
+      on 2023-01-17 is not this column but statewide_office_handovers) or, for someone appointed to the vacancy who
+      has not yet faced an election, the day they took office (Hanaway, 2025-09-08). term_end is the next second
+      Monday of January after the term's election (RSMo 27.010 sets this for the Attorney General; the other offices follow the same practice), so it is 2029-01-08 for the 2024 cohort and
+      2027-01-11 for the auditor.
     config:
       column_types: {term_start: date, term_end: date}
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: term_start <= term_end
     columns:
       - name: office
         data_tests: [unique, not_null]
+  - name: statewide_office_handovers
+    description: >
+      Exact hand-over dates for statewide officeholders whose Official Manual term is in whole years but who left or
+      arrived mid-term, or on a day other than the regular hand-over, the second Monday of January (#606): Hawley
+      left the Attorney General's office on 2019-01-03 for Schmitt, Greitens resigned on 2018-06-01 and Parson
+      succeeded him, and so on. fct_audit_report_officeholders uses term_start / term_end when a row matches (office,
+      term start year, family name) and otherwise the convention (a term begins and ends on the second Monday of
+      January of its first and last year when that year is an inauguration year). A blank date keeps the convention
+      for that side. Unlike statewide_officials, whose dates are the CURRENT term only, a row here is the whole
+      continuous stretch the Manual lists as one term: Malek took office 2023-01-17 by appointment and is still
+      Treasurer. This cannot be derived from statewide_officials or wikidata: those hold only today's six officers,
+      and most rows here are people who no longer hold office (Greitens, Hawley as Attorney General, Bailey). Past
+      terms of current officials (Malek's 2023 appointment, Fitzpatrick's Treasurer term) are not listed again in a
+      separate list: int_statewide__terms joins these dates to the Manual's terms and fct_office_history reads them
+      from there. Dates are from each row's source_url (checked_on), the official page where one gives the day:
+      the Secretary of State's historical listings (Hawley, Schmitt, Bailey, Schweich's death 2015-02-26), the
+      Treasurer's Past Treasurers page (Malek appointed 2023-01-17; Fitzpatrick appointed 2019-01-14, ends
+      2023-01-09 when the Auditor's biography says he was sworn in as Auditor), the Lieutenant Governor's Past
+      Lieutenant Governors page (Carnahan "Died: 10/16/2000"; Parson succeeded 2018-06-01; Kehoe appointed
+      2018-06-18), the Attorney General's swearing-in release (Hanaway) and nga.org (Wilson sworn in as Governor
+      2000-10-18). Only news gives the day for two rows: Maxwell's 2000-11-15 appointment (mdn.org, Wikipedia; the
+      Secretary of State's page only says he was appointed to the vacancy) and Watson's 2015-02-27 interim
+      appointment by Governor Nixon (politicmo.com, St. Louis Public Radio; no official page dates his swearing-in).
+      Galloway took the oath 2015-04-27 (auditor.mo.gov). Add a row when a new mid-term change appears in
+      int_bluebook__statewide_officeholders (the test assert_statewide_handovers_cover_mid_term_changes lists the
+      ones missing, including a mid-year change inside an inauguration year when it adds a third term to that year).
+    config:
+      column_types: {office: varchar, family_name: varchar, term_start_year: integer, term_start: date, term_end: date, source_url: varchar, checked_on: date}
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [office, family_name, term_start_year]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: term_start is null or term_end is null or term_start <= term_end
+      # the dates stay inside the Manual's years: a typo would silently move a holder out of the term
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: term_start is null or extract(year from term_start) = term_start_year
+    columns:
+      - name: office
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('statewide_officials')
+                field: office
+      - name: source_url
+        data_tests: [not_null]
+      - name: checked_on
+        data_tests: [not_null]
   - name: house_speakers
-    description: Speaker of the Missouri House per year; roll-call PDFs list the Speaker as "MR SPEAKER".
+    description: >
+      Speaker of the Missouri House per year (the district number is the Speaker's seat); roll-call PDFs list the
+      Speaker as "MR SPEAKER". The Speaker is on every roll call, so these rows also keep int_officeholders__years
+      from reading a Speaker with no named votes as a member who stopped voting (#491). 2017-2022 are Todd
+      Richardson (HD152, Speaker to January 2019), Elijah Haahr (HD134, 2019-2020) and Rob Vescovo (HD112,
+      2021-2022); each matches the member of that district in the session's House roster.
   - name: legislator_seat_corrections
     description: >
       Legislative seat-terms Open States lacks or cuts short, added to int_mo_legislators__seats so journal votes
@@ -266,9 +332,24 @@ seeds:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [alias_id, person_id, relation]
+      # a maintainer signs a row off by filling checked_by and checked_on together (#174); a half-signed row is
+      # ignored by int_officials__person_ids, so flag it
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: >-
+              (case when checked_by is null then 0 else 1 end) = (case when checked_on is null then 0 else 1 end)
     columns:
       - name: alias_id
-        data_tests: [not_null]
+        data_tests:
+          - not_null
+          # typo guard (#688): a signed same_person row whose alias_id int_officials__person_ids never saw is
+          # dropped silently by the model and by assert_signed_same_person_links_end_in_one_person, so fail on it
+          - relationships:
+              arguments:
+                to: ref('int_officials__person_ids')
+                field: alias_id
+              config:
+                where: "relation = 'same_person' and checked_by is not null and checked_on is not null"
       - name: person_id
         data_tests:
           - not_null
@@ -324,7 +405,7 @@ seeds:
       Audit report titles that audit a statewide elected office, matched as a case-insensitive prefix of the
       Auditor's report title (titles vary by year: "Office of State Treasurer", "Office of the State Treasurer/
       Year Ended June 30, 2011", "State Treasurer's Office"). `office` is the key in statewide_officials. Only
-      these audits are linked to an officeholder (fct_audit_reports); a county audit never is, because the
+      these audits are linked to officeholders (fct_audit_report_officeholders); a county audit never is, because the
       Auditor's summary says the rating "does not indicate the performance of any one elected official".
       Add a prefix when a new title form appears (assert_audit_statewide_titles_map_to_one_office checks that
       none matches two offices).
@@ -340,3 +421,129 @@ seeds:
               arguments:
                 to: ref('statewide_officials')
                 field: office
+  - name: mo_senate_session_codes
+    description: >
+      The House's session code for each Senate bill-list session (#586): senate.mo.gov names a session by year and
+      type (R = regular; E1, E2 = the first and second extraordinary sessions), the House by a three-digit code. The
+      regular session is the two-digit year + 1 (251), but the extraordinary sessions are not year + 2: the House
+      has no 252, 2025's June special session is 253 and its September one 254. A row is added only with evidence
+      (the evidence column), such as the same bills and titles in the House XML for that code; a Senate session
+      with no row has a null session_code in the staging models and fails assert_senate_sessions_have_house_codes
+      (its header says how to add the row). 2017 E1 has no row: the Senate site returns an empty list for it (the House
+      has 173 and 174), so those special-session Senate bills are not landed.
+    config:
+      column_types: {session_year: integer, session_type: varchar, house_session_code: varchar, evidence: varchar}
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [session_year, session_type]
+    columns:
+      - name: session_year
+        data_tests: [not_null]
+      - name: session_type
+        data_tests: [not_null]
+      - name: house_session_code
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              arguments:
+                to: ref('stg_mo_house__bills')
+                field: session_code
+      - name: evidence
+        data_tests: [not_null]
+  - name: mo_senate_action_flags
+    description: >
+      Which stage a Senate bill's own action wording records (#588): senate.mo.gov's action history for a bill
+      (stg_mo_senate__bill_actions.action) says "Second Read and Referred S Education Committee", "S Third Read and
+      Passed", "Signed by Governor" where the House XML says "Referred: Education(H)", "Third Read and Passed (S)",
+      "Approved by Governor (G)". int_bills__status reads a stage flag per matching row. action_pattern is a SQL LIKE
+      pattern (matched ignoring case, the whole action text); bill_type is the bill's prefix (SB, SJR, SCR, SR, ...)
+      or `any`; flag is one of the int_bills__status flags. An action no row matches counts for no stage, so a new
+      phrasing never lifts a bill to a wrong stage: add a row to count it. Substitute and amendment actions (SS for
+      SCS S withdrawn, HCS H defeated, SA 1 S offered & defeated) are deliberately not mapped: they are not the bill.
+      `S adopted` / `H adopted` also appear on substitutes ("SCS S adopted"), which the exact-text patterns skip.
+    config:
+      column_types: {action_pattern: varchar, bill_type: varchar, flag: varchar, evidence: varchar}
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [action_pattern, bill_type, flag]
+    columns:
+      - name: action_pattern
+        data_tests: [not_null]
+      - name: bill_type
+        data_tests: [not_null]
+      - name: flag
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [referred, reported, perfected, passed_senate, passed_house, defeated, adopted, truly_agreed,
+                         approved, vetoed, vetoed_in_part, veto_overridden, delivered_to_sos, withdrawn, combined]
+  - name: mo_senate_action_flag_examples
+    description: >
+      Golden examples for mo_senate_action_flags (#588): real Senate action wordings with the stage flag each must
+      map to (`none` = no stage), checked by assert_senate_action_flags_map_known_wordings. A phrasing can appear
+      on several rows (the House's adoption of a Senate concurrent resolution is both passed_house and adopted).
+      Substitute, amendment, enrollment and Governor-message wordings are listed with `none` on purpose.
+    config:
+      column_types: {action: varchar, bill_type: varchar, expected_flag: varchar}
+    columns:
+      - name: action
+        data_tests: [not_null]
+      - name: bill_type
+        data_tests: [not_null]
+      - name: expected_flag
+        data_tests: [not_null]
+  - name: mo_vote_stage_rules
+    description: >
+      Rules that classify a Missouri roll call by stage (#804), read by the classify_vote_stage macro for
+      int_votes__stage / fct_votes.vote_stage. chamber is state_house (the calendar item, e.g. "HBs FOR THIRD
+      READING") or state_senate (the journal sentence introducing the vote). description_pattern and measure_pattern
+      are SQL LIKE patterns matched ignoring case against the description and the measure (`%` = anything). The rule
+      with the lowest priority within a chamber that matches both wins, so specific rules come before general ones
+      (a conference-report vote is an "adopted by the following vote" sentence too). A roll call no rule matches is
+      `unknown`: a new phrasing is a new row, never a guess. mo_vote_stage_examples pins real wordings to stages.
+    config:
+      column_types: {chamber: varchar, priority: integer, description_pattern: varchar, measure_pattern: varchar, stage: varchar, evidence: varchar}
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [chamber, priority]
+    columns:
+      - name: chamber
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [state_house, state_senate]
+      - name: priority
+        data_tests: [not_null]
+      - name: description_pattern
+        data_tests: [not_null]
+      - name: measure_pattern
+        data_tests: [not_null]
+      - name: stage
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [perfection, third_reading, third_reading_consent, senate_amendments, conference, veto_override,
+                         amendment, emergency_clause, previous_question, procedural_motion, quorum, resolution, other]
+      - name: evidence
+        data_tests: [not_null]
+  - name: mo_vote_stage_examples
+    description: >
+      Golden examples for mo_vote_stage_rules (#804): real House calendar items and Senate journal sentences with
+      the stage and informal flag each must get, checked by assert_vote_stage_rules_map_known_wordings against the
+      real rules (the unit tests mock the seed). Removing or breaking a rule fails the example it served.
+    config:
+      column_types: {chamber: varchar, vote_description: varchar, measure: varchar, expected_stage: varchar, expected_informal: boolean}
+    columns:
+      - name: chamber
+        data_tests: [not_null]
+      - name: expected_stage
+        data_tests: [not_null]
+      - name: expected_informal
+        data_tests: [not_null]

@@ -1,0 +1,95 @@
+---
+// Missouri House bill sponsorship outcomes (fct_sponsorship_outcomes, from the House's own bill actions): per
+// session, how many bills the member was the primary sponsor of and how many of the decided ones passed the House
+// and became law. Counts with their n; a percent only when 5 or more bills were decided. Not a score.
+import type { OfficialBundle } from "../lib/exports/types";
+import { MIN_DECIDED_FOR_SHARE, countWithShare, inProgressNote } from "../lib/sponsorshipOutcomes";
+import { href } from "../lib/site";
+import SourceLink from "./SourceLink.astro";
+
+interface Props {
+  bundle: OfficialBundle;
+}
+const { bundle } = Astro.props;
+const sessions = bundle.sponsorship;
+const isHouse = bundle.official.office === "state_house";
+const show = isHouse || (sessions?.length ?? 0) > 0;
+---
+
+{show && (
+  <section class="card" id="sponsorship" aria-labelledby="sponsorship-h">
+    <h2 id="sponsorship-h">Bills sponsored in the House</h2>
+    <p class="lede">
+      For each House session, the House bills (HB) and House joint resolutions (HJR) this{" "}
+      {isHouse ? "member" : "official"} was the <strong>primary sponsor</strong> of, how many of the{" "}
+      <strong>decided</strong> ones <strong>passed the House</strong>, and how many{" "}
+      <strong>became law</strong> (an HB that was enacted, or an HJR sent to the voters). Counts come from the
+      House's own bill actions.
+    </p>
+    {sessions === null ? (
+      <p class="muted small">Not available yet (the fct_sponsorship_outcomes export is missing).</p>
+    ) : sessions.length === 0 ? (
+      <p class="muted">
+        No House bills or joint resolutions with this official as primary sponsor in the sessions we hold.
+      </p>
+    ) : (
+      <>
+        <div class="table-scroll">
+          <table>
+            <caption class="sr-only">
+              Primary-sponsored House bills and joint resolutions by session, newest first
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Session</th>
+                <th scope="col">Primary-sponsored HB and HJR</th>
+                <th scope="col">Decided (not pending or awaiting the governor)</th>
+                <th scope="col">Passed the House (of decided)</th>
+                <th scope="col">Became law (of decided)</th>
+                <th scope="col">Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sessions.map((s) => (
+                <tr>
+                  <th scope="row" class="what">
+                    {s.label}
+                    {s.in_progress && <span class="muted small">{inProgressNote(s)}</span>}
+                  </th>
+                  <td>{s.bills_sponsored}</td>
+                  <td>{s.bills_decided}</td>
+                  <td>{countWithShare(s.bills_passed_house, s.bills_decided, s.passed_house_pct)}</td>
+                  <td>{countWithShare(s.bills_became_law, s.bills_decided, s.became_law_pct)}</td>
+                  <td>
+                    <SourceLink url={s.source_url} context={`for ${s.label}`} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p class="muted small note">
+          A percent appears only when {MIN_DECIDED_FOR_SHARE} or more bills were decided. Current officials
+          only: bills sponsored by members who have since left office are not here, so the earliest sessions
+          show only members still serving, mostly long-serving leaders, and their numbers are not comparable
+          with recent sessions. Resolutions (HR, HCR) and Senate bills are left out (Senate service is not
+          counted for members who also served there), appropriation bills are included (the Budget chair
+          sponsors them and nearly all pass), and a bill the House passed that then died in the Senate counts
+          as passed the House but not as law.
+          <a href={href("/methodology/#sponsorship")}>How this is counted</a>.
+        </p>
+      </>
+    )}
+  </section>
+)}
+
+<style>
+  .what {
+    max-width: 52ch;
+    text-align: left;
+    font-weight: normal;
+  }
+  .note {
+    margin: 0.75em 0 0;
+  }
+</style>

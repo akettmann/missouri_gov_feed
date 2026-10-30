@@ -1,0 +1,106 @@
+# Unit tests for #740: org-word list, the 3-letter prefix minimum and the abbreviation map in the 24-hour-notice dedupe.
+version: 2
+
+unit_tests:
+  - name: tap_contributions_notice_dedupe_abbreviations_and_org_words
+    model: int_tap_mec__contributions
+    description: >
+      Two abbreviations of one word pair through the map org_word_abbreviation (Ass / Assoc / Assn / Association, Ed / Edu / Educ, Int / Intl, Com / Comm,
+      Telecom / Telecomm, Govt / Government) and the organisation words added to is_org_word_prefix pair with their truncations (womens, offices, missouri,
+      fighters, masons, funds, casinos, nurses). Dropped: every notice of the n0..n17 pairs. Kept: Missouri St Council / Missouri State Council (a 2-letter
+      prefix never pairs, whichever word it starts), Com / Dist and Assoc / Educ (abbreviations of different words).
+    given:
+      - input: ref('stg_tap_mec__contributions')
+        rows:
+          - {record_id: n0, mec_committee_id: R0, contributor_name: Workers Int Ass, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f0, mec_committee_id: R0, contributor_name: Workers Int Assoc, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: n1, mec_committee_id: R1, contributor_name: Pol Ed Fund, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f1, mec_committee_id: R1, contributor_name: Pol Educ Fund, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: n2, mec_committee_id: R2, contributor_name: Acme Edu Fund, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f2, mec_committee_id: R2, contributor_name: Acme Educ Fund, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: n3, mec_committee_id: R3, contributor_name: Acme Assoc, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f3, mec_committee_id: R3, contributor_name: Acme Assn, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: n4, mec_committee_id: R4, contributor_name: Acme Int, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f4, mec_committee_id: R4, contributor_name: Acme Intl, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: n5, mec_committee_id: R5, contributor_name: Acme Com, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f5, mec_committee_id: R5, contributor_name: Acme Comm, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: n6, mec_committee_id: R6, contributor_name: Acme Telecom, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f6, mec_committee_id: R6, contributor_name: Acme Telecomm, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: n7, mec_committee_id: R7, contributor_name: Acme Govt, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f7, mec_committee_id: R7, contributor_name: Acme Government, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: n8, mec_committee_id: R8, contributor_name: Acme Dist 6, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f8, mec_committee_id: R8, contributor_name: Acme District 6, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: n9, mec_committee_id: R9, contributor_name: Acme Assn, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f9, mec_committee_id: R9, contributor_name: Acme Association, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: n10, mec_committee_id: R10, contributor_name: Acme Wom Club, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f10, mec_committee_id: R10, contributor_name: Acme Womens Club, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: n11, mec_committee_id: R11, contributor_name: Law Off, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f11, mec_committee_id: R11, contributor_name: Law Offices, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: n12, mec_committee_id: R12, contributor_name: Acme Missou, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f12, mec_committee_id: R12, contributor_name: Acme Missouri, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: n13, mec_committee_id: R13, contributor_name: Fire Fight, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f13, mec_committee_id: R13, contributor_name: Fire Fighters, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: n14, mec_committee_id: R14, contributor_name: Acme Mas, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f14, mec_committee_id: R14, contributor_name: Acme Masons, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: n15, mec_committee_id: R15, contributor_name: Acme Fun, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f15, mec_committee_id: R15, contributor_name: Acme Funds, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: n16, mec_committee_id: R16, contributor_name: Acme Cas, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f16, mec_committee_id: R16, contributor_name: Acme Casinos, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: n17, mec_committee_id: R17, contributor_name: Acme Nur, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f17, mec_committee_id: R17, contributor_name: Acme Nurses, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: kn0, mec_committee_id: K0, contributor_name: Missouri St Council, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: kf0, mec_committee_id: K0, contributor_name: Missouri State Council, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: kn1, mec_committee_id: K1, contributor_name: Acme Com, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: kf1, mec_committee_id: K1, contributor_name: Acme Dist, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: kn2, mec_committee_id: K2, contributor_name: Acme Assoc, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: kf2, mec_committee_id: K2, contributor_name: Acme Educ, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+    expect:
+      rows:
+        - {record_id: f0}
+        - {record_id: f1}
+        - {record_id: f2}
+        - {record_id: f3}
+        - {record_id: f4}
+        - {record_id: f5}
+        - {record_id: f6}
+        - {record_id: f7}
+        - {record_id: f8}
+        - {record_id: f9}
+        - {record_id: f10}
+        - {record_id: f11}
+        - {record_id: f12}
+        - {record_id: f13}
+        - {record_id: f14}
+        - {record_id: f15}
+        - {record_id: f16}
+        - {record_id: f17}
+        - {record_id: kn0}
+        - {record_id: kf0}
+        - {record_id: kn1}
+        - {record_id: kf1}
+        - {record_id: kn2}
+        - {record_id: kf2}
+
+  - name: direct_contributions_notice_dedupe_abbreviations_and_org_words
+    model: int_mec__contributions_direct
+    description: >
+      The same abbreviation map and 3-letter minimum for the MEC direct export (#740): Assoc / Assn and Wom Club / Womens Club are dropped, Missouri St Council /
+      Missouri State Council is kept.
+    overrides:
+      vars:
+        mec_direct: true
+    given:
+      - input: ref('stg_mec__contributions')
+        rows:
+          - {record_id: n0, mec_committee_id: S0, contributor_name: Acme Assoc, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f0, mec_committee_id: S0, contributor_name: Acme Assn, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: n1, mec_committee_id: S1, contributor_name: Acme Wom Club, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: f1, mec_committee_id: S1, contributor_name: Acme Womens Club, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: kn0, mec_committee_id: T0, contributor_name: Missouri St Council, amount: 5000, contribution_date: 2020-07-28, report: '24 Hour Expenditure Report-8/4/2020 Primary', contributor_city: Jefferson City, contributor_state: MO}
+          - {record_id: kf0, mec_committee_id: T0, contributor_name: Missouri State Council, amount: 5000, contribution_date: 2020-07-28, report: April Quarterly Report, contributor_city: Jefferson City, contributor_state: MO}
+    expect:
+      rows:
+        - {record_id: f0}
+        - {record_id: f1}
+        - {record_id: kn0}
+        - {record_id: kf0}
