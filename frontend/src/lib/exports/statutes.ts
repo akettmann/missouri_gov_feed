@@ -42,23 +42,50 @@ type FootnoteRow = StatuteFootnote & { section_version_id: string };
 const CACHED_CHAPTERS = 4;
 const chapters = new Map<string, Promise<Map<string, StatuteVersion[]>>>();
 
+let staged: Promise<unknown> | undefined;
+
+/**
+ * Copy both exports into DuckDB tables sorted by chapter, once per DuckDB instance. The parquet is one row group,
+ * so a `where chapter = ?` on it scans the whole file (~100 ms); 531 chapters, and once more per prerender worker
+ * (`experimental.parallelPrerender`), made those scans most of the build. Sorted tables let zone maps skip to the chapter.
+ */
+function stageStatutes(): Promise<unknown> {
+  staged ??= query(`
+    create temp table statute_sections as
+    select *, coalesce(chapter, '') as chapter_key from {fct_statute_sections}
+    order by chapter_key, section_id, bid`)
+    .then(() =>
+      query(`
+        create temp table statute_footnotes as
+        select f.*, s.chapter_key
+        from {fct_statute_section_footnotes} f
+        join statute_sections s on s.section_version_id = f.section_version_id
+        order by s.chapter_key, f.section_version_id, f.footnote_number`),
+    )
+    .catch((e: unknown) => {
+      staged = undefined;
+      throw e;
+    });
+  return staged;
+}
+
 async function readChapter(chapter: string): Promise<Map<string, StatuteVersion[]>> {
+  await stageStatutes();
   const sections = await query<SectionRow>(
     `select section_id, bid::int as bid, section_version_id, chapter, chapter_name, title_numeral, title_name,
             heading, status, is_current, effective_date::varchar as effective_date, held_unconstitutional,
             ended_date::varchar as ended_date, transferred_to, history_note, section_text, repeal_pending,
             source_url, loaded_at::varchar as loaded_at
-     from {fct_statute_sections}
-     where coalesce(chapter, '') = ?
+     from statute_sections
+     where chapter_key = ?
      order by section_id, bid`,
     [chapter],
   );
   const notes = await query<FootnoteRow>(
-    `select f.section_version_id, f.footnote_number::int as footnote_number, f.footnote_text, f.is_history_note
-     from {fct_statute_section_footnotes} f
-     join {fct_statute_sections} s on s.section_version_id = f.section_version_id
-     where coalesce(s.chapter, '') = ?
-     order by f.section_version_id, f.footnote_number`,
+    `select section_version_id, footnote_number::int as footnote_number, footnote_text, is_history_note
+     from statute_footnotes
+     where chapter_key = ?
+     order by section_version_id, footnote_number`,
     [chapter],
   );
   const byVersion = new Map<string, StatuteFootnote[]>();
