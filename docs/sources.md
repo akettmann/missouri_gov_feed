@@ -819,7 +819,7 @@ Quirks:
   the organization into the name fields too (first = last = company, or the organization alone in `first_name`
   and `company`, such as "Vantage CU") is still an Organization: a one-part match counts only for a one-word
   company. A filled `committee` still makes a Committee. Filler names (`x`, `PAC`, `#N/A`, `Not applicable`,
-  one-character values) are not a person, and filler companies (`N/A`, `NONE`, digits only) are no company.
+  one-character values) are not a person, and filler companies (`N/A`, `NONE`, `Individual`, digits only) are no company.
 - ASP.NET WebForms: each postback must carry the `__VIEWSTATE` of the page it came from. An export
   answers with a file, not a page. Posting from the export body used to lose the view state, so MEC
   silently returned its generic page. Every election after the first in a year then landed the site

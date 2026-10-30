@@ -77,13 +77,13 @@
     ) }})
 {%- endmacro %}
 
-{#- The company column as a company name: trimmed, or null for a filler (blank, 'N/A', 'NONE', all digits,
-    one character). -#}
+{#- The company column as a company name: trimmed, or null for a filler (blank, 'N/A', 'NONE', 'Individual', all
+    digits, one character). -#}
 {% macro real_company(expr) -%}
     case
         when
             {{ mogov.clean_name(expr) }} is not null
-            and upper(trim({{ expr }})) not in ('NONE', 'N/A', 'NA', '#N/A', 'NOT APPLICABLE')
+            and upper(trim({{ expr }})) not in ('NONE', 'N/A', 'NA', '#N/A', 'NOT APPLICABLE', 'INDIVIDUAL')
             and not {{ mogov.regex_matches('trim(' ~ expr ~ ')', '^[0-9]+$') }}
             then trim({{ expr }})
     end
@@ -128,7 +128,12 @@
                 {{ mogov.real_name_part(first_expr) }} is not null
                 and {{ mogov.real_last_part(last_expr) }} is not null
                 and {{ mogov.name_key(first_expr) }} <> {{ mogov.name_key(last_expr) }}
-                and {{ mogov.name_key(company_expr) }} in ({{ mogov.name_key(first_expr) }}, {{ mogov.name_key(last_expr) }})
+                and (
+                    {{ mogov.name_key(company_expr) }} in ({{ mogov.name_key(first_expr) }}, {{ mogov.name_key(last_expr) }})
+                    -- or one whole word of a multi-word given name ("Christopher Busken" as first_name, "Christopher"
+                    -- as company)
+                    or ' ' || {{ mogov.name_key(first_expr) }} || ' ' like '% ' || {{ mogov.name_key(company_expr) }} || ' %'
+                )
             )
         ),
         false

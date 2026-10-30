@@ -58,6 +58,8 @@ unit_tests:
           union all select 'C1', 'Friends of Jo Poe', 'Rex', 'Sinquefield', 'Rex A. Sinquefield', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r22'
           union all select 'C1', 'Friends of Jo Poe', 'Dennis', 'Jones Jr', 'Dennis M. Jones', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r23'
           union all select 'C1', 'Friends of Jo Poe', 'Ellen Y', 'Moceri', 'Ellen Y', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r24'
+          union all select 'C1', 'Friends of Jo Poe', 'Christopher Busken', 'Busken', 'Christopher', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r25'
+          union all select 'C1', 'Friends of Jo Poe', 'Tom', 'Wapelhorst', 'Individual', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r26'
     expect:
       rows:
         - {record_id: r1, contributor_name: Natalie DiNicola, contributor_type: Individual, contributor_company: null}
@@ -84,3 +86,5 @@ unit_tests:
         - {record_id: r22, contributor_name: Rex Sinquefield, contributor_type: Individual, contributor_company: null}
         - {record_id: r23, contributor_name: Dennis Jones Jr, contributor_type: Individual, contributor_company: null}
         - {record_id: r24, contributor_name: Ellen Y Moceri, contributor_type: Individual, contributor_company: null}
+        - {record_id: r25, contributor_name: Christopher Busken Busken, contributor_type: Individual, contributor_company: null}
+        - {record_id: r26, contributor_name: Tom Wapelhorst, contributor_type: Individual, contributor_company: null}
