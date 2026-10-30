@@ -3,20 +3,27 @@
 select
     mecid as mec_committee_id,
     committee_name,
+    -- a filled company is the donor and the name its contact person (MEC's convention), unless the company only
+    -- repeats the person or the recipient committee (#485)
     coalesce(
-        nullif(trim(coalesce(first_name, '') || ' ' || coalesce(last_name, '')), ''), company, committee
+        case
+            when committee is null or committee = ''
+                then {{ mogov.donor_company('company', 'first_name', 'last_name', 'committee_name') }}
+        end,
+        nullif(trim(coalesce(first_name, '') || ' ' || coalesce(last_name, '')), ''),
+        company,
+        committee
     ) as contributor_name,
     case
         when committee is not null and committee <> '' then 'Committee'
-        -- a company beside a person's name is the person's employer, not the donor (#485)
-        when company is not null and company <> '' and not {{ mogov.has_person_name('first_name', 'last_name') }}
+        when {{ mogov.donor_company('company', 'first_name', 'last_name', 'committee_name') }} is not null
             then 'Organization'
         else 'Individual'
     end as contributor_type,
     -- the donor committee's name as reported (no MECID: mecid is the receiving committee's)
     nullif(trim(committee), '') as contributor_committee_name,
     coalesce(
-        nullif({{ mogov.company_unless_person_name('company', 'first_name', 'last_name') }}, ''), nullif(committee, '')
+        {{ mogov.donor_company('company', 'first_name', 'last_name', 'committee_name') }}, nullif(committee, '')
     ) as contributor_company,
     employer as contributor_employer,
     occupation as contributor_occupation,

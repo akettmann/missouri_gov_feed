@@ -31,42 +31,73 @@
     end
 {%- endmacro %}
 
-{#- Whether a filer's first / last name columns hold a person's name (#485). MEC exports a company beside the person's
-    name for people who list an employer ("Natalie" / "DiNicola" / company "Natalie", or a credit union's staff with
-    the credit union as company), so a company alone does not make the donor an organization. Not a person: both
-    parts blank, or both a "no value" filler ('#N/A', 'Not applicable'), where the company is the real donor. -#}
+{#- One part of a filer's first / last name that counts as a person's name (#485): trimmed, or null for the filler MEC
+    filers type where a name doesn't apply: one-character values ('x'), 'PAC', 'N/A' / '#N/A', 'Not applicable',
+    'None', and anything with no letter or number or all digits. (A real initial is a name_part, but alone it
+    is not enough to call the donor a person.) -#}
+{% macro real_name_part(expr) -%}
+    case
+        when
+            length(trim({{ expr }})) >= 2
+            and {{ mogov.regex_matches(expr, '[A-Za-z0-9]') }}
+            and not {{ mogov.regex_matches('trim(' ~ expr ~ ')', '^[0-9]+$') }}
+            and lower(trim({{ expr }})) not in ('pac', 'n/a', '#n/a', 'na', 'none', 'not applicable')
+            then trim({{ expr }})
+    end
+{%- endmacro %}
+
+{#- Whether a filer's first / last name columns hold a person's name: at least one part is not a filler. -#}
 {% macro has_person_name(first_expr, last_expr) -%}
     coalesce(
-        (nullif(trim({{ first_expr }}), '') is not null or nullif(trim({{ last_expr }}), '') is not null)
-        and not (
-            lower(trim(coalesce({{ first_expr }}, ''))) in ('#n/a', 'n/a', 'not applicable', 'none')
-            and lower(trim(coalesce({{ last_expr }}, ''))) in ('#n/a', 'n/a', 'not applicable', 'none')
+        {{ mogov.real_name_part(first_expr) }} is not null or {{ mogov.real_name_part(last_expr) }} is not null, false
+    )
+{%- endmacro %}
+
+{#- The company column as a company name: trimmed, or null for a filler (blank, 'N/A', 'NONE', all digits,
+    one character). -#}
+{% macro real_company(expr) -%}
+    case
+        when
+            {{ mogov.clean_name(expr) }} is not null
+            and upper(trim({{ expr }})) not in ('NONE', 'N/A', 'NA', '#N/A', 'NOT APPLICABLE')
+            and not {{ mogov.regex_matches('trim(' ~ expr ~ ')', '^[0-9]+$') }}
+            then trim({{ expr }})
+    end
+{%- endmacro %}
+
+{#- Whether the company is not a business but the person (#485): the person's own name ("Natalie DiNicola",
+    "DiNicola, Natalie"), a bare given name or surname (a shifted row: surname in first_name, given name in company,
+    or the first name repeated), or the recipient committee's own name. Needs a person's name to be true: a filler name
+    leaves nothing to repeat, so the company is the donor. -#}
+{% macro company_is_person_name(company_expr, first_expr, last_expr, recipient_expr) -%}
+    coalesce(
+        {{ mogov.has_person_name(first_expr, last_expr) }}
+        and {{ mogov.real_company(company_expr) }} is not null
+        and (
+            {{ mogov.name_key(company_expr) }} in (
+                {{ mogov.name_key("coalesce(" ~ first_expr ~ ", '') || ' ' || coalesce(" ~ last_expr ~ ", '')") }},
+                {{ mogov.name_key("coalesce(" ~ last_expr ~ ", '') || ' ' || coalesce(" ~ first_expr ~ ", '')") }},
+                {{ mogov.name_key(first_expr) }},
+                {{ mogov.name_key(last_expr) }},
+                {{ mogov.name_key(recipient_expr) }}
+            )
+            or (
+                -- one half of the name is missing and the company is a single word: the other half
+                ({{ mogov.real_name_part(first_expr) }} is null or {{ mogov.real_name_part(last_expr) }} is null)
+                and {{ mogov.name_key(company_expr) }} not like '% %'
+            )
         ),
         false
     )
 {%- endmacro %}
 
-{#- The company column unless it is part of the person's own name (#485): MEC filers often type the donor's name into
-    `company` as well, and that is not an employer. That is the first name, last name or both repeated, or, when
-    only one of first / last name is filled (a shifted row: surname in first_name, given name in company), the other
-    half of the name. -#}
-{% macro company_unless_person_name(company_expr, first_expr, last_expr) -%}
+{#- The company as the donor: the business named in `company`, when there is one. MEC's convention (#485) is that a
+    filled company is the donor and the first / last name is its contact person, so the donor is the company except
+    when it only repeats the person (see company_is_person_name). Null when the company is not the donor. -#}
+{% macro donor_company(company_expr, first_expr, last_expr, recipient_expr) -%}
     case
-        when
-            lower(trim({{ company_expr }})) in (
-                lower(trim({{ first_expr }})),
-                lower(trim({{ last_expr }})),
-                lower(trim(coalesce({{ first_expr }}, '') || ' ' || coalesce({{ last_expr }}, '')))
-            )
-            or (
-                (
-                    (nullif(trim({{ first_expr }}), '') is null and nullif(trim({{ last_expr }}), '') is not null)
-                    or (nullif(trim({{ first_expr }}), '') is not null and nullif(trim({{ last_expr }}), '') is null)
-                )
-                and {{ mogov.has_person_name(first_expr, last_expr) }}
-            )
-            then null
-        else {{ company_expr }}
+        when not {{ mogov.company_is_person_name(company_expr, first_expr, last_expr, recipient_expr) }}
+            then {{ mogov.real_company(company_expr) }}
     end
 {%- endmacro %}
 
