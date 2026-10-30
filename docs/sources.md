@@ -730,6 +730,11 @@ Quirks:
   and is skipped (logged as `mo_revisor.section_page_refused`; a re-run tries it again). Three skipped in a row
   stop the load, since that is a real warning, and so does a total above max(20, 0.5% of the pages) however
   they are spread; the run ends with `mo_revisor.sections_skipped total=N`.
+- The site has also served its home page (the table of contents), with status 200 and no redirect, in place of
+  a listed section: 161.415 (bid 7908) on 2026-10-29, which read normally on the next request. A section
+  response without the content block is refused like the warning page (`Misserved`): retried after a minute,
+  never cached, and skipped and counted the same way if it persists. Before this check the home page was cached
+  for 180 days and every run failed with "section page without a content block".
 - Several versions of one section can be in force side by side: a later version with a future effective date
   (27.117 has one effective 28 Aug 2026 and one effective 1 Jul 2027), or conflicting enactments of the same
   year (`MultiEnact.aspx`). `fct_statute_sections.is_current` marks the in-force version with the latest
