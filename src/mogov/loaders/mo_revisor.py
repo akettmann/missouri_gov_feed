@@ -18,6 +18,7 @@ status and the history citations. Units: chapters, plus rx.aspx (owned by one sh
 import os
 import re
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
@@ -53,6 +54,11 @@ MAX_CONSECUTIVE_SKIPS = 3
 MIN_SKIPS_ALLOWED = 20
 MAX_SKIPPED_SHARE = 0.005
 REFUSED_MARKER = b"Recent accesses are tracked over a thirty second interval"
+# A section page's content block (header, body, footnotes) runs from CONTENT_START to the page footer. The site has
+# also served its home page, with 200 and no redirect, in place of a listed section (161.415, 2026-10); a section
+# response without the block is refused like the warning page, so it is retried and never cached.
+CONTENT_START = '<div style="margin:.1em 0em .4em .5em;">'
+CONTENT_END = '<div id="BOTTOM"'
 # A new enactment or amendment is a new version with its own bid (a new URL), found through the chapter lists,
 # which are re-read weekly. A version's page only changes with annotations, so it is re-read twice a year.
 SECTION_MAX_AGE = 180 * 86400
@@ -76,11 +82,21 @@ class Warned(Blocked):
     """The too-fast / no-such-page warning (not yet a block)."""
 
 
+class Misserved(Warned):
+    """Another page (the home page) served with 200 in place of the section asked for."""
+
+
 def _not_blocked(resp: httpx.Response) -> None:
     if resp.url.path.lower().endswith("/block.aspx"):
         raise Blocked(f"revisor.mo.gov blocked this IP address; stop and retry later ({resp.url})")
     if REFUSED_MARKER in resp.content:
         raise Warned(f"revisor.mo.gov answered with its too-fast / no-such-page warning for {resp.url}")
+
+
+def _section_served(resp: httpx.Response) -> None:
+    _not_blocked(resp)
+    if CONTENT_START.encode() not in resp.content:
+        raise Misserved(f"revisor.mo.gov served a page without a section content block for {resp.url}")
 
 
 def _get(
@@ -90,13 +106,18 @@ def _get(
 
 
 def _get_stamped(
-    url: str, params: dict | None = None, *, max_age: float = LIST_MAX_AGE, backoff: tuple[float, ...] | None = None
+    url: str,
+    params: dict | None = None,
+    *,
+    max_age: float = LIST_MAX_AGE,
+    backoff: tuple[float, ...] | None = None,
+    check: Callable[[httpx.Response], None] = _not_blocked,
 ) -> tuple[str, str]:
     """The page text and fetched_at: when its bytes came from revisor.mo.gov, as an ISO-8601 UTC string. A page
     served from the HTTP cache carries the time of the fetch that filled the cache, not the time it was reused."""
     for wait in (*(WARNING_BACKOFF if backoff is None else backoff), None):
         try:
-            page, fetched = fetch_stamped(url, params, max_age=max_age, min_interval=POLITE_DELAY, check=_not_blocked)
+            page, fetched = fetch_stamped(url, params, max_age=max_age, min_interval=POLITE_DELAY, check=check)
             return page.decode("utf-8", "replace"), datetime.fromtimestamp(fetched, UTC).isoformat(timespec="seconds")
         except Warned:
             if wait is None:
@@ -177,8 +198,8 @@ def parse_section(page: str) -> dict:
     html is the content block as served (header with title and effective line, body, footnotes); the
     other fields are its text, unparsed. text is the body's paragraphs separated by blank lines (table rows
     one per line, cells tab-separated)."""
-    start = page.find('<div style="margin:.1em 0em .4em .5em;">')
-    end = page.find('<div id="BOTTOM"', start)
+    start = page.find(CONTENT_START)
+    end = page.find(CONTENT_END, start)
     if start < 0 or end < 0:
         raise ValueError("section page without a content block")
     block = page[start:end]
@@ -276,7 +297,11 @@ def load(shard: db.Shard) -> dict[str, int]:
         for chapter, section, bid in versions:
             try:
                 page, fetched_at = _get_stamped(
-                    url, {"section": section, "bid": bid}, max_age=SECTION_MAX_AGE, backoff=SECTION_WARNING_BACKOFF
+                    url,
+                    {"section": section, "bid": bid},
+                    max_age=SECTION_MAX_AGE,
+                    backoff=SECTION_WARNING_BACKOFF,
+                    check=_section_served,
                 )
             except Warned:
                 skipped += 1

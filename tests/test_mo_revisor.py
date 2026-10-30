@@ -113,6 +113,44 @@ def test_speeding_warning_raises_and_is_not_cached(tmp_path, monkeypatch):
     assert not [p for p in tmp_path.iterdir() if not p.name.startswith(".")]
 
 
+SECTION_URL = "https://revisor.mo.gov/main/OneSection.aspx"
+
+
+def _serve(tmp_path, monkeypatch, answers: list[str]) -> list:
+    """Serve `answers` in turn (the last one repeats); returns the requests made."""
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url)
+        return httpx.Response(200, text=answers[min(len(calls), len(answers)) - 1])
+
+    monkeypatch.setattr(http, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(http, "_client", httpx.Client(transport=httpx.MockTransport(handler)))
+    monkeypatch.setattr(mo_revisor, "POLITE_DELAY", 0)
+    monkeypatch.setattr(mo_revisor.time, "sleep", lambda s: None)
+    monkeypatch.setattr(mo_revisor, "pause_host", lambda host, s: None)
+    return calls
+
+
+def test_home_page_served_for_a_section_is_refused_and_not_cached(tmp_path, monkeypatch):
+    # 161.415 bid 7908 once came back as the home page (table of contents), 200 and no redirect
+    _serve(tmp_path, monkeypatch, [read("home_excerpt.html")])
+    with pytest.raises(mo_revisor.Misserved):
+        mo_revisor._get_stamped(
+            SECTION_URL, {"section": "161.415", "bid": 7908}, backoff=(0,), check=mo_revisor._section_served
+        )
+    assert not [p for p in tmp_path.iterdir() if not p.name.startswith(".")]
+
+
+def test_home_page_served_for_a_section_is_retried(tmp_path, monkeypatch):
+    calls = _serve(tmp_path, monkeypatch, [read("home_excerpt.html"), read("section_1.010.html")])
+    page, _ = mo_revisor._get_stamped(
+        SECTION_URL, {"section": "1.010", "bid": 1}, backoff=(0,), check=mo_revisor._section_served
+    )
+    assert parse_section(page)["heading"]
+    assert len(calls) == 2
+
+
 def test_speeding_warning_backs_off_and_retries(tmp_path, monkeypatch):
     # a single warning (other traffic from the same IP counts) waits and retries instead of failing the load
     answers = ["<p>Recent accesses are tracked over a thirty second interval.</p>", "<html>the section</html>"]
@@ -245,6 +283,7 @@ def _loader_pages(monkeypatch, refused: set[str], n: int = 5):
     """Run mo_revisor.load on one chapter with sections 1.010, 1.020, ...; pages in `refused` get the warning."""
     sections = [(f"1.0{i}0", i) for i in range(1, n + 1)]
     added, fetched = _Added(), []
+    added.checks = {}
 
     class Sink:
         counts: ClassVar[dict] = {}
@@ -262,7 +301,8 @@ def _loader_pages(monkeypatch, refused: set[str], n: int = 5):
             added.append((table, key))
             added.payloads[(table, key)] = payload
 
-    def fake_get(url, params=None, *, max_age=None, backoff=None):
+    def fake_get(url, params=None, *, max_age=None, backoff=None, check=mo_revisor._not_blocked):
+        added.checks[url.rsplit("/", 1)[-1]] = check
         if params and "section" in params:
             fetched.append(params["section"])
             if params["section"] in refused:
@@ -278,6 +318,13 @@ def _loader_pages(monkeypatch, refused: set[str], n: int = 5):
     monkeypatch.setattr(mo_revisor, "parse_section", lambda page: {"html": "h"})
     monkeypatch.delenv("CLOUD_RUN_TASK_COUNT", raising=False)
     return added, fetched
+
+
+def test_only_section_pages_must_carry_a_content_block(monkeypatch):
+    added, _ = _loader_pages(monkeypatch, refused=set())
+    mo_revisor.load(mo_revisor.db.UNSHARDED)
+    assert added.checks["OneSection.aspx"] is mo_revisor._section_served
+    assert {added.checks[page] for page in ("Home.aspx", "rx.aspx", "OneChapter.aspx")} == {mo_revisor._not_blocked}
 
 
 def test_a_section_page_that_stays_refused_is_skipped_not_fatal(monkeypatch):
