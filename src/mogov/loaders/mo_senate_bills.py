@@ -85,6 +85,15 @@ class NotABillFragment(RuntimeError):
     """A bill-page tab fragment that is neither a document list nor the site's "none available" notice."""
 
 
+class UpstreamTabError(NotABillFragment):
+    """The site's own "Error loading <tab>: ... Status: 500" notice, served with HTTP 200 in place of the tab: its
+    backend failed for this bill (#872). Persistent per bill, not a block page."""
+
+    def __init__(self, message: str, status: int):
+        super().__init__(message)
+        self.status = status
+
+
 class TooManyRejectedFragments(RuntimeError):
     """Rejected fragments past the bound: the site is likely blocking us, so publish nothing from this shard."""
 
@@ -93,6 +102,20 @@ class TooManyRejectedFragments(RuntimeError):
 MAX_CONSECUTIVE_REJECTED = 3
 MAX_REJECTED_SHARE = 0.05
 MIN_REJECTED_BILLS = 3
+# The site's own per-bill errors (UpstreamTabError) have their own bound: they are steady (BillText only, 11 of
+# ~3,200 bills of 2017-2021, seen 2026-10), so they don't spend the block-page budget, but a site-wide fault
+# serving the notice for every bill still stops the shard: 10 bills in a row, or 5% (never fewer than 10).
+MAX_CONSECUTIVE_UPSTREAM = 10
+MIN_UPSTREAM_BILLS = 10
+# `<p ...>Error loading bill text: The HTTP status code of the response was not expected (500).\n\nStatus: 500\n
+# Response: \n{"title":"An unexpected error occurred.","status":500}</p>` (230 bytes, seen live 2026-10).
+UPSTREAM_ERROR = re.compile(rb"Error loading [^:<]{1,40}:.*?Status: (\d{3})", re.S)
+
+
+def _check_upstream_error(resp, tab: str) -> None:
+    if m := UPSTREAM_ERROR.search(resp.content):
+        status = int(m.group(1))
+        raise UpstreamTabError(f"{tab} tab: the site's own error (status {status}): {resp.url}", status)
 
 
 class NotABillList(RuntimeError):
@@ -125,6 +148,7 @@ def _is_doc_fragment(handler: str):
 
     def check(resp) -> None:
         if marker not in resp.content and not none.search(resp.content):
+            _check_upstream_error(resp, handler)
             raise NotABillFragment(f"not a {handler} fragment: {resp.url}")
 
     return check
@@ -133,6 +157,7 @@ def _is_doc_fragment(handler: str):
 def _is_actions_fragment(resp) -> None:
     """check= for the Actions tab: its container or its "none" notice, else an error or block page (not cached)."""
     if ACTIONS_MARKER not in resp.content and not ACTIONS_NONE.search(resp.content):
+        _check_upstream_error(resp, "Actions")
         raise NotABillFragment(f"not an Actions fragment: {resp.url}")
 
 
@@ -343,7 +368,7 @@ def load(shard: db.Shard) -> dict[str, int]:
     tables = [BILLS_TABLE, ACTIONS_TABLE, *(DOC_TABLES if docs else [])]
     with db.JsonSink(shard, source_url=LIST_URL, tables=tables) as sink:
         progress = obs.Progress("bills", len(units), log)
-        rejected_bills = consecutive = 0
+        rejected_bills = consecutive = upstream_bills = upstream_consecutive = 0
         for year, session, bill in units:
             key = bill_key(year, session, bill["billId"])
             params = _actions_params(year, bill)
@@ -367,14 +392,31 @@ def load(shard: db.Shard) -> dict[str, int]:
                 durl = f"{LIST_URL}?" + "&".join(f"{k}={v}" for k, v in dparams.items())
                 fetched.append((handler, DOC_PARSERS[handler](fragment), durl))
             for tab, e in skipped:
-                log.warning(
-                    "mo_senate_bills.fragment_rejected", year=year, session=session, bill_key=key, tab=tab, error=str(e)
-                )
-            if skipped:
+                if isinstance(e, UpstreamTabError):
+                    log.warning(
+                        "mo_senate_bills.upstream_tab_error",
+                        year=year,
+                        session=session,
+                        bill_key=key,
+                        tab=tab,
+                        status=e.status,
+                        error=str(e),
+                    )
+                else:
+                    log.warning(
+                        "mo_senate_bills.fragment_rejected",
+                        year=year,
+                        session=session,
+                        bill_key=key,
+                        tab=tab,
+                        error=str(e),
+                    )
+            # A site that starts serving block pages (or its own error for every bill) would otherwise skip every
+            # remaining bill and end the run "cleanly", and the sink would then replace the last good landing.
+            # Stop before publishing instead. Each kind counts bills against its own bound.
+            if any(not isinstance(e, UpstreamTabError) for _, e in skipped):
                 rejected_bills += 1
                 consecutive += 1
-                # A site that starts serving block pages would otherwise skip every remaining bill and end the run
-                # "cleanly", and the sink would then replace the last good landing. Stop before publishing instead.
                 if consecutive >= MAX_CONSECUTIVE_REJECTED or rejected_bills >= max(
                     MIN_REJECTED_BILLS, math.ceil(MAX_REJECTED_SHARE * len(units))
                 ):
@@ -384,6 +426,18 @@ def load(shard: db.Shard) -> dict[str, int]:
                     )
             else:
                 consecutive = 0
+            if any(isinstance(e, UpstreamTabError) for _, e in skipped):
+                upstream_bills += 1
+                upstream_consecutive += 1
+                if upstream_consecutive >= MAX_CONSECUTIVE_UPSTREAM or upstream_bills >= max(
+                    MIN_UPSTREAM_BILLS, math.ceil(MAX_REJECTED_SHARE * len(units))
+                ):
+                    raise TooManyRejectedFragments(
+                        f"{upstream_bills} of {len(units)} bills had a tab the site itself failed to serve "
+                        f"({upstream_consecutive} in a row, last {key}); nothing published"
+                    )
+            else:
+                upstream_consecutive = 0
             sink.add(
                 BILLS_TABLE,
                 key,

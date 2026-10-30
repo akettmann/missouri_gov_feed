@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+import structlog
 
 from mogov import db
 from mogov.loaders import mo_senate_bills as m
@@ -744,4 +745,98 @@ def test_the_share_limit_scales_with_the_list_49_of_1000_publish_50_raise(monkey
     assert m.load(db.Shard())[m.BILLS_TABLE] == 1000
     monkeypatch.setattr(m, "_get", _fake_get(_reject_ids(set(scattered), {"Actions"})))
     with pytest.raises(m.TooManyRejectedFragments):
+        m.load(db.Shard())
+
+
+# The site's own error in place of a tab (#872): HTTP 200, 230 bytes, served for 2017 SB 82 and 2019 SR 254's
+# BillText every time (captured live 2026-10-29).
+UPSTREAM_500 = (
+    "<p style='text-align: center; padding: 40px; color: #dc3545;'>Error loading bill text: The HTTP status code of"
+    " the response was not expected (500).\n\nStatus: 500\nResponse: \n"
+    '{"title":"An unexpected error occurred.","status":500}</p>'
+)
+
+
+def test_the_upstream_error_notice_is_the_real_230_byte_answer():
+    assert len(UPSTREAM_500.encode()) == 230
+
+
+@pytest.mark.parametrize("check", [m._is_actions_fragment, *(m._is_doc_fragment(h) for h in m.DOC_HANDLERS)])
+def test_the_sites_own_error_is_an_upstream_tab_error_with_its_status(check):
+    with pytest.raises(m.UpstreamTabError) as e:
+        check(_Resp(UPSTREAM_500))
+    assert e.value.status == 500
+    assert isinstance(e.value, m.NotABillFragment)  # still rejected, so never cached
+
+
+@pytest.mark.parametrize("bad", ["<html>Service unavailable</html>", "<p>Error loading page</p>", ""])
+def test_other_error_pages_stay_plain_rejections(bad):
+    with pytest.raises(m.NotABillFragment) as e:
+        m._is_doc_fragment("BillText")(_Resp(bad))
+    assert not isinstance(e.value, m.UpstreamTabError)
+
+
+def _fake_get_upstream(fails):
+    """_get stand-in: BillText of the bills in `fails` is the site's own error, run through the real check."""
+    plain = _fake_get(lambda p: False)
+
+    def fake_get(params, year, **kw):
+        if params.get("handler") == "BillText" and params["billId"] in fails:
+            kw["check"](_Resp(UPSTREAM_500))
+        return plain(params, year, **kw)
+
+    return fake_get
+
+
+def test_upstream_errors_do_not_spend_the_block_page_budget(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=True)
+    _many_bills(monkeypatch, 20)
+    # 3 in a row and 9 of 20 bills: either would stop the run as block pages
+    bad = {4, 5, 6, 9, 10, 11, 14, 15, 16}
+    monkeypatch.setattr(m, "_get", _fake_get_upstream(bad))
+    with structlog.testing.capture_logs() as logs:
+        counts = m.load(db.Shard())
+    assert counts[m.BILLS_TABLE] == 20
+    texts = {k.rsplit("/", 1)[0] for k in _keys(m.TEXTS_TABLE)}
+    assert texts and not {f"2025/R/{i}" for i in bad} & texts  # not fetched: no rows, never an empty answer
+    assert any(k.startswith("2025/R/4/") for k in _keys(m.SUMMARIES_TABLE))  # the bill's other tabs land
+    events = [x for x in logs if x["event"] == "mo_senate_bills.upstream_tab_error"]
+    assert len(events) == 9 and {x["status"] for x in events} == {500} and {x["tab"] for x in events} == {"BillText"}
+    assert not [x for x in logs if x["event"] == "mo_senate_bills.fragment_rejected"]
+
+
+def test_ten_upstream_errors_in_a_row_stop_the_run_nine_publish(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=True)
+    _many_bills(monkeypatch, 1000)  # 5% is 50, so only the run of bills in a row can trip
+    monkeypatch.setattr(m, "_get", _fake_get_upstream(set(range(100, 109))))
+    assert m.load(db.Shard())[m.BILLS_TABLE] == 1000
+    monkeypatch.setattr(m, "_get", _fake_get_upstream(set(range(100, 110))))
+    with pytest.raises(m.TooManyRejectedFragments, match="failed to serve"):
+        m.load(db.Shard())
+
+
+def test_upstream_errors_past_the_share_stop_the_run(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=True)
+    _many_bills(monkeypatch, 400)  # 5% is 20
+    scattered = [i * 15 for i in range(1, 21)]  # never adjacent
+    monkeypatch.setattr(m, "_get", _fake_get_upstream(set(scattered[:19])))
+    assert m.load(db.Shard())[m.BILLS_TABLE] == 400
+    monkeypatch.setattr(m, "_get", _fake_get_upstream(set(scattered)))
+    with pytest.raises(m.TooManyRejectedFragments, match="failed to serve"):
+        m.load(db.Shard())
+
+
+def test_block_pages_still_count_on_bills_that_also_had_an_upstream_error(monkeypatch, tmp_path):
+    _setup(monkeypatch, tmp_path, docs=True)
+    _many_bills(monkeypatch, 200)
+    upstream = _fake_get_upstream({7, 8, 9})
+    blocked = _fake_get(lambda p: p["billId"] in {7, 8, 9} and p["handler"] == "Amendments")
+
+    def fake_get(params, year, **kw):
+        if params.get("handler") == "BillText":
+            return upstream(params, year, **kw)
+        return blocked(params, year, **kw)
+
+    monkeypatch.setattr(m, "_get", fake_get)
+    with pytest.raises(m.TooManyRejectedFragments, match="rejected fragments"):
         m.load(db.Shard())
