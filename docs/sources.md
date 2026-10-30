@@ -595,6 +595,15 @@ Quirks:
   for a listed bill is a gap to check against the warnings, not evidence of no actions. If bills with rejected
   fragments reach 3 in a row, or 5% of the shard's bills (at least 3), the shard raises
   `TooManyRejectedFragments` and publishes nothing, so the previous landing stays.
+- For some bills the site's own backend fails on a tab, every time: the tab is answered HTTP 200 with a 230-byte
+  `<p ...>Error loading bill text: The HTTP status code of the response was not expected (500). Status: 500
+  Response: {"title":"An unexpected error occurred.","status":500}</p>` (#872). Seen only on BillText: 11 of ~3,200
+  bills of 2017-2021 (2017 SB 82, 197, 313, 326; 2019 SB 369, 374, SR 254; 2020 E1 SB 6; 2021 SB 351, SJR 2,
+  SR 22), as of 2026-10. It is rejected and not cached like any other bad fragment, so those bills have no
+  text-version rows ("not fetched", never "no text versions"), but it logs `mo_senate_bills.upstream_tab_error`
+  with the tab and the `status` instead of `fragment_rejected`, and it does not count toward the block-page bound
+  above. It has its own: 10 bills in a row, or 5% of the shard's bills (at least 10), raise
+  `TooManyRejectedFragments`, since the notice on every bill means the site is down, not one bill.
 - In the 2017 R list 561 of 604 bill objects have `session` = `"R "` with a trailing space (the loader's own
   `session_type` is clean).
 - `FiscalNotes` is sent with `sessionType=<session>` as the tab's own script does (the list page's
