@@ -1,6 +1,7 @@
 // Page-weight budgets for the big shared payloads in dist/ (checked by `pnpm sizes`, after `pnpm build`).
 // Sizes measured 2026-10 with the badge fix: lookup/districts.json ~1147 KB raw / ~309 KB gzipped;
-// awards/index.html 339 KB raw / 19 KB gzipped (753 KB / 28 KB before the repeated badges were dropped). Budgets leave ~30% headroom so normal data growth
+// awards/index.html 339 KB raw / 19 KB gzipped (753 KB / 28 KB before the repeated badges were dropped), grown to
+// 453 KB / 25 KB by 2026-10-29 as awards were added (budget raised then). Budgets leave ~30% headroom so normal data growth
 // passes but a payload that doubles (say, a repeated field added to every row) fails the build check.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
@@ -8,7 +9,7 @@ import { gzipSync } from "node:zlib";
 
 export const BUDGETS = [
   { file: "lookup/districts.json", maxRawKB: 1500, maxGzKB: 410 },
-  { file: "awards/index.html", maxRawKB: 450, maxGzKB: 25 },
+  { file: "awards/index.html", maxRawKB: 600, maxGzKB: 33 },
   // The largest RSMo section page (260.700, 69.6k characters of law text), measured 2026-10 (#840): ~74 KB raw /
   // ~18.5 KB gzipped. Only built when the statute exports are there; the "not loaded yet" build has no such page.
   {
