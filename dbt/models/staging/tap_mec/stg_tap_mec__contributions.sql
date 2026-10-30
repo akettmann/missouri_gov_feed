@@ -232,6 +232,7 @@ source_rows as (
             false
         ) as is_org_in_first_name,
         {{ mogov.person_name('first_name', 'last_name') }} as person_name,
+        coalesce(cmte_name, committee_name) as recipient_name,
         case
             when
                 ctrb_type = 'Individual'
@@ -255,6 +256,15 @@ select
         ctrb_name_without_zero,
         ctrb_name_clean,
         committee_clean,
+        -- 2020-2022 layout: a filled company is the donor and the name its contact person (#485)
+        case
+            when
+                ctrb_type is null
+                then {{ mogov.donor_company('company', 'first_name', 'last_name', 'recipient_name') }}
+        end,
+        case
+            when ctrb_type is null then {{ mogov.first_name_beside_address('company', 'first_name', 'last_name') }}
+        end,
         person_name,
         company_clean
     ) as contributor_name,
@@ -266,7 +276,9 @@ select
             ctrb_type,
             case
                 when committee_clean is not null then 'Committee'
-                when company_clean is not null then 'Organization'
+                -- a filled company is the donor unless it only repeats the person or the recipient (#485)
+                when {{ mogov.donor_company('company', 'first_name', 'last_name', 'recipient_name') }} is not null
+                    then 'Organization'
                 else 'Individual'
             end
         )
@@ -276,7 +288,11 @@ select
         when ctrb_type = 'Committee' then ctrb_name_clean
         when ctrb_type is null then committee_clean
     end as contributor_committee_name,
-    company as contributor_company,
+    -- 2020-2022 layout only: a company that repeats the person or the recipient is not a business (#485)
+    case
+        when ctrb_type is null then {{ mogov.donor_company('company', 'first_name', 'last_name', 'recipient_name') }}
+        else company
+    end as contributor_company,
     employer as contributor_employer,
     occupation as contributor_occupation,
     coalesce(city_clean, city) as contributor_city,

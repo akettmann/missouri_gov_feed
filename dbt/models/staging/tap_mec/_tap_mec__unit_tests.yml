@@ -59,6 +59,91 @@ unit_tests:
         - {mec_committee_id: C2, contributor_name: Acme Corp, contributor_type: Organization, contributor_committee_name: null, amount: 20}
         - {mec_committee_id: C2, contributor_name: John Doe, contributor_type: Individual, contributor_committee_name: null, amount: 10}
 
+  - name: tap_contributions_company_beside_person_name
+    model: stg_tap_mec__contributions
+    description: >
+      In the 2020-2022 layout (no ctrb_type) MEC's convention applies (#485): a filled company is the donor
+      (Organization, named for the company) and the first / last name is its contact person. Exceptions, typed
+      Individual with no employer: the company is the person's own name, a bare given name of a shifted row
+      (surname alone), or the recipient committee's name. A committee wins, the filler names ('x', 'PAC', '#N/A')
+      are not a person, and a row with ctrb_type (older layout) keeps its ctrb_type.
+    given:
+      - input: source('tap_mec', 'contributions')
+        format: sql
+        rows: |
+          select
+              cast(null as varchar) as cmte_id,
+              cast('C1' as varchar) as mecid,
+              cast('Friends of Jo Poe' as varchar) as cmte_name,
+              cast(null as varchar) as committee_name,
+              cast(null as varchar) as ctrb_name,
+              cast(null as varchar) as ctrb_type,
+              cast(null as varchar) as committee,
+              cast('Wendi' as varchar) as company,
+              cast('Wendi' as varchar) as first_name,
+              cast('Alper-Pressman' as varchar) as last_name,
+              cast(null as varchar) as address_1,
+              cast(null as varchar) as employer,
+              cast(null as varchar) as occupation,
+              cast(null as varchar) as city_clean,
+              cast(null as varchar) as city,
+              cast(null as varchar) as state_clean,
+              cast(null as varchar) as state,
+              cast('100' as varchar) as amount,
+              cast(null as varchar) as date,
+              cast(null as varchar) as year,
+              cast(null as varchar) as cont_type,
+              cast(null as varchar) as contribution_type,
+              cast(null as varchar) as rpt_type,
+              cast(null as varchar) as report,
+              cast('FALSE' as varchar) as dupe_flag,
+              cast(null as varchar) as txn,
+              cast('t1' as varchar) as cd1_a_id,
+              cast(null as varchar) as address_clean
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Acme Corp', '', '', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't2', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'McDonalds', '#N/A', '#N/A', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't3', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, ' Some PAC ', 'Hotel Co', 'Jo', 'Poe', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't4', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Dennis', 'Boling', '', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't5', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Hotel Co', 'Jo', 'Poe', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't6', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Poe, Jo', 'Jo', 'Poe', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't7', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Friends of Jo Poe', 'Jo', 'Poe', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't8', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Spire Missouri', 'x', 'x', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't9', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Evergy Power', 'PAC', '', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't10', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'N/A', 'Jo', 'Poe', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't11', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, 'Acme Corp', 'Corporation', '', 'Acme Corp', 'Jo', 'Poe', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't12', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Centene', 'x', '', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't13', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Cerner', '', 'PAC', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't14', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Vantage CU', 'Vantage CU', null, null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't15', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'ANC Properties', 'ANC Properties', 'ANC Properties', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't16', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Donn', 'Parsons', '700 12th Avenue South', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't17', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Rex A. Sinquefield', 'Rex', 'Sinquefield', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't18', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Dennis M. Jones', 'Dennis', 'Jones Jr', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't19', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'J. David', 'J David', 'Levy', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't20', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Individual', 'Tom', 'Wapelhorst', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't21', null
+    expect:
+      rows:
+        - {record_id: t1, contributor_name: Wendi Alper-Pressman, contributor_type: Individual, contributor_company: null}
+        - {record_id: t2, contributor_name: Acme Corp, contributor_type: Organization, contributor_company: Acme Corp}
+        - {record_id: t3, contributor_name: McDonalds, contributor_type: Organization, contributor_company: McDonalds}
+        - {record_id: t4, contributor_name: Some PAC, contributor_type: Committee, contributor_company: Hotel Co}
+        - {record_id: t5, contributor_name: Boling, contributor_type: Individual, contributor_company: null}
+        - {record_id: t6, contributor_name: Hotel Co, contributor_type: Organization, contributor_company: Hotel Co}
+        - {record_id: t7, contributor_name: Jo Poe, contributor_type: Individual, contributor_company: null}
+        - {record_id: t8, contributor_name: Jo Poe, contributor_type: Individual, contributor_company: null}
+        - {record_id: t9, contributor_name: Spire Missouri, contributor_type: Organization, contributor_company: Spire Missouri}
+        - {record_id: t10, contributor_name: Evergy Power, contributor_type: Organization, contributor_company: Evergy Power}
+        - {record_id: t11, contributor_name: Jo Poe, contributor_type: Individual, contributor_company: null}
+        - {record_id: t12, contributor_name: Acme Corp, contributor_type: Corporation, contributor_company: Acme Corp}
+        - {record_id: t13, contributor_name: Centene, contributor_type: Organization, contributor_company: Centene}
+        - {record_id: t14, contributor_name: Cerner, contributor_type: Organization, contributor_company: Cerner}
+        - {record_id: t15, contributor_name: Vantage CU, contributor_type: Organization, contributor_company: Vantage CU}
+        - {record_id: t16, contributor_name: ANC Properties, contributor_type: Organization, contributor_company: ANC Properties}
+        - {record_id: t17, contributor_name: Parsons, contributor_type: Individual, contributor_company: null}
+        - {record_id: t18, contributor_name: Rex Sinquefield, contributor_type: Individual, contributor_company: null}
+        - {record_id: t19, contributor_name: Dennis Jones Jr, contributor_type: Individual, contributor_company: null}
+        - {record_id: t20, contributor_name: J David Levy, contributor_type: Individual, contributor_company: null}
+        - {record_id: t21, contributor_name: Tom Wapelhorst, contributor_type: Individual, contributor_company: null}
+
   - name: tap_contributions_placeholder_names
     model: stg_tap_mec__contributions
     description: >

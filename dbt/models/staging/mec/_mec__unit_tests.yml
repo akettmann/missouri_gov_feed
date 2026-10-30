@@ -1,0 +1,90 @@
+# Unit tests for the MEC direct contributions staging model: fixed source rows -> exact expected rows.
+# The model is gated by var mec_direct, so these tests are too (run them with `mogov build` or --vars).
+version: 2
+
+unit_tests:
+  - name: mec_contributions_company_beside_person_name
+    model: stg_mec__contributions
+    config:
+      enabled: "{{ var('mec_direct', false) }}"
+    description: >
+      MEC's convention (#485): a filled company is the donor (Organization) and the first / last name is its
+      contact person, so the row is typed Organization and named for the company (a credit union's staff, a
+      business and its owner). Exceptions, typed Individual with no employer: the company is the person's own name
+      ("Natalie DiNicola", "DiNicola, Natalie"), a bare given name (a shifted row: surname alone in first_name,
+      or the first name repeated), or the recipient committee's own name. A committee wins over both. The filler
+      names ('x', 'PAC', '#N/A', 'Not applicable') are not a person, so the company is the donor, and a filler
+      company ('N/A') is no company.
+    given:
+      - input: source('mec', 'cd1_a')
+        format: sql
+        rows: |
+          select
+              cast('C1' as varchar) as mecid,
+              cast('Friends of Jo Poe' as varchar) as committee_name,
+              cast('Natalie' as varchar) as first_name,
+              cast('DiNicola' as varchar) as last_name,
+              cast('Natalie' as varchar) as company,
+              cast(null as varchar) as committee,
+              cast('retired' as varchar) as employer,
+              cast(null as varchar) as occupation,
+              cast(null as varchar) as city,
+              cast(null as varchar) as state,
+              cast('1' as varchar) as amount,
+              cast('1/2/2024 12:00:00 AM' as varchar) as date,
+              cast(null as varchar) as contribution_type,
+              cast(null as varchar) as report,
+              cast('r1' as varchar) as cd1_a_id
+          union all select 'C1', 'Friends of Jo Poe', 'Mary', 'Harmon', 'United Consumers CU', null, 'United Consumers CU', null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r2'
+          union all select 'C1', 'Friends of Jo Poe', 'Boling', null, 'Dennis', null, 'Self', null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r3'
+          union all select 'C1', 'Friends of Jo Poe', null, null, 'Acme Corp', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r4'
+          union all select 'C1', 'Friends of Jo Poe', '#N/A', '#N/A', 'McDonalds', null, '#N/A', null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r5'
+          union all select 'C1', 'Friends of Jo Poe', 'Not applicable', 'Not applicable', 'St. Clement of Rome', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r6'
+          union all select 'C1', 'Friends of Jo Poe', null, null, null, 'Some PAC', null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r7'
+          union all select 'C1', 'Friends of Jo Poe', 'Jane', 'Roe', null, null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r8'
+          union all select 'C1', 'Friends of Jo Poe', 'Natalie', 'DiNicola', 'DiNicola, Natalie', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r9'
+          union all select 'C1', 'Friends of Jo Poe', 'Natalie', 'DiNicola', 'Natalie DiNicola ', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r10'
+          union all select 'C1', 'Friends of Jo Poe', 'Jo', 'Poe', 'Friends of Jo Poe', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r11'
+          union all select 'C1', 'Friends of Jo Poe', 'x', 'x', 'Spire Missouri', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r12'
+          union all select 'C1', 'Friends of Jo Poe', 'PAC', null, 'Evergy Power', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r13'
+          union all select 'C1', 'Friends of Jo Poe', 'Jane', 'Roe', 'N/A', null, 'Lindbergh school district', null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r14'
+          union all select 'C1', 'Friends of Jo Poe', 'Nick', 'Hinrichs', 'Hinrichs Law Firm LLC', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r15'
+          union all select 'C1', 'Friends of Jo Poe', 'Fisher', null, 'Stephanie ', null, 'Retired', null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r16'
+          union all select 'C1', 'Friends of Jo Poe', 'x', null, 'Centene', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r17'
+          union all select 'C1', 'Friends of Jo Poe', null, 'PAC', 'Cerner', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r18'
+          union all select 'C1', 'Friends of Jo Poe', 'Vantage CU', null, 'Vantage CU', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r19'
+          union all select 'C1', 'Friends of Jo Poe', 'ANC Properties', 'ANC Properties', 'ANC Properties', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r20'
+          union all select 'C1', 'Friends of Jo Poe', 'Parsons', '700 12th Avenue South', 'Donn', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r21'
+          union all select 'C1', 'Friends of Jo Poe', 'Rex', 'Sinquefield', 'Rex A. Sinquefield', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r22'
+          union all select 'C1', 'Friends of Jo Poe', 'Dennis', 'Jones Jr', 'Dennis M. Jones', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r23'
+          union all select 'C1', 'Friends of Jo Poe', 'Ellen Y', 'Moceri', 'Ellen Y', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r24'
+          union all select 'C1', 'Friends of Jo Poe', 'Christopher Busken', 'Busken', 'Christopher', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r25'
+          union all select 'C1', 'Friends of Jo Poe', 'Tom', 'Wapelhorst', 'Individual', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r26'
+    expect:
+      rows:
+        - {record_id: r1, contributor_name: Natalie DiNicola, contributor_type: Individual, contributor_company: null}
+        - {record_id: r2, contributor_name: United Consumers CU, contributor_type: Organization, contributor_company: United Consumers CU}
+        - {record_id: r3, contributor_name: Boling, contributor_type: Individual, contributor_company: null}
+        - {record_id: r4, contributor_name: Acme Corp, contributor_type: Organization, contributor_company: Acme Corp}
+        - {record_id: r5, contributor_name: McDonalds, contributor_type: Organization, contributor_company: McDonalds}
+        - {record_id: r6, contributor_name: St. Clement of Rome, contributor_type: Organization, contributor_company: St. Clement of Rome}
+        - {record_id: r7, contributor_name: Some PAC, contributor_type: Committee, contributor_company: Some PAC}
+        - {record_id: r8, contributor_name: Jane Roe, contributor_type: Individual, contributor_company: null}
+        - {record_id: r9, contributor_name: Natalie DiNicola, contributor_type: Individual, contributor_company: null}
+        - {record_id: r10, contributor_name: Natalie DiNicola, contributor_type: Individual, contributor_company: null}
+        - {record_id: r11, contributor_name: Jo Poe, contributor_type: Individual, contributor_company: null}
+        - {record_id: r12, contributor_name: Spire Missouri, contributor_type: Organization, contributor_company: Spire Missouri}
+        - {record_id: r13, contributor_name: Evergy Power, contributor_type: Organization, contributor_company: Evergy Power}
+        - {record_id: r14, contributor_name: Jane Roe, contributor_type: Individual, contributor_company: null}
+        - {record_id: r15, contributor_name: Hinrichs Law Firm LLC, contributor_type: Organization, contributor_company: Hinrichs Law Firm LLC}
+        - {record_id: r16, contributor_name: Fisher, contributor_type: Individual, contributor_company: null}
+        - {record_id: r17, contributor_name: Centene, contributor_type: Organization, contributor_company: Centene}
+        - {record_id: r18, contributor_name: Cerner, contributor_type: Organization, contributor_company: Cerner}
+        - {record_id: r19, contributor_name: Vantage CU, contributor_type: Organization, contributor_company: Vantage CU}
+        - {record_id: r20, contributor_name: ANC Properties, contributor_type: Organization, contributor_company: ANC Properties}
+        - {record_id: r21, contributor_name: Parsons, contributor_type: Individual, contributor_company: null}
+        - {record_id: r22, contributor_name: Rex Sinquefield, contributor_type: Individual, contributor_company: null}
+        - {record_id: r23, contributor_name: Dennis Jones Jr, contributor_type: Individual, contributor_company: null}
+        - {record_id: r24, contributor_name: Ellen Y Moceri, contributor_type: Individual, contributor_company: null}
+        - {record_id: r25, contributor_name: Christopher Busken Busken, contributor_type: Individual, contributor_company: null}
+        - {record_id: r26, contributor_name: Tom Wapelhorst, contributor_type: Individual, contributor_company: null}
