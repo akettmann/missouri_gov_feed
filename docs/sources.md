@@ -808,10 +808,14 @@ the candidate↔committee crosswalk per election, and lobbyist expenditures.
 - Shard units: (report type, year), crosswalk years, the lobbyist export.
 
 Quirks:
-- A `company` can sit beside a person's first and last name: people who list an employer (a credit union's
-  staff with the credit union as company, or the first name repeated in `company`). A company alone makes the
-  donor an Organization; a company beside a name is still an Individual (#485). The `#N/A` and `Not
-  applicable` filler names are not a person, so the company stays the donor.
+- A `company` can sit beside a person's first and last name (a credit union's staff with the credit union as
+  company, a business and its owner, the first name repeated in `company`). MEC's own convention, kept here (#485):
+  a filled company is the donor (Organization, named for the company) and the first / last name is its contact
+  person. The company is not the donor, and the row is an Individual with no employer from the company, when it
+  only repeats the person (their own name as "Natalie DiNicola" or "DiNicola, Natalie"), is a bare given name
+  (a shifted row: surname alone in `first_name`, given name in `company`), or is the recipient committee's own
+  name. A filled `committee` still makes a Committee. Filler names (`x`, `PAC`, `#N/A`, `Not applicable`,
+  one-character values) are not a person, and filler companies (`N/A`, `NONE`, digits only) are no company.
 - ASP.NET WebForms: each postback must carry the `__VIEWSTATE` of the page it came from. An export
   answers with a file, not a page. Posting from the export body used to lose the view state, so MEC
   silently returned its generic page. Every election after the first in a year then landed the site
@@ -868,8 +872,10 @@ Cleaned MEC contributions, expenditures and lobbyist expenditures from TAP's pub
 - Lands: `tap_mec_contributions`, `tap_mec_expenditures`, `tap_mec_lobbyist_expenditures`.
 
 Quirks:
-- The 2020-2022 layout types the donor by which columns are filled, as the direct MEC export does: a company
-  beside a first or last name is the person's employer, so the donor is an Individual (#485).
+- The 2020-2022 layout has no `ctrb_type`, so the donor is typed by the same rule as the direct MEC export: a
+  filled company is the donor (Organization) and the first / last name its contact person, unless the company only
+  repeats the person or the recipient committee (then an Individual, #485). The older layout keeps its
+  `ctrb_type`.
 - Coverage ends in 2022.
 - Column names are TAP's, not MEC's.
 - Some rows are malformed, so they're read with `ignore_errors` and without strict mode. The quote and

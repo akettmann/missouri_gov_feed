@@ -111,6 +111,8 @@ unit_tests:
           union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Evergy Power', 'PAC', '', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't10', null
           union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'N/A', 'Jo', 'Poe', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't11', null
           union all select null, 'C1', 'Friends of Jo Poe', null, 'Acme Corp', 'Corporation', '', 'Acme Corp', 'Jo', 'Poe', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't12', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Centene', 'x', '', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't13', null
+          union all select null, 'C1', 'Friends of Jo Poe', null, null, null, '', 'Cerner', '', 'PAC', null, null, null, null, null, null, null, '1', null, null, null, null, null, null, null, null, 't14', null
     expect:
       rows:
         - {record_id: t1, contributor_name: Wendi Alper-Pressman, contributor_type: Individual, contributor_company: null}
@@ -125,6 +127,8 @@ unit_tests:
         - {record_id: t10, contributor_name: Evergy Power, contributor_type: Organization, contributor_company: Evergy Power}
         - {record_id: t11, contributor_name: Jo Poe, contributor_type: Individual, contributor_company: null}
         - {record_id: t12, contributor_name: Acme Corp, contributor_type: Corporation, contributor_company: Acme Corp}
+        - {record_id: t13, contributor_name: Centene, contributor_type: Organization, contributor_company: Centene}
+        - {record_id: t14, contributor_name: Cerner, contributor_type: Organization, contributor_company: Cerner}
 
   - name: tap_contributions_placeholder_names
     model: stg_tap_mec__contributions

@@ -50,6 +50,8 @@ unit_tests:
           union all select 'C1', 'Friends of Jo Poe', 'Jane', 'Roe', 'N/A', null, 'Lindbergh school district', null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r14'
           union all select 'C1', 'Friends of Jo Poe', 'Nick', 'Hinrichs', 'Hinrichs Law Firm LLC', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r15'
           union all select 'C1', 'Friends of Jo Poe', 'Fisher', null, 'Stephanie ', null, 'Retired', null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r16'
+          union all select 'C1', 'Friends of Jo Poe', 'x', null, 'Centene', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r17'
+          union all select 'C1', 'Friends of Jo Poe', null, 'PAC', 'Cerner', null, null, null, null, null, '2', '1/2/2024 12:00:00 AM', null, null, 'r18'
     expect:
       rows:
         - {record_id: r1, contributor_name: Natalie DiNicola, contributor_type: Individual, contributor_company: null}
@@ -68,3 +70,5 @@ unit_tests:
         - {record_id: r14, contributor_name: Jane Roe, contributor_type: Individual, contributor_company: null}
         - {record_id: r15, contributor_name: Hinrichs Law Firm LLC, contributor_type: Organization, contributor_company: Hinrichs Law Firm LLC}
         - {record_id: r16, contributor_name: Fisher, contributor_type: Individual, contributor_company: null}
+        - {record_id: r17, contributor_name: Centene, contributor_type: Organization, contributor_company: Centene}
+        - {record_id: r18, contributor_name: Cerner, contributor_type: Organization, contributor_company: Cerner}
