@@ -1,6 +1,6 @@
 # Frontend principles
 
-Goal: help a voter see measurable lean and potential conflicts of interest for their Missouri officials.
+Goal: A site to undo all of the intentional and institutional obfuscation and misdirection so that all citizens can get a direct understanding of if a politician is likely working for the citizenry or for themselves, an external benefactor, a corporate overlord, whatever.
 Show evidence, not verdicts. The MVP is built in `frontend/`; build and refresh steps are in docs/environment.md
 and docs/sync.md. Open work is tracked in GitHub issues labeled `Frontend`.
 
